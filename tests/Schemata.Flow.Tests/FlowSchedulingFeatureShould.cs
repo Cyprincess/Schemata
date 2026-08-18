@@ -11,6 +11,7 @@ using Schemata.Flow.Scheduling.Internal;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
+using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Scheduling.Foundation.Internal;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -36,11 +37,10 @@ public sealed class FlowSchedulingFeatureShould
                  .Returns(Task.CompletedTask);
 
         await using var services = CreateServices(scheduler);
-        var advisor = Assert.Single(services.GetServices<IFlowTransitionAdvisor>());
+        var handler = Assert.Single(services.GetServices<IFlowCatchHandler>());
 
-        var result = await advisor.AdviseAsync(new AdviceContext(services), Context(), CancellationToken.None);
+        await handler.ArmAsync(Context(), CancellationToken.None);
 
-        Assert.Equal(AdviseResult.Continue, result);
         Assert.NotNull(scheduled);
         Assert.Equal("flow-p1-timer-t1", scheduled!.Name);
         Assert.Equal(FlowTimerJob.JobKey, scheduled.JobKey);

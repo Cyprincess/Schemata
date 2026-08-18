@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using Schemata.Flow.Skeleton;
 using System;
 using System.Collections.Generic;
@@ -128,7 +129,9 @@ public class FlowRunnerIdempotencyShould
                       .BuildServiceProvider();
 
         var notifier = new ProcessLifecycleNotifier([], Mock.Of<ILogger<ProcessLifecycleNotifier>>());
-        return new(registry.Object, new ProcessPersistence(), notifier, services);
+        return new(registry.Object, new ProcessPersistence(), notifier, services,
+                   services.GetRequiredService<IServiceScopeFactory>(),
+                   Options.Create(new SchemataFlowOptions()));
     }
 
     private static Mock<IRepository<T>> Repository<T>(params T[] items)

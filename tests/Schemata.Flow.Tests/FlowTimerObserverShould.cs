@@ -8,6 +8,7 @@ using Schemata.Flow.Scheduling.Internal;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
+using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Scheduling.Foundation.Internal;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -39,8 +40,7 @@ public class FlowTimerObserverShould
         services.AddSingleton(scheduler.Object);
         services.AddSingleton<IScheduledJobRegistry, DefaultScheduledJobRegistry>();
         var provider = services.BuildServiceProvider();
-        var advisor  = new AdviceTransitionTimer(provider);
-        var advice   = new AdviceContext(provider);
+        var handler = new FlowTimerCatchHandler(provider);
 
         var definition = new ProcessDefinition();
         definition.Elements.Add(new FlowEvent {
@@ -56,8 +56,8 @@ public class FlowTimerObserverShould
 
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.AdviseAsync(advice, Context(process, definition, "timer-a"));
-        await advisor.AdviseAsync(advice, Context(process, definition, "timer-b"));
+        await handler.ArmAsync(Context(process, definition, "timer-a"));
+        await handler.ArmAsync(Context(process, definition, "timer-b"));
 
         Assert.Equal(2, scheduled.Count);
         Assert.Equal(2, scheduled.Distinct().Count());
@@ -80,8 +80,7 @@ public class FlowTimerObserverShould
         var services = new ServiceCollection().AddSingleton(scheduler.Object)
                                               .AddSingleton<IScheduledJobRegistry, DefaultScheduledJobRegistry>()
                                               .BuildServiceProvider();
-        var advisor  = new AdviceTransitionTimer(services);
-        var advice   = new AdviceContext(services);
+        var handler = new FlowTimerCatchHandler(services);
 
         var host = new UserTask { Name = "review" };
         var boundary = new FlowEvent {
@@ -97,7 +96,7 @@ public class FlowTimerObserverShould
         definition.Elements.Add(nested);
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.AdviseAsync(advice, Context(process, definition, null, "review"));
+        await handler.ArmAsync(Context(process, definition, null, "review"));
 
         var scheduled = Assert.Single(jobs);
         Assert.Contains("review-timeout", scheduled.Name);
@@ -106,17 +105,18 @@ public class FlowTimerObserverShould
     [Fact]
     public async SystemTask NonTimerTransition_WithoutScheduler_PassesThrough() {
         var provider = new ServiceCollection().BuildServiceProvider();
-        var advisor  = new AdviceTransitionTimer(provider);
-        var advice   = new AdviceContext(provider);
+        var handler  = new FlowTimerCatchHandler(provider);
 
         var definition = new ProcessDefinition();
         definition.Elements.Add(new FlowEvent { Name = "catch-msg", Position = EventPosition.IntermediateCatch });
 
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        var result = await advisor.AdviseAsync(advice, Context(process, definition, "catch-msg"));
+        // A transition touching no timer catch must not reach the scheduler, so its absence is fine.
+        var exception = await Record.ExceptionAsync(
+            async () => await handler.ArmAsync(Context(process, definition, "catch-msg")));
 
-        Assert.Equal(AdviseResult.Continue, result);
+        Assert.Null(exception);
     }
 
     private static FlowTransitionContext Context(

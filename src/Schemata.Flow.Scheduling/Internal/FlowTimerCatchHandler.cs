@@ -6,37 +6,36 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
-using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Common;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
+using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 
 namespace Schemata.Flow.Scheduling.Internal;
 
 /// <summary>
-///     Schedules and cancels jobs for BPMN intermediate and boundary timer catches as instances transition.
-///     Only timer-catch transitions touch the scheduler; such a transition raises
-///     <c>FAILED_PRECONDITION</c> when the <see cref="IScheduler" /> service is absent, while
-///     transitions outside timer catches pass through untouched.
+///     Delivers timer catches through the scheduler. Schedules and cancels jobs for BPMN intermediate
+///     and boundary timer catches as instances transition; a transition that touches no timer catch
+///     never reaches the scheduler.
 /// </summary>
-public sealed class AdviceTransitionTimer : IFlowTransitionAdvisor
+public sealed class FlowTimerCatchHandler : IFlowCatchHandler
 {
     private readonly IServiceProvider _services;
 
-    /// <summary>Creates an advisor that schedules Flow timer jobs through the service provider.</summary>
-    public AdviceTransitionTimer(IServiceProvider services) {
+    /// <summary>Creates a handler that schedules Flow timer jobs through the service provider.</summary>
+    public FlowTimerCatchHandler(IServiceProvider services) {
         _services = services;
     }
 
-    #region IFlowTransitionAdvisor Members
+    #region IFlowCatchHandler Members
 
-    public int Order => 0;
+    public bool Handles(FlowCatchKind kind) { return kind is FlowCatchKind.Timer; }
 
-    public async Task<AdviseResult> AdviseAsync(AdviceContext ctx, FlowTransitionContext context, CancellationToken ct = default) {
+    public async ValueTask ArmAsync(FlowTransitionContext context, CancellationToken ct = default) {
         var process    = context.Snapshot.Process;
         var token      = context.Token;
         var definition = context.Definition;
@@ -74,9 +73,11 @@ public sealed class AdviceTransitionTimer : IFlowTransitionAdvisor
         }
 
         if (previousTimerJobs.Count == 0 && timers.Count == 0) {
-            return AdviseResult.Continue;
+            return;
         }
 
+        // The scheduler is this handler's own dependency, so its absence is reported here rather than
+        // inferred by the runtime from which packages happen to be installed.
         var scheduler = _services.GetService<IScheduler>();
         if (scheduler is null) {
             throw new FailedPreconditionException(
@@ -94,8 +95,6 @@ public sealed class AdviceTransitionTimer : IFlowTransitionAdvisor
             var (timerJob, timerVariables) = CreateTimerJob(process, token.CanonicalName, elementName, timerDefinition, jobKey);
             await scheduler.ScheduleAsync(timerJob, timerVariables, ct);
         }
-
-        return AdviseResult.Continue;
     }
 
     #endregion

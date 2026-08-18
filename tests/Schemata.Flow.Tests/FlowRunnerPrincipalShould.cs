@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using Schemata.Flow.Skeleton;
 using System;
 using System.Collections.Generic;
@@ -23,7 +24,7 @@ namespace Schemata.Flow.Tests;
 public class FlowRunnerPrincipalShould
 {
     [Fact]
-    public async Task Start_Exposes_Principal_To_Execution_Context_And_Transition_Advisor() {
+    public async Task Start_Exposes_Principal_To_Execution_Context_And_Catch_Handler() {
         var principal = new ClaimsPrincipal(new ClaimsIdentity("test"));
         var harness   = CreateHarness();
 
@@ -80,11 +81,11 @@ public class FlowRunnerPrincipalShould
         var registry = new Mock<IProcessRegistry>();
         registry.Setup(r => r.GetRegistration("principal-process")).Returns(registration);
 
-        var advisor = new Mock<IFlowTransitionAdvisor>();
-        advisor.Setup(a => a.AdviseAsync(It.IsAny<AdviceContext>(), It.IsAny<FlowTransitionContext>(), It.IsAny<CancellationToken>()))
-               .Returns((AdviceContext _, FlowTransitionContext context, CancellationToken _) => {
+        var handler = new Mock<IFlowCatchHandler>();
+        handler.Setup(h => h.ArmAsync(It.IsAny<FlowTransitionContext>(), It.IsAny<CancellationToken>()))
+               .Returns((FlowTransitionContext context, CancellationToken _) => {
                    harness.CapturedContext = context;
-                   return Task.FromResult(AdviseResult.Continue);
+                   return ValueTask.CompletedTask;
                });
 
         var existing = new SchemataProcess {
@@ -106,12 +107,14 @@ public class FlowRunnerPrincipalShould
                       .AddSingleton(transitions.Object)
                       .AddSingleton(sources.Object)
                       .AddSingleton(compensations.Object)
-                      .AddSingleton(advisor.Object)
+                      .AddSingleton(handler.Object)
                       .AddKeyedSingleton<IFlowRuntime>(FlowConstants.Engines.StateMachine, engine.Object)
                       .BuildServiceProvider();
 
         var notifier = new ProcessLifecycleNotifier([], Mock.Of<ILogger<ProcessLifecycleNotifier>>());
-        harness.Runner = new FlowRunner(registry.Object, new ProcessPersistence(), notifier, services);
+        harness.Runner = new FlowRunner(registry.Object, new ProcessPersistence(), notifier, services,
+                                        services.GetRequiredService<IServiceScopeFactory>(),
+                                        Options.Create(new SchemataFlowOptions()));
         return harness;
     }
 

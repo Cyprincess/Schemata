@@ -11,7 +11,6 @@ using Schemata.Event.Skeleton.Entities;
 using Schemata.Flow.Event.Internal;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Integration.Tests.Fixtures;
-using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Builders;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
@@ -29,7 +28,7 @@ public sealed class BridgeBehaviorShould : IClassFixture<EfCoreFlowFixture>
 
     [Fact]
     public async Task Forward_Typed_Bus_Payload_To_The_Addressed_Message_Token() {
-        _fixture.FlowOptions.Bridges.Add(SchemataFlowOptions.EventsBridge);
+        _fixture.CatchKinds.Add(FlowCatchKind.Message);
 
         using (var scope = _fixture.CreateScope()) {
             var registry = scope.ServiceProvider.GetRequiredService<IProcessRegistry>();

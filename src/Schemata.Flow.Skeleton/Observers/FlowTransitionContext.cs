@@ -4,7 +4,10 @@ using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Observers;
 
-/// <summary>Per-transition payload handed to <see cref="IFlowTransitionAdvisor" />.</summary>
+/// <summary>
+///     Per-transition payload handed to <c>IFlowCatchHandler.ArmAsync</c> and to
+///     <see cref="IFlowSourceAdvisor{TSource}" />.
+/// </summary>
 public class FlowTransitionContext
 {
     /// <summary>The active process definition. May be <c>null</c> during termination of a deregistered process.</summary>

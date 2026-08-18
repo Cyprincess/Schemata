@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Concurrent;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
+using Moq;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
@@ -38,7 +41,7 @@ public sealed class TimerBridgeFixture : IAsyncLifetime
     private SqliteConnection? _connection;
     private ServiceProvider?  _root;
 
-    public RecordingTransitionAdvisor Spy { get; } = new();
+    public ConcurrentQueue<TransitionRecord> Observed { get; } = new();
 
     #region IAsyncLifetime Members
 
@@ -76,7 +79,17 @@ public sealed class TimerBridgeFixture : IAsyncLifetime
 
         ConfigureFeature(new SchemataSchedulingFeature(), services);
         ConfigureFeature(new SchemataFlowSchedulingFeature(), services);
-        services.AddSingleton<IFlowTransitionAdvisor>(Spy);
+        // Claims no catch kind, so it never satisfies the has-an-owner check: it is here only to
+        // record the transitions the timer path produces.
+        var spy = new Mock<IFlowCatchHandler>();
+        spy.Setup(handler => handler.Handles(It.IsAny<FlowCatchKind>())).Returns(false);
+        spy.Setup(handler => handler.ArmAsync(It.IsAny<FlowTransitionContext>(), It.IsAny<CancellationToken>()))
+           .Returns((FlowTransitionContext context, CancellationToken _) => {
+               Observed.Enqueue(new(context.Snapshot.Process.CanonicalName!, context.Token.CanonicalName,
+                                    context.PreviousWaitingAtName));
+               return ValueTask.CompletedTask;
+           });
+        services.AddSingleton(spy.Object);
 
         _root = services.BuildServiceProvider();
 

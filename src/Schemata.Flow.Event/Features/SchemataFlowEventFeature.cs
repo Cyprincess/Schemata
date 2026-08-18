@@ -33,8 +33,7 @@ public sealed class SchemataFlowEventFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        services.Configure<SchemataFlowOptions>(options => options.Bridges.Add(SchemataFlowOptions.EventsBridge));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowTransitionAdvisor, AdviceTransitionEvent>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowCatchHandler, FlowEventCatchHandler>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IProcessLifecycleObserver, ProcessEventLifecycleObserver>());
         services.TryAddScoped<IEventHandler<IEvent>, FlowEventHandler>();
 

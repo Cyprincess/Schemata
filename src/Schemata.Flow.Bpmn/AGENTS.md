@@ -11,7 +11,7 @@ Full BPMN 2.0.2 multi-token engine. `BpmnEngine` implements `IFlowRuntime` and `
 | `BpmnEngine.cs` | Stateless orchestrator (singleton, no per-process fields). Executes `ProcedureTaskBase` with StateMachine parity; declares `Capabilities = FlowRuntimeCapabilities.All`. Compensation bindings travel on `ProcessSnapshot.CompensationBindings` and are restored from `FlowExecutionContext` on load |
 | `BpmnValidator.cs` | Static structural validator (no DI); validates procedure-task payloads and rejects `AdHocSubProcess` / `LinkDefinition` / `MultipleDefinition` outright |
 | `BpmnFlowEngineValidator.cs` | Adapts `BpmnValidator` to `IFlowEngineValidator` (TryAddEnumerable) |
-| `Features/SchemataFlowBpmnFeature.cs` | `[DependsOn<SchemataFlowFeature>]`; registers keyed singletons under `SchemataConstants.FlowEngines.Bpmn` |
+| `Features/SchemataFlowBpmnFeature.cs` | `[DependsOn<SchemataFlowFeature>]`; registers keyed singletons under `FlowConstants.Engines.Bpmn` |
 | `Extensions/FlowBpmnBuilderExtensions.cs` | `UseBpmn()` on `SchemataFlowBuilder` |
 | `Runtime/Boundary/` | `CompensationBoundaryHandler`, `EscalationBoundaryHandler` (uses Skeleton scope-chain indexes for escalation/error routing; BPMN 2.0.2 §10.5.1 / §10.5.6 / §13.5.3), `NonInterruptingBoundaryHandler` (sibling spawn, host stays live) |
 | `Runtime/Compensation/` | `ICompensationHandler`, `BoundaryCompensationHandler`, `CompensationThrowHandler` (targeted = reverse snapshot scan; global = `CompensationCoordinator`), `CompensationCoordinator` (reverse registration order, first failure stops), `CompensationStack` (scope-local LIFO rebuilt from persisted bindings on each throw), `CompensationInvocationContext`, `CompensationResult` |
@@ -38,7 +38,7 @@ Full BPMN 2.0.2 multi-token engine. `BpmnEngine` implements `IFlowRuntime` and `
 - `ProcedureTaskBase` executes here with StateMachine parity: the engine builds a `FlowTaskContext` per token, awaits `InvokeAsync`, then resolves the outgoing auto-flow; an unresolvable auto-flow parks the token at the procedure name.
 - The engine declares `FlowRuntimeCapabilities.All`; `ProcessRegistry` rejects definitions whose shapes exceed the selected engine's declared capabilities at registration, and both validators reject inert AST (`AdHocSubProcess`, `LinkDefinition`, `MultipleDefinition`) — no silent degradation.
 - Static gateway handlers take no DI dependencies.
-- DI registration: keyed singleton `IFlowRuntime` under `SchemataConstants.FlowEngines.Bpmn` (engine key `"bpmn"`).
+- DI registration: keyed singleton `IFlowRuntime` under `FlowConstants.Engines.Bpmn` (engine key `"bpmn"`).
 
 ## ANTI-PATTERNS / GOTCHAS
 

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using Schemata.Flow.Skeleton;
 using System;
 using System.Collections.Generic;
@@ -69,7 +70,9 @@ public class FlowRunnerPayloadShould
                       .BuildServiceProvider();
 
         var notifier = new ProcessLifecycleNotifier([], Mock.Of<ILogger<ProcessLifecycleNotifier>>());
-        var runner   = new FlowRunner(registry.Object, new ProcessPersistence(), notifier, services);
+        var runner = new FlowRunner(registry.Object, new ProcessPersistence(), notifier, services,
+                                    services.GetRequiredService<IServiceScopeFactory>(),
+                                    Options.Create(new SchemataFlowOptions()));
         var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "greet-process" };
 
         await runner.CorrelateAsync(process, "Greet", """{"gReEtInG":"hello","cOuNt":3}""", null, null, CancellationToken.None);

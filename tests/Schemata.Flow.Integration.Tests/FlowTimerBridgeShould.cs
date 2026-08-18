@@ -60,7 +60,7 @@ public sealed class FlowTimerBridgeShould : IClassFixture<TimerBridgeFixture>
     }
 
     [Fact]
-    public async Task Run_Transition_Advisors_On_The_Timer_Triggered_Path() {
+    public async Task Arm_Catch_Handlers_On_The_Timer_Triggered_Path() {
         var process = await StartAsync(nameof(ParallelTimerProcess));
 
         var jobs      = await ReadJobsAsync(process.CanonicalName!);
@@ -69,7 +69,7 @@ public sealed class FlowTimerBridgeShould : IClassFixture<TimerBridgeFixture>
 
         await FireAsync(job);
 
-        var observed = _fixture.Spy.Observed
+        var observed = _fixture.Observed
                                .Where(record => record.Process == process.CanonicalName)
                                .ToList();
         Assert.Contains(observed, record => record.Token == tokenName && record.PreviousWaitingAtName is "timer-a" or "timer-b");

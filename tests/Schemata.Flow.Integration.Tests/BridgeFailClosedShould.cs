@@ -1,3 +1,6 @@
+using Moq;
+using Schemata.Event.Skeleton.Entities;
+using Schemata.Flow.Skeleton;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -5,13 +8,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Integration.Tests.Fixtures;
-using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
@@ -27,125 +28,134 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
     public BridgeFailClosedShould(EfCoreFlowFixture fixture) { _fixture = fixture; }
 
     public static IEnumerable<object[]> MixedGatewayCases => [
-        [FlowConstants.Engines.StateMachine, Array.Empty<string>(), "message-catch", "UseEvent()"],
-        [FlowConstants.Engines.Bpmn, Array.Empty<string>(), "message-catch", "UseEvent()"],
-        [FlowConstants.Engines.StateMachine, new[] { SchemataFlowOptions.EventsBridge }, "timer-catch", "UseScheduling()"],
-        [FlowConstants.Engines.Bpmn, new[] { SchemataFlowOptions.EventsBridge }, "timer-catch", "UseScheduling()"],
-        [FlowConstants.Engines.StateMachine, new[] { SchemataFlowOptions.TimersBridge }, "message-catch", "UseEvent()"],
-        [FlowConstants.Engines.Bpmn, new[] { SchemataFlowOptions.TimersBridge }, "message-catch", "UseEvent()"],
+        [FlowConstants.Engines.StateMachine, Array.Empty<FlowCatchKind>(), "message-catch", FlowCatchKind.Message],
+        [FlowConstants.Engines.Bpmn, Array.Empty<FlowCatchKind>(), "message-catch", FlowCatchKind.Message],
+        [FlowConstants.Engines.StateMachine, new[] { FlowCatchKind.Message }, "timer-catch", FlowCatchKind.Timer],
+        [FlowConstants.Engines.Bpmn, new[] { FlowCatchKind.Message }, "timer-catch", FlowCatchKind.Timer],
+        [FlowConstants.Engines.StateMachine, new[] { FlowCatchKind.Timer }, "message-catch", FlowCatchKind.Message],
+        [FlowConstants.Engines.Bpmn, new[] { FlowCatchKind.Timer }, "message-catch", FlowCatchKind.Message],
     ];
 
     [Fact]
-    public void UseEvent_Declares_Events_Bridge() {
+    public void UseEvent_Registers_A_Handler_For_Message_And_Signal_Catches() {
         var builder = WebApplication.CreateBuilder();
         builder.UseSchemata(schema => schema.UseFlow().UseEvent());
+
+        // The handler persists subscriptions, so a host without a persistence provider must still
+        // supply the repository it depends on.
+        builder.Services.AddSingleton(Mock.Of<IRepository<SchemataEventSubscription>>());
         using var services = builder.Services.BuildServiceProvider();
 
-        var options = services.GetRequiredService<IOptions<SchemataFlowOptions>>().Value;
-        Assert.Contains(SchemataFlowOptions.EventsBridge, options.Bridges);
+        var handlers = services.GetServices<IFlowCatchHandler>().ToList();
+
+        Assert.Contains(handlers, handler => handler.Handles(FlowCatchKind.Message));
+        Assert.Contains(handlers, handler => handler.Handles(FlowCatchKind.Signal));
+        Assert.DoesNotContain(handlers, handler => handler.Handles(FlowCatchKind.Timer));
     }
 
     [Fact]
-    public void UseScheduling_Declares_Timers_Bridge() {
+    public void UseScheduling_Registers_A_Handler_For_Timer_Catches() {
         var builder = WebApplication.CreateBuilder();
         builder.UseSchemata(schema => schema.UseFlow().UseScheduling());
         using var services = builder.Services.BuildServiceProvider();
 
-        var options = services.GetRequiredService<IOptions<SchemataFlowOptions>>().Value;
-        Assert.Contains(SchemataFlowOptions.TimersBridge, options.Bridges);
+        var handlers = services.GetServices<IFlowCatchHandler>().ToList();
+
+        Assert.Contains(handlers, handler => handler.Handles(FlowCatchKind.Timer));
+        Assert.DoesNotContain(handlers, handler => handler.Handles(FlowCatchKind.Message));
     }
 
     [Theory]
-    [InlineData(typeof(BpmnDirectMessageBridgeProcess), SchemataFlowOptions.EventsBridge, "message-catch", "UseEvent()")]
-    [InlineData(typeof(BpmnDirectTimerBridgeProcess), SchemataFlowOptions.TimersBridge, "timer-catch", "UseScheduling()")]
-    public async Task Start_Direct_Bpmn_Catch_Without_Bridge_Throws(
-        Type   definition,
-        string bridge,
-        string catchName,
-        string activation
+    [InlineData(typeof(BpmnDirectMessageBridgeProcess), FlowCatchKind.Message, "message-catch")]
+    [InlineData(typeof(BpmnDirectTimerBridgeProcess), FlowCatchKind.Timer, "timer-catch")]
+    public async Task Start_Direct_Bpmn_Catch_WithNoHandlerForItsKind_Throws(
+        Type          definition,
+        FlowCatchKind kind,
+        string        catchName
     ) {
-        ConfigureBridges();
+        ConfigureCatchKinds();
         var process = await RegisterAsync(definition, FlowConstants.Engines.Bpmn);
 
         var exception = await Assert.ThrowsAsync<FailedPreconditionException>(async () => await StartAsync(process));
 
+        // The diagnostic names the catch and its kind; it must not name the package that supplies one.
         Assert.Contains(catchName, exception.Message);
-        Assert.Contains(activation, exception.Message);
-        Assert.DoesNotContain(bridge, _fixture.FlowOptions.Bridges);
+        Assert.Contains(kind.ToString(), exception.Message);
+        Assert.DoesNotContain(kind, _fixture.CatchKinds);
     }
 
     [Theory]
     [MemberData(nameof(MixedGatewayCases))]
-    public async Task Start_Mixed_Event_Gateway_With_A_Missing_Bridge_Throws(
-        string   engine,
-        string[] bridges,
-        string   catchName,
-        string   activation
+    public async Task Start_Mixed_Event_Gateway_WithAnUnhandledKind_Throws(
+        string          engine,
+        FlowCatchKind[] handled,
+        string          catchName,
+        FlowCatchKind   unhandled
     ) {
-        ConfigureBridges(bridges);
+        ConfigureCatchKinds(handled);
         var process = await RegisterAsync(typeof(MixedGatewayBridgeProcess), engine);
 
         var exception = await Assert.ThrowsAsync<FailedPreconditionException>(async () => await StartAsync(process));
 
         Assert.Contains(catchName, exception.Message);
-        Assert.Contains(activation, exception.Message);
+        Assert.Contains(unhandled.ToString(), exception.Message);
     }
 
     [Theory]
     [InlineData(FlowConstants.Engines.StateMachine)]
     [InlineData(FlowConstants.Engines.Bpmn)]
     public async Task Start_Boundary_Timer_Without_Scheduling_Bridge_Throws(string engine) {
-        ConfigureBridges();
+        ConfigureCatchKinds();
         var process = await RegisterAsync(typeof(BoundaryTimerBridgeProcess), engine);
 
         var exception = await Assert.ThrowsAsync<FailedPreconditionException>(async () => await StartAsync(process));
 
         Assert.Contains("boundary-timer", exception.Message);
-        Assert.Contains("UseScheduling()", exception.Message);
+        Assert.Contains(nameof(FlowCatchKind.Timer), exception.Message);
     }
 
     [Theory]
     [InlineData(FlowConstants.Engines.StateMachine)]
     [InlineData(FlowConstants.Engines.Bpmn)]
     public async Task Start_Event_Gateway_Without_Event_Bridge_Throws(string engine) {
-        ConfigureBridges();
+        ConfigureCatchKinds();
         var process = await RegisterAsync(typeof(MessageGatewayBridgeProcess), engine);
 
         var exception = await Assert.ThrowsAsync<FailedPreconditionException>(async () => await StartAsync(process));
 
         Assert.Contains("start-message", exception.Message);
-        Assert.Contains("UseEvent()", exception.Message);
+        Assert.Contains(nameof(FlowCatchKind.Message), exception.Message);
     }
 
     [Theory]
     [InlineData(FlowConstants.Engines.StateMachine)]
     [InlineData(FlowConstants.Engines.Bpmn)]
     public async Task Trigger_Repark_Without_Event_Bridge_Throws(string engine) {
-        ConfigureBridges(SchemataFlowOptions.EventsBridge);
+        ConfigureCatchKinds(FlowCatchKind.Message);
         var process = await RegisterAsync(typeof(ReparkAfterTriggerBridgeProcess), engine);
         var started = await StartAsync(process);
 
-        ConfigureBridges();
+        ConfigureCatchKinds();
         var exception = await Assert.ThrowsAsync<FailedPreconditionException>(async () =>
             await CorrelateAsync(started, "first-message"));
 
         Assert.Contains("second-message", exception.Message);
-        Assert.Contains("UseEvent()", exception.Message);
+        Assert.Contains(nameof(FlowCatchKind.Message), exception.Message);
 
         var token = await ReadTokenAsync(started.Name!);
         Assert.Equal("first-gateway", token.WaitingAtName);
     }
 
     [Theory]
-    [InlineData(typeof(BpmnDirectMessageBridgeProcess), FlowConstants.Engines.Bpmn, SchemataFlowOptions.EventsBridge, "message-catch")]
-    [InlineData(typeof(BpmnDirectTimerBridgeProcess), FlowConstants.Engines.Bpmn, SchemataFlowOptions.TimersBridge, "timer-catch")]
+    [InlineData(typeof(BpmnDirectMessageBridgeProcess), FlowConstants.Engines.Bpmn, FlowCatchKind.Message, "message-catch")]
+    [InlineData(typeof(BpmnDirectTimerBridgeProcess), FlowConstants.Engines.Bpmn, FlowCatchKind.Timer, "timer-catch")]
     public async Task Start_Direct_Bpmn_Catch_With_Its_Bridge_Parks(
-        Type   definition,
-        string engine,
-        string bridge,
-        string waitingAt
+        Type          definition,
+        string        engine,
+        FlowCatchKind kind,
+        string        waitingAt
     ) {
-        ConfigureBridges(bridge);
+        ConfigureCatchKinds(kind);
         var process = await RegisterAsync(definition, engine);
         var started = await StartAsync(process);
 
@@ -157,7 +167,7 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
     [InlineData(FlowConstants.Engines.StateMachine)]
     [InlineData(FlowConstants.Engines.Bpmn)]
     public async Task Start_Mixed_Event_Gateway_With_Both_Bridges_Parks(string engine) {
-        ConfigureBridges(SchemataFlowOptions.EventsBridge, SchemataFlowOptions.TimersBridge);
+        ConfigureCatchKinds(FlowCatchKind.Message, FlowCatchKind.Timer);
         var process = await RegisterAsync(typeof(MixedGatewayBridgeProcess), engine);
         var started = await StartAsync(process);
 
@@ -169,7 +179,7 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
     [InlineData(FlowConstants.Engines.StateMachine)]
     [InlineData(FlowConstants.Engines.Bpmn)]
     public async Task Start_Boundary_Timer_With_Scheduling_Bridge_Remains_Active(string engine) {
-        ConfigureBridges(SchemataFlowOptions.TimersBridge);
+        ConfigureCatchKinds(FlowCatchKind.Timer);
         var process = await RegisterAsync(typeof(BoundaryTimerBridgeProcess), engine);
         var started = await StartAsync(process);
 
@@ -183,7 +193,7 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
     [InlineData(FlowConstants.Engines.StateMachine)]
     [InlineData(FlowConstants.Engines.Bpmn)]
     public async Task Trigger_Repark_With_Event_Bridge_Persists(string engine) {
-        ConfigureBridges(SchemataFlowOptions.EventsBridge);
+        ConfigureCatchKinds(FlowCatchKind.Message);
         var process = await RegisterAsync(typeof(ReparkAfterTriggerBridgeProcess), engine);
         var started = await StartAsync(process);
 
@@ -193,10 +203,10 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
         Assert.True(token.WaitingAtName is "second-gateway" or "second-message");
     }
 
-    private void ConfigureBridges(params string[] bridges) {
-        _fixture.FlowOptions.Bridges.Clear();
-        foreach (var bridge in bridges) {
-            _fixture.FlowOptions.Bridges.Add(bridge);
+    private void ConfigureCatchKinds(params FlowCatchKind[] kinds) {
+        _fixture.CatchKinds.Clear();
+        foreach (var kind in kinds) {
+            _fixture.CatchKinds.Add(kind);
         }
     }
 

@@ -30,8 +30,7 @@ public sealed class SchemataFlowSchedulingFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        services.Configure<SchemataFlowOptions>(options => options.Bridges.Add(SchemataFlowOptions.TimersBridge));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowTransitionAdvisor, AdviceTransitionTimer>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowCatchHandler, FlowTimerCatchHandler>());
         services.AddScheduledJob<FlowTimerJob>();
     }
 }

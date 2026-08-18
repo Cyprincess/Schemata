@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Moq;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
 using Schemata.Common;
@@ -163,7 +164,11 @@ public sealed class OwnedSourceFixture : IAsyncLifetime
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryBuildQueryAdvisor<>), typeof(AdviceBuildQueryOwner<>)));
 
         services.AddOptions<SchemataFlowOptions>();
-        services.Configure<SchemataFlowOptions>(options => options.Bridges.Add(SchemataFlowOptions.TimersBridge));
+
+        var timers = new Mock<IFlowCatchHandler>();
+        timers.Setup(handler => handler.Handles(It.IsAny<FlowCatchKind>()))
+              .Returns<FlowCatchKind>(kind => kind is FlowCatchKind.Timer);
+        services.AddSingleton(timers.Object);
 
         services.TryAddSingleton<IProcessRegistry, ProcessRegistry>();
         services.TryAddSingleton<ProcessPersistence>();

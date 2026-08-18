@@ -24,36 +24,4 @@ public class ProcessDefinitionLabelWireShould
         Assert.Equal("display_names", fields["DisplayNames"].Name);
         Assert.Equal("descriptions", fields["Descriptions"].Name);
     }
-
-    private static ProcessDefinitionInfo Sample() {
-        return new() {
-            CanonicalName = "definitions/orders",
-            DisplayName   = "Approval",
-            DisplayNames  = new() { ["zh-Hans"] = "审批" },
-            Descriptions  = new() { ["zh-Hans"] = "把请求路由给审批人。" },
-            Elements = [
-                new() {
-                    Name         = "Approval",
-                    Kind         = nameof(UserTask),
-                    DisplayName  = "Approval task",
-                    DisplayNames = new() { ["zh-Hans"] = "审批任务" },
-                },
-            ],
-            Flows = [
-                new() {
-                    Source       = "Approval",
-                    Target       = "Done",
-                    DisplayName  = "Over limit",
-                    DisplayNames = new() { ["zh-Hans"] = "金额超限" },
-                },
-            ],
-            Messages = [
-                new() {
-                    Name         = "nudge",
-                    DisplayName  = "Nudge",
-                    DisplayNames = new() { ["zh-Hans"] = "催办消息" },
-                },
-            ],
-        };
-    }
 }

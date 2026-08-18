@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Options;
+using Schemata.Flow.Skeleton;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -156,7 +158,9 @@ public class FlowTransportSourceBindingShould
 
             services.AddKeyedSingleton<IFlowRuntime>("StateMachine", runtime ?? DefaultRuntime());
             Services = services.BuildServiceProvider();
-            Runner = new(Registry.Object, new(), Notifier(), Services);
+            Runner = new(Registry.Object, new(), Notifier(), Services,
+                         Services.GetRequiredService<IServiceScopeFactory>(),
+                         Options.Create(new SchemataFlowOptions()));
         }
 
         public Order Order { get; }

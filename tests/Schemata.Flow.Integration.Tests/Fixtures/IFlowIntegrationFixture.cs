@@ -24,11 +24,11 @@ public interface IFlowIntegrationFixture
 internal static class FlowFixtureServices
 {
     internal static void AddResourceTypeResolver(IServiceCollection services, params Type[] resourceTypes) {
-        services.Configure<SchemataResourceOptions>(options => {
-            foreach (var resourceType in resourceTypes) {
-                options.Resources[resourceType.TypeHandle] = new(resourceType);
-            }
-        });
+        var registry = new ResourceRegistry();
+        foreach (var resourceType in resourceTypes) {
+            registry.Add(new(resourceType), []);
+        }
+        services.TryAddSingleton<IResourceRegistry>(registry);
         services.TryAddSingleton<IResourceTypeResolver, DefaultResourceTypeResolver>();
     }
 

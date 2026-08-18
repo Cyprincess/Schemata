@@ -11,21 +11,22 @@ using Schemata.Flow.Event.Internal;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
+using Schemata.Flow.Skeleton.Runtime;
 using Xunit;
 using SystemTask = System.Threading.Tasks.Task;
 
 namespace Schemata.Flow.Tests;
 
-public class AdviceTransitionEventShould
+public class FlowEventCatchHandlerShould
 {
     [Fact]
     public async SystemTask AddsSubscription_WhenEnteringMessageCatch() {
         var rows    = new List<SchemataEventSubscription>();
-        var advisor = new AdviceTransitionEvent(Repository(rows).Object);
+        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
 
         var (definition, process) = MessageCatchSetup();
 
-        await advisor.AdviseAsync(Advice(), Context(process, definition, "catch-msg"));
+        await advisor.ArmAsync(Context(process, definition, "catch-msg"));
 
         var row = Assert.Single(rows);
         Assert.Equal("flow:processes/p1:catch-msg:processes/p1/tokens/t1", row.SubscriptionId);
@@ -37,7 +38,7 @@ public class AdviceTransitionEventShould
     [Fact]
     public async SystemTask AddsSubscription_WithNullCorrelation_WhenEnteringSignalCatch() {
         var rows    = new List<SchemataEventSubscription>();
-        var advisor = new AdviceTransitionEvent(Repository(rows).Object);
+        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
 
         var definition = new ProcessDefinition();
         definition.Elements.Add(new FlowEvent {
@@ -47,7 +48,7 @@ public class AdviceTransitionEventShould
         });
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.AdviseAsync(Advice(), Context(process, definition, "catch-sig"));
+        await advisor.ArmAsync(Context(process, definition, "catch-sig"));
 
         var row = Assert.Single(rows);
         Assert.Null(row.CorrelationKey);
@@ -65,14 +66,12 @@ public class AdviceTransitionEventShould
                 Target         = "processes/p1",
             },
         };
-        var advisor = new AdviceTransitionEvent(Repository(rows).Object);
+        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
 
         var (definition, process) = MessageCatchSetup();
         process.State             = "Completed";
 
-        await advisor.AdviseAsync(
-            Advice(),
-            Context(process, definition, null, "catch-msg"));
+        await advisor.ArmAsync(Context(process, definition, null, "catch-msg"));
 
         Assert.Empty(rows);
     }
@@ -88,11 +87,11 @@ public class AdviceTransitionEventShould
                 Target         = "stale-target",
             },
         };
-        var advisor = new AdviceTransitionEvent(Repository(rows).Object);
+        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
 
         var (definition, process) = MessageCatchSetup();
 
-        await advisor.AdviseAsync(Advice(), Context(process, definition, "catch-msg"));
+        await advisor.ArmAsync(Context(process, definition, "catch-msg"));
 
         var row = Assert.Single(rows);
         Assert.Equal("payment", row.EventType);
@@ -103,7 +102,7 @@ public class AdviceTransitionEventShould
     [Fact]
     public async SystemTask AddsSubscription_ForMessageCatchNestedInSubProcess() {
         var rows    = new List<SchemataEventSubscription>();
-        var advisor = new AdviceTransitionEvent(Repository(rows).Object);
+        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
 
         var catchEvent = new FlowEvent {
             Name       = "payment-catch",
@@ -116,7 +115,7 @@ public class AdviceTransitionEventShould
         definition.Elements.Add(nested);
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.AdviseAsync(Advice(), Context(process, definition, "payment-catch"));
+        await advisor.ArmAsync(Context(process, definition, "payment-catch"));
 
         var row = Assert.Single(rows);
         Assert.Equal("processes/p1/tokens/t1", row.Token);
@@ -126,7 +125,7 @@ public class AdviceTransitionEventShould
     [Fact]
     public async SystemTask AddsSubscriptionPerBranch_WhenEnteringEventBasedGateway() {
         var rows    = new List<SchemataEventSubscription>();
-        var advisor = new AdviceTransitionEvent(Repository(rows).Object);
+        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
 
         var pay = new FlowEvent {
             Name       = "catch-pay",
@@ -149,7 +148,7 @@ public class AdviceTransitionEventShould
 
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.AdviseAsync(Advice(), Context(process, definition, "gw"));
+        await advisor.ArmAsync(Context(process, definition, "gw"));
 
         Assert.Equal(2, rows.Count);
         Assert.Contains(rows, r => r is { SubscriptionId: "flow:processes/p1:catch-pay:processes/p1/tokens/t1", CorrelationKey: "processes/p1" });
@@ -161,13 +160,13 @@ public class AdviceTransitionEventShould
         var rows       = new List<SchemataEventSubscription>();
         var repository = Repository(rows);
         var uow        = Mock.Of<IUnitOfWork>();
-        var advisor    = new AdviceTransitionEvent(repository.Object);
+        var advisor    = new FlowEventCatchHandler(repository.Object);
 
         var (definition, process) = MessageCatchSetup();
         var context               = Context(process, definition, "catch-msg");
         context.UnitOfWork        = uow;
 
-        await advisor.AdviseAsync(Advice(), context);
+        await advisor.ArmAsync(context);
 
         repository.Verify(r => r.Join(uow), Times.Once);
         repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
@@ -176,12 +175,12 @@ public class AdviceTransitionEventShould
     [Fact]
     public async SystemTask AddsBoundarySubscription_WhenActiveAtHostActivity() {
         var rows    = new List<SchemataEventSubscription>();
-        var advisor = new AdviceTransitionEvent(Repository(rows).Object);
+        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
 
         var (definition, host, boundary) = BoundarySetup(new Message { Name = "payment" });
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.AdviseAsync(Advice(), Context(process, definition, null, stateName: host.Name));
+        await advisor.ArmAsync(Context(process, definition, null, stateName: host.Name));
 
         var row = Assert.Single(rows);
         Assert.Equal($"flow:processes/p1:{boundary.Name}:processes/p1/tokens/t1", row.SubscriptionId);
@@ -193,12 +192,12 @@ public class AdviceTransitionEventShould
     [Fact]
     public async SystemTask AddsBoundarySubscription_WithNullCorrelation_ForSignalCatch() {
         var rows    = new List<SchemataEventSubscription>();
-        var advisor = new AdviceTransitionEvent(Repository(rows).Object);
+        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
 
         var (definition, host, boundary) = BoundarySetup(new Signal { Name = "shutdown" });
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.AdviseAsync(Advice(), Context(process, definition, null, stateName: host.Name));
+        await advisor.ArmAsync(Context(process, definition, null, stateName: host.Name));
 
         var row = Assert.Single(rows);
         Assert.Equal($"flow:processes/p1:{boundary.Name}:broadcast", row.SubscriptionId);
@@ -216,16 +215,14 @@ public class AdviceTransitionEventShould
                 Target         = "processes/p1",
             },
         };
-        var advisor = new AdviceTransitionEvent(Repository(rows).Object);
+        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
 
         var (definition, host, _) = BoundarySetup(new Message { Name = "payment" });
         var next = new UserTask { Name = "next" };
         definition.Elements.Add(next);
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.AdviseAsync(
-            Advice(),
-            Context(process, definition, null, stateName: next.Name, previousStateName: host.Name));
+        await advisor.ArmAsync(Context(process, definition, null, stateName: next.Name, previousStateName: host.Name));
 
         Assert.Empty(rows);
     }
@@ -233,14 +230,12 @@ public class AdviceTransitionEventShould
     [Fact]
     public async SystemTask DoesNotAddBoundarySubscription_WhenTokenNotActive() {
         var rows    = new List<SchemataEventSubscription>();
-        var advisor = new AdviceTransitionEvent(Repository(rows).Object);
+        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
 
         var (definition, host, _) = BoundarySetup(new Message { Name = "payment" });
         var process = new SchemataProcess { CanonicalName = "processes/p1", State = "Completed" };
 
-        await advisor.AdviseAsync(
-            Advice(),
-            Context(process, definition, null, stateName: host.Name, status: "Completed"));
+        await advisor.ArmAsync(Context(process, definition, null, stateName: host.Name, status: "Completed"));
 
         Assert.Empty(rows);
     }
@@ -248,18 +243,14 @@ public class AdviceTransitionEventShould
     [Fact]
     public async SystemTask DoesNotAddBoundarySubscription_ForNonBusEventDefinitions() {
         var rows    = new List<SchemataEventSubscription>();
-        var advisor = new AdviceTransitionEvent(Repository(rows).Object);
+        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
 
         var (definition, host, _) = BoundarySetup(new ErrorDefinition { Name = "Boom" });
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.AdviseAsync(Advice(), Context(process, definition, null, stateName: host.Name));
+        await advisor.ArmAsync(Context(process, definition, null, stateName: host.Name));
 
         Assert.Empty(rows);
-    }
-
-    private static AdviceContext Advice() {
-        return new(new ServiceCollection().BuildServiceProvider());
     }
 
     private static FlowTransitionContext Context(

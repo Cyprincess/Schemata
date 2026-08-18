@@ -16,13 +16,18 @@ src/Schemata.Flow.Skeleton/
                   sub-processes: SubProcess (abstract), Embedded, Event, Transaction, CallActivity, AdHoc
                   loops: StandardLoopCharacteristics, MultiInstanceLoopCharacteristics
   Runtime/        contracts + shared helpers
-                  IFlowRuntime (Capabilities), FlowRuntimeCapabilities, IFlowEngineValidator, IProcessRegistry, IProcessLifecycleObserver, IFlowTransitionAdvisor, FlowTransitionContext
+                  IFlowRuntime (Capabilities), FlowRuntimeCapabilities, IFlowEngineValidator, IProcessRegistry, IProcessLifecycleObserver
+                  IFlowCatchHandler (FlowCatchKind): declares the catch kinds it delivers, and arms them through ArmAsync inside the transition's unit of work; Flow.Event and Flow.Scheduling each register one
                   TokenFactory, TokenAggregator, TokenSnapshotFactory, FlowResolver (state-machine engine only)
                   FlowSourceDescriptor, ProcessStates, ISourceCondition, SourceStringConditionExpression, FlowExecutionContext (TouchedSources, LoadedCompensationBindings)
+  Observers/      FlowTransitionContext, shared by both per-transition contracts
+                  IFlowTransitionAdvisor: IAdvisor<FlowTransitionContext>, the general per-transition extension point — ordered, runs before arming, rejects by throwing
+                  IFlowSourceAdvisor<TSource>: IAdvisor<FlowTransitionContext, TSource> for advisors that read the entity bound to the process or token
   Entities/       SchemataProcess, SchemataProcessToken, SchemataProcessTransition, SchemataProcessSource, SchemataProcessCompensation
                   token states: Active / Waiting / Completed / Failed / Cancelled / Compensating / Compensated
   Builders/       engine-neutral fluent DSL: ProcessBuilder, ActivityBehavior, BoundaryCatch, Branch, EventBranch, FlowBranch, InclusiveBranch, InclusiveMerge, ParallelFork, ParallelJoin, StartFlow, FlowSourceBindingBuilder
   Utilities/      ProcessDefinitionExtensions, ProcessScopeMap, ProcessStructureValidator
+  FlowConstants.cs  flow-domain constants; FlowConstants.Engines holds the keyed IFlowRuntime names ("statemachine", "bpmn")
 ```
 
 ## WHERE TO LOOK

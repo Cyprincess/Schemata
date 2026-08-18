@@ -1,11 +1,6 @@
 using System;
-using System.Collections.Concurrent;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Xml;
-using Schemata.Abstractions.Advisors;
 using Schemata.Flow.Skeleton.Models;
-using Schemata.Flow.Skeleton.Observers;
 
 namespace Schemata.Flow.Integration.Tests.Fixtures;
 
@@ -83,22 +78,6 @@ public sealed class SourceTimerProcess : ProcessDefinition
         Flows.Add(new() { Source = timer, Target = apply });
         Flows.Add(new() { Source = apply, Target = end });
     }
-}
-
-public sealed class RecordingTransitionAdvisor : IFlowTransitionAdvisor
-{
-    public ConcurrentQueue<TransitionRecord> Observed { get; } = new();
-
-    #region IFlowTransitionAdvisor Members
-
-    public int Order => 100;
-
-    public Task<AdviseResult> AdviseAsync(AdviceContext ctx, FlowTransitionContext context, CancellationToken ct = default) {
-        Observed.Enqueue(new(context.Snapshot.Process.CanonicalName!, context.Token.CanonicalName, context.PreviousWaitingAtName));
-        return Task.FromResult(AdviseResult.Continue);
-    }
-
-    #endregion
 }
 
 public sealed record TransitionRecord(string Process, string Token, string? PreviousWaitingAtName);

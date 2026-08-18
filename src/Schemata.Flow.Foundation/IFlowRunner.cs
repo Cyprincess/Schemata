@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -125,7 +126,11 @@ public interface IFlowRunner
     /// <param name="token">Restricts delivery to a single token; <see langword="null" /> delivers to every waiting target.</param>
     /// <param name="principal">The principal the request runs as.</param>
     /// <param name="ct">A cancellation token.</param>
-    ValueTask ThrowSignalAsync(
+    /// <returns>
+    ///     One entry per candidate process, ordered by canonical name. Each target commits
+    ///     independently, so the caller reads this to learn which targets landed and which did not.
+    /// </returns>
+    ValueTask<IReadOnlyList<SignalDeliveryResult>> ThrowSignalAsync(
         string            signalName,
         string?           payload,
         string?           token,
@@ -139,7 +144,11 @@ public interface IFlowRunner
     /// <param name="token">Restricts delivery to a single token; <see langword="null" /> delivers to every waiting target.</param>
     /// <param name="principal">The principal the request runs as.</param>
     /// <param name="ct">A cancellation token.</param>
-    ValueTask ThrowSignalAsync(
+    /// <returns>
+    ///     One entry per candidate process, ordered by canonical name. Each target commits
+    ///     independently, so the caller reads this to learn which targets landed and which did not.
+    /// </returns>
+    ValueTask<IReadOnlyList<SignalDeliveryResult>> ThrowSignalAsync(
         string            signalName,
         object?           payload,
         string?           token,

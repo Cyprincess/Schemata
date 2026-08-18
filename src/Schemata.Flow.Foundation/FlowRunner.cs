@@ -26,10 +26,12 @@ namespace Schemata.Flow.Foundation;
 
 /// <summary>Executes Flow runtime operations and persists their results.</summary>
 public sealed class FlowRunner(
-    IProcessRegistry         registry,
-    ProcessPersistence       persistence,
-    ProcessLifecycleNotifier notifier,
-    IServiceProvider         services
+    IProcessRegistry                registry,
+    ProcessPersistence              persistence,
+    ProcessLifecycleNotifier        notifier,
+    IServiceProvider                services,
+    IServiceScopeFactory            scopes,
+    IOptions<SchemataFlowOptions>   options
 ) : IFlowRunner
 {
     private static readonly ConcurrentDictionary<Type, ISourceWorker?> SourceWorkers = new();
@@ -111,7 +113,7 @@ public sealed class FlowRunner(
             var before = WaitingMap(tokens);
             var ctx    = await CreateExecutionContextAsync(scope, process, principal, c);
             snapshot = await engine.AdvanceAsync(reg.Definition, process, tokens, ctx, token, c);
-            EnsureBridgeRequirements(reg.Definition, snapshot);
+            EnsureCatchesHaveHandlers(reg.Definition, snapshot);
             await RunAdvisorsAsync(reg, scope, ctx, snapshot, before, c);
             await persistence.PersistSnapshotAsync(scope, snapshot, c);
         }, ct);
@@ -215,7 +217,7 @@ public sealed class FlowRunner(
                 : token;
             var before = WaitingMap(tokens);
             snapshot = await engine.TriggerAsync(reg.Definition, process, tokens, ctx, trigger, payload, tokenName, c);
-            EnsureBridgeRequirements(reg.Definition, snapshot);
+            EnsureCatchesHaveHandlers(reg.Definition, snapshot);
             await RunAdvisorsAsync(reg, scope, ctx, snapshot, before, c);
             await persistence.PersistSnapshotAsync(scope, snapshot, c);
         }, ct);
@@ -225,28 +227,28 @@ public sealed class FlowRunner(
     }
 
     /// <summary>Broadcasts a signal to waiting processes.</summary>
-    public async ValueTask ThrowSignalAsync(
+    public async ValueTask<IReadOnlyList<SignalDeliveryResult>> ThrowSignalAsync(
         string           signalName,
         string?          payload,
         string?          token,
         ClaimsPrincipal? principal,
         CancellationToken ct
     ) {
-        await ThrowSignalCoreAsync(signalName, payload, token, principal, ct, true);
+        return await ThrowSignalCoreAsync(signalName, payload, token, principal, ct, true);
     }
 
     /// <summary>Broadcasts a signal with a typed payload to waiting processes.</summary>
-    public async ValueTask ThrowSignalAsync(
+    public async ValueTask<IReadOnlyList<SignalDeliveryResult>> ThrowSignalAsync(
         string           signalName,
         object?          payload,
         string?          token,
         ClaimsPrincipal? principal,
         CancellationToken ct
     ) {
-        await ThrowSignalCoreAsync(signalName, payload, token, principal, ct, false);
+        return await ThrowSignalCoreAsync(signalName, payload, token, principal, ct, false);
     }
 
-    private async ValueTask ThrowSignalCoreAsync(
+    private async ValueTask<IReadOnlyList<SignalDeliveryResult>> ThrowSignalCoreAsync(
         string           signalName,
         object?          payload,
         string?          token,
@@ -254,28 +256,199 @@ public sealed class FlowRunner(
         CancellationToken ct,
         bool             deserialize
     ) {
-        await foreach (var process in persistence.ListWaitingAsync(services, ct)) {
-            var reg = registry.GetRegistration(process.DefinitionName);
-            if (reg is null) {
-                continue;
-            }
+        // Cancellation before the candidate set exists has nothing to report per target, so it
+        // propagates. Once the snapshot is taken every candidate gets an entry instead.
+        var candidates = await SnapshotSignalCandidatesAsync(signalName, ct);
+        if (candidates.Count == 0) {
+            return [];
+        }
 
-            var signal = reg.Definition.Signals.FirstOrDefault(s => s.Name == signalName);
-            if (signal is null) {
-                continue;
-            }
+        var concurrency = Math.Max(1, options.Value.SignalBroadcastConcurrency);
+        var results     = new SignalDeliveryResult?[candidates.Count];
+        var pending     = new List<Task<(int Index, SignalDeliveryResult Result)>>(concurrency);
 
-            var engine = services.GetKeyedService<IFlowRuntime>(reg.Engine);
-            if (engine is null) {
-                continue;
-            }
+        using var gate = new SemaphoreSlim(concurrency, concurrency);
+        try {
+            for (var i = 0; i < candidates.Count; i++) {
+                if (ct.IsCancellationRequested) {
+                    results[i] = new(candidates[i].CanonicalName, SignalDeliveryStatus.Canceled);
+                    continue;
+                }
 
-            var value = deserialize && payload is string text
-                ? DeserializePayload(text, reg.SignalPayloadTypes.GetValueOrDefault(signalName))
-                : payload;
-            await TriggerSignalTargetsAsync(reg, engine, process, signal, value, token, principal, ct);
+                try {
+                    await gate.WaitAsync(ct);
+                } catch (OperationCanceledException) when (ct.IsCancellationRequested) {
+                    results[i] = new(candidates[i].CanonicalName, SignalDeliveryStatus.Canceled);
+                    continue;
+                }
+
+                pending.Add(DeliverInOwnScopeAsync(
+                                i, candidates[i], signalName, payload, token, principal, deserialize, gate, ct));
+
+                // Never hold more than the configured number of in-flight deliveries; this is what
+                // bounds live scopes and units of work without awaiting the whole candidate set.
+                if (pending.Count >= concurrency) {
+                    await DrainOneAsync(pending, results);
+                }
+            }
+        } finally {
+            while (pending.Count > 0) {
+                await DrainOneAsync(pending, results);
+            }
+        }
+
+        return results.Select(static r => r!).ToList();
+    }
+
+    /// <summary>
+    ///     Reads the waiting processes that declare <paramref name="signalName" /> into a detached,
+    ///     stably ordered identity list. Discovery holds its own scope and is fully drained before
+    ///     any delivery runs, so its reader never overlaps a delivery's writes.
+    /// </summary>
+    private async ValueTask<IReadOnlyList<SignalCandidate>> SnapshotSignalCandidatesAsync(
+        string            signalName,
+        CancellationToken ct
+    ) {
+        var candidates = new List<SignalCandidate>();
+
+        await using (var scope = scopes.CreateAsyncScope()) {
+            await foreach (var process in persistence.ListWaitingAsync(scope.ServiceProvider, ct)) {
+                if (string.IsNullOrEmpty(process.CanonicalName)) {
+                    continue;
+                }
+
+                var reg = registry.GetRegistration(process.DefinitionName);
+                if (reg?.Definition.Signals.Any(s => s.Name == signalName) != true) {
+                    continue;
+                }
+
+                candidates.Add(new(process.CanonicalName, process.DefinitionName));
+            }
+        }
+
+        // ListWaitingAsync walks a HashSet and its query carries no ORDER BY, so the arrival order
+        // is not reproducible; results are positional, so impose an order the caller can rely on.
+        candidates.Sort(static (a, b) => string.CompareOrdinal(a.CanonicalName, b.CanonicalName));
+        return candidates;
+    }
+
+    private async Task<(int Index, SignalDeliveryResult Result)> DeliverInOwnScopeAsync(
+        int               index,
+        SignalCandidate   candidate,
+        string            signalName,
+        object?           payload,
+        string?           token,
+        ClaimsPrincipal?  principal,
+        bool              deserialize,
+        SemaphoreSlim     gate,
+        CancellationToken ct
+    ) {
+        try {
+            // One delivery, one scope, one unit of work: the delivery runner owns its repositories,
+            // advisors, observers and AdviceContext, none of which are safe to share concurrently.
+            await using var scope = scopes.CreateAsyncScope();
+            var runner = scope.ServiceProvider.GetRequiredService<FlowRunner>();
+            var result = await runner.DeliverSignalAsync(
+                             candidate, signalName, payload, token, principal, deserialize, ct);
+            return (index, result);
+        } catch (OperationCanceledException) when (ct.IsCancellationRequested) {
+            return (index, new(candidate.CanonicalName, SignalDeliveryStatus.Canceled));
+        } catch (Exception ex) {
+            return (index, new(candidate.CanonicalName, SignalDeliveryStatus.Failed, ex));
+        } finally {
+            gate.Release();
         }
     }
+
+    private static async Task DrainOneAsync(
+        List<Task<(int Index, SignalDeliveryResult Result)>> pending,
+        SignalDeliveryResult?[]                              results
+    ) {
+        var completed = await Task.WhenAny(pending);
+        pending.Remove(completed);
+
+        // The worker converts every outcome into a result, so awaiting it cannot throw here.
+        var (index, result) = await completed;
+        results[index] = result;
+    }
+
+    /// <summary>Delivers a broadcast signal to one process, inside this runner's own scope.</summary>
+    private async ValueTask<SignalDeliveryResult> DeliverSignalAsync(
+        SignalCandidate   candidate,
+        string            signalName,
+        object?           payload,
+        string?           token,
+        ClaimsPrincipal?  principal,
+        bool              deserialize,
+        CancellationToken ct
+    ) {
+        var reg    = registry.GetRegistration(candidate.DefinitionName);
+        var signal = reg?.Definition.Signals.FirstOrDefault(s => s.Name == signalName);
+        if (reg is null || signal is null) {
+            return new(candidate.CanonicalName, SignalDeliveryStatus.NoLongerWaiting);
+        }
+
+        var engine = ResolveEngine(reg);
+        var value = deserialize && payload is string text
+            ? DeserializePayload(text, reg.SignalPayloadTypes.GetValueOrDefault(signalName))
+            : payload;
+
+        var              delivered = false;
+        var              committed = new List<ProcessSnapshot>();
+        SchemataProcess? target    = null;
+
+        try {
+            await persistence.ExecuteAsync(services, async (scope, c) => {
+                committed.Clear();
+                delivered = false;
+
+                // The candidate list carries identity only; the process itself is reloaded here so
+                // it belongs to this delivery's unit of work.
+                var process = await scope.Processes.FirstOrDefaultAsync(
+                                  q => q.Where(p => p.CanonicalName == candidate.CanonicalName), c);
+                if (process is null) {
+                    return;
+                }
+
+                target = process;
+                var tokens  = await LoadTokensAsync(scope, process.Name!, c);
+                var ctx     = await CreateExecutionContextAsync(scope, process, principal, c);
+                var targets = await engine.FindTriggerTargetsAsync(reg.Definition, process, tokens, ctx, signal, c);
+                foreach (var item in FilterTargets(targets, token)) {
+                    var before   = WaitingMap(tokens);
+                    var snapshot = await engine.TriggerAsync(
+                                       reg.Definition, process, tokens, ctx, signal, value, item, c);
+                    EnsureCatchesHaveHandlers(reg.Definition, snapshot);
+                    await RunAdvisorsAsync(reg, scope, ctx, snapshot, before, c);
+                    await persistence.PersistSnapshotAsync(scope, snapshot, c);
+                    committed.Add(snapshot);
+                    delivered = true;
+                }
+            }, ct);
+        } catch (OperationCanceledException) when (ct.IsCancellationRequested) {
+            return new(candidate.CanonicalName, SignalDeliveryStatus.Canceled);
+        } catch (Exception ex) {
+            if (target is not null) {
+                await notifier.NotifyFailedAsync(target, ex, CancellationToken.None);
+            }
+
+            return new(candidate.CanonicalName, SignalDeliveryStatus.Failed, ex);
+        }
+
+        if (!delivered) {
+            return new(candidate.CanonicalName, SignalDeliveryStatus.NoLongerWaiting);
+        }
+
+        // IProcessLifecycleObserver is a post-persistence contract, so notify only after the unit of
+        // work committed — a rollback must not leave observers believing the transition landed.
+        foreach (var snapshot in committed) {
+            await NotifyTransitionResultAsync(snapshot, ct);
+        }
+
+        return new(candidate.CanonicalName, SignalDeliveryStatus.Delivered);
+    }
+
+    private sealed record SignalCandidate(string CanonicalName, string DefinitionName);
 
     /// <summary>Terminates a process and cancels its tokens.</summary>
     public async ValueTask<ProcessSnapshot> TerminateAsync(
@@ -384,7 +557,7 @@ public sealed class FlowRunner(
             await BindStartSourceAsync(scope, reg, process, source, sourceName, c);
             var ctx = await CreateExecutionContextAsync(scope, process, principal, c);
             snapshot = await engine.StartAsync(reg.Definition, process, ctx, c);
-            EnsureBridgeRequirements(reg.Definition, snapshot);
+            EnsureCatchesHaveHandlers(reg.Definition, snapshot);
             await RunAdvisorsAsync(reg, scope, ctx, snapshot, new Dictionary<string, string?>(), c);
             await persistence.PersistSnapshotAsync(scope, snapshot, c);
         }, ct);
@@ -392,34 +565,6 @@ public sealed class FlowRunner(
         await notifier.NotifyStartedAsync(snapshot!, ct);
         await notifier.NotifyTransitionedAsync(snapshot!, ct);
         return process;
-    }
-
-    private async Task TriggerSignalTargetsAsync(
-        ProcessRegistration reg,
-        IFlowRuntime        engine,
-        SchemataProcess     process,
-        Signal              signal,
-        object?             payload,
-        string?             token,
-        ClaimsPrincipal?    principal,
-        CancellationToken   ct
-    ) {
-        await ExecuteWithNotificationAsync(process, async (scope, c) => {
-            var tokens  = await LoadTokensAsync(scope, process.Name!, c);
-            var ctx     = await CreateExecutionContextAsync(scope, process, principal, c);
-            var targets = await engine.FindTriggerTargetsAsync(reg.Definition, process, tokens, ctx, signal, c);
-            foreach (var target in FilterTargets(targets, token)) {
-                var before = WaitingMap(tokens);
-                var snapshot = await engine.TriggerAsync(reg.Definition, process, tokens, ctx, signal, payload, target, c);
-                EnsureBridgeRequirements(reg.Definition, snapshot);
-                await RunAdvisorsAsync(reg, scope, ctx, snapshot, before, c);
-                await persistence.PersistSnapshotAsync(scope, snapshot, c);
-                await notifier.NotifyTransitionedAsync(snapshot, c);
-                if (ProcessStates.IsTerminal(snapshot.Process.State)) {
-                    await notifier.NotifyTerminatedAsync(snapshot.Process, c);
-                }
-            }
-        }, ct);
     }
 
     private async ValueTask ExecuteWithNotificationAsync(
@@ -467,6 +612,8 @@ public sealed class FlowRunner(
 
         await FlushTouchedSourcesAsync(scope, execution, snapshot.Process.CanonicalName ?? string.Empty, ct);
 
+        var handlers = services.GetServices<IFlowCatchHandler>().ToList();
+
         foreach (var transition in snapshot.Transitions) {
             var token = snapshot.Tokens.FirstOrDefault(t => t.CanonicalName == transition.Token);
             if (token is null) {
@@ -482,13 +629,25 @@ public sealed class FlowRunner(
                 Principal             = execution.Principal,
             };
 
-            var advice = new AdviceContext(services);
-            await Advisor.For<IFlowTransitionAdvisor>().RunAsync(advice, context, ct);
+            // Advice runs first and may reject the transition by throwing; a returned Block or
+            // Handle only ends the chain. Arming then runs whatever the pipeline returned, because a
+            // token parked on a catch nobody armed waits forever.
+            await Advisor.For<IFlowTransitionAdvisor>().RunAsync(new AdviceContext(services), context, ct);
+
+            // Every handler sees every transition: each one decides for itself which catches it just
+            // gained and which it must release, so arming and releasing stay in one pass.
+            foreach (var handler in handlers) {
+                await handler.ArmAsync(context, ct);
+            }
         }
     }
 
-    private void EnsureBridgeRequirements(ProcessDefinition definition, ProcessSnapshot snapshot) {
-        var bridges = services.GetService<IOptions<SchemataFlowOptions>>()?.Value.Bridges;
+    /// <summary>
+    ///     Fails a transition that would park a token on a catch no registered
+    ///     <see cref="IFlowCatchHandler" /> delivers, so the run stops instead of waiting forever.
+    /// </summary>
+    private void EnsureCatchesHaveHandlers(ProcessDefinition definition, ProcessSnapshot snapshot) {
+        var handlers = services.GetServices<IFlowCatchHandler>().ToList();
         var changed = snapshot.Transitions
                               .Select(transition => transition.Token)
                               .Where(token => !string.IsNullOrEmpty(token))
@@ -501,27 +660,27 @@ public sealed class FlowRunner(
                 continue;
             }
 
-            foreach (var catchEvent in ResolveBridgeCatches(definition, token)) {
-                var bridge = catchEvent.Definition switch {
-                    Message or Signal => SchemataFlowOptions.EventsBridge,
-                    TimerDefinition   => SchemataFlowOptions.TimersBridge,
-                    _                 => null,
+            foreach (var catchEvent in ResolveExternalCatches(definition, token)) {
+                FlowCatchKind? kind = catchEvent.Definition switch {
+                    Message         => FlowCatchKind.Message,
+                    Signal          => FlowCatchKind.Signal,
+                    TimerDefinition => FlowCatchKind.Timer,
+                    _               => null,
                 };
 
-                if (bridge is null || bridges?.Contains(bridge) == true) {
+                if (kind is null || handlers.Any(handler => handler.Handles(kind.Value))) {
                     continue;
                 }
 
-                var activation = bridge == SchemataFlowOptions.EventsBridge
-                    ? "flow.UseEvent()"
-                    : "flow.UseScheduling()";
+                // The question is whether the catch has an owner, not which package supplies one.
                 throw new FailedPreconditionException(
-                    message: $"Flow catch '{catchEvent.Name}' requires the Flow bridge; activate it with {activation}.");
+                    message: $"Flow catch '{catchEvent.Name}' waits on a {kind} event, but no registered "
+                           + $"{nameof(IFlowCatchHandler)} delivers that kind; the token would wait forever.");
             }
         }
     }
 
-    private static IEnumerable<FlowEvent> ResolveBridgeCatches(
+    private static IEnumerable<FlowEvent> ResolveExternalCatches(
         ProcessDefinition      definition,
         SchemataProcessToken   token
     ) {
@@ -719,7 +878,13 @@ public sealed class FlowRunner(
             return null;
         }
 
-        return JsonSerializer.Deserialize(payload, type ?? typeof(object), SchemataJson.Default);
+        // A payload whose message/signal declares no type cannot be bound to anything the engine
+        // understands; deserializing into object would hand the engine an unusable value instead.
+        if (type is null) {
+            throw new InvalidArgumentException(SchemataResources.INVALID_PAYLOAD);
+        }
+
+        return JsonSerializer.Deserialize(payload, type, SchemataJson.Default);
     }
 
     private static Dictionary<string, string?> WaitingMap(IEnumerable<SchemataProcessToken> tokens) {

@@ -3,91 +3,83 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions.Advisors;
 using Schemata.Entity.Repository;
 using Schemata.Event.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
+using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Event.Internal;
 
 /// <summary>
-///     Maintains event-bus subscriptions for BPMN intermediate message and signal catches,
-///     including those reached through an event-based gateway, and for boundary message and
-///     signal catches attached to the activity hosting the active token. The single-token state
-///     machine waits at the host activity for boundary message and signal events, so boundary
-///     subscriptions follow the token's active state (<see cref="TokenSnapshot.WaitingAtName" />
+///     Delivers message and signal catches by correlating them through the event bus. Maintains the
+///     <see cref="SchemataEventSubscription" /> rows for BPMN intermediate message and signal catches,
+///     including those reached through an event-based gateway, and for boundary message and signal
+///     catches attached to the activity hosting the active token.
+/// </summary>
+/// <remarks>
+///     The single-token state machine waits at the host activity for boundary message and signal
+///     events, so boundary subscriptions follow the token's active state (<see cref="TokenSnapshot.WaitingAtName" />
 ///     is empty) rather than a waiting element. Multi-token engines plugged in via keyed
 ///     <c>IFlowRuntime</c> may bridge boundary catches by following the intermediate-catch
 ///     subscription pattern.
-/// </summary>
-public sealed class AdviceTransitionEvent : IFlowTransitionAdvisor
+/// </remarks>
+public sealed class FlowEventCatchHandler : IFlowCatchHandler
 {
     private readonly IRepository<SchemataEventSubscription> _subscriptions;
 
-    /// <summary>Creates an advisor that persists Flow event subscriptions through the supplied repository.</summary>
-    public AdviceTransitionEvent(IRepository<SchemataEventSubscription> subscriptions) {
+    /// <summary>Creates a handler that persists Flow event subscriptions through the supplied repository.</summary>
+    public FlowEventCatchHandler(IRepository<SchemataEventSubscription> subscriptions) {
         _subscriptions = subscriptions;
     }
 
-    #region IFlowTransitionAdvisor Members
+    #region IFlowCatchHandler Members
 
-    public int Order => 0;
+    public bool Handles(FlowCatchKind kind) {
+        return kind is FlowCatchKind.Message or FlowCatchKind.Signal;
+    }
 
-    public async Task<AdviseResult> AdviseAsync(
-        AdviceContext         ctx,
-        FlowTransitionContext context,
-        CancellationToken     ct = default
-    ) {
+    public async ValueTask ArmAsync(FlowTransitionContext context, CancellationToken ct = default) {
         _subscriptions.Join(context.UnitOfWork!);
 
         var token       = context.Token;
         var definition  = context.Definition;
         var processName = context.Snapshot.Process.CanonicalName!;
 
-        if (definition is not null) {
-            // PreviousWaitingAtName is the only source for the waiting element being left, so its
-            // subscription can be removed when the token moved off it.
-            if (!string.IsNullOrEmpty(context.PreviousWaitingAtName)
-             && context.PreviousWaitingAtName != token.WaitingAtName) {
-                var oldElement = definition.AllElements.FirstOrDefault(e => e.Name == context.PreviousWaitingAtName);
-                foreach (var elementName in ResolveCatchElementNames(oldElement, definition)) {
-                    await RemoveSubscriptionAsync(SubscriptionId(processName, elementName, token.CanonicalName), ct);
-                }
-            }
+        if (definition is null) {
+            return;
+        }
 
-            // Boundary subscriptions follow the host activity rather than a waiting element, so
-            // they are removed when the token leaves the host — by completion, boundary fire, or
-            // termination. The previous state comes from the transition row, since the token rows
-            // in the snapshot already carry the new state.
-            var previousState = PreviousStateOf(context);
-            if (!string.IsNullOrEmpty(previousState)
-             && previousState != token.StateName
-             && definition.AllElements.FirstOrDefault(e => e.Name == previousState) is Activity previousHost) {
-                foreach (var (elementName, _) in ResolveBoundaryCatchEventDefinitions(previousHost, definition)) {
-                    await RemoveSubscriptionAsync(SubscriptionId(processName, elementName, token.CanonicalName), ct);
-                }
+        // PreviousWaitingAtName is the only source for the waiting element being left, so its
+        // subscription can be removed when the token moved off it.
+        if (!string.IsNullOrEmpty(context.PreviousWaitingAtName)
+         && context.PreviousWaitingAtName != token.WaitingAtName) {
+            var oldElement = definition.AllElements.FirstOrDefault(e => e.Name == context.PreviousWaitingAtName);
+            foreach (var elementName in ResolveCatchElementNames(oldElement, definition)) {
+                await RemoveSubscriptionAsync(SubscriptionId(processName, elementName, token.CanonicalName), ct);
             }
         }
 
-        if (definition is null) {
-            return AdviseResult.Continue;
+        // Boundary subscriptions follow the host activity rather than a waiting element, so they are
+        // removed when the token leaves the host — by completion, boundary fire, or termination. The
+        // previous state comes from the transition row, since the token rows in the snapshot already
+        // carry the new state.
+        var previousState = PreviousStateOf(context);
+        if (!string.IsNullOrEmpty(previousState)
+         && previousState != token.StateName
+         && definition.AllElements.FirstOrDefault(e => e.Name == previousState) is Activity previousHost) {
+            foreach (var (elementName, _) in ResolveBoundaryCatchEventDefinitions(previousHost, definition)) {
+                await RemoveSubscriptionAsync(SubscriptionId(processName, elementName, token.CanonicalName), ct);
+            }
         }
 
         if (!string.IsNullOrEmpty(token.WaitingAtName)) {
             var newElement = definition.AllElements.FirstOrDefault(e => e.Name == token.WaitingAtName);
             foreach (var (elementName, eventDef) in ResolveCatchEventDefinitions(newElement, definition)) {
-                var subscriptionToken = eventDef is Message ? token.CanonicalName : null;
-                await UpsertSubscriptionAsync(
-                    SubscriptionId(processName, elementName, subscriptionToken),
-                    eventDef.Name,
-                    eventDef is Message ? processName : null,
-                    processName,
-                    subscriptionToken,
-                    ct);
+                await UpsertAsync(processName, elementName, eventDef, token.CanonicalName, ct);
             }
 
-            return AdviseResult.Continue;
+            return;
         }
 
         // An active token parked on a host activity has no waiting element, but its boundary
@@ -95,21 +87,30 @@ public sealed class AdviceTransitionEvent : IFlowTransitionAdvisor
         if (string.Equals(token.Status, "Active", StringComparison.Ordinal)
          && definition.AllElements.FirstOrDefault(e => e.Name == token.StateName) is Activity host) {
             foreach (var (elementName, eventDef) in ResolveBoundaryCatchEventDefinitions(host, definition)) {
-                var subscriptionToken = eventDef is Message ? token.CanonicalName : null;
-                await UpsertSubscriptionAsync(
-                    SubscriptionId(processName, elementName, subscriptionToken),
-                    eventDef.Name,
-                    eventDef is Message ? processName : null,
-                    processName,
-                    subscriptionToken,
-                    ct);
+                await UpsertAsync(processName, elementName, eventDef, token.CanonicalName, ct);
             }
         }
-
-        return AdviseResult.Continue;
     }
 
     #endregion
+
+    private async Task UpsertAsync(
+        string            processName,
+        string            elementName,
+        IEventDefinition  eventDef,
+        string            tokenCanonical,
+        CancellationToken ct
+    ) {
+        // Messages correlate to one token; signals stay process-level broadcasts.
+        var subscriptionToken = eventDef is Message ? tokenCanonical : null;
+        await UpsertSubscriptionAsync(
+            SubscriptionId(processName, elementName, subscriptionToken),
+            eventDef.Name,
+            eventDef is Message ? processName : null,
+            processName,
+            subscriptionToken,
+            ct);
+    }
 
     private async Task RemoveSubscriptionAsync(string subscriptionId, CancellationToken ct) {
         var existing = await _subscriptions.FirstOrDefaultAsync(

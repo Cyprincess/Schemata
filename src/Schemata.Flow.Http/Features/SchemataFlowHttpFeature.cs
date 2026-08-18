@@ -2,13 +2,9 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Features;
-using Schemata.Flow.Foundation;
 using Schemata.Flow.Foundation.Features;
-using Schemata.Flow.Skeleton.Entities;
-using Schemata.Resource.Foundation;
 using Schemata.Resource.Http.Features;
 
 namespace Schemata.Flow.Http.Features;
@@ -31,23 +27,6 @@ public sealed class SchemataFlowHttpFeature : FeatureBase
         IWebHostEnvironment environment
     ) {
         services.AddSchemataApplicationPart<SchemataFlowHttpFeature>();
-
-        FlowResourceRegistration.RegisterHandlers(services);
-        var resources = new SchemataResourceBuilder(schemata, services);
-        resources.Use<SchemataProcess, SchemataProcess, SchemataProcess, SchemataProcess>(
-            [HttpResourceAttribute.Name],
-            resource => {
-                resource.Operations = FlowResourceRegistration.ProcessOperations;
-                resource.Methods    = FlowResourceRegistration.ProcessMethods;
-            });
-        resources.Use<SchemataProcessToken, SchemataProcessToken, SchemataProcessToken, SchemataProcessToken>(
-            [HttpResourceAttribute.Name],
-            resource => {
-                resource.Operations = FlowResourceRegistration.TokenOperations;
-                resource.Methods    = FlowResourceRegistration.TokenMethods;
-            });
-        resources.Use<SchemataProcessTransition, SchemataProcessTransition, SchemataProcessTransition, SchemataProcessTransition>(
-            [HttpResourceAttribute.Name],
-            resource => resource.Operations = FlowResourceRegistration.TransitionOperations);
+        services.AddSchemataFlowHttpResources(schemata);
     }
 }

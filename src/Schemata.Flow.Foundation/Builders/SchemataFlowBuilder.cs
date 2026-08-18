@@ -36,6 +36,22 @@ public sealed class SchemataFlowBuilder
     }
 
     /// <summary>
+    ///     Requires <paramref name="scheme" /> on the Flow resource endpoints, overriding the
+    ///     resource system's global default for the Flow resources alone. Call it before
+    ///     <c>MapHttp()</c> / <c>MapGrpc()</c>, which read the scheme when they register the
+    ///     resources.
+    /// </summary>
+    /// <param name="scheme">
+    ///     The authentication scheme; <see langword="null" /> restores the global default.
+    /// </param>
+    /// <returns>This builder for chaining.</returns>
+    public SchemataFlowBuilder WithAuthorization(string? scheme = null) {
+        Schemata.Set(FlowResourceRegistration.AuthenticationSchemeKey, scheme);
+
+        return this;
+    }
+
+    /// <summary>
     ///     Registers a code-first process definition type, writing its
     ///     <see cref="ProcessConfiguration" /> to <see cref="SchemataFlowOptions" />. Returns this
     ///     builder so multiple definitions chain; configure the definition through
