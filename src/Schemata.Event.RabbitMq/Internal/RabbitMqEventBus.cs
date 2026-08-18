@@ -15,12 +15,14 @@ using Schemata.Common;
 using Schemata.Event.Foundation;
 using Schemata.Event.Skeleton;
 using Schemata.Event.Skeleton.Advisors;
+using Schemata.Transport.RabbitMq;
 
 namespace Schemata.Event.RabbitMq.Internal;
 
 /// <summary>RabbitMQ-backed <see cref="IEventBus"/> for cross-process broadcast and request/response.</summary>
 public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
 {
+    private readonly IRabbitMqConnectionProvider    _connections;
     private readonly CorrelationTracker             _correlation;
     private readonly EventOutboxDispatcher?         _dispatcher;
     private readonly SemaphoreSlim                  _initializationLock = new(1, 1);
@@ -30,12 +32,12 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
     private readonly IEventTypeRegistry             _registry;
     private readonly string                         _replyQueueName;
     private readonly IServiceProvider               _services;
-    private          IConnection?                   _connection;
     private          IChannel?                      _replyChannel;
 
     /// <summary>Initializes a new <see cref="RabbitMqEventBus" /> with a lazily initialized reply queue.</summary>
     public RabbitMqEventBus(
         IOptions<RabbitMqEventOptions> options,
+        IRabbitMqConnectionProvider    connections,
         CorrelationTracker             correlation,
         IEventTypeRegistry             registry,
         IServiceProvider               services,
@@ -44,6 +46,7 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
         EventOutboxDispatcher?         dispatcher = null
     ) {
         _options     = options;
+        _connections = connections;
         _correlation = correlation;
         _registry    = registry;
         _services    = services;
@@ -59,16 +62,11 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
     public async ValueTask DisposeAsync() {
         await _initializationLock.WaitAsync();
         try {
+            // Only the reply channel is ours; the connection belongs to the shared provider.
             if (_replyChannel is { } replyChannel) {
                 _replyChannel = null;
                 await replyChannel.CloseAsync();
                 replyChannel.Dispose();
-            }
-
-            if (_connection is { } connection) {
-                _connection = null;
-                await connection.CloseAsync();
-                connection.Dispose();
             }
         } finally {
             _initializationLock.Release();
@@ -120,7 +118,8 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
             await observer.OnPublishedAsync(eventCtx, ct);
         }
 
-        var (connection, replyChannel) = await InitializeAsync(ct);
+        var connection   = await _connections.GetConnectionAsync(ct);
+        var replyChannel = await InitializeReplyChannelAsync(ct);
         await using var channel = await connection.CreateChannelAsync(new(true, true), ct);
 
         var body = Encoding.UTF8.GetBytes(eventCtx.Payload ?? string.Empty);
@@ -181,31 +180,22 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
         _dispatcher?.NotifyPending();
     }
 
-    private async ValueTask<(IConnection Connection, IChannel ReplyChannel)> InitializeAsync(CancellationToken ct) {
-        if (_connection is { } existingConnection && _replyChannel is { } existingReplyChannel) {
-            return (existingConnection, existingReplyChannel);
+    private async ValueTask<IChannel> InitializeReplyChannelAsync(CancellationToken ct) {
+        if (_replyChannel is { } existingReplyChannel) {
+            return existingReplyChannel;
         }
 
         await _initializationLock.WaitAsync(ct);
         try {
-            if (_connection is { } initializedConnection && _replyChannel is { } initializedReplyChannel) {
-                return (initializedConnection, initializedReplyChannel);
+            if (_replyChannel is { } initializedReplyChannel) {
+                return initializedReplyChannel;
             }
 
-            var options = _options.Value;
-            var factory = new ConnectionFactory {
-                HostName                   = options.HostName,
-                Port                       = options.Port,
-                UserName                   = options.UserName,
-                Password                   = options.Password,
-                VirtualHost                = options.VirtualHost,
-                RequestedConnectionTimeout = TimeSpan.FromMilliseconds(options.ConnectionTimeoutMs),
-            };
+            var connection = await _connections.GetConnectionAsync(ct);
 
-            var newConnection = await factory.CreateConnectionAsync(ct);
             IChannel? newReplyChannel = null;
             try {
-                newReplyChannel = await newConnection.CreateChannelAsync(cancellationToken: ct);
+                newReplyChannel = await connection.CreateChannelAsync(cancellationToken: ct);
                 await newReplyChannel.QueueDeclareAsync(_replyQueueName, false, true, true, cancellationToken: ct);
 
                 var consumer = new AsyncEventingBasicConsumer(newReplyChannel);
@@ -213,17 +203,17 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
 
                 await newReplyChannel.BasicConsumeAsync(_replyQueueName, true, consumer, ct);
             } catch {
+                // Only the half-built channel is discarded; the shared connection stays open for
+                // every other client in the process.
                 if (newReplyChannel is not null) {
                     await newReplyChannel.DisposeAsync();
                 }
 
-                await newConnection.DisposeAsync();
                 throw;
             }
 
-            _connection   = newConnection;
             _replyChannel = newReplyChannel;
-            return (newConnection, newReplyChannel);
+            return newReplyChannel;
         } finally {
             _initializationLock.Release();
         }

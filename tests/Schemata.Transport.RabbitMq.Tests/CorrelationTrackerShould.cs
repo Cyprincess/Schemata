@@ -1,10 +1,9 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Time.Testing;
-using Schemata.Event.RabbitMq.Internal;
 using Xunit;
 
-namespace Schemata.Event.RabbitMq.Tests;
+namespace Schemata.Transport.RabbitMq.Tests;
 
 public class CorrelationTrackerShould
 {

@@ -2,9 +2,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Common;
 
-namespace Schemata.Event.RabbitMq.Internal;
+namespace Schemata.Transport.RabbitMq;
 
 /// <summary>Tracks in-flight RabbitMQ request/response calls by correlation identifier.</summary>
 public sealed class CorrelationTracker : IDisposable
@@ -12,6 +11,7 @@ public sealed class CorrelationTracker : IDisposable
     private readonly ConcurrentDictionary<string, Pending> _pending = new();
     private readonly TimeProvider                          _timeProvider;
 
+    /// <summary>Initializes a tracker, optionally over a test-controlled clock.</summary>
     public CorrelationTracker(TimeProvider? timeProvider = null) {
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
@@ -31,7 +31,9 @@ public sealed class CorrelationTracker : IDisposable
 
     /// <summary>Registers a pending response and returns the broker correlation identifier.</summary>
     public string Track<TResponse>(TaskCompletionSource<TResponse> tcs, TimeSpan timeout) {
-        var correlationId = Identifiers.NewUid().ToString("n");
+        // A correlation id lives only until its reply arrives and is never persisted or ordered,
+        // so an unsequenced GUID is sufficient here.
+        var correlationId = Guid.NewGuid().ToString("n");
         var wrapper       = new TaskCompletionSource<object?>();
         var cts           = new CancellationTokenSource();
 

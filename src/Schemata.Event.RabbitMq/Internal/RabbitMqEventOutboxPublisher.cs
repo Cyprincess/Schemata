@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using Schemata.Common;
 using Schemata.Event.Skeleton;
+using Schemata.Transport.RabbitMq;
 
 namespace Schemata.Event.RabbitMq.Internal;
 
@@ -16,53 +17,38 @@ namespace Schemata.Event.RabbitMq.Internal;
 ///     Replays a persisted event to RabbitMQ for the outbox dispatcher, using a
 ///     publisher-confirm channel so a confirmed publish is durable and reuses the existing audit row.
 /// </summary>
-public sealed class RabbitMqEventOutboxPublisher : IEventOutboxPublisher, IAsyncDisposable
+public sealed class RabbitMqEventOutboxPublisher : IEventOutboxPublisher
 {
-    private readonly SemaphoreSlim                          _initializationLock = new(1, 1);
+    private readonly IRabbitMqConnectionProvider            _connections;
     private readonly JsonSerializerOptions                  _json;
     private readonly ILogger<RabbitMqEventOutboxPublisher>? _logger;
     private readonly IOptions<RabbitMqEventOptions>         _options;
     private readonly IEventTypeRegistry                     _registry;
     private readonly IServiceProvider                       _services;
-    private          IConnection?                           _connection;
 
-    /// <summary>Initializes an outbox publisher over the configured RabbitMQ connection.</summary>
+    /// <summary>Initializes an outbox publisher over the shared RabbitMQ connection.</summary>
     public RabbitMqEventOutboxPublisher(
         IOptions<RabbitMqEventOptions>         options,
+        IRabbitMqConnectionProvider            connections,
         IServiceProvider                       services,
         IEventTypeRegistry                     registry,
         IOptions<JsonSerializerOptions>        json,
         ILogger<RabbitMqEventOutboxPublisher>? logger = null
     ) {
-        _options  = options;
-        _services = services;
-        _registry = registry;
-        _json     = json.Value;
-        _logger   = logger;
+        _options     = options;
+        _connections = connections;
+        _services    = services;
+        _registry    = registry;
+        _json        = json.Value;
+        _logger      = logger;
     }
-
-    #region IAsyncDisposable Members
-
-    public async ValueTask DisposeAsync() {
-        await _initializationLock.WaitAsync();
-        try {
-            if (_connection is { } connection) {
-                _connection = null;
-                await connection.DisposeAsync();
-            }
-        } finally {
-            _initializationLock.Release();
-        }
-    }
-
-    #endregion
 
     #region IEventOutboxPublisher Members
 
     public async Task<EventOutboxDelivery> PublishAsync(EventOutboxMessage message, CancellationToken ct = default) {
         // Publisher confirms make BasicPublishAsync complete only when the broker accepts the
         // message, so the dispatcher marks the row delivered only after a durable publish.
-        var connection = await ConnectAsync(ct);
+        var connection = await _connections.GetConnectionAsync(ct);
         await using var channel = await connection.CreateChannelAsync(new(true, true), ct);
 
         var exchange = _options.Value.ExchangeName;
@@ -123,35 +109,6 @@ public sealed class RabbitMqEventOutboxPublisher : IEventOutboxPublisher, IAsync
                                     "IEventLifecycleObserver.OnDeliveredAsync threw for event '{EventType}'.",
                                     message.EventType);
             }
-        }
-    }
-
-    private async ValueTask<IConnection> ConnectAsync(CancellationToken ct) {
-        if (_connection is { } existingConnection) {
-            return existingConnection;
-        }
-
-        await _initializationLock.WaitAsync(ct);
-        try {
-            if (_connection is { } initializedConnection) {
-                return initializedConnection;
-            }
-
-            var options = _options.Value;
-            var factory = new ConnectionFactory {
-                HostName                   = options.HostName,
-                Port                       = options.Port,
-                UserName                   = options.UserName,
-                Password                   = options.Password,
-                VirtualHost                = options.VirtualHost,
-                RequestedConnectionTimeout = TimeSpan.FromMilliseconds(options.ConnectionTimeoutMs),
-            };
-
-            var newConnection = await factory.CreateConnectionAsync(ct);
-            _connection = newConnection;
-            return newConnection;
-        } finally {
-            _initializationLock.Release();
         }
     }
 }

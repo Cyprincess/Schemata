@@ -75,6 +75,7 @@
     <Project Path="src/Schemata.Tenancy.Skeleton/Schemata.Tenancy.Skeleton.csproj" />
     <Project Path="src/Schemata.Transport.Grpc/Schemata.Transport.Grpc.csproj" />
     <Project Path="src/Schemata.Transport.Http/Schemata.Transport.Http.csproj" />
+    <Project Path="src/Schemata.Transport.RabbitMq/Schemata.Transport.RabbitMq.csproj" />
     <Project Path="src/Schemata.Validation.FluentValidation/Schemata.Validation.FluentValidation.csproj" />
     <Project Path="src/Schemata.Validation.Skeleton/Schemata.Validation.Skeleton.csproj" />
   </Folder>
@@ -103,7 +104,6 @@
     <Project Path="tests/Schemata.Entity.Owner.Tests/Schemata.Entity.Owner.Tests.csproj" />
     <Project Path="tests/Schemata.Entity.Repository.Tests/Schemata.Entity.Repository.Tests.csproj" />
     <Project Path="tests/Schemata.Event.Foundation.Tests/Schemata.Event.Foundation.Tests.csproj" />
-    <Project Path="tests/Schemata.Event.RabbitMq.Tests/Schemata.Event.RabbitMq.Tests.csproj" />
     <Project Path="tests/Schemata.Expressions.Aip.Tests/Schemata.Expressions.Aip.Tests.csproj" />
     <Project Path="tests/Schemata.Expressions.Cel.Tests/Schemata.Expressions.Cel.Tests.csproj" />
     <Project Path="tests/Schemata.Expressions.Order.Tests/Schemata.Expressions.Order.Tests.csproj" />
@@ -128,5 +128,6 @@
     <Project Path="tests/Schemata.Security.Tests/Schemata.Security.Tests.csproj" />
     <Project Path="tests/Schemata.Tenancy.Tests/Schemata.Tenancy.Tests.csproj" />
     <Project Path="tests/Schemata.Transport.Grpc.Tests/Schemata.Transport.Grpc.Tests.csproj" />
+    <Project Path="tests/Schemata.Transport.RabbitMq.Tests/Schemata.Transport.RabbitMq.Tests.csproj" />
   </Folder>
 </Solution>

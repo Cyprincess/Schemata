@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Schemata.Event.Foundation\Schemata.Event.Foundation.csproj" />
     <ProjectReference Include="..\Schemata.Event.Skeleton\Schemata.Event.Skeleton.csproj" />
+    <ProjectReference Include="..\Schemata.Transport.RabbitMq\Schemata.Transport.RabbitMq.csproj" />
   </ItemGroup>
 
 </Project>

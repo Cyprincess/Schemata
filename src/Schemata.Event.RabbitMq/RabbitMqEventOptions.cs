@@ -1,23 +1,12 @@
 namespace Schemata.Event.RabbitMq;
 
-/// <summary>Connection and topology settings for the RabbitMQ event bus and consumer host.</summary>
+/// <summary>
+///     Topology settings for the RabbitMQ event bus and consumer host. Broker connection settings
+///     live on <c>RabbitMqConnectionOptions</c> in <c>Schemata.Transport.RabbitMq</c>, which owns the
+///     connection every client in the process shares.
+/// </summary>
 public class RabbitMqEventOptions
 {
-    /// <summary>Broker host name or IP. Defaults to <c>localhost</c>.</summary>
-    public string HostName { get; set; } = "localhost";
-
-    /// <summary>Broker AMQP port. Defaults to 5672.</summary>
-    public int Port { get; set; } = 5672;
-
-    /// <summary>SASL PLAIN user name. Defaults to <c>guest</c>.</summary>
-    public string UserName { get; set; } = "guest";
-
-    /// <summary>SASL PLAIN password. Defaults to <c>guest</c>.</summary>
-    public string Password { get; set; } = "guest";
-
-    /// <summary>AMQP virtual host the connection joins. Defaults to <c>/</c>.</summary>
-    public string VirtualHost { get; set; } = "/";
-
     /// <summary>Exchange that publishers write to and consumers bind against.</summary>
     public string ExchangeName { get; set; } = "schemata.events";
 
@@ -26,9 +15,6 @@ public class RabbitMqEventOptions
 
     /// <summary>Queue the consumer host declares and binds to <see cref="ExchangeName"/>.</summary>
     public string QueueName { get; set; } = "schemata.consumer";
-
-    /// <summary>Connection-establishment timeout in milliseconds.</summary>
-    public int ConnectionTimeoutMs { get; set; } = 30000;
 
     /// <summary>Request/response wait-for-reply timeout in milliseconds.</summary>
     public int RequestTimeoutMs { get; set; } = 30000;

@@ -21,6 +21,7 @@ using Schemata.Event.Foundation.Internal;
 using Schemata.Event.Skeleton;
 using Schemata.Event.Skeleton.Advisors;
 using Schemata.Event.Skeleton.Entities;
+using Schemata.Transport.RabbitMq;
 
 namespace Schemata.Event.RabbitMq.Internal;
 
@@ -28,6 +29,7 @@ namespace Schemata.Event.RabbitMq.Internal;
 public sealed class RabbitMqConsumerHost : BackgroundService
 {
     private readonly SemaphoreSlim                  _channelLock = new(1, 1);
+    private readonly IRabbitMqConnectionProvider    _connections;
     private readonly JsonSerializerOptions          _json;
     private readonly ILogger<RabbitMqConsumerHost>? _logger;
     private readonly IOptions<RabbitMqEventOptions> _options;
@@ -36,27 +38,23 @@ public sealed class RabbitMqConsumerHost : BackgroundService
     /// <summary>Initializes a RabbitMQ consumer host over the configured broker topology.</summary>
     public RabbitMqConsumerHost(
         IServiceProvider               services,
+        IRabbitMqConnectionProvider    connections,
         IOptions<RabbitMqEventOptions> options,
         IOptions<JsonSerializerOptions> json,
         ILogger<RabbitMqConsumerHost>? logger = null
     ) {
-        _services = services;
-        _options  = options;
-        _json     = json.Value;
-        _logger   = logger;
+        _services    = services;
+        _connections = connections;
+        _options     = options;
+        _json        = json.Value;
+        _logger      = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct) {
-        var factory = new ConnectionFactory {
-            HostName    = _options.Value.HostName,
-            Port        = _options.Value.Port,
-            UserName    = _options.Value.UserName,
-            Password    = _options.Value.Password,
-            VirtualHost = _options.Value.VirtualHost,
-        };
-
-        await using var connection = await factory.CreateConnectionAsync(ct);
-        await using var channel    = await connection.CreateChannelAsync(cancellationToken: ct);
+        // The connection is owned by the shared provider and outlives this host; only the channel
+        // is ours to dispose.
+        var connection = await _connections.GetConnectionAsync(ct);
+        await using var channel = await connection.CreateChannelAsync(cancellationToken: ct);
 
         var exchange = _options.Value.ExchangeName;
         var queue    = _options.Value.QueueName;
@@ -174,8 +172,7 @@ public sealed class RabbitMqConsumerHost : BackgroundService
         var method        = typeof(HandlerResolver).GetMethod(nameof(HandlerResolver.InvokeEventHandlersAsync))!;
         var genericMethod = method.MakeGenericMethod(eventType);
 
-        var routing = scope.ServiceProvider.GetRequiredService<IOptions<SchemataEventOptions>>()
-                           .Value.RoutingTable.GetValueOrDefault(eventType, EventRouting.Broadcast);
+        var routing = registry.GetRouting(eventType);
 
         var eventForCtx = (IEvent)eventInstance;
         var eventCtx = new EventContext(eventForCtx, eventTypeName) {
