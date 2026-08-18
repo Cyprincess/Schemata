@@ -1,11 +1,8 @@
-using System;
-using System.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Core;
 using Schemata.Core.Features;
 using static Schemata.Abstractions.SchemataConstants;
@@ -34,22 +31,7 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) {
-        var provider = typeof(TProvider);
-        var modules = Utilities.CreateInstance<IModulesProvider>(provider, schemata.CreateLogger(provider), configuration, environment, TimeProvider.System)!
-                               .GetModules()
-                               .ToList();
-        schemata.SetModules(modules);
-
-        if (services.Any(s => s.ServiceType == typeof(IModulesRunner))) {
-            return;
-        }
-
-        var runner = typeof(TRunner);
-        var context = Utilities.CreateInstance<IModulesRunner>(runner, schemata.CreateLogger(runner), schemata, configuration, environment)!;
-        context.ConfigureServices(services, configuration, environment);
-        services.TryAddSingleton<IModulesRunner>(_ => context);
-    }
+    ) => services.AddSchemataModules<TProvider, TRunner>(schemata, configuration, environment);
 
     public override void ConfigureApplication(
         IApplicationBuilder app,

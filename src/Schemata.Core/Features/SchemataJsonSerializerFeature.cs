@@ -1,19 +1,14 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Core.Json;
 
 namespace Schemata.Core.Features;
 
 /// <summary>
-///     Configures <see cref="JsonSerializerOptions" /> with snake_case naming,
-///     string-number coercion, kebab-case enums, and polymorphic type resolution.
-///     Also wires <see cref="JsonOptions" /> and
-///     <see cref="Microsoft.AspNetCore.Mvc.JsonOptions" /> when controllers are
-///     present.
+///     Configures <see cref="JsonSerializerOptions" /> with snake_case naming, string-number coercion,
+///     kebab-case enums, and polymorphic type resolution. MVC JSON options are configured only when
+///     controllers are present.
 /// </summary>
 public sealed class SchemataJsonSerializerFeature : FeatureBase
 {
@@ -30,37 +25,7 @@ public sealed class SchemataJsonSerializerFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) {
-        var configure = configurators.PopOrDefault<JsonSerializerOptions>();
-
-        services.Configure<JsonSerializerOptions>(Configure);
-
-        services.Configure<JsonOptions>(options => { Configure(options.SerializerOptions); });
-
-        if (!schemata.HasFeature<SchemataControllersFeature>()) {
-            return;
-        }
-
-        services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options => {
-            Configure(options.JsonSerializerOptions);
-        });
-
-        return;
-
-        void Configure(JsonSerializerOptions options) {
-            options.MaxDepth = 32;
-
-            options.TypeInfoResolver = PolymorphicTypeResolver.Instance;
-
-            options.DictionaryKeyPolicy    = JsonNamingPolicy.SnakeCaseLower;
-            options.PropertyNamingPolicy   = JsonNamingPolicy.SnakeCaseLower;
-            options.NumberHandling         = JsonNumberHandling.AllowReadingFromString;
-            options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-
-            options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.KebabCaseLower));
-            options.Converters.Add(JsonStringNumberConverter.Instance);
-
-            configure(options);
-        }
-    }
+    ) => services.AddSchemataJsonSerializer(
+        configurators.PopOrDefault<JsonSerializerOptions>(),
+        schemata.HasFeature<SchemataControllersFeature>());
 }

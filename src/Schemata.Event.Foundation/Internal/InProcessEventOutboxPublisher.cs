@@ -127,8 +127,7 @@ public sealed class InProcessEventOutboxPublisher(
         var genericMethod = typeof(HandlerResolver)
                            .GetMethod(nameof(HandlerResolver.InvokeEventHandlersAsync))!
                            .MakeGenericMethod(eventType);
-        var routing = serviceProvider.GetRequiredService<IOptions<SchemataEventOptions>>()
-                                     .Value.RoutingTable.GetValueOrDefault(eventType, EventRouting.Broadcast);
+        var routing = serviceProvider.GetRequiredService<IEventTypeRegistry>().GetRouting(eventType);
 
         object? invoked;
         try {

@@ -16,6 +16,7 @@ using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Common;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
 
@@ -141,7 +142,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         string            issuer,
         CancellationToken ct
     ) {
-        var subject = principal.FindFirstValue(Claims.Subject);
+        var subject = principal.FindFirstValue(IdentityClaims.Subject);
         if (string.IsNullOrWhiteSpace(subject)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,

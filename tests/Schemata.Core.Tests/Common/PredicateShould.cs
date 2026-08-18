@@ -8,26 +8,6 @@ namespace Schemata.Core.Tests.Common;
 public class PredicateShould
 {
     [Fact]
-    public void True_AlwaysReturnTrue() {
-        var predicate = Predicate.True<int>();
-        var compiled  = predicate.Compile();
-
-        Assert.True(compiled(0));
-        Assert.True(compiled(42));
-        Assert.True(compiled(-1));
-    }
-
-    [Fact]
-    public void False_AlwaysReturnFalse() {
-        var predicate = Predicate.False<int>();
-        var compiled  = predicate.Compile();
-
-        Assert.False(compiled(0));
-        Assert.False(compiled(42));
-        Assert.False(compiled(-1));
-    }
-
-    [Fact]
     public void And_BothPredicates_CombineWithAndAlso() {
         Expression<Func<int, bool>> left  = x => x > 0;
         Expression<Func<int, bool>> right = x => x < 10;

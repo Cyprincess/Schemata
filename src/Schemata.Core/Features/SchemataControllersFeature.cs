@@ -1,8 +1,6 @@
-using System.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Session;
 using Microsoft.Extensions.Configuration;
@@ -11,10 +9,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Schemata.Core.Features;
 
 /// <summary>
-///     Registers MVC controllers with endpoint routing, applies deferred
-///     <see cref="MvcOptions" /> / <see cref="IMvcBuilder" /> configurators, and
-///     strips <c>Schemata.*</c> assemblies from the
-///     <see cref="ApplicationPartManager" /> to prevent duplicate controller discovery.
+///     Registers MVC controllers with endpoint routing and applies the deferred
+///     <see cref="MvcOptions" /> / <see cref="IMvcBuilder" /> configurators.
 /// </summary>
 [DependsOn<SchemataRoutingFeature>]
 public sealed class SchemataControllersFeature : FeatureBase
@@ -32,24 +28,9 @@ public sealed class SchemataControllersFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) {
-        var configure = configurators.PopOrDefault<MvcOptions>();
-        var build     = configurators.PopOrDefault<IMvcBuilder>();
-
-        var builder = services.AddControllers(configure);
-
-        builder.ConfigureApplicationPartManager(manager => {
-            var parts = manager.ApplicationParts.OfType<AssemblyPart>()
-                               .Where(p => p.Name.StartsWith(nameof(Schemata) + "."))
-                               .ToArray();
-
-            foreach (var part in parts) {
-                manager.ApplicationParts.Remove(part);
-            }
-        });
-
-        build(builder);
-    }
+    ) => services.AddSchemataControllers(
+        configurators.PopOrDefault<MvcOptions>(),
+        configurators.PopOrDefault<IMvcBuilder>());
 
     public override void ConfigureEndpoints(
         IApplicationBuilder   app,

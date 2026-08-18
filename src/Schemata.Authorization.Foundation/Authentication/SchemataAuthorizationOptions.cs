@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using Microsoft.IdentityModel.Tokens;
 using Schemata.Abstractions;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Authentication;
 
@@ -157,7 +158,7 @@ public class SchemataAuthorizationOptions
     public HashSet<string> AllowedResponseModes { get; } = [];
 
     /// <summary>Claim types advertised in the discovery document's claims_supported.</summary>
-    public HashSet<string> SupportedClaims { get; } = [Claims.Subject];
+    public HashSet<string> SupportedClaims { get; } = [IdentityClaims.Subject];
 
     /// <summary>Permits a single response_type value (e.g., "code").</summary>
     public SchemataAuthorizationOptions PermitResponseType(string type) {

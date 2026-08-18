@@ -1,3 +1,4 @@
+using Schemata.Flow.Skeleton;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -25,7 +26,7 @@ public class FlowRunnerPayloadShould
 
         var registration = new ProcessRegistration {
             Name                = "greet-process",
-            Engine              = SchemataConstants.FlowEngines.StateMachine,
+            Engine              = FlowConstants.Engines.StateMachine,
             Definition          = definition,
             Configuration       = new ProcessConfiguration(),
             MessagePayloadTypes = new Dictionary<string, Type> { ["Greet"] = typeof(GreetPayload) },
@@ -64,7 +65,7 @@ public class FlowRunnerPayloadShould
                       .AddSingleton(transitions.Object)
                       .AddSingleton(sources.Object)
                       .AddSingleton(compensations.Object)
-                      .AddKeyedSingleton<IFlowRuntime>(SchemataConstants.FlowEngines.StateMachine, engine.Object)
+                      .AddKeyedSingleton<IFlowRuntime>(FlowConstants.Engines.StateMachine, engine.Object)
                       .BuildServiceProvider();
 
         var notifier = new ProcessLifecycleNotifier([], Mock.Of<ILogger<ProcessLifecycleNotifier>>());

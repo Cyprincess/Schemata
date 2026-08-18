@@ -22,6 +22,7 @@ using Schemata.Authorization.Skeleton.Services;
 using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Tests;
 
@@ -117,7 +118,7 @@ public class IntrospectionHandlerShould
 
         var claims = new List<Claim> {
             new(Claims.JwtId, Identifiers.NewUid().ToString()),
-            new(Claims.Subject, "users/u-42"),
+            new(IdentityClaims.Subject, "users/u-42"),
             new(Claims.ClientId, "test-client"),
             new(Claims.Scope, "openid profile"),
             new(Claims.Audience, "api"),
@@ -147,7 +148,7 @@ public class IntrospectionHandlerShould
 
         var claims = new List<Claim> {
             new(Claims.JwtId, Identifiers.NewUid().ToString()),
-            new(Claims.Subject, "user-42"),
+            new(IdentityClaims.Subject, "user-42"),
             new(Claims.ClientId, "other-client"),
             new(Claims.Audience, "api"),
             new(Claims.Issuer, Issuer),
@@ -170,7 +171,7 @@ public class IntrospectionHandlerShould
 
         var claims = new List<Claim> {
             new(Claims.JwtId, Identifiers.NewUid().ToString()),
-            new(Claims.Subject, "user-42"),
+            new(IdentityClaims.Subject, "user-42"),
             new(Claims.Audience, "api"),
         };
 

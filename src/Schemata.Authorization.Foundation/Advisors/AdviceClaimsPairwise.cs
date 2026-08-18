@@ -10,6 +10,7 @@ using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
@@ -55,7 +56,7 @@ public sealed class AdviceClaimsPairwise<TApp> : IClaimsAdvisor
     public int Order => AdviceClaimsPairwise.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(AdviceContext ctx, List<Claim> claims, CancellationToken ct = default) {
-        var sub    = claims.FirstOrDefault(c => c.Type == Claims.Subject)?.Value;
+        var sub    = claims.FirstOrDefault(c => c.Type == IdentityClaims.Subject)?.Value;
         var client = claims.FirstOrDefault(c => c.Type == Claims.ClientId)?.Value;
 
         if (string.IsNullOrWhiteSpace(sub) || string.IsNullOrWhiteSpace(client)) {
@@ -75,8 +76,8 @@ public sealed class AdviceClaimsPairwise<TApp> : IClaimsAdvisor
         }
 
         for (var i = 0; i < claims.Count; i++) {
-            if (claims[i].Type == Claims.Subject) {
-                claims[i] = new(Claims.Subject, projected);
+            if (claims[i].Type == IdentityClaims.Subject) {
+                claims[i] = new(IdentityClaims.Subject, projected);
             }
         }
 

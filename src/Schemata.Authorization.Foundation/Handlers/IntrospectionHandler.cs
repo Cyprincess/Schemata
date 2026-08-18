@@ -16,6 +16,7 @@ using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
 
@@ -89,7 +90,7 @@ public sealed class IntrospectionHandler<TApp, TToken>(
                 Exp       = GetUnixTimestamp(principal, Claims.Expiration),
                 Iat       = GetUnixTimestamp(principal, Claims.IssuedAt),
                 Nbf       = GetUnixTimestamp(principal, Claims.NotBefore),
-                Sub       = principal.FindFirstValue(Claims.Subject),
+                Sub       = principal.FindFirstValue(IdentityClaims.Subject),
                 Aud       = principal.FindFirstValue(Claims.Audience),
                 Iss       = principal.FindFirstValue(Claims.Issuer),
                 Jti       = principal.FindFirstValue(Claims.JwtId),

@@ -108,7 +108,7 @@ public class MapsterRecordTargetShould
     }
 
     [Fact]
-    public void MaskedClassUpdate_PopulatedString_StillWorks() {
+    public void MaskedClassUpdate_PopulatedString_WritesOnlyTheMaskedMember() {
         var mapper      = CreateMapper();
         var source      = new SourceProfile { DisplayName = "Updated", Bio = "new", Locale = "fr" };
         var destination = new DestinationProfile { DisplayName = "Original", Bio = "old", Locale = "en" };

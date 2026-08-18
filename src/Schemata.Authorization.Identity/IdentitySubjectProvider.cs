@@ -8,6 +8,7 @@ using Schemata.Common;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Managers;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Identity;
 
@@ -45,17 +46,17 @@ internal sealed class IdentitySubjectProvider<TUser>(SchemataUserManager<TUser> 
             : $"users/{user.Uid}";
 
         var claims = new List<Claim> {
-            new(Claims.Subject, canonical),
+            new(IdentityClaims.Subject, canonical),
         };
 
         var username = await manager.GetUserPrincipalNameAsync(user);
         if (!string.IsNullOrWhiteSpace(username)) {
-            claims.Add(new(Claims.PreferredUsername, username));
+            claims.Add(new(IdentityClaims.PreferredUsername, username));
         }
 
         var email = await manager.GetEmailAsync(user);
         if (!string.IsNullOrWhiteSpace(email)) {
-            claims.Add(new(Claims.Email, email));
+            claims.Add(new(IdentityClaims.Email, email));
             claims.Add(new(Claims.EmailVerified, (await manager.IsEmailConfirmedAsync(user)).ToString().ToLowerInvariant()));
         }
 
@@ -71,7 +72,7 @@ internal sealed class IdentitySubjectProvider<TUser>(SchemataUserManager<TUser> 
         }
 
         foreach (var role in await manager.GetRolesAsync(user)) {
-            claims.Add(new(Claims.Role, role));
+            claims.Add(new(IdentityClaims.Role, role));
         }
 
         return claims;

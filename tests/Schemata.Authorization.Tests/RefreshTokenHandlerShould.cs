@@ -17,6 +17,7 @@ using Schemata.Authorization.Skeleton.Services;
 using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Tests;
 
@@ -33,7 +34,7 @@ public class RefreshTokenHandlerShould
         var refreshOpts  = Options.Create(new RefreshTokenFlowOptions());
         var tokenService = new TokenService(opts);
 
-        var claims = new List<Claim> { new(Claims.Subject, "user-1"), new(Claims.Scope, approvedScope ?? "") };
+        var claims = new List<Claim> { new(IdentityClaims.Subject, "user-1"), new(Claims.Scope, approvedScope ?? "") };
         var jwt    = tokenService.CreateToken(claims, TimeSpan.FromHours(1));
 
         var refreshToken = new SchemataToken {

@@ -22,6 +22,7 @@ using Schemata.Authorization.Skeleton.Services;
 using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Tests;
 
@@ -126,7 +127,7 @@ public class RevocationHandlerShould
 
         var claims = new List<Claim> {
             new(Claims.JwtId, Identifiers.NewUid().ToString()),
-            new(Claims.Subject, "user-42"),
+            new(IdentityClaims.Subject, "user-42"),
             new(Claims.Audience, "api"),
         };
 
@@ -163,7 +164,7 @@ public class RevocationHandlerShould
 
         var claims = new List<Claim> {
             new(Claims.JwtId, Identifiers.NewUid().ToString()),
-            new(Claims.Subject, "user-42"),
+            new(IdentityClaims.Subject, "user-42"),
             new(Claims.Audience, "api"),
         };
 

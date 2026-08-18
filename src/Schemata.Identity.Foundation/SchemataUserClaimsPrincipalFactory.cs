@@ -9,7 +9,7 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Identity.Foundation;
 
 /// <summary>
-///     Issues a <see cref="Claims.Subject" /> claim whose value is the user's
+///     Issues a <see cref="IdentityClaims.Subject" /> claim whose value is the user's
 ///     <see cref="ICanonicalName.CanonicalName" /> (e.g. <c>"users/{uid}"</c>), aligning
 ///     the Identity-issued cookie / token subject with the framework-wide AIP-122
 ///     canonical-name contract for resource-reference fields (<c>[ResourceReference]</c>).
@@ -36,7 +36,7 @@ public class SchemataUserClaimsPrincipalFactory<TUser, TRole> : UserClaimsPrinci
     protected override async Task<ClaimsIdentity> GenerateClaimsAsync(TUser user) {
         var identity = await base.GenerateClaimsAsync(user);
 
-        // The base factory issues Claims.Subject from user.Id.ToString() via
+        // The base factory issues IdentityClaims.Subject from user.Id.ToString() via
         // IdentityOptions.ClaimsIdentity.UserIdClaimType. Overwrite that value with the
         // canonical name so every Schemata code path reading `sub` sees the "users/{uid}" form.
         var existing = identity.FindFirst(Options.ClaimsIdentity.UserIdClaimType);

@@ -1,3 +1,4 @@
+using Schemata.Flow.Skeleton;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -15,8 +16,8 @@ namespace Schemata.Flow.StateMachine;
 /// <summary>Runs supported BPMN process definitions as single-token state machines.</summary>
 public sealed class StateMachineEngine : IFlowRuntime
 {
-    /// <summary>Engine name registered in <see cref="SchemataConstants.FlowEngines"/>.</summary>
-    public string EngineName => SchemataConstants.FlowEngines.StateMachine;
+    /// <summary>Engine name registered in <see cref="FlowConstants.Engines"/>.</summary>
+    public string EngineName => FlowConstants.Engines.StateMachine;
 
     public FlowRuntimeCapabilities Capabilities => FlowRuntimeCapabilities.ProcedureTasks;
 

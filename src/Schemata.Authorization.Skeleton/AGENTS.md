@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-72 files, ~2814 LOC. **Contract-only.** Zero concrete managers, services, endpoints or advisors — every implementation lives in `Schemata.Authorization.Foundation` (own AGENTS.md). The csproj references only `Schemata.Entity.Repository`, so no ASP.NET dependency reaches consumers of the contracts.
+73 files, ~2814 LOC. **Contract-only.** Zero concrete managers, services, endpoints or advisors — every implementation lives in `Schemata.Authorization.Foundation` (own AGENTS.md). The csproj references only `Schemata.Entity.Repository`, so no ASP.NET dependency reaches consumers of the contracts.
 
 ## STRUCTURE
 
@@ -15,7 +15,7 @@
 | `Handlers/` | 8 abstract endpoint bases + 3 strategy interfaces (`IGrantHandler`, `IInteractionHandler`, `ITokenExchangeHandler`) |
 | `Services/` | `IClientAuthentication<TApplication>` + `IClientAuthenticationService<TApplication>` |
 | `Models/` | ~24 DTO records (request/response/detail/summary shapes) |
-| root | `ScopeParser`, `AuthorizationResult`, `AuthorizationStatus`, `ConsentDecision`, `ILogoutNotifier`, `ISubjectProvider`, `ISubjectIdentifierService`, `IPairwiseSubjectTranslator` |
+| root | `AuthorizationConstants`, `ScopeParser`, `AuthorizationResult`, `AuthorizationStatus`, `ConsentDecision`, `ILogoutNotifier`, `ISubjectProvider`, `ISubjectIdentifierService`, `IPairwiseSubjectTranslator` |
 
 No `*Options` type ships here — all options live in Foundation.
 

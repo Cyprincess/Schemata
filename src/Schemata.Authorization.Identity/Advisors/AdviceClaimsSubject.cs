@@ -24,7 +24,7 @@ public sealed class AdviceClaimsSubject(ISubjectProvider subjects) : IClaimsAdvi
     public int Order => DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(AdviceContext ctx, List<Claim> claims, CancellationToken ct = default) {
-        var sub = claims.FirstOrDefault(c => c.Type == Claims.Subject)?.Value;
+        var sub = claims.FirstOrDefault(c => c.Type == IdentityClaims.Subject)?.Value;
         if (string.IsNullOrWhiteSpace(sub)) {
             return AdviseResult.Continue;
         }

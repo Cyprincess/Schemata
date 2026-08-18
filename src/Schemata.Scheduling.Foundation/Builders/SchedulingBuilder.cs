@@ -37,6 +37,22 @@ public sealed class SchedulingBuilder
     }
 
     /// <summary>
+    ///     Requires <paramref name="scheme" /> on the Scheduling resource endpoints, overriding the
+    ///     resource system's global default for the Scheduling resources alone. Call it before
+    ///     <c>MapHttp()</c> / <c>MapGrpc()</c>, which read the scheme when they register the
+    ///     resources.
+    /// </summary>
+    /// <param name="scheme">
+    ///     The authentication scheme; <see langword="null" /> restores the global default.
+    /// </param>
+    /// <returns>This builder for chaining.</returns>
+    public SchedulingBuilder WithAuthorization(string? scheme = null) {
+        Schemata.Set(SchedulingResourceRegistration.AuthenticationSchemeKey, scheme);
+
+        return this;
+    }
+
+    /// <summary>
     ///     Registers <typeparamref name="T" /> for keying without a schedule, so a job triggered
     ///     on-demand resolves its stable key after a restart.
     /// </summary>

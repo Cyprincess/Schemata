@@ -84,17 +84,17 @@ public sealed class RepositoryDriver(IServiceProvider services) : ISourceDriver
         var scope = _services.CreateAsyncScope();
         try {
             var services = scope.ServiceProvider;
-            Expression? entitlement = null;
+            Expression<Func<TEntity, bool>>? entitlement = null;
             if (subPlan.EnforceSecurity) {
-                entitlement = await InsightSecurityGate.AuthorizeAsync(typeof(TEntity), request, principal, services, ct);
+                entitlement = await InsightSecurityGate.AuthorizeAsync<TEntity>(request, principal, services, ct);
             }
             var shape = Lower(subPlan.Root);
             var residuals = new List<Func<TEntity, bool>>();
 
             IQueryable<TEntity> Query(IQueryable<TEntity> source) {
                 var query = source;
-                if (entitlement is Expression<Func<TEntity, bool>> e) {
-                    query = query.Where(e);
+                if (entitlement is not null) {
+                    query = query.Where(entitlement);
                 }
 
                 foreach (var filter in shape.Filters) {

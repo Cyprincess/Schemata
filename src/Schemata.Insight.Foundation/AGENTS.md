@@ -28,7 +28,7 @@ Insight resolves `IExpressionCompiler` and `IExpressionPushdownPlanner` **keyed*
 
 ## SECURITY
 
-`InsightSecurityGate.AuthorizeAsync` reflectively closes `IAccessProvider<rowType, QueryInsightRequest>` and `IEntitlementProvider<rowType, QueryInsightRequest>` from `Schemata.Security.Skeleton`. The source-access and row-entitlement gate runs **before** filter pushdown, so an entitlement expression stays inside the backend query rather than becoming a local filter.
+`InsightSecurityGate.AuthorizeAsync<TEntity>` resolves `IAccessProvider<TEntity, QueryInsightRequest>` and `IEntitlementProvider<TEntity, QueryInsightRequest>` from `Schemata.Security.Skeleton`. The row type is a generic parameter of the calling driver, so nothing is closed reflectively. The source-access and row-entitlement gate runs **before** filter pushdown, so an entitlement expression stays inside the backend query rather than becoming a local filter.
 
 ## ADVISORS
 

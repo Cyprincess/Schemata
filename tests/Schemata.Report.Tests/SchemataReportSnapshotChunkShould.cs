@@ -1,9 +1,5 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Schemata.Common;
 using Schemata.Report.Skeleton;
-using Schemata.Resource.Foundation;
-using Schemata.Resource.Foundation.Features;
 using Xunit;
 
 namespace Schemata.Report.Tests;
@@ -25,20 +21,5 @@ public class SchemataReportSnapshotChunkShould
                 Snapshot = "2026-07-18",
                 Name     = "chunk-0",
             }));
-    }
-
-    [Fact]
-    public void Chunk_Is_Not_Auto_Registered_As_Resource() {
-        var services = new ServiceCollection();
-        services.Configure<SchemataResourceOptions>(_ => { });
-
-        SchemataResourceFeature.RegisterDiscoveredResources(
-            services,
-            typeof(SchemataReportSnapshotChunk).Assembly.GetExportedTypes());
-
-        using var provider = services.BuildServiceProvider();
-        var options = provider.GetRequiredService<IOptions<SchemataResourceOptions>>().Value;
-
-        Assert.False(options.Resources.ContainsKey(typeof(SchemataReportSnapshotChunk).TypeHandle));
     }
 }

@@ -41,7 +41,9 @@ public sealed class SchemataReportHttpFeature<TReport, TSnapshot, TChunk> : Feat
         services.AddOptions<MvcOptions>()
                 .Configure(mvc => mvc.ModelMetadataDetailsProviders.Add(new ReadSnapshotBindingMetadataProvider()));
 
-        var resources = new SchemataResourceBuilder(schemata, services);
+        var resources = new SchemataResourceBuilder(schemata, services) {
+            AuthenticationScheme = schemata.Get<string>(SchemataReportBuilder<TReport, TSnapshot, TChunk>.AuthenticationSchemeKey),
+        };
         resources.Use<TReport, TReport, TReport, TReport>(
             [HttpResourceAttribute.Name],
             resource => resource.Methods = ReportResourceRegistration<TReport, TSnapshot>.ReportMethods);

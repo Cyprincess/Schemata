@@ -20,6 +20,7 @@ using Schemata.Authorization.Skeleton.Services;
 using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Tests;
 
@@ -232,7 +233,7 @@ public class AuthorizationCodeHandlerShould
         Assert.NotNull(identity);
         Assert.Equal(SchemataAuthorizationSchemes.Bearer, identity!.AuthenticationType);
         Assert.Contains(identity.Claims, c => c is { Type: Claims.ClientId, Value: TestClientId });
-        Assert.Contains(identity.Claims, c => c is { Type: Claims.Subject, Value : "user-1" });
+        Assert.Contains(identity.Claims, c => c is { Type: IdentityClaims.Subject, Value : "user-1" });
     }
 
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider

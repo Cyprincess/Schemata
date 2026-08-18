@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,31 +28,7 @@ public sealed class SchemataQuotaFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) {
-        var configure = configurators.Pop<RateLimiterOptions>();
-        services.AddRateLimiter(options => {
-            configure(options);
-
-            var rejected = options.OnRejected;
-            options.OnRejected = async (ctx, ct) => {
-                if (rejected is null) {
-                    throw CreateQuotaExceededException(ctx.HttpContext);
-                }
-
-                await rejected(ctx, ct);
-
-                if (ctx.HttpContext.Response.HasStarted) {
-                    return;
-                }
-
-                throw CreateQuotaExceededException(ctx.HttpContext);
-            };
-        });
-    }
-
-    private static QuotaExceededException CreateQuotaExceededException(HttpContext context) {
-        return new([new() { Subject = $"client:{context.Connection.RemoteIpAddress}", }]);
-    }
+    ) => services.AddSchemataRateLimiter(configurators.Pop<RateLimiterOptions>());
 
     public override void ConfigureApplication(
         IApplicationBuilder app,

@@ -8,7 +8,7 @@ using Schemata.Authorization.Foundation.Features;
 using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Core;
-using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;

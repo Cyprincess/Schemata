@@ -13,6 +13,7 @@ using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Handlers;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
 
@@ -34,7 +35,7 @@ public sealed class UserInfoHandler(IServiceProvider sp) : UserInfoEndpoint
     public override async Task<AuthorizationResult> HandleAsync(ClaimsPrincipal principal, CancellationToken ct) {
         var ctx = new AdviceContext(sp);
 
-        var sub    = principal.FindFirstValue(Claims.Subject);
+        var sub    = principal.FindFirstValue(IdentityClaims.Subject);
         var scope  = principal.FindFirstValue(Claims.Scope);
         var client = principal.FindFirstValue(Claims.ClientId);
         var scopes = ScopeParser.Parse(scope);
@@ -63,7 +64,7 @@ public sealed class UserInfoHandler(IServiceProvider sp) : UserInfoEndpoint
         var claims = new List<Claim>();
 
         if (!string.IsNullOrWhiteSpace(sub)) {
-            claims.Add(new(Claims.Subject, sub));
+            claims.Add(new(IdentityClaims.Subject, sub));
         }
 
         if (!string.IsNullOrWhiteSpace(client)) {

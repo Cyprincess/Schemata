@@ -11,6 +11,7 @@ using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
@@ -56,7 +57,7 @@ public sealed class AdviceAuthorizeConsent<TApp, TAuth>(IAuthorizationManager<TA
         var consent = prompts.Contains(PromptValues.Consent);
         var none    = prompts.Contains(PromptValues.None);
 
-        var subject = authz.Principal?.FindFirstValue(Claims.Subject);
+        var subject = authz.Principal?.FindFirstValue(IdentityClaims.Subject);
 
         var scopes = ScopeParser.Parse(authz.Request?.Scope);
 

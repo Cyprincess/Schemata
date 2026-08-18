@@ -1,3 +1,4 @@
+using Schemata.Flow.Skeleton;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -43,7 +44,7 @@ public sealed class ProcessRegistry : IProcessRegistry
         where TProcess : ProcessDefinition {
         var configuration = new ProcessConfiguration {
             Name           = typeof(TProcess).Name,
-            Engine         = engine ?? SchemataConstants.FlowEngines.StateMachine,
+            Engine         = engine ?? FlowConstants.Engines.StateMachine,
             DefinitionType = typeof(TProcess),
         };
 

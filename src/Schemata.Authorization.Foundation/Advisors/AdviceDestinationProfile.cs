@@ -6,6 +6,7 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Authorization.Foundation.Extensions;
 using Schemata.Authorization.Skeleton.Advisors;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
@@ -44,7 +45,7 @@ public sealed class AdviceDestinationProfile : IDestinationAdvisor
             case Claims.FamilyName:
             case Claims.MiddleName:
             case Claims.Nickname:
-            case Claims.PreferredUsername:
+            case IdentityClaims.PreferredUsername:
             case Claims.Profile:
             case Claims.Picture:
             case Claims.Website:

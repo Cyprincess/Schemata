@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using System.Threading;
@@ -473,8 +472,9 @@ public class PlanExecutorShould
             await CountAsync(materialized.Rows);
         }
 
-        var exception = await Assert.ThrowsAsync<TargetInvocationException>(async () => await executor.MaterializeAsync(RepositorySource(), new(), null));
-        Assert.IsType<MockException>(exception.InnerException);
+        // Negative control: with security enforced the gate really does reach the provider, so the
+        // strict mock rejects the un-setup call. Without this the pass above could be vacuous.
+        await Assert.ThrowsAsync<MockException>(async () => await executor.MaterializeAsync(RepositorySource(), new(), null));
     }
 
     [Fact]

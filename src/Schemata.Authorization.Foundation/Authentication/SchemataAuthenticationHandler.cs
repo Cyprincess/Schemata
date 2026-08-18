@@ -23,6 +23,7 @@ using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Common;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Authentication;
 
@@ -241,10 +242,10 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
             return AuthenticateResult.NoResult();
         }
 
-        var claims = id.Claims.Where(c => c.Type != Claims.Subject)
-                       .Append(new(Claims.Subject, entity.Subject ?? string.Empty))
+        var claims = id.Claims.Where(c => c.Type != IdentityClaims.Subject)
+                       .Append(new(IdentityClaims.Subject, entity.Subject ?? string.Empty))
                        .ToList();
-        principal = new(new ClaimsIdentity(claims, id.AuthenticationType, Claims.Subject, Claims.Role));
+        principal = new(new ClaimsIdentity(claims, id.AuthenticationType, IdentityClaims.Subject, IdentityClaims.Role));
 
         return AuthenticateResult.Success(new(principal, Scheme.Name));
     }
@@ -281,7 +282,7 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         var app = !string.IsNullOrWhiteSpace(client)
             ? (await apps.FindByClientIdAsync(client, ct))?.CanonicalName
             : null;
-        var @internal = principal.FindFirstValue(Claims.Subject);
+        var @internal = principal.FindFirstValue(IdentityClaims.Subject);
 
         switch (await Advisor.For<IClaimsAdvisor>()
                              .RunAsync(ctx, claims, ct)) {

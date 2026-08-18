@@ -15,6 +15,7 @@ using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
 
@@ -45,7 +46,7 @@ public sealed class EndSessionHandler<TApp>(
         ClaimsPrincipal   principal,
         CancellationToken ct
     ) {
-        var subject = principal.FindFirstValue(Claims.Subject);
+        var subject = principal.FindFirstValue(IdentityClaims.Subject);
         var session = principal.FindFirstValue(config.Value.SessionIdClaimType);
 
         TApp? application = null;
@@ -70,7 +71,7 @@ public sealed class EndSessionHandler<TApp>(
                 }
             }
 
-            subject ??= hint?.FindFirstValue(Claims.Subject);
+            subject ??= hint?.FindFirstValue(IdentityClaims.Subject);
             session ??= hint?.FindFirstValue(Claims.SessionId);
         }
 

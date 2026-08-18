@@ -31,7 +31,9 @@ public sealed class SchemataSchedulingGrpcFeature : FeatureBase
     ) {
         SchedulingResourceRegistration.RegisterHandlers(services);
 
-        var resources = new SchemataResourceBuilder(schemata, services);
+        var resources = new SchemataResourceBuilder(schemata, services) {
+            AuthenticationScheme = schemata.Get<string>(SchedulingResourceRegistration.AuthenticationSchemeKey),
+        };
         resources.Use<SchemataJob, SchemataJob, SchemataJob, SchemataJob>(
             [GrpcResourceAttribute.Name],
             resource => resource.Methods = SchedulingResourceRegistration.JobMethods);

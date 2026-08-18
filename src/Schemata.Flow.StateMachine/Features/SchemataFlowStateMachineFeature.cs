@@ -6,6 +6,7 @@ using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Flow.Foundation.Features;
+using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.StateMachine.Features;
@@ -25,7 +26,7 @@ public sealed class SchemataFlowStateMachineFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        services.TryAddKeyedSingleton<IFlowRuntime, StateMachineEngine>(SchemataConstants.FlowEngines.StateMachine);
+        services.TryAddKeyedSingleton<IFlowRuntime, StateMachineEngine>(FlowConstants.Engines.StateMachine);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowEngineValidator, StateMachineFlowEngineValidator>());
     }
 }

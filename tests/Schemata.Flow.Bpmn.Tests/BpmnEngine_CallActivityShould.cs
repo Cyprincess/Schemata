@@ -1,3 +1,4 @@
+using Schemata.Flow.Skeleton;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -205,9 +206,9 @@ public class BpmnEngine_CallActivityShould
         private static ProcessRegistration Registration(string name, ProcessDefinition definition) {
             return new() {
                 Name          = name,
-                Engine        = SchemataConstants.FlowEngines.Bpmn,
+                Engine        = FlowConstants.Engines.Bpmn,
                 Definition    = definition,
-                Configuration = new() { Name = name, Engine = SchemataConstants.FlowEngines.Bpmn },
+                Configuration = new() { Name = name, Engine = FlowConstants.Engines.Bpmn },
             };
         }
 

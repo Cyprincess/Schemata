@@ -7,6 +7,7 @@ using Schemata.Authorization.Foundation.Extensions;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Security.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
@@ -30,7 +31,7 @@ public sealed class AdviceDestinationRole : IDestinationAdvisor
         ClaimsPrincipal   principal,
         CancellationToken ct = default
     ) {
-        if (claim.Type != Claims.Role) {
+        if (claim.Type != IdentityClaims.Role) {
             return Task.FromResult(AdviseResult.Continue);
         }
 

@@ -15,6 +15,7 @@ using Schemata.Authorization.Skeleton.Models;
 using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Tests;
 
@@ -108,7 +109,7 @@ public class DeviceInteractionHandlerShould
     }
 
     private static ClaimsPrincipal CreatePrincipal(string subject = "users/u-42", string sid = "sess-99") {
-        return new(new ClaimsIdentity([new(Claims.Subject, subject), new("sid", sid)], "test"));
+        return new(new ClaimsIdentity([new(IdentityClaims.Subject, subject), new("sid", sid)], "test"));
     }
 
     [Fact]

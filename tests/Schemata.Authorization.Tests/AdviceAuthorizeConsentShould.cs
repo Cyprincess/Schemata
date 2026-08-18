@@ -12,6 +12,7 @@ using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Tests;
 
@@ -65,7 +66,7 @@ public class AdviceAuthorizeConsentShould
     }
 
     private static ClaimsPrincipal CreatePrincipal(string subject) {
-        return new(new ClaimsIdentity([new(Claims.Subject, subject)], "test"));
+        return new(new ClaimsIdentity([new(IdentityClaims.Subject, subject)], "test"));
     }
 
     private static Mock<IAuthorizationManager<SchemataAuthorization>> SetupAuthzMgr(

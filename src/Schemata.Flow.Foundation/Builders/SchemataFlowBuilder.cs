@@ -58,7 +58,7 @@ public sealed class SchemataFlowBuilder
         where TProcess : ProcessDefinition {
         var config = new ProcessConfiguration {
             Name           = typeof(TProcess).Name,
-            Engine         = engine ?? SchemataConstants.FlowEngines.StateMachine,
+            Engine         = engine ?? FlowConstants.Engines.StateMachine,
             DefinitionType = typeof(TProcess),
         };
 

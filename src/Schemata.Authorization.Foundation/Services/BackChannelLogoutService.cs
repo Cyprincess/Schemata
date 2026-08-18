@@ -16,6 +16,7 @@ using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Common;
 using Schemata.Scheduling.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Services;
 
@@ -88,7 +89,7 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
             }
 
             if (!string.IsNullOrWhiteSpace(sub)) {
-                claims.Add(new(Claims.Subject, sub));
+                claims.Add(new(IdentityClaims.Subject, sub));
             }
 
             if (!string.IsNullOrWhiteSpace(app.ClientId)) {

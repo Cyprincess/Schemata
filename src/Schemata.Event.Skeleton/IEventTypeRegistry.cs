@@ -28,6 +28,12 @@ public interface IEventTypeRegistry
     Type? Resolve(string name);
 
     /// <summary>
+    ///     Returns the delivery mode configured for <paramref name="type" />, or
+    ///     <see cref="EventRouting.Broadcast" /> when none was configured.
+    /// </summary>
+    EventRouting GetRouting(Type type);
+
+    /// <summary>
     ///     Returns the registered name for <paramref name="type" /> or throws
     ///     <see cref="InvalidOperationException" /> when unregistered. Use at publish boundaries
     ///     where a missing registration is a programmer error.

@@ -90,7 +90,7 @@ internal static class IdempotencyHelper
     ///     a cached result is only replayed to the caller that produced it.
     /// </summary>
     public static string PrincipalId(ClaimsPrincipal? principal) {
-        return principal?.FindFirst(Claims.Subject)?.Value
+        return principal?.FindFirst(IdentityClaims.Subject)?.Value
             ?? principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? principal?.Identity?.Name
             ?? Principals.Anonymous;

@@ -40,7 +40,7 @@ public sealed partial class IdentityHandler<TUser>
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
-            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(Claims.Subject));
+            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(IdentityClaims.Subject));
         }
 
         var claims = new ClaimsStore();
@@ -83,7 +83,7 @@ public sealed partial class IdentityHandler<TUser>
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
-            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(Claims.Subject));
+            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(IdentityClaims.Subject));
         }
 
         await SendConfirmationCodeAsync(found, request.EmailAddress, null);
@@ -122,7 +122,7 @@ public sealed partial class IdentityHandler<TUser>
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
-            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(Claims.Subject));
+            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(IdentityClaims.Subject));
         }
 
         await SendConfirmationCodeAsync(found, null, request.PhoneNumber);
@@ -161,7 +161,7 @@ public sealed partial class IdentityHandler<TUser>
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
-            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(Claims.Subject));
+            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(IdentityClaims.Subject));
         }
 
         var result = await _users.ChangePasswordAsync(found, request.OldPassword!, request.NewPassword!);
@@ -205,7 +205,7 @@ public sealed partial class IdentityHandler<TUser>
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
-            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(Claims.Subject));
+            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(IdentityClaims.Subject));
         }
 
         var result = new AuthenticatorResponse { IsTwoFactorEnabled = await _users.GetTwoFactorEnabledAsync(found) };
@@ -249,7 +249,7 @@ public sealed partial class IdentityHandler<TUser>
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
-            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(Claims.Subject));
+            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(IdentityClaims.Subject));
         }
 
         await _users.SetTwoFactorEnabledAsync(found, true);
@@ -288,7 +288,7 @@ public sealed partial class IdentityHandler<TUser>
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
-            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(Claims.Subject));
+            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(IdentityClaims.Subject));
         }
 
         var passed = request switch {

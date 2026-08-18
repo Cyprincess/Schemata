@@ -7,7 +7,6 @@ using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using Schemata.Abstractions.Json;
 using Schemata.Common;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Core.Json;
 
@@ -19,6 +18,8 @@ namespace Schemata.Core.Json;
 /// </summary>
 public class PolymorphicTypeResolver : DefaultJsonTypeInfoResolver
 {
+    private const string TypeDiscriminator = "@type";
+
     private readonly Dictionary<RuntimeTypeHandle, List<JsonDerivedType>?> _types = [];
 
     private PolymorphicTypeResolver() {
@@ -49,7 +50,7 @@ public class PolymorphicTypeResolver : DefaultJsonTypeInfoResolver
         }
 
         info.PolymorphismOptions = new() {
-            TypeDiscriminatorPropertyName        = Parameters.Type,
+            TypeDiscriminatorPropertyName        = TypeDiscriminator,
             IgnoreUnrecognizedTypeDiscriminators = true,
             UnknownDerivedTypeHandling           = JsonUnknownDerivedTypeHandling.FailSerialization,
         };

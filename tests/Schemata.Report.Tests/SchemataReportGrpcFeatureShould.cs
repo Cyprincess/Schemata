@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Core;
@@ -28,24 +27,24 @@ public class SchemataReportGrpcFeatureShould
             schema.UseReport().MapGrpc();
         });
 
-        using var app = builder.Build();
-        var options = app.Services.GetRequiredService<IOptions<SchemataResourceOptions>>().Value;
+        using var app      = builder.Build();
+        var       registry = app.Services.GetRequiredService<IResourceRegistry>();
 
         Assert.True(schemata!.HasFeature<SchemataReportGrpcFeature<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>());
         Assert.Equal(
             SchemataReportFeature<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>.DefaultPriority + 200_000,
             new SchemataReportGrpcFeature<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>().Priority);
-        Assert.Contains(typeof(SchemataReport).TypeHandle, options.Resources.Keys);
-        Assert.Contains(typeof(SchemataReportSnapshot).TypeHandle, options.Resources.Keys);
+        Assert.NotNull(registry.GetResource(typeof(SchemataReport)));
+        Assert.NotNull(registry.GetResource(typeof(SchemataReportSnapshot)));
 
-        var generate = Assert.Single(options.Methods[typeof(SchemataReport).TypeHandle]);
+        var generate = Assert.Single(registry.GetMethods(typeof(SchemataReport)));
         Assert.Equal(Verbs.Generate, generate.Verb);
         Assert.Equal(typeof(GenerateHandler<SchemataReport>), generate.Handler);
         Assert.Equal(ResourceMethodScope.Collection, generate.Scope);
         Assert.Equal(typeof(Operation), ResponseType(generate.Handler));
         Assert.Equal("GenerateReport", GrpcResourceNaming.CustomMethodName(ResourceNameDescriptor.ForType(typeof(SchemataReport)), generate.Verb));
 
-        var read = Assert.Single(options.Methods[typeof(SchemataReportSnapshot).TypeHandle]);
+        var read = Assert.Single(registry.GetMethods(typeof(SchemataReportSnapshot)));
         Assert.Equal(Verbs.Read, read.Verb);
         Assert.Equal(typeof(ReadSnapshotHandler<SchemataReportSnapshot>), read.Handler);
         Assert.Equal(ResourceMethodScope.Instance, read.Scope);
@@ -58,11 +57,11 @@ public class SchemataReportGrpcFeatureShould
         var builder = WebApplication.CreateBuilder();
         builder.UseSchemata(schema => schema.UseReport().MapGrpc().MapGrpc());
 
-        using var app = builder.Build();
-        var options = app.Services.GetRequiredService<IOptions<SchemataResourceOptions>>().Value;
+        using var app      = builder.Build();
+        var       registry = app.Services.GetRequiredService<IResourceRegistry>();
 
-        Assert.Single(options.Methods[typeof(SchemataReport).TypeHandle], method => method.Verb == Verbs.Generate);
-        Assert.Single(options.Methods[typeof(SchemataReportSnapshot).TypeHandle], method => method.Verb == Verbs.Read);
+        Assert.Single(registry.GetMethods(typeof(SchemataReport)), method => method.Verb == Verbs.Generate);
+        Assert.Single(registry.GetMethods(typeof(SchemataReportSnapshot)), method => method.Verb == Verbs.Read);
     }
 
     private static Type ResponseType(Type handler) {

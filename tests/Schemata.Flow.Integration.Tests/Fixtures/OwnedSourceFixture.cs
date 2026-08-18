@@ -172,8 +172,8 @@ public sealed class OwnedSourceFixture : IAsyncLifetime
         services.TryAddScoped<IFlowRunner>(sp => sp.GetRequiredService<FlowRunner>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IFlowSourceAdvisor<>), typeof(AdviceSourceProjection<>)));
 
-        services.TryAddKeyedSingleton<IFlowRuntime, StateMachineEngine>(SchemataConstants.FlowEngines.StateMachine);
-        services.TryAddKeyedSingleton<IFlowRuntime, BpmnEngine>(SchemataConstants.FlowEngines.Bpmn);
+        services.TryAddKeyedSingleton<IFlowRuntime, StateMachineEngine>(FlowConstants.Engines.StateMachine);
+        services.TryAddKeyedSingleton<IFlowRuntime, BpmnEngine>(FlowConstants.Engines.Bpmn);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowEngineValidator, StateMachineFlowEngineValidator>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowEngineValidator, BpmnFlowEngineValidator>());
 
@@ -185,8 +185,8 @@ public sealed class OwnedSourceFixture : IAsyncLifetime
         }
 
         var registry = _root.GetRequiredService<IProcessRegistry>();
-        await registry.RegisterAsync<OwnedTimerProcess>(SchemataConstants.FlowEngines.Bpmn);
-        await registry.RegisterAsync<OwnedTaskProcess>(SchemataConstants.FlowEngines.StateMachine);
+        await registry.RegisterAsync<OwnedTimerProcess>(FlowConstants.Engines.Bpmn);
+        await registry.RegisterAsync<OwnedTaskProcess>(FlowConstants.Engines.StateMachine);
     }
 
     public async Task DisposeAsync() {

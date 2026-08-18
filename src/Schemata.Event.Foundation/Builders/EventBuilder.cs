@@ -60,7 +60,8 @@ public sealed class EventBuilder
     /// <summary>Sets the <see cref="EventRouting"/> mode for <typeparamref name="TEvent"/>.</summary>
     public EventBuilder ConfigureRouting<TEvent>(EventRouting routing)
         where TEvent : IEvent {
-        Services.Configure<SchemataEventOptions>(options => options.RoutingTable[typeof(TEvent)] = routing);
+        Services.AddSingleton<IPostConfigureOptions<EventTypeRegistryConfiguration>>(
+            new ConfigureRoutingConfiguration(typeof(TEvent), routing));
         return this;
     }
 }

@@ -5,7 +5,7 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
-using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 

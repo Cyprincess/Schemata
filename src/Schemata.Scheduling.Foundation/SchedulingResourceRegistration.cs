@@ -16,6 +16,13 @@ namespace Schemata.Scheduling.Foundation;
 /// </summary>
 internal static class SchedulingResourceRegistration
 {
+    /// <summary>
+    ///     Options-bag key carrying the authentication scheme set through
+    ///     <c>SchedulingBuilder.WithAuthorization</c>, read by the transport packages when they
+    ///     register the Scheduling resources.
+    /// </summary>
+    internal const string AuthenticationSchemeKey = "Scheduling:AuthenticationScheme";
+
     /// <summary>The AIP-136 <c>:run</c> custom method on <see cref="SchemataJob" />.</summary>
     internal static readonly ResourceMethodAttribute[] JobMethods = [
         new(Verbs.Run, typeof(RunJobHandler)),

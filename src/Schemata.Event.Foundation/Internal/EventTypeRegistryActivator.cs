@@ -17,6 +17,10 @@ internal static class EventTypeRegistryActivator
             registry.Register(type, name);
         }
 
+        foreach (var (type, routing) in options.Value.Routings) {
+            registry.SetRouting(type, routing);
+        }
+
         return registry;
     }
 }

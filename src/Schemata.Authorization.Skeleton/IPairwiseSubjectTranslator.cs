@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Skeleton;
 
@@ -26,7 +27,7 @@ namespace Schemata.Authorization.Skeleton;
 ///             <description>
 ///                 Convert an outgoing canonical subject back to pairwise form for the
 ///                 caller's client if that client uses
-///                 <c>SchemataConstants.SubjectTypes.Pairwise</c> (<see cref="ToPairwiseAsync" />).
+    ///                 <c>AuthorizationConstants.SubjectTypes.Pairwise</c> (<see cref="ToPairwiseAsync" />).
 ///             </description>
 ///         </item>
 ///     </list>

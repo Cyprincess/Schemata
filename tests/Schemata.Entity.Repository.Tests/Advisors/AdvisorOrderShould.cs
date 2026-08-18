@@ -1,6 +1,6 @@
 // TestRepository below is a structural type-token: it serves as TImpl in the
-// AddRepository<TEntity, TImpl>() generic registration, a role a Moq proxy cannot fill.
-// It is retained as a hand-written stub as a sanctioned exception to the Moq-only rule.
+// AddRepository<TEntity, TImpl>() generic registration, which needs a type nameable at
+// compile time — a role a Moq proxy cannot fill.
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;

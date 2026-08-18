@@ -1,3 +1,4 @@
+using Schemata.Flow.Skeleton;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -105,7 +106,7 @@ public class FlowRunnerIdempotencyShould
         registry.Setup(r => r.GetRegistration("def"))
                 .Returns(new ProcessRegistration {
                      Name          = "def",
-                     Engine        = SchemataConstants.FlowEngines.StateMachine,
+                     Engine        = FlowConstants.Engines.StateMachine,
                      Definition    = new IdempotentProcess(),
                      Configuration = new ProcessConfiguration(),
                  });
@@ -123,7 +124,7 @@ public class FlowRunnerIdempotencyShould
                       .AddSingleton(transitions.Object)
                       .AddSingleton(sources.Object)
                       .AddSingleton(compensations.Object)
-                      .AddKeyedSingleton<IFlowRuntime>(SchemataConstants.FlowEngines.StateMachine, engine.Object)
+                      .AddKeyedSingleton<IFlowRuntime>(FlowConstants.Engines.StateMachine, engine.Object)
                       .BuildServiceProvider();
 
         var notifier = new ProcessLifecycleNotifier([], Mock.Of<ILogger<ProcessLifecycleNotifier>>());

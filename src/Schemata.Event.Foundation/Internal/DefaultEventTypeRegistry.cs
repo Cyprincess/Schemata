@@ -12,8 +12,9 @@ namespace Schemata.Event.Foundation.Internal;
 /// </summary>
 public sealed class DefaultEventTypeRegistry : IEventTypeRegistry
 {
-    private readonly ConcurrentDictionary<string, Type> _byName = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<Type, string> _byType = new();
+    private readonly ConcurrentDictionary<string, Type>       _byName  = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<Type, string>       _byType  = new();
+    private readonly ConcurrentDictionary<Type, EventRouting> _routing = new();
 
     #region IEventTypeRegistry Members
 
@@ -50,9 +51,22 @@ public sealed class DefaultEventTypeRegistry : IEventTypeRegistry
         _byName[name] = type;
     }
 
+    /// <summary>Sets the delivery mode for <paramref name="type" />.</summary>
+    public void SetRouting(Type type, EventRouting routing) {
+        if (type is null) {
+            throw new ArgumentNullException(nameof(type));
+        }
+
+        _routing[type] = routing;
+    }
+
     public string? GetName(Type type) { return _byType.GetValueOrDefault(type); }
 
     public Type? Resolve(string name) { return _byName.GetValueOrDefault(name); }
+
+    public EventRouting GetRouting(Type type) {
+        return _routing.GetValueOrDefault(type, EventRouting.Broadcast);
+    }
 
     public string RequireName(Type type) {
         return _byType.TryGetValue(type, out var name)

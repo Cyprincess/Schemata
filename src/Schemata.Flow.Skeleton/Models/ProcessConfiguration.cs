@@ -10,7 +10,7 @@ public sealed class ProcessConfiguration
     public string Name { get; set; } = null!;
 
     /// <summary>Engine that executes this definition.  Defaults to the state-machine engine.</summary>
-    public string Engine { get; set; } = SchemataConstants.FlowEngines.StateMachine;
+    public string Engine { get; set; } = FlowConstants.Engines.StateMachine;
 
     /// <summary>CLR type of the <see cref="ProcessDefinition" /> subclass.</summary>
     public Type? DefinitionType { get; set; }

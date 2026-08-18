@@ -49,4 +49,23 @@ public static class EndpointBuilderExtensions
 
         return endpoints;
     }
+
+    /// <summary>
+    ///     Maps every entry of <paramref name="options" /> as an anonymous GET route under
+    ///     <c>/.well-known/</c>.
+    /// </summary>
+    /// <param name="endpoints">The endpoint route builder.</param>
+    /// <param name="options">The well-known route table.</param>
+    /// <returns>The endpoint route builder for chaining.</returns>
+    public static IEndpointRouteBuilder MapSchemataWellKnown(
+        this IEndpointRouteBuilder endpoints,
+        WellKnownOptions           options
+    ) {
+        foreach (var (suffix, handler) in options.Endpoints) {
+            endpoints.MapGet($"/.well-known/{suffix}", handler)
+                     .AllowAnonymous();
+        }
+
+        return endpoints;
+    }
 }

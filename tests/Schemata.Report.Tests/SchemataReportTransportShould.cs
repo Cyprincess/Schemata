@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Report.Foundation;
@@ -20,20 +19,20 @@ public class SchemataReportTransportShould
         var builder = WebApplication.CreateBuilder();
         builder.UseSchemata(schema => schema.UseReport().MapHttp().MapGrpc());
 
-        using var app     = builder.Build();
-        var       options = app.Services.GetRequiredService<IOptions<SchemataResourceOptions>>().Value;
+        using var app      = builder.Build();
+        var       registry = app.Services.GetRequiredService<IResourceRegistry>();
 
-        Assert.Contains(typeof(SchemataReport).TypeHandle, options.Resources.Keys);
-        Assert.Contains(typeof(SchemataReportSnapshot).TypeHandle, options.Resources.Keys);
-        Assert.DoesNotContain(typeof(SchemataReportSnapshotChunk).TypeHandle, options.Resources.Keys);
+        Assert.NotNull(registry.GetResource(typeof(SchemataReport)));
+        Assert.NotNull(registry.GetResource(typeof(SchemataReportSnapshot)));
+        Assert.Null(registry.GetResource(typeof(SchemataReportSnapshotChunk)));
 
-        var report = options.Resources[typeof(SchemataReport).TypeHandle];
+        var report = registry.GetResource(typeof(SchemataReport))!;
         Assert.Null(report.Operations);
         Assert.Equal(
             [HttpResourceAttribute.Name, GrpcResourceAttribute.Name],
             report.Endpoints!.OrderBy(endpoint => endpoint, StringComparer.Ordinal));
 
-        var snapshot = options.Resources[typeof(SchemataReportSnapshot).TypeHandle];
+        var snapshot = registry.GetResource(typeof(SchemataReportSnapshot))!;
         Assert.Equal([Operations.List, Operations.Get], snapshot.Operations!);
         Assert.Equal(
             [HttpResourceAttribute.Name, GrpcResourceAttribute.Name],
@@ -45,14 +44,14 @@ public class SchemataReportTransportShould
         var builder = WebApplication.CreateBuilder();
         builder.UseSchemata(schema => schema.UseReport().MapHttp().MapGrpc());
 
-        using var app     = builder.Build();
-        var       options = app.Services.GetRequiredService<IOptions<SchemataResourceOptions>>().Value;
+        using var app      = builder.Build();
+        var       registry = app.Services.GetRequiredService<IResourceRegistry>();
 
-        var generate = Assert.Single(options.Methods[typeof(SchemataReport).TypeHandle]);
+        var generate = Assert.Single(registry.GetMethods(typeof(SchemataReport)));
         Assert.Equal(Verbs.Generate, generate.Verb);
         Assert.Equal(typeof(GenerateHandler<SchemataReport>), generate.Handler);
 
-        var read = Assert.Single(options.Methods[typeof(SchemataReportSnapshot).TypeHandle]);
+        var read = Assert.Single(registry.GetMethods(typeof(SchemataReportSnapshot)));
         Assert.Equal(Verbs.Read, read.Verb);
         Assert.Equal(typeof(ReadSnapshotHandler<SchemataReportSnapshot>), read.Handler);
     }
@@ -75,13 +74,14 @@ public class SchemataReportTransportShould
     [Fact]
     public void UseReport_Without_Transports_Registers_No_Resources() {
         var builder = WebApplication.CreateBuilder();
+        builder.Services.AddSingleton<IResourceRegistry>(new ResourceRegistry());
         builder.UseSchemata(schema => schema.UseReport());
 
-        using var app     = builder.Build();
-        var       options = app.Services.GetRequiredService<IOptions<SchemataResourceOptions>>().Value;
+        using var app      = builder.Build();
+        var       registry = app.Services.GetRequiredService<IResourceRegistry>();
 
-        Assert.DoesNotContain(typeof(SchemataReport).TypeHandle, options.Resources.Keys);
-        Assert.DoesNotContain(typeof(SchemataReportSnapshot).TypeHandle, options.Resources.Keys);
+        Assert.Null(registry.GetResource(typeof(SchemataReport)));
+        Assert.Null(registry.GetResource(typeof(SchemataReportSnapshot)));
     }
 
     [Fact]

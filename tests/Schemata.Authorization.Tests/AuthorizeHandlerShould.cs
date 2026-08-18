@@ -14,6 +14,7 @@ using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Tests;
 
@@ -39,7 +40,7 @@ public class AuthorizeHandlerShould
     }
 
     private static ClaimsPrincipal AuthenticatedUser(string subject = "user-1") {
-        return new(new ClaimsIdentity([new(Claims.Subject, subject)], "test"));
+        return new(new ClaimsIdentity([new(IdentityClaims.Subject, subject)], "test"));
     }
 
     [Fact]

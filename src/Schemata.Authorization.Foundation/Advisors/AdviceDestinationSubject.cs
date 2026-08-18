@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Authorization.Skeleton.Advisors;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
@@ -45,7 +46,7 @@ public sealed class AdviceDestinationSubject : IDestinationAdvisor
         CancellationToken ct = default
     ) {
         switch (claim.Type) {
-            case Claims.Subject:
+            case IdentityClaims.Subject:
                 destinations.Add(ClaimDestinations.AccessToken);
 
                 destinations.Add(ClaimDestinations.IdentityToken);

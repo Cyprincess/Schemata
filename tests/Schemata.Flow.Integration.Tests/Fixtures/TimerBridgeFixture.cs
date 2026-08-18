@@ -71,7 +71,7 @@ public sealed class TimerBridgeFixture : IAsyncLifetime
         services.TryAddScoped<IFlowRunner>(sp => sp.GetRequiredService<FlowRunner>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IFlowSourceAdvisor<>), typeof(AdviceSourceProjection<>)));
 
-        services.TryAddKeyedSingleton<IFlowRuntime, BpmnEngine>(SchemataConstants.FlowEngines.Bpmn);
+        services.TryAddKeyedSingleton<IFlowRuntime, BpmnEngine>(FlowConstants.Engines.Bpmn);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowEngineValidator, BpmnFlowEngineValidator>());
 
         ConfigureFeature(new SchemataSchedulingFeature(), services);
@@ -91,8 +91,8 @@ public sealed class TimerBridgeFixture : IAsyncLifetime
         await _root.GetRequiredService<IScheduler>().StartAsync(default);
 
         var registry = _root.GetRequiredService<IProcessRegistry>();
-        await registry.RegisterAsync<ParallelTimerProcess>(SchemataConstants.FlowEngines.Bpmn);
-        await registry.RegisterAsync<SourceTimerProcess>(SchemataConstants.FlowEngines.Bpmn);
+        await registry.RegisterAsync<ParallelTimerProcess>(FlowConstants.Engines.Bpmn);
+        await registry.RegisterAsync<SourceTimerProcess>(FlowConstants.Engines.Bpmn);
     }
 
     public async Task DisposeAsync() {

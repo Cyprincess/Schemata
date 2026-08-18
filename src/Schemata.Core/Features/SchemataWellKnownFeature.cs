@@ -38,12 +38,5 @@ public sealed class SchemataWellKnownFeature : FeatureBase
         IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
         IWebHostEnvironment   environment
-    ) {
-        var options = app.ApplicationServices.GetRequiredService<WellKnownOptions>();
-
-        foreach (var (suffix, handler) in options.Endpoints) {
-            endpoints.MapGet($"/.well-known/{suffix}", handler)
-                     .AllowAnonymous();
-        }
-    }
+    ) => endpoints.MapSchemataWellKnown(app.ApplicationServices.GetRequiredService<WellKnownOptions>());
 }

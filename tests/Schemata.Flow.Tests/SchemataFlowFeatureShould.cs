@@ -34,7 +34,7 @@ public sealed class SchemataFlowFeatureShould
         Configure(new SchemataFlowFeature(), services);
 
         var provider = services.BuildServiceProvider();
-        var runtime  = provider.GetKeyedService<IFlowRuntime>(SchemataConstants.FlowEngines.StateMachine);
+        var runtime  = provider.GetKeyedService<IFlowRuntime>(FlowConstants.Engines.StateMachine);
 
         Assert.Null(runtime);
     }
@@ -46,7 +46,7 @@ public sealed class SchemataFlowFeatureShould
         Configure(new SchemataFlowStateMachineFeature(), services);
 
         var provider   = services.BuildServiceProvider();
-        var runtime    = provider.GetKeyedService<IFlowRuntime>(SchemataConstants.FlowEngines.StateMachine);
+        var runtime    = provider.GetKeyedService<IFlowRuntime>(FlowConstants.Engines.StateMachine);
         var validators = provider.GetServices<IFlowEngineValidator>();
 
         Assert.IsType<StateMachineEngine>(runtime);

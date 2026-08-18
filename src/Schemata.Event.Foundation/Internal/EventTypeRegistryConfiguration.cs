@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Schemata.Event.Skeleton;
 
 namespace Schemata.Event.Foundation.Internal;
 
@@ -13,4 +14,7 @@ public sealed class EventTypeRegistryConfiguration
 {
     /// <summary>The accumulated (event type, wire name) pairs registered through <see cref="Builders.EventBuilder.RegisterEvent{TEvent}"/>.</summary>
     public List<(Type Type, string Name)> Registrations { get; } = [];
+
+    /// <summary>The accumulated delivery modes set through <see cref="Builders.EventBuilder.ConfigureRouting{TEvent}"/>.</summary>
+    public List<(Type Type, EventRouting Routing)> Routings { get; } = [];
 }

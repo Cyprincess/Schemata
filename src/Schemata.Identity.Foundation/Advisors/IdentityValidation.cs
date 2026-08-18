@@ -46,7 +46,7 @@ internal static class IdentityValidation
         where TUser : SchemataUser, new() {
         var user = await users.GetUserAsync(principal);
         if (user is null) {
-            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(Claims.Subject));
+            throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(IdentityClaims.Subject));
         }
 
         return user;

@@ -18,6 +18,7 @@ using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Common;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
 
@@ -158,7 +159,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
     ) {
         // The interaction page calls this endpoint over XHR; a cookie challenge would answer with a
         // redirect the caller cannot follow, so an unauthenticated approval is a plain 401.
-        var subject = principal.FindFirstValue(Claims.Subject);
+        var subject = principal.FindFirstValue(IdentityClaims.Subject);
         if (string.IsNullOrWhiteSpace(subject)) {
             throw new UnauthenticatedException(
                 message: SchemataResources.GetResourceString(SchemataResources.USER_AUTHENTICATION_REQUIRED));
@@ -192,7 +193,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
         }
 
         var claims = new List<Claim> {
-            new(Claims.Subject, subject),
+            new(IdentityClaims.Subject, subject),
             new(Claims.ClientId, application.ClientId),
         };
 

@@ -6,6 +6,7 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Authorization.Foundation.Extensions;
 using Schemata.Authorization.Skeleton.Advisors;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
@@ -39,7 +40,7 @@ public sealed class AdviceDestinationEmail : IDestinationAdvisor
         CancellationToken ct = default
     ) {
         switch (claim.Type) {
-            case Claims.Email:
+            case IdentityClaims.Email:
             case Claims.EmailVerified:
                 if (!principal.HasScope(Scopes.Email)) {
                     return Task.FromResult(AdviseResult.Handle);

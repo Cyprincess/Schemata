@@ -8,7 +8,7 @@ using Schemata.Authorization.Foundation.Managers;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Entity.Repository;
 using Xunit;
-using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Tests;
 

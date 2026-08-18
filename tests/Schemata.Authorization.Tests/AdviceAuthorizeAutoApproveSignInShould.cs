@@ -16,6 +16,7 @@ using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Tests;
 
@@ -42,7 +43,7 @@ public class AdviceAuthorizeAutoApproveSignInShould
         string sid      = "sess-1",
         string clientId = "app-1"
     ) {
-        var claims = new List<Claim> { new(Claims.Subject, subject), new("sid", sid) };
+        var claims = new List<Claim> { new(IdentityClaims.Subject, subject), new("sid", sid) };
         return new() {
             Application     = new() {
                 Uid           = Identifiers.NewUid(),

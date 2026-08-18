@@ -1,3 +1,4 @@
+using Schemata.Flow.Skeleton;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -55,7 +56,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 {
     #region IFlowRuntime Members
 
-    public string EngineName => SchemataConstants.FlowEngines.Bpmn;
+    public string EngineName => FlowConstants.Engines.Bpmn;
 
     public FlowRuntimeCapabilities Capabilities => FlowRuntimeCapabilities.All;
 

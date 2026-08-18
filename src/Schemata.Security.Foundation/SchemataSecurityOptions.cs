@@ -6,5 +6,5 @@ namespace Schemata.Security.Foundation;
 public class SchemataSecurityOptions
 {
     /// <summary>Claim type for permission lookup on a ClaimsPrincipal. Default: "role".</summary>
-    public string PermissionClaimType { get; set; } = SchemataConstants.Claims.Role;
+    public string PermissionClaimType { get; set; } = SchemataConstants.IdentityClaims.Role;
 }

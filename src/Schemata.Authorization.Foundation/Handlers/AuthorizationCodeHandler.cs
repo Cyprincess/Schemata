@@ -19,6 +19,7 @@ using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
 
@@ -154,7 +155,7 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
         }
 
         var claims = new List<Claim> {
-            new(Claims.Subject, token.Subject),
+            new(IdentityClaims.Subject, token.Subject),
             new(Claims.ClientId, application.ClientId),
         };
 

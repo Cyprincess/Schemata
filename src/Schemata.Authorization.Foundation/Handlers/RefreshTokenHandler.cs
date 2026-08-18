@@ -20,6 +20,7 @@ using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
 
@@ -174,7 +175,7 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
         };
 
         if (!string.IsNullOrWhiteSpace(token.Subject)) {
-            claims.Add(new(Claims.Subject, token.Subject));
+            claims.Add(new(IdentityClaims.Subject, token.Subject));
         }
 
         var issuedScope = string.IsNullOrWhiteSpace(request.Scope) ? scope : request.Scope;

@@ -7,7 +7,7 @@
 ```
 Schemata.Abstractions/
 ├── IFeature.cs            # Order/Priority contract; shared by features + modules
-├── SchemataConstants.cs   # well-known string constants (DI keys, header names, …)
+├── SchemataConstants.cs   # cross-domain constants (DI keys, error codes/reasons, principal claims, …)
 ├── Unit.cs                # void-equivalent value type for generic pipelines
 ├── Advisors/              # IAdvisor + AdviceContext + AdviseResult
 ├── Entities/              # trait marker interfaces + Operations / Ordering enums
@@ -60,7 +60,7 @@ Mirror of [google.rpc.Status](https://cloud.google.com/apis/design/errors). All 
 - `ErrorResponse` wraps an `ErrorBody` plus `IErrorDetail[]`. AIP-flavoured `OAuthErrorResponse` for OAuth 2.0 flows.
 - `IErrorDetail` implementations: `BadRequestDetail`, `DebugInfoDetail`, `ErrorInfoDetail`, `HelpDetail`, `LocalizedMessageDetail`, `PreconditionFailureDetail`, `QuotaFailureDetail`, `RequestInfoDetail`, `ResourceInfoDetail`, `RetryInfoDetail`, plus the violation records (`ErrorFieldViolation`, `PreconditionViolation`, `QuotaViolation`, `ErrorHelpLink`).
 - Exception hierarchy: `SchemataException` ← `InvalidArgumentException`, `AlreadyExistsException`, `NotFoundException`, `FailedPreconditionException`, `AbortedException`, `QuotaExceededException`, `UnauthenticatedException`, `PermissionDeniedException`, `NoContentException`, `OAuthException`, `TenantResolveException`, `ValidationException`. Each maps to a specific HTTP/gRPC status.
-- AIP-193 alignment: `google.rpc.Code` (Status) is separate from `ErrorInfo.reason` (UPPER_SNAKE_CASE domain identifier). The reason table is `SchemataConstants.ErrorReasons` ([SchemataConstants.cs:556](SchemataConstants.cs)). Every named exception attaches a default reason; the localized message helper falls back Reason resx → Status resx.
+- AIP-193 alignment: `google.rpc.Code` (Status) is separate from `ErrorInfo.reason` (UPPER_SNAKE_CASE domain identifier). The reason table is `SchemataConstants.ErrorReasons` ([SchemataConstants.cs:68](SchemataConstants.cs)). Every named exception attaches a default reason; the localized message helper falls back Reason resx → Status resx.
 - Fluent error-detail helpers live in `Schemata.Common`: [SchemataResourceErrors](../Schemata.Common/Errors/SchemataResourceErrors.cs) (`NotFound<T>(...)`, `AlreadyExists<T>(...)` etc., accepts `reason:` override) and [SchemataErrorDetailExtensions](../Schemata.Common/Errors/SchemataErrorDetailExtensions.cs) (`.WithRetryAfter(TimeSpan)`, `.WithHelp(description, url)` for `RetryInfo` / `Help` decoration). `ErrorFieldViolation` carries the canonical `localized_message`; `QuotaViolation` carries the six `QuotaFailure.Violation` fields.
 
 ## Modular
@@ -84,5 +84,6 @@ Mirror of [google.rpc.Status](https://cloud.google.com/apis/design/errors). All 
 ## Notes
 
 - `Unit.cs` exists so generic pipelines can be expressed without `void` special-casing.
-- `SchemataConstants.cs` is the single source of truth for HTTP header names (`X-Request-Id`, `Authorization`, …) and DI keys; do not duplicate the strings inline.
+- `SchemataConstants.cs` is the single source of truth for the DI keys and error identifiers shared across domains; do not duplicate the strings inline. It holds only **cross-domain** constants — nine nested classes: `ErrorCodes`, `ErrorReasons`, `IdentityClaims`, `Keys`, `Orders`, `PreconditionSubjects`, `Principals`, `Verbs`, `Wildcards`. Single-domain constants belong to that domain's Skeleton (F8): OAuth/OIDC → `Schemata.Authorization.Skeleton.AuthorizationConstants` (which owns `Claims` and `Parameters`), flow engine keys → `Schemata.Flow.Skeleton.FlowConstants`. `IdentityClaims` is the F8 residue of the claim table: the five claim names Identity, Authorization and Resource all read (`Email`, `PreferredUsername`, `Role`, `SecurityStamp`, `Subject`) stay here under a distinct name so a file can import both claim tables without collision; the other 32 are OAuth/OIDC-only and live in `AuthorizationConstants.Claims`.
+- Resource wire field names are not constants here. `name` (AIP-122) and `etag` (AIP-154) belong to [ResourceWireNameRules](../Schemata.Common/ResourceWireNameRules.cs), which owns those aliases; the polymorphic JSON discriminator `@type` is private to `Schemata.Core`'s `PolymorphicTypeResolver`.
 - `ResourceAttribute` has five arity-suffixed files (\`1, \`2, \`3, \`4) to support nested parent/grandparent typing — keep them in sync.

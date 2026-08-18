@@ -6,6 +6,7 @@ using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Flow.Foundation.Features;
+using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Bpmn.Features;
@@ -31,7 +32,7 @@ public sealed class SchemataFlowBpmnFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        services.TryAddKeyedSingleton<IFlowRuntime, BpmnEngine>(SchemataConstants.FlowEngines.Bpmn);
+        services.TryAddKeyedSingleton<IFlowRuntime, BpmnEngine>(FlowConstants.Engines.Bpmn);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowEngineValidator, BpmnFlowEngineValidator>());
     }
 }

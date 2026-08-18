@@ -14,6 +14,7 @@ using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Common;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
@@ -65,13 +66,13 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
         // No session: fall through so the handler redirects to the interaction URI, where the user
         // signs in and the authorize request resumes. Only prompt=none turns this into
         // login_required, which AdviceAuthorizePrompt raises on its own.
-        var subject = authz.Principal?.FindFirstValue(Claims.Subject);
+        var subject = authz.Principal?.FindFirstValue(IdentityClaims.Subject);
         if (string.IsNullOrWhiteSpace(subject)) {
             return AdviseResult.Continue;
         }
 
         var claims = new List<Claim> {
-            new(Claims.Subject, subject),
+            new(IdentityClaims.Subject, subject),
             new(Claims.ClientId, authz.Application.ClientId),
         };
 

@@ -27,12 +27,12 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
     public BridgeFailClosedShould(EfCoreFlowFixture fixture) { _fixture = fixture; }
 
     public static IEnumerable<object[]> MixedGatewayCases => [
-        [SchemataConstants.FlowEngines.StateMachine, Array.Empty<string>(), "message-catch", "UseEvent()"],
-        [SchemataConstants.FlowEngines.Bpmn, Array.Empty<string>(), "message-catch", "UseEvent()"],
-        [SchemataConstants.FlowEngines.StateMachine, new[] { SchemataFlowOptions.EventsBridge }, "timer-catch", "UseScheduling()"],
-        [SchemataConstants.FlowEngines.Bpmn, new[] { SchemataFlowOptions.EventsBridge }, "timer-catch", "UseScheduling()"],
-        [SchemataConstants.FlowEngines.StateMachine, new[] { SchemataFlowOptions.TimersBridge }, "message-catch", "UseEvent()"],
-        [SchemataConstants.FlowEngines.Bpmn, new[] { SchemataFlowOptions.TimersBridge }, "message-catch", "UseEvent()"],
+        [FlowConstants.Engines.StateMachine, Array.Empty<string>(), "message-catch", "UseEvent()"],
+        [FlowConstants.Engines.Bpmn, Array.Empty<string>(), "message-catch", "UseEvent()"],
+        [FlowConstants.Engines.StateMachine, new[] { SchemataFlowOptions.EventsBridge }, "timer-catch", "UseScheduling()"],
+        [FlowConstants.Engines.Bpmn, new[] { SchemataFlowOptions.EventsBridge }, "timer-catch", "UseScheduling()"],
+        [FlowConstants.Engines.StateMachine, new[] { SchemataFlowOptions.TimersBridge }, "message-catch", "UseEvent()"],
+        [FlowConstants.Engines.Bpmn, new[] { SchemataFlowOptions.TimersBridge }, "message-catch", "UseEvent()"],
     ];
 
     [Fact]
@@ -65,7 +65,7 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
         string activation
     ) {
         ConfigureBridges();
-        var process = await RegisterAsync(definition, SchemataConstants.FlowEngines.Bpmn);
+        var process = await RegisterAsync(definition, FlowConstants.Engines.Bpmn);
 
         var exception = await Assert.ThrowsAsync<FailedPreconditionException>(async () => await StartAsync(process));
 
@@ -92,8 +92,8 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
     }
 
     [Theory]
-    [InlineData(SchemataConstants.FlowEngines.StateMachine)]
-    [InlineData(SchemataConstants.FlowEngines.Bpmn)]
+    [InlineData(FlowConstants.Engines.StateMachine)]
+    [InlineData(FlowConstants.Engines.Bpmn)]
     public async Task Start_Boundary_Timer_Without_Scheduling_Bridge_Throws(string engine) {
         ConfigureBridges();
         var process = await RegisterAsync(typeof(BoundaryTimerBridgeProcess), engine);
@@ -105,8 +105,8 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
     }
 
     [Theory]
-    [InlineData(SchemataConstants.FlowEngines.StateMachine)]
-    [InlineData(SchemataConstants.FlowEngines.Bpmn)]
+    [InlineData(FlowConstants.Engines.StateMachine)]
+    [InlineData(FlowConstants.Engines.Bpmn)]
     public async Task Start_Event_Gateway_Without_Event_Bridge_Throws(string engine) {
         ConfigureBridges();
         var process = await RegisterAsync(typeof(MessageGatewayBridgeProcess), engine);
@@ -118,8 +118,8 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
     }
 
     [Theory]
-    [InlineData(SchemataConstants.FlowEngines.StateMachine)]
-    [InlineData(SchemataConstants.FlowEngines.Bpmn)]
+    [InlineData(FlowConstants.Engines.StateMachine)]
+    [InlineData(FlowConstants.Engines.Bpmn)]
     public async Task Trigger_Repark_Without_Event_Bridge_Throws(string engine) {
         ConfigureBridges(SchemataFlowOptions.EventsBridge);
         var process = await RegisterAsync(typeof(ReparkAfterTriggerBridgeProcess), engine);
@@ -137,8 +137,8 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
     }
 
     [Theory]
-    [InlineData(typeof(BpmnDirectMessageBridgeProcess), SchemataConstants.FlowEngines.Bpmn, SchemataFlowOptions.EventsBridge, "message-catch")]
-    [InlineData(typeof(BpmnDirectTimerBridgeProcess), SchemataConstants.FlowEngines.Bpmn, SchemataFlowOptions.TimersBridge, "timer-catch")]
+    [InlineData(typeof(BpmnDirectMessageBridgeProcess), FlowConstants.Engines.Bpmn, SchemataFlowOptions.EventsBridge, "message-catch")]
+    [InlineData(typeof(BpmnDirectTimerBridgeProcess), FlowConstants.Engines.Bpmn, SchemataFlowOptions.TimersBridge, "timer-catch")]
     public async Task Start_Direct_Bpmn_Catch_With_Its_Bridge_Parks(
         Type   definition,
         string engine,
@@ -154,8 +154,8 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
     }
 
     [Theory]
-    [InlineData(SchemataConstants.FlowEngines.StateMachine)]
-    [InlineData(SchemataConstants.FlowEngines.Bpmn)]
+    [InlineData(FlowConstants.Engines.StateMachine)]
+    [InlineData(FlowConstants.Engines.Bpmn)]
     public async Task Start_Mixed_Event_Gateway_With_Both_Bridges_Parks(string engine) {
         ConfigureBridges(SchemataFlowOptions.EventsBridge, SchemataFlowOptions.TimersBridge);
         var process = await RegisterAsync(typeof(MixedGatewayBridgeProcess), engine);
@@ -166,8 +166,8 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
     }
 
     [Theory]
-    [InlineData(SchemataConstants.FlowEngines.StateMachine)]
-    [InlineData(SchemataConstants.FlowEngines.Bpmn)]
+    [InlineData(FlowConstants.Engines.StateMachine)]
+    [InlineData(FlowConstants.Engines.Bpmn)]
     public async Task Start_Boundary_Timer_With_Scheduling_Bridge_Remains_Active(string engine) {
         ConfigureBridges(SchemataFlowOptions.TimersBridge);
         var process = await RegisterAsync(typeof(BoundaryTimerBridgeProcess), engine);
@@ -180,8 +180,8 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
     }
 
     [Theory]
-    [InlineData(SchemataConstants.FlowEngines.StateMachine)]
-    [InlineData(SchemataConstants.FlowEngines.Bpmn)]
+    [InlineData(FlowConstants.Engines.StateMachine)]
+    [InlineData(FlowConstants.Engines.Bpmn)]
     public async Task Trigger_Repark_With_Event_Bridge_Persists(string engine) {
         ConfigureBridges(SchemataFlowOptions.EventsBridge);
         var process = await RegisterAsync(typeof(ReparkAfterTriggerBridgeProcess), engine);

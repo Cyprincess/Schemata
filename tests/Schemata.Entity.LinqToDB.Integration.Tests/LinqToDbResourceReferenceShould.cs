@@ -51,7 +51,7 @@ public class LinqToDbResourceReferenceShould : IAsyncLifetime
     #endregion
 
     [Fact]
-    public void AssociationJoin_OnResourceReferencedField_Works() {
+    public void AssociationJoin_OnResourceReferencedField_ResolvesTheReferencedRow() {
         using var connection = new DataConnection(_options);
         connection.Insert(new Book {
             Uid           = Identifiers.NewUid(),

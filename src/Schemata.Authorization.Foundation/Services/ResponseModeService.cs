@@ -4,7 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Mime;
 using Microsoft.AspNetCore.Mvc;
-using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Services;
 

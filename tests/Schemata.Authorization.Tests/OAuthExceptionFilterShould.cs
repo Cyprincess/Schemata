@@ -9,7 +9,7 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Filters;
 using Xunit;
-using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Tests;
 

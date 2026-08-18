@@ -1,3 +1,4 @@
+using Schemata.Flow.Skeleton;
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,9 +43,9 @@ internal static class FlowFixtureServices
         services.TryAddScoped<CorrelateMessageHandler>();
         services.TryAddScoped<ThrowSignalHandler>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IFlowSourceAdvisor<>), typeof(AdviceSourceProjection<>)));
-        services.TryAddKeyedSingleton<IFlowRuntime, StateMachineEngine>(SchemataConstants.FlowEngines.StateMachine);
+        services.TryAddKeyedSingleton<IFlowRuntime, StateMachineEngine>(FlowConstants.Engines.StateMachine);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowEngineValidator, StateMachineFlowEngineValidator>());
-        services.TryAddKeyedSingleton<IFlowRuntime, BpmnEngine>(SchemataConstants.FlowEngines.Bpmn);
+        services.TryAddKeyedSingleton<IFlowRuntime, BpmnEngine>(FlowConstants.Engines.Bpmn);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowEngineValidator, BpmnFlowEngineValidator>());
     }
 
@@ -56,7 +57,7 @@ internal static class FlowFixtureServices
         await registry.RegisterAsync<FailingTaskProcess>();
         await registry.RegisterAsync<BranchWriteProcess>();
         await registry.RegisterAsync<IdempotencyProcess>();
-        await registry.RegisterAsync<CompensationReloadProcess>(SchemataConstants.FlowEngines.Bpmn);
-        await registry.RegisterAsync<CompensationTerminalProcess>(SchemataConstants.FlowEngines.Bpmn);
+        await registry.RegisterAsync<CompensationReloadProcess>(FlowConstants.Engines.Bpmn);
+        await registry.RegisterAsync<CompensationTerminalProcess>(FlowConstants.Engines.Bpmn);
     }
 }

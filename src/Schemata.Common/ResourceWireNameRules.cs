@@ -4,7 +4,6 @@ using System.Linq.Expressions;
 using Humanizer;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Common;
 
@@ -16,6 +15,18 @@ namespace Schemata.Common;
 /// </summary>
 public static class ResourceWireNameRules
 {
+    /// <summary>
+    ///     The <seealso href="https://google.aip.dev/122">AIP-122</seealso> resource name wire field,
+    ///     which every <see cref="ICanonicalName" /> type serializes its canonical name as.
+    /// </summary>
+    public const string Name = "name";
+
+    /// <summary>
+    ///     The <seealso href="https://google.aip.dev/154">AIP-154</seealso> entity tag wire field,
+    ///     which every <see cref="IFreshness" /> type serializes its concurrency token as.
+    /// </summary>
+    public const string EntityTag = "etag";
+
     /// <summary>
     ///     Resolves the public wire field name for a CLR property declared (or inherited) on
     ///     <paramref name="owner" />.
@@ -37,13 +48,13 @@ public static class ResourceWireNameRules
             }
 
             if (propertyName == nameof(ICanonicalName.CanonicalName)) {
-                return Parameters.Name;
+                return Name;
             }
         }
 
         if (typeof(IFreshness).IsAssignableFrom(owner)
          && propertyName == nameof(IFreshness.EntityTag)) {
-            return Parameters.EntityTag;
+            return EntityTag;
         }
 
         return propertyName;
@@ -59,11 +70,11 @@ public static class ResourceWireNameRules
     /// <param name="wireSegment">The wire-format mask segment.</param>
     /// <returns>The CLR property name; never <see langword="null" />.</returns>
     public static string ResolveClrName(Type owner, string wireSegment) {
-        if (typeof(ICanonicalName).IsAssignableFrom(owner) && wireSegment == Parameters.Name) {
+        if (typeof(ICanonicalName).IsAssignableFrom(owner) && wireSegment == Name) {
             return nameof(ICanonicalName.CanonicalName);
         }
 
-        if (typeof(IFreshness).IsAssignableFrom(owner) && wireSegment == Parameters.EntityTag) {
+        if (typeof(IFreshness).IsAssignableFrom(owner) && wireSegment == EntityTag) {
             return nameof(IFreshness.EntityTag);
         }
 

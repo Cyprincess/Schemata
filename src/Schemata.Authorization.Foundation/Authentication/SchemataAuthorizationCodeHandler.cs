@@ -22,6 +22,7 @@ using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Common;
 using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Authentication;
 
@@ -83,7 +84,7 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
         var app = !string.IsNullOrWhiteSpace(client)
             ? (await apps.FindByClientIdAsync(client, ct))?.CanonicalName
             : null;
-        var subject = principal.FindFirstValue(Claims.Subject);
+        var subject = principal.FindFirstValue(IdentityClaims.Subject);
 
         switch (await Advisor.For<IClaimsAdvisor>()
                              .RunAsync(ctx, claims, ct)) {

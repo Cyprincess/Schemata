@@ -16,7 +16,7 @@ public static class FlowHandlerSupport
             return null;
         }
 
-        var sub = principal.FindFirst(SchemataConstants.Claims.Subject)?.Value;
+        var sub = principal.FindFirst(SchemataConstants.IdentityClaims.Subject)?.Value;
         if (!string.IsNullOrWhiteSpace(sub)) {
             return $"users/{sub}";
         }

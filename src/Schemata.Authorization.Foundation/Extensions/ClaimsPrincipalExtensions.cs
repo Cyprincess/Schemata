@@ -19,7 +19,7 @@ namespace Schemata.Authorization.Foundation.Extensions;
 /// </remarks>
 internal static class ClaimsPrincipalExtensions
 {
-    private const string ScopeClaim = SchemataConstants.Claims.Scope;
+    private const string ScopeClaim = AuthorizationConstants.Claims.Scope;
 
     /// <summary>Determines whether <paramref name="principal" /> has been granted the specified <paramref name="scope" />.</summary>
     /// <param name="principal">The claims principal representing the authenticated user.</param>

@@ -11,7 +11,7 @@ using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
-using static Schemata.Abstractions.SchemataConstants;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 

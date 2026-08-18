@@ -4,8 +4,8 @@ using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Entities;
 using Xunit;
-using static Schemata.Abstractions.SchemataConstants;
 using Options = Microsoft.Extensions.Options.Options;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Tests;
 

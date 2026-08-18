@@ -1,4 +1,5 @@
 using Schemata.Abstractions;
+using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
 
@@ -9,7 +10,7 @@ public sealed class StateMachineFlowEngineValidator : IFlowEngineValidator
 {
     #region IFlowEngineValidator Members
 
-    public string EngineName => SchemataConstants.FlowEngines.StateMachine;
+    public string EngineName => FlowConstants.Engines.StateMachine;
 
     public void Validate(ProcessDefinition definition) { StateMachineValidator.Validate(definition); }
 
