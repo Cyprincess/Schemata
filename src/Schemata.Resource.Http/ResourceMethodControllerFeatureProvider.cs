@@ -19,29 +19,19 @@ namespace Schemata.Resource.Http;
 public sealed class ResourceMethodControllerFeatureProvider : IApplicationFeatureProvider<ControllerFeature>
 {
     /// <summary>
-    ///     Gets or sets the registered resources keyed by entity type handle.
-    ///     Used to filter to HTTP-enabled resources only.
+    ///     Gets or sets the registry supplying the resources and their AIP-136 custom methods.
     /// </summary>
-    public Dictionary<RuntimeTypeHandle, ResourceAttribute> Resources { get; set; } = [];
-
-    /// <summary>
-    ///     Gets or sets the AIP-136 custom methods declared by each resource.
-    /// </summary>
-    public Dictionary<RuntimeTypeHandle, List<ResourceMethodAttribute>> Methods { get; set; } = [];
+    public IResourceRegistry? Registry { get; set; }
 
     #region IApplicationFeatureProvider<ControllerFeature> Members
 
     public void PopulateFeature(IEnumerable<ApplicationPart> parts, ControllerFeature feature) {
-        foreach (var (handle, methods) in Methods) {
-            if (!Resources.TryGetValue(handle, out var resource)) {
-                continue;
-            }
-
+        foreach (var resource in Registry?.Resources ?? []) {
             if (!HttpResourceHelper.IsHttpEnabled(resource)) {
                 continue;
             }
 
-            foreach (var method in methods) {
+            foreach (var method in Registry!.GetMethods(resource.Entity)) {
                 var handlerInterface = ResourceMethodHandlerHelper.FindHandlerInterface(method.Handler);
                 if (handlerInterface is null) {
                     continue;

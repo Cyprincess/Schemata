@@ -23,12 +23,12 @@ internal static class FileDescriptorBridge
     /// </summary>
     /// <param name="model">The protobuf-net model for inspecting serializable members.</param>
     /// <param name="serviceTypes">Closed <see cref="IResourceService{TEntity,TRequest,TDetail,TSummary}" /> service types.</param>
-    /// <param name="options">Registered resource and custom-method metadata.</param>
+    /// <param name="registry">Registered resource and custom-method metadata.</param>
     /// <returns>The generated protobuf service descriptors.</returns>
     public static IReadOnlyList<ServiceDescriptor> BuildServiceDescriptors(
-        RuntimeTypeModel model,
-        Type[]           serviceTypes,
-        SchemataResourceOptions options
+        RuntimeTypeModel  model,
+        Type[]            serviceTypes,
+        IResourceRegistry registry
     ) {
         var results = new List<ServiceDescriptor>();
 
@@ -38,9 +38,9 @@ internal static class FileDescriptorBridge
             var descriptor = ResourceNameDescriptor.ForType(entityType);
             var package    = descriptor.Package ?? entityType.Namespace;
 
-            options.Methods.TryGetValue(entityType.TypeHandle, out var methods);
-            options.Resources.TryGetValue(entityType.TypeHandle, out var resource);
-            var file = BuildFileDescriptor(model, descriptor, package, args, methods ?? [], resource?.Operations);
+            var methods  = registry.GetMethods(entityType);
+            var resource = registry.GetResource(entityType);
+            var file     = BuildFileDescriptor(model, descriptor, package, args, methods, resource?.Operations);
             results.AddRange(file.Services);
         }
 

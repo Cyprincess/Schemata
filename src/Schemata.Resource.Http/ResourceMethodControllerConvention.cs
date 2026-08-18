@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Routing;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Resource.Foundation;
 using Schemata.Resource.Http.Internal;
 
 namespace Schemata.Resource.Http;
@@ -21,8 +22,8 @@ namespace Schemata.Resource.Http;
 ///     <c>{name}:{verb}</c> (Instance scope) or <c>:{verb}</c> (Collection scope).
 /// </summary>
 public sealed class ResourceMethodControllerConvention(
-    Dictionary<RuntimeTypeHandle, List<ResourceMethodAttribute>> methods,
-    string?                                                      scheme = null
+    IResourceRegistry registry,
+    string?           scheme = null
 ) : IControllerModelConvention
 {
     #region IControllerModelConvention Members
@@ -37,11 +38,7 @@ public sealed class ResourceMethodControllerConvention(
         var entity           = genericArguments[0];
         var handler          = genericArguments[3];
 
-        if (!methods.TryGetValue(entity.TypeHandle, out var resourceMethods)) {
-            return;
-        }
-
-        var handlerMethods = resourceMethods.Where(m => m.Handler == handler).ToList();
+        var handlerMethods = registry.GetMethods(entity).Where(m => m.Handler == handler).ToList();
         if (handlerMethods.Count == 0) {
             return;
         }
@@ -74,7 +71,7 @@ public sealed class ResourceMethodControllerConvention(
         }
 
         ResourceHttpConventionHelper.ApplyRateLimit(controller, entity);
-        ResourceHttpConventionHelper.ApplyAuthorization(controller, scheme);
+        ResourceHttpConventionHelper.ApplyAuthorization(controller, registry.GetResource(entity)?.AuthenticationScheme ?? scheme);
     }
 
     private static void ConfigureMethodAction(ActionModel action, ResourceMethodAttribute method, string controllerRoute) {

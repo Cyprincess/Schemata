@@ -78,8 +78,8 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             return TotalSizeMode.Exact;
         }
 
-        if (options.Resources.TryGetValue(typeof(TEntity).TypeHandle, out var resource)
-         && resource.TotalSize is not TotalSizeMode.Default) {
+        var resource = _sp.GetService<IResourceRegistry>()?.GetResource(typeof(TEntity));
+        if (resource is not null && resource.TotalSize is not TotalSizeMode.Default) {
             return resource.TotalSize;
         }
 

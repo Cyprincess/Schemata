@@ -19,6 +19,8 @@ namespace Schemata.Resource.Foundation;
 /// </summary>
 public sealed class SchemataResourceBuilder : IExpressionLanguageBuilder
 {
+    private const string RegistryKey = "Schemata.Resource.Registry";
+
     /// <summary>
     ///     Initializes a new instance with the Schemata options and service collection.
     /// </summary>
@@ -27,6 +29,7 @@ public sealed class SchemataResourceBuilder : IExpressionLanguageBuilder
     public SchemataResourceBuilder(SchemataOptions schemata, IServiceCollection services) {
         Schemata = schemata;
         Services = services;
+        Registry = GetOrAddRegistry(schemata, services);
 
         // Bind only when this builder enables a language so a builder that registers resources
         // without filtering (e.g. a feature's internal resource) does not clear another's profile.
@@ -38,6 +41,16 @@ public sealed class SchemataResourceBuilder : IExpressionLanguageBuilder
     }
 
     private SchemataOptions Schemata { get; }
+
+    private ResourceRegistry Registry { get; }
+
+    /// <summary>
+    ///     The authentication scheme stamped onto every resource this builder registers that does
+    ///     not already declare one. A component that owns its own builder instance sets this to
+    ///     demand its own scheme without touching the resource system's global default, which
+    ///     <see cref="WithAuthorization" /> configures.
+    /// </summary>
+    public string? AuthenticationScheme { get; set; }
 
     /// <inheritdoc />
     public IServiceCollection Services { get; }
@@ -183,6 +196,39 @@ public sealed class SchemataResourceBuilder : IExpressionLanguageBuilder
 
         var resource = entity.GetCustomAttribute<ResourceAttribute>() ?? new(entity, request, detail, summary);
 
+        return Register(resource, endpoints, configure);
+    }
+
+    /// <summary>
+    ///     Registers a resource that declares its own type roles through <see cref="ResourceAttribute" />,
+    ///     so the DTO types need not be repeated as type arguments. Resources are never discovered
+    ///     automatically: a <c>[Resource]</c>-decorated entity is registered only by this call or by
+    ///     <see cref="Use{TEntity,TRequest,TDetail,TSummary}(IList{string})" />.
+    /// </summary>
+    /// <typeparam name="TEntity">The persistent entity type, decorated with <see cref="ResourceAttribute" />.</typeparam>
+    /// <param name="endpoints">Optional endpoint names to restrict registration.</param>
+    /// <param name="configure">Optional resource metadata callback.</param>
+    /// <returns>This builder for chaining.</returns>
+    public SchemataResourceBuilder AddResource<TEntity>(
+        IList<string>?             endpoints = null,
+        Action<ResourceAttribute>? configure = null
+    )
+        where TEntity : class, ICanonicalName {
+        var entity = typeof(TEntity);
+
+        var resource = entity.GetCustomAttribute<ResourceAttribute>()
+                    ?? throw new InvalidOperationException(
+                           $"Resource '{entity.FullName}' carries no [Resource] attribute. Either declare one, or "
+                         + "register it with Use<TEntity, TRequest, TDetail, TSummary>() and name the DTO types.");
+
+        return Register(resource, endpoints, configure);
+    }
+
+    private SchemataResourceBuilder Register(
+        ResourceAttribute          resource,
+        IList<string>?             endpoints,
+        Action<ResourceAttribute>? configure
+    ) {
         if (endpoints is null) {
             resource.Endpoints = null;
         } else if (resource.Endpoints is null) {
@@ -195,8 +241,26 @@ public sealed class SchemataResourceBuilder : IExpressionLanguageBuilder
 
         configure?.Invoke(resource);
 
-        SchemataResourceFeature.RegisterResource(Services, resource);
+        resource.AuthenticationScheme ??= AuthenticationScheme;
+
+        Services.AddResource(resource, Registry);
 
         return this;
+    }
+
+    private static ResourceRegistry GetOrAddRegistry(SchemataOptions schemata, IServiceCollection services) {
+        // Flow, Report and Scheduling each construct their own builder to register their own
+        // resources, so the registry cannot belong to any one builder. It is created on the first
+        // one and handed to the rest through the options bag, which is the only state every builder
+        // over one host already shares.
+        var registry = schemata.Get<ResourceRegistry>(RegistryKey);
+        if (registry is not null) {
+            return registry;
+        }
+
+        registry = new();
+        schemata.Set(RegistryKey, registry);
+        services.AddSingleton<IResourceRegistry>(registry);
+        return registry;
     }
 }

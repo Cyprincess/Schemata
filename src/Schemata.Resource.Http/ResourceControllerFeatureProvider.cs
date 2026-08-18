@@ -7,8 +7,8 @@ using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Primitives;
-using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Resource.Foundation;
 using Schemata.Resource.Http.Internal;
 
 namespace Schemata.Resource.Http;
@@ -24,9 +24,9 @@ public sealed class ResourceControllerFeatureProvider : IApplicationFeatureProvi
     private CancellationTokenSource _cts = new();
 
     /// <summary>
-    ///     Gets or sets the registered resources that should produce HTTP controllers.
+    ///     Gets or sets the registry whose resources should produce HTTP controllers.
     /// </summary>
-    public Dictionary<RuntimeTypeHandle, ResourceAttribute> Resources { get; set; } = [];
+    public IResourceRegistry? Registry { get; set; }
 
     #region IActionDescriptorChangeProvider Members
 
@@ -37,7 +37,7 @@ public sealed class ResourceControllerFeatureProvider : IApplicationFeatureProvi
     #region IApplicationFeatureProvider<ControllerFeature> Members
 
     public void PopulateFeature(IEnumerable<ApplicationPart> parts, ControllerFeature feature) {
-        foreach (var (_, resource) in Resources) {
+        foreach (var resource in Registry?.Resources ?? []) {
             if (!HttpResourceHelper.IsHttpEnabled(resource)) {
                 continue;
             }

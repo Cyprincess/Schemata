@@ -4,9 +4,9 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
+using Schemata.Core;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Features;
 using Xunit;
@@ -18,23 +18,23 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void LeaveMethodsEmpty_WhenResourceHasNoResourceMethodAttribute() {
         var services = new ServiceCollection();
+        var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<PlainEntity>();
 
-        SchemataResourceFeature.RegisterResource(services, resource);
+        services.AddResource(resource, registry);
 
-        var options = BuildOptions(services);
-        Assert.Empty(options.Methods);
+        Assert.Empty(registry.GetMethods(typeof(PlainEntity)));
     }
 
     [Fact]
     public void StoreBuiltInMethods_WhenResourceIsSoftDeletable() {
         var services = new ServiceCollection();
+        var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<SoftEntity>();
 
-        SchemataResourceFeature.RegisterResource(services, resource);
+        services.AddResource(resource, registry);
 
-        var options = BuildOptions(services);
-        var methods = options.Methods[typeof(SoftEntity).TypeHandle].OrderBy(m => m.Verb).ToArray();
+        var methods = registry.GetMethods(typeof(SoftEntity)).OrderBy(m => m.Verb).ToArray();
 
         Assert.Equal(3, methods.Length);
         Assert.Equal("expunge", methods[0].Verb);
@@ -51,24 +51,23 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void LeaveMethodsEmpty_WhenResourceIsNotSoftDeletable() {
         var services = new ServiceCollection();
+        var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<PlainEntity>();
 
-        SchemataResourceFeature.RegisterResource(services, resource);
+        services.AddResource(resource, registry);
 
-        var options = BuildOptions(services);
-
-        Assert.False(options.Methods.ContainsKey(typeof(PlainEntity).TypeHandle));
+        Assert.Empty(registry.GetMethods(typeof(PlainEntity)));
     }
 
     [Fact]
     public void PreserveUserDeclaredVerb_WhenSoftDeletableResourceOverridesBuiltIn() {
         var services = new ServiceCollection();
+        var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<SoftOverrideEntity, SoftOverrideEntity>();
 
-        SchemataResourceFeature.RegisterResource(services, resource);
+        services.AddResource(resource, registry);
 
-        var options = BuildOptions(services);
-        var methods = options.Methods[typeof(SoftOverrideEntity).TypeHandle].OrderBy(m => m.Verb).ToArray();
+        var methods = registry.GetMethods(typeof(SoftOverrideEntity)).OrderBy(m => m.Verb).ToArray();
 
         Assert.Equal(3, methods.Length);
         Assert.Equal("expunge", methods[0].Verb);
@@ -83,14 +82,14 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void HonorOperationsWhitelist_ForPurge() {
         var services = new ServiceCollection();
+        var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<SoftEntity> {
             Operations = [Operations.Get, Operations.List, Operations.Undelete, Operations.Expunge],
         };
 
-        SchemataResourceFeature.RegisterResource(services, resource);
+        services.AddResource(resource, registry);
 
-        var options = BuildOptions(services);
-        var methods = options.Methods[typeof(SoftEntity).TypeHandle].OrderBy(m => m.Verb).ToArray();
+        var methods = registry.GetMethods(typeof(SoftEntity)).OrderBy(m => m.Verb).ToArray();
 
         Assert.DoesNotContain(methods, m => m.Verb == "purge");
     }
@@ -98,12 +97,12 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void PreserveUserDeclaredPurge_WhenSoftDeletableResourceOverridesBuiltIn() {
         var services = new ServiceCollection();
+        var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<SoftPurgeOverrideEntity, SoftPurgeOverrideEntity>();
 
-        SchemataResourceFeature.RegisterResource(services, resource);
+        services.AddResource(resource, registry);
 
-        var options = BuildOptions(services);
-        var method  = options.Methods[typeof(SoftPurgeOverrideEntity).TypeHandle].Single(m => m.Verb == "purge");
+        var method = registry.GetMethods(typeof(SoftPurgeOverrideEntity)).Single(m => m.Verb == "purge");
 
         Assert.Equal(typeof(SoftPurgeHandler), method.Handler);
         Assert.Equal(ResourceMethodScope.Collection, method.Scope);
@@ -112,12 +111,12 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void StoreSingleMethod_WhenResourceDeclaresOneVerb() {
         var services = new ServiceCollection();
+        var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<SingleVerbEntity, RunRequest>();
 
-        SchemataResourceFeature.RegisterResource(services, resource);
+        services.AddResource(resource, registry);
 
-        var options    = BuildOptions(services);
-        var methods    = options.Methods[typeof(SingleVerbEntity).TypeHandle];
+        var methods    = registry.GetMethods(typeof(SingleVerbEntity));
         var registered = Assert.Single(methods);
         Assert.Equal("run", registered.Verb);
         Assert.Equal(typeof(RunHandler), registered.Handler);
@@ -127,14 +126,14 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void StoreSingleMethod_WhenResourceSuppliesProgrammaticVerb() {
         var services = new ServiceCollection();
+        var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<PlainEntity, RunRequest> {
             Methods = [new("run", typeof(PlainRunHandler))],
         };
 
-        SchemataResourceFeature.RegisterResource(services, resource);
+        services.AddResource(resource, registry);
 
-        var options    = BuildOptions(services);
-        var methods    = options.Methods[typeof(PlainEntity).TypeHandle];
+        var methods    = registry.GetMethods(typeof(PlainEntity));
         var registered = Assert.Single(methods);
         Assert.Equal("run", registered.Verb);
         Assert.Equal(typeof(PlainRunHandler), registered.Handler);
@@ -143,19 +142,16 @@ public class SchemataResourceFeatureRegisterMethodShould
 
     [Fact]
     public void StoreSameMethodMetadata_ForAttributeAndProgrammaticRegistration() {
-        var attributeServices = new ServiceCollection();
-        SchemataResourceFeature.RegisterResource(attributeServices,
-                                                 new ResourceAttribute<SingleVerbEntity, RunRequest>());
+        var attributeRegistry = new ResourceRegistry();
+        new ServiceCollection().AddResource(new ResourceAttribute<SingleVerbEntity, RunRequest>(), attributeRegistry);
 
-        var programmaticServices = new ServiceCollection();
-        SchemataResourceFeature.RegisterResource(programmaticServices,
-                                                 new ResourceAttribute<PlainEntity, RunRequest> {
-                                                     Methods = [new("run", typeof(PlainRunHandler))],
-                                                 });
+        var programmaticRegistry = new ResourceRegistry();
+        new ServiceCollection().AddResource(new ResourceAttribute<PlainEntity, RunRequest> {
+                                                Methods = [new("run", typeof(PlainRunHandler))],
+                                            }, programmaticRegistry);
 
-        var attributeMethod
-            = Assert.Single(BuildOptions(attributeServices).Methods[typeof(SingleVerbEntity).TypeHandle]);
-        var explicitMethod = Assert.Single(BuildOptions(programmaticServices).Methods[typeof(PlainEntity).TypeHandle]);
+        var attributeMethod = Assert.Single(attributeRegistry.GetMethods(typeof(SingleVerbEntity)));
+        var explicitMethod  = Assert.Single(programmaticRegistry.GetMethods(typeof(PlainEntity)));
 
         Assert.Equal(attributeMethod.Verb, explicitMethod.Verb);
         Assert.Equal(attributeMethod.Scope, explicitMethod.Scope);
@@ -165,12 +161,12 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void StoreAllVerbs_WhenResourceDeclaresMultipleMethods() {
         var services = new ServiceCollection();
+        var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<MultiVerbEntity, RunRequest>();
 
-        SchemataResourceFeature.RegisterResource(services, resource);
+        services.AddResource(resource, registry);
 
-        var options = BuildOptions(services);
-        var methods = options.Methods[typeof(MultiVerbEntity).TypeHandle].OrderBy(m => m.Verb).ToArray();
+        var methods = registry.GetMethods(typeof(MultiVerbEntity)).OrderBy(m => m.Verb).ToArray();
 
         Assert.Equal(2, methods.Length);
         Assert.Equal("archive", methods[0].Verb);
@@ -182,11 +178,11 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void Throw_WhenHandlerDoesNotImplementResourceMethodHandler() {
         var services = new ServiceCollection();
+        var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<InvalidHandlerEntity>();
 
         var ex
-            = Assert.Throws<InvalidOperationException>(() => SchemataResourceFeature.RegisterResource(
-                                                           services, resource));
+            = Assert.Throws<InvalidOperationException>(() => services.AddResource(resource, registry));
 
         Assert.Contains("IResourceMethodHandler", ex.Message, StringComparison.Ordinal);
         Assert.Contains("badVerb", ex.Message, StringComparison.Ordinal);
@@ -195,29 +191,39 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void RegisterOneMethod_WhenTheSameResourceIsDeclaredTwice() {
         var services = new ServiceCollection();
+        var registry = new ResourceRegistry();
 
-        SchemataResourceFeature.RegisterResource(services, new ResourceAttribute<SingleVerbEntity, RunRequest>());
-        SchemataResourceFeature.RegisterResource(services, new ResourceAttribute<SingleVerbEntity, RunRequest>());
+        services.AddResource(new ResourceAttribute<SingleVerbEntity, RunRequest>(), registry);
+        services.AddResource(new ResourceAttribute<SingleVerbEntity, RunRequest>(), registry);
 
-        var registered = Assert.Single(BuildOptions(services).Methods[typeof(SingleVerbEntity).TypeHandle]);
+        var registered = Assert.Single(registry.GetMethods(typeof(SingleVerbEntity)));
         Assert.Equal("run", registered.Verb);
     }
 
     [Fact]
-    public void AssemblyLoadError_RegistersLoadableResources_NotSilentDropAll() {
+    public void LeaveAnAttributedEntityUnregistered_UntilItIsAddedExplicitly() {
         var services = new ServiceCollection();
+        var registry = new ResourceRegistry();
 
-        // Simulates a partially-loaded assembly (ReflectionTypeLoadException.Types): one type
-        // resolved, one is null. The resolved resource must still register.
-        SchemataResourceFeature.RegisterDiscoveredResources(services, [typeof(ScanResource), null]);
+        services.AddResource(new ResourceAttribute<PlainEntity>(), registry);
 
-        var options = BuildOptions(services);
-        Assert.True(options.Resources.ContainsKey(typeof(ScanResource).TypeHandle));
+        Assert.NotNull(registry.GetResource(typeof(PlainEntity)));
+        Assert.Null(registry.GetResource(typeof(ScanResource)));
     }
 
-    private static SchemataResourceOptions BuildOptions(IServiceCollection services) {
+    [Fact]
+    public void Share_One_Registry_Across_Builders_Over_The_Same_Options() {
+        var schemata = new SchemataOptions();
+        var services = new ServiceCollection();
+
+        new SchemataResourceBuilder(schemata, services).AddResource<ScanResource>();
+        new SchemataResourceBuilder(schemata, services).Use<PlainEntity, PlainEntity, PlainEntity, PlainEntity>();
+
         using var provider = services.BuildServiceProvider();
-        return provider.GetRequiredService<IOptions<SchemataResourceOptions>>().Value;
+        var       registry = provider.GetRequiredService<IResourceRegistry>();
+
+        Assert.NotNull(registry.GetResource(typeof(ScanResource)));
+        Assert.NotNull(registry.GetResource(typeof(PlainEntity)));
     }
 
     #region Nested type: InvalidHandlerEntity

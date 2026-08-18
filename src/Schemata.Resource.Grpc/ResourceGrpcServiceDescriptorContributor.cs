@@ -21,19 +21,19 @@ internal sealed class ResourceGrpcServiceDescriptorContributor : IGrpcServiceDes
     #region IGrpcServiceDescriptorContributor Members
 
     public IReadOnlyList<ProtoServiceDescriptor> GetServiceDescriptors(IServiceProvider serviceProvider) {
-        var config  = serviceProvider.GetRequiredService<ResourceBinderConfiguration>();
-        var options = serviceProvider.GetRequiredService<IOptions<SchemataResourceOptions>>();
+        var config   = serviceProvider.GetRequiredService<ResourceBinderConfiguration>();
+        var registry = serviceProvider.GetRequiredService<IResourceRegistry>();
 
-        var types = options.Value.Resources
-                           .Where(r => GrpcResourceHelper.IsGrpcEnabled(r.Value))
-                           .Select(r => typeof(IResourceService<,,,>).MakeGenericType(r.Value.Entity, r.Value.Request!, r.Value.Detail!, r.Value.Summary!))
-                           .ToArray();
+        var types = registry.Resources
+                            .Where(GrpcResourceHelper.IsGrpcEnabled)
+                            .Select(r => typeof(IResourceService<,,,>).MakeGenericType(r.Entity, r.Request!, r.Detail!, r.Summary!))
+                            .ToArray();
 
         if (types.Length == 0) {
             return [];
         }
 
-        return FileDescriptorBridge.BuildServiceDescriptors(config.Model, types, options.Value);
+        return FileDescriptorBridge.BuildServiceDescriptors(config.Model, types, registry);
     }
 
     #endregion

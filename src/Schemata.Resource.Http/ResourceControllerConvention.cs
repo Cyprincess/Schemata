@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Resource.Foundation;
 using Schemata.Resource.Http.Internal;
 
 namespace Schemata.Resource.Http;
@@ -16,8 +17,8 @@ namespace Schemata.Resource.Http;
 ///     <see cref="ResourceAttribute.Operations" /> whitelist excludes.
 /// </summary>
 public sealed class ResourceControllerConvention(
-    IReadOnlyDictionary<RuntimeTypeHandle, ResourceAttribute> resources,
-    string?                                                   scheme = null
+    IResourceRegistry registry,
+    string?           scheme = null
 ) : IControllerModelConvention
 {
     // Custom methods are handled by ResourceMethodControllerConvention and are unaffected.
@@ -51,8 +52,9 @@ public sealed class ResourceControllerConvention(
             selector.AttributeRouteModel?.Template = route;
         }
 
-        if (resources.TryGetValue(entityType.TypeHandle, out var resource)
-         && resource.Operations is { } allowed) {
+        var resource = registry.GetResource(entityType);
+
+        if (resource is { Operations: { } allowed }) {
             var allowedSet = new HashSet<Operations>(allowed);
             for (var i = controller.Actions.Count - 1; i >= 0; i--) {
                 if (VerbByAction.TryGetValue(controller.Actions[i].ActionName, out var verb)
@@ -63,7 +65,7 @@ public sealed class ResourceControllerConvention(
         }
 
         ResourceHttpConventionHelper.ApplyRateLimit(controller, entityType);
-        ResourceHttpConventionHelper.ApplyAuthorization(controller, scheme);
+        ResourceHttpConventionHelper.ApplyAuthorization(controller, resource?.AuthenticationScheme ?? scheme);
     }
 
     #endregion

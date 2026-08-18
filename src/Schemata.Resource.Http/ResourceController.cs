@@ -8,7 +8,6 @@ using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Resource.Foundation;
 using HttpResourceIdentifiers = Schemata.Resource.Http.Internal.ResourceIdentifiers;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Http;
 
@@ -104,7 +103,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     [HttpPatch("{name}")]
     public virtual async Task<IActionResult> UpdateAsync(string name, [FromBody] TRequest request) {
         if (request is IFreshness freshness && string.IsNullOrWhiteSpace(freshness.EntityTag)) {
-            var tag = HttpContext.Request.Query[Parameters.EntityTag].ToString();
+            var tag = HttpContext.Request.Query[ResourceWireNameRules.EntityTag].ToString();
             if (string.IsNullOrWhiteSpace(tag)) {
                 tag = HttpContext.Request.Headers.IfMatch.ToString();
             }

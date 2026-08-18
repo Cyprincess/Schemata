@@ -1,5 +1,4 @@
 using System;
-using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Resource;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Tests.Fixtures;
@@ -90,13 +89,13 @@ public class DefaultResourceTypeResolverShould
     }
 
     private static IResourceTypeResolver Resolver(params Type[] additional) {
-        var options = new SchemataResourceOptions();
-        options.Resources[typeof(TrashStudent).TypeHandle] = new(typeof(TrashStudent));
-        options.Resources[typeof(Student).TypeHandle]      = new(typeof(Student));
+        var registry = new ResourceRegistry();
+        registry.Add(new(typeof(TrashStudent)), []);
+        registry.Add(new(typeof(Student)), []);
         foreach (var type in additional) {
-            options.Resources[type.TypeHandle] = new(type);
+            registry.Add(new(type), []);
         }
 
-        return new DefaultResourceTypeResolver(Options.Create(options));
+        return new DefaultResourceTypeResolver(registry);
     }
 }

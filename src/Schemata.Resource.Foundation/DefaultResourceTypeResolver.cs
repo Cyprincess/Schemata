@@ -1,31 +1,28 @@
 using System;
 using System.Collections.Generic;
-using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 
 namespace Schemata.Resource.Foundation;
 
 /// <summary>
-///     Reverse-resolves an entity type from a resource name against the registered
-///     <see cref="SchemataResourceOptions.Resources" />. Two indexes are built once on first use:
-///     a collection-name dictionary for bare-segment lookup, and a pattern trie that matches a
-///     full canonical name segment-by-segment with placeholder backtracking.
+///     Reverse-resolves an entity type from a resource name against <see cref="IResourceRegistry" />.
+///     Two indexes are built at construction — the registry is complete once the container exists —
+///     a collection-name dictionary for bare-segment lookup, and a pattern trie that matches a full
+///     canonical name segment-by-segment with placeholder backtracking.
 /// </summary>
 public sealed class DefaultResourceTypeResolver : IResourceTypeResolver
 {
     private static readonly char[] Separator = ['/'];
 
-    private readonly Lazy<Dictionary<string, Type>>    _byCollection;
-    private readonly Lazy<TrieNode>                    _trie;
-    private readonly IOptions<SchemataResourceOptions> _options;
+    private readonly Dictionary<string, Type> _byCollection;
+    private readonly TrieNode                 _trie;
 
     /// <summary>Creates the resolver over the registered resource descriptors.</summary>
-    /// <param name="options">The registered resources.</param>
-    public DefaultResourceTypeResolver(IOptions<SchemataResourceOptions> options) {
-        _options      = options;
-        _byCollection = new(BuildCollectionIndex);
-        _trie         = new(BuildPatternTrie);
+    /// <param name="registry">The registered resources.</param>
+    public DefaultResourceTypeResolver(IResourceRegistry registry) {
+        _byCollection = BuildCollectionIndex(registry);
+        _trie         = BuildPatternTrie(registry);
     }
 
     #region IResourceTypeResolver Members
@@ -36,7 +33,7 @@ public sealed class DefaultResourceTypeResolver : IResourceTypeResolver
         }
 
         var parts = canonicalName.Split(Separator);
-        var entity = Walk(_trie.Value, parts, 0);
+        var entity = Walk(_trie, parts, 0);
         if (entity is not null) {
             return entity;
         }
@@ -49,7 +46,7 @@ public sealed class DefaultResourceTypeResolver : IResourceTypeResolver
             return null;
         }
 
-        return _byCollection.Value.GetValueOrDefault(collection);
+        return _byCollection.GetValueOrDefault(collection);
     }
 
     #endregion
@@ -81,9 +78,9 @@ public sealed class DefaultResourceTypeResolver : IResourceTypeResolver
         }
     }
 
-    private Dictionary<string, Type> BuildCollectionIndex() {
+    private static Dictionary<string, Type> BuildCollectionIndex(IResourceRegistry registry) {
         var index = new Dictionary<string, Type>(StringComparer.Ordinal);
-        foreach (var resource in _options.Value.Resources.Values) {
+        foreach (var resource in registry.Resources) {
             var entity     = resource.Entity;
             var collection = ResourceNameDescriptor.ForType(entity).Collection;
             if (!string.IsNullOrEmpty(collection)) {
@@ -94,9 +91,9 @@ public sealed class DefaultResourceTypeResolver : IResourceTypeResolver
         return index;
     }
 
-    private TrieNode BuildPatternTrie() {
+    private static TrieNode BuildPatternTrie(IResourceRegistry registry) {
         var root = new TrieNode();
-        foreach (var resource in _options.Value.Resources.Values) {
+        foreach (var resource in registry.Resources) {
             var entity     = resource.Entity;
             var descriptor = ResourceNameDescriptor.ForType(entity);
             var pattern    = descriptor.Pattern;

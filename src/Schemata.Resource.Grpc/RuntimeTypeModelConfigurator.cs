@@ -15,9 +15,9 @@ internal static class RuntimeTypeModelConfigurator
     /// <summary>
     ///     Creates a runtime model containing standard resource messages and registered gRPC-enabled resource DTOs.
     /// </summary>
-    /// <param name="options">The registered resource options.</param>
+    /// <param name="registry">The registered resources.</param>
     /// <returns>The configured protobuf-net runtime model.</returns>
-    public static RuntimeTypeModel Configure(SchemataResourceOptions options) {
+    public static RuntimeTypeModel Configure(IResourceRegistry registry) {
         var model = RuntimeTypeModel.Create();
 
         model.DefaultCompatibilityLevel = CompatibilityLevel.Level300;
@@ -26,7 +26,7 @@ internal static class RuntimeTypeModelConfigurator
         SchemataProtoModelConfigurator.ConfigureType(model, typeof(GetRequest));
         SchemataProtoModelConfigurator.ConfigureType(model, typeof(DeleteRequest));
 
-        foreach (var (_, resource) in options.Resources) {
+        foreach (var resource in registry.Resources) {
             if (!GrpcResourceHelper.IsGrpcEnabled(resource)) {
                 continue;
             }
@@ -37,12 +37,12 @@ internal static class RuntimeTypeModelConfigurator
             SchemataProtoModelConfigurator.ConfigureListResultType(model, resource.Summary!);
         }
 
-        foreach (var (handle, methods) in options.Methods) {
-            if (!options.Resources.TryGetValue(handle, out var resource) || !GrpcResourceHelper.IsGrpcEnabled(resource)) {
+        foreach (var resource in registry.Resources) {
+            if (!GrpcResourceHelper.IsGrpcEnabled(resource)) {
                 continue;
             }
 
-            foreach (var method in methods) {
+            foreach (var method in registry.GetMethods(resource.Entity)) {
                 var iface = ResourceMethodHandlerHelper.FindHandlerInterface(method.Handler);
                 if (iface is null) {
                     continue;

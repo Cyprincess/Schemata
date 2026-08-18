@@ -80,4 +80,12 @@ public class ResourceAttribute : Attribute
     ///     <see cref="TotalSizeMode.Default" /> inherits the global option.
     /// </summary>
     public TotalSizeMode TotalSize { get; set; }
+
+    /// <summary>
+    ///     The authentication scheme this resource's transport endpoints require. When
+    ///     <see langword="null" />, the scheme configured for the whole resource system applies,
+    ///     so a component that registers resources can demand its own scheme without changing
+    ///     the global default.
+    /// </summary>
+    public string? AuthenticationScheme { get; set; }
 }

@@ -31,24 +31,24 @@ internal static class ResourceCustomMethod
     /// <typeparam name="TService">The closed resource service type.</typeparam>
     /// <param name="context">The gRPC service method discovery context.</param>
     /// <param name="config">The resource gRPC binder configuration.</param>
-    /// <param name="options">The registered resource options.</param>
+    /// <param name="registry">The registered resources.</param>
     public static void Register<TService>(
         ServiceMethodProviderContext<TService> context,
         ResourceBinderConfiguration            config,
-        SchemataResourceOptions                options
+        IResourceRegistry                      registry
     ) where TService : class {
         var serviceType = typeof(TService);
         if (!serviceType.IsGenericType || serviceType.GetGenericTypeDefinition() != typeof(ResourceService<,,,>)) {
             return;
         }
 
-        var entity = serviceType.GetGenericArguments()[0];
-        if (!options.Methods.TryGetValue(entity.TypeHandle, out var methods) || methods.Count == 0) {
+        var entity  = serviceType.GetGenericArguments()[0];
+        var methods = registry.GetMethods(entity);
+        if (methods.Count == 0) {
             return;
         }
 
-        if (options.Resources.TryGetValue(entity.TypeHandle, out var resourceAttr)
-         && !GrpcResourceHelper.IsGrpcEnabled(resourceAttr)) {
+        if (registry.GetResource(entity) is { } resourceAttr && !GrpcResourceHelper.IsGrpcEnabled(resourceAttr)) {
             return;
         }
 

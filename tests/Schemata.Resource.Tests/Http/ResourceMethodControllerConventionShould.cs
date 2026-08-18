@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Security.Claims;
@@ -7,9 +6,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc.ActionConstraints;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
+using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
+using Schemata.Resource.Foundation;
 using Schemata.Resource.Http;
 using Xunit;
 
@@ -19,10 +20,8 @@ public class ResourceMethodControllerConventionShould
 {
     [Fact]
     public void DoNothing_ForUnrelatedControllerType() {
-        var methods = new Dictionary<RuntimeTypeHandle, List<ResourceMethodAttribute>> {
-            [typeof(EntityB).TypeHandle] = [new("run", typeof(HandlerB))],
-        };
-        var convention = new ResourceMethodControllerConvention(methods);
+        var convention = new ResourceMethodControllerConvention(
+            Registry(new ResourceMethodAttribute("run", typeof(HandlerB))));
 
         var model           = BuildController(typeof(UnrelatedController).GetTypeInfo());
         var initialTemplate = model.Selectors[0].AttributeRouteModel!.Template;
@@ -35,10 +34,8 @@ public class ResourceMethodControllerConventionShould
 
     [Fact]
     public void RewriteInstanceScopeAction_To_AbsoluteNameColonVerb() {
-        var methods = new Dictionary<RuntimeTypeHandle, List<ResourceMethodAttribute>> {
-            [typeof(EntityB).TypeHandle] = [new("run", typeof(HandlerB))],
-        };
-        var convention = new ResourceMethodControllerConvention(methods);
+        var convention = new ResourceMethodControllerConvention(
+            Registry(new ResourceMethodAttribute("run", typeof(HandlerB))));
 
         var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
         var model          = BuildController(controllerType);
@@ -52,10 +49,10 @@ public class ResourceMethodControllerConventionShould
 
     [Fact]
     public void CloneActionPerVerb_WhenHandlerRegisteredForMultipleVerbs() {
-        var methods = new Dictionary<RuntimeTypeHandle, List<ResourceMethodAttribute>> {
-            [typeof(EntityB).TypeHandle] = [new("archive", typeof(HandlerB)), new("restore", typeof(HandlerB))],
-        };
-        var convention = new ResourceMethodControllerConvention(methods);
+        var convention = new ResourceMethodControllerConvention(
+            Registry(
+                new ResourceMethodAttribute("archive", typeof(HandlerB)),
+                new ResourceMethodAttribute("restore", typeof(HandlerB))));
 
         var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
         var model          = BuildController(controllerType);
@@ -73,10 +70,8 @@ public class ResourceMethodControllerConventionShould
 
     [Fact]
     public void RewriteCollectionScopeAction_To_AbsoluteColonVerb() {
-        var methods = new Dictionary<RuntimeTypeHandle, List<ResourceMethodAttribute>> {
-            [typeof(EntityB).TypeHandle] = [new("batchCreate", typeof(HandlerB), ResourceMethodScope.Collection)],
-        };
-        var convention = new ResourceMethodControllerConvention(methods);
+        var convention = new ResourceMethodControllerConvention(
+            Registry(new ResourceMethodAttribute("batchCreate", typeof(HandlerB), ResourceMethodScope.Collection)));
 
         var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
         var model          = BuildController(controllerType);
@@ -90,10 +85,8 @@ public class ResourceMethodControllerConventionShould
 
     [Fact]
     public void NullControllerRoute_AndSetPluralName() {
-        var methods = new Dictionary<RuntimeTypeHandle, List<ResourceMethodAttribute>> {
-            [typeof(EntityB).TypeHandle] = [new("run", typeof(HandlerB))],
-        };
-        var convention = new ResourceMethodControllerConvention(methods);
+        var convention = new ResourceMethodControllerConvention(
+            Registry(new ResourceMethodAttribute("run", typeof(HandlerB))));
 
         var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
         var model          = BuildController(controllerType);
@@ -106,7 +99,7 @@ public class ResourceMethodControllerConventionShould
 
     [Fact]
     public void SkipWhenMethodNotRegistered_ForHandlerType() {
-        var convention = new ResourceMethodControllerConvention([]);
+        var convention = new ResourceMethodControllerConvention(Registry());
 
         var controllerType  = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
         var model           = BuildController(controllerType);
@@ -121,10 +114,8 @@ public class ResourceMethodControllerConventionShould
 
     [Fact]
     public void RebindGetMethod_ToGetConstraintAndQueryBinding() {
-        var methods = new Dictionary<RuntimeTypeHandle, List<ResourceMethodAttribute>> {
-            [typeof(EntityB).TypeHandle] = [new("preview", typeof(HandlerB)) { Method = ResourceHttpMethod.Get }],
-        };
-        var convention = new ResourceMethodControllerConvention(methods);
+        var convention = new ResourceMethodControllerConvention(
+            Registry(new ResourceMethodAttribute("preview", typeof(HandlerB)) { Method = ResourceHttpMethod.Get }));
 
         var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
         var model          = BuildController(controllerType, true);
@@ -142,10 +133,8 @@ public class ResourceMethodControllerConventionShould
 
     [Fact]
     public void KeepPostConstraint_ForDefaultMethod() {
-        var methods = new Dictionary<RuntimeTypeHandle, List<ResourceMethodAttribute>> {
-            [typeof(EntityB).TypeHandle] = [new("run", typeof(HandlerB))],
-        };
-        var convention = new ResourceMethodControllerConvention(methods);
+        var convention = new ResourceMethodControllerConvention(
+            Registry(new ResourceMethodAttribute("run", typeof(HandlerB))));
 
         var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
         var model          = BuildController(controllerType, true);
@@ -159,6 +148,55 @@ public class ResourceMethodControllerConventionShould
 
         var parameter = Assert.Single(model.Actions[0].Parameters, p => p.ParameterName == "request");
         Assert.Null(parameter.BindingInfo);
+    }
+
+    [Fact]
+    public void RequireResourceDeclaredScheme_OverGlobalDefault() {
+        var registry = new ResourceRegistry();
+        registry.Add(new(typeof(EntityB)) { AuthenticationScheme = "ResourceScheme" },
+                     [new ResourceMethodAttribute("run", typeof(HandlerB))]);
+        var convention = new ResourceMethodControllerConvention(registry, "GlobalScheme");
+
+        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
+        var model          = BuildController(controllerType);
+
+        convention.Apply(model);
+
+        var filter = Assert.IsType<AuthorizeFilter>(Assert.Single(model.Filters));
+        Assert.Equal(["ResourceScheme"], filter.Policy!.AuthenticationSchemes);
+    }
+
+    [Fact]
+    public void RequireGlobalScheme_WhenResourceDeclaresNone() {
+        var convention = new ResourceMethodControllerConvention(
+            Registry(new ResourceMethodAttribute("run", typeof(HandlerB))), "GlobalScheme");
+
+        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
+        var model          = BuildController(controllerType);
+
+        convention.Apply(model);
+
+        var filter = Assert.IsType<AuthorizeFilter>(Assert.Single(model.Filters));
+        Assert.Equal(["GlobalScheme"], filter.Policy!.AuthenticationSchemes);
+    }
+
+    [Fact]
+    public void AddNoAuthorizationFilter_WhenNeitherResourceNorGlobalDeclaresScheme() {
+        var convention = new ResourceMethodControllerConvention(
+            Registry(new ResourceMethodAttribute("run", typeof(HandlerB))));
+
+        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
+        var model          = BuildController(controllerType);
+
+        convention.Apply(model);
+
+        Assert.Empty(model.Filters);
+    }
+
+    private static ResourceRegistry Registry(params ResourceMethodAttribute[] methods) {
+        var registry = new ResourceRegistry();
+        registry.Add(new(typeof(EntityB)), methods);
+        return registry;
     }
 
     private static ControllerModel BuildController(TypeInfo controllerType, bool withRequestParameter) {

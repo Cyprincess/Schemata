@@ -20,12 +20,12 @@ namespace Schemata.Resource.Grpc;
 internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodProvider<TService>
     where TService : class
 {
-    private static readonly Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, SchemataResourceOptions>? Registrar;
+    private static readonly Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, IResourceRegistry>? Registrar;
 
     private static readonly Marshaller<Empty> EmptyMarshaller = new((_, ctx) => ctx.Complete([]), _ => new());
 
-    private readonly ResourceBinderConfiguration       _config;
-    private readonly IOptions<SchemataResourceOptions> _options;
+    private readonly ResourceBinderConfiguration _config;
+    private readonly IResourceRegistry           _registry;
 
     static ResourceServiceMethodProvider() {
         var t = typeof(TService);
@@ -36,27 +36,27 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
         var args   = t.GetGenericArguments();
         var method = typeof(ResourceServiceMethodProvider<TService>).GetMethod(nameof(RegisterAll), BindingFlags.Static | BindingFlags.NonPublic)!.MakeGenericMethod(args[0], args[1], args[2], args[3]);
 
-        Registrar = (Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, SchemataResourceOptions>)Delegate.CreateDelegate(typeof(Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, SchemataResourceOptions>), method);
+        Registrar = (Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, IResourceRegistry>)Delegate.CreateDelegate(typeof(Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, IResourceRegistry>), method);
     }
 
     /// <summary>
     ///     Initializes a method provider for resource gRPC services.
     /// </summary>
     /// <param name="config">The resource gRPC binder configuration.</param>
-    /// <param name="options">The registered resource options.</param>
+    /// <param name="registry">The registered resources.</param>
     public ResourceServiceMethodProvider(
-        ResourceBinderConfiguration       config,
-        IOptions<SchemataResourceOptions> options
+        ResourceBinderConfiguration config,
+        IResourceRegistry           registry
     ) {
-        _config  = config;
-        _options = options;
+        _config   = config;
+        _registry = registry;
     }
 
     #region IServiceMethodProvider<TService> Members
 
     void IServiceMethodProvider<TService>.OnServiceMethodDiscovery(ServiceMethodProviderContext<TService> context) {
-        Registrar?.Invoke(context, _config, _options.Value);
-        ResourceCustomMethod.Register(context, _config, _options.Value);
+        Registrar?.Invoke(context, _config, _registry);
+        ResourceCustomMethod.Register(context, _config, _registry);
     }
 
     #endregion
@@ -64,7 +64,7 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
     private static void RegisterAll<TEntity, TRequest, TDetail, TSummary>(
         ServiceMethodProviderContext<TService> context,
         ResourceBinderConfiguration            config,
-        SchemataResourceOptions                options
+        IResourceRegistry                      registry
     )
         where TEntity : class, ICanonicalName
         where TRequest : class, ICanonicalName
@@ -74,9 +74,7 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
         var descriptor = ResourceNameDescriptor.ForType<TEntity>();
         var service    = GrpcResourceNaming.ServiceFullName(typeof(TEntity), descriptor);
 
-        var allowed = options.Resources.TryGetValue(typeof(TEntity).TypeHandle, out var resource)
-                          ? resource.Operations
-                          : null;
+        var allowed = registry.GetResource(typeof(TEntity))?.Operations;
 
         bool IsAllowed(Operations verb) {
             return allowed is null || Array.IndexOf(allowed, verb) >= 0;

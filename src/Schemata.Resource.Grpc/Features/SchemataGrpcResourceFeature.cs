@@ -1,8 +1,4 @@
-using System;
-using System.Linq;
-using System.Reflection;
 using Grpc.AspNetCore.Server.Model;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Routing;
@@ -11,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using ProtoBuf.Grpc.Configuration;
-using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Resource.Foundation;
@@ -39,13 +34,6 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
     /// </summary>
     public const int DefaultPriority = SchemataResourceFeature.DefaultPriority + 200_000;
 
-    private static readonly MethodInfo? MapGrpcServiceMethod = typeof(GrpcEndpointRouteBuilderExtensions)
-                                                              .GetMethods(BindingFlags.Public | BindingFlags.Static)
-                                                              .FirstOrDefault(m => m is {
-                                                                   Name: nameof(GrpcEndpointRouteBuilderExtensions.MapGrpcService),
-                                                                   IsGenericMethodDefinition: true,
-                                                               } && m.GetParameters().Length == 1);
-
     public override int Priority => DefaultPriority;
 
     public override void ConfigureServices(
@@ -58,8 +46,8 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
         services.TryAddScoped(typeof(ResourceService<,,,>));
 
         services.TryAddSingleton(sp => {
-            var options    = sp.GetRequiredService<IOptions<SchemataResourceOptions>>();
-            var model      = RuntimeTypeModelConfigurator.Configure(options.Value);
+            var registry   = sp.GetRequiredService<IResourceRegistry>();
+            var model      = RuntimeTypeModelConfigurator.Configure(registry);
             var marshaller = ProtoBufMarshallerFactory.Create(model);
             var binder     = BinderConfiguration.Create([marshaller], new ResourceServiceBinder());
             return new ResourceBinderConfiguration(model, binder);
@@ -77,38 +65,7 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
         IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
         IWebHostEnvironment   environment
-    ) {
-        var sp      = app.ApplicationServices;
-        var options = sp.GetRequiredService<IOptions<SchemataResourceOptions>>();
-
-        foreach (var (_, resource) in options.Value.Resources) {
-            if (!GrpcResourceHelper.IsGrpcEnabled(resource)) {
-                continue;
-            }
-
-            var service = typeof(ResourceService<,,,>).MakeGenericType(resource.Entity, resource.Request!, resource.Detail!, resource.Summary!);
-
-            var result = MapGrpcService(endpoints, service);
-
-            if (result is not IEndpointConventionBuilder builder) {
-                continue;
-            }
-
-            var quota = resource.Entity.GetCustomAttribute<RateLimitPolicyAttribute>();
-            if (quota is not null) {
-                builder.RequireRateLimiting(quota.PolicyName);
-            }
-
-            if (!string.IsNullOrWhiteSpace(options.Value.AuthenticationScheme)) {
-                var policy = new AuthorizationPolicyBuilder(options.Value.AuthenticationScheme)
-                            .RequireAssertion(_ => true)
-                            .Build();
-                builder.RequireAuthorization(policy);
-            }
-        }
-    }
-
-    private static object? MapGrpcService(IEndpointRouteBuilder endpoints, Type serviceType) {
-        return MapGrpcServiceMethod?.MakeGenericMethod(serviceType).Invoke(null, [endpoints]);
-    }
+    ) => endpoints.MapSchemataGrpcResources(
+        app.ApplicationServices.GetRequiredService<IResourceRegistry>(),
+        app.ApplicationServices.GetRequiredService<IOptions<SchemataResourceOptions>>().Value.AuthenticationScheme);
 }

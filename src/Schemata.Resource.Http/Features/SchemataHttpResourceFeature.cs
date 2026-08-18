@@ -1,13 +1,9 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Schemata.Core;
 using Schemata.Core.Features;
-using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Features;
 using Schemata.Transport.Http.Features;
 
@@ -37,44 +33,11 @@ public sealed class SchemataHttpResourceFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) {
-        var provider = new ResourceControllerFeatureProvider();
-        var method   = new ResourceMethodControllerFeatureProvider();
-        services.AddSingleton(provider);
-        services.AddSingleton(method);
-        services.AddSingleton<IActionDescriptorChangeProvider>(provider);
-
-        services.AddOptions<MvcOptions>()
-                .Configure<IOptions<SchemataResourceOptions>>((mvc, opts) => {
-                     mvc.Conventions.Add(new ResourceControllerConvention(opts.Value.Resources, opts.Value.AuthenticationScheme));
-                     mvc.Conventions.Add(new ResourceMethodControllerConvention(opts.Value.Methods, opts.Value.AuthenticationScheme));
-                 });
-
-        services.AddMvcCore()
-                .ConfigureApplicationPartManager(manager => {
-                     manager.FeatureProviders.Add(provider);
-                     manager.FeatureProviders.Add(method);
-                 });
-    }
+    ) => services.AddSchemataHttpResources();
 
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) {
-        var sp = app.ApplicationServices;
-
-        var provider       = sp.GetRequiredService<ResourceControllerFeatureProvider>();
-        var methodProvider = sp.GetRequiredService<ResourceMethodControllerFeatureProvider>();
-        var options        = sp.GetRequiredService<IOptions<SchemataResourceOptions>>();
-
-        provider.Resources       = options.Value.Resources;
-        methodProvider.Resources = options.Value.Resources;
-        methodProvider.Methods   = options.Value.Methods;
-
-        // The CRUD provider is the IActionDescriptorChangeProvider; its Commit()
-        // signals MVC to repopulate ALL controller feature providers, including
-        // the method provider configured above.
-        provider.Commit();
-    }
+    ) => app.UseSchemataHttpResources();
 }
