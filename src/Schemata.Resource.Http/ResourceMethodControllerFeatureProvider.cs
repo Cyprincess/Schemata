@@ -10,11 +10,9 @@ using Schemata.Resource.Http.Internal;
 namespace Schemata.Resource.Http;
 
 /// <summary>
-///     Synthesizes a closed-generic
-///     <see cref="ResourceMethodController{TEntity, TRequest, TResponse, THandler}" />
-///     per AIP-136 custom method declared via
-///     <see cref="ResourceMethodAttribute" /> on each registered resource, and
-///     adds them to the MVC controller feature so they participate in routing.
+///     Synthesizes one closed
+///     <see cref="ResourceMethodController{TEntity, TRequest, TResponse}" /> per distinct custom
+///     method request/response shape and adds it to MVC controller discovery.
 /// </summary>
 public sealed class ResourceMethodControllerFeatureProvider : IApplicationFeatureProvider<ControllerFeature>
 {
@@ -32,19 +30,17 @@ public sealed class ResourceMethodControllerFeatureProvider : IApplicationFeatur
             }
 
             foreach (var method in Registry!.GetMethods(resource.Entity)) {
-                var handlerInterface = ResourceMethodHandlerHelper.FindHandlerInterface(method.Handler);
-                if (handlerInterface is null) {
+                var descriptor = ResourceMethodHandlerHelper.Describe(resource.Entity, method.Handler);
+                if (descriptor is null) {
                     continue;
                 }
 
-                var arguments = handlerInterface.GetGenericArguments();
-                var entity    = arguments[0];
-                var request   = arguments[1];
-                var response  = arguments[2];
-
-                var controller = typeof(ResourceMethodController<,,,>)
-                                .MakeGenericType(entity, request, response, method.Handler)
-                                .GetTypeInfo();
+                var controller = typeof(ResourceMethodController<,,>)
+                                .MakeGenericType(
+                                     descriptor.Entity,
+                                     descriptor.Request,
+                                     descriptor.Response)
+                                 .GetTypeInfo();
 
                 if (feature.Controllers.Contains(controller)) {
                     continue;

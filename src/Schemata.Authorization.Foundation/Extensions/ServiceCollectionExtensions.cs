@@ -9,6 +9,11 @@ using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Binding;
 using Schemata.Authorization.Foundation.Features;
 using Schemata.Authorization.Foundation.Handlers;
+using Schemata.Authorization.Foundation.Commands;
+using Schemata.Authorization.Foundation.Queries;
+using Schemata.Messaging.Skeleton;
+using Schemata.Authorization.Skeleton.Models;
+using Schemata.Messaging.Skeleton.Internal;
 using Schemata.Authorization.Foundation.Managers;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
@@ -131,6 +136,17 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<DiscoveryHandler<TScope>>();
 
         services.TryAddScoped<TokenService>();
+        services.TryAddScoped<
+            IAuthorizationSignInService,
+            AuthorizationSignInService<TApp, TToken>>();
+        services.TryAddScoped<
+            IAuthorizationSignInHttpWriter,
+            AuthorizationSignInHttpWriter>();
+        services.TryAddScoped<InProcessRequestDispatcher>();
+        services.TryAddScoped<IRequestDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+        services.TryAddScoped<ICommandDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+        services.TryAddScoped<IQueryDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+        AddAuthorizationHandlers<TApp, TToken>(services);
         services.TryAddScoped<ISubjectIdentifierService, SubjectIdentifierService>();
 
         // Pairwise (application × canonical-subject) → pairwise-hash mapping lives in
@@ -156,4 +172,40 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
+    private static void AddAuthorizationHandlers<TApp, TToken>(IServiceCollection services)
+        where TApp : SchemataApplication
+        where TToken : SchemataToken, new()
+    {
+        services.TryAddScoped<
+            IRequestHandler<AuthorizeEndpointRequest, AuthorizationResult>,
+            AuthorizeEndpointHandler>();
+        services.TryAddScoped<
+            IRequestHandler<TokenEndpointRequest, AuthorizationResult>,
+            TokenEndpointHandler>();
+        services.TryAddScoped<
+            IRequestHandler<RevokeEndpointRequest, Unit>,
+            RevokeEndpointHandler>();
+        services.TryAddScoped<
+            IRequestHandler<DeviceAuthorizeEndpointRequest, AuthorizationResult>,
+            DeviceAuthorizeEndpointHandler>();
+        services.TryAddScoped<
+            IRequestHandler<EndSessionEndpointRequest, AuthorizationResult>,
+            EndSessionEndpointHandler>();
+        services.TryAddScoped<
+            IRequestHandler<InteractionApproveRequest, AuthorizationResult>,
+            InteractionApproveHandler>();
+        services.TryAddScoped<
+            IRequestHandler<InteractionDenyRequest, Unit>,
+            InteractionDenyHandler>();
+        services.TryAddScoped<
+            IRequestHandler<IntrospectionEndpointQuery, IntrospectionResponse>,
+            IntrospectionEndpointHandler>();
+        services.TryAddScoped<
+            IRequestHandler<UserInfoEndpointQuery, AuthorizationResult>,
+            UserInfoEndpointHandler>();
+        services.TryAddScoped<
+            IRequestHandler<InteractionDetailsQuery, AuthorizationResult>,
+            InteractionDetailsHandler>();
+    }
+
 }

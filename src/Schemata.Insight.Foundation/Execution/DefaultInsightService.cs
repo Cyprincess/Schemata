@@ -1,25 +1,24 @@
+using System;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Insight.Skeleton;
+using Schemata.Messaging.Skeleton;
 
 namespace Schemata.Insight.Foundation;
 
 /// <summary>
-///     Composes the plan builder and executor: it builds the logical plan for a request, then runs it.
-///     Source-level and row-level security run inside each driver.
+///     Preserves the public Insight facade while dispatching queries through the registered request dispatcher.
 /// </summary>
 public sealed class DefaultInsightService : IInsightService
 {
-    private readonly PlanExecutor       _executor;
-    private readonly InsightPlanBuilder _planner;
+    private readonly IServiceProvider _services;
 
-    /// <summary>Composes the default Insight query service from the logical plan builder and the plan executor.</summary>
-    /// <param name="planner">The logical plan builder.</param>
-    /// <param name="executor">The plan executor.</param>
-    public DefaultInsightService(InsightPlanBuilder planner, PlanExecutor executor) {
-        _planner  = planner;
-        _executor = executor;
+    /// <summary>Creates the facade over the registered request dispatcher.</summary>
+    /// <param name="services">The provider resolving a per-call scope for the request dispatcher.</param>
+    public DefaultInsightService(IServiceProvider services) {
+        _services = services;
     }
 
     #region IInsightService Members
@@ -29,8 +28,10 @@ public sealed class DefaultInsightService : IInsightService
         ClaimsPrincipal?    principal,
         CancellationToken   ct = default
     ) {
-        var plan = await _planner.BuildAsync(request, ct);
-        return await _executor.ExecuteAsync(plan, request, principal, ct);
+        request.Principal = principal;
+        using var scope      = _services.CreateScope();
+        var       dispatcher = scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
+        return await dispatcher.SendAsync<QueryInsightRequest, QueryInsightResponse>(request, ct);
     }
 
     #endregion

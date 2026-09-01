@@ -20,6 +20,13 @@
     <ProjectReference Include="..\..\src\Schemata.Mapping.Mapster\Schemata.Mapping.Mapster.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Entity.EntityFrameworkCore\Schemata.Entity.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Caching.Distributed\Schemata.Caching.Distributed.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Flow.Foundation\Schemata.Flow.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Flow.Grpc\Schemata.Flow.Grpc.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Flow.Skeleton\Schemata.Flow.Skeleton.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Scheduling.Foundation\Schemata.Scheduling.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Scheduling.Grpc\Schemata.Scheduling.Grpc.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Scheduling.Skeleton\Schemata.Scheduling.Skeleton.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Transport.Grpc\Schemata.Transport.Grpc.csproj" />
   </ItemGroup>
 
 </Project>

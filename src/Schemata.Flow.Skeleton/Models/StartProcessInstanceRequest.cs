@@ -1,10 +1,14 @@
+using System.Security.Claims;
+using System.Text.Json.Serialization;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
+using Schemata.Flow.Skeleton.Entities;
+using Schemata.Messaging.Skeleton;
 
 namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>Request body for starting a new process instance.</summary>
-public sealed class StartProcessInstanceRequest : ICanonicalName, IRequestIdentification
+public sealed class StartProcessInstanceRequest : ICanonicalName, IRequestIdentification, ICommand<SchemataProcess>, IRequestPrincipal
 {
     /// <summary>The <see cref="Models.ProcessDefinition.Name" /> of the definition to instantiate.</summary>
     public string DefinitionName { get; set; } = null!;
@@ -35,6 +39,13 @@ public sealed class StartProcessInstanceRequest : ICanonicalName, IRequestIdenti
     #region IRequestIdentification Members
 
     public string? RequestId { get; set; }
+
+    #endregion
+
+    #region IRequestPrincipal Members
+
+    [JsonIgnore]
+    public ClaimsPrincipal? Principal { get; set; }
 
     #endregion
 }

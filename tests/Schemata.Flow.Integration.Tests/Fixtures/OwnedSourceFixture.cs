@@ -157,7 +157,6 @@ public sealed class OwnedSourceFixture : IAsyncLifetime
             services, typeof(OwnedOrder), typeof(SchemataProcess), typeof(SchemataProcessToken));
 
         services.AddLogging();
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddIdentifier<>)));
 
         services.AddOptions<SchemataOwnerOptions>();
         services.AddSingleton(typeof(IOwnerResolver<>), typeof(AmbientOwnerResolver<>));
@@ -170,12 +169,7 @@ public sealed class OwnedSourceFixture : IAsyncLifetime
               .Returns<FlowCatchKind>(kind => kind is FlowCatchKind.Timer);
         services.AddSingleton(timers.Object);
 
-        services.TryAddSingleton<IProcessRegistry, ProcessRegistry>();
-        services.TryAddSingleton<ProcessPersistence>();
-        services.TryAddScoped<ProcessLifecycleNotifier>();
-        services.TryAddScoped<FlowRunner>();
-        services.TryAddScoped<IFlowRunner>(sp => sp.GetRequiredService<FlowRunner>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IFlowSourceAdvisor<>), typeof(AdviceSourceProjection<>)));
+        services.AddSchemataFlow();
 
         services.TryAddKeyedSingleton<IFlowRuntime, StateMachineEngine>(FlowConstants.Engines.StateMachine);
         services.TryAddKeyedSingleton<IFlowRuntime, BpmnEngine>(FlowConstants.Engines.Bpmn);

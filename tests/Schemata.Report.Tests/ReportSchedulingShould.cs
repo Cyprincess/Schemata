@@ -4,12 +4,15 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Core;
 using Schemata.Entity.Repository;
 using Schemata.Insight.Skeleton;
+using Schemata.Messaging.Skeleton;
 using Schemata.Report.Foundation;
+using Schemata.Report.Foundation.Commands;
 using Schemata.Report.Scheduling;
 using Schemata.Report.Scheduling.Advisors;
 using Schemata.Report.Skeleton;
@@ -120,10 +123,22 @@ public class ReportSchedulingShould
 
     [Fact]
     public async Task Fire_Invokes_Generation_For_Named_Report() {
-        var service = ReportTestHost.CreateReportService(new());
+        var handler = new Mock<IRequestHandler<RunReportRequest, ReportResult>>(MockBehavior.Strict);
+        handler.Setup(value => value.HandleAsync(
+                          It.Is<RunReportRequest>(request =>
+                              request.Request.Name == "daily"
+                           && request.Request.Persist
+                           && request.Principal == null),
+                          It.IsAny<CancellationToken>()))
+               .ReturnsAsync(new ReportResult());
         using var provider = ReportTestHost.Create(
             ReportTestHost.CreateDriver(ReportTestRows.Create(1)),
-            configure: services => services.AddSingleton(service.Object));
+            configure: services => {
+                services.RemoveAll<IRequestHandler<RunReportRequest, ReportResult>>();
+                services.RemoveAll<IReportService>();
+                services.AddSingleton(new Mock<IReportService>(MockBehavior.Strict).Object);
+                services.AddSingleton(handler.Object);
+            });
         var job = new ReportGenerationJob<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
             provider.GetRequiredService<IServiceScopeFactory>(),
             provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<SchemataReportOptions>>());
@@ -132,12 +147,7 @@ public class ReportSchedulingShould
             Variables = new Dictionary<string, string?> { ["report"] = "daily" },
         }, CancellationToken.None);
 
-        service.Verify(
-            value => value.RunAsync(
-                It.Is<ReportRequest>(request => request.Name == "daily" && request.Persist),
-                null,
-                It.IsAny<CancellationToken>()),
-            Times.Once);
+        handler.VerifyAll();
     }
 
     [Fact]

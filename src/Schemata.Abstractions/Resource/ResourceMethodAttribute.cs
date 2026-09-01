@@ -22,8 +22,9 @@ public sealed class ResourceMethodAttribute : Attribute
     /// </param>
     /// <param name="handler">
     ///     A concrete type implementing
-    ///     <see cref="IResourceMethodHandler{TEntity, TRequest, TResponse}" />.
-    ///     The handler is resolved from DI at invocation time.
+    ///     <c>IRequestHandler&lt;TRequest, TResponse&gt;</c>. The request must expose
+    ///     the transport-bound caller through <c>IRequestPrincipal</c>. The handler is
+    ///     registered with DI and invoked through the request dispatcher.
     /// </param>
     /// <param name="scope">
     ///     Whether the method targets a single resource instance or the entire
@@ -46,7 +47,7 @@ public sealed class ResourceMethodAttribute : Attribute
 
     /// <summary>
     ///     The handler type implementing
-    ///     <see cref="IResourceMethodHandler{TEntity, TRequest, TResponse}" />.
+    ///     <c>IRequestHandler&lt;TRequest, TResponse&gt;</c>.
     /// </summary>
     public Type Handler { get; }
 

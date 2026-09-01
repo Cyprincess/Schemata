@@ -5,12 +5,13 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Report.Foundation;
 
-internal static class ReportResourceRegistration<TReport, TSnapshot>
+internal static class ReportResourceRegistration<TReport, TSnapshot, TChunk>
     where TReport : SchemataReport, new()
     where TSnapshot : SchemataReportSnapshot, new()
+    where TChunk : SchemataReportSnapshotChunk, new()
 {
     internal static readonly ResourceMethodAttribute[] ReportMethods = [
-        new(Verbs.Generate, typeof(GenerateHandler<TReport>), ResourceMethodScope.Collection),
+        new(Verbs.Generate, typeof(GenerateHandler<TReport, TSnapshot, TChunk>), ResourceMethodScope.Collection),
     ];
 
     internal static readonly ResourceMethodAttribute[] SnapshotMethods = [

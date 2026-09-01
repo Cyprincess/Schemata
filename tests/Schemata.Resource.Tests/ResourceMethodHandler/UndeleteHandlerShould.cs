@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Moq;
@@ -24,18 +23,32 @@ public class UndeleteHandlerShould
             DeleteTime    = DateTime.UtcNow,
             PurgeTime     = DateTime.UtcNow.AddDays(7),
         };
+        var other = new TrashStudent {
+            Name          = "bob-1",
+            CanonicalName = "trashStudents/bob-1",
+            DeleteTime    = DateTime.UtcNow,
+            PurgeTime     = DateTime.UtcNow.AddDays(7),
+        };
 
+        var suppression = new Mock<IDisposable>();
         var repository = new Mock<IRepository<TrashStudent>>();
+        repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(suppression.Object);
+        repository.Setup(r => r.SingleOrDefaultAsync(
+                             It.IsAny<Func<IQueryable<TrashStudent>, IQueryable<TrashStudent>>>(),
+                             It.IsAny<CancellationToken>()))
+                  .Returns((Func<IQueryable<TrashStudent>, IQueryable<TrashStudent>> query, CancellationToken _) =>
+                      ValueTask.FromResult<TrashStudent?>(query(new[] { other, entity }.AsQueryable())
+                                                         .SingleOrDefault()));
         repository.Setup(r => r.UpdateAsync(entity, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         var mapper = new Mock<ISimpleMapper>();
         mapper.Setup(m => m.Map<TrashStudent, TrashStudent>(entity)).Returns(entity);
-
         var handler = new UndeleteHandler<TrashStudent, TrashStudent>(repository.Object, mapper.Object);
 
-        var detail = await handler.InvokeAsync(entity.CanonicalName, new(), entity, Mock.Of<ClaimsPrincipal>(),
-                                               CancellationToken.None);
+        var detail = await handler.HandleAsync(
+            new UndeleteResourceRequest<TrashStudent, TrashStudent> { CanonicalName = entity.CanonicalName },
+            CancellationToken.None);
 
         Assert.Same(entity, detail);
         Assert.Null(entity.DeleteTime);
@@ -48,15 +61,19 @@ public class UndeleteHandlerShould
     public async Task Invoke_LiveEntity_ThrowsAlreadyExists() {
         var entity = new TrashStudent { Name = "alice-1", CanonicalName = "trashStudents/alice-1" };
 
+        var suppression = new Mock<IDisposable>();
         var repository = new Mock<IRepository<TrashStudent>>();
-        var mapper     = new Mock<ISimpleMapper>();
-        var handler    = new UndeleteHandler<TrashStudent, TrashStudent>(repository.Object, mapper.Object);
+        repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(suppression.Object);
+        repository.Setup(r => r.SingleOrDefaultAsync(
+                             It.IsAny<Func<IQueryable<TrashStudent>, IQueryable<TrashStudent>>>(),
+                             It.IsAny<CancellationToken>()))
+                  .Returns(ValueTask.FromResult<TrashStudent?>(entity));
+        var mapper  = new Mock<ISimpleMapper>();
+        var handler = new UndeleteHandler<TrashStudent, TrashStudent>(repository.Object, mapper.Object);
 
-        var ex = await Assert.ThrowsAsync<AlreadyExistsException>(() => handler.InvokeAsync(
-                                                                      entity.CanonicalName, new(), entity,
-                                                                      null,
-                                                                      CancellationToken.None)
-                                                                 .AsTask());
+        var ex = await Assert.ThrowsAsync<AlreadyExistsException>(() => handler.HandleAsync(
+            new UndeleteResourceRequest<TrashStudent, TrashStudent> { CanonicalName = entity.CanonicalName },
+            CancellationToken.None));
 
         var resource = Assert.Single(ex.Details!.OfType<ResourceInfoDetail>());
         Assert.Equal(entity.CanonicalName, resource.ResourceName);

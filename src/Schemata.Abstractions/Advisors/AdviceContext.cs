@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace Schemata.Abstractions.Advisors;
 
@@ -94,6 +95,53 @@ public class AdviceContext
         var hadPrev = _options.TryGetValue(handle, out var prev);
         _options[handle] = value;
         return new Restore(this, handle, hadPrev, prev);
+    }
+
+    private static readonly AsyncLocal<AdviceContext?> s_current = new();
+
+    /// <summary>
+    ///     The ambient <see cref="AdviceContext" /> established by the nearest pipeline root, or
+    ///     <see langword="null" /> when no pipeline is currently executing.
+    /// </summary>
+    /// <remarks>
+    ///     Pipeline roots — dispatchers, scheduler-triggered jobs, event publish/consume, actor
+    ///     turns, and message consumers — are responsible for calling <see cref="Establish" />.
+    ///     Downstream components only read <see cref="Current" /> to pick up the ambient context;
+    ///     they never establish one themselves. The ambient value does not flow across
+    ///     Channel or process boundaries.
+    /// </remarks>
+    public static AdviceContext? Current => s_current.Value;
+
+    /// <summary>
+    ///     Returns the ambient context or throws when no pipeline root is active.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No ambient context is established.</exception>
+    public static AdviceContext Require()
+        => Current
+           ?? throw new InvalidOperationException("An ambient AdviceContext is required; enter through IRequestDispatcher or another pipeline root.");
+
+    /// <summary>
+    ///     Establishes <paramref name="context" /> as the ambient <see cref="Current" /> context
+    ///     until the returned scope is disposed.
+    /// </summary>
+    /// <param name="context">The context to establish as ambient.</param>
+    /// <returns>A disposable that restores the previously ambient context on disposal.</returns>
+    public static IDisposable Establish(AdviceContext context) {
+        var previous = s_current.Value;
+        s_current.Value = context;
+        return new AmbientScope(previous);
+    }
+
+    private sealed class AmbientScope(AdviceContext? previous) : IDisposable
+    {
+        private bool _disposed;
+
+        public void Dispose() {
+            if (_disposed) return;
+            _disposed = true;
+
+            s_current.Value = previous;
+        }
     }
 
     private sealed class Restore(AdviceContext context, RuntimeTypeHandle key, bool hadPrevious, object? previous) : IDisposable

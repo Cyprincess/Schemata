@@ -19,7 +19,7 @@ builder.UseSchemata(schema => {
    `TypeAdapterConfig.GlobalSettings`, applies `Default.IgnoreNullValues(true).PreserveReference(true)`,
    then runs `MapsterConfigurator.Configure`.
 2. Adds `SchemataMappingFeature<Schemata.Mapping.Mapster.SimpleMapper>`
-   (Priority `Orders.Extension + 60_000_000`).
+   (Priority `Orders.Extension + 70_000_000`).
 
 The configuration is a clone of the global settings, so the process-wide `TypeAdapterConfig` stays
 untouched.

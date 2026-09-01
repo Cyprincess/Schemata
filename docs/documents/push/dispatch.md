@@ -1,36 +1,41 @@
 # Dispatch
 
-`DefaultPushService.SendAsync` drives one dispatch through the advisor pipeline and then fans it out
+`IPushService.SendAsync` (`DefaultPushService`) dispatches a `SendPushRequest` through
+`IRequestDispatcher`; the `SendPushHandler` runs the advisor pipeline and then fans the request out
 to every registered transport.
 
 ## Pipeline order
 
-`SendAsync` is an async iterator (`Schemata.Push.Foundation.DefaultPushService.cs`) that runs two
-stages:
+`SendPushHandler` (`Schemata.Push.Foundation.Handlers.SendPushHandler.cs`) runs two stages and
+returns the collected results as an `ImmutableArray<TransportResult>`. `DefaultPushService.SendAsync`
+awaits that whole array and re-yields it to keep the facade's `IAsyncEnumerable` signature:
 
-1. **Advisor stage.** A fresh `AdviceContext` is built over the service provider, and
-   `Advisor.For<IPushSendAdvisor>().RunAsync(context, …)` runs the registered advisors in ascending
-   `Order`. The first advisor that returns a result other than `AdviseResult.Continue` short-circuits
-   the dispatch: `SendAsync` yields nothing and no transport runs.
-2. **Fan-out stage.** Every `IPushTransport` resolved from DI is invoked concurrently. Results stream
-   back as each transport completes.
+1. **Advisor stage.** The ambient `AdviceContext` established for the dispatch runs the registered
+   `IPushSendAdvisor` chain in ascending `Order`. The first advisor that returns a result other than
+   `AdviseResult.Continue` short-circuits the dispatch: the handler returns an empty array and no
+   transport runs.
+2. **Fan-out stage.** Every `IPushTransport` resolved from DI is invoked concurrently. The handler
+   awaits every transport before returning, collecting each result into the array as its transport
+   finishes.
 
 ```csharp
-var adviceContext = new AdviceContext(_services);
-var advice        = await Advisor.For<IPushSendAdvisor>().RunAsync(adviceContext, context, ct);
+var ctx    = AdviceContext.Require();
+var advice = await Advisor.For<IPushSendAdvisor>().RunAsync(ctx, request.Context, ct);
 if (advice is not AdviseResult.Continue) {
-    yield break;
+    return [];
 }
 
-var pending = _services.GetServices<IPushTransport>()
-                       .Select(transport => InvokeAsync(transport, context, ct))
-                       .ToList();
-
+var pending = services.GetServices<IPushTransport>()
+                      .Select(transport => InvokeAsync(transport, request.Context, ct))
+                      .ToList();
+var results = ImmutableArray.CreateBuilder<TransportResult>(pending.Count);
 while (pending.Count > 0) {
     var finished = await Task.WhenAny(pending);
     pending.Remove(finished);
-    yield return await finished;
+    results.Add(await finished);
 }
+
+return results.MoveToImmutable();
 ```
 
 ## Self-filtering
@@ -53,16 +58,19 @@ Typical responses by target:
 Filtering is transport-defined, so multiple transports can claim the same target (a
 `BroadcastTarget` delivered by both SignalR and a websocket gateway, for example).
 
-## Streaming order
+## Result ordering
 
-`SendAsync` returns `IAsyncEnumerable<TransportResult>` and yields results in **completion order**.
-The fan-out loop awaits `Task.WhenAny` over the outstanding transport tasks, so each result reaches
-the caller as soon as its transport finishes.
+`SendAsync` returns `IAsyncEnumerable<TransportResult>` and keeps that signature, but the facade
+now awaits the whole dispatch before yielding: the caller observes every transport's outcome
+together, not one per completion. The results inside the set are ordered by completion — the handler
+still uses `Task.WhenAny` to collect them — but they arrive as one batch. The observable difference
+from the former per-completion streaming is the time the first result reaches the caller: it is now
+after the slowest transport, not the fastest.
 
 ```csharp
 await foreach (var result in push.SendAsync(context, ct))
 {
-    // results arrive in completion order, regardless of registration order
+    // the whole set arrives together; results are ordered by completion within it
 }
 ```
 

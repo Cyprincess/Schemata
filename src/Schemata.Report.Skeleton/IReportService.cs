@@ -5,15 +5,16 @@ using Schemata.Abstractions.Resource;
 
 namespace Schemata.Report.Skeleton;
 
-/// <summary>Runs report requests inline or dispatches them as long-running operations.</summary>
+/// <summary>Dispatches report requests for immediate results or long-running operations.</summary>
 /// <remarks>
-///     Generation runs Insight queries under the supplied principal with Insight source security applied.
-///     Dispatched and scheduled generations run with no principal; an <see cref="IReportGenerateAdvisor" />
-///     may replace <see cref="ReportGenerateContext.Principal" /> or reject the generation.
+///     <see cref="RunAsync" /> executes Insight queries under the supplied principal with Insight source
+///     security applied. <see cref="GenerateAsync" /> and scheduled generations run with no principal;
+///     an <see cref="IReportGenerateAdvisor" /> may replace
+///     <see cref="ReportGenerateContext.Principal" /> or reject the generation.
 /// </remarks>
 public interface IReportService
 {
-    /// <summary>Runs a report inline and returns its result.</summary>
+    /// <summary>Dispatches a report request and returns its inline or persisted result.</summary>
     /// <param name="request">The named or inline report request.</param>
     /// <param name="principal">The principal the materialization runs under.</param>
     /// <param name="ct">The cancellation token.</param>

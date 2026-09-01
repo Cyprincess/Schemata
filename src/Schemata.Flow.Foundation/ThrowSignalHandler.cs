@@ -1,28 +1,28 @@
-using System.Security.Claims;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Messaging.Skeleton;
+using ThrowProcessSignalRequest = Schemata.Flow.Foundation.Commands.ThrowSignalRequest;
 
 namespace Schemata.Flow.Foundation;
 
-/// <summary>Resource method handler that broadcasts BPMN signals to waiting process instances.</summary>
-public sealed class ThrowSignalHandler(FlowRunner runner)
-    : IResourceMethodHandler<SchemataProcess, ThrowSignalRequest, EmptyResourceResponse>
+/// <summary>
+///     Handles BPMN signal broadcast requests dispatched through the resource-method pipeline.
+/// </summary>
+public sealed class ThrowSignalHandler(IRequestDispatcher dispatcher)
+    : IRequestHandler<ThrowSignalRequest, EmptyResourceResponse>
 {
-    #region IResourceMethodHandler<SchemataProcess,ThrowSignalRequest,EmptyResourceResponse> Members
-
-    public async ValueTask<EmptyResourceResponse> InvokeAsync(
-        string?            name,
+    /// <inheritdoc />
+    public async Task<EmptyResourceResponse> HandleAsync(
         ThrowSignalRequest request,
-        SchemataProcess?   entity,
-        ClaimsPrincipal?   principal,
-        CancellationToken  ct
-    ) {
-        await runner.ThrowSignalAsync(request.SignalName, request.Payload, request.Token, principal, ct);
+        CancellationToken ct = default)
+    {
+        await dispatcher.SendAsync<ThrowProcessSignalRequest, IReadOnlyList<SignalDeliveryResult>>(
+            new(request.SignalName, request.Payload, request.Token, request.Principal), ct);
         return new();
     }
-
-    #endregion
 }

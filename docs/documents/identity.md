@@ -11,7 +11,7 @@ depends on `SchemataAuthenticationFeature` and `SchemataTransportHttpFeature`.
 | Package                        | Key files                                                                                                                                                                                                                                       |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Schemata.Identity.Skeleton`   | `Entities/SchemataUser.cs`, `Entities/SchemataRole.cs`, the join entities, `Managers/SchemataUserManager.cs`, `Stores/`, `Advisors/`, `Json/ClaimStoreJsonConverter.cs`, `Services/IMailSender.cs`, `Services/IMessageSender.cs`                |
-| `Schemata.Identity.Foundation` | `Extensions/SchemataBuilderExtensions.cs` (three `UseIdentity` overloads), `Features/SchemataIdentityFeature.cs`, `Controllers/AuthenticateController*.cs`, `Handlers/IdentityHandler*.cs`, `Advisors/Advice*.cs`, `SchemataIdentityOptions.cs` |
+| `Schemata.Identity.Foundation` | `Extensions/SchemataBuilderExtensions.cs` (three `UseIdentity` overloads), `Features/SchemataIdentityFeature.cs`, `Controllers/AuthenticateController*.cs`, `Commands/`, `Queries/`, `Handlers/IdentityHandler.cs`, `Handlers/IdentityOperationHandler*.cs`, `Advisors/Advice*.cs`, `SchemataIdentityOptions.cs` |
 
 ## Entity types
 
@@ -68,7 +68,9 @@ stores are `SchemataUserStore<TUser>` and `SchemataRoleStore<TRole>`.
 - Calls `AddSchemataApplicationPart<...>()`, then registers `AuthenticateController<TUser>` through
   an `IdentityControllerFeatureProvider` so MVC discovers the controller without exposing the whole
   Schemata assembly as an `ApplicationPart`.
-- Registers `IdentityHandler<TUser>` (scoped) and the request-advisor chain (see below).
+- Supplies default dispatcher aliases when none is already registered, registers the scoped
+  `IdentityHandler<TUser>` facade, and explicitly closes 14 request handlers for `TUser`; the
+  operation handler owns the existing advisor and Identity-manager pipeline.
 - Registers `IMailSender<>` and `IMessageSender<>` with the `NoOpMailSender<>` /
   `NoOpMessageSender<>` defaults.
 - Registers `IUserStore<TUser>` and `IRoleStore<TRole>` with the supplied store types.
@@ -106,8 +108,11 @@ account actions carry `[Authorize]`.
 | `PUT`   | `~/Account/Profile/Phone`      | `Phone`         | Start a phone-number change           |
 | `PUT`   | `~/Account/Profile/Password`   | `Password`      | Change the password                   |
 
-Each action delegates to `IdentityHandler<TUser>`, which runs the request advisor pipeline for the
-operation before performing it. The request bodies are the `*Request` models in
+The 14 account-operation actions dispatch their command or query directly; `SignOut` and `Continue`
+retain their HTTP-specific handling. `IdentityHandler<TUser>` exposes the same operations as a
+dispatcher-backed facade for non-HTTP callers. The internal operation handler requires the
+dispatcher-established `AdviceContext`, runs the request advisor pipeline, and then performs the
+operation. HTTP request bodies remain the `*Request` models in
 `Schemata.Identity.Skeleton.Models`; with snake_case serialization, `RegisterRequest` posts
 `username`, `email_address`, `phone_number`, `password`, and an optional `use_cookies`.
 

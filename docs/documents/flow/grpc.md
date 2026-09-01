@@ -4,14 +4,14 @@
 `SchemataProcessToken`, and `SchemataProcessTransition` as Schemata resources. Process operations
 ride the standard Resource pipeline as AIP-136 custom methods, and the package maps a small code-first
 service that lists registered process definitions. `MapGrpc()` activates `SchemataFlowGrpcFeature`
-(priority `SchemataFlowFeature.DefaultPriority + 200_000` = `480_200_000`).
+(priority `SchemataFlowFeature.DefaultPriority + 200_000` = `490_200_000`).
 
 ## Where the code lives
 
 | Package                    | Key files                                                                                                                                                                                                                                                                                        |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `Schemata.Flow.Grpc`       | `Features/SchemataFlowGrpcFeature.cs`, `Services/IProcessDefinitionService.cs`, `Services/ProcessDefinitionService.cs`, `FlowProtoTypeContributor.cs`, `Extensions/SchemataBuilderExtensions.cs`                                                                                               |
-| `Schemata.Flow.Foundation` | `StartProcessHandler.cs`, `FlowStartProcessHandler.cs`, `CompleteActivityHandler.cs`, `CorrelateMessageHandler.cs`, `ThrowSignalHandler.cs`, `TerminateProcessHandler.cs`, `CancelTokenHandler.cs`, `FlowResourceRegistration.cs`, `FlowRunner.cs`, `ProcessRegistry.cs`, `ProcessDefinitionQueryService.cs` |
+| `Schemata.Flow.Foundation` | `StartProcessHandler.cs`, `FlowStartProcessHandler.cs`, `CompleteActivityHandler.cs`, `CorrelateMessageHandler.cs`, `ThrowSignalHandler.cs`, `TerminateProcessHandler.cs`, `CancelTokenHandler.cs`, `FlowResourceRegistration.cs`, `FlowRunner.cs`, `ProcessRegistry.cs`, `Commands/ListProcessDefinitionsQuery.cs`, `Handlers/DefaultListProcessDefinitionsHandler.cs` |
 | `Schemata.Flow.Skeleton`   | `Models/StartProcessInstanceRequest.cs`, `Models/CompleteActivityRequest.cs`, `Models/CorrelateMessageRequest.cs`, `Models/ThrowSignalRequest.cs`, `Entities/SchemataProcess.cs`, `Entities/SchemataProcessToken.cs`, `Entities/SchemataProcessTransition.cs`, `Models/ProcessDefinitionInfo.cs` |
 
 ## Activation
@@ -127,9 +127,10 @@ HTTP URI; it does not require a singular noun:
 
 `cancel` is instance-scoped on `TokenService`.
 
-Each handler implements `IResourceMethodHandler<TSummary, TRequest, TResponse>`; the gRPC and
-HTTP transports invoke the same handler types over the same `InvokeAsync(name, request, entity,
-principal, ct)` signature. The principal comes from the gRPC call's `HttpContext.User`.
+Each handler implements `IRequestHandler<TRequest, TResponse>` for the same dedicated wire request
+used by HTTP. `ResourceMethodOperationHandler` runs resource authorization and target validation,
+copies the gRPC call's `HttpContext.User` onto the request, and dispatches it through
+`IRequestDispatcher`.
 
 `FlowStartProcessHandler` delegates source loading to `FlowSourceLoader`: the loader resolves the
 optional `Source` canonical name through `IResourceTypeResolver`, checks the resolved type against
@@ -150,10 +151,11 @@ public interface IProcessDefinitionService
 }
 ```
 
-The method carries `[Operation]` from `ProtoBuf.Grpc.Configuration`. The implementation passes the
-registry-backed `ProcessDefinitionQueryService.ListProcessDefinitions()` results through
-unchanged; each entry has `CanonicalName = "definitions/{name}"`, plus the `IDescriptive` label
-fields from the source `ProcessDefinition`, and the same `messages` / `elements` / `flows`
+The method carries `[Operation]` from `ProtoBuf.Grpc.Configuration`. The implementation dispatches a
+`ListProcessDefinitionsQuery` through `IQueryDispatcher` and passes the results through unchanged;
+the internal `DefaultListProcessDefinitionsHandler` reads the registry, and each entry has
+`CanonicalName = "definitions/{name}"`, plus the `IDescriptive` label fields from the source
+`ProcessDefinition`, and the same `messages` / `elements` / `flows`
 definition graph documented for the HTTP endpoint. `messages` carries the message definitions the
 process declares.
 

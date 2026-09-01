@@ -2,10 +2,14 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Features;
+using Schemata.Messaging.Skeleton;
+using Schemata.Push.Foundation.Commands;
 using Schemata.Push.Foundation.Features;
 using Schemata.Push.Scheduling.Internal;
+using Schemata.Push.Skeleton;
 using Schemata.Scheduling.Foundation.Features;
 
 namespace Schemata.Push.Scheduling.Features;
@@ -33,6 +37,13 @@ public sealed class SchemataPushSchedulingFeature : FeatureBase
         IWebHostEnvironment environment
     ) {
         services.AddScheduledJob<PushDispatchJob>();
+
+        services.TryAddKeyedScoped<IRequestHandler<SchedulePushRequest, Operation>, SchedulePushHandler>(
+            PushConstants.Handlers.Default);
+        services.TryAddScoped<IRequestHandler<SchedulePushRequest, Operation>>(provider =>
+            provider.GetRequiredKeyedService<IRequestHandler<SchedulePushRequest, Operation>>(
+                PushConstants.Handlers.Default));
+
         services.TryAddScoped<IScheduledPushService, ScheduledPushService>();
     }
 }

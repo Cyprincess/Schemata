@@ -61,8 +61,8 @@ builder.UseSchemata(schema => {
 `Use<TProcess>()` returns the builder, so definitions chain. An optional
 `Action<ProcessConfiguration>` configures the individual definition without breaking the chain.
 
-`SchemataFlowFeature.Priority` is `SchemataConstants.Orders.Extension + 80_000_000` =
-`480_000_000`. Its `ConfigureServices` registers:
+`SchemataFlowFeature.Priority` is `SchemataConstants.Orders.Extension + 90_000_000` =
+`490_000_000`. Its `ConfigureServices` registers:
 
 1. `IProcessRegistry` (`ProcessRegistry`, singleton). The factory eagerly registers every
    configuration through `RegisterAsync`, which validates the definition and resolves its keyed
@@ -90,13 +90,14 @@ no authorization. See [Security](../security.md).
 
 | Feature                           | Activation           | Priority    |
 | --------------------------------- | -------------------- | ----------- |
-| `SchemataFlowFeature`             | `schema.UseFlow()`   | 480,000,000 |
-| `SchemataFlowStateMachineFeature` | `.UseStateMachine()` | 480,050,000 |
-| `SchemataFlowHttpFeature`         | `.MapHttp()`         | 480,100,000 |
-| `SchemataFlowGrpcFeature`         | `.MapGrpc()`         | 480,200,000 |
-| `SchemataFlowEventFeature`        | `.UseEvent()`        | 480,300,000 |
-| `SchemataFlowSchedulingFeature`   | `.UseScheduling()`   | 480,400,000 |
-| `SchemataFlowBpmnFeature`         | `.UseBpmn()`         | 480,500,000 |
+| `SchemataFlowFeature`             | `schema.UseFlow()`   | 490,000,000 |
+| `SchemataFlowStateMachineFeature` | `.UseStateMachine()` | 490,050,000 |
+| `SchemataFlowBpmnFeature`         | `.UseBpmn()`         | 490,060,000 |
+| `SchemataFlowHttpFeature`         | `.MapHttp()`         | 490,100,000 |
+| `SchemataFlowGrpcFeature`         | `.MapGrpc()`         | 490,200,000 |
+| `SchemataFlowEventFeature`        | `.UseEvent()`        | 490,300,000 |
+| `SchemataFlowSchedulingFeature`   | `.UseScheduling()`   | 490,400,000 |
+| `SchemataFlowActorFeature`        | `.UseActor()`        | 490,600,000 |
 
 The chained methods hang off the `SchemataFlowBuilder` that `UseFlow()` returns. Note the
 asymmetry: the transports are `MapHttp` / `MapGrpc`, while the bridges and engines are `Use*`
@@ -143,6 +144,39 @@ persisted process row + token rows + transition row + source-binding rows
   `OnStartedAsync` / `OnTransitionedAsync` / `OnTerminatedAsync` / `OnFailedAsync`. It is the only
   lifecycle observer interface; the per-token observer path (fork / join / cancel) was removed, so
   per-token reactions belong in a catch handler.
+
+## Internal command dispatch
+
+Every Flow entry point — `IFlowRunner`'s own methods, the HTTP/gRPC transports, the resource-method
+adapters (`CompleteActivityHandler` and friends), and the event/timer bridges — constructs a
+request record (`StartProcessRequest`, `CompleteActivityRequest`, `CorrelateMessageRequest`,
+`RunEventRequest`, `ThrowSignalRequest`, `TerminateProcessRequest`, `CancelTokenRequest`,
+`DeliverSignalRequest`, all `ICommand<TResult>`) and dispatches it through
+`IRequestDispatcher.SendAsync`. `RunEventRequest` is the one entry with no HTTP/gRPC equivalent: it
+is dispatched by the public bridge facade `FlowRunner.RunEventAsync` and, directly (not through the
+facade), by `Flow.Scheduling`'s `FlowTimerJob` on a timer catch's fire. `Flow.Event`'s
+`FlowEventHandler` dispatches the other two bridge-relevant requests instead — `CorrelateMessageRequest`
+for a matched message correlation and `ThrowSignalRequest` for a matched signal — not `RunEventRequest`.
+
+`FlowRunner` itself is a thin request constructor: `CompleteAsync(process, token, principal, ct)` resolves
+`IRequestDispatcher` and calls `SendAsync<CompleteActivityRequest, ProcessSnapshot>(...)` — it does
+not orchestrate the transition itself. The internal `Default*Handler` classes registered as
+`IRequestHandler<TRequest, TResponse>` (keyed `FlowConstants.Handlers.Default`, with an unkeyed
+alias every entry resolves through the dispatcher) hold the actual orchestration: they load the
+process, resolve the engine, run the transition, arm catch handlers, and persist the snapshot.
+
+Because every entry dispatches the same request type, a registered `ICommandAdvisor<TRequest>`
+(`Schemata.Messaging.Skeleton.Advisors`) runs before the handler regardless of which entry point
+was called — the facade, a transport, and a raw `IRequestDispatcher.SendAsync` call are the same
+pipeline, not three independent ones. See [Messaging](../messaging/overview.md) for the dispatcher,
+the advisor chains, and the ambient `AdviceContext` rules.
+
+The definition listing rides the same pipeline on the query side. The HTTP and gRPC definition
+endpoints construct a `ListProcessDefinitionsQuery` (`IQuery<IReadOnlyList<ProcessDefinitionInfo>>`)
+and dispatch it through `IQueryDispatcher`; the internal `DefaultListProcessDefinitionsHandler`,
+registered keyed `FlowConstants.Handlers.Default` with the same unkeyed alias, reads
+`IProcessRegistry` and projects each `ProcessDefinitionInfo`. A registered
+`IQueryAdvisor<ListProcessDefinitionsQuery>` runs before the handler.
 
 ## Extension points
 

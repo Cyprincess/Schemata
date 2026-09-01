@@ -14,6 +14,8 @@
   href: flow-with-timers.md
 - name: Flow with Events
   href: flow-with-events.md
+- name: Actor Process Serialization
+  href: actor-process-serialization.md
 - name: OIDC Server
   href: oidc-server.md
 - name: Ownership and Row ACL

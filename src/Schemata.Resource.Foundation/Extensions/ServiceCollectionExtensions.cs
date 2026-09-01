@@ -6,8 +6,12 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Internal;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Advisors;
+using Schemata.Resource.Foundation.Commands;
+using Schemata.Resource.Foundation.Handlers;
 using Schemata.Scheduling.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -26,6 +30,11 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddSchemataResources(this IServiceCollection services) {
+        services.TryAddScoped<InProcessRequestDispatcher>();
+        services.TryAddScoped<IRequestDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+        services.TryAddScoped<ICommandDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+        services.TryAddScoped<IQueryDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+
         services.TryAddScoped(typeof(ResourceOperationHandler<,,,>));
         services.TryAddScoped(typeof(ResourceMethodOperationHandler<,,>));
 
@@ -83,6 +92,9 @@ public static class ServiceCollectionExtensions
         var entity  = resource.Entity;
         var request = resource.Request!;
         var detail  = resource.Detail!;
+        var summary = resource.Summary!;
+
+        AddStandardHandlers(services, entity, request, detail, summary);
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateRequestAdvisor<,>).MakeGenericType(entity, request), typeof(AdviceCreateRequestIdempotency<,,>).MakeGenericType(entity, request, detail)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateRequestAdvisor<,>).MakeGenericType(entity, request), typeof(AdviceUpdateRequestIdempotency<,,>).MakeGenericType(entity, request, detail)));
@@ -94,18 +106,19 @@ public static class ServiceCollectionExtensions
         AddBuiltInMethods(resource, methods, entity, detail);
 
         foreach (var method in methods) {
-            var handlerInterface = FindResourceMethodHandlerInterface(method.Handler);
-            if (handlerInterface is null) {
+            var descriptor = ResourceMethodHandlerHelper.Describe(entity, method.Handler);
+            if (descriptor is null) {
                 throw new InvalidOperationException(
                     $"Handler '{method.Handler.FullName}' for verb '{method.Verb}' on resource "
-                    + $"'{entity.FullName}' must implement IResourceMethodHandler<TEntity, TRequest, TResponse>.");
+                    + $"'{entity.FullName}' must implement IRequestHandler<TRequest, TResponse>, "
+                    + "where TRequest implements IRequest<TResponse> and IRequestPrincipal.");
             }
 
-            services.TryAddScoped(method.Handler);
+            var handlerInterface = ResourceMethodHandlerHelper.FindHandlerInterface(descriptor.Handler)!;
+            services.TryAddScoped(handlerInterface, descriptor.Handler);
 
-            var arguments      = handlerInterface.GetGenericArguments();
-            var methodRequest  = arguments[1];
-            var methodResponse = arguments[2];
+            var methodRequest  = descriptor.Request;
+            var methodResponse = descriptor.Response;
 
             if (typeof(ICanonicalName).IsAssignableFrom(methodRequest)) {
                 services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceMethodRequestAdvisor<,>).MakeGenericType(entity, methodRequest), typeof(AdviceMethodRequestIdempotency<,,>).MakeGenericType(entity, methodRequest, methodResponse)));
@@ -138,14 +151,49 @@ public static class ServiceCollectionExtensions
             + $"preceded by a collection literal, such as \"books/{{book}}\". Found {found}.");
     }
 
-    private static Type? FindResourceMethodHandlerInterface(Type handler) {
-        foreach (var iface in handler.GetInterfaces()) {
-            if (iface.IsGenericType && iface.GetGenericTypeDefinition() == typeof(IResourceMethodHandler<,,>)) {
-                return iface;
-            }
-        }
+    private static void AddStandardHandlers(
+        IServiceCollection services,
+        Type               entity,
+        Type               request,
+        Type               detail,
+        Type               summary
+    ) {
+        AddHandler(
+            services,
+            typeof(IRequestHandler<,>).MakeGenericType(
+                typeof(CreateResourceRequest<,,>).MakeGenericType(entity, request, detail),
+                typeof(CreateResultBase<>).MakeGenericType(detail)),
+            typeof(DefaultCreateResourceHandler<,,,>).MakeGenericType(entity, request, detail, summary));
+        AddHandler(
+            services,
+            typeof(IRequestHandler<,>).MakeGenericType(
+                typeof(GetResourceQueryRequest<,>).MakeGenericType(entity, detail),
+                typeof(GetResultBase<>).MakeGenericType(detail)),
+            typeof(DefaultGetResourceHandler<,,,>).MakeGenericType(entity, request, detail, summary));
+        AddHandler(
+            services,
+            typeof(IRequestHandler<,>).MakeGenericType(
+                typeof(ListResourceQueryRequest<,>).MakeGenericType(entity, summary),
+                typeof(ListResultBase<>).MakeGenericType(summary)),
+            typeof(DefaultListResourceHandler<,,,>).MakeGenericType(entity, request, detail, summary));
+        AddHandler(
+            services,
+            typeof(IRequestHandler<,>).MakeGenericType(
+                typeof(UpdateResourceRequest<,,>).MakeGenericType(entity, request, detail),
+                typeof(UpdateResultBase<>).MakeGenericType(detail)),
+            typeof(DefaultUpdateResourceHandler<,,,>).MakeGenericType(entity, request, detail, summary));
+        AddHandler(
+            services,
+            typeof(IRequestHandler<,>).MakeGenericType(
+                typeof(DeleteResourceRequest<,>).MakeGenericType(entity, detail),
+                typeof(DeleteResultBase<>).MakeGenericType(detail)),
+            typeof(DefaultDeleteResourceHandler<,,,>).MakeGenericType(entity, request, detail, summary));
+    }
 
-        return null;
+    private static void AddHandler(IServiceCollection services, Type service, Type implementation) {
+        services.TryAdd(ServiceDescriptor.KeyedScoped(service, ResourceConstants.Handlers.Default, implementation));
+        services.TryAdd(ServiceDescriptor.Scoped(service, sp =>
+            sp.GetRequiredKeyedService(service, ResourceConstants.Handlers.Default)));
     }
 
     private static void AddBuiltInMethods(

@@ -8,16 +8,16 @@ using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Common;
 using Schemata.Flow.Foundation;
+using Schemata.Flow.Foundation.Commands;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Messaging.Skeleton;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Attributes;
 
 namespace Schemata.Flow.Scheduling.Internal;
 
 /// <summary>
-///     Scheduled job that fires a BPMN timer catch by delegating to
-///     <see cref="FlowRunner.RunEventAsync" />, which advances the addressed token through the full
-///     transition unit of work: advisor chain, source projection, and follow-up event subscriptions.
+///     Scheduled job that fires a BPMN timer catch through the unkeyed Flow event request handler.
 /// </summary>
 [ScheduledJob(JobKey)]
 public sealed class FlowTimerJob : IScheduledJob
@@ -38,9 +38,9 @@ public sealed class FlowTimerJob : IScheduledJob
         var tokenName   = RequireVariable(context, "tokenName");
         var timerDef    = RequireTimerDefinition(context);
 
-        using var scope  = _services.CreateScope();
-        var       runner = scope.ServiceProvider.GetRequiredService<FlowRunner>();
-        await runner.RunEventAsync(processName, tokenName, timerDef, null, ct);
+        using var scope = _services.CreateScope();
+        var dispatcher = scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
+        await dispatcher.SendAsync<RunEventRequest, ProcessSnapshot>(new(processName, tokenName, timerDef, Payload: null), ct);
     }
 
     #endregion

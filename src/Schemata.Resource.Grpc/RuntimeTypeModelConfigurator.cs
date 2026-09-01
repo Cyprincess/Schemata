@@ -43,14 +43,13 @@ internal static class RuntimeTypeModelConfigurator
             }
 
             foreach (var method in registry.GetMethods(resource.Entity)) {
-                var iface = ResourceMethodHandlerHelper.FindHandlerInterface(method.Handler);
-                if (iface is null) {
+                var descriptor = ResourceMethodHandlerHelper.Describe(resource.Entity, method.Handler);
+                if (descriptor is null) {
                     continue;
                 }
 
-                var arguments = iface.GetGenericArguments();
-                SchemataProtoModelConfigurator.ConfigureType(model, arguments[1]);
-                SchemataProtoModelConfigurator.ConfigureType(model, arguments[2]);
+                SchemataProtoModelConfigurator.ConfigureType(model, descriptor.Request);
+                SchemataProtoModelConfigurator.ConfigureType(model, descriptor.Response);
             }
         }
 

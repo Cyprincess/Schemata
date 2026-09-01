@@ -115,12 +115,12 @@ public sealed class DefaultOperationService : IOperationService
     ) {
         ArgumentNullException.ThrowIfNull(method);
 
-        var executionUid = uid ?? Identifiers.NewUid();
-        var now = _time.GetUtcNow().UtcDateTime;
+        var name = (uid ?? Identifiers.NewUid()).ToString("n");
+        var now  = _time.GetUtcNow().UtcDateTime;
         var execution = new SchemataJobExecution {
-            Uid           = executionUid,
-            Name          = executionUid.ToString("n"),
-            CanonicalName = $"operations/{executionUid:n}",
+            Uid           = uid ?? Guid.Empty,
+            Name          = name,
+            CanonicalName = $"operations/{name}",
             Method        = method,
             State         = error is null ? ExecutionState.Succeeded : ExecutionState.Failed,
             StartTime     = now,
@@ -128,7 +128,6 @@ public sealed class DefaultOperationService : IOperationService
             Output        = output,
             RecentError   = error,
         };
-
         await using var scope = _scopes.CreateAsyncScope();
         var executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
         await executions.AddAsync(execution, ct);

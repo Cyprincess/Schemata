@@ -49,14 +49,6 @@ public sealed class EventBuilder
         return this;
     }
 
-    /// <summary>Registers <typeparamref name="THandler"/> as a scoped <see cref="IRequestHandler{TRequest, TResponse}"/>.</summary>
-    public EventBuilder UseHandler<TRequest, TResponse, THandler>()
-        where TRequest : IRequest<TResponse>
-        where THandler : class, IRequestHandler<TRequest, TResponse> {
-        Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestHandler<,>).MakeGenericType(typeof(TRequest), typeof(TResponse)), typeof(THandler)));
-        return this;
-    }
-
     /// <summary>Sets the <see cref="EventRouting"/> mode for <typeparamref name="TEvent"/>.</summary>
     public EventBuilder ConfigureRouting<TEvent>(EventRouting routing)
         where TEvent : IEvent {

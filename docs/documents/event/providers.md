@@ -47,9 +47,6 @@ default `InProcessEventOutboxPublisher`, which deserializes the payload, loads s
 handlers, then the consume advisors and lifecycle observers. It returns `EventOutboxDelivery.Consumed`
 because the consume path already owns the terminal `Succeeded`/`Failed` state.
 
-`InProcessEventBus.SendAsync` runs the single `IRequestHandler<TRequest, TResponse>` inline and
-returns its response.
-
 ### Subscription persistence
 
 `SchemataEventSubscription` rows persist through `IRepository<SchemataEventSubscription>`, so
@@ -158,24 +155,18 @@ declaration; poison messages are then rejected without requeue and dropped.
 `PrefetchCount` bounds the unacknowledged window per consumer (`BasicQosAsync`), so a slow handler
 stops the broker from sending more work rather than starving other consumers.
 
-### Request/reply
+### Request/reply lives elsewhere
 
-`SendAsync<TRequest, TResponse>` opens a private exclusive auto-delete reply queue named
-`reply.<guid>` per `RabbitMqEventBus`, publishes the request with `ReplyTo` and a tracker
-`CorrelationId`, and awaits a `TaskCompletionSource<TResponse>` held by `CorrelationTracker`. The
-consumer host detects `ReplyTo`, invokes the request handler, and publishes the response back. The
-tracker matches by correlation id; on `RequestTimeoutMs` (default 30,000 ms) it faults the task with
-`TimeoutException`.
+The event bus is broadcast-only. Cross-process request/reply is `Schemata.Messaging.RabbitMq`, which
+registers its own `IRequestDispatcher` through `AddRabbitMqRequestDispatcher(...)` and owns its reply
+queue and correlation handling. Both packages share the one `IConnection` and the
+`CorrelationTracker` from `Schemata.Transport.RabbitMq`. See [Messaging](../messaging/overview.md).
 
 ## Caveats (RabbitMQ)
 
 - `RabbitMqEventBus` is registered scoped but opens a broker connection in its constructor using
   synchronous waits on async connection open (`GetAwaiter().GetResult()`). Inject `IEventBus` into
   long-lived services; many short-lived scopes each open a connection.
-- `SendAsync` requires the request type and the response type both registered. Either missing throws
-  `InvalidOperationException` at the call, not at startup.
-- `IRequestHandler<TRequest, TResponse>` is single-handler only on the RabbitMQ bus, matching the
-  in-process behavior.
 - `IEventHandler<IEvent>` is a fallback path: with no more specific handler for a wire name, the
   fallback handler receives the message.
 

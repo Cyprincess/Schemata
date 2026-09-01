@@ -1,10 +1,8 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Core;
 using Schemata.Core.Features;
-using Schemata.Insight.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Insight.Foundation.Features;
@@ -16,7 +14,7 @@ namespace Schemata.Insight.Foundation.Features;
 public sealed class SchemataInsightFeature : FeatureBase
 {
     /// <summary>The default feature priority for Insight service registration.</summary>
-    public const int DefaultPriority = Orders.Extension + 95_000_000;
+    public const int DefaultPriority = Orders.Extension + 110_000_000;
 
     public override int Priority => DefaultPriority;
 
@@ -26,12 +24,5 @@ public sealed class SchemataInsightFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) {
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IInsightSourceCatalog, InMemoryInsightSourceCatalog>());
-
-        services.TryAddSingleton<InsightPlanBuilder>();
-        services.TryAddSingleton<LocalPipelineExecutor>();
-        services.TryAddSingleton<PlanExecutor>();
-        services.TryAddSingleton<IInsightService, DefaultInsightService>();
-    }
+    ) => services.AddSchemataInsight();
 }

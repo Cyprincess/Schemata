@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using System.Text.Json.Serialization;
 using Humanizer;
 using ProtoBuf.Meta;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Messaging.Skeleton;
 
 namespace Schemata.Transport.Grpc.Proto;
 
@@ -21,10 +24,13 @@ public static class SchemataProtoModelConfigurator
     ///     <see langword="false" /> when the type cannot be added (e.g. open generic).
     /// </summary>
     /// <remarks>
-    ///     Dictionary properties with a scalar key are registered as proto3 maps
+    ///     <see cref="IRequestPrincipal" /> envelopes are modeled explicitly so properties marked
+    ///     <see cref="JsonIgnoreAttribute" /> with <see cref="JsonIgnoreCondition.Always" /> cannot
+    ///     be added by protobuf-net's default inference. Other types retain protobuf-net's default
+    ///     behavior. Dictionary properties with a scalar key are registered as proto3 maps
     ///     (<see cref="ValueMember.IsMap" />), so duplicate keys resolve last-wins. A
-    ///     <see langword="null" /> map value is written as a key-only entry on the wire;
-    ///     proto3 readers materialize it as an empty string.
+    ///     <see langword="null" /> map value is written as a key-only entry on the wire; proto3
+    ///     readers materialize it as an empty string.
     /// </remarks>
     public static bool ConfigureType(RuntimeTypeModel model, Type? type) {
         lock (model) {
@@ -51,17 +57,22 @@ public static class SchemataProtoModelConfigurator
         }
 
         try {
+            var properties            = AppDomainTypeCache.GetWritableProperties(type).ToList();
+            var applyDefaultBehaviour = !typeof(IRequestPrincipal).IsAssignableFrom(type);
+
             MetaType meta;
             try {
-                meta = model.Add(type, true);
+                meta = model.Add(type, applyDefaultBehaviour);
             } catch (ArgumentException) when (model.IsDefined(type)) {
                 return true;
             }
 
-            var properties = AppDomainTypeCache.GetWritableProperties(type).ToList();
-
             var number = 1;
             foreach (var property in properties) {
+                if (IsAlwaysIgnored(property)) {
+                    continue;
+                }
+
                 var resolved = ResourceWireNameRules.ResolveWireName(type, property.Name);
                 if (resolved is null) {
                     continue;
@@ -87,6 +98,10 @@ public static class SchemataProtoModelConfigurator
         } finally {
             configuring.Remove(type);
         }
+    }
+
+    private static bool IsAlwaysIgnored(PropertyInfo property) {
+        return property.GetCustomAttribute<JsonIgnoreAttribute>()?.Condition == JsonIgnoreCondition.Always;
     }
 
     private static void ConfigureDependencies(RuntimeTypeModel model, Type underlying, HashSet<Type> configuring) {

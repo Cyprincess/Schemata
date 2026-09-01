@@ -2,14 +2,14 @@ using System.Security.Claims;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Common;
+using Schemata.Messaging.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
 /// <summary>
 ///     Advises on an AIP-136 custom method request before the registered
-///     <see cref="Schemata.Abstractions.Resource.IResourceMethodHandler{TEntity, TRequest, TResponse}" />
-///     is invoked. Parallels
-///     <see cref="IResourceCreateRequestAdvisor{TEntity, TRequest}" /> -- used by
+///     <see cref="IRequestHandler{TRequest,TResponse}" /> is invoked by the dispatcher.
+///     Parallels <see cref="IResourceCreateRequestAdvisor{TEntity, TRequest}" /> -- used by
 ///     sanitize, authorize, validation, and idempotency advisors per
 ///     <seealso href="https://google.aip.dev/136">AIP-136: Custom methods</seealso>.
 /// </summary>

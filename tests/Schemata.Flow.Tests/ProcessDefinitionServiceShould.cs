@@ -1,8 +1,10 @@
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Flow.Grpc.Services;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
+using Schemata.Messaging.Skeleton;
 using Xunit;
 
 namespace Schemata.Flow.Tests;
@@ -25,7 +27,12 @@ public class ProcessDefinitionServiceShould
         registry.Setup(r => r.GetRegisteredProcesses()).Returns(["orders"]);
         registry.Setup(r => r.GetRegistration("orders")).Returns(registration);
 
-        var service = new ProcessDefinitionService(new(registry.Object));
+        await using var services = new ServiceCollection()
+                                  .AddSingleton(registry.Object)
+                                  .AddSchemataFlow()
+                                  .BuildServiceProvider();
+        await using var scope = services.CreateAsyncScope();
+        var service = new ProcessDefinitionService(scope.ServiceProvider.GetRequiredService<IQueryDispatcher>());
 
         var result = await service.ListProcessDefinitionsAsync(new());
 

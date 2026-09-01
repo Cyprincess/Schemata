@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Report.Foundation;
 using Schemata.Report.Skeleton;
 using Xunit;
 
@@ -106,6 +109,105 @@ public class ReportRetentionShould
 
         Assert.Equal(3, state.Snapshots.Count);
         Assert.Equal(3, state.Chunks.Count);
+    }
+
+    [Fact]
+    public async Task EnforceAsync_Selects_MaxCount_MaxAge_And_Incomplete_Victims_Only() {
+        var clock = new MutableClock(Anchor);
+        var state = new ReportPersistenceState();
+
+        var daily  = "daily";
+        var weekly = "weekly";
+        var newestSucceeded    = Snapshot(daily, "newest", SnapshotState.Succeeded, Anchor);
+        var middleSucceeded    = Snapshot(daily, "middle", SnapshotState.Succeeded, Anchor.AddMinutes(-5));
+        var oldestSucceeded    = Snapshot(daily, "oldest", SnapshotState.Succeeded, Anchor.AddDays(-3));
+        var countOnlySucceeded = Snapshot(daily, "count-only", SnapshotState.Succeeded, Anchor);
+        countOnlySucceeded.CapturedAt = null;
+        countOnlySucceeded.UpdateTime = null;
+        countOnlySucceeded.CreateTime = null;
+        var oldFailed          = Snapshot(daily, "old-failed", SnapshotState.Failed, Anchor.AddDays(-2));
+        var freshFailed        = Snapshot(daily, "fresh-failed", SnapshotState.Failed, Anchor.AddMinutes(-30));
+        var oldCancelled       = Snapshot(daily, "old-cancelled", SnapshotState.Cancelled, Anchor.AddDays(-2).AddMinutes(-30));
+        var oldPending         = Snapshot(daily, "old-pending", SnapshotState.Pending, Anchor.AddDays(-5));
+        var weeklyOldSucceeded = Snapshot(weekly, "weekly-old", SnapshotState.Succeeded, Anchor.AddDays(-10));
+        newestSucceeded.Uid          = Guid.Parse("11111111-0000-0000-0000-000000000001");
+        middleSucceeded.Uid          = Guid.Parse("11111111-0000-0000-0000-000000000002");
+        oldestSucceeded.Uid          = Guid.Parse("11111111-0000-0000-0000-000000000003");
+        countOnlySucceeded.Uid       = Guid.Parse("11111111-0000-0000-0000-000000000004");
+        oldFailed.Uid                = Guid.Parse("11111111-0000-0000-0000-000000000005");
+        oldFailed.UpdateTime         = Anchor.AddDays(-2);
+        freshFailed.Uid              = Guid.Parse("11111111-0000-0000-0000-000000000006");
+        freshFailed.UpdateTime       = Anchor.AddMinutes(-30);
+        oldCancelled.Uid             = Guid.Parse("11111111-0000-0000-0000-000000000007");
+        oldCancelled.UpdateTime      = Anchor.AddDays(-2).AddMinutes(-30);
+        oldPending.Uid               = Guid.Parse("11111111-0000-0000-0000-000000000008");
+        oldPending.UpdateTime        = Anchor.AddDays(-5);
+        weeklyOldSucceeded.Uid       = Guid.Parse("22222222-0000-0000-0000-000000000001");
+        foreach (var snapshot in new[] {
+                     newestSucceeded, middleSucceeded, oldestSucceeded, countOnlySucceeded,
+                     oldFailed, freshFailed, oldCancelled, oldPending, weeklyOldSucceeded,
+                 }) {
+            snapshot.CanonicalName = $"reports/{snapshot.Report}/snapshots/{snapshot.Name}";
+        }
+
+        state.Snapshots.AddRange([
+            newestSucceeded, middleSucceeded, oldestSucceeded, countOnlySucceeded,
+            oldFailed, freshFailed, oldCancelled, oldPending, weeklyOldSucceeded,
+        ]);
+
+        foreach (var snapshot in state.Snapshots) {
+            var chunk = new SchemataReportSnapshotChunk {
+                Report   = snapshot.Report,
+                Snapshot = snapshot.Name,
+                Name     = "chunk-0",
+                Index    = 0,
+            };
+            chunk.Uid          = Guid.NewGuid();
+            chunk.CanonicalName = $"reports/{snapshot.Report}/snapshots/{snapshot.Name}/chunks/chunk-0";
+            state.Chunks.Add(chunk);
+        }
+        var report = Report(daily, new() { MaxCount = 3, MaxAgeDays = 2 });
+        using var provider = ReportTestHost.Create(
+            ReportTestHost.CreateDriver(ReportTestRows.Create(1)), state, report: report,
+            configure: services => services.AddSingleton<TimeProvider>(clock));
+        var enforcer = provider.GetRequiredService<ReportRetentionEnforcer<SchemataReportSnapshot, SchemataReportSnapshotChunk>>();
+
+        await enforcer.EnforceAsync(report);
+
+        var snapshotNames = state.Snapshots.Select(value => value.Name!).ToHashSet(StringComparer.Ordinal);
+        var chunkSnapshots = state.Chunks.Select(value => value.Snapshot!).ToHashSet(StringComparer.Ordinal);
+        var chunkCanonicalNames = state.Chunks.Select(value => value.CanonicalName!).ToHashSet(StringComparer.Ordinal);
+
+        Assert.Contains(newestSucceeded.Name!, snapshotNames);
+        Assert.Contains(middleSucceeded.Name!, snapshotNames);
+        Assert.Contains(freshFailed.Name!, snapshotNames);
+        Assert.Contains(oldPending.Name!, snapshotNames);
+        Assert.Contains(weeklyOldSucceeded.Name!, snapshotNames);
+
+        Assert.DoesNotContain(oldestSucceeded.Name!, snapshotNames);
+        Assert.DoesNotContain(countOnlySucceeded.Name!, snapshotNames);
+        Assert.DoesNotContain(oldFailed.Name!, snapshotNames);
+        Assert.DoesNotContain(oldCancelled.Name!, snapshotNames);
+
+        Assert.Equal(5, state.Snapshots.Count);
+
+        foreach (var retained in new[] { newestSucceeded, middleSucceeded, freshFailed, oldPending, weeklyOldSucceeded }) {
+            Assert.Contains(retained.Name!, chunkSnapshots);
+        }
+
+        foreach (var removed in new[] { oldestSucceeded, countOnlySucceeded, oldFailed, oldCancelled }) {
+            Assert.DoesNotContain(removed.Name!, chunkSnapshots);
+            Assert.DoesNotContain(
+                $"reports/{daily}/snapshots/{removed.Name}/chunks/chunk-0",
+                chunkCanonicalNames);
+        }
+
+        Assert.All(state.Chunks, chunk => {
+            Assert.Equal("chunk-0", chunk.Name);
+            Assert.Equal(0, chunk.Index);
+            Assert.EndsWith("/chunks/chunk-0", chunk.CanonicalName ?? string.Empty);
+        });
+        Assert.Equal(5, state.Chunks.Count);
     }
 
     private static SchemataReport Report(string name, ReportRetention? retention) {

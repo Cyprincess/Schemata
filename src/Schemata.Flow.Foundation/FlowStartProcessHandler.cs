@@ -16,20 +16,26 @@ using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
+using Schemata.Messaging.Skeleton;
+using StartProcessCommand = Schemata.Flow.Foundation.Commands.StartProcessRequest;
 
 namespace Schemata.Flow.Foundation;
 
-/// <summary>Resource-method handler for starting process instances with transport-loaded sources.</summary>
-public sealed class FlowStartProcessHandler(FlowRunner runner, FlowSourceLoader sources)
-    : IResourceMethodHandler<SchemataProcess, StartProcessInstanceRequest, SchemataProcess>
+/// <summary>
+///     Handles process-instance start requests dispatched through the resource-method pipeline.
+/// </summary>
+public sealed class FlowStartProcessHandler(
+    IRequestDispatcher dispatcher,
+    FlowSourceLoader   sources)
+    : IRequestHandler<StartProcessInstanceRequest, SchemataProcess>
 {
-    public ValueTask<SchemataProcess> InvokeAsync(
-        string?                     name,
+    /// <inheritdoc />
+    public async Task<SchemataProcess> HandleAsync(
         StartProcessInstanceRequest request,
-        SchemataProcess?            entity,
-        ClaimsPrincipal?            principal,
-        CancellationToken           ct
-    ) {
+        CancellationToken ct = default)
+    {
+        var principal = request.Principal;
+
         var options = new StartProcessOptions {
             DisplayName    = request.DisplayName,
             Description    = request.Description,
@@ -37,14 +43,24 @@ public sealed class FlowStartProcessHandler(FlowRunner runner, FlowSourceLoader 
         };
 
         if (string.IsNullOrWhiteSpace(request.Source)) {
-            return runner.StartAsync(request.DefinitionName, options, principal, ct);
+            return await dispatcher.SendAsync<StartProcessCommand, SchemataProcess>(new(
+                request.DefinitionName,
+                Source: null,
+                SourceType: null,
+                SourceCanonicalName: null,
+                options,
+                principal), ct);
         }
 
-        return sources.StartAsync(runner, request.DefinitionName, request.Source!, options, principal, ct);
+        var command = await sources.CreateRequestAsync(
+            request.DefinitionName, request.Source, options, principal, ct);
+        return await dispatcher.SendAsync<StartProcessCommand, SchemataProcess>(command, ct);
     }
 }
 
-/// <summary>Loads source entities for resource start requests before invoking Flow.</summary>
+/// <summary>
+///     Loads source entities for resource start requests before invoking Flow.
+/// </summary>
 public sealed class FlowSourceLoader(
     IResourceTypeResolver resolver,
     IProcessRegistry      registry,
@@ -53,8 +69,7 @@ public sealed class FlowSourceLoader(
 {
     private readonly ConcurrentDictionary<Type, ISourceLoadStrategy> _strategies = new();
 
-    public ValueTask<SchemataProcess> StartAsync(
-        FlowRunner           runner,
+    public ValueTask<StartProcessCommand> CreateRequestAsync(
         string               definitionName,
         string               source,
         StartProcessOptions  options,
@@ -82,7 +97,7 @@ public sealed class FlowSourceLoader(
         }
 
         var strategy = _strategies.GetOrAdd(type, CreateStrategy);
-        return strategy.StartAsync(services, runner, definitionName, source, options, principal, ct);
+        return strategy.CreateRequestAsync(services, definitionName, source, options, principal, ct);
     }
 
     private static ISourceLoadStrategy CreateStrategy(Type type) {
@@ -96,9 +111,8 @@ public sealed class FlowSourceLoader(
 
     private interface ISourceLoadStrategy
     {
-        ValueTask<SchemataProcess> StartAsync(
+        ValueTask<StartProcessCommand> CreateRequestAsync(
             IServiceProvider     services,
-            FlowRunner           runner,
             string               definitionName,
             string               source,
             StartProcessOptions  options,
@@ -110,9 +124,8 @@ public sealed class FlowSourceLoader(
     private sealed class SourceLoadStrategy<TSource> : ISourceLoadStrategy
         where TSource : class, ICanonicalName
     {
-        public async ValueTask<SchemataProcess> StartAsync(
+        public async ValueTask<StartProcessCommand> CreateRequestAsync(
             IServiceProvider     services,
-            FlowRunner           runner,
             string               definitionName,
             string               source,
             StartProcessOptions  options,
@@ -120,7 +133,13 @@ public sealed class FlowSourceLoader(
             CancellationToken    ct
         ) {
             var entity = await LoadAsync(services, source, ct);
-            return await runner.StartAsync(definitionName, entity, options, principal, ct);
+            return new(
+                definitionName,
+                entity,
+                typeof(TSource),
+                entity.CanonicalName,
+                options,
+                principal);
         }
 
         private static async ValueTask<TSource> LoadAsync(IServiceProvider services, string source, CancellationToken ct) {

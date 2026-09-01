@@ -239,9 +239,10 @@ write goes through `Schemata.Common.DescriptiveExtensions`.
 `TryAdd`, so a locale the element already carries keeps its value. Assigning in code therefore
 overrides the attributes, whichever order the two run in.
 
-`ProcessDefinitionQueryService` projects all four members onto every element, event definition,
-message, and edge, so a client renders a localized diagram with no dictionary of its own. The four
-projection DTOs implement `IDescriptive` for that reason.
+`DefaultListProcessDefinitionsHandler`, the `ListProcessDefinitionsQuery` handler, projects all
+four members onto every element, event definition, message, and edge, so a client renders a
+localized diagram with no dictionary of its own. The four projection DTOs implement `IDescriptive`
+for that reason.
 
 ## IConditionExpression
 

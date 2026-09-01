@@ -44,7 +44,8 @@ public class JobExecutionCancellationShould
         var scheduler = new Mock<IScheduler>();
         var services = new ServiceCollection().AddSingleton(executions.Object).AddSingleton<IScheduledJobRegistry>(registry)
                                               .AddSingleton(job).AddSingleton(running).AddSingleton(jobs.Object)
-                                              .AddSingleton<IScheduler>(scheduler.Object).BuildServiceProvider();
+                                              .AddSingleton<IScheduler>(scheduler.Object).AddSchemataScheduling()
+                                              .BuildServiceProvider();
         var dispatcher = new JobExecutionDispatcher(services);
         var operation = new DefaultOperationService(services.GetRequiredService<IServiceScopeFactory>(), Options.Create(new SchemataSchedulingOptions()), scheduler.Object);
 

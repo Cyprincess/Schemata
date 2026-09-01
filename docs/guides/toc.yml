@@ -24,12 +24,16 @@
   href: grpc-transport.md
 - name: Multi-Tenancy
   href: multi-tenancy.md
+- name: Messaging
+  href: messaging.md
 - name: Flow
   href: flow.md
 - name: Event Bus
   href: event-bus.md
 - name: Scheduling
   href: scheduling.md
+- name: Actor
+  href: actor.md
 - name: Push
   href: push.md
 - name: Insight

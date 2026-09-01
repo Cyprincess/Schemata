@@ -99,6 +99,7 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
         }
 
         var ctx = new AdviceContext(sp);
+        using var _ = AdviceContext.Establish(ctx);
 
         switch (await Advisor.For<ITokenRequestAdvisor<TApp>>()
                              .RunAsync(ctx, application, request, ct)) {

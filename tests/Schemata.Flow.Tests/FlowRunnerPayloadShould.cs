@@ -53,27 +53,30 @@ public class FlowRunnerPayloadShould
         var registry = new Mock<IProcessRegistry>();
         registry.Setup(r => r.GetRegistration("greet-process")).Returns(registration);
 
-        var processes = Repository<SchemataProcess>();
+        var process = new SchemataProcess {
+            Name = "p1", CanonicalName = "processes/p1", DefinitionName = "greet-process",
+        };
+        var processes = Repository(process);
         var tokens    = Repository<SchemataProcessToken>();
         var transitions = Repository<SchemataProcessTransition>();
         var sources     = Repository<SchemataProcessSource>();
         var compensations = Repository<SchemataProcessCompensation>();
         processes.Setup(r => r.Begin()).Returns(Mock.Of<IUnitOfWork>());
 
-        var services = new ServiceCollection()
-                      .AddSingleton(processes.Object)
-                      .AddSingleton(tokens.Object)
-                      .AddSingleton(transitions.Object)
-                      .AddSingleton(sources.Object)
-                      .AddSingleton(compensations.Object)
-                      .AddKeyedSingleton<IFlowRuntime>(FlowConstants.Engines.StateMachine, engine.Object)
-                      .BuildServiceProvider();
+        var collection = new ServiceCollection()
+                        .AddLogging()
+                        .AddSingleton(registry.Object)
+                        .AddSingleton<IOptions<SchemataFlowOptions>>(Options.Create(new SchemataFlowOptions()))
+                        .AddSingleton(processes.Object)
+                        .AddSingleton(tokens.Object)
+                        .AddSingleton(transitions.Object)
+                        .AddSingleton(sources.Object)
+                        .AddSingleton(compensations.Object)
+                        .AddKeyedSingleton<IFlowRuntime>(FlowConstants.Engines.StateMachine, engine.Object);
+        collection.AddSchemataFlow();
+        var services = collection.BuildServiceProvider();
 
-        var notifier = new ProcessLifecycleNotifier([], Mock.Of<ILogger<ProcessLifecycleNotifier>>());
-        var runner = new FlowRunner(registry.Object, new ProcessPersistence(), notifier, services,
-                                    services.GetRequiredService<IServiceScopeFactory>(),
-                                    Options.Create(new SchemataFlowOptions()));
-        var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "greet-process" };
+        var runner = services.GetRequiredService<FlowRunner>();
 
         await runner.CorrelateAsync(process, "Greet", """{"gReEtInG":"hello","cOuNt":3}""", null, null, CancellationToken.None);
 

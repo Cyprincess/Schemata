@@ -3,7 +3,7 @@
 `Schemata.Authorization.Foundation` is a hand-rolled OAuth 2.0 / OpenID Connect authorization
 server. It builds on `Microsoft.IdentityModel` for key material and JWT handling but pulls in no
 external server framework. The core feature is generic over four entity types — `TApp`, `TAuth`,
-`TScope`, `TToken` — and runs at priority 450,000,000. Flows are opt-in: `UseAuthorization()`
+TScope`, `TToken` — and runs at priority 460,000,000. Flows are opt-in: `UseAuthorization()`
 registers the core, and each `Use*Flow` / `Use*` call on the returned builder adds one
 `IAuthorizationFlowFeature`.
 
@@ -41,7 +41,7 @@ endpoints into the well-known pipeline, add `SchemataAuthorizationFeature<...>`,
 ## What the core feature registers
 
 `SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken>` (`Priority = Orders.Extension +
-50_000_000 = 450_000_000`) depends on `SchemataAuthenticationFeature`,
+60_000_000 = 460_000_000`) depends on `SchemataAuthenticationFeature`,
 `SchemataTransportHttpFeature`, and `SchemataWellKnownFeature`. `ConfigureServices`:
 
 - Validates `SchemataAuthorizationOptions` in `PostConfigure`: `SigningKey`, `SigningAlgorithm`,
@@ -57,11 +57,13 @@ endpoints into the well-known pipeline, add `SchemataAuthorizationFeature<...>`,
 - Registers client authentication: `ClientSecretBasicAuthentication<TApp>` and
   `ClientSecretPostAuthentication<TApp>` as `IClientAuthentication<TApp>`, plus
   `IClientAuthenticationService<TApp>`.
-- Registers the advisor families (see below), `DiscoveryHandler<TScope>`, `TokenService`, and
-  `ISubjectIdentifierService`.
+- Registers the advisor families (see below), `DiscoveryHandler<TScope>`, `TokenService`,
+  `IAuthorizationSignInService`, and `ISubjectIdentifierService`. The sign-in service issues either
+  a transport-neutral `TokenResponse` or authorization callback parameters.
 - Adds two authentication schemes via `AddAuthentication()`: `BearerScheme`
   (`SchemataAuthenticationHandler<TApp, TToken>`) and `CodeScheme`
-  (`SchemataAuthorizationCodeHandler<TApp, TToken>`).
+  (`SchemataAuthorizationCodeHandler<TApp, TToken>`). Connect endpoints render issued responses in
+  the controller; the schemes are thin compatibility adapters over the same issuer.
 - Registers `TokenCleanupJob<TToken>` and schedules it through the Scheduling job model — see
   below.
 
@@ -80,6 +82,11 @@ which flow methods are enabled, but the routes are fixed:
 | `POST`                    | `/Connect/Revoke`     | `Revoke`                                              | RFC 7009 §§2.1–2.2, Revocation Request and Response            |
 | `GET` / `POST`            | `/Connect/Profile`    | `Profile` (bearer-authorized)                         | OpenID Connect Core 1.0 §5.3, UserInfo Endpoint               |
 | `GET` / `POST`            | `/Connect/EndSession` | `EndSessionGet` / `EndSessionPost`                    | OpenID Connect RP-Initiated Logout 1.0 §2, RP-Initiated Logout |
+
+`IAuthorizationSignInService` owns transport-neutral protocol issuance. `ConnectController` renders
+endpoint token responses as JSON and callback parameters through `ResponseModeService` as query,
+fragment, or `form_post`. `IAuthorizationSignInHttpWriter` renders only direct compatibility-scheme
+sign-ins. Endpoint handlers remain transport-neutral and do not access `HttpContext`.
 
 `GET /.well-known/openid-configuration` is the configuration path required by OpenID Connect
 Discovery 1.0 §4, Obtaining OpenID Provider Configuration Information. `GET /.well-known/jwks` is
@@ -226,8 +233,8 @@ there is no cron schedule on it.
 
 `Schemata.Authorization.Identity` connects the authorization server to ASP.NET Core Identity. It is
 not automatic — you opt in by calling `.UseIdentity()` on the `SchemataAuthorizationBuilder`, which
-adds `SchemataAuthorizationIdentityFeature` (`Priority = Orders.Extension + 50_100_000 =
-450_100_000`). The feature declares `[DependsOn(typeof(SchemataAuthorizationFeature<,,,>))]` and
+adds `SchemataAuthorizationIdentityFeature` (`Priority = SchemataAuthorizationFeature<,,,>.DefaultPriority + 100_000 =
+460_100_000`). The feature declares `[DependsOn(typeof(SchemataAuthorizationFeature<,,,>))]` and
 `[DependsOn(typeof(SchemataIdentityFeature<,,,>))]` — open-generic type references that match any
 closed instantiation. The package references `Schemata.Identity.Foundation` (not
 `Schemata.Identity.Skeleton`) so the feature types are reachable. At configure time it discovers the

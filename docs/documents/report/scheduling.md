@@ -2,7 +2,7 @@
 
 The Report Scheduling bridge turns periodic definitions into Scheduler jobs that persist a snapshot
 at each fire. It adds `SchemataReportSchedulingFeature<TReport, TSnapshot, TChunk>`, whose priority
-is 500,400,000.
+is 530,400,000.
 
 ## Enable the bridge
 

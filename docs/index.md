@@ -49,9 +49,10 @@ Packages are organized in layers. Higher layers depend on lower ones; consumers 
 | **Authorization** | `Schemata.Authorization.Skeleton`, `.Foundation`, `.Identity`                         | OAuth 2.0 / OpenID Connect authorization server                      |
 | **Tenancy**       | `Schemata.Tenancy.Skeleton`, `.Foundation`                                            | Multi-tenant resolution with per-tenant DI isolation                 |
 | **Event**         | `Schemata.Event.Skeleton`, `.Foundation`, `.RabbitMQ`                                 | Event bus with in-process and RabbitMQ transports                    |
-| **Scheduling**    | `Schemata.Scheduling.Skeleton`, `.Foundation`                                         | Cron and periodic job scheduling with lifecycle observers            |
+| **Actor**         | `Schemata.Actor.Skeleton`, `.Foundation`, `.Event`, `.Scheduling`, `Schemata.Flow.Actor`, `Schemata.Push.Actor`, `Schemata.Report.Actor` | In-process actor system with event, reminder, and per-module (Flow, Push, Report) serialization bridges |
+| **Scheduling**    | `Schemata.Scheduling.Skeleton`, `.Foundation`, `.Event`, `.Http`, `.Grpc` | Cron, periodic, and one-time jobs with lifecycle event publishing and HTTP/gRPC bridges |
 | **Resource**      | `Schemata.Resource.Foundation`, `.Http`, `.Grpc`                                      | Auto-generated CRUD endpoints (HTTP REST and gRPC)                   |
-| **Flow**          | `Schemata.Flow.Foundation`, `.Http`, `.Grpc`, `.Scheduling`, `.Event`                 | BPMN 2.0.2 process engine with transport and integration bridges     |
+| **Flow**          | `Schemata.Flow.Foundation`, `.StateMachine`, `.Bpmn`, `.Http`, `.Grpc`, `.Scheduling`, `.Event`, `Schemata.Flow.Actor` | BPMN 2.0.2 process engine with state-machine and full BPMN runtimes plus HTTP/gRPC, scheduling, event, and actor bridges |
 | **Modular**       | `Schemata.Modular`                                                                    | Module discovery and lifecycle management                            |
 | **Modeling**      | `Schemata.Modeling.Generator`                                                         | SKM schema definition language for `.skm` files                      |
 
@@ -61,7 +62,13 @@ Many feature domains ship two packages: a **Skeleton** package (contracts and ab
 
 Features are ordered by two independent integers. `Order` controls `ConfigureServices` sequence; `Priority` controls `ConfigureApplication` and `ConfigureEndpoints` sequence. The range `[100_000_000, 900_000_000]` is reserved for built-in features and Schemata extensions. User features pick numbers outside that range.
 
-Two non-`10M` offsets are also reserved: `+5M` for a sub-feature of a built-in (only `WellKnown` uses this today), and `+100K` / `+200K` for bridges that wire two extension features together. When two bridges share the same later-feature anchor (e.g. `Flow.Event` and `Flow.Scheduling` both sit above `Flow`), they stack at `+100K` and `+200K` respectively.
+Several non-`10M` offsets are reserved above extension anchors. Flow engines use `+50K`
+(`Flow.StateMachine`) and `+60K` (`Flow.Bpmn`). Domain-specific transport and bridge slots use
+`+100K`, `+200K`, and `+300K`: `Scheduling.Event` occupies `+100K`, while `Flow.Event` occupies
+`+300K`. Scheduling bridges use `+400K` (`Flow.Scheduling`, `Push.Scheduling`,
+`Report.Scheduling`), and `+600K` is the actor bridge slot (`Flow.Actor`, `Push.Actor`,
+`Report.Actor`). The `+5M` offset
+is reserved separately for a built-in sub-feature; only `WellKnown` uses it.
 
 ### Built-in Features
 
@@ -93,20 +100,39 @@ Two non-`10M` offsets are also reserved: `+5M` for a sub-feature of a built-in (
 | 420_000_000 | Schemata.Transport.Grpc           | Transport.Grpc        | Shared gRPC plumbing: code-first protobuf-net, interceptor, reflection |
 | 430_000_000 | Schemata.Identity.Foundation      | Identity              | ASP.NET Core Identity integration                                      |
 | 440_000_000 | Schemata.Event.Foundation         | Event                 | Event bus and dispatch pipeline                                        |
-| 450_000_000 | Schemata.Authorization.Foundation | Authorization         | OAuth 2.0 / OpenID Connect server                                      |
-| 450_100_000 | Schemata.Authorization.Identity   | AuthorizationIdentity | Bridge: Authorization + Identity (+100K)                               |
-| 460_000_000 | Schemata.Mapping.Foundation       | Mapping               | Unified object mapper abstraction                                      |
-| 470_000_000 | Schemata.Scheduling.Foundation    | Scheduling            | Cron and periodic job scheduler                                        |
-| 470_100_000 | Schemata.Scheduling.Event         | Scheduling.Event      | Bridge: Scheduling + Event (+100K)                                     |
-| 480_000_000 | Schemata.Flow.Foundation          | Flow                  | BPMN process engine                                                    |
-| 480_100_000 | Schemata.Flow.Http                | Flow.Http             | Flow HTTP transport (+100K)                                            |
-| 480_200_000 | Schemata.Flow.Grpc                | Flow.Grpc             | Flow gRPC transport (+200K)                                            |
-| 480_300_000 | Schemata.Flow.Event               | Flow.Event            | Bridge: Flow + Event (+300K)                                           |
-| 480_400_000 | Schemata.Flow.Scheduling          | Flow.Scheduling       | Bridge: Flow + Scheduling (+400K)                                      |
-| 490_000_000 | Schemata.Resource.Foundation      | Resource              | Google AIP-compliant resource service                                  |
-| 490_100_000 | Schemata.Resource.Http            | Resource.Http         | HTTP/REST endpoint generation (+100K)                                  |
-| 490_200_000 | Schemata.Resource.Grpc            | Resource.Grpc         | gRPC endpoint generation (+200K)                                       |
-| 520_000_000 | Schemata.Modular                  | Modular               | Module discovery and loading                                           |
+| 450_000_000 | Schemata.Actor.Foundation         | Actor                 | In-process actor system: per-instance mailbox serialization            |
+| 450_100_000 | Schemata.Actor.Event              | Actor.Event           | Bridge: Actor + Event (+100K)                                          |
+| 450_200_000 | Schemata.Actor.Scheduling         | Actor.Scheduling      | Bridge: Actor + Scheduling (+200K)                                     |
+| 460_000_000 | Schemata.Authorization.Foundation | Authorization         | OAuth 2.0 / OpenID Connect server                                      |
+| 460_100_000 | Schemata.Authorization.Identity   | AuthorizationIdentity | Bridge: Authorization + Identity (+100K)                               |
+| 470_000_000 | Schemata.Mapping.Foundation       | Mapping               | Unified object mapper abstraction                                      |
+| 480_000_000 | Schemata.Scheduling.Foundation    | Scheduling            | Cron and periodic job scheduler                                        |
+| 480_100_000 | Schemata.Scheduling.Event         | Scheduling.Event      | Bridge: Scheduling + Event (+100K)                                     |
+| 480_200_000 | Schemata.Scheduling.Http           | Scheduling.Http        | Bridge: Scheduling + HTTP transport (+200K)                            |
+| 480_300_000 | Schemata.Scheduling.Grpc           | Scheduling.Grpc        | Bridge: Scheduling + gRPC transport (+300K)                            |
+| 490_000_000 | Schemata.Flow.Foundation          | Flow                  | BPMN process engine                                                    |
+| 490_050_000 | Schemata.Flow.StateMachine        | Flow.StateMachine     | Default state-machine engine on Flow (+50K)                            |
+| 490_060_000 | Schemata.Flow.Bpmn                | Flow.Bpmn             | Full BPMN 2.0.2 engine on Flow (+60K)                                  |
+| 490_100_000 | Schemata.Flow.Http                | Flow.Http             | Flow HTTP transport (+100K)                                            |
+| 490_200_000 | Schemata.Flow.Grpc                | Flow.Grpc             | Flow gRPC transport (+200K)                                            |
+| 490_300_000 | Schemata.Flow.Event               | Flow.Event            | Bridge: Flow + Event (+300K)                                           |
+| 490_400_000 | Schemata.Flow.Scheduling          | Flow.Scheduling       | Bridge: Flow + Scheduling (+400K)                                      |
+| 490_600_000 | Schemata.Flow.Actor               | Flow.Actor            | Bridge: Flow + Actor (+600K)                                           |
+| 500_000_000 | Schemata.Resource.Foundation      | Resource              | Google AIP-compliant resource service                                  |
+| 500_100_000 | Schemata.Resource.Http            | Resource.Http         | HTTP/REST endpoint generation (+100K)                                  |
+| 500_200_000 | Schemata.Resource.Grpc            | Resource.Grpc         | gRPC endpoint generation (+200K)                                       |
+| 510_000_000 | Schemata.Insight.Foundation       | Insight               | Federated query planning and execution over resource entities         |
+| 510_100_000 | Schemata.Insight.Http             | Insight.Http          | Insight HTTP transport (+100K)                                         |
+| 510_200_000 | Schemata.Insight.Grpc             | Insight.Grpc          | Insight gRPC transport (+200K)                                         |
+| 520_000_000 | Schemata.Push.Foundation          | Push                  | Push notification fan-out                                              |
+| 520_400_000 | Schemata.Push.Scheduling          | Push.Scheduling       | Bridge: Push + Scheduling (+400K)                                      |
+| 520_600_000 | Schemata.Push.Actor               | Push.Actor            | Bridge: Push + Actor (+600K)                                          |
+| 530_000_000 | Schemata.Report.Foundation        | Report                | Report definitions, snapshots, and generation                         |
+| 530_100_000 | Schemata.Report.Http              | Report.Http           | Report HTTP transport (+100K)                                          |
+| 530_200_000 | Schemata.Report.Grpc              | Report.Grpc           | Report gRPC transport (+200K)                                          |
+| 530_400_000 | Schemata.Report.Scheduling        | Report.Scheduling     | Bridge: Report + Scheduling (+400K)                                    |
+| 530_600_000 | Schemata.Report.Actor             | Report.Actor          | Bridge: Report + Actor (+600K)                                        |
+| 540_000_000 | Schemata.Modular                  | Modular               | Module discovery and lifecycle management                                |
 
 ## Documentation
 

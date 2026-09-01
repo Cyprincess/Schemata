@@ -1,3 +1,4 @@
+using System;
 using Schemata.Core;
 using Schemata.Flow.Foundation.Builders;
 using Schemata.Flow.Foundation.Features;
@@ -21,5 +22,18 @@ public static class FlowBuilderExtensions
         builder.AddFeature<SchemataFlowFeature>();
 
         return new(builder.Options, builder.Services);
+    }
+
+    /// <summary>Enables Flow and configures process definitions through a callback.</summary>
+    /// <param name="builder">The Schemata builder.</param>
+    /// <param name="configure">Callback that configures the Flow builder.</param>
+    /// <returns>The Schemata builder for continued application-level configuration.</returns>
+    public static SchemataBuilder UseFlow(
+        this SchemataBuilder          builder,
+        Action<SchemataFlowBuilder> configure
+    ) {
+        ArgumentNullException.ThrowIfNull(configure);
+        configure(builder.UseFlow());
+        return builder;
     }
 }

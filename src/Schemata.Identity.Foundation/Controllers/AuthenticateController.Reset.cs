@@ -1,10 +1,13 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Identity.Foundation.Commands;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Models;
+using Schemata.Messaging.Skeleton;
 
 namespace Schemata.Identity.Foundation.Controllers;
 
@@ -14,7 +17,8 @@ public sealed partial class AuthenticateController<TUser>
     /// <summary>Sends a password-reset code to a confirmed contact address.</summary>
     [HttpPost(nameof(Forgot))]
     public async Task<IActionResult> Forgot([FromBody] ForgetRequest request, CancellationToken ct) {
-        var result = await handler.ForgotAsync(request, HttpContext.User, ct);
+        var result = await dispatcher.SendAsync<ForgotUserPasswordRequest<TUser>, IdentityResult<Unit>>(
+            new(request, HttpContext.User), ct);
         return result.Status switch {
             IdentityStatus.Success   => Accepted(),
             IdentityStatus.Challenge => Challenge(),
@@ -25,7 +29,8 @@ public sealed partial class AuthenticateController<TUser>
     /// <summary>Resets a password with a password-reset code.</summary>
     [HttpPost(nameof(Reset))]
     public async Task<IActionResult> Reset([FromBody] ResetRequest request, CancellationToken ct) {
-        var result = await handler.ResetAsync(request, HttpContext.User, ct);
+        var result = await dispatcher.SendAsync<ResetUserPasswordRequest<TUser>, IdentityResult<Unit>>(
+            new(request, HttpContext.User), ct);
         return result.Status switch {
             IdentityStatus.Success   => NoContent(),
             IdentityStatus.Challenge => Challenge(),

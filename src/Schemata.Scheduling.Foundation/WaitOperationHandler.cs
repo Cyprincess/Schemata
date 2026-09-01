@@ -1,8 +1,8 @@
 using System;
-using System.Security.Claims;
+using Schemata.Abstractions.Resource;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions.Resource;
+using Schemata.Messaging.Skeleton;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 
@@ -17,25 +17,20 @@ namespace Schemata.Scheduling.Foundation;
 ///     elapses.
 /// </summary>
 public sealed class WaitOperationHandler(IOperationService operations, TimeProvider? time = null)
-    : IResourceMethodHandler<SchemataJobExecution, WaitOperationRequest, Operation>
+    : IRequestHandler<WaitOperationRequest, Operation>
 {
-    /// <summary>Maximum server-side wait duration accepted by the handler.</summary>
-    public static readonly  TimeSpan MaxWait      = TimeSpan.FromSeconds(30);
+    /// <summary>
+    ///     Maximum server-side wait duration accepted by the handler.
+    /// </summary>
+    public static readonly TimeSpan MaxWait = TimeSpan.FromSeconds(30);
 
     private readonly TimeProvider _time = time ?? TimeProvider.System;
 
-    #region IResourceMethodHandler<SchemataJobExecution, WaitOperationRequest, Operation> Members
-
-    public async ValueTask<Operation> InvokeAsync(
-        string?               name,
-        WaitOperationRequest  request,
-        SchemataJobExecution? entity,
-        ClaimsPrincipal?      principal,
-        CancellationToken     ct
+    public async Task<Operation> HandleAsync(
+        WaitOperationRequest request,
+        CancellationToken ct = default
     ) {
-        ArgumentNullException.ThrowIfNull(entity);
-
-        var operation = entity.CanonicalName ?? $"operations/{entity.Uid:n}";
+        var operation = request.CanonicalName ?? string.Empty;
         using var deadline = new CancellationTokenSource(GetEffectiveTimeout(request.Timeout), _time);
         using var bounded = CancellationTokenSource.CreateLinkedTokenSource(ct, deadline.Token);
 
@@ -46,9 +41,9 @@ public sealed class WaitOperationHandler(IOperationService operations, TimeProvi
         }
     }
 
-    #endregion
-
-    /// <summary>Returns the bounded wait duration used for a request.</summary>
+    /// <summary>
+    ///     Returns the bounded wait duration used for a request.
+    /// </summary>
     public static TimeSpan GetEffectiveTimeout(TimeSpan? requested) {
         if (requested is null || requested.Value <= TimeSpan.Zero) {
             return MaxWait;

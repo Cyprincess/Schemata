@@ -6,11 +6,14 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Event.Skeleton;
 
 /// <summary>
-///     Event bus abstraction supporting fire-and-forget broadcast
-///     (<see cref="PublishAsync{TEvent}(TEvent, CancellationToken)" />) and request/response
-///     (<see cref="SendAsync" />).  Implementations may dispatch in-process or bridge to an
-///     out-of-process transport.
+///     Fire-and-forget broadcast: an event goes to every subscribed handler and nothing is returned.
+///     Implementations may dispatch in-process or bridge to an out-of-process transport.
 /// </summary>
+/// <remarks>
+///     Request/response is a different shape — one handler, one answer — and lives on
+///     <c>Schemata.Messaging.Skeleton.IRequestDispatcher</c>. The bus deliberately does not carry
+///     both: doing so made every consumer of request/reply depend on the event domain.
+/// </remarks>
 public interface IEventBus
 {
     /// <summary>
@@ -38,9 +41,4 @@ public interface IEventBus
         EventSourceContract.Ensure(sourceEntity);
         return PublishAsync(@event, ct);
     }
-
-    /// <summary>Dispatches <paramref name="request" /> to its single handler and returns the response.</summary>
-    Task<TResponse> SendAsync<TRequest, TResponse>(TRequest request, CancellationToken ct = default)
-        where TRequest : IRequest<TResponse>;
-
 }

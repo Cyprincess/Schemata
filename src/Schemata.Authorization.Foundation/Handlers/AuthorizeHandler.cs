@@ -55,6 +55,7 @@ public sealed class AuthorizeHandler<TApp, TToken>(
         CancellationToken ct
     ) {
         var ctx = new AdviceContext(sp);
+        using var _ = AdviceContext.Establish(ctx);
         var authz = new AuthorizeContext<TApp> {
             Request      = request,
             Principal    = principal,

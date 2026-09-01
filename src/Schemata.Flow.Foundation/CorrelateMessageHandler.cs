@@ -1,29 +1,34 @@
 using System;
-using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
+using Schemata.Common.Errors;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Messaging.Skeleton;
+using CorrelateProcessRequest = Schemata.Flow.Foundation.Commands.CorrelateMessageRequest;
 
 namespace Schemata.Flow.Foundation;
 
-/// <summary>Resource method handler that correlates a message to a process instance.</summary>
-public sealed class CorrelateMessageHandler(FlowRunner runner)
-    : IResourceMethodHandler<SchemataProcess, CorrelateMessageRequest, ProcessSnapshot>
+/// <summary>
+///     Handles process-instance message-correlation requests dispatched through the resource-method pipeline.
+/// </summary>
+public sealed class CorrelateMessageHandler(IRequestDispatcher dispatcher)
+    : IRequestHandler<CorrelateMessageRequest, ProcessSnapshot>
 {
-    #region IResourceMethodHandler<SchemataProcess,CorrelateMessageRequest,ProcessSnapshot> Members
-
-    public ValueTask<ProcessSnapshot> InvokeAsync(
-        string?                 name,
+    /// <inheritdoc />
+    public async Task<ProcessSnapshot> HandleAsync(
         CorrelateMessageRequest request,
-        SchemataProcess?        entity,
-        ClaimsPrincipal?        principal,
-        CancellationToken       ct
-    ) {
-        ArgumentNullException.ThrowIfNull(entity);
-        return runner.CorrelateAsync(entity, request.MessageName, request.Payload, request.Token, principal, ct);
+        CancellationToken ct = default)
+    {
+        var canonicalName = request.CanonicalName
+            ?? throw new InvalidOperationException("Instance method requires a target canonical name.");
+        return await dispatcher.SendAsync<CorrelateProcessRequest, ProcessSnapshot>(new(
+            canonicalName,
+            request.MessageName,
+            request.Payload,
+            request.Token,
+            request.Principal), ct);
     }
-
-    #endregion
 }

@@ -75,6 +75,7 @@ public sealed class IntrospectionHandler<TApp, TToken>(
         }
 
         var ctx = new AdviceContext(sp);
+        using var _ = AdviceContext.Establish(ctx);
 
         var introspection = new IntrospectionContext<TApp, TToken> {
             Application = application,

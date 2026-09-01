@@ -8,7 +8,7 @@ AIP-136 custom method on a job. `Cancel` and `Wait` are Schemata operation metho
 upstream HTTP binding. The transport inherits its service synthesis, routing, protobuf-net wire format, exception interceptor, and
 reflection from the Resource gRPC transport; this feature only registers the resources and their
 custom-method handlers. `MapGrpc()` on `SchedulingBuilder` activates `SchemataSchedulingGrpcFeature`
-(priority `SchemataSchedulingFeature.DefaultPriority + 300_000` = `470_300_000`).
+(priority `SchemataSchedulingFeature.DefaultPriority + 300_000` = `480_300_000`).
 
 ## Where the code lives
 
@@ -90,8 +90,10 @@ same `ResourceWireNameRules` aliases as HTTP (`Name` dropped, `CanonicalName` â†
 `Dictionary<string, string?>` values are registered as proto3 maps. A null value is written as a
 key-only entry and a proto3 reader materializes that entry as an empty string.
 
-Custom-method request bodies are the same Skeleton types as the HTTP transport:
-`RunJobRequest`, `EmptyResourceRequest` (for `CancelOperation`), and `WaitOperationRequest`.
+Custom-method request bodies are the same types as the HTTP transport:
+`RunJobRequest`, `CancelOperationRequest`, and `WaitOperationRequest`. Each implements
+`IRequestPrincipal`; the resource method pipeline binds the gRPC call's `HttpContext.User` before
+dispatch.
 
 ## Error mapping
 

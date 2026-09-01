@@ -31,6 +31,20 @@ public sealed partial class DefaultScheduler : IScheduler
 
     internal int EntryCount => _entries.Count;
 
+    internal ConcurrentDictionary<string, ScheduledEntry> Entries => _entries;
+
+    internal SemaphoreSlim Gate => _lock;
+
+    internal ILogger<DefaultScheduler>? Logger => _logger;
+
+    internal IOptions<SchemataSchedulingOptions> Options => _options;
+
+    internal IServiceProvider Services => _services;
+
+    internal bool IsStopped => _stopped;
+
+    internal TimeProvider Time => _time;
+
     public DefaultScheduler(
         IServiceProvider                    services,
         IOptions<SchemataSchedulingOptions> options,
@@ -75,11 +89,11 @@ public sealed partial class DefaultScheduler : IScheduler
     #endregion
 
     /// <summary>Signals the dispatcher that a row has come due, when one is registered.</summary>
-    private void SignalDispatcher() {
+    internal void SignalDispatcher() {
         _services.GetService<JobExecutionDispatcher>()?.NotifyPending();
     }
 
-    private sealed class ScheduledEntry
+    internal sealed class ScheduledEntry
     {
         public ScheduledEntry(SchemataJob job, CancellationTokenSource cts, int replayedMisses = 0) {
             Job            = job;

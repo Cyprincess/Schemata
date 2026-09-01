@@ -97,12 +97,15 @@ builder.UseSchemata(schema => {
 
 `MapHttp()` exposes the process verbs over HTTP; the start call in Step 4 goes through it.
 
-The flow-builder `UseEvent()` adds `SchemataFlowEventFeature` (priority `480_300_000`). It depends
+The flow-builder `UseEvent()` adds `SchemataFlowEventFeature` (priority `490_300_000`). It depends
 on both `SchemataFlowFeature` and `SchemataEventFeature`, so `UseEvent()` composes at any position
 in the builder chain. The bus still needs a producer and a consumer for events to flow.
 
-`SchemataFlowEventFeature.ConfigureServices` registers `FlowEventCatchHandler` as a scoped
-`IFlowCatchHandler` and `FlowEventHandler` as a scoped `IEventHandler<IEvent>`.
+`SchemataFlowEventFeature.ConfigureServices` registers `FlowEventCatchHandler` through
+`TryAddEnumerable` as a scoped `IFlowCatchHandler`, so it joins the catch-handler chain alongside
+any other handler, and `FlowEventHandler` through `TryAddScoped<IEventHandler<IEvent>>` — a
+`TryAdd` on that interface, so a second `IEventHandler<IEvent>` registration is skipped rather
+than stacked.
 
 **Check:** the app starts and `IRepository<SchemataEventSubscription>` resolves from DI.
 
@@ -196,9 +199,9 @@ events are dropped. Configure the transports on the schema-level `UseEvent()`.
 
 **`FlowEventHandler` works off the dispatch context.** It reads
 `IEventDispatchContext.MatchedSubscriptions`, which the bus fills before handler dispatch. Calling
-`FlowRunner.CorrelateAsync` or `FlowRunner.ThrowSignalAsync` directly bypasses that context; use
-them for out-of-band correlation from your own code paths. Inject `FlowRunner` rather than
-`IFlowRunner` to access those methods.
+`IFlowRunner.CorrelateAsync` or `IFlowRunner.ThrowSignalAsync` directly bypasses that context; use
+them for out-of-band correlation from your own code paths. Both methods live on the `IFlowRunner`
+interface, so inject `IFlowRunner` rather than the concrete `FlowRunner`.
 
 **Two names, two layers.** `Message.Name` / `Signal.Name` (`payment-received`) is the BPMN
 subscription `EventType`. The wire name registered with `RegisterEvent<T>` (`orders/payment-received`)

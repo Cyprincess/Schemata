@@ -23,7 +23,11 @@ public class SchemataEvent : IIdentifier, ICanonicalName, IConcurrency, ISourceR
     /// <summary>Correlation identifier copied from <see cref="EventContext.CorrelationId" />.</summary>
     public virtual string? CorrelationId { get; set; }
 
-    /// <summary>Serialized handler response (for <see cref="IEventBus.SendAsync" /> requests).</summary>
+    /// <summary>
+    ///     Serialized handler outcome, copied from <see cref="EventContext.Result" /> — set when a
+    ///     publish advisor short-circuits with a result, or when the consume path records what the
+    ///     handler returned.
+    /// </summary>
     public virtual string? ResponsePayload { get; set; }
 
     /// <summary>Last error reported by a failed handler dispatch.</summary>

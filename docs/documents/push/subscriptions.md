@@ -65,18 +65,20 @@ public interface IPushSubscriptionManager
 }
 ```
 
-`DefaultPushSubscriptionManager` wraps `IRepository<SchemataPushSubscription>`:
+`DefaultPushSubscriptionManager` dispatches each call through `IRequestDispatcher`. Reads go to
+`GetPushSubscriptionsQuery` (and `ExistsPushSubscriptionQuery`); writes go to `AddPushSubscriptionRequest`
+and `RemovePushSubscriptionRequest`. The facade keeps its `IAsyncEnumerable` signature on
+`GetForOwnerAsync` and re-yields the materialized `IReadOnlyList` the query handler returns:
 
 | Method             | Behaviour                                                                                           |
 | ------------------ | --------------------------------------------------------------------------------------------------- |
-| `GetForOwnerAsync` | `ListAsync` over `Owner == owner && (provider == null \|\| Provider == provider)`                   |
-| `AddAsync`         | idempotent on the triple: returns the existing row if present, otherwise creates, adds, and commits |
-| `RemoveAsync`      | finds the matching row and removes + commits; a no-op when absent                                   |
-| `ExistsAsync`      | `AnyAsync` over the triple                                                                          |
+| `GetForOwnerAsync` | `GetPushSubscriptionsQuery` — `ToListAsync` over `Owner == owner && (provider == null \|\| Provider == provider)`, materialized before yield |
+| `AddAsync`         | `AddPushSubscriptionRequest` — idempotent on the triple: returns the existing row if present, otherwise creates, adds, and commits |
+| `RemoveAsync`      | `RemovePushSubscriptionRequest` — finds the matching row, soft-deletes it, and commits; a no-op when absent |
+| `ExistsAsync`      | `ExistsPushSubscriptionQuery` — `AnyAsync` over the triple                                          |
 
-`AddAsync` sets `Owner` explicitly from its argument and assigns a fresh `Uid`. Each mutating method
-performs one repository mutation followed by `CommitAsync`, matching the manager pattern used across
-the framework.
+Each request carries the subscription triple on the wire. `Uid` is stamped by the built-in
+`AdviceAddIdentifier` when the row is added; the manager never assigns it itself.
 
 ## Ownership interaction
 

@@ -75,20 +75,19 @@ internal static class FileDescriptorBridge
             [typeof(GetRequest)]    = nameof(GetRequest),
             [typeof(DeleteRequest)] = nameof(DeleteRequest),
         };
-        messages.TryAdd(requestType, requestType.Name);
-        messages.TryAdd(detailType, detailType.Name);
-        messages.TryAdd(summaryType, summaryType.Name);
+        messages.TryAdd(requestType, MessageName(requestType));
+        messages.TryAdd(detailType, MessageName(detailType));
+        messages.TryAdd(summaryType, MessageName(summaryType));
         messages[listResultType] = $"List{descriptor.Plural}Response";
 
         foreach (var method in methods) {
-            var iface = ResourceMethodHandlerHelper.FindHandlerInterface(method.Handler);
-            if (iface is null) {
+            var methodDescriptor = ResourceMethodHandlerHelper.Describe(entityArgs[0], method.Handler);
+            if (methodDescriptor is null) {
                 continue;
             }
 
-            var arguments = iface.GetGenericArguments();
-            messages.TryAdd(arguments[1], arguments[1].Name);
-            messages.TryAdd(arguments[2], arguments[2].Name);
+            messages.TryAdd(methodDescriptor.Request, MessageName(methodDescriptor.Request));
+            messages.TryAdd(methodDescriptor.Response, MessageName(methodDescriptor.Response));
         }
 
         foreach (var (type, name) in messages) {
@@ -148,16 +147,15 @@ internal static class FileDescriptorBridge
         }
 
         foreach (var method in methods) {
-            var iface = ResourceMethodHandlerHelper.FindHandlerInterface(method.Handler);
-            if (iface is null) {
+            var methodDescriptor = ResourceMethodHandlerHelper.Describe(entityArgs[0], method.Handler);
+            if (methodDescriptor is null) {
                 continue;
             }
 
-            var arguments = iface.GetGenericArguments();
             service.Method.Add(new MethodDescriptorProto {
                 Name       = GrpcResourceNaming.CustomMethodName(descriptor, method.Verb),
-                InputType  = $"{fqPrefix}{messages[arguments[1]]}",
-                OutputType = $"{fqPrefix}{messages[arguments[2]]}",
+                InputType  = $"{fqPrefix}{messages[methodDescriptor.Request]}",
+                OutputType = $"{fqPrefix}{messages[methodDescriptor.Response]}",
             });
         }
 
@@ -170,6 +168,16 @@ internal static class FileDescriptorBridge
 
         return FileDescriptor.BuildFromByteStrings(deps.Select(d => d.SerializedData).Append(proto.ToByteString()))
                              .Last();
+    }
+
+    private static string MessageName(Type type) {
+        var name  = type.Name;
+        var arity = name.IndexOf('`');
+        if (arity < 0) {
+            return name;
+        }
+
+        return $"{name[..arity]}Of{string.Join("And", type.GetGenericArguments().Select(MessageName))}";
     }
 
     private static DescriptorProto BuildMessage(

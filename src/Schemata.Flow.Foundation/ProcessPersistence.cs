@@ -105,10 +105,6 @@ public sealed class ProcessPersistence
         }
 
         foreach (var transition in snapshot.Transitions) {
-            if (transition.Uid == Guid.Empty) {
-                transition.Uid = Identifiers.NewUid();
-            }
-
             await scope.Transitions.AddAsync(transition, ct);
         }
 

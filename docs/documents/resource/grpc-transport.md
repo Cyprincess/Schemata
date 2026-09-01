@@ -75,8 +75,11 @@ responds with the updated detail per AIP-164, a hard-deletable entity with `goog
 `ResourceCustomMethod.Register` runs inside `ResourceServiceMethodProvider` and adds one unary RPC per declared
 method to the resource's existing service. The RPC name is
 `GrpcResourceNaming.CustomMethodName(descriptor, verb)` = `{PascalVerb}{Singular}` (`run` + `Job` → `RunJob`). The
-unary handler resolves the `IResourceMethodHandler<TEntity, TRequest, TResponse>` from DI and dispatches through
-`ResourceMethodOperationHandler`. See [Custom Methods](custom-methods.md).
+unary handler resolves the closed `ResourceMethodOperationHandler<TEntity, TRequest, TResponse>` from DI and
+calls its `InvokeAsync(verb, name, request, principal, ct)` — that operation handler is the resource pipeline
+root that runs authorization and target validation, binds the principal onto the request, and dispatches
+through `IRequestDispatcher` to the `IRequestHandler<TRequest, TResponse>` declared by the verb. The transport
+does not resolve or invoke the handler itself. See [Custom Methods](custom-methods.md).
 
 ## Request and response wire format
 

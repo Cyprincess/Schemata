@@ -1,29 +1,28 @@
 using System;
-using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Messaging.Skeleton;
+using TerminateProcessCommand = Schemata.Flow.Foundation.Commands.TerminateProcessRequest;
 
 namespace Schemata.Flow.Foundation;
 
-/// <summary>Resource method handler that terminates process instances.</summary>
-public sealed class TerminateProcessHandler(FlowRunner runner)
-    : IResourceMethodHandler<SchemataProcess, EmptyResourceRequest, ProcessSnapshot>
+/// <summary>
+///     Handles process-instance termination requests dispatched through the resource-method pipeline.
+/// </summary>
+public sealed class TerminateProcessHandler(IRequestDispatcher dispatcher)
+    : IRequestHandler<TerminateProcessResourceRequest, ProcessSnapshot>
 {
-    #region IResourceMethodHandler<SchemataProcess,EmptyResourceRequest,ProcessSnapshot> Members
-
-    public ValueTask<ProcessSnapshot> InvokeAsync(
-        string?              name,
-        EmptyResourceRequest request,
-        SchemataProcess?     entity,
-        ClaimsPrincipal?     principal,
-        CancellationToken    ct
-    ) {
-        ArgumentNullException.ThrowIfNull(entity);
-        return runner.TerminateAsync(entity, principal, ct);
+    /// <inheritdoc />
+    public async Task<ProcessSnapshot> HandleAsync(
+        TerminateProcessResourceRequest request,
+        CancellationToken ct = default)
+    {
+        var canonicalName = request.CanonicalName
+            ?? throw new InvalidOperationException("Instance method requires a target canonical name.");
+        return await dispatcher.SendAsync<TerminateProcessCommand, ProcessSnapshot>(new(canonicalName, request.Principal), ct);
     }
-
-    #endregion
 }

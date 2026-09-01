@@ -24,7 +24,7 @@ builder.UseSchemata(schema => {
 ```
 
 `UseEvent()` on `SchedulingBuilder` adds `SchemataSchedulingEventFeature` (Priority
-`SchemataSchedulingFeature.DefaultPriority + 100_000` = 470,100,000). The feature declares
+`SchemataSchedulingFeature.DefaultPriority + 100_000` = 480,100,000). The feature declares
 `[DependsOn<SchemataSchedulingFeature>]` and `[DependsOn<SchemataEventFeature>]`, so both are pulled
 in if not already present. Pass an `Action<SchemataSchedulingEventOptions>` to configure defaults and
 per-job overrides.

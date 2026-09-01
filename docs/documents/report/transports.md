@@ -51,15 +51,16 @@ so their entity namespace supplies the package.
 | `SchemataReportSnapshot` | `Schemata.Report.Skeleton.SnapshotService` | `ReadSnapshot` |
 
 `GrpcResourceNaming.CustomMethodName` constructs these custom method names from the resource method
-verb and descriptor singular. The HTTP and gRPC features bind the same `GenerateHandler<TReport>` and
-`ReadSnapshotHandler<TSnapshot>` implementations.
+verb and descriptor singular. The HTTP and gRPC features bind the same
+`GenerateHandler<TReport, TSnapshot, TChunk>` and `ReadSnapshotHandler<TSnapshot>` implementations.
 
 ## Generation and operations
 
 `GenerateReportRequest` accepts `Name` or `Query`, `Persist`, and `Sync`. Supplying both or neither
-of `Name` and `Query` raises `InvalidArgumentException`. A synchronous request runs the report and
-creates a terminal operation; an asynchronous request dispatches `ReportGenerationJob<TReport,
-TSnapshot, TChunk>` and returns a pending operation.
+of `Name` and `Query` raises `InvalidArgumentException`. A synchronous request dispatches
+`RunReportRequest` and creates a terminal operation. An asynchronous request is dispatched to
+`GenerateHandler<TReport, TSnapshot, TChunk>`, which triggers
+`ReportGenerationJob<TReport, TSnapshot, TChunk>` and returns a pending operation.
 
 The operation name returned by generation is suitable for the polling route above. [AIP-151](https://google.aip.dev/151)
 requires operations to use the shared `google.longrunning.Operation` type and shared Operations

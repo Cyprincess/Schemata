@@ -23,6 +23,7 @@
     <ProjectReference Include="..\Schemata.Scheduling.Skeleton\Schemata.Scheduling.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Security.Skeleton\Schemata.Security.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Transport.Http\Schemata.Transport.Http.csproj" />
+    <ProjectReference Include="..\Schemata.Messaging.Skeleton\Schemata.Messaging.Skeleton.csproj" />
   </ItemGroup>
 
 </Project>

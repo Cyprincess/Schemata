@@ -64,7 +64,7 @@ internal static class PurgeFilter
 
     private static ValidationException InvalidFilter() {
         return new([new() {
-            Field       = nameof(PurgeRequest.Filter).Underscore(),
+            Field       = nameof(PurgeResourceRequest<object>.Filter).Underscore(),
             Description = string.Format(SchemataResources.GetResourceString(SchemataResources.INVALID_EXPRESSION), "filter"),
             Reason      = SchemataResources.INVALID_FILTER,
         }]);
@@ -72,7 +72,7 @@ internal static class PurgeFilter
 
     private static ValidationException InvalidLanguage() {
         return new([new() {
-            Field       = nameof(PurgeRequest.Language).Underscore(),
+            Field       = nameof(PurgeResourceRequest<object>.Language).Underscore(),
             Description = string.Format(SchemataResources.GetResourceString(SchemataResources.INVALID_EXPRESSION), "language"),
             Reason      = SchemataResources.INVALID_FILTER,
         }]);

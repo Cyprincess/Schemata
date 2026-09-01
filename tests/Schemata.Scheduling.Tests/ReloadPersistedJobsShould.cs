@@ -56,8 +56,9 @@ public class ReloadPersistedJobsShould
             .AddSingleton<IRepository<SchemataJobExecution>>(executions.Object)
             .AddSingleton<IOptions<SchemataSchedulingOptions>>(Options.Create(new SchemataSchedulingOptions()))
             .AddSingleton<TimeProvider>(clock)
+            .AddSchemataScheduling()
             .BuildServiceProvider();
-        var scheduler = new DefaultScheduler(services, services.GetRequiredService<IOptions<SchemataSchedulingOptions>>(), time: clock);
+        var scheduler = services.GetRequiredService<DefaultScheduler>();
         var initializer = new SchedulingInitializer(
             scheduler,
             services.GetRequiredService<IOptions<SchemataSchedulingOptions>>(),

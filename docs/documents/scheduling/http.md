@@ -9,7 +9,7 @@ leaves `WaitOperation` without an HTTP binding; Schemata supplies both routes. T
 its controller synthesis, routing, JSON wire format, and exception handler from the
 Resource HTTP transport; this feature only registers the resources and their custom-method
 handlers. `MapHttp()` on `SchedulingBuilder` activates `SchemataSchedulingHttpFeature` (priority
-`SchemataSchedulingFeature.DefaultPriority + 200_000` = `470_200_000`).
+`SchemataSchedulingFeature.DefaultPriority + 200_000` = `480_200_000`).
 
 ## Where the code lives
 
@@ -81,18 +81,23 @@ caller polls `/v1/operations/{name}` or calls `:wait` for terminal state.
 the resource's plural (`jobs`, `operations`). Property names then go through snake_case via the
 configured `PropertyNamingPolicy`.
 
-Custom-method request bodies live in `Schemata.Scheduling.Skeleton`:
+`RunJobRequest` and `WaitOperationRequest` live in `Schemata.Scheduling.Skeleton`;
+`CancelOperationRequest` lives in `Schemata.Scheduling.Foundation`:
 
 ```csharp
 public sealed class RunJobRequest        // POST /v1/jobs/{name}:run
-{ public string? Variables; }
+{ public Dictionary<string, string?>? Variables; }
+
+public sealed class CancelOperationRequest // POST /v1/operations/{name}:cancel
+{ }
 
 public sealed class WaitOperationRequest // POST /v1/operations/{name}:wait
 { public TimeSpan? Timeout; }
 ```
 
-`:cancel` takes an `EmptyResourceRequest`. `Variables` is a JSON string deserialized by
-`JobVariableSerializer` before the scheduler call.
+All three requests implement `IRequestPrincipal`; the resource method pipeline binds
+`HttpContext.User` before dispatch. `RunJobRequest.Variables` is copied to the triggered execution;
+when omitted, it is empty rather than merged from the persisted job row.
 
 ## Error mapping
 

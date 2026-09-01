@@ -7,7 +7,7 @@ Every scheduled unit is an `IScheduledJob`. The scheduler persists a `SchemataJo
 | Package                          | Key files                                                                                                                                                                                                                                                                                                             |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Schemata.Scheduling.Skeleton`   | `IScheduledJob.cs`, `JobContext.cs`, `JobRegistration.cs`, `IScheduledJobRegistry.cs`, `IScheduledJobKeyResolver.cs`, `Attributes/ScheduledJobAttribute.cs`, `IJobLifecycleObserver.cs`, `Advisors/IJobExecutionAdvisor.cs`, `Entities/SchemataJobExecution.cs`, `Entities/ExecutionState.cs` |
-| `Schemata.Scheduling.Foundation` | `JobExecutionDispatcher.cs`, `Internal/DefaultScheduler.Trigger.cs`, `Internal/DefaultScheduledJobRegistry.cs`, `Observers/SchemataJobAuditObserver.cs`, `RunJobHandler.cs`, `SchedulingResourceRegistration.cs`                                                                                                      |
+| `Schemata.Scheduling.Foundation` | `JobExecutionDispatcher.cs`, `Internal/DefaultScheduler.Trigger.cs`, `Internal/DefaultScheduledJobRegistry.cs`, `Internal/SchemataJobWriteGate.cs`, `Handlers/DefaultStageJobExecutionResultHandler.cs`, `Commands/StageJobExecutionResultRequest.cs`, `RunJobHandler.cs`, `SchedulingResourceRegistration.cs` |
 | `Schemata.Resource.Foundation`   | `PurgeJob.cs`, `PurgeJobKeyResolver.cs`, `PurgeHandler.cs`, `PurgeOperationArgs.cs`                                                                                                                                                                                                                                   |
 
 ## IScheduledJob
@@ -116,8 +116,8 @@ services.TryAddEnumerable(
 
 ## IJobLifecycleObserver
 
-`IJobLifecycleObserver` is the audit and bridge extension point. It is notification-only: no
-observer result gates the fire.
+`IJobLifecycleObserver` is the application notification and bridge extension point. It is
+notification-only: no observer result gates the fire.
 
 ```csharp
 public interface IJobLifecycleObserver
@@ -178,7 +178,7 @@ call ExecuteAsync(context, linkedToken)
   |-- host shutdown cancellation: leave the row Running for re-dispatch
 ```
 
-`SchemataJobAuditObserver` persists the `SchemataJob` row. `JobExecutionDispatcher` owns the execution row from claim through terminal state, then asks observers to record the matching job-row transition. For recurring jobs, the dispatcher computes the next fire from the job's current `NextRunTime` (falling back to now) and calls the scheduler so the next `Pending` row is materialized.
+`JobExecutionDispatcher` owns the execution row from claim through terminal state. After the terminal write it computes a recurring job's next occurrence and dispatches `StageJobExecutionResultRequest` carrying the job identity, `State`, `RecentRunTime`, `RecentError`, and `NextRunTime`. `DefaultStageJobExecutionResultHandler` is the sole writer of the `RecentRunTime` and `RecentError` result fields: it fresh-reads the row under the process-wide `SchemataJobWriteGate`, writes the staged values, and for a recurring `Active` job materializes the next `Pending` execution and arms its timer. The other two staged fields are shared: the schedule handler also writes `State` and `NextRunTime`, and the unschedule handler writes `State` as `Paused`. All job-row writers run under the same gate, and a concurrency conflict on the job row propagates to the caller instead of being retried.
 
 ## Cancelling a running execution
 
@@ -200,7 +200,9 @@ A body cancelled by host shutdown is left `Running` so a later pass reclaims and
 
 - Advisor `Handle` finalizes the execution as `Skipped`; advisor `Block` finalizes it as `Blocked`.
   Both prevent the job body from running.
-- Observer exceptions are logged at `Warning` and swallowed. A throwing observer does not stop other observers or fail the job.
+- Terminal and schedule-transition observer callbacks are caught, logged at `Warning`, and
+  swallowed; a throwing observer does not stop other observers or fail the job. `OnTriggeredAsync`
+  runs before that boundary and must return successfully.
 - A job body throwing marks the execution `Failed`. The job row remains `Active` for recurring jobs and becomes `Failed` for one-time jobs.
 - `JobExecutionDispatcher` resolves the job type from `JobKey`; a missing registration fails the execution row instead of loading a CLR type from persisted data.
 

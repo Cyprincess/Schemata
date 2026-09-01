@@ -22,7 +22,7 @@ internal static class ReportTestHost
     internal const string TestDriverName = "test";
 
     // Deterministic stand-in for the handwritten scheduler double's Guid.NewGuid() fallback;
-    // DefaultReportService always stamps JobContext.ExecutionUid, so this never fires in practice.
+    // GenerateHandler always stamps JobContext.ExecutionUid, so this never fires in practice.
     private static readonly Guid FallbackExecutionUid = new("3f6c1a2b-4d5e-4f6a-8b9c-0d1e2f3a4b5c");
 
     // Mirrors RepositoryDriver's honest set so the bare report plan (empty SelectionNode) fully
@@ -61,7 +61,7 @@ internal static class ReportTestHost
         services.AddSingleton<ReportRetentionEnforcer<SchemataReportSnapshot, SchemataReportSnapshotChunk>>();
         services.AddSingleton<ReportSnapshotWriter<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>();
         services.AddSingleton<IReportSnapshotStore, DefaultReportSnapshotStore<SchemataReportSnapshot, SchemataReportSnapshotChunk>>();
-        services.AddScoped<IReportService, DefaultReportService<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>();
+        services.AddSchemataReport<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>();
         configure?.Invoke(services);
 
         return services.BuildServiceProvider();
@@ -103,13 +103,6 @@ internal static class ReportTestHost
                      return Task.FromResult(execution);
                  });
         return scheduler;
-    }
-
-    internal static Mock<IReportService> CreateReportService(ReportResult result) {
-        var service = new Mock<IReportService>(MockBehavior.Strict);
-        service.Setup(value => value.RunAsync(It.IsAny<ReportRequest>(), null, It.IsAny<CancellationToken>()))
-               .Returns(ValueTask.FromResult(result));
-        return service;
     }
 
     internal static ReportRequest InlineRequest(bool persist = false) {
@@ -173,13 +166,21 @@ internal sealed class ReportPersistenceState
 
     internal Queue<DateTime> SuccessfulCaptureTimes { get; } = [];
 
+    internal List<SnapshotState> SnapshotStateSequence { get; } = [];
+
+    internal List<ReportChunkMetadata> ChunkAddSequence { get; } = [];
+
     internal IRepository<SchemataReportSnapshot> CreateSnapshotRepository() {
-        return ReportRepositoryMocks.Create(Snapshots, _transactions, onUpdate: SetSuccessfulCaptureTime);
+        return ReportRepositoryMocks.Create(Snapshots, _transactions,
+                                            onAdd:    CaptureSnapshotAdd,
+                                            onUpdate: CaptureSnapshotUpdate);
     }
 
     internal IRepository<SchemataReportSnapshotChunk> CreateChunkRepository() {
         ChunkRepositoryInstances++;
-        return ReportRepositoryMocks.Create(Chunks, _transactions, CancelAfterChunkCommit);
+        return ReportRepositoryMocks.Create(Chunks, _transactions,
+                                            onCommit: CancelAfterChunkCommit,
+                                            onAdd:    CaptureChunkAdd);
     }
 
     internal IRepository<SchemataJobExecution> CreateExecutionRepository() {
@@ -204,7 +205,34 @@ internal sealed class ReportPersistenceState
             snapshot.CapturedAt = capturedAt;
         }
     }
+
+    private void CaptureSnapshotAdd(SchemataReportSnapshot snapshot) {
+        SnapshotStateSequence.Add(snapshot.State);
+    }
+
+    private void CaptureSnapshotUpdate(SchemataReportSnapshot snapshot) {
+        SnapshotStateSequence.Add(snapshot.State);
+        SetSuccessfulCaptureTime(snapshot);
+    }
+
+    private void CaptureChunkAdd(SchemataReportSnapshotChunk chunk) {
+        ChunkAddSequence.Add(new ReportChunkMetadata(
+            chunk.Name ?? string.Empty,
+            chunk.Index,
+            chunk.CanonicalName ?? string.Empty,
+            chunk.Report,
+            chunk.Snapshot,
+            chunk.RowCount));
+    }
 }
+
+internal sealed record ReportChunkMetadata(
+    string                Name,
+    int                   Index,
+    string                CanonicalName,
+    string?               Report,
+    string?               Snapshot,
+    int                   RowCount);
 
 internal static class ReportTestRows
 {

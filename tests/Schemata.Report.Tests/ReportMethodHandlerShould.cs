@@ -12,6 +12,8 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Entity.Repository;
+using Schemata.Insight.Skeleton;
+using Schemata.Messaging.Skeleton;
 using Schemata.Report.Foundation;
 using Schemata.Report.Skeleton;
 using Schemata.Resource.Foundation;
@@ -25,6 +27,8 @@ public class ReportMethodHandlerShould
     [Fact]
     public async Task Generate_Sync_Persisted_Sets_Snapshot_Operation_To_Terminal_Row() {
         var state      = new ReportPersistenceState();
+        var driver     = ReportTestHost.CreateDriver(ReportTestRows.Create(1));
+        var principal  = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity("test"));
         var operations = new Mock<IOperationService>();
         Guid? uid      = null;
         string? output = null;
@@ -37,16 +41,18 @@ public class ReportMethodHandlerShould
                   });
 
         using var provider = ReportTestHost.Create(
-            ReportTestHost.CreateDriver(ReportTestRows.Create(1)),
+            driver,
             state,
             configure: services => {
                 services.AddSingleton(operations.Object);
-                services.AddScoped<GenerateHandler<SchemataReport>>();
+                services.AddScoped<GenerateHandler<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>();
             });
         using var scope = provider.CreateScope();
-        var handler = scope.ServiceProvider.GetRequiredService<GenerateHandler<SchemataReport>>();
+        var handler = scope.ServiceProvider.GetRequiredService<GenerateHandler<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>();
+        var request = GenerateRequest(persist: true, sync: true);
+        request.Principal = principal;
 
-        await handler.InvokeAsync(null, GenerateRequest(persist: true, sync: true), null, null, default);
+        await handler.HandleAsync(request, default);
 
         var snapshot = Assert.Single(state.Snapshots);
         Assert.NotNull(uid);
@@ -55,6 +61,12 @@ public class ReportMethodHandlerShould
         Assert.Equal(snapshot.CanonicalName, terminal!.Snapshot);
         operations.Verify(service => service.CreateTerminalAsync(
             "generate", output, null, uid, It.IsAny<CancellationToken>()), Times.Once);
+        driver.Verify(value => value.ExecuteAsync(
+                          It.IsAny<SubPlan>(),
+                          It.IsAny<QueryInsightRequest>(),
+                          principal,
+                          It.IsAny<CancellationToken>()),
+                      Times.Once);
     }
 
     [Fact]
@@ -67,16 +79,22 @@ public class ReportMethodHandlerShould
             configure: services => {
                 services.AddSingleton(scheduler.Object);
                 services.AddSingleton(operations.Object);
-                services.AddScoped<GenerateHandler<SchemataReport>>();
+                services.AddScoped<GenerateHandler<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>();
             });
         using var scope = provider.CreateScope();
-        var handler = scope.ServiceProvider.GetRequiredService<GenerateHandler<SchemataReport>>();
+        var handler = scope.ServiceProvider.GetRequiredService<GenerateHandler<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>();
 
-        var result = await handler.InvokeAsync(null, GenerateRequest(), null, null, default);
+        var request = GenerateRequest(persist: true);
+        var result = await handler.HandleAsync(request, default);
 
         Assert.False(result.Done);
         Assert.NotNull(context);
         Assert.Equal("generate", context!.Method);
+        var replayed = Assert.IsType<ReportRequest>(
+            JsonSerializer.Deserialize<ReportRequest>(context.ArgsJson!, SchemataJson.Default));
+        Assert.True(replayed.Persist);
+        var source = Assert.Single(replayed.Query!.Sources);
+        Assert.Equal(("r", "rows"), (source.Alias, source.Name));
         scheduler.Verify(
             value => value.TriggerAsync<ReportGenerationJob<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>(
                 It.IsAny<JobContext>(),
@@ -96,17 +114,15 @@ public class ReportMethodHandlerShould
         var options = Options.Create(new SchemataReportOptions { MaxReadPageSize = 2_000 });
         var handler = new ReadSnapshotHandler<SchemataReportSnapshot>(store.Object, options);
 
-        var first = await handler.InvokeAsync(
-            snapshot.CanonicalName,
-            new ReadSnapshotRequest { PageSize = 1_500 },
-            snapshot,
-            null,
+        var first = await handler.HandleAsync(
+            new ReadSnapshotRequest { CanonicalName = snapshot.CanonicalName, PageSize = 1_500 },
             default);
-        var second = await handler.InvokeAsync(
-            snapshot.CanonicalName,
-            new ReadSnapshotRequest { PageSize = 1_500, PageToken = first.NextPageToken },
-            snapshot,
-            null,
+        var second = await handler.HandleAsync(
+            new ReadSnapshotRequest {
+                CanonicalName = snapshot.CanonicalName,
+                PageSize      = 1_500,
+                PageToken     = first.NextPageToken,
+            },
             default);
 
         Assert.Equal(1_500, first.Rows.Count);
@@ -125,11 +141,11 @@ public class ReportMethodHandlerShould
             options);
 
         var error = await Assert.ThrowsAsync<InvalidArgumentException>(async () => {
-            await handler.InvokeAsync(
-                snapshot.CanonicalName,
-                new ReadSnapshotRequest { PageToken = "not-a-report-token" },
-                snapshot,
-                null,
+            await handler.HandleAsync(
+                new ReadSnapshotRequest {
+                    CanonicalName = snapshot.CanonicalName,
+                    PageToken     = "not-a-report-token",
+                },
                 default);
         });
 
@@ -147,11 +163,11 @@ public class ReportMethodHandlerShould
         var options = Options.Create(new SchemataReportOptions { MaxReadPageSize = 1_000 });
         var handler = new ReadSnapshotHandler<SchemataReportSnapshot>(store.Object, options);
 
-        var page = await handler.InvokeAsync(
-            snapshot.CanonicalName,
-            new ReadSnapshotRequest { PageSize = 5_000 },
-            snapshot,
-            null,
+        var page = await handler.HandleAsync(
+            new ReadSnapshotRequest {
+                CanonicalName = snapshot.CanonicalName,
+                PageSize      = 5_000,
+            },
             default);
 
         Assert.Equal(1_000, page.Rows.Count);
@@ -162,28 +178,28 @@ public class ReportMethodHandlerShould
     [Fact]
     public async Task Generate_With_Name_And_Query_Throws_InvalidArgument() {
         using var services = new ServiceCollection().BuildServiceProvider();
-        var handler = new GenerateHandler<SchemataReport>(
-            new Mock<IReportService>(MockBehavior.Strict).Object,
+        var handler = new GenerateHandler<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
+            new Mock<IRequestDispatcher>(MockBehavior.Strict).Object,
             new(),
             services);
         var request = GenerateRequest();
         request.Name = "reports/daily";
 
         await Assert.ThrowsAsync<InvalidArgumentException>(async () => {
-            await handler.InvokeAsync(null, request, null, null, default);
+            await handler.HandleAsync(request, default);
         });
     }
 
     [Fact]
     public async Task Generate_Without_Operation_Service_Throws_FailedPrecondition() {
         using var services = new ServiceCollection().BuildServiceProvider();
-        var handler = new GenerateHandler<SchemataReport>(
-            new Mock<IReportService>(MockBehavior.Strict).Object,
+        var handler = new GenerateHandler<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
+            new Mock<IRequestDispatcher>(MockBehavior.Strict).Object,
             new(),
             services);
 
         var exception = await Assert.ThrowsAsync<FailedPreconditionException>(async () => {
-            await handler.InvokeAsync(null, GenerateRequest(), null, null, default);
+            await handler.HandleAsync(GenerateRequest(sync: true), default);
         });
 
         Assert.Equal("Report generation requires an operation service.", exception.Message);
@@ -192,13 +208,18 @@ public class ReportMethodHandlerShould
     [Fact]
     public async Task Generate_Request_Flows_Through_Collection_Method_Pipeline() {
         using var services = new ServiceCollection().BuildServiceProvider();
+        var handler    = new PipelineHandler();
+        var request    = new GenerateReportRequest { Name = "reports/daily" };
+        var dispatcher = new Mock<IRequestDispatcher>(MockBehavior.Strict);
+        dispatcher.Setup(value => value.SendAsync<GenerateReportRequest, Operation>(
+                             request, It.IsAny<CancellationToken>()))
+                  .Returns((GenerateReportRequest sent, CancellationToken ct) => handler.HandleAsync(sent, ct));
         var operation = new ResourceMethodOperationHandler<SchemataReport, GenerateReportRequest, Operation>(
             new Mock<IRepository<SchemataReport>>(MockBehavior.Strict).Object,
-            services);
-        var handler = new PipelineHandler();
-        var request = new GenerateReportRequest { Name = "reports/daily" };
+            services,
+            dispatcher.Object);
 
-        var response = await operation.InvokeAsync(handler, "generate", null, request, null, default);
+        var response = await operation.InvokeAsync("generate", null, request, null, default);
 
         Assert.Same(request, handler.Request);
         Assert.Same(response, handler.Response);
@@ -225,21 +246,18 @@ public class ReportMethodHandlerShould
         };
     }
 
-    private sealed class PipelineHandler : IResourceMethodHandler<SchemataReport, GenerateReportRequest, Operation>
+    private sealed class PipelineHandler : IRequestHandler<GenerateReportRequest, Operation>
     {
         internal GenerateReportRequest? Request { get; private set; }
 
         internal Operation Response { get; } = new();
 
-        public ValueTask<Operation> InvokeAsync(
-            string?                name,
-            GenerateReportRequest  request,
-            SchemataReport?        entity,
-            System.Security.Claims.ClaimsPrincipal? principal,
-            CancellationToken      ct
+        public Task<Operation> HandleAsync(
+            GenerateReportRequest request,
+            CancellationToken ct = default
         ) {
             Request = request;
-            return ValueTask.FromResult(Response);
+            return Task.FromResult(Response);
         }
     }
 

@@ -2,12 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
-using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Entity.Repository;
+using Schemata.Messaging.Skeleton;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 
@@ -20,43 +23,42 @@ namespace Schemata.Scheduling.Foundation;
 ///     <see cref="SchemataJobExecution" /> row synchronously so the response
 ///     carries an addressable <c>operations/{uid}</c>.
 /// </summary>
-public sealed class RunJobHandler : IResourceMethodHandler<SchemataJob, RunJobRequest, Operation>
+public sealed class RunJobHandler(
+    IScheduler scheduler,
+    IServiceProvider services,
+    IScheduledJobRegistry registry)
+    : IRequestHandler<RunJobRequest, Operation>
 {
     private static readonly MethodInfo TriggerOpenMethod =
         typeof(IScheduler).GetMethod(nameof(IScheduler.TriggerAsync))!;
 
-    private readonly IScheduler       _scheduler;
-    private readonly IServiceProvider _services;
-    private readonly IScheduledJobRegistry _registry;
-
-    public RunJobHandler(IScheduler scheduler, IServiceProvider services, IScheduledJobRegistry registry) {
-        _scheduler = scheduler;
-        _services  = services;
-        _registry  = registry;
-    }
-
-    #region IResourceMethodHandler<SchemataJob, RunJobRequest, Operation> Members
-
-    public async ValueTask<Operation> InvokeAsync(
-        string?           name,
-        RunJobRequest     request,
-        SchemataJob?      entity,
-        ClaimsPrincipal?  principal,
-        CancellationToken ct
+    public async Task<Operation> HandleAsync(
+        RunJobRequest request,
+        CancellationToken ct = default
     ) {
-        ArgumentNullException.ThrowIfNull(entity);
+        var repository = services.GetRequiredService<IRepository<SchemataJob>>();
+        SchemataJob? entity;
+        var canonicalName = request.CanonicalName ?? string.Empty;
+        using (repository.SuppressQuerySoftDelete()) {
+            entity = await repository.FirstOrDefaultAsync(
+                q => q.Where(r => r.Name == canonicalName || r.CanonicalName == canonicalName), ct);
+        }
+
+        if (entity is null) {
+            throw new NotFoundException(message: $"Job '{canonicalName}' was not found.");
+        }
 
         if (string.IsNullOrEmpty(entity.JobKey)) {
-            throw JobNotRunnable(entity);
+            throw new FailedPreconditionException(message: $"Job '{entity.CanonicalName}' cannot be run.");
         }
 
-        var jobType = _registry.Resolve(entity.JobKey);
+        var jobType = registry.Resolve(entity.JobKey);
         if (jobType is null) {
-            throw JobNotRunnable(entity);
+            throw new FailedPreconditionException(message: $"Job '{entity.CanonicalName}' cannot be run.");
         }
 
-        if (_services.GetService(jobType) is null) {
-            throw JobNotRunnable(entity);
+        if (services.GetService(jobType) is null) {
+            throw new FailedPreconditionException(message: $"Job '{entity.CanonicalName}' cannot be run.");
         }
 
         var context = new JobContext {
@@ -69,24 +71,12 @@ public sealed class RunJobHandler : IResourceMethodHandler<SchemataJob, RunJobRe
 
         Task<SchemataJobExecution> task;
         try {
-            task = (Task<SchemataJobExecution>)trigger.Invoke(_scheduler, [context, ct])!;
+            task = (Task<SchemataJobExecution>)trigger.Invoke(scheduler, [context, ct])!;
         } catch (TargetInvocationException tie) when (tie.InnerException is not null) {
-            // A scheduler that fails synchronously surfaces through reflection as a
-            // TargetInvocationException; unwrap it so the caller sees the real failure.
             ExceptionDispatchInfo.Capture(tie.InnerException).Throw();
             throw;
         }
 
         return OperationMapper.FromExecution(await task);
-    }
-
-    #endregion
-
-    /// <summary>
-    ///     The technical reason (missing, unloadable, or unregistered job type) stays out
-    ///     of the client-visible message; the persisted job row carries the specifics.
-    /// </summary>
-    private static FailedPreconditionException JobNotRunnable(SchemataJob entity) {
-        return new(message: $"Job '{entity.CanonicalName}' cannot be run.");
     }
 }

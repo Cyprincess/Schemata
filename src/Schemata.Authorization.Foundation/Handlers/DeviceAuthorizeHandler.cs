@@ -67,6 +67,7 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
         }
 
         var ctx = new AdviceContext(sp);
+        using var _ = AdviceContext.Establish(ctx);
 
         switch (await Advisor.For<IDeviceAuthorizeAdvisor<TApp>>()
                              .RunAsync(ctx, application, request, ct)) {

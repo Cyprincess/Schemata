@@ -7,6 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Common;
 using Schemata.Entity.Repository;
+using Schemata.Messaging.Skeleton;
+using Schemata.Report.Foundation.Commands;
 using Schemata.Report.Foundation.Internal;
 using Schemata.Report.Skeleton;
 using Schemata.Scheduling.Skeleton;
@@ -39,8 +41,8 @@ public sealed class ReportGenerationJob<TReport, TSnapshot, TChunk>(
             execution.IsCancelled = token => IsCancelledAsync(uid, token);
         }
 
-        var service = scope.ServiceProvider.GetRequiredService<IReportService>();
-        var result = await service.RunAsync(request, null, ct);
+        var dispatcher = scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
+        var result = await dispatcher.SendAsync<RunReportRequest, ReportResult>(new(request, null), ct);
         if (context.Execution is { } scheduled) {
             scheduled.Output = JsonSerializer.Serialize(Output(result), SchemataJson.Default);
         }

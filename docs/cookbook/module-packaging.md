@@ -127,7 +127,7 @@ var builder = WebApplication.CreateBuilder(args)
 ```
 
 `UseModular()` registers `SchemataModulesFeature<DefaultModulesProvider, DefaultModulesRunner>` at
-`Priority = 520_000_000`. During `ConfigureServices`, `DefaultModulesProvider` reads the stamped
+`Priority = 540_000_000`. During `ConfigureServices`, `DefaultModulesProvider` reads the stamped
 `ModuleAttribute` instances from `Assembly.GetEntryAssembly()`, calls `Assembly.Load(name)` for
 each, finds the first non-abstract `IModule` type, and stores a `ModuleDescriptor`.
 `DefaultModulesRunner` then dispatches each lifecycle phase.

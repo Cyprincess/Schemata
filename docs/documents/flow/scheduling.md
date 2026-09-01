@@ -29,7 +29,7 @@ builder.UseSchemata(schema => {
 ```
 
 `UseScheduling()` adds `SchemataFlowSchedulingFeature`, priority
-`SchemataFlowFeature.DefaultPriority + 400_000` = `480_400_000`. The feature declares
+`SchemataFlowFeature.DefaultPriority + 400_000` = `490_400_000`. The feature declares
 `[DependsOn<SchemataFlowFeature>]` and `[DependsOn<SchemataSchedulingFeature>]`, so both are pulled
 in if missing.
 

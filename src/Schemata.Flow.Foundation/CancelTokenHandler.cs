@@ -1,29 +1,46 @@
 using System;
-using System.Security.Claims;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
+using Schemata.Common.Errors;
+using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Messaging.Skeleton;
+using CancelProcessTokenRequest = Schemata.Flow.Foundation.Commands.CancelTokenRequest;
 
 namespace Schemata.Flow.Foundation;
 
-/// <summary>Resource method handler that cancels a single execution token.</summary>
-public sealed class CancelTokenHandler(FlowRunner runner)
-    : IResourceMethodHandler<SchemataProcessToken, EmptyResourceRequest, ProcessSnapshot>
+/// <summary>
+///     Handles token-cancellation requests dispatched through the resource-method pipeline.
+/// </summary>
+public sealed class CancelTokenHandler(
+    IRequestDispatcher                    dispatcher,
+    IRepository<SchemataProcessToken> tokens)
+    : IRequestHandler<CancelTokenResourceRequest, ProcessSnapshot>
 {
-    #region IResourceMethodHandler<SchemataProcessToken,EmptyResourceRequest,ProcessSnapshot> Members
+    /// <inheritdoc />
+    public async Task<ProcessSnapshot> HandleAsync(
+        CancelTokenResourceRequest request,
+        CancellationToken ct = default)
+    {
+        var name = request.CanonicalName
+            ?? throw new InvalidOperationException("Instance method requires a target canonical name.");
 
-    public ValueTask<ProcessSnapshot> InvokeAsync(
-        string?               name,
-        EmptyResourceRequest  request,
-        SchemataProcessToken? entity,
-        ClaimsPrincipal?      principal,
-        CancellationToken     ct
-    ) {
-        ArgumentNullException.ThrowIfNull(entity);
-        return runner.CancelTokenAsync(entity, principal, ct);
+        SchemataProcessToken? token;
+        using (tokens.SuppressQuerySoftDelete()) {
+            token = await tokens.SingleOrDefaultAsync(
+                q => q.Where(t => t.CanonicalName == name), ct);
+        }
+
+        if (token is null) {
+            throw SchemataResourceErrors.NotFound<SchemataProcessToken>(name);
+        }
+
+        return await dispatcher.SendAsync<CancelProcessTokenRequest, ProcessSnapshot>(
+            new($"processes/{token.Process}", name, request.Principal), ct);
     }
-
-    #endregion
 }

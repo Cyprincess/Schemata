@@ -77,18 +77,20 @@ for a hard delete; gRPC returns the detail message or `google.protobuf.Empty`.
 `SchemataResourceFeature.RegisterResource` adds Schemata's `undelete`, `expunge`, and `purge` custom methods to
 every `ISoftDelete` resource. AIP-164 says a soft-deletable resource should provide `Undelete` and may provide
 `Expunge`; AIP-165 specifies the criteria-based `Purge` operation. Each method is skipped when the `Operations`
-whitelist excludes it or the entity already declares the same verb.
+whitelist excludes it or the entity already declares the same verb. The built-in handlers are
+`IRequestHandler<TRequest, TResponse>` implementations registered in DI as scoped — the same dispatcher
+pipeline that carries every other command or query reaches them.
 
-| Method      | Route                                   | Handler                             | Behavior                                                                                                                                                                                                                                                                                                                                                                             |
-| ----------- | --------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `:undelete` | `POST /v1/{collection}/{name}:undelete` | `UndeleteHandler<TEntity, TDetail>` | Clears `DeleteTime` and `PurgeTime`, returns the restored detail; a live resource throws `AlreadyExistsException`                                                                                                                                                                                                                                                                      |
-| `:expunge`  | `POST /v1/{collection}/{name}:expunge`  | `ExpungeHandler<TEntity>`           | Physically removes a tombstoned resource under `SuppressSoftDelete()`, returns `EmptyResourceResponse`; a live resource throws `FailedPreconditionException`                                                                                                                                                                                                                         |
-| `:purge`    | `POST /v1/{collection}:purge`           | `PurgeHandler<TEntity>`             | Collection-scoped AIP-165 purge dispatched through `IScheduler` as a `PurgeJob<TEntity>` long-running operation; the open-generic job and its `PurgeJobKeyResolver` (mapping the stable `purge:{collection}` key back to the closed type after a restart) are registered by the resource feature, and the handler throws `InvalidOperationException` when no scheduler is registered |
+| Method      | Route                                   | Request DTO / handler                                                                                                                                                                                                                                                                                                                                                |
+| ----------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `:undelete` | `POST /v1/{collection}/{name}:undelete` | `UndeleteResourceRequest<TEntity, TDetail>` : `ICommand<TDetail>`, `ICanonicalName`, `IRequestPrincipal` — handled by `UndeleteHandler<TEntity, TDetail> : IRequestHandler<UndeleteResourceRequest<TEntity, TDetail>, TDetail>`. Clears `DeleteTime` and `PurgeTime`, returns the restored detail; a live resource throws `AlreadyExistsException` |
+| `:expunge`  | `POST /v1/{collection}/{name}:expunge`  | `ExpungeResourceRequest<TEntity>` : `ICommand<EmptyResourceResponse>`, `ICanonicalName`, `IRequestPrincipal` — handled by `ExpungeHandler<TEntity> : IRequestHandler<ExpungeResourceRequest<TEntity>, EmptyResourceResponse>`. Physically removes a tombstoned resource under `SuppressSoftDelete()`; a live resource throws `FailedPreconditionException` |
+| `:purge`    | `POST /v1/{collection}:purge`           | `PurgeResourceRequest<TEntity>` : `ICommand<Operation>`, `IRequestPrincipal` — handled by `PurgeHandler<TEntity> : IRequestHandler<PurgeResourceRequest<TEntity>, Operation>`. Collection-scoped AIP-165 purge triggered through `IScheduler` as the restart-durable `PurgeJob<TEntity>` long-running operation; the open-generic job and its `PurgeJobKeyResolver` (mapping the stable `purge:{collection}` key back to the closed type after a restart) are registered by the resource feature. |
 
-`PurgeRequest.Parent` narrows the purge to the child collection of one parent resource (applied through
-`ResourceIdentifiers.ApplyParent`). `PurgeRequest.Force = false` runs a preview: the job reports
-`PurgeCount` plus a sample of up to 100 matching canonical names and expunges nothing; `Force = true`
-permanently removes every soft-deleted row matching the filter.
+`PurgeResourceRequest<TEntity>.Parent` narrows the purge to the child collection of one parent resource (applied
+through `ResourceIdentifiers.ApplyParent`). `PurgeResourceRequest<TEntity>.Force = false` runs a preview: the job
+reports `PurgeCount` plus a sample of up to 100 matching canonical names and expunges nothing;
+`Force = true` permanently removes every soft-deleted row matching the filter.
 
 ## Extension points
 

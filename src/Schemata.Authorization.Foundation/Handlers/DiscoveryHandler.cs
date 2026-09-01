@@ -67,6 +67,7 @@ public sealed class DiscoveryHandler<TScope>(
         };
 
         var ctx = new AdviceContext(sp);
+        using var _ = AdviceContext.Establish(ctx);
         var discovery = new DiscoveryContext {
             Issuer                           = issuer,
             Document                         = document,

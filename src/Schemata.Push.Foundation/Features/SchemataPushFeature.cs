@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
@@ -19,7 +18,7 @@ namespace Schemata.Push.Foundation.Features;
 public sealed class SchemataPushFeature : FeatureBase
 {
     /// <summary>Default <see cref="FeatureBase.Priority" /> for the Push feature.</summary>
-    public const int DefaultPriority = SchemataConstants.Orders.Extension + 100_000_000;
+    public const int DefaultPriority = SchemataConstants.Orders.Extension + 120_000_000;
 
     public override int Priority => DefaultPriority;
 
@@ -30,7 +29,6 @@ public sealed class SchemataPushFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        services.TryAddScoped<IPushService, DefaultPushService>();
-        services.TryAddScoped<IPushSubscriptionManager, DefaultPushSubscriptionManager>();
+        services.AddSchemataPush();
     }
 }

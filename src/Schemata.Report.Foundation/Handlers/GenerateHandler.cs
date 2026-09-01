@@ -1,5 +1,4 @@
 using System;
-using System.Security.Claims;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -7,6 +6,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Messaging.Skeleton;
+using Schemata.Report.Foundation.Commands;
 using Schemata.Report.Foundation.Internal;
 using Schemata.Report.Skeleton;
 using Schemata.Scheduling.Skeleton;
@@ -14,23 +15,17 @@ using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Report.Foundation;
 
-/// <summary>Generates a report through the collection-scoped AIP-136 resource method.</summary>
-/// <typeparam name="TReport">The report-definition entity type.</typeparam>
-public sealed class GenerateHandler<TReport>(
-    IReportService         reports,
+/// <summary>Handles the AIP-136 report generation request through the Report command pipeline.</summary>
+public sealed class GenerateHandler<TReport, TSnapshot, TChunk>(
+    IRequestDispatcher     dispatcher,
     ReportExecutionContext execution,
     IServiceProvider       services
-) : IResourceMethodHandler<TReport, GenerateReportRequest, Operation>
-    where TReport : SchemataReport
+) : IRequestHandler<GenerateReportRequest, Operation>
+    where TReport : SchemataReport, new()
+    where TSnapshot : SchemataReportSnapshot, new()
+    where TChunk : SchemataReportSnapshotChunk, new()
 {
-    /// <inheritdoc />
-    public async ValueTask<Operation> InvokeAsync(
-        string?                name,
-        GenerateReportRequest  request,
-        TReport?               entity,
-        ClaimsPrincipal?       principal,
-        CancellationToken      ct
-    ) {
+    public async Task<Operation> HandleAsync(GenerateReportRequest request, CancellationToken ct = default) {
         ArgumentNullException.ThrowIfNull(request);
         Validate(request);
         var operationService = services.GetService<IOperationService>()
@@ -41,13 +36,22 @@ public sealed class GenerateHandler<TReport>(
             Persist = request.Persist,
         };
         if (!request.Sync) {
-            return await reports.GenerateAsync(reportRequest, ct);
+            var scheduler = services.GetService<IScheduler>()
+                            ?? throw new FailedPreconditionException(message: "Report generation requires a scheduler.");
+            var context = new JobContext {
+                ExecutionUid = Identifiers.NewUid(),
+                Method       = Verbs.Generate,
+                ArgsJson     = JsonSerializer.Serialize(reportRequest, SchemataJson.Default),
+            };
+            var scheduled = await scheduler.TriggerAsync<ReportGenerationJob<TReport, TSnapshot, TChunk>>(context, ct);
+            return OperationMapper.FromExecution(scheduled);
         }
 
         var uid = Identifiers.NewUid();
-        execution.Operation = $"operations/{uid:n}";
         try {
-            var result = await reports.RunAsync(reportRequest, principal, ct);
+            execution.Operation = $"operations/{uid:n}";
+            var result = await dispatcher.SendAsync<RunReportRequest, ReportResult>(
+                new(reportRequest, request.Principal), ct);
             return await operationService.CreateTerminalAsync(
                        Verbs.Generate,
                        JsonSerializer.Serialize(Output(result), SchemataJson.Default),

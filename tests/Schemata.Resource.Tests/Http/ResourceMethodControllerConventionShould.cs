@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
+using Schemata.Messaging.Skeleton;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Http;
 using Xunit;
@@ -37,7 +38,7 @@ public class ResourceMethodControllerConventionShould
         var convention = new ResourceMethodControllerConvention(
             Registry(new ResourceMethodAttribute("run", typeof(HandlerB))));
 
-        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
+        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB>).GetTypeInfo();
         var model          = BuildController(controllerType);
 
         convention.Apply(model);
@@ -54,7 +55,7 @@ public class ResourceMethodControllerConventionShould
                 new ResourceMethodAttribute("archive", typeof(HandlerB)),
                 new ResourceMethodAttribute("restore", typeof(HandlerB))));
 
-        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
+        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB>).GetTypeInfo();
         var model          = BuildController(controllerType);
 
         convention.Apply(model);
@@ -73,7 +74,7 @@ public class ResourceMethodControllerConventionShould
         var convention = new ResourceMethodControllerConvention(
             Registry(new ResourceMethodAttribute("batchCreate", typeof(HandlerB), ResourceMethodScope.Collection)));
 
-        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
+        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB>).GetTypeInfo();
         var model          = BuildController(controllerType);
 
         convention.Apply(model);
@@ -88,7 +89,7 @@ public class ResourceMethodControllerConventionShould
         var convention = new ResourceMethodControllerConvention(
             Registry(new ResourceMethodAttribute("run", typeof(HandlerB))));
 
-        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
+        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB>).GetTypeInfo();
         var model          = BuildController(controllerType);
 
         convention.Apply(model);
@@ -101,7 +102,7 @@ public class ResourceMethodControllerConventionShould
     public void SkipWhenMethodNotRegistered_ForHandlerType() {
         var convention = new ResourceMethodControllerConvention(Registry());
 
-        var controllerType  = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
+        var controllerType  = typeof(ResourceMethodController<EntityB, RequestB, ResponseB>).GetTypeInfo();
         var model           = BuildController(controllerType);
         var initialTemplate = model.Selectors[0].AttributeRouteModel!.Template;
         var initialAction   = model.Actions[0].ActionName;
@@ -117,7 +118,7 @@ public class ResourceMethodControllerConventionShould
         var convention = new ResourceMethodControllerConvention(
             Registry(new ResourceMethodAttribute("preview", typeof(HandlerB)) { Method = ResourceHttpMethod.Get }));
 
-        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
+        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB>).GetTypeInfo();
         var model          = BuildController(controllerType, true);
         model.Actions[0].Selectors[0].ActionConstraints.Add(new HttpMethodActionConstraint(["POST"]));
 
@@ -136,7 +137,7 @@ public class ResourceMethodControllerConventionShould
         var convention = new ResourceMethodControllerConvention(
             Registry(new ResourceMethodAttribute("run", typeof(HandlerB))));
 
-        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
+        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB>).GetTypeInfo();
         var model          = BuildController(controllerType, true);
         model.Actions[0].Selectors[0].ActionConstraints.Add(new HttpMethodActionConstraint(["POST"]));
 
@@ -157,7 +158,7 @@ public class ResourceMethodControllerConventionShould
                      [new ResourceMethodAttribute("run", typeof(HandlerB))]);
         var convention = new ResourceMethodControllerConvention(registry, "GlobalScheme");
 
-        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
+        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB>).GetTypeInfo();
         var model          = BuildController(controllerType);
 
         convention.Apply(model);
@@ -171,7 +172,7 @@ public class ResourceMethodControllerConventionShould
         var convention = new ResourceMethodControllerConvention(
             Registry(new ResourceMethodAttribute("run", typeof(HandlerB))), "GlobalScheme");
 
-        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
+        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB>).GetTypeInfo();
         var model          = BuildController(controllerType);
 
         convention.Apply(model);
@@ -185,7 +186,7 @@ public class ResourceMethodControllerConventionShould
         var convention = new ResourceMethodControllerConvention(
             Registry(new ResourceMethodAttribute("run", typeof(HandlerB))));
 
-        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB, HandlerB>).GetTypeInfo();
+        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB>).GetTypeInfo();
         var model          = BuildController(controllerType);
 
         convention.Apply(model);
@@ -243,35 +244,25 @@ public class ResourceMethodControllerConventionShould
 
     #region Nested type: HandlerB
 
-    public sealed class HandlerB : IResourceMethodHandler<EntityB, RequestB, ResponseB>
+    public sealed class HandlerB : IRequestHandler<RequestB, ResponseB>
     {
-        #region IResourceMethodHandler<EntityB,RequestB,ResponseB> Members
-
-        public ValueTask<ResponseB> InvokeAsync(
-            string?           name,
-            RequestB          request,
-            EntityB?          entity,
-            ClaimsPrincipal?  principal,
-            CancellationToken ct
+        public Task<ResponseB> HandleAsync(
+            RequestB        request,
+            CancellationToken ct = default
         ) {
-            return ValueTask.FromResult(new ResponseB());
+            return Task.FromResult(new ResponseB());
         }
-
-        #endregion
     }
 
     #endregion
 
     #region Nested type: RequestB
 
-    public sealed class RequestB : ICanonicalName
+    public sealed class RequestB : IRequest<ResponseB>, IRequestPrincipal, ICanonicalName
     {
-        #region ICanonicalName Members
-
-        public string? Name          { get; set; }
-        public string? CanonicalName { get; set; }
-
-        #endregion
+        public string?           Name          { get; set; }
+        public string?           CanonicalName { get; set; }
+        public ClaimsPrincipal? Principal { get; set; }
     }
 
     #endregion

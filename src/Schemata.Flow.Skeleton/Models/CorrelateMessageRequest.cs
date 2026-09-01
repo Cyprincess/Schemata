@@ -1,9 +1,12 @@
+using System.Security.Claims;
+using System.Text.Json.Serialization;
 using Schemata.Abstractions.Entities;
+using Schemata.Messaging.Skeleton;
 
 namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>Request body for correlating a message to a process instance.</summary>
-public sealed class CorrelateMessageRequest : ICanonicalName
+public sealed class CorrelateMessageRequest : ICanonicalName, ICommand<ProcessSnapshot>, IRequestPrincipal
 {
     /// <summary>The <see cref="Models.Message.Name" /> of the message definition to correlate.</summary>
     public string MessageName { get; set; } = null!;
@@ -23,6 +26,13 @@ public sealed class CorrelateMessageRequest : ICanonicalName
     public string? Name { get; set; }
 
     public string? CanonicalName { get; set; }
+
+    #endregion
+
+    #region IRequestPrincipal Members
+
+    [JsonIgnore]
+    public ClaimsPrincipal? Principal { get; set; }
 
     #endregion
 }

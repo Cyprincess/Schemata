@@ -19,7 +19,7 @@ surface.
 
 `UseInsight()` on `SchemataBuilder` activates
 `Schemata.Insight.Foundation.Features.SchemataInsightFeature` (Priority
-`Orders.Extension + 95_000_000` = 495,000,000) and returns a `SchemataInsightBuilder`:
+`Orders.Extension + 110_000_000` = 510,000,000) and returns a `SchemataInsightBuilder`:
 
 ```csharp
 using Microsoft.AspNetCore.Builder;
@@ -50,7 +50,8 @@ builder.UseSchemata(schema => {
 `SchemataInsightFeature.ConfigureServices` registers:
 
 1. `InMemoryInsightSourceCatalog` as an `IInsightSourceCatalog` singleton.
-2. `InsightPlanBuilder`, `LocalPipelineExecutor`, and `PlanExecutor` as singletons.
+2. `InsightPlanBuilder` and `LocalPipelineExecutor` as singletons; `PlanExecutor` as scoped, so its
+   per-source `IInsightSourceAdvisor` resolution runs against the calling request's own scope.
 3. `DefaultInsightService` as `IInsightService` (singleton, `TryAdd`).
 
 The feature registers the in-memory catalog from `SchemataInsightOptions.Sources`. Calling
@@ -123,13 +124,31 @@ and `IEntitlementProvider<TEntity, QueryInsightRequest>` from the container:
 `RepositoryDriver` applies the entitlement expression before filter pushdown so row security remains in
 the backend query when the provider returns an expression.
 
+## Internal command dispatch
+
+`QueryInsightRequest : IInsightQuery<QueryInsightResponse>`, and `IInsightQuery<TResult> : IQuery<TResult>`
+(`Schemata.Messaging.Skeleton`) — a query is dispatched, not called directly. `DefaultInsightService.QueryAsync`
+(the `IInsightService` facade), `InsightController.QueryAsync` (HTTP), and `InsightGrpcService.QueryAsync`
+(gRPC) each resolve `IRequestDispatcher` and call `SendAsync<QueryInsightRequest, QueryInsightResponse>` —
+the facade is not a special path the transports route through; all three are independent dispatcher callers
+sending the same request type. `DefaultQueryInsightHandler`, registered as
+`IRequestHandler<QueryInsightRequest, QueryInsightResponse>` (keyed `InsightConstants.Handlers.Default`, with
+an unkeyed alias), is the sole handler: it runs `IInsightRequestAdvisor` before planning,
+`IInsightPlanAdvisor` over the built plan, `PlanExecutor.ExecuteAsync`, then `IInsightResponseAdvisor` over
+the response — the four Insight-specific advisor contracts, distinct from the dispatcher-level
+`IQueryAdvisor<QueryInsightRequest>` chain described below.
+
+Because every entry dispatches the same request, a registered `IQueryAdvisor<QueryInsightRequest>`
+(`Schemata.Messaging.Skeleton.Advisors`) runs before `DefaultQueryInsightHandler` regardless of which entry
+point was called. See [Messaging](../messaging/overview.md) for the dispatcher, the advisor chains, and the
+ambient `AdviceContext` rules.
+
 ## Feature priority table
 
 | Feature                      | Priority    |
-| ---------------------------- | ----------- |
-| `SchemataInsightFeature`     | 495,000,000 |
-| `SchemataInsightHttpFeature` | 495,100,000 |
-| `SchemataInsightGrpcFeature` | 495,200,000 |
+| `SchemataInsightFeature`     | 510,000,000 |
+| `SchemataInsightHttpFeature` | 510,100,000 |
+| `SchemataInsightGrpcFeature` | 510,200,000 |
 
 ## Extension points
 

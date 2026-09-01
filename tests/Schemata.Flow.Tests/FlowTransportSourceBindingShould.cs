@@ -16,10 +16,13 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Foundation;
+using Schemata.Flow.Foundation.Commands;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
 using Schemata.Flow.Skeleton.Runtime;
+using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Advisors;
 using Xunit;
 
 namespace Schemata.Flow.Tests;
@@ -28,10 +31,11 @@ public class FlowTransportSourceBindingShould
 {
     [Fact]
     public async Task Start_Loads_Source_Entity_And_Persists_Binding() {
-        var harness = new Harness();
-        var handler = new FlowStartProcessHandler(harness.Runner, new(harness.Resolver.Object, harness.Registry.Object, harness.Services));
+        var harness   = new Harness();
+        var principal = Mock.Of<ClaimsPrincipal>();
 
-        var process = await handler.InvokeAsync(null, Request(), null, Mock.Of<ClaimsPrincipal>(), CancellationToken.None);
+        var process = await harness.StartHandler.HandleAsync(
+            Request(principal), CancellationToken.None);
 
         Assert.Equal("approval", process.DefinitionName);
         var source = Assert.Single(harness.Sources);
@@ -40,33 +44,31 @@ public class FlowTransportSourceBindingShould
         Assert.Equal(typeof(Order).FullName, source.SourceType);
         Assert.Equal("orders/o1", source.Source);
         Assert.Equal(harness.Order.Timestamp, source.SourceTimestamp);
+        Assert.Same(principal, harness.StartPrincipalAdvisor.Principal);
     }
 
     [Fact]
     public async Task Start_Returns_NotFound_When_Source_Name_Does_Not_Resolve() {
         var harness = new Harness(false);
-        var handler = new FlowStartProcessHandler(harness.Runner, new(harness.Resolver.Object, harness.Registry.Object, harness.Services));
 
         await Assert.ThrowsAsync<NotFoundException>(() =>
-            handler.InvokeAsync(null, Request(), null, Mock.Of<ClaimsPrincipal>(), CancellationToken.None).AsTask());
+            harness.StartHandler.HandleAsync(Request(Mock.Of<ClaimsPrincipal>()), CancellationToken.None));
     }
 
     [Fact]
     public async Task Start_Returns_NotFound_When_Source_Type_Is_Not_Registered() {
         var harness = new Harness(resolvedType: typeof(Customer));
-        var handler = new FlowStartProcessHandler(harness.Runner, new(harness.Resolver.Object, harness.Registry.Object, harness.Services));
 
         await Assert.ThrowsAsync<NotFoundException>(() =>
-            handler.InvokeAsync(null, Request(), null, Mock.Of<ClaimsPrincipal>(), CancellationToken.None).AsTask());
+            harness.StartHandler.HandleAsync(Request(Mock.Of<ClaimsPrincipal>()), CancellationToken.None));
     }
 
     [Fact]
     public async Task Start_Fails_When_Resolved_Source_Repository_Is_Not_Registered() {
         var harness = new Harness(registerOrderRepository: false);
-        var handler = new FlowStartProcessHandler(harness.Runner, new(harness.Resolver.Object, harness.Registry.Object, harness.Services));
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            handler.InvokeAsync(null, Request(), null, Mock.Of<ClaimsPrincipal>(), CancellationToken.None).AsTask());
+            harness.StartHandler.HandleAsync(Request(Mock.Of<ClaimsPrincipal>()), CancellationToken.None));
 
         Assert.Contains(nameof(IRepository<Order>), exception.Message);
     }
@@ -123,8 +125,8 @@ public class FlowTransportSourceBindingShould
         Assert.Contains(nameof(IRepository<Order>), exception.Message);
     }
 
-    private static StartProcessInstanceRequest Request() {
-        return new() { DefinitionName = "approval", Source = "orders/o1" };
+    private static StartProcessInstanceRequest Request(ClaimsPrincipal? principal = null) {
+        return new() { DefinitionName = "approval", Source = "orders/o1", Principal = principal };
     }
 
     private sealed class Harness
@@ -143,7 +145,10 @@ public class FlowTransportSourceBindingShould
             Resolver.Setup(r => r.Resolve("orders/o1")).Returns(resolveSource ? resolvedType ?? typeof(Order) : null);
             Registry = RegistryMock(sourceTypes);
 
-            var services = new ServiceCollection();
+            var services = new ServiceCollection()
+                          .AddLogging()
+                          .AddSingleton(Registry.Object)
+                          .AddSingleton<IOptions<SchemataFlowOptions>>(Options.Create(new SchemataFlowOptions()));
             if (registerOrderRepository) {
                 services.AddSingleton(Repository([Order]).Object);
             }
@@ -155,12 +160,16 @@ public class FlowTransportSourceBindingShould
             if (sourceAdvisor is not null) {
                 services.AddSingleton(sourceAdvisor);
             }
+            StartPrincipalAdvisor = new();
+            services.AddSingleton<ICommandAdvisor<StartProcessRequest>>(StartPrincipalAdvisor);
 
             services.AddKeyedSingleton<IFlowRuntime>("StateMachine", runtime ?? DefaultRuntime());
+            services.AddSchemataFlow();
             Services = services.BuildServiceProvider();
-            Runner = new(Registry.Object, new(), Notifier(), Services,
-                         Services.GetRequiredService<IServiceScopeFactory>(),
-                         Options.Create(new SchemataFlowOptions()));
+            Runner = Services.GetRequiredService<FlowRunner>();
+            StartHandler = new(
+                Services.GetRequiredService<IRequestDispatcher>(),
+                new(Resolver.Object, Registry.Object, Services));
         }
 
         public Order Order { get; }
@@ -174,6 +183,26 @@ public class FlowTransportSourceBindingShould
         public IServiceProvider Services { get; }
 
         public FlowRunner Runner { get; }
+        public RecordingStartPrincipalAdvisor StartPrincipalAdvisor { get; }
+
+
+        public FlowStartProcessHandler StartHandler { get; }
+    }
+
+    private sealed class RecordingStartPrincipalAdvisor : ICommandAdvisor<StartProcessRequest>
+    {
+        public int Order => 0;
+
+        public ClaimsPrincipal? Principal { get; private set; }
+
+        public Task<AdviseResult> AdviseAsync(
+            AdviceContext       ctx,
+            StartProcessRequest request,
+            CancellationToken   ct = default
+        ) {
+            Principal = request.Principal;
+            return Task.FromResult(AdviseResult.Continue);
+        }
     }
 
     private static Mock<IProcessRegistry> RegistryMock(IReadOnlyDictionary<string, FlowSourceDescriptor>? sourceTypes = null) {

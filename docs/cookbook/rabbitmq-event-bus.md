@@ -4,7 +4,11 @@
 
 A Schemata application that publishes an `OrderPlaced` event to RabbitMQ, consumes it in a handler,
 dead-letters poison messages, and performs a synchronous request/reply over the same broker. By the
-end you'll have a producer, a consumer host, DLX topology, and a typed `SendAsync` call.
+end you'll have a producer, a consumer host, DLX topology, and a typed request dispatcher.
+
+Events and request/reply are **two packages**: `Schemata.Event.RabbitMq` broadcasts, and
+`Schemata.Messaging.RabbitMq` does request/reply. They share the one broker connection from
+`Schemata.Transport.RabbitMq`.
 
 ## Prerequisites
 
@@ -17,6 +21,7 @@ end you'll have a producer, a consumer host, DLX topology, and a typed `SendAsyn
 
 ```csharp
 using Schemata.Event.Skeleton;
+using Schemata.Messaging.Skeleton;
 
 public sealed class OrderPlaced : IEvent
 {
@@ -36,8 +41,10 @@ public sealed class PriceResult
 }
 ```
 
-Fire-and-forget types implement `IEvent`; request/reply types implement `IRequest<TResponse>`. The
-CLR type name is never the routing key; assign the wire name in Step 2.
+Fire-and-forget types implement `IEvent` from `Schemata.Event.Skeleton`; request/reply types
+implement `IRequest<TResponse>` from `Schemata.Messaging.Skeleton`, which is a separate package so
+that request/reply carries no dependency on the event domain. The CLR type name is never the routing
+key; the event gets its wire name in Step 2, the request in Step 6.
 
 **Assertion:** the project compiles with no errors referencing `IEvent` or `IRequest<>`.
 
@@ -47,8 +54,6 @@ CLR type name is never the routing key; assign the wire name in Step 2.
 builder.UseSchemata(schema => {
     schema.UseEvent()
           .RegisterEvent<OrderPlaced>("orders/order-placed")
-          .RegisterEvent<PriceQuery>("orders/price-query")
-          .RegisterEvent<PriceResult>("orders/price-result")
           .UseProducer(p => p.UseRabbitMq(o => {
               o.ExchangeName       = "schemata.events";
               o.DeadLetterExchange = "schemata.events.dlx";
@@ -56,14 +61,13 @@ builder.UseSchemata(schema => {
               c.HostName = "localhost";
           }))
           .UseConsumer(c => c.UseRabbitMq())
-          .UseHandler<OrderPlaced, OrderPlacedHandler>()
-          .UseHandler<PriceQuery, PriceResult, PriceQueryHandler>();
+       .UseHandler<OrderPlaced, OrderPlacedHandler>();
 });
 ```
 
-`RegisterEvent<T>(name)` binds the CLR type to a wire name in `IEventTypeRegistry`. A request/reply
-pair needs all three types registered: the request, the response, and any broadcast event the
-consumer receives.
+`RegisterEvent<T>(name)` binds the CLR type to a wire name in `IEventTypeRegistry`. It covers
+broadcast events only — `PriceQuery` and `PriceResult` are never registered here, because the
+request dispatcher keeps its own registry (Step 6).
 
 `UseRabbitMq()` on the producer registers `RabbitMqEventBus` as a scoped `IEventBus` and
 `RabbitMqEventOutboxPublisher` as the outbox publisher. On the consumer it registers
@@ -77,6 +81,7 @@ topology (`RabbitMqEventOptions`), the second the connection (`RabbitMqConnectio
 
 ```csharp
 using Schemata.Event.Skeleton;
+using Schemata.Messaging.Skeleton;
 
 public sealed class OrderPlacedHandler : IEventHandler<OrderPlaced>
 {
@@ -98,8 +103,9 @@ public sealed class PriceQueryHandler : IRequestHandler<PriceQuery, PriceResult>
 }
 ```
 
-`IEventHandler<T>` handles fire-and-forget events; `IRequestHandler<TRequest, TResponse>` handles
-request/reply. Only one request handler per request type may be registered.
+`IEventHandler<T>` (`Schemata.Event.Skeleton`) handles fire-and-forget events;
+`IRequestHandler<TRequest, TResponse>` (`Schemata.Messaging.Skeleton`) handles request/reply. Only
+one request handler per request type may be registered.
 
 **Assertion:** both handler classes compile and their `HandleAsync` methods are reachable.
 
@@ -124,7 +130,8 @@ public sealed class OrdersController : ControllerBase
 
 `PublishAsync` records the event as a `Pending` outbox row and returns. The `EventOutboxDispatcher`
 replays the row through `RabbitMqEventOutboxPublisher`, which opens a publisher-confirm channel,
-serializes the payload, and publishes with `DeliveryModes.Persistent`. The publish completes only
+serializes the payload, and publishes with `BasicProperties.DeliveryMode = DeliveryModes.Persistent`.
+The publish completes only
 after the broker confirms receipt, then the row is marked delivered.
 
 **Assertion:** `POST /orders` returns `202 Accepted` and the management UI shows one message on
@@ -152,24 +159,35 @@ exchange receives one message.
 
 ## Step 6: Perform a request/reply call
 
+Request/reply is **not** on the event bus. It is a separate package, `Schemata.Messaging.RabbitMq`,
+sharing the same broker connection:
+
+```csharp
+schema.ConfigureServices(services =>
+    services.AddRabbitMqRequestDispatcher(options => {
+        options.QueueName = "pricing";                       // omit on a send-only process
+        options.Register<PriceQuery, PriceResult>("pricing.quote");
+    }));
+```
+
 ```csharp
 [HttpGet("price/{productId}")]
 public async Task<IActionResult> GetPrice(string productId, CancellationToken ct)
 {
-    var result = await _bus.SendAsync<PriceQuery, PriceResult>(
+    var result = await _dispatcher.SendAsync<PriceQuery, PriceResult>(
         new PriceQuery { ProductId = productId }, ct);
     return Ok(result);
 }
 ```
 
-`SendAsync` opens a private exclusive auto-delete reply queue named `reply.<guid>` per
-`RabbitMqEventBus`, publishes the request with `ReplyTo` and a tracker `CorrelationId`, and awaits a
-`TaskCompletionSource<TResponse>` held by `CorrelationTracker`. The consumer host detects `ReplyTo`,
-invokes `PriceQueryHandler`, and publishes the response back. The tracker matches by correlation id
-and completes the task. Unlike `PublishAsync`, `SendAsync` runs synchronously over the broker rather
-than through the outbox.
+`IRequestDispatcher.SendAsync` opens a private exclusive auto-delete reply queue named
+`reply.<guid>` per dispatcher, publishes the request with `ReplyTo` and a tracker `CorrelationId`,
+and awaits a `TaskCompletionSource<TResponse>` held by `CorrelationTracker`. The consumer host
+resolves `IRequestHandler<PriceQuery, PriceResult>`, invokes it, and publishes the response straight
+back to the reply queue. Unlike `PublishAsync`, this runs synchronously over the broker rather than
+through the outbox.
 
-The timeout is `RabbitMqEventOptions.RequestTimeoutMs` (default 30,000 ms); on timeout the tracker
+The timeout is `RabbitMqRequestOptions.RequestTimeoutMs` (default 30,000 ms); on timeout the tracker
 faults the task with `TimeoutException`.
 
 **Assertion:** `GET /price/widget-1` returns `{"price":9.99}` within the timeout window.
@@ -184,12 +202,18 @@ still gets its own connection on first use — inject `IEventBus` into long-live
 (controllers, background workers) so short-lived scopes don't each pay the connect cost.
 
 **Single handler per request type.** Registering a second `IRequestHandler<TRequest, TResponse>` for
-the same pair makes the resolver throw at dispatch ("Multiple request handlers registered"). For
-fan-out, use `IEventHandler<T>` with a fire-and-forget event.
+the same pair makes the dispatcher throw ("Multiple request handlers registered"). For fan-out, use
+`IEventHandler<T>` with a fire-and-forget event.
 
-**All three types in a req/reply pair must be registered.** `SendAsync` calls `RequireName` on both
-the request and the response type. Either missing throws `InvalidOperationException` at the call, not
-at startup.
+**The request type must carry a registered wire name.** `Register<TRequest, TResponse>(name)` in
+`AddRabbitMqRequestDispatcher` is mandatory — a CLR type name never travels on the wire. Sending an
+unregistered request throws `InvalidOperationException` at the call, naming the type. Note the
+response type needs **no** name: replies go straight to the caller's exclusive reply queue, matched
+by correlation id.
+
+**Events and requests use separate registries.** `RegisterEvent<T>(name)` covers the bus;
+`Register<TRequest, TResponse>(name)` covers the request dispatcher. Registering a request as an
+event does not make it dispatchable, and vice versa.
 
 **DLX exchange must exist before the queue is declared.** `RabbitMqConsumerHost` declares the DLX
 exchange and binds the queue in `ExecuteAsync`. If the broker already has the queue without

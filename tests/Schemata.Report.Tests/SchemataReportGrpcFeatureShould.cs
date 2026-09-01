@@ -1,8 +1,9 @@
 using System;
 using System.Linq;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Resource;
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Messaging.Skeleton;
 using Schemata.Common;
 using Schemata.Core;
 using Schemata.Report.Foundation;
@@ -39,7 +40,7 @@ public class SchemataReportGrpcFeatureShould
 
         var generate = Assert.Single(registry.GetMethods(typeof(SchemataReport)));
         Assert.Equal(Verbs.Generate, generate.Verb);
-        Assert.Equal(typeof(GenerateHandler<SchemataReport>), generate.Handler);
+        Assert.Equal(typeof(GenerateHandler<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>), generate.Handler);
         Assert.Equal(ResourceMethodScope.Collection, generate.Scope);
         Assert.Equal(typeof(Operation), ResponseType(generate.Handler));
         Assert.Equal("GenerateReport", GrpcResourceNaming.CustomMethodName(ResourceNameDescriptor.ForType(typeof(SchemataReport)), generate.Verb));
@@ -66,7 +67,7 @@ public class SchemataReportGrpcFeatureShould
 
     private static Type ResponseType(Type handler) {
         return handler.GetInterfaces()
-                      .Single(type => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IResourceMethodHandler<,,>))
-                      .GetGenericArguments()[2];
+                      .Single(type => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IRequestHandler<,>))
+                      .GetGenericArguments()[1];
     }
 }

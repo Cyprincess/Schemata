@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
+using Schemata.Messaging.Skeleton;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Http;
 using Xunit;
@@ -37,13 +38,12 @@ public class ResourceMethodControllerFeatureProviderShould
 
         var controller = Assert.Single(feature.Controllers);
         Assert.True(controller.IsGenericType);
-        Assert.Equal(typeof(ResourceMethodController<,,,>), controller.GetGenericTypeDefinition());
+        Assert.Equal(typeof(ResourceMethodController<,,>), controller.GetGenericTypeDefinition());
 
         var args = controller.GetGenericArguments();
         Assert.Equal(typeof(EntityA), args[0]);
         Assert.Equal(typeof(RequestA), args[1]);
         Assert.Equal(typeof(ResponseA), args[2]);
-        Assert.Equal(typeof(HandlerA), args[3]);
     }
 
     [Fact]
@@ -73,8 +73,8 @@ public class ResourceMethodControllerFeatureProviderShould
         provider.PopulateFeature([], feature);
 
         Assert.Equal(2, feature.Controllers.Count);
-        Assert.Contains(feature.Controllers, c => c.GetGenericArguments()[3] == typeof(HandlerA));
-        Assert.Contains(feature.Controllers, c => c.GetGenericArguments()[3] == typeof(HandlerB));
+        Assert.Contains(feature.Controllers, controller => controller.GetGenericArguments()[1] == typeof(RequestA));
+        Assert.Contains(feature.Controllers, controller => controller.GetGenericArguments()[1] == typeof(RequestB));
     }
 
     [Fact]
@@ -114,56 +114,50 @@ public class ResourceMethodControllerFeatureProviderShould
 
     #region Nested type: HandlerA
 
-    public sealed class HandlerA : IResourceMethodHandler<EntityA, RequestA, ResponseA>
+    public sealed class HandlerA : IRequestHandler<RequestA, ResponseA>
     {
-        #region IResourceMethodHandler<EntityA,RequestA,ResponseA> Members
-
-        public ValueTask<ResponseA> InvokeAsync(
-            string?           name,
-            RequestA          request,
-            EntityA?          entity,
-            ClaimsPrincipal?  principal,
-            CancellationToken ct
+        public Task<ResponseA> HandleAsync(
+            RequestA        request,
+            CancellationToken ct = default
         ) {
-            return ValueTask.FromResult(new ResponseA());
+            return Task.FromResult(new ResponseA());
         }
-
-        #endregion
     }
 
     #endregion
 
     #region Nested type: HandlerB
 
-    public sealed class HandlerB : IResourceMethodHandler<EntityA, RequestA, ResponseA>
+    public sealed class HandlerB : IRequestHandler<RequestB, ResponseA>
     {
-        #region IResourceMethodHandler<EntityA,RequestA,ResponseA> Members
-
-        public ValueTask<ResponseA> InvokeAsync(
-            string?           name,
-            RequestA          request,
-            EntityA?          entity,
-            ClaimsPrincipal?  principal,
-            CancellationToken ct
+        public Task<ResponseA> HandleAsync(
+            RequestB        request,
+            CancellationToken ct = default
         ) {
-            return ValueTask.FromResult(new ResponseA());
+            return Task.FromResult(new ResponseA());
         }
-
-        #endregion
     }
 
     #endregion
 
     #region Nested type: RequestA
 
-    public sealed class RequestA : ICanonicalName
+    public sealed class RequestA : IRequest<ResponseA>, IRequestPrincipal, ICanonicalName
     {
-        #region ICanonicalName Members
+        public string?           Name          { get; set; }
+        public string?           CanonicalName { get; set; }
+        public ClaimsPrincipal? Principal { get; set; }
+    }
 
-        public string? Name          { get; set; }
-        public string? CanonicalName { get; set; }
+    #endregion
 
-        #endregion
+    #region Nested type: RequestB
+
+    public sealed class RequestB : IRequest<ResponseA>, IRequestPrincipal, ICanonicalName
+    {
+        public string?          Name          { get; set; }
+        public string?          CanonicalName { get; set; }
+        public ClaimsPrincipal? Principal     { get; set; }
     }
 
     #endregion

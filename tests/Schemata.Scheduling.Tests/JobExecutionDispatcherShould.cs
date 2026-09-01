@@ -8,6 +8,7 @@ using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Common;
 using Schemata.Entity.Repository;
+using Schemata.Messaging.Skeleton;
 using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Foundation.Internal;
 using Schemata.Scheduling.Skeleton;
@@ -88,7 +89,7 @@ public class JobExecutionDispatcherShould
                                                .AddSingleton<IScheduledJobRegistry>(registry)
                                                .AddSingleton(capturing)
                                                .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
-                                               .AddSingleton<IScheduler>(Mock.Of<IScheduler>())
+                                               .AddSchemataScheduling()
                                                .BuildServiceProvider();
 
         var dispatcher = new JobExecutionDispatcher(services);
@@ -110,7 +111,7 @@ public class JobExecutionDispatcherShould
                                                .AddSingleton<IScheduledJobRegistry>(registry)
                                                .AddSingleton<CompletingJob>()
                                                .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
-                                               .AddSingleton<IScheduler>(Mock.Of<IScheduler>())
+                                               .AddSchemataScheduling()
                                                .BuildServiceProvider();
         var dispatcher = new JobExecutionDispatcher(services);
 
@@ -151,7 +152,7 @@ public class JobExecutionDispatcherShould
                                               .AddSingleton<IScheduledJobRegistry>(registry)
                                               .AddSingleton<CompletingJob>()
                                               .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
-                                              .AddSingleton<IScheduler>(Mock.Of<IScheduler>())
+                                              .AddSchemataScheduling()
                                               .BuildServiceProvider();
 
         await new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None);
@@ -214,7 +215,7 @@ public class JobExecutionDispatcherShould
                                                .AddSingleton<IJobExecutionAdvisor>(gate.Object)
                                                .AddSingleton<IJobLifecycleObserver>(observer.Object)
                                                .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
-                                               .AddSingleton<IScheduler>(Mock.Of<IScheduler>())
+                                               .AddSchemataScheduling()
                                                .BuildServiceProvider();
 
         await new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None);
@@ -250,9 +251,10 @@ public class JobExecutionDispatcherShould
     }
 
     [Fact]
-    public async Task DispatchPendingAsync_MissingScheduler_Throws() {
+    public async Task DispatchPendingAsync_MissingRequestDispatcher_Throws() {
         var execution = new SchemataJobExecution {
             Uid       = Identifiers.NewUid(),
+            Job       = "jobs/completing",
             JobKey    = "jobs.completing",
             State     = ExecutionState.Pending,
             StartTime = DateTime.UtcNow.AddMinutes(-1),
@@ -269,7 +271,7 @@ public class JobExecutionDispatcherShould
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None));
 
-        Assert.Contains(nameof(IScheduler), exception.Message);
+        Assert.Contains(nameof(IRequestDispatcher), exception.Message);
     }
 
     private static Mock<IRepository<SchemataJobExecution>> ExecutionRepository(SchemataJobExecution execution) {

@@ -1,40 +1,29 @@
 using System.Collections.Generic;
-using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Common;
-using Schemata.Entity.Repository;
+using Schemata.Abstractions;
+using Schemata.Messaging.Skeleton;
+using Schemata.Push.Foundation.Commands;
 using Schemata.Push.Skeleton;
 using Schemata.Push.Skeleton.Entities;
 
 namespace Schemata.Push.Foundation;
 
-/// <summary>
-///     Repository-backed <see cref="IPushSubscriptionManager" />. A subscription is unique by
-///     <c>(owner, provider, providerKey)</c>; <see cref="AddAsync" /> is idempotent on that triple.
-///     The owner is stored verbatim, so callers may address users, groups, tags, or any principal.
-/// </summary>
-public sealed class DefaultPushSubscriptionManager : IPushSubscriptionManager
+/// <summary>Dispatcher-backed facade for push subscription management.</summary>
+public sealed class DefaultPushSubscriptionManager(IRequestDispatcher dispatcher) : IPushSubscriptionManager
 {
-    private readonly IRepository<SchemataPushSubscription> _subscriptions;
-
-    /// <summary>Initializes the manager over the subscription repository.</summary>
-    /// <param name="subscriptions">The subscription repository.</param>
-    public DefaultPushSubscriptionManager(IRepository<SchemataPushSubscription> subscriptions) {
-        _subscriptions = subscriptions;
-    }
-
-    #region IPushSubscriptionManager Members
-
-    public IAsyncEnumerable<SchemataPushSubscription> GetForOwnerAsync(
-        string            owner,
-        string?           provider = null,
-        CancellationToken ct       = default
+    public async IAsyncEnumerable<SchemataPushSubscription> GetForOwnerAsync(
+        string                                      owner,
+        string?                                     provider = null,
+        [EnumeratorCancellation] CancellationToken ct       = default
     ) {
-        return _subscriptions.ListAsync(
-            q => q.Where(s => s.Owner == owner
-                           && (provider == null || s.Provider == provider)),
-            ct);
+        var subscriptions = await dispatcher.SendAsync<
+            GetPushSubscriptionsQuery,
+            IReadOnlyList<SchemataPushSubscription>>(new(owner, provider), ct);
+        foreach (var subscription in subscriptions) {
+            yield return subscription;
+        }
     }
 
     public async ValueTask<SchemataPushSubscription> AddAsync(
@@ -44,26 +33,9 @@ public sealed class DefaultPushSubscriptionManager : IPushSubscriptionManager
         Dictionary<string, string?>? metadata = null,
         CancellationToken            ct       = default
     ) {
-        var existing = await _subscriptions.SingleOrDefaultAsync(
-            q => q.Where(s => s.Owner == owner && s.Provider == provider && s.ProviderKey == providerKey),
-            ct);
-
-        if (existing is not null) {
-            return existing;
-        }
-
-        var subscription = new SchemataPushSubscription {
-            Uid         = Identifiers.NewUid(),
-            Owner       = owner,
-            Provider    = provider,
-            ProviderKey = providerKey,
-            Metadata    = metadata,
-        };
-
-        await _subscriptions.AddAsync(subscription, ct);
-        await _subscriptions.CommitAsync(ct);
-
-        return subscription;
+        var result = await dispatcher.SendAsync<AddPushSubscriptionRequest, PushSubscriptionResult>(
+            new(owner, provider, providerKey, metadata), ct);
+        return result.ToEntity();
     }
 
     public async ValueTask RemoveAsync(
@@ -72,28 +44,17 @@ public sealed class DefaultPushSubscriptionManager : IPushSubscriptionManager
         string            providerKey,
         CancellationToken ct = default
     ) {
-        var subscription = await _subscriptions.FirstOrDefaultAsync(
-            q => q.Where(s => s.Owner == owner && s.Provider == provider && s.ProviderKey == providerKey),
-            ct);
-
-        if (subscription is null) {
-            return;
-        }
-
-        await _subscriptions.RemoveAsync(subscription, ct);
-        await _subscriptions.CommitAsync(ct);
+        _ = await dispatcher.SendAsync<RemovePushSubscriptionRequest, Unit>(
+            new(owner, provider, providerKey), ct);
     }
 
-    public ValueTask<bool> ExistsAsync(
+    public async ValueTask<bool> ExistsAsync(
         string            owner,
         string            provider,
         string            providerKey,
         CancellationToken ct = default
     ) {
-        return _subscriptions.AnyAsync(
-            q => q.Where(s => s.Owner == owner && s.Provider == provider && s.ProviderKey == providerKey),
-            ct);
+        return await dispatcher.SendAsync<ExistsPushSubscriptionQuery, bool>(
+            new(owner, provider, providerKey), ct);
     }
-
-    #endregion
 }

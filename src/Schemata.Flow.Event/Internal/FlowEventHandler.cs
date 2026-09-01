@@ -7,20 +7,24 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Common;
 using Schemata.Event.Skeleton;
 using Schemata.Flow.Foundation;
+using Schemata.Flow.Foundation.Commands;
+using Schemata.Flow.Skeleton.Models;
+using Schemata.Messaging.Skeleton;
+using CorrelateProcessRequest = Schemata.Flow.Foundation.Commands.CorrelateMessageRequest;
+using ThrowProcessSignalRequest = Schemata.Flow.Foundation.Commands.ThrowSignalRequest;
 
 namespace Schemata.Flow.Event.Internal;
 
 /// <summary>
-///     Bridges inbound events to waiting BPMN message or signal catches by invoking the engine-neutral
-///     <see cref="CorrelateMessageHandler" /> / <see cref="ThrowSignalHandler" /> in
-///     <c>Schemata.Flow.Foundation</c> directly.
+///     Bridges inbound events to waiting BPMN message or signal catches through the unkeyed Flow
+///     request handlers.
 /// </summary>
 public sealed class FlowEventHandler : IEventHandler<IEvent>
 {
     private readonly IEventDispatchContext _context;
     private readonly IServiceProvider      _services;
 
-    /// <summary>Creates an event bridge that wakes matching Flow process waits via the resource-method handlers.</summary>
+    /// <summary>Creates an event bridge that wakes matching Flow process waits through request handlers.</summary>
     public FlowEventHandler(IServiceProvider services, IEventDispatchContext context) {
         _services = services;
         _context  = context;
@@ -41,22 +45,16 @@ public sealed class FlowEventHandler : IEventHandler<IEvent>
                 using var scope = _services.CreateScope();
                 var       sp    = scope.ServiceProvider;
 
-                var persistence = sp.GetRequiredService<ProcessPersistence>();
-                var process     = await persistence.FindAsync(sp, sub.Target, ct);
-                if (process is null) continue;
-
-                var handler = sp.GetRequiredService<CorrelateMessageHandler>();
-                await handler.InvokeAsync(sub.Target,
-                                          new() { MessageName = sub.EventType, Payload = payload, Token = sub.Token },
-                                          process, null, ct);
+                var dispatcher = sp.GetRequiredService<IRequestDispatcher>();
+                await dispatcher.SendAsync<CorrelateProcessRequest, ProcessSnapshot>(
+                    new(sub.Target, sub.EventType, payload, sub.Token, Principal: null), ct);
             } else if (signals.Add(sub.EventType)) {
                 using var scope = _services.CreateScope();
                 var       sp    = scope.ServiceProvider;
 
-                var handler = sp.GetRequiredService<ThrowSignalHandler>();
-                await handler.InvokeAsync(null,
-                                          new() { SignalName = sub.EventType, Payload = payload, Token = null },
-                                          null, null, ct);
+                var dispatcher = sp.GetRequiredService<IRequestDispatcher>();
+                await dispatcher.SendAsync<ThrowProcessSignalRequest, IReadOnlyList<SignalDeliveryResult>>(
+                    new(sub.EventType, payload, Token: null, Principal: null), ct);
             }
         }
     }

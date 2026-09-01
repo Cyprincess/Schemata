@@ -46,12 +46,12 @@ public sealed class SchemataReportHttpFeature<TReport, TSnapshot, TChunk> : Feat
         };
         resources.Use<TReport, TReport, TReport, TReport>(
             [HttpResourceAttribute.Name],
-            resource => resource.Methods = ReportResourceRegistration<TReport, TSnapshot>.ReportMethods);
+            resource => resource.Methods = ReportResourceRegistration<TReport, TSnapshot, TChunk>.ReportMethods);
         resources.Use<TSnapshot, TSnapshot, TSnapshot, TSnapshot>(
             [HttpResourceAttribute.Name],
             resource => {
-                resource.Operations = ReportResourceRegistration<TReport, TSnapshot>.SnapshotOperations;
-                resource.Methods    = ReportResourceRegistration<TReport, TSnapshot>.SnapshotMethods;
+                resource.Operations = ReportResourceRegistration<TReport, TSnapshot, TChunk>.SnapshotOperations;
+                resource.Methods    = ReportResourceRegistration<TReport, TSnapshot, TChunk>.SnapshotMethods;
             });
     }
 }

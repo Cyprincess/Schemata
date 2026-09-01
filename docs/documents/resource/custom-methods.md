@@ -8,7 +8,7 @@ lowerCamelCase string.
 
 | Package                        | Key files                                                                                                                                                                 |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Schemata.Abstractions`        | `Resource/ResourceMethodAttribute.cs`, `Resource/ResourceMethodScope.cs`, `Resource/ResourceHttpMethod.cs`, `Resource/IResourceMethodHandler.cs`                          |
+| `Schemata.Abstractions`        | `Resource/ResourceMethodAttribute.cs`, `Resource/ResourceMethodScope.cs`, `Resource/ResourceHttpMethod.cs`                                                       |
 | `Schemata.Resource.Foundation` | `ResourceMethodOperationHandler.cs`, `Advisors/IResourceMethodRequestAdvisor.cs`, `Advisors/IResourceMethodAdvisor.cs`, `Advisors/ResourceMethodVerb.cs`                  |
 | `Schemata.Resource.Foundation` | `Advisors/AdviceMethodRequestAnonymous.cs`, `Advisors/AdviceMethodRequestAuthorize.cs`, `Advisors/AdviceMethodRequestIdempotency.cs`, `Advisors/AdviceMethodEntityAuthorize.cs`, `Advisors/AdviceMethodFreshness.cs` |
 | `Schemata.Resource.Http`       | `ResourceMethodController.cs`, `ResourceMethodControllerConvention.cs`, `ResourceMethodControllerFeatureProvider.cs`                                                      |
@@ -17,42 +17,79 @@ lowerCamelCase string.
 ## Declaring a custom method
 
 ```csharp
+using System.Security.Claims;
+using System.Text.Json.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
+using Schemata.Abstractions.Entities;
+using Schemata.Messaging.Skeleton;
+
 [Resource<Job, JobRequest, JobDetail, JobSummary>]
 [ResourceMethod("run", typeof(RunJobHandler), ResourceMethodScope.Instance)]
 [CanonicalName("jobs/{job}")]
-public sealed class Job : IIdentifier, ICanonicalName, ITimestamp
+public sealed class Job : ICanonicalName
 {
     public string? Name          { get; set; }
     public string? CanonicalName { get; set; }
-    public Guid    Uid           { get; set; }
     public string? Status        { get; set; }
 }
 
-public sealed class RunJobHandler : IResourceMethodHandler<Job, RunJobRequest, RunJobResponse>
+public sealed class RunJobRequest : ICommand<RunJobResponse>, IRequestPrincipal, ICanonicalName
 {
-    public ValueTask<RunJobResponse> InvokeAsync(
-        string?           name,
-        RunJobRequest     request,
-        Job?              entity,
-        ClaimsPrincipal?  principal,
-        CancellationToken ct) {
+    public string? Filter { get; set; }
+
+    public string? Name          { get; set; }
+    public string? CanonicalName { get; set; }
+
+    [JsonIgnore]
+    public ClaimsPrincipal? Principal { get; set; }
+}
+
+public sealed class RunJobResponse : ICanonicalName
+{
+    public string? Name          { get; set; }
+    public string? CanonicalName { get; set; }
+}
+
+public sealed class RunJobHandler : IRequestHandler<RunJobRequest, RunJobResponse>
+{
+    public Task<RunJobResponse> HandleAsync(
+        RunJobRequest      request,
+        CancellationToken  ct = default) {
         // ...
+        var response = new RunJobResponse {
+            Name          = request.Name,
+            CanonicalName = request.CanonicalName,
+        };
+        return Task.FromResult(response);
     }
 }
 ```
 
-`ResourceMethodAttribute(verb, handler, scope = Instance)` stores the verb (lowerCamelCase), the handler type, and
-the scope, plus an optional `Method` (`ResourceHttpMethod`). The attribute is read when the entity is registered,
-which records it in `IResourceRegistry` against the entity type,
-registers the handler in DI, and reads the `TRequest`/`TResponse` types from the handler's
-`IResourceMethodHandler<TEntity, TRequest, TResponse>` interface.
+`ResourceMethodAttribute(verb, handler, scope = Instance)` stores the verb (lowerCamelCase), the handler type,
+and the scope, plus an optional `Method` (`ResourceHttpMethod`). Each custom verb owns a dedicated wire request
+implementing `IRequest<TResponse>` (normally `ICommand<TResponse>` or `IQuery<TResponse>`),
+`IRequestPrincipal`, and — for instance-scoped methods — `ICanonicalName` so the URI target can be carried on
+the request for AIP-155 idempotency. The handler implements
+`Schemata.Messaging.Skeleton.IRequestHandler<TRequest, TResponse>` with a single
+`HandleAsync(TRequest, CancellationToken)` method.
+
+During resource registration (`SchemataResourceFeature.AddResource` →
+`ServiceCollectionExtensions.AddResource`), every `ResourceMethodAttribute` is read off the entity. The handler
+type is matched against the closed `IRequestHandler<TRequest, TResponse>` interface through
+`ResourceMethodHandlerHelper.Describe`, which requires the request argument to implement `IRequestPrincipal`
+and the response argument to implement `ICanonicalName`. A handler that does not match throws
+`InvalidOperationException`. The matched interface is registered with DI as scoped, the verb and methods are
+stored against the entity in `IResourceRegistry`, and — whenever the request implements
+`ICanonicalName` — the per-verb idempotency and freshness advisors are added
+(`AdviceMethodRequestIdempotency`, `AdviceMethodFreshness`).
 
 ### Scope
 
-| Scope        | HTTP route                            | gRPC RPC           | Entity passed to handler |
-| ------------ | ------------------------------------- | ------------------ | ------------------------ |
-| `Instance`   | `POST /v1/{collection}/{name}:{verb}` | `{Verb}{Singular}` | The loaded resource      |
-| `Collection` | `POST /v1/{collection}:{verb}`        | `{Verb}{Singular}` | `null`                   |
+| Scope        | HTTP route                            | gRPC RPC           | Target validation |
+| ------------ | ------------------------------------- | ------------------ | ----------------- |
+| `Instance`   | `POST /v1/{collection}/{name}:{verb}` | `{Verb}{Singular}` | Resource is loaded and must exist before dispatch |
+| `Collection` | `POST /v1/{collection}:{verb}`        | `{Verb}{Singular}` | No resource target |
 
 The verb follows the colon in the HTTP path; the gRPC RPC is PascalCased and lives on the resource's existing
 service (e.g. `JobService.RunJob`, not a separate service). A `ResourceMethodAttribute.Method` of
@@ -60,26 +97,33 @@ service (e.g. `JobService.RunJob`, not a separate service). A `ResourceMethodAtt
 
 ## Stages
 
-`ResourceMethodOperationHandler<TEntity, TRequest, TResponse>.InvokeAsync` runs a verb-scoped pipeline that
-mirrors the CRUD stages. Before the gate, it stashes `ResourceMethodVerb(verb)` on `AdviceContext`.
+`ResourceMethodOperationHandler<TEntity, TRequest, TResponse>.InvokeAsync(verb, name, request, principal, ct)`
+runs the verb-scoped advisor pipeline, then dispatches the request through `IRequestDispatcher`. Before the
+gate, it stashes `ResourceMethodVerb(verb)` on `AdviceContext`. The operation handler is the resource
+pipeline's transport-facing root for authorization and target validation; the dispatcher invokes the
+`IRequestHandler<TRequest, TResponse>` implementation with the request alone.
 
 ```
-ResourceMethodController / ResourceCustomMethod
-  -> ResourceMethodOperationHandler.InvokeAsync(handler, verb, name, request, principal, ct)
+ResourceMethodController (HTTP) / ResourceCustomMethod (gRPC)
+  -> ResourceMethodOperationHandler.InvokeAsync(verb, name, request, principal, ct)
        1. IResourceRequestAdvisor<TEntity>            gate; operation token is the verb itself
        2. IResourceMethodRequestAdvisor<TEntity, TRequest>   request stage
        3. (instance scope) load entity, then IResourceMethodAdvisor<TEntity, TRequest, TResponse>
-       4. handler.InvokeAsync(name, request, entity, principal, ct)
+       4. request.Principal = principal
+          -> IRequestDispatcher.SendAsync<TRequest, TResponse>(request, ct)
+                -> IRequestHandler<TRequest, TResponse>.HandleAsync(request, ct)
        5. IResourceResponseAdvisor<TEntity, TResponse>   response stage
 ```
 
 A `Block` at any stage throws `NotFoundException` (`Blocked(name)`); a `Handle` returns a `TResponse` stashed in
-`AdviceContext`. For an instance-scoped method, the handler binds `request.CanonicalName = name` when the request
-implements `ICanonicalName`, so the AIP-155 idempotency key distinguishes the same verb against different
-resources. It then loads the entity inside
-`_repository.SuppressQuerySoftDelete()`; a missing entity throws `ResourceNotFound(name)`. A collection-scoped
-method (`name is null`) skips the load and the method-advisor stage, passing a `null` entity to
-the handler.
+`AdviceContext`. For an instance-scoped method the handler binds `request.CanonicalName = name` when the
+request implements `ICanonicalName`, so the AIP-155 idempotency key distinguishes the same verb against
+different resources, then loads the entity inside `_repository.SuppressQuerySoftDelete()`; a missing entity
+throws `ResourceNotFound(name)`. A collection-scoped method (`name is null`) skips the load and the
+method-advisor stage. After the advisors run, the operation handler assigns `request.Principal = principal`
+and dispatches the request through `IRequestDispatcher.SendAsync<TRequest, TResponse>`; the dispatcher runs
+any registered `ICommandAdvisor<TRequest>` / `IQueryAdvisor<TRequest>` (`Schemata.Messaging.Skeleton.Advisors`)
+and then invokes the single registered `IRequestHandler<TRequest, TResponse>`.
 
 ### Built-in method advisors
 
@@ -87,7 +131,7 @@ the handler.
 | -------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
 | `AdviceMethodRequestAnonymous`   | request | Grants anonymous access when the verb is configured for it                                                       |
 | `AdviceMethodRequestAuthorize`   | request | Applies row-level entitlement filtering, then authorizes with the verb as the permission token                   |
-| `AdviceMethodRequestIdempotency` | request | Replays a cached response keyed by the verb and `RequestId`                                                      |
+| `AdviceMethodRequestIdempotency` | request | Replays a cached response keyed by the verb and `RequestId`; registered per verb by `AddResource`                |
 | `AdviceMethodEntityAuthorize`    | method  | Post-load AIP-211 check against the loaded entity (primary check + parent-read probe); order 100M (`Orders.Base`) |
 | `AdviceMethodFreshness`          | method  | Validates the ETag against the target instance per AIP-154; runs after entity authorize at +10M                  |
 
@@ -97,9 +141,6 @@ container via `container.ApplyWhere(...)` (row-level filtering, applied even for
 then runs the access check, skipping only that check when `AnonymousGranted` is present.
 `AdviceMethodEntityAuthorize` runs on instance-scoped methods after the entity loads and skips when
 `AnonymousGranted` is present.
-
-`AdviceMethodRequestIdempotency` and `AdviceMethodFreshness` are registered per verb by `RegisterResource`; the
-anonymous and authorize advisors are added by `WithAuthorization()`.
 
 ## Extension points
 
@@ -118,7 +159,9 @@ Custom methods ride the same advisor pipeline as CRUD so authorization, idempote
 uniformly across both. The verb is carried on `AdviceContext` as `ResourceMethodVerb` so a single set of advisor
 interfaces dispatches by verb without per-verb advisor types. HTTP and gRPC reuse the same handlers because the
 verb-scoped stages depend only on `ClaimsPrincipal?` — never on `HttpContext` — keeping the handler unit-testable
-without a web host.
+without a web host. Each verb's own logic is a plain `IRequestHandler<TRequest, TResponse>`, dispatchable
+through the same `IRequestDispatcher` that carries every other command or query, so cross-cutting messaging
+advisors (`ICommandAdvisor` / `IQueryAdvisor`) apply uniformly.
 
 ## Caveats
 

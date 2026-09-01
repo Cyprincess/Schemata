@@ -10,6 +10,7 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Insight.Skeleton;
 using Schemata.Report.Skeleton;
+using Schemata.Scheduling.Skeleton;
 using Xunit;
 
 namespace Schemata.Report.Tests;
@@ -58,6 +59,22 @@ public class DefaultReportServiceShould
         Assert.Equal(3, state.Chunks.Count);
         Assert.Equal(result.Snapshot, snapshot.CanonicalName);
         Assert.Equal(3, state.ChunkRepositoryInstances);
+
+        Assert.Equal(
+            new[] { SnapshotState.Pending, SnapshotState.Running, SnapshotState.Succeeded },
+            state.SnapshotStateSequence);
+        Assert.Equal(3, state.ChunkAddSequence.Count);
+        var expectedRowCounts = new[] { 2, 2, 1 };
+        for (var index = 0; index < state.ChunkAddSequence.Count; index++) {
+            var chunk = state.ChunkAddSequence[index];
+            Assert.Equal($"chunk-{index}", chunk.Name);
+            Assert.Equal(index, chunk.Index);
+            Assert.Equal($"{snapshot.CanonicalName}/chunks/chunk-{index}", chunk.CanonicalName);
+            Assert.Equal(snapshot.Report, chunk.Report);
+            Assert.Equal(snapshot.Name, chunk.Snapshot);
+            Assert.Equal(expectedRowCounts[index], chunk.RowCount);
+        }
+        Assert.Equal(state.Chunks.Count, state.ChunkRepositoryInstances);
     }
 
     [Fact]
@@ -76,6 +93,18 @@ public class DefaultReportServiceShould
         Assert.Equal(SnapshotState.Failed, snapshot.State);
         Assert.Equal("source failed", snapshot.Error);
         Assert.Single(state.Chunks);
+
+        Assert.Equal(
+            new[] { SnapshotState.Pending, SnapshotState.Running, SnapshotState.Failed },
+            state.SnapshotStateSequence);
+        var failedChunk = Assert.Single(state.ChunkAddSequence);
+        Assert.Equal("chunk-0", failedChunk.Name);
+        Assert.Equal(0, failedChunk.Index);
+        Assert.Equal($"{snapshot.CanonicalName}/chunks/chunk-0", failedChunk.CanonicalName);
+        Assert.Equal(snapshot.Report, failedChunk.Report);
+        Assert.Equal(snapshot.Name, failedChunk.Snapshot);
+        Assert.Equal(2, failedChunk.RowCount);
+        Assert.Equal(1, state.ChunkRepositoryInstances);
     }
 
     [Fact]
@@ -191,7 +220,10 @@ public class DefaultReportServiceShould
 
     [Fact]
     public async Task Generate_Without_Scheduler_Throws_FailedPrecondition() {
-        using var provider = ReportTestHost.Create(ReportTestHost.CreateDriver(ReportTestRows.Create(1)));
+        var operations = new Mock<IOperationService>(MockBehavior.Strict);
+        using var provider = ReportTestHost.Create(
+            ReportTestHost.CreateDriver(ReportTestRows.Create(1)),
+            configure: services => services.AddSingleton(operations.Object));
         var service = provider.GetRequiredService<IReportService>();
 
         var exception = await Assert.ThrowsAsync<FailedPreconditionException>(async () => {

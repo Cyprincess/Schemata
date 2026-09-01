@@ -14,11 +14,9 @@ using Schemata.Resource.Http.Internal;
 namespace Schemata.Resource.Http;
 
 /// <summary>
-///     MVC convention that wires up AIP-136 custom-method routes on closed
-///     <see cref="ResourceMethodController{TEntity, TRequest, TResponse, THandler}" />
-///     instances. The convention picks the
-///     <see cref="ResourceMethodAttribute" /> matching the controller's
-///     <c>THandler</c> and rewrites the action template to
+///     MVC convention that wires AIP-136 routes on closed
+///     <see cref="ResourceMethodController{TEntity, TRequest, TResponse}" /> instances. It matches
+///     methods by request and response type, then rewrites each action template to
 ///     <c>{name}:{verb}</c> (Instance scope) or <c>:{verb}</c> (Collection scope).
 /// </summary>
 public sealed class ResourceMethodControllerConvention(
@@ -30,15 +28,21 @@ public sealed class ResourceMethodControllerConvention(
 
     public void Apply(ControllerModel controller) {
         if (!controller.ControllerType.IsGenericType
-         || controller.ControllerType.GetGenericTypeDefinition() != typeof(ResourceMethodController<,,,>)) {
+         || controller.ControllerType.GetGenericTypeDefinition() != typeof(ResourceMethodController<,,>)) {
             return;
         }
 
         var genericArguments = controller.ControllerType.GetGenericArguments();
         var entity           = genericArguments[0];
-        var handler          = genericArguments[3];
+        var request          = genericArguments[1];
+        var response         = genericArguments[2];
 
-        var handlerMethods = registry.GetMethods(entity).Where(m => m.Handler == handler).ToList();
+        var handlerMethods = registry.GetMethods(entity)
+                                     .Where(method => {
+                                         var descriptor = ResourceMethodHandlerHelper.Describe(entity, method.Handler);
+                                         return descriptor?.Request == request && descriptor.Response == response;
+                                     })
+                                     .ToList();
         if (handlerMethods.Count == 0) {
             return;
         }

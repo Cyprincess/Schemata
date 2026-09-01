@@ -1,8 +1,12 @@
 using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Internal;
 using Schemata.Report.Foundation;
+using Schemata.Report.Foundation.Commands;
 using Schemata.Report.Foundation.Definitions;
 using Schemata.Report.Foundation.Internal;
 using Schemata.Report.Skeleton;
@@ -36,11 +40,18 @@ public static class ServiceCollectionExtensions
 
         EnsureSingleRegistration<TReport, TSnapshot, TChunk>(services);
 
+        services.TryAddScoped<InProcessRequestDispatcher>();
+        services.TryAddScoped<IRequestDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+        services.TryAddScoped<ICommandDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+        services.TryAddScoped<IQueryDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+
         services.Configure<SchemataReportOptions>(_ => { });
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddScoped<ReportExecutionContext>();
 
-        services.TryAddScoped<GenerateHandler<TReport>>();
+        services.TryAddScoped<GenerateHandler<TReport, TSnapshot, TChunk>>();
+        AddHandler<RunReportRequest, ReportResult, RunReportHandler<TReport, TSnapshot, TChunk>>(services);
+        AddHandler<GenerateReportRequest, Operation, GenerateHandler<TReport, TSnapshot, TChunk>>(services);
         services.TryAddScoped<ReadSnapshotHandler<TSnapshot>>();
 
         services.TryAddSingleton<ReportRetentionEnforcer<TSnapshot, TChunk>>();
@@ -54,6 +65,16 @@ public static class ServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IScheduledJobKeyResolver, ReportJobKeyResolver<TReport, TSnapshot, TChunk>>());
 
         return services;
+    }
+
+    private static void AddHandler<TRequest, TResponse, THandler>(IServiceCollection services)
+        where TRequest : IRequest<TResponse>
+        where THandler : class, IRequestHandler<TRequest, TResponse> {
+        services.TryAddKeyedScoped<IRequestHandler<TRequest, TResponse>, THandler>(
+            ReportConstants.Handlers.Default);
+        services.TryAddScoped<IRequestHandler<TRequest, TResponse>>(sp =>
+            sp.GetRequiredKeyedService<IRequestHandler<TRequest, TResponse>>(
+                ReportConstants.Handlers.Default));
     }
 
     private static void EnsureSingleRegistration<TReport, TSnapshot, TChunk>(IServiceCollection services)

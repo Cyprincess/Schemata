@@ -1,7 +1,7 @@
 # Report generation
 
-`IReportService` runs a named definition or an inline Insight query. `ReportRequest` requires exactly
-one of `Name` and `Query`; `Persist` chooses whether rows remain in the response or become a snapshot.
+`IReportService` dispatches a named definition or an inline Insight query. `ReportRequest` requires
+exactly one of `Name` and `Query`; `Persist` chooses whether rows remain in the response or become a snapshot.
 
 ```csharp
 using System.Security.Claims;
@@ -25,9 +25,10 @@ public interface IReportService
 
 ## `RunAsync`
 
-`RunAsync` invokes `IReportGenerateAdvisor`, resolves the named or inline definition, invokes
-`IReportDefinitionAdvisor`, builds an Insight plan, and materializes it under the supplied principal.
-Insight applies its source access and entitlement providers during that materialization.
+`RunAsync` dispatches `RunReportRequest`. `RunReportHandler<TReport, TSnapshot, TChunk>` invokes
+`IReportGenerateAdvisor`, resolves the named or inline definition, invokes `IReportDefinitionAdvisor`,
+builds an Insight plan, and materializes it under the supplied principal. Insight applies its source
+access and entitlement providers during that materialization.
 
 | Request shape | Result |
 | --- | --- |
@@ -42,9 +43,10 @@ An inline result that reaches `MaxInlineRows` throws `ReportException` with reas
 
 ## `GenerateAsync` and operations
 
-`GenerateAsync` resolves `IScheduler`, serializes the `ReportRequest` into a `JobContext`, and
-triggers `ReportGenerationJob<TReport, TSnapshot, TChunk>`. The job returns a pending
-`Operation`; its eventual output contains either a snapshot reference or an inline response.
+`GenerateAsync` dispatches `GenerateReportRequest`. For asynchronous generation,
+`GenerateHandler<TReport, TSnapshot, TChunk>` resolves `IScheduler`, serializes the `ReportRequest`
+into a `JobContext`, triggers `ReportGenerationJob<TReport, TSnapshot, TChunk>`, and returns the
+pending `Operation`. The job writes the eventual snapshot reference or inline response.
 
 [AIP-151](https://google.aip.dev/151) directs methods that may take significant time to return a
 `google.longrunning.Operation` and use the shared Operations service. Report follows that operation
@@ -54,13 +56,13 @@ model through the Scheduling domain.
 
 | Input to the job | `ReportRunKind` | Persistence behavior |
 | --- | --- | --- |
-| `JobContext.ArgsJson` from `GenerateAsync` | `ImmediatePersisted` | Replays the request's `Persist` value. |
+| `JobContext.ArgsJson` from `GenerateHandler` | `ImmediatePersisted` | Replays the request's `Persist` value. |
 | `JobContext.Variables["report"]` from a periodic schedule | `Scheduled` | Generates a named report with `Persist = true`. |
 
 ## Transport request
 
-`GenerateHandler<TReport>` implements the collection-scoped `generate` method with
-`GenerateReportRequest`:
+`GenerateHandler<TReport, TSnapshot, TChunk>` implements the collection-scoped `generate` method
+with `GenerateReportRequest`:
 
 | Property | Meaning |
 | --- | --- |
@@ -74,8 +76,8 @@ operation service raises `FailedPreconditionException`, which the HTTP transport
 the [Error Model](../core/error-model.md) for the full exception and status table, including where
 Schemata's HTTP codes diverge from `google.rpc.Code`.
 
-`GenerateAsync` independently needs `IScheduler`. Enable the host Scheduling feature for both
-services, then add the Report Scheduling bridge when periodic reports are required:
+The asynchronous handler path also needs `IScheduler`. Enable the host Scheduling feature, then add
+the Report Scheduling bridge when periodic reports are required:
 
 ```csharp
 using Microsoft.AspNetCore.Builder;

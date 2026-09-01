@@ -29,8 +29,9 @@ public class WaitOperationHandlerShould
                   .Returns(new ValueTask<Operation>(OperationMapper.FromExecution(entity)));
         var handler = new WaitOperationHandler(operations.Object);
 
-        var result = await handler.InvokeAsync(entity.CanonicalName, new() { Timeout = TimeSpan.FromMilliseconds(10) },
-                                               entity, null, CancellationToken.None);
+        var result = await handler.HandleAsync(
+            new() { CanonicalName = entity.CanonicalName, Timeout = TimeSpan.FromMilliseconds(10) },
+            CancellationToken.None);
 
         Assert.False(result.Done);
         operations.Verify(s => s.WaitAsync(entity.CanonicalName, It.IsAny<CancellationToken>()), Times.Once);

@@ -150,6 +150,16 @@
       href: flow/http.md
     - name: gRPC Transport
       href: flow/grpc.md
+- name: Actor
+  href: actor/overview.md
+  items:
+    - name: Overview
+      href: actor/overview.md
+- name: Messaging
+  href: messaging/overview.md
+  items:
+    - name: Overview
+      href: messaging/overview.md
 - name: Push
   href: push/overview.md
   items:

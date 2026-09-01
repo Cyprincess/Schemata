@@ -67,4 +67,33 @@ public class ResourceGrpcReflectionShould
         Assert.Contains("students", allFields);
         Assert.DoesNotContain("entities", allFields);
     }
+
+    [Fact]
+    public async Task FileDescriptor_Uses_Stable_BuiltIn_Request_Names_And_Omits_Principal() {
+        var channel = _factory.CreateGrpcChannel();
+        var client  = new ServerReflection.ServerReflectionClient(channel);
+
+        using var call = client.ServerReflectionInfo();
+        await call.RequestStream.WriteAsync(new() {
+            FileContainingSymbol = "Schemata.Resource.Grpc.Integration.Tests.Fixtures.TrashService",
+        });
+        await call.RequestStream.CompleteAsync();
+
+        Assert.True(await call.ResponseStream.MoveNext(CancellationToken.None));
+        var files = call.ResponseStream.Current.FileDescriptorResponse.FileDescriptorProto
+                        .Select(FileDescriptorProto.Parser.ParseFrom);
+        var messages = files.Where(file => !file.Name.StartsWith("google/"))
+                            .SelectMany(file => file.MessageType)
+                            .ToList();
+
+        foreach (var name in new[] {
+                     "UndeleteResourceRequestOfTrashAndTrash",
+                     "ExpungeResourceRequestOfTrash",
+                     "PurgeResourceRequestOfTrash",
+                 }) {
+            var message = Assert.Single(messages, descriptor => descriptor.Name == name);
+            Assert.DoesNotContain(message.Field, field => field.Name == "principal");
+        }
+    }
+
 }

@@ -70,8 +70,8 @@ schema.ConfigureServices(services => {
 });
 ```
 
-The default `SchemataTenantManager<Tenant>` resolves these repositories to look up the identifier
-from the selected resolver. Replace `Tenant` with `SchemataTenant` when you use the non-generic
+The default `SchemataTenantManager<Tenant>` dispatches its lookups to the closed handlers that resolve
+these repositories. Replace `Tenant` with `SchemataTenant` when you use the non-generic
 `UseTenancy()` overload.
 
 ## Per-tenant DI overrides

@@ -119,19 +119,20 @@ public class FlowRunnerIdempotencyShould
         var compensations = Repository<SchemataProcessCompensation>();
         processes.Setup(r => r.Begin()).Returns(Mock.Of<IUnitOfWork>());
 
-        var services = new ServiceCollection()
-                      .AddSingleton(processes.Object)
-                      .AddSingleton(tokens.Object)
-                      .AddSingleton(transitions.Object)
-                      .AddSingleton(sources.Object)
-                      .AddSingleton(compensations.Object)
-                      .AddKeyedSingleton<IFlowRuntime>(FlowConstants.Engines.StateMachine, engine.Object)
-                      .BuildServiceProvider();
+        var collection = new ServiceCollection()
+                        .AddLogging()
+                        .AddSingleton(registry.Object)
+                        .AddSingleton<IOptions<SchemataFlowOptions>>(Options.Create(new SchemataFlowOptions()))
+                        .AddSingleton(processes.Object)
+                        .AddSingleton(tokens.Object)
+                        .AddSingleton(transitions.Object)
+                        .AddSingleton(sources.Object)
+                        .AddSingleton(compensations.Object)
+                        .AddKeyedSingleton<IFlowRuntime>(FlowConstants.Engines.StateMachine, engine.Object);
+        collection.AddSchemataFlow();
+        var services = collection.BuildServiceProvider();
 
-        var notifier = new ProcessLifecycleNotifier([], Mock.Of<ILogger<ProcessLifecycleNotifier>>());
-        return new(registry.Object, new ProcessPersistence(), notifier, services,
-                   services.GetRequiredService<IServiceScopeFactory>(),
-                   Options.Create(new SchemataFlowOptions()));
+        return services.GetRequiredService<FlowRunner>();
     }
 
     private static Mock<IRepository<T>> Repository<T>(params T[] items)

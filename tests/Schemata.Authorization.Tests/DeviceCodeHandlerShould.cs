@@ -151,6 +151,7 @@ public class DeviceCodeHandlerShould
 
         Assert.Equal("auth-approved", result.Properties![Properties.AuthorizationName]);
         Assert.Equal("sess-approved", result.Properties![Properties.SessionId]);
+        f.Tokens.Verify(value => value.RevokeAsync(f.Device, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

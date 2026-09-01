@@ -1,25 +1,22 @@
-using System;
-using System.Security.Claims;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions.Resource;
+using Schemata.Common.Errors;
+using Schemata.Entity.Repository;
+using Schemata.Messaging.Skeleton;
 
 namespace Schemata.Resource.Http.Integration.Tests.Fixtures;
 
-public sealed class PreviewHandler : IResourceMethodHandler<Student, EmptyResourceRequest, Student>
+public sealed class PreviewHandler(IRepository<Student> repository)
+    : IRequestHandler<PreviewResourceRequest, Student>
 {
-    #region IResourceMethodHandler<Student,EmptyResourceRequest,Student> Members
-
-    public ValueTask<Student> InvokeAsync(
-        string?              name,
-        EmptyResourceRequest request,
-        Student?             entity,
-        ClaimsPrincipal?     principal,
-        CancellationToken    ct
+    public async Task<Student> HandleAsync(
+        PreviewResourceRequest request,
+        CancellationToken      ct = default
     ) {
-        ArgumentNullException.ThrowIfNull(entity);
-        return ValueTask.FromResult(entity);
+        var entity = await repository.SingleOrDefaultAsync(
+            query => query.Where(student => student.CanonicalName == request.CanonicalName),
+            ct);
+        return entity ?? throw SchemataResourceErrors.NotFound<Student>(request.CanonicalName);
     }
-
-    #endregion
 }

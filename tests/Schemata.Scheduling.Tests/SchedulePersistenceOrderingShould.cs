@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Entity.Repository;
@@ -34,6 +35,13 @@ public class SchedulePersistenceOrderingShould
         executions.Setup(r => r.Begin()).Returns(unitOfWork.Object);
         executions.Setup(r => r.AddAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
                   .ThrowsAsync(new InvalidOperationException("execution write failed"));
+        var jobs = new Mock<IRepository<SchemataJob>>();
+        jobs.Setup(r => r.FirstOrDefaultAsync(
+                      It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(),
+                      It.IsAny<CancellationToken>()))
+            .Returns(ValueTask.FromResult<SchemataJob?>(null));
+        jobs.Setup(r => r.AddAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         executions.Setup(r => r.ListAsync(
                              It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(),
                              It.IsAny<CancellationToken>()))
@@ -41,13 +49,14 @@ public class SchedulePersistenceOrderingShould
                                Empty());
 
         await using var services = new ServiceCollection()
+            .AddSingleton<IRepository<SchemataJob>>(jobs.Object)
             .AddSingleton<IRepository<SchemataJobExecution>>(executions.Object)
             .AddSingleton<IOptions<SchemataSchedulingOptions>>(Options.Create(new SchemataSchedulingOptions()))
             .AddSingleton<TimeProvider>(clock)
             .AddSingleton<IScheduledJobRegistry>(registry)
             .AddSingleton(recording)
-            .AddSingleton<DefaultScheduler>()
-            .AddSingleton<IScheduler>(provider => provider.GetRequiredService<DefaultScheduler>())
+            .AddSchemataScheduling()
+            .RemoveAll<IJobLifecycleObserver>()
             .BuildServiceProvider();
         var scheduler  = services.GetRequiredService<DefaultScheduler>();
         var dispatcher = new JobExecutionDispatcher(services, time: clock);

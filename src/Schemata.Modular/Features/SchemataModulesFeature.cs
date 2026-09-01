@@ -21,7 +21,7 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
     /// <summary>
     ///     Default priority for the modular feature in the extension feature range.
     /// </summary>
-    public const int DefaultPriority = Orders.Extension + 120_000_000;
+    public const int DefaultPriority = Orders.Extension + 140_000_000;
 
     public override int Priority => DefaultPriority;
 

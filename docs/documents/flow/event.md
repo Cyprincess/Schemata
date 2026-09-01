@@ -30,7 +30,7 @@ builder.UseSchemata(schema => {
 ```
 
 `UseEvent()` adds `SchemataFlowEventFeature`, priority `SchemataFlowFeature.DefaultPriority + 300_000`
-= `480_300_000`. The feature declares `[DependsOn<SchemataFlowFeature>]` and
+= `490_300_000`. The feature declares `[DependsOn<SchemataFlowFeature>]` and
 `[DependsOn<SchemataEventFeature>]`, so both are pulled in if missing. You still need a producer and
 consumer transport on the event bus for events to move between publishers and consumers.
 

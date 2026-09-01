@@ -2,29 +2,20 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.DependencyInjection;
-using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
-using Schemata.Authorization.Skeleton.Handlers;
+using Schemata.Authorization.Foundation.Queries;
+using AuthorizationResult = Schemata.Authorization.Skeleton.AuthorizationResult;
 
 namespace Schemata.Authorization.Foundation.Controllers;
 
-/// <summary>
-///     Contains the OpenID Connect UserInfo endpoint action.
-/// </summary>
 public partial class ConnectController
 {
-    /// <summary>Returns UserInfo claims for the authenticated bearer token.</summary>
     [HttpGet("Profile")]
     [HttpPost("Profile")]
     [Authorize(AuthenticationSchemes = SchemataAuthorizationSchemes.Bearer)]
     public async Task<IActionResult> Profile(CancellationToken ct) {
-        var handler = HttpContext.RequestServices.GetService<UserInfoEndpoint>();
-        if (handler is null) {
-            throw new NotFoundException();
-        }
-
-        var result = await handler.HandleAsync(HttpContext.User, ct);
-        return MapResult(result);
+        var result = await dispatcher.SendAsync<UserInfoEndpointQuery, AuthorizationResult>(
+            new(HttpContext.User), ct);
+        return await MapResult(result, ct);
     }
 }

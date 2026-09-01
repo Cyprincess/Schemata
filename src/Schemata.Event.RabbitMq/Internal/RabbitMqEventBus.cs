@@ -19,26 +19,25 @@ using Schemata.Transport.RabbitMq;
 
 namespace Schemata.Event.RabbitMq.Internal;
 
-/// <summary>RabbitMQ-backed <see cref="IEventBus"/> for cross-process broadcast and request/response.</summary>
-public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
+/// <summary>RabbitMQ-backed <see cref="IEventBus"/> for cross-process broadcast.</summary>
+/// <remarks>
+///     Broadcast only. Cross-process request/reply lives in <c>Schemata.Messaging.RabbitMq</c>,
+///     which owns its own reply queue and correlation handling.
+/// </remarks>
+public sealed class RabbitMqEventBus : IEventBus
 {
     private readonly IRabbitMqConnectionProvider    _connections;
-    private readonly CorrelationTracker             _correlation;
     private readonly EventOutboxDispatcher?         _dispatcher;
-    private readonly SemaphoreSlim                  _initializationLock = new(1, 1);
     private readonly JsonSerializerOptions          _json;
     private readonly ILogger<RabbitMqEventBus>?     _logger;
     private readonly IOptions<RabbitMqEventOptions> _options;
     private readonly IEventTypeRegistry             _registry;
-    private readonly string                         _replyQueueName;
     private readonly IServiceProvider               _services;
-    private          IChannel?                      _replyChannel;
 
-    /// <summary>Initializes a new <see cref="RabbitMqEventBus" /> with a lazily initialized reply queue.</summary>
+    /// <summary>Initializes a new <see cref="RabbitMqEventBus" />.</summary>
     public RabbitMqEventBus(
         IOptions<RabbitMqEventOptions> options,
         IRabbitMqConnectionProvider    connections,
-        CorrelationTracker             correlation,
         IEventTypeRegistry             registry,
         IServiceProvider               services,
         IOptions<JsonSerializerOptions> json,
@@ -47,33 +46,12 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
     ) {
         _options     = options;
         _connections = connections;
-        _correlation = correlation;
         _registry    = registry;
         _services    = services;
         _json        = json.Value;
         _logger      = logger;
         _dispatcher  = dispatcher;
-
-        _replyQueueName = $"reply.{Identifiers.NewUid():n}";
     }
-
-    #region IAsyncDisposable Members
-
-    public async ValueTask DisposeAsync() {
-        await _initializationLock.WaitAsync();
-        try {
-            // Only the reply channel is ours; the connection belongs to the shared provider.
-            if (_replyChannel is { } replyChannel) {
-                _replyChannel = null;
-                await replyChannel.CloseAsync();
-                replyChannel.Dispose();
-            }
-        } finally {
-            _initializationLock.Release();
-        }
-    }
-
-    #endregion
 
     #region IEventBus Members
 
@@ -86,61 +64,6 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
         where TEvent : IEvent {
         EventSourceContract.Ensure(sourceEntity);
         await PublishCoreAsync(@event, sourceEntity, ct);
-    }
-
-    public async Task<TResponse> SendAsync<TRequest, TResponse>(TRequest request, CancellationToken ct = default)
-        where TRequest : IRequest<TResponse> {
-        var exchange           = _options.Value.ExchangeName;
-        var routingKey         = _registry.RequireName(typeof(TRequest));
-        var responseRoutingKey = _registry.RequireName(typeof(TResponse));
-
-        using var scope = _services.CreateScope();
-        var eventCtx = new EventContext(request!, routingKey) {
-            Payload = JsonSerializer.Serialize(request, _json),
-            CorrelationId = Identifiers.NewUid().ToString("n"),
-        };
-        var adviceCtx = new AdviceContext(scope.ServiceProvider);
-
-        switch (await Advisor.For<IEventPublishAdvisor>()
-                             .RunAsync(adviceCtx, eventCtx, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when adviceCtx.TryGet<TResponse>(out var r) && r is not null:
-                eventCtx.Result = r;
-                return r;
-            case AdviseResult.Block:
-            default:
-                throw new InvalidOperationException("Request blocked by advisor.");
-        }
-
-        var observers = scope.ServiceProvider.GetServices<IEventLifecycleObserver>().ToList();
-        foreach (var observer in observers) {
-            await observer.OnPublishedAsync(eventCtx, ct);
-        }
-
-        var connection   = await _connections.GetConnectionAsync(ct);
-        var replyChannel = await InitializeReplyChannelAsync(ct);
-        await using var channel = await connection.CreateChannelAsync(new(true, true), ct);
-
-        var body = Encoding.UTF8.GetBytes(eventCtx.Payload ?? string.Empty);
-
-        var tcs                  = new TaskCompletionSource<TResponse>();
-        var trackerCorrelationId = _correlation.Track(tcs, TimeSpan.FromMilliseconds(_options.Value.RequestTimeoutMs));
-
-        // BasicProperties.CorrelationId carries the tracker key so HandleReplyAsync can match
-        // the reply; EventContext.CorrelationId is the audit key and intentionally differs.
-        var props = new BasicProperties {
-            ContentType   = "application/json",
-            DeliveryMode  = DeliveryModes.Persistent,
-            ReplyTo       = _replyQueueName,
-            CorrelationId = trackerCorrelationId,
-        };
-
-        await channel.ExchangeDeclareAsync(exchange, _options.Value.ExchangeType, true, cancellationToken: ct);
-        await replyChannel.QueueBindAsync(_replyQueueName, exchange, responseRoutingKey, cancellationToken: ct);
-        await channel.BasicPublishAsync(exchange, routingKey, true, props, body, ct);
-
-        return await tcs.Task.WaitAsync(ct);
     }
 
     #endregion
@@ -160,6 +83,7 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
             Source                 = source,
         };
         var adviceCtx = new AdviceContext(scope.ServiceProvider);
+        using var _ = AdviceContext.Establish(adviceCtx);
 
         switch (await Advisor.For<IEventPublishAdvisor>()
                              .RunAsync(adviceCtx, eventCtx, ct)) {
@@ -178,62 +102,5 @@ public sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
             await observer.OnPublishedAsync(eventCtx, ct);
         }
         _dispatcher?.NotifyPending();
-    }
-
-    private async ValueTask<IChannel> InitializeReplyChannelAsync(CancellationToken ct) {
-        if (_replyChannel is { } existingReplyChannel) {
-            return existingReplyChannel;
-        }
-
-        await _initializationLock.WaitAsync(ct);
-        try {
-            if (_replyChannel is { } initializedReplyChannel) {
-                return initializedReplyChannel;
-            }
-
-            var connection = await _connections.GetConnectionAsync(ct);
-
-            IChannel? newReplyChannel = null;
-            try {
-                newReplyChannel = await connection.CreateChannelAsync(cancellationToken: ct);
-                await newReplyChannel.QueueDeclareAsync(_replyQueueName, false, true, true, cancellationToken: ct);
-
-                var consumer = new AsyncEventingBasicConsumer(newReplyChannel);
-                consumer.ReceivedAsync += HandleReplyAsync;
-
-                await newReplyChannel.BasicConsumeAsync(_replyQueueName, true, consumer, ct);
-            } catch {
-                // Only the half-built channel is discarded; the shared connection stays open for
-                // every other client in the process.
-                if (newReplyChannel is not null) {
-                    await newReplyChannel.DisposeAsync();
-                }
-
-                throw;
-            }
-
-            _replyChannel = newReplyChannel;
-            return newReplyChannel;
-        } finally {
-            _initializationLock.Release();
-        }
-    }
-
-    private Task HandleReplyAsync(object sender, BasicDeliverEventArgs ea) {
-        var correlationId = ea.BasicProperties.CorrelationId;
-        if (string.IsNullOrEmpty(correlationId)) {
-            return Task.CompletedTask;
-        }
-
-        var responseType = _registry.Resolve(ea.RoutingKey);
-        if (responseType is null) {
-            return Task.CompletedTask;
-        }
-
-        var body     = Encoding.UTF8.GetString(ea.Body.Span);
-        var response = JsonSerializer.Deserialize(body, responseType, _json);
-        _correlation.Complete(correlationId, response);
-
-        return Task.CompletedTask;
     }
 }

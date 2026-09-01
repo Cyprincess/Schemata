@@ -15,11 +15,13 @@ internal static class ReportRepositoryMocks
         List<TEntity>                 records,
         ReportRepositoryTransactions  transactions,
         Action?                       onCommit = null,
-        Action<TEntity>?              onUpdate = null
+        Action<TEntity>?              onUpdate = null,
+        Action<TEntity>?              onAdd = null
     )
         where TEntity : class {
         var pending = new List<TEntity>();
         var removed = new List<TEntity>();
+        var updated = new List<TEntity>();
         var services = new Mock<IServiceProvider>(MockBehavior.Strict);
         var disposable = new Mock<IDisposable>(MockBehavior.Strict);
         var repository = new Mock<IRepository<TEntity>>(MockBehavior.Strict);
@@ -68,7 +70,7 @@ internal static class ReportRepositoryMocks
         repository.Setup(value => value.UpdateAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
                   .Callback<TEntity, CancellationToken>((entity, _) => {
                       EnsureOpen();
-                      onUpdate?.Invoke(entity);
+                      updated.Add(entity);
                   })
                   .Returns(Task.CompletedTask);
         repository.Setup(value => value.RemoveRangeAsync(It.IsAny<IEnumerable<TEntity>>(), It.IsAny<CancellationToken>()))
@@ -97,10 +99,18 @@ internal static class ReportRepositoryMocks
                 throw new InvalidOperationException("Repository was reused after commit.");
             }
         }
-
         void Commit() {
             records.AddRange(pending);
+            foreach (var entity in pending) {
+                onAdd?.Invoke(entity);
+            }
             pending.Clear();
+
+            foreach (var entity in updated) {
+                onUpdate?.Invoke(entity);
+            }
+            updated.Clear();
+
             foreach (var entity in removed) {
                 records.Remove(entity);
             }

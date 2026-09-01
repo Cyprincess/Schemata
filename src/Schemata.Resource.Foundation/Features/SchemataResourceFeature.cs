@@ -18,7 +18,7 @@ public sealed class SchemataResourceFeature : FeatureBase
     /// <summary>
     ///     The default feature priority for resource service registration.
     /// </summary>
-    public const int DefaultPriority = Orders.Extension + 90_000_000;
+    public const int DefaultPriority = Orders.Extension + 100_000_000;
 
     public override int Priority => DefaultPriority;
 

@@ -1,9 +1,12 @@
+using System.Security.Claims;
+using System.Text.Json.Serialization;
+using Schemata.Abstractions.Resource;
 using Schemata.Insight.Skeleton;
+using Schemata.Messaging.Skeleton;
 
 namespace Schemata.Report.Foundation;
 
-/// <summary>Wire request that starts a report generation operation.</summary>
-public sealed class GenerateReportRequest
+public sealed class GenerateReportRequest : ICommand<Operation>, IRequestPrincipal, IReportScoped
 {
     /// <summary>Named report definition to generate; mutually exclusive with <see cref="Query" />.</summary>
     public string? Name { get; set; }
@@ -16,4 +19,11 @@ public sealed class GenerateReportRequest
 
     /// <summary>Whether generation runs inline and returns a terminal operation.</summary>
     public bool Sync { get; set; }
+
+    [JsonIgnore]
+    public ClaimsPrincipal? Principal { get; set; }
+
+    /// <inheritdoc />
+    [JsonIgnore]
+    public string? ReportKey => Name;
 }

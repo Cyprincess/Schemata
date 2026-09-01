@@ -1,0 +1,96 @@
+using System.Security.Claims;
+using System.Threading;
+using System.Threading.Tasks;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Exceptions;
+using Schemata.Advice;
+using Schemata.Identity.Skeleton;
+using Schemata.Identity.Skeleton.Advisors;
+using Schemata.Identity.Skeleton.Entities;
+using Schemata.Identity.Skeleton.Models;
+
+namespace Schemata.Identity.Foundation.Handlers;
+
+internal sealed partial class IdentityOperationHandler<TUser>
+    where TUser : SchemataUser, new()
+{
+    /// <summary>Confirms an email address or phone number with a confirmation code.</summary>
+    public async Task<IdentityResult<Unit>> ConfirmAsync(
+        ConfirmRequest    request,
+        ClaimsPrincipal   principal,
+        CancellationToken ct = default
+    ) {
+        var ctx = AdviceContext.Require();
+
+        switch (await Advisor.For<IIdentityRequestAdvisor<ConfirmRequest>>()
+                             .RunAsync(ctx, request, IdentityOperation.Confirm, principal, ct)) {
+            case AdviseResult.Continue:
+                break;
+            case AdviseResult.Handle when ctx.TryGet<IdentityResult<Unit>>(out var response):
+                return response!;
+            case AdviseResult.Block:
+            default:
+                throw new PermissionDeniedException();
+        }
+
+        // Missing accounts and invalid confirmation codes share one response shape for
+        // unauthenticated callers.
+        var found = await GetUserAsync(request.EmailAddress, request.PhoneNumber);
+        if (found is null) {
+            throw new NoContentException();
+        }
+
+        var result = request switch {
+            var _ when !string.IsNullOrWhiteSpace(request.EmailAddress) => await _users.ChangeEmailAsync(found, request.EmailAddress, request.Code),
+            var _ when !string.IsNullOrWhiteSpace(request.PhoneNumber) => await _users.ChangePhoneNumberAsync(found, request.PhoneNumber, request.Code),
+            var _ => null,
+        };
+
+        if (result is not { Succeeded: true }) {
+            throw new NoContentException();
+        }
+
+        switch (await Advisor.For<IIdentityRecoveryAdvisor>()
+                             .RunAsync(ctx, found, IdentityOperation.Confirm, ct)) {
+            case AdviseResult.Continue:
+                break;
+            case AdviseResult.Handle when ctx.TryGet<IdentityResult<Unit>>(out var response):
+                return response!;
+            case AdviseResult.Block:
+            default:
+                throw new PermissionDeniedException();
+        }
+
+        return IdentityResult<Unit>.Success(null);
+    }
+
+    /// <summary>Sends an account-confirmation code to a contact address.</summary>
+    public async Task<IdentityResult<Unit>> CodeAsync(
+        ForgetRequest     request,
+        ClaimsPrincipal   principal,
+        CancellationToken ct = default
+    ) {
+        var ctx = AdviceContext.Require();
+
+        switch (await Advisor.For<IIdentityRequestAdvisor<ForgetRequest>>()
+                             .RunAsync(ctx, request, IdentityOperation.Code, principal, ct)) {
+            case AdviseResult.Continue:
+                break;
+            case AdviseResult.Handle when ctx.TryGet<IdentityResult<Unit>>(out var response):
+                return response!;
+            case AdviseResult.Block:
+            default:
+                throw new PermissionDeniedException();
+        }
+
+        var found = await GetUserAsync(request.EmailAddress, request.PhoneNumber);
+        if (found is null) {
+            throw new NoContentException();
+        }
+
+        await SendConfirmationCodeAsync(found, request.EmailAddress, request.PhoneNumber);
+
+        return IdentityResult<Unit>.Success(null);
+    }
+}

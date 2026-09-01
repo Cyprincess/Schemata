@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -8,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using Schemata.Common;
+using Schemata.Event.Foundation.Observers;
 using Schemata.Event.Skeleton;
 using Schemata.Transport.RabbitMq;
 
@@ -100,15 +102,12 @@ public sealed class RabbitMqEventOutboxPublisher : IEventOutboxPublisher
         };
 
         using var scope     = _services.CreateScope();
-        var       observers = scope.ServiceProvider.GetServices<IEventLifecycleObserver>();
+        // Audit-last ordering is enforced here regardless of DI registration order: application
+        // observers run before SchemataEventAuditObserver so the audit record sees their outcome.
+        var       observers = scope.ServiceProvider.GetServices<IEventLifecycleObserver>()
+                                   .OrderBy(observer => observer is SchemataEventAuditObserver);
         foreach (var observer in observers) {
-            try {
-                await observer.OnDeliveredAsync(eventCtx, ct);
-            } catch (Exception ex) {
-                _logger?.LogWarning(ex,
-                                    "IEventLifecycleObserver.OnDeliveredAsync threw for event '{EventType}'.",
-                                    message.EventType);
-            }
+            await observer.OnDeliveredAsync(eventCtx, ct);
         }
     }
 }

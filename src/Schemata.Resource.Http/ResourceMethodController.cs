@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
+using Schemata.Messaging.Skeleton;
 using Schemata.Common;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Http.Internal;
@@ -16,47 +17,29 @@ namespace Schemata.Resource.Http;
 
 /// <summary>
 ///     Generic controller exposing an AIP-136 custom method as a
-///     <c>POST {collection}/{name}:{verb}</c> or
-///     <c>POST {collection}:{verb}</c> endpoint. The route's verb suffix is
-///     injected by <see cref="ResourceMethodControllerConvention" />, which also tags each
-///     action with a <see cref="ResourceMethodVerbMetadata" />; this class dispatches the matched
-///     verb through the
-///     <see cref="ResourceMethodOperationHandler{TEntity,TRequest,TResponse}" />
-///     advisor pipeline before invoking the registered
-///     <see cref="IResourceMethodHandler{TEntity,TRequest,TResponse}" /> per
-///     <seealso href="https://google.aip.dev/136">AIP-136: Custom methods</seealso>.
+///     <c>POST {collection}/{name}:{verb}</c> or <c>POST {collection}:{verb}</c> endpoint.
+///     The route convention supplies the verb and the controller sends the request through the
+///     resource and dispatcher pipelines.
 /// </summary>
 [ApiController]
 [Route("~/Resource")]
-public class ResourceMethodController<TEntity, TRequest, TResponse, THandler> : ControllerBase
+public class ResourceMethodController<TEntity, TRequest, TResponse> : ControllerBase
     where TEntity : class, ICanonicalName
-    where TRequest : class
+    where TRequest : class, IRequest<TResponse>, IRequestPrincipal
     where TResponse : class, ICanonicalName
-    where THandler : class, IResourceMethodHandler<TEntity, TRequest, TResponse>
 {
-    /// <summary>
-    ///     Handles the custom resource method.
-    /// </summary>
-    protected readonly THandler                                                    Handler;
 
     /// <summary>
     ///     Invokes the custom-method advisor pipeline.
     /// </summary>
     protected readonly ResourceMethodOperationHandler<TEntity, TRequest, TResponse> Operation;
 
-    /// <summary>
-    ///     Initializes a new instance with the operation handler, custom-method handler, and JSON serializer options.
-    /// </summary>
-    /// <param name="operation">The <see cref="ResourceMethodOperationHandler{TEntity,TRequest,TResponse}" />.</param>
-    /// <param name="handler">The registered <see cref="IResourceMethodHandler{TEntity,TRequest,TResponse}" />.</param>
-    /// <param name="json">The host's <see cref="JsonSerializerOptions" />.</param>
+    /// <summary>Initializes the controller with its operation pipeline and JSON options.</summary>
     public ResourceMethodController(
         ResourceMethodOperationHandler<TEntity, TRequest, TResponse> operation,
-        THandler                                                     handler,
         IOptions<JsonSerializerOptions>                              json
     ) {
         Operation   = operation;
-        Handler     = handler;
         JsonOptions = json.Value;
     }
 
@@ -83,13 +66,13 @@ public class ResourceMethodController<TEntity, TRequest, TResponse, THandler> : 
         var verb = HttpContext.GetEndpoint()?.Metadata.GetMetadata<ResourceMethodVerbMetadata>()?.Verb;
         if (verb is null) {
             throw new InvalidOperationException(
-                $"No resource-method verb is bound to the matched route for handler '{typeof(THandler).FullName}'."
+                $"No resource-method verb is bound to the matched route for request '{typeof(TRequest).FullName}'."
             );
         }
 
         var fullName = string.IsNullOrEmpty(name) ? null : BuildFullName(name);
 
-        var response = await Operation.InvokeAsync(Handler, verb, fullName, request, HttpContext.User, ct);
+        var response = await Operation.InvokeAsync(verb, fullName, request, HttpContext.User, ct);
 
         return new JsonResult(response, JsonOptions);
     }

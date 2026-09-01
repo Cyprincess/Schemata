@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
+    <PackageReference Include="SQLitePCLRaw.core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Schemata.Abstractions\Schemata.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Actor.Foundation\Schemata.Actor.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Actor.Skeleton\Schemata.Actor.Skeleton.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Common\Schemata.Common.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Core\Schemata.Core.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Entity.EntityFrameworkCore\Schemata.Entity.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Expressions.Aip\Schemata.Expressions.Aip.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Expressions.Cel\Schemata.Expressions.Cel.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Expressions.Order\Schemata.Expressions.Order.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Insight.Foundation\Schemata.Insight.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Messaging.Skeleton\Schemata.Messaging.Skeleton.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Report.Actor\Schemata.Report.Actor.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Report.Foundation\Schemata.Report.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Report.Skeleton\Schemata.Report.Skeleton.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Scheduling.Skeleton\Schemata.Scheduling.Skeleton.csproj" />
+  </ItemGroup>
+
+</Project>

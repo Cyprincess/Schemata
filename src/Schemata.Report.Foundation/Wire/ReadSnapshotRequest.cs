@@ -1,17 +1,20 @@
+using System.Security.Claims;
+using System.Text.Json.Serialization;
 using Schemata.Abstractions.Entities;
+using Schemata.Messaging.Skeleton;
 
 namespace Schemata.Report.Foundation;
 
-/// <summary>Query parameters for reading one page of persisted report snapshot rows.</summary>
-public sealed class ReadSnapshotRequest : ICanonicalName
+public sealed class ReadSnapshotRequest : ICanonicalName, IQuery<ReadSnapshotResponse>, IRequestPrincipal
 {
-    /// <summary>Maximum number of rows returned in the page.</summary>
     public int? PageSize { get; set; }
 
-    /// <summary>Opaque continuation token returned by the preceding page.</summary>
     public string? PageToken { get; set; }
 
-    string? ICanonicalName.Name { get; set; }
+    public string? Name { get; set; }
 
-    string? ICanonicalName.CanonicalName { get; set; }
+    public string? CanonicalName { get; set; }
+
+    [JsonIgnore]
+    public ClaimsPrincipal? Principal { get; set; }
 }

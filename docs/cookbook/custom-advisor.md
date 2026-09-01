@@ -150,8 +150,12 @@ The built-in update advisors and their `Order` values:
 | `AdviceUpdateValidation` | 110,000,000                 |
 
 `SlugNormalizeAdvisor` at `Order = 50_000_000` runs before both. To run after validation, pick an
-`Order` above 110,000,000; user advisors stay outside the reserved range
-`[100_000_000, 900_000_000]`. The update pipeline applies no concurrency advisor — concurrency runs
+`Order` above 110,000,000. The `[100_000_000, 900_000_000]` band reserves *feature* priorities —
+it does not constrain advisor `Order`. An advisor's `Order` only fixes its position relative to the
+built-in advisor chain, whose anchors come from `SchemataConstants.Orders` (`Base` = 100M for
+built-in advisors, `Extension` = 400M as the extension-feature anchor, `Max` = 900M for advisors
+that must run near the end). A value below `Base`, like the example's 50M, is legal and means
+"before every built-in advisor". The update pipeline applies no concurrency advisor — concurrency runs
 on the add pipeline (`AdviceAddConcurrency`, 110M); freshness on update is enforced by the resource
 layer.
 

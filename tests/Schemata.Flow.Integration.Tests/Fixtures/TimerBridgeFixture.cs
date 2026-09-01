@@ -66,13 +66,7 @@ public sealed class TimerBridgeFixture : IAsyncLifetime
             typeof(SchemataJobExecution));
 
         services.AddLogging();
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddIdentifier<>)));
-        services.TryAddSingleton<IProcessRegistry, ProcessRegistry>();
-        services.TryAddSingleton<ProcessPersistence>();
-        services.TryAddScoped<ProcessLifecycleNotifier>();
-        services.TryAddScoped<FlowRunner>();
-        services.TryAddScoped<IFlowRunner>(sp => sp.GetRequiredService<FlowRunner>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IFlowSourceAdvisor<>), typeof(AdviceSourceProjection<>)));
+        services.AddSchemataFlow();
 
         services.TryAddKeyedSingleton<IFlowRuntime, BpmnEngine>(FlowConstants.Engines.Bpmn);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowEngineValidator, BpmnFlowEngineValidator>());

@@ -9,6 +9,7 @@ using Schemata.Entity.Repository;
 using Schemata.Tenancy.Foundation.Services;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
+using static Schemata.Tenancy.Tests.TenancyTestHost;
 using Xunit;
 
 namespace Schemata.Tenancy.Tests;
@@ -30,7 +31,8 @@ public class SchemataTenantManagerShould
                                      It.IsAny<CancellationToken>()))
              .Returns(EmptyAsync<SchemataTenantHost>());
 
-        var manager = new SchemataTenantManager<SchemataTenant>(tenants.Object, hosts.Object, cache.Object);
+        using var provider = CreateProvider(tenants, hosts, cache);
+        var manager = Manager(provider);
 
         await manager.DeleteAsync(tenant, CancellationToken.None);
 
@@ -55,7 +57,8 @@ public class SchemataTenantManagerShould
         hosts.Setup(h => h.RemoveRangeAsync(It.IsAny<IEnumerable<SchemataTenantHost>>(), It.IsAny<CancellationToken>()))
              .Returns(Task.CompletedTask);
 
-        var manager = new SchemataTenantManager<SchemataTenant>(tenants.Object, hosts.Object, cache.Object);
+        using var provider = CreateProvider(tenants, hosts, cache);
+        var manager = Manager(provider);
 
         await manager.DeleteAsync(tenant, CancellationToken.None);
 
@@ -103,7 +106,8 @@ public class SchemataTenantManagerShould
                           It.IsAny<CancellationToken>()))
                .ReturnsAsync(tenant);
 
-        var manager = new SchemataTenantManager<SchemataTenant>(tenants.Object, hosts.Object, cache.Object);
+        using var provider = CreateProvider(tenants, hosts, cache);
+        var manager = Manager(provider);
 
         var resolved = await manager.FindByHost("example.test", CancellationToken.None);
 
@@ -122,7 +126,8 @@ public class SchemataTenantManagerShould
                         It.IsAny<CancellationToken>()))
              .ReturnsAsync((SchemataTenantHost?)null);
 
-        var manager = new SchemataTenantManager<SchemataTenant>(tenants.Object, hosts.Object, cache.Object);
+        using var provider = CreateProvider(tenants, hosts, cache);
+        var manager = Manager(provider);
 
         Assert.Null(await manager.FindByHost("missing.test", CancellationToken.None));
     }

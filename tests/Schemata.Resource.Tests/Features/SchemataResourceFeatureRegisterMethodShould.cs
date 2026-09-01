@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
+using Schemata.Messaging.Skeleton;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Features;
 using Xunit;
@@ -176,7 +177,7 @@ public class SchemataResourceFeatureRegisterMethodShould
     }
 
     [Fact]
-    public void Throw_WhenHandlerDoesNotImplementResourceMethodHandler() {
+    public void Throw_WhenHandlerDoesNotImplementRequiredInterface() {
         var services = new ServiceCollection();
         var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<InvalidHandlerEntity>();
@@ -184,7 +185,7 @@ public class SchemataResourceFeatureRegisterMethodShould
         var ex
             = Assert.Throws<InvalidOperationException>(() => services.AddResource(resource, registry));
 
-        Assert.Contains("IResourceMethodHandler", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("IRequest", ex.Message, StringComparison.Ordinal);
         Assert.Contains("badVerb", ex.Message, StringComparison.Ordinal);
     }
 
@@ -282,18 +283,15 @@ public class SchemataResourceFeatureRegisterMethodShould
 
     #region Nested type: PlainRunHandler
 
-    public sealed class PlainRunHandler : IResourceMethodHandler<PlainEntity, RunRequest, RunResponse>
+    public sealed class PlainRunHandler : IRequestHandler<PlainRunRequest, RunResponse>
     {
-        #region IResourceMethodHandler<PlainEntity,RunRequest,RunResponse> Members
+        #region IRequestHandler<PlainRunRequest,RunResponse> Members
 
-        public ValueTask<RunResponse> InvokeAsync(
-            string?           name,
-            RunRequest        request,
-            PlainEntity?      entity,
-            ClaimsPrincipal?  principal,
-            CancellationToken ct
+        public Task<RunResponse> HandleAsync(
+            PlainRunRequest       request,
+            CancellationToken ct = default
         ) {
-            return ValueTask.FromResult(new RunResponse());
+            return Task.FromResult(new RunResponse());
         }
 
         #endregion
@@ -301,20 +299,28 @@ public class SchemataResourceFeatureRegisterMethodShould
 
     #endregion
 
+    #region Nested type: PlainRunRequest
+
+    public sealed class PlainRunRequest : IRequest<RunResponse>, IRequestPrincipal, ICanonicalName
+    {
+        public string?          Name          { get; set; }
+        public string?          CanonicalName { get; set; }
+        public ClaimsPrincipal? Principal     { get; set; }
+    }
+
+    #endregion
+
     #region Nested type: RunHandler
 
-    public sealed class RunHandler : IResourceMethodHandler<SingleVerbEntity, RunRequest, RunResponse>
+    public sealed class RunHandler : IRequestHandler<RunRequest, RunResponse>
     {
-        #region IResourceMethodHandler<SingleVerbEntity,RunRequest,RunResponse> Members
+        #region IRequestHandler<RunRequest,RunResponse> Members
 
-        public ValueTask<RunResponse> InvokeAsync(
-            string?           name,
+        public Task<RunResponse> HandleAsync(
             RunRequest        request,
-            SingleVerbEntity? entity,
-            ClaimsPrincipal?  principal,
-            CancellationToken ct
+            CancellationToken ct = default
         ) {
-            return ValueTask.FromResult(new RunResponse());
+            return Task.FromResult(new RunResponse());
         }
 
         #endregion
@@ -324,14 +330,11 @@ public class SchemataResourceFeatureRegisterMethodShould
 
     #region Nested type: RunRequest
 
-    public sealed class RunRequest : ICanonicalName
+    public sealed class RunRequest : IRequest<RunResponse>, IRequestPrincipal, ICanonicalName
     {
-        #region ICanonicalName Members
-
-        public string? Name          { get; set; }
-        public string? CanonicalName { get; set; }
-
-        #endregion
+        public string?          Name          { get; set; }
+        public string?          CanonicalName { get; set; }
+        public ClaimsPrincipal? Principal     { get; set; }
     }
 
     #endregion
@@ -429,18 +432,15 @@ public class SchemataResourceFeatureRegisterMethodShould
 
     #region Nested type: SoftPurgeHandler
 
-    public sealed class SoftPurgeHandler : IResourceMethodHandler<SoftPurgeOverrideEntity, PurgeRequest, PurgeResponse>
+    public sealed class SoftPurgeHandler : IRequestHandler<SoftPurgeOverrideRequest, SoftPurgeResponse>
     {
-        #region IResourceMethodHandler<SoftPurgeOverrideEntity,PurgeRequest,PurgeResponse> Members
+        #region IRequestHandler<SoftPurgeOverrideRequest,SoftPurgeResponse> Members
 
-        public ValueTask<PurgeResponse> InvokeAsync(
-            string?                  name,
-            PurgeRequest             request,
-            SoftPurgeOverrideEntity? entity,
-            ClaimsPrincipal?         principal,
-            CancellationToken        ct
+        public Task<SoftPurgeResponse> HandleAsync(
+            SoftPurgeOverrideRequest request,
+            CancellationToken        ct = default
         ) {
-            return ValueTask.FromResult(new PurgeResponse());
+            return Task.FromResult(new SoftPurgeResponse());
         }
 
         #endregion
@@ -471,24 +471,54 @@ public class SchemataResourceFeatureRegisterMethodShould
 
     #endregion
 
+    #region Nested type: SoftPurgeOverrideRequest
+
+    public sealed class SoftPurgeOverrideRequest : IRequest<SoftPurgeResponse>, IRequestPrincipal, ICanonicalName
+    {
+        public string?          Name          { get; set; }
+        public string?          CanonicalName { get; set; }
+        public ClaimsPrincipal? Principal     { get; set; }
+        public string?          Filter        { get; set; }
+        public bool             Force         { get; set; }
+    }
+
+    #endregion
+
+    #region Nested type: SoftPurgeResponse
+
+    public sealed class SoftPurgeResponse : ICanonicalName
+    {
+        public string? Name          { get; set; }
+        public string? CanonicalName { get; set; }
+    }
+
+    #endregion
+
     #region Nested type: SoftUndeleteHandler
 
-    public sealed class
-        SoftUndeleteHandler : IResourceMethodHandler<SoftOverrideEntity, EmptyResourceRequest, SoftOverrideEntity>
+    public sealed class SoftUndeleteHandler : IRequestHandler<SoftUndeleteOverrideRequest, SoftOverrideEntity>
     {
-        #region IResourceMethodHandler<SoftOverrideEntity,EmptyResourceRequest,SoftOverrideEntity> Members
+        #region IRequestHandler<SoftUndeleteOverrideRequest,SoftOverrideEntity> Members
 
-        public ValueTask<SoftOverrideEntity> InvokeAsync(
-            string?              name,
-            EmptyResourceRequest request,
-            SoftOverrideEntity?  entity,
-            ClaimsPrincipal?     principal,
-            CancellationToken    ct
+        public Task<SoftOverrideEntity> HandleAsync(
+            SoftUndeleteOverrideRequest request,
+            CancellationToken           ct = default
         ) {
-            return ValueTask.FromResult(entity ?? new SoftOverrideEntity());
+            return Task.FromResult(new SoftOverrideEntity());
         }
 
         #endregion
+    }
+
+    #endregion
+
+    #region Nested type: SoftUndeleteOverrideRequest
+
+    public sealed class SoftUndeleteOverrideRequest : IRequest<SoftOverrideEntity>, IRequestPrincipal, ICanonicalName
+    {
+        public string?          Name          { get; set; }
+        public string?          CanonicalName { get; set; }
+        public ClaimsPrincipal? Principal     { get; set; }
     }
 
     #endregion

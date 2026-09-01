@@ -13,11 +13,10 @@ the always-on repository advisors in `Schemata.Entity.Repository`, the ownership
 
 ## Trait-to-advisor summary
 
-| Trait              | Built-in advisor                      | Pipeline   | Order       |
-| ------------------ | ------------------------------------- | ---------- | ----------- |
-| `IIdentifier`      | —                                     | —          | —           |
-| `ITimestamp`       | `AdviceAddTimestamp<TEntity>`         | Add        | 100,000,000 |
-| `ITimestamp`       | `AdviceUpdateTimestamp<TEntity>`      | Update     | 100,000,000 |
+| Trait              | Built-in advisor                      | Pipeline   | Order            |
+| ------------------ | ------------------------------------- | ---------- | ---------------- |
+| `IIdentifier`      | `AdviceAddIdentifier<TEntity>`        | Add        | 90,000,000       |
+| `ITimestamp`       | `AdviceAddTimestamp<TEntity>`         | Add        | 100,000,000      |
 | `IConcurrency`     | `AdviceAddConcurrency<TEntity>`       | Add        | 110,000,000 |
 | `ICanonicalName`   | `AdviceAddCanonicalName<TEntity>`     | Add        | 120,000,000 |
 | `ISoftDelete`      | `AdviceBuildQuerySoftDelete<TEntity>` | BuildQuery | 100,000,000 |
@@ -49,8 +48,9 @@ Provides a `Guid` primary key. `RepositoryBase.ResolveKeyProperties` falls back 
 class-level `[PrimaryKey]` attribute resolves. `[PrimaryKey]` and the repeatable `[Index]` are
 Schemata's own attributes in `Schemata.Abstractions.Entities` (class-level; `Properties` carries the
 property names, `Index` adds `IsUnique`) — see
-[overview.md](overview.md#primary-key-convention). No advisor assigns `Uid`; application code or a
-custom add advisor sets it before `AddAsync`.
+[overview.md](overview.md#primary-key-convention). The built-in `AdviceAddIdentifier` assigns a
+fresh `Uid` whenever the property is still empty (`Guid.Empty`); an application that always sets a
+specific `Uid` before `AddAsync` is not overridden.
 
 ## ITimestamp
 

@@ -18,7 +18,7 @@ builder.UseSchemata(schema => {
 1. Registers `MapperConfiguration` as a singleton, built from `IOptions<SchemataMappingOptions>`
    and an `ILoggerFactory` resolved from DI.
 2. Adds `SchemataMappingFeature<Schemata.Mapping.AutoMapper.SimpleMapper>`
-   (Priority `Orders.Extension + 60_000_000`).
+   (Priority `Orders.Extension + 70_000_000`).
 
 The configuration is built inside the singleton factory, so AutoMapper sees every mapping declared
 before the service provider is built.

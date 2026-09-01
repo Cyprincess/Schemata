@@ -7,7 +7,7 @@ using Schemata.Event.Skeleton;
 
 namespace Schemata.Event.Foundation.Internal;
 
-/// <summary>Resolves and invokes <see cref="IEventHandler{TEvent}"/> and <see cref="IRequestHandler{TRequest, TResponse}"/> instances from DI.</summary>
+/// <summary>Resolves and invokes <see cref="IEventHandler{TEvent}"/> instances from DI.</summary>
 public sealed class HandlerResolver
 {
     private readonly IServiceProvider _services;
@@ -41,23 +41,4 @@ public sealed class HandlerResolver
         return Task.WhenAll(tasks);
     }
 
-    /// <summary>Invokes the single registered request handler for <typeparamref name="TRequest"/>.</summary>
-    public Task<TResponse> InvokeRequestHandlerAsync<TRequest, TResponse>(TRequest request, CancellationToken ct)
-        where TRequest : IRequest<TResponse> {
-        var handlers = _services.GetServices<IRequestHandler<TRequest, TResponse>>().ToList();
-
-        if (handlers.Count == 0) {
-            throw new InvalidOperationException($"No request handler registered for request type '{
-                typeof(TRequest).FullName
-            }'.");
-        }
-
-        if (handlers.Count > 1) {
-            throw new InvalidOperationException($"Multiple request handlers registered for request type '{
-                typeof(TRequest).FullName
-            }'. Expected exactly one.");
-        }
-
-        return handlers.First().HandleAsync(request, ct);
-    }
 }

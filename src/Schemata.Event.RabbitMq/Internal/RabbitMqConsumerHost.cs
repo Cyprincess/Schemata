@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Text;
@@ -18,6 +19,7 @@ using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Event.Foundation;
 using Schemata.Event.Foundation.Internal;
+using Schemata.Event.Foundation.Observers;
 using Schemata.Event.Skeleton;
 using Schemata.Event.Skeleton.Advisors;
 using Schemata.Event.Skeleton.Entities;
@@ -146,10 +148,6 @@ public sealed class RabbitMqConsumerHost : BackgroundService
             return false;
         }
 
-        if (!string.IsNullOrEmpty(replyTo)) {
-            return await HandleRequestAsync(channel, resolver, registry, eventType, body, correlationId, ct);
-        }
-
         var matched = new List<SchemataEventSubscription>();
         await foreach (var sub in subscriptions.ListMatchingAsync(eventTypeName, ct: ct)) {
             matched.Add(sub);
@@ -201,6 +199,7 @@ public sealed class RabbitMqConsumerHost : BackgroundService
             throw;
         } finally {
             var consumeAdviceCtx = new AdviceContext(scope.ServiceProvider);
+            using var _ = AdviceContext.Establish(consumeAdviceCtx);
             switch (await Advisor.For<IEventConsumeAdvisor>()
                                  .RunAsync(consumeAdviceCtx, eventCtx, ct)) {
                 case AdviseResult.Continue:
@@ -210,84 +209,29 @@ public sealed class RabbitMqConsumerHost : BackgroundService
                     break;
             }
 
-            foreach (var observer in scope.ServiceProvider.GetServices<IEventLifecycleObserver>()) {
+            Exception? observerFailure = null;
+            // Audit-last ordering is enforced here regardless of DI registration order: application
+            // observers run before SchemataEventAuditObserver so the audit record sees their outcome.
+            var observers = scope.ServiceProvider.GetServices<IEventLifecycleObserver>()
+                                 .OrderBy(observer => observer is SchemataEventAuditObserver);
+            foreach (var observer in observers) {
                 try {
                     await observer.OnConsumedAsync(eventCtx, ct);
                 } catch (Exception ex) {
-                    _logger?.LogWarning(ex,
-                                        "IEventLifecycleObserver.OnConsumedAsync threw for event '{EventType}'.",
-                                        eventCtx.EventType);
+                    // The audit observer runs last in the enforced audit-last order, so it persists the
+                    // first failure through EventContext.Exception before it escapes to the consumer loop.
+                    if (observerFailure is null) {
+                        observerFailure    = ex;
+                        eventCtx.Exception = ex;
+                    }
                 }
             }
-        }
 
-        return true;
-    }
-
-    private async Task<bool> HandleRequestAsync(
-        IChannel           channel,
-        HandlerResolver    resolver,
-        IEventTypeRegistry registry,
-        Type               requestType,
-        string             body,
-        string?            correlationId,
-        CancellationToken  ct
-    ) {
-        var responseType = GetResponseType(requestType);
-        if (responseType is null) {
-            return false;
-        }
-
-        var request = JsonSerializer.Deserialize(body, requestType, _json);
-        if (request is null) {
-            return false;
-        }
-
-        var method        = typeof(HandlerResolver).GetMethod(nameof(HandlerResolver.InvokeRequestHandlerAsync))!;
-        var genericMethod = method.MakeGenericMethod(requestType, responseType);
-        object? result;
-        try {
-            result = genericMethod.Invoke(resolver, [request, ct]);
-        } catch (TargetInvocationException tie) when (tie.InnerException is not null) {
-            // Reflection wraps a synchronous throw from the resolver method; surface the real
-            // handler failure.
-            ExceptionDispatchInfo.Capture(tie.InnerException).Throw();
-            throw;
-        }
-
-        if (result is not Task task) {
-            return false;
-        }
-
-        await task;
-
-        var response           = AppDomainTypeCache.GetProperty(task.GetType(), nameof(Task<>.Result))?.GetValue(task);
-        var responseRoutingKey = registry.RequireName(responseType);
-        var responseBody       = JsonSerializer.SerializeToUtf8Bytes(response, responseType, _json);
-
-        var props = new BasicProperties {
-            ContentType = "application/json",
-            DeliveryMode = DeliveryModes.Persistent,
-            CorrelationId = correlationId,
-        };
-
-        await _channelLock.WaitAsync(ct);
-        try {
-            await channel.BasicPublishAsync(_options.Value.ExchangeName, responseRoutingKey, true, props, responseBody, ct);
-        } finally {
-            _channelLock.Release();
-        }
-
-        return true;
-    }
-
-    private static Type? GetResponseType(Type requestType) {
-        foreach (var type in requestType.GetInterfaces()) {
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IRequest<>)) {
-                return type.GetGenericArguments()[0];
+            if (observerFailure is not null) {
+                ExceptionDispatchInfo.Capture(observerFailure).Throw();
             }
         }
 
-        return null;
+        return true;
     }
 }

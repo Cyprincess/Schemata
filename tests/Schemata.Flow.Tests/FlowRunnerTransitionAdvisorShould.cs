@@ -144,6 +144,9 @@ public class FlowRunnerTransitionAdvisorShould
         });
 
         var collection = new ServiceCollection()
+                        .AddLogging()
+                        .AddSingleton(registry.Object)
+                        .AddSingleton<IOptions<SchemataFlowOptions>>(Options.Create(new SchemataFlowOptions()))
                         .AddSingleton(processes.Object)
                         .AddSingleton(Repository<SchemataProcessToken>(harness.UnitOfWork.Object).Object)
                         .AddSingleton(Repository<SchemataProcessTransition>(harness.UnitOfWork.Object).Object)
@@ -156,12 +159,10 @@ public class FlowRunnerTransitionAdvisorShould
             collection.AddSingleton(advisor(harness).Object);
         }
 
+        collection.AddSchemataFlow();
         var services = collection.BuildServiceProvider();
 
-        var notifier = new ProcessLifecycleNotifier([], Mock.Of<ILogger<ProcessLifecycleNotifier>>());
-        harness.Runner = new FlowRunner(registry.Object, new ProcessPersistence(), notifier, services,
-                                        services.GetRequiredService<IServiceScopeFactory>(),
-                                        Options.Create(new SchemataFlowOptions()));
+        harness.Runner = services.GetRequiredService<FlowRunner>();
         return harness;
     }
 

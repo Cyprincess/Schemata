@@ -21,6 +21,7 @@ public class AdvisorOrderShould
     public void DefaultOrders_Match_AddAdvisorChain() {
         Assert.Equal(
             [
+                90_000_000,
                 100_000_000,
                 110_000_000,
                 120_000_000,
@@ -32,6 +33,7 @@ public class AdvisorOrderShould
                 900_000_000,
             ],
             [
+                AdviceAddIdentifier.DefaultOrder,
                 AdviceAddTimestamp.DefaultOrder,
                 AdviceAddConcurrency.DefaultOrder,
                 AdviceAddCanonicalName.DefaultOrder,
@@ -56,6 +58,7 @@ public class AdvisorOrderShould
 
         Assert.Collection(
             advisors,
+            advisor => Assert.IsType<AdviceAddIdentifier<AdvisorEntity>>(advisor),
             advisor => Assert.IsType<AdviceAddTimestamp<AdvisorEntity>>(advisor),
             advisor => Assert.IsType<AdviceAddConcurrency<AdvisorEntity>>(advisor),
             advisor => Assert.IsType<AdviceAddCanonicalName<AdvisorEntity>>(advisor),

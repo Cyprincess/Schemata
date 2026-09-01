@@ -98,6 +98,7 @@ public class RefreshTokenHandlerShould
         Assert.NotNull(result.Properties);
         Assert.Equal("auth-42", result.Properties![Properties.AuthorizationName]);
         Assert.Equal("session-xyz", result.Properties[Properties.SessionId]);
+        f.Tokens.Verify(value => value.RevokeAsync(f.RefreshToken, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

@@ -8,6 +8,7 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Resource.Foundation;
+using Schemata.Messaging.Skeleton;
 using Schemata.Resource.Grpc.Internal;
 using Schemata.Transport.Grpc;
 
@@ -56,19 +57,16 @@ internal static class ResourceCustomMethod
         var service    = GrpcResourceNaming.ServiceFullName(entity, descriptor);
 
         foreach (var method in methods) {
-            var handlerInterface = ResourceMethodHandlerHelper.FindHandlerInterface(method.Handler);
-            if (handlerInterface is null) {
+            var methodDescriptor = ResourceMethodHandlerHelper.Describe(entity, method.Handler);
+            if (methodDescriptor is null) {
                 continue;
             }
 
-            var arguments = handlerInterface.GetGenericArguments();
-            var request   = arguments[1];
-            var response  = arguments[2];
-
             var rpcName = GrpcResourceNaming.CustomMethodName(descriptor, method.Verb);
 
-            var generic = RegisterTypedMethod.MakeGenericMethod(typeof(TService), entity, request, response);
-            generic.Invoke(null, [context, config, service, rpcName, method.Verb, method.Handler]);
+            var generic = RegisterTypedMethod.MakeGenericMethod(
+                typeof(TService), entity, methodDescriptor.Request, methodDescriptor.Response);
+            generic.Invoke(null, [context, config, service, rpcName, method.Verb]);
         }
     }
 
@@ -77,12 +75,11 @@ internal static class ResourceCustomMethod
         ResourceBinderConfiguration            config,
         string                                 service,
         string                                 rpcName,
-        string                                 verb,
-        Type                                   handlerType
+        string                                 verb
     )
         where TService : class
         where TEntity : class, ICanonicalName
-        where TRequest : class
+        where TRequest : class, IRequest<TResponse>, IRequestPrincipal
         where TResponse : class, ICanonicalName {
         var rpc = new Method<TRequest, TResponse>(
             MethodType.Unary,
@@ -91,25 +88,22 @@ internal static class ResourceCustomMethod
             GrpcMarshallers.Create<TRequest>(config.Model),
             GrpcMarshallers.Create<TResponse>(config.Model));
 
-        context.AddUnaryMethod(rpc, [], (_, request, callContext) => InvokeAsync<TEntity, TRequest, TResponse>(request, callContext, verb, handlerType));
+        context.AddUnaryMethod(rpc, [], (_, request, callContext) => InvokeAsync<TEntity, TRequest, TResponse>(request, callContext, verb));
     }
 
     private static async Task<TResponse> InvokeAsync<TEntity, TRequest, TResponse>(
         TRequest          request,
         ServerCallContext ctx,
-        string            verb,
-        Type              handlerType
+        string            verb
     )
         where TEntity : class, ICanonicalName
-        where TRequest : class
+        where TRequest : class, IRequest<TResponse>, IRequestPrincipal
         where TResponse : class, ICanonicalName {
         var http      = ctx.GetHttpContext();
         var sp        = http.RequestServices;
         var operation = sp.GetRequiredService<ResourceMethodOperationHandler<TEntity, TRequest, TResponse>>();
-        var handler   = (IResourceMethodHandler<TEntity, TRequest, TResponse>)sp.GetRequiredService(handlerType);
+        var name      = (request as ICanonicalName)?.CanonicalName;
 
-        var name = (request as ICanonicalName)?.CanonicalName;
-
-        return await operation.InvokeAsync(handler, verb, name, request, http.User, ctx.CancellationToken);
+        return await operation.InvokeAsync(verb, name, request, http.User, ctx.CancellationToken);
     }
 }

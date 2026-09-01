@@ -30,6 +30,7 @@
     <ProjectReference Include="..\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
     <ProjectReference Include="..\Schemata.Expressions.Skeleton\Schemata.Expressions.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Flow.Skeleton\Schemata.Flow.Skeleton.csproj" />
+    <ProjectReference Include="..\Schemata.Messaging.Skeleton\Schemata.Messaging.Skeleton.csproj" />
   </ItemGroup>
 
 </Project>

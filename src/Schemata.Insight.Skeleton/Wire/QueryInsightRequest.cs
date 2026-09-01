@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Security.Claims;
+using System.Text.Json.Serialization;
 
 namespace Schemata.Insight.Skeleton;
 
@@ -30,7 +32,7 @@ public enum JoinKind
 public sealed record JoinSpec(string Left, string Right, JoinKind Kind, InsightExpression On);
 
 /// <summary>A federated read query: sources, joins, an ordered transformation pipeline, and nested selections.</summary>
-public sealed class QueryInsightRequest
+public sealed class QueryInsightRequest : IInsightQuery<QueryInsightResponse>
 {
     /// <summary>The bound sources (at least one); FROM/JOIN inputs.</summary>
     public IList<SourceBinding> Sources { get; set; } = [];
@@ -55,4 +57,17 @@ public sealed class QueryInsightRequest
 
     /// <summary>The request-level default expression language; each slot may override it.</summary>
     public string? Language { get; set; }
+
+    /// <summary>
+    ///     The caller the query runs as. Source-level and row-level security read it from here, so it is
+    ///     never serialized onto the wire.
+    /// </summary>
+    /// <remarks>
+    ///     The dispatching entry point sets this immediately before handing the request to its handler.
+    ///     A request instance therefore belongs to exactly one dispatch: sharing one across concurrent
+    ///     calls lets a later caller's principal overwrite an earlier one still in flight, and the query
+    ///     would run under the wrong identity. Construct a request per call.
+    /// </remarks>
+    [JsonIgnore]
+    public ClaimsPrincipal? Principal { get; set; }
 }

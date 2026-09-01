@@ -1,7 +1,9 @@
+using Schemata.Messaging.Skeleton;
+
 namespace Schemata.Event.Skeleton;
 
 /// <summary>
 ///     Marker interface for event payloads published through
 ///     <see cref="IEventBus" />.
 /// </summary>
-public interface IEvent;
+public interface IEvent : IMessage;

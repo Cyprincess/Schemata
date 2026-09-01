@@ -7,10 +7,13 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Entity.Repository;
+using Schemata.Messaging.Skeleton;
+using Schemata.Scheduling.Foundation.Commands;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Advisors;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -24,8 +27,9 @@ namespace Schemata.Scheduling.Foundation;
 ///     rows whose <see cref="SchemataJobExecution.StartTime" /> has arrived, claims each with a
 ///     <see cref="ExecutionState.Pending" /> → <see cref="ExecutionState.Running" /> transition
 ///     guarded by the concurrency token, runs the advisor / observer / job-body pipeline, records
-///     the terminal state, and advances recurring schedules. Multiple dispatchers can scale
-///     execution horizontally; only the row claim serializes them.
+///     the terminal state, and dispatches <see cref="Commands.StageJobExecutionResultRequest" /> so
+///     the scheduling writer stages the job row and re-arms recurring schedules. Multiple
+///     dispatchers can scale execution horizontally; only the row claim serializes them.
 /// </summary>
 public sealed class JobExecutionDispatcher(
     IServiceProvider                 services,
@@ -105,7 +109,7 @@ public sealed class JobExecutionDispatcher(
 
     /// <summary>
     ///     Runs the advisor → observer → job-body pipeline for a claimed execution row, records the
-    ///     terminal state, and advances recurring schedules. Pipeline context and scheduling state
+    ///     terminal state, and stages the job-row result. Pipeline context and scheduling state
     ///     are sourced from the durable row.
     /// </summary>
     private async Task RunPipelineAsync(
@@ -125,6 +129,7 @@ public sealed class JobExecutionDispatcher(
         var context   = BuildContext(execution);
 
         var adviceCtx = new AdviceContext(serviceProvider);
+        using var adviceScope = AdviceContext.Establish(adviceCtx);
         adviceCtx.Set(job);
 
         switch (await Advisor.For<IJobExecutionAdvisor>().RunAsync(adviceCtx, context, ct)) {
@@ -175,10 +180,10 @@ public sealed class JobExecutionDispatcher(
     }
 
     /// <summary>
-    ///     Writes the terminal execution row, then runs the matching lifecycle observers and advances
-    ///     a recurring job to its next occurrence. The claimed <paramref name="execution" /> instance
-    ///     carries its expected concurrency token, so a concurrent cancellation aborts finalization
-    ///     instead of overwriting it.
+    ///     Writes the terminal execution row, stages the job-row result through the scheduling
+    ///     writer, then runs the matching lifecycle observers against the post-write job fields.
+    ///     The claimed <paramref name="execution" /> instance carries its expected concurrency
+    ///     token, so a concurrent cancellation aborts finalization instead of overwriting it.
     /// </summary>
     private async Task FinalizeAsync(
         IServiceProvider                  serviceProvider,
@@ -207,11 +212,11 @@ public sealed class JobExecutionDispatcher(
             return;
         }
 
-        // Advance the in-memory job row so observers and the next occurrence see the post-fire view.
+        // Advance the in-memory job row so observers always see the post-fire view; the staging handler
+        // persists these fields only when the persisted job row exists.
         job.RecentRunTime = execution.EndTime;
         job.RecentError   = state == ExecutionState.Failed ? exception?.Message : null;
 
-        var scheduler = serviceProvider.GetRequiredService<IScheduler>();
         var recurring = job.ScheduleType is ScheduleType.Cron or ScheduleType.Periodic;
 
         if (state == ExecutionState.Failed) {
@@ -219,6 +224,20 @@ public sealed class JobExecutionDispatcher(
         } else if (!recurring) {
             job.State       = JobState.Completed;
             job.NextRunTime = null;
+        }
+
+        // Recurring active jobs carry their next occurrence in the staged payload; the staging
+        // handler recomputes from the freshly loaded persisted schedule only when the FireAll
+        // missed-fire walk exhausts its cap.
+        if (recurring && job is { State: JobState.Active }) {
+            job.NextRunTime = ComputeNextRunTime(job);
+        }
+
+        var identity = job.CanonicalName ?? job.Name ?? execution.Job;
+        if (!string.IsNullOrWhiteSpace(identity)) {
+            var dispatcher = serviceProvider.GetRequiredService<IRequestDispatcher>();
+            await dispatcher.SendAsync<StageJobExecutionResultRequest, Unit>(
+                new(identity, job.State, job.RecentRunTime, job.RecentError, job.NextRunTime), ct);
         }
 
         foreach (var observer in observers) {
@@ -234,14 +253,6 @@ public sealed class JobExecutionDispatcher(
                 }
             } catch (Exception observerEx) {
                 logger?.LogWarning(observerEx, "Lifecycle observer threw while finalizing job '{JobName}'.", job.Name);
-            }
-        }
-
-        // Recurring jobs re-arm their next occurrence; the scheduler materializes the next Pending row.
-        if (recurring && job is { State: JobState.Active, Name: not null }) {
-            job.NextRunTime = ComputeNextRunTime(job);
-            if (job.NextRunTime is not null) {
-                await scheduler.ScheduleAsync(job, ct);
             }
         }
     }

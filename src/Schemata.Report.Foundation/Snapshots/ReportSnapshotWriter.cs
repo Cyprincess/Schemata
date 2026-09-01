@@ -147,10 +147,8 @@ public sealed class ReportSnapshotWriter<TReport, TSnapshot, TChunk>
 
     private static TSnapshot CreateHeader(SchemataReport? report, ReportRunKind kind, string? operation) {
         var reportName = report?.Name ?? "inline";
-        var uid        = Identifiers.NewUid();
-        var name       = uid.ToString("n");
+        var name       = Identifiers.NewUid().ToString("n");
         return new() {
-            Uid           = uid,
             Name          = name,
             Report        = reportName,
             CanonicalName = $"reports/{reportName}/snapshots/{name}",
@@ -197,7 +195,6 @@ public sealed class ReportSnapshotWriter<TReport, TSnapshot, TChunk>
         var repository = scope.ServiceProvider.GetRequiredService<IRepository<TChunk>>();
         var chunkName  = $"chunk-{index}";
         var chunk = new TChunk {
-            Uid           = Identifiers.NewUid(),
             Name          = chunkName,
             Report        = header.Report,
             Snapshot      = header.Name,

@@ -4,7 +4,7 @@
 project reference: `Schemata.Application.Modular.Targets.targets` stamps an
 `[assembly: ModuleAttribute("<name>")]` onto the host during build, so application authors never
 write the attribute by hand. The runtime feature, `SchemataModulesFeature<TProvider, TRunner>`,
-runs at Priority 520,000,000 and drives a three-phase lifecycle on every discovered module.
+runs at Priority 540,000,000 and drives a three-phase lifecycle on every discovered module.
 
 ## Where the code lives
 
@@ -78,7 +78,7 @@ not set `UseModularTargets=true`, so no module attributes are stamped.
 ## Runtime sequence
 
 `UseModular()` adds `SchemataModulesFeature<DefaultModulesProvider, DefaultModulesRunner>` at
-`Priority = SchemataConstants.Orders.Extension + 120_000_000` (520,000,000).
+`Priority = SchemataConstants.Orders.Extension + 140_000_000` (540,000,000).
 
 **ConfigureServices.**
 

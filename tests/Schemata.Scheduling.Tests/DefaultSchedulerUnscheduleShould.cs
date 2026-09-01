@@ -27,8 +27,14 @@ public class DefaultSchedulerUnscheduleShould
         var executions = new Mock<IRepository<SchemataJobExecution>>();
         executions.Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(), It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> _, CancellationToken _) => Empty());
-        var services = new ServiceCollection().AddSingleton(jobs.Object).AddSingleton(executions.Object).BuildServiceProvider();
-        var scheduler = new DefaultScheduler(services, Options.Create(new SchemataSchedulingOptions()));
+        var services = new ServiceCollection()
+                      .AddSingleton(jobs.Object)
+                      .AddSingleton(executions.Object)
+                      .AddSingleton<IOptions<SchemataSchedulingOptions>>(
+                           Options.Create(new SchemataSchedulingOptions()))
+                      .AddSchemataScheduling()
+                      .BuildServiceProvider();
+        var scheduler = services.GetRequiredService<DefaultScheduler>();
         await scheduler.StartAsync(CancellationToken.None);
 
         await scheduler.UnscheduleAsync("jobs/a", CancellationToken.None);

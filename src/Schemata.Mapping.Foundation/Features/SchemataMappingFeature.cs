@@ -17,7 +17,7 @@ public static class SchemataMappingFeature
     /// <summary>
     ///     Default priority for the mapping feature in the extension feature range.
     /// </summary>
-    public const int DefaultPriority = Orders.Extension + 60_000_000;
+    public const int DefaultPriority = Orders.Extension + 70_000_000;
 }
 
 /// <summary>

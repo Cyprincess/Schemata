@@ -10,51 +10,45 @@ using Schemata.Advice;
 using Schemata.Common;
 using Schemata.Common.Errors;
 using Schemata.Entity.Repository;
+using Schemata.Messaging.Skeleton;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Foundation.Internal;
 
 namespace Schemata.Resource.Foundation;
 
 /// <summary>
-///     Coordinates the advisor pipeline for an AIP-136 custom method invocation:
-///     <see cref="IResourceRequestAdvisor{TEntity}" /> gate
-///     -> <see cref="IResourceMethodRequestAdvisor{TEntity, TRequest}" /> request stage
-///     -> <see cref="IResourceMethodAdvisor{TEntity, TRequest, TResponse}" /> method stage
-///     -> registered <see cref="IResourceMethodHandler{TEntity,TRequest,TResponse}" />
-///     -> <see cref="IResourceResponseAdvisor{TEntity, TResponse}" /> response stage.
-///     Each stage may short-circuit by stashing a <typeparamref name="TResponse" />
-///     in the <see cref="AdviceContext" /> and returning
-///     <see cref="AdviseResult.Handle" />.
+///     Runs the AIP-136 resource advisor pipeline, validates an instance target, and dispatches the
+///     resulting request through the unified request pipeline. Each resource-advisor stage may
+///     short-circuit with a response stored in its
+///     <see cref="AdviceContext" />.
 /// </summary>
 /// <typeparam name="TEntity">The resource entity type.</typeparam>
 /// <typeparam name="TRequest">The custom method's request DTO type.</typeparam>
 /// <typeparam name="TResponse">The custom method's response type.</typeparam>
 public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
     where TEntity : class, ICanonicalName
-    where TRequest : class
+    where TRequest : class, IRequest<TResponse>, IRequestPrincipal
     where TResponse : class, ICanonicalName
 {
+    private readonly IRequestDispatcher   _dispatcher;
     private readonly IRepository<TEntity> _repository;
     private readonly IServiceProvider     _sp;
 
-    /// <summary>
-    ///     Initializes the custom-method operation handler.
-    /// </summary>
-    /// <param name="repository">The repository for loading instance-scoped resources.</param>
-    /// <param name="sp">The service provider for resolving advisors and options.</param>
-    public ResourceMethodOperationHandler(IRepository<TEntity> repository, IServiceProvider sp) {
+    /// <summary>Initializes the custom-method operation pipeline.</summary>
+    public ResourceMethodOperationHandler(
+        IRepository<TEntity> repository,
+        IServiceProvider     sp,
+        IRequestDispatcher   dispatcher
+    ) {
         _repository = repository;
         _sp         = sp;
+        _dispatcher = dispatcher;
     }
 
     /// <summary>
-    ///     Runs the full custom-method advisor pipeline around the registered
-    ///     handler.
+    ///     Runs the full custom-method resource advisor pipeline, then dispatches the request
+    ///     through the command or query pipeline.
     /// </summary>
-    /// <param name="handler">
-    ///     The resolved handler implementing
-    ///     <see cref="IResourceMethodHandler{TEntity, TRequest, TResponse}" />.
-    /// </param>
     /// <param name="verb">
     ///     The verb in lowerCamelCase as declared by
     ///     <see cref="Schemata.Abstractions.Resource.ResourceMethodAttribute" />.
@@ -79,30 +73,35 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
     /// <exception cref="NotFoundException">
     ///     An advisor stage blocked the invocation.
     /// </exception>
+    /// <remarks>
+    ///     The resource pipeline is the transport-facing root for authorization and target
+    ///     validation. Dispatch then runs command or query advisors and the single request
+    ///     handler with the same principal supplied by HTTP or gRPC.
+    /// </remarks>
     public async Task<TResponse> InvokeAsync(
-        IResourceMethodHandler<TEntity, TRequest, TResponse> handler,
-        string                                               verb,
-        string?                                              name,
-        TRequest                                             request,
-        ClaimsPrincipal?                                     principal,
-        CancellationToken?                                   ct
+        string           verb,
+        string?          name,
+        TRequest         request,
+        ClaimsPrincipal? principal,
+        CancellationToken? ct
     ) {
         ct ??= CancellationToken.None;
+
+        using var scope = AdviceContext.Current is null ? AdviceContext.Establish(new AdviceContext(_sp)) : null;
 
         var ctx = ResourceAdviceContext.Create(_sp);
         ctx.Set(new ResourceMethodVerb(verb));
 
-        return await InvokeCoreAsync(ctx, handler, verb, name, request, principal, ct.Value);
+        return await InvokeCoreAsync(ctx, verb, name, request, principal, ct.Value);
     }
 
     private async Task<TResponse> InvokeCoreAsync(
-        AdviceContext                                        ctx,
-        IResourceMethodHandler<TEntity, TRequest, TResponse> handler,
-        string                                               verb,
-        string?                                              name,
-        TRequest                                             request,
-        ClaimsPrincipal?                                     principal,
-        CancellationToken                                    ct
+        AdviceContext    ctx,
+        string           verb,
+        string?          name,
+        TRequest         request,
+        ClaimsPrincipal? principal,
+        CancellationToken ct
     ) {
         var gate = await ResourcePipelineRunner<string>.RunAsync<TResponse>(
             ctx, () => Advisor.For<IResourceRequestAdvisor<TEntity>>().RunAsync(ctx, principal, verb, ct),
@@ -149,7 +148,8 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
             }
         }
 
-        var response = await handler.InvokeAsync(name, request, entity, principal, ct);
+        request.Principal = principal;
+        var response = await _dispatcher.SendAsync<TRequest, TResponse>(request, ct);
 
         var responseResult = await ResourcePipelineRunner<string>.RunAsync<TResponse>(
             ctx,

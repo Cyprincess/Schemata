@@ -116,9 +116,11 @@ public sealed class NotificationService(IPushService push)
 }
 ```
 
-`SendAsync` runs the advisor pipeline, fans out to every transport concurrently, and yields one
-`TransportResult` per transport in completion order. The console transport delivers to the subscribed
-device and reports `Sent`; a transport with no matching subscription reports `Skipped`.
+`SendAsync` runs the advisor pipeline and fans out to every transport concurrently. The facade keeps
+its `IAsyncEnumerable<TransportResult>` signature, but it now awaits the whole dispatch and then
+yields the collected results, so every transport's outcome arrives together rather than one per
+completion; the result set is unchanged. The console transport delivers to the subscribed device and
+reports `Sent`; a transport with no matching subscription reports `Skipped`.
 
 ## Targets
 

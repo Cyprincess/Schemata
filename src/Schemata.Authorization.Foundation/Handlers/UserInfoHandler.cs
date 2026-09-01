@@ -34,6 +34,7 @@ public sealed class UserInfoHandler(IServiceProvider sp) : UserInfoEndpoint
 {
     public override async Task<AuthorizationResult> HandleAsync(ClaimsPrincipal principal, CancellationToken ct) {
         var ctx = new AdviceContext(sp);
+        using var _ = AdviceContext.Establish(ctx);
 
         var sub    = principal.FindFirstValue(IdentityClaims.Subject);
         var scope  = principal.FindFirstValue(Claims.Scope);

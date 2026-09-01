@@ -1,9 +1,10 @@
 using System.ComponentModel;
 using System.Linq;
 using System.Text.Json;
+using System.Threading.Tasks;
 using Moq;
 using Schemata.Abstractions.Entities;
-using Schemata.Flow.Foundation;
+using Schemata.Flow.Foundation.Handlers;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
 using Xunit;
@@ -15,8 +16,8 @@ public class ProcessDefinitionGraphProjectionShould
     private const string ConditionText = "amount > 1000 /* guard-sentinel */";
 
     [Fact]
-    public void PlaceEveryElementInItsOwnScope() {
-        var info = Project();
+    public async Task PlaceEveryElementInItsOwnScope() {
+        var info = await Project();
 
         Assert.Null(Element(info, "start").Scope);
         Assert.Null(Element(info, "sub").Scope);
@@ -26,8 +27,8 @@ public class ProcessDefinitionGraphProjectionShould
     }
 
     [Fact]
-    public void AttachBoundaryEventsToTheirHost() {
-        var info = Project();
+    public async Task AttachBoundaryEventsToTheirHost() {
+        var info = await Project();
 
         Assert.Equal("sub", Element(info, "onTimeout").AttachedTo);
         Assert.Equal("sub", Element(info, "onNudge").AttachedTo);
@@ -37,8 +38,8 @@ public class ProcessDefinitionGraphProjectionShould
     }
 
     [Fact]
-    public void ReportTheEventDefinitionShapeNotOnlyItsName() {
-        var info = Project();
+    public async Task ReportTheEventDefinitionShapeNotOnlyItsName() {
+        var info = await Project();
 
         Assert.Equal("TimerDefinition", Element(info, "onTimeout").TriggerKind);
         Assert.Equal("Message", Element(info, "onNudge").TriggerKind);
@@ -48,8 +49,8 @@ public class ProcessDefinitionGraphProjectionShould
     }
 
     [Fact]
-    public void ReportTerminationAndLoopAndEventSubProcessShapes() {
-        var info = Project();
+    public async Task ReportTerminationAndLoopAndEventSubProcessShapes() {
+        var info = await Project();
 
         Assert.True(Element(info, "abort").IsTerminate);
         Assert.False(Element(info, "done").IsTerminate);
@@ -63,8 +64,8 @@ public class ProcessDefinitionGraphProjectionShould
     }
 
     [Fact]
-    public void MarkConditionalAndDefaultEdges() {
-        var info = Project();
+    public async Task MarkConditionalAndDefaultEdges() {
+        var info = await Project();
 
         var conditional = Flow(info, "decide", "abort");
         Assert.True(conditional.IsConditional);
@@ -76,8 +77,8 @@ public class ProcessDefinitionGraphProjectionShould
     }
 
     [Fact]
-    public void RenderEveryNodeEventDefinitionMessageAndEdgeWithoutAClientDictionary() {
-        var info = Project();
+    public async Task RenderEveryNodeEventDefinitionMessageAndEdgeWithoutAClientDictionary() {
+        var info = await Project();
 
         Assert.All(info.Elements, element => Assert.False(string.IsNullOrEmpty(element.DisplayName)));
         Assert.All(info.Flows, flow => Assert.False(string.IsNullOrEmpty(flow.DisplayName)));
@@ -89,15 +90,15 @@ public class ProcessDefinitionGraphProjectionShould
     }
 
     [Fact]
-    public void KeepConditionExpressionsOffTheWire() {
-        var json = JsonSerializer.Serialize(Project());
+    public async Task KeepConditionExpressionsOffTheWire() {
+        var json = JsonSerializer.Serialize(await Project());
 
         Assert.DoesNotContain("guard-sentinel", json);
     }
 
     [Fact]
-    public void KeepElementNamesStableWhenLabelsChange() {
-        var before = Project().Elements.Select(e => e.Name).ToArray();
+    public async Task KeepElementNamesStableWhenLabelsChange() {
+        var before = (await Project()).Elements.Select(e => e.Name).ToArray();
 
         var definition = Definition();
         foreach (var element in definition.AllElements) {
@@ -105,7 +106,7 @@ public class ProcessDefinitionGraphProjectionShould
             element.DisplayNames = null;
         }
 
-        Assert.Equal(before, Project(definition).Elements.Select(e => e.Name).ToArray());
+        Assert.Equal(before, (await Project(definition)).Elements.Select(e => e.Name).ToArray());
     }
 
     private static ProcessDefinitionElementInfo Element(ProcessDefinitionInfo info, string name) {
@@ -116,7 +117,7 @@ public class ProcessDefinitionGraphProjectionShould
         return Assert.Single(info.Flows, flow => flow.Source == source && flow.Target == target);
     }
 
-    private static ProcessDefinitionInfo Project(ProcessDefinition? definition = null) {
+    private static async Task<ProcessDefinitionInfo> Project(ProcessDefinition? definition = null) {
         var registration = new ProcessRegistration {
             Name          = "orders",
             Engine        = "StateMachine",
@@ -128,7 +129,7 @@ public class ProcessDefinitionGraphProjectionShould
         registry.Setup(r => r.GetRegisteredProcesses()).Returns(["orders"]);
         registry.Setup(r => r.GetRegistration("orders")).Returns(registration);
 
-        return Assert.Single(new ProcessDefinitionQueryService(registry.Object).ListProcessDefinitions());
+        return Assert.Single(await new DefaultListProcessDefinitionsHandler(registry.Object).HandleAsync(new()));
     }
 
     private static ProcessDefinition Definition() {

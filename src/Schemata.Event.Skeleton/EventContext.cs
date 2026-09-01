@@ -4,15 +4,14 @@ using Schemata.Event.Skeleton.Entities;
 namespace Schemata.Event.Skeleton;
 
 /// <summary>
-///     Per-dispatch context carrying the <see cref="IEvent" /> payload alongside
-///     the wire-format type, serialized body, correlation key, audit record,
-///     and the handler outcome (result or exception).
+///     Per-dispatch context carrying the event alongside the wire-format type, serialized body,
+///     correlation key, audit record, and the handler outcome (result or exception).
 /// </summary>
 public class EventContext
 {
     /// <summary>
-    ///     Creates a new <see cref="EventContext" /> for an <see cref="IEvent" /> being
-    ///     published or consumed.
+    ///     Creates a new <see cref="EventContext" /> for an <see cref="IEvent" /> being published or
+    ///     consumed.
     /// </summary>
     /// <param name="event">The event instance.</param>
     /// <param name="eventType">

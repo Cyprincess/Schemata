@@ -1,20 +1,28 @@
 using System;
+using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions;
 using Schemata.Identity.Foundation;
 using Schemata.Identity.Foundation.Advisors;
+using Schemata.Identity.Foundation.Commands;
 using Schemata.Identity.Foundation.Controllers;
 using Schemata.Identity.Foundation.Handlers;
 using Schemata.Identity.Foundation.Internal;
+using Schemata.Identity.Foundation.Queries;
+using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Advisors;
+using Schemata.Identity.Skeleton.Claims;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Json;
 using Schemata.Identity.Skeleton.Managers;
 using Schemata.Identity.Skeleton.Models;
 using Schemata.Identity.Skeleton.Services;
+using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Internal;
 using static Schemata.Abstractions.SchemataConstants;
 
 // ReSharper disable once CheckNamespace
@@ -64,6 +72,12 @@ public static class ServiceCollectionExtensions
                      manager.FeatureProviders.Add(new IdentityControllerFeatureProvider(typeof(AuthenticateController<TUser>)));
                  });
 
+        services.TryAddScoped<InProcessRequestDispatcher>();
+        services.TryAddScoped<IRequestDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+        services.TryAddScoped<ICommandDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+        services.TryAddScoped<IQueryDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+        services.TryAddScoped<IdentityOperationHandler<TUser>>();
+        AddIdentityHandlers<TUser>(services);
         services.TryAddScoped<IdentityHandler<TUser>>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IIdentityRequestAdvisor<>), typeof(AdviceRequestFeature<>)));
 
@@ -103,4 +117,63 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
+
+    private static void AddIdentityHandlers<TUser>(IServiceCollection services)
+        where TUser : SchemataUser, new() {
+        var user = typeof(TUser);
+        var principalResult = typeof(IdentityResult<ClaimsPrincipal>);
+        var unitResult      = typeof(IdentityResult<Unit>);
+        AddHandler(services, typeof(RegisterUserRequest<>), principalResult, typeof(RegisterUserHandler<>), user);
+        AddHandler(services, typeof(LoginUserRequest<>), principalResult, typeof(LoginUserHandler<>), user);
+        AddHandler(services, typeof(RefreshUserRequest<>), principalResult, typeof(RefreshUserHandler<>), user);
+        AddHandler(
+            services,
+            typeof(GetUserProfileQuery<>),
+            typeof(IdentityResult<ClaimsStore>),
+            typeof(GetUserProfileHandler<>),
+            user);
+        AddHandler(services, typeof(ChangeUserEmailRequest<>), unitResult, typeof(ChangeUserEmailHandler<>), user);
+        AddHandler(services, typeof(ChangeUserPhoneRequest<>), unitResult, typeof(ChangeUserPhoneHandler<>), user);
+        AddHandler(services, typeof(ChangeUserPasswordRequest<>), unitResult, typeof(ChangeUserPasswordHandler<>), user);
+        AddHandler(services, typeof(ForgotUserPasswordRequest<>), unitResult, typeof(ForgotUserPasswordHandler<>), user);
+        AddHandler(services, typeof(ResetUserPasswordRequest<>), unitResult, typeof(ResetUserPasswordHandler<>), user);
+        AddHandler(services, typeof(ConfirmUserRequest<>), unitResult, typeof(ConfirmUserHandler<>), user);
+        AddHandler(
+            services,
+            typeof(SendUserConfirmationCodeRequest<>),
+            unitResult,
+            typeof(SendUserConfirmationCodeHandler<>),
+            user);
+        AddHandler(
+            services,
+            typeof(GetUserAuthenticatorRequest<>),
+            typeof(IdentityResult<AuthenticatorResponse>),
+            typeof(GetUserAuthenticatorHandler<>),
+            user);
+        AddHandler(
+            services,
+            typeof(EnrollUserAuthenticatorRequest<>),
+            unitResult,
+            typeof(EnrollUserAuthenticatorHandler<>),
+            user);
+        AddHandler(
+            services,
+            typeof(DowngradeUserAuthenticatorRequest<>),
+            unitResult,
+            typeof(DowngradeUserAuthenticatorHandler<>),
+            user);
+    }
+
+    private static void AddHandler(
+        IServiceCollection services,
+        Type               request,
+        Type               response,
+        Type               handler,
+        Type               user
+    ) {
+        services.TryAddScoped(
+            typeof(IRequestHandler<,>).MakeGenericType(request.MakeGenericType(user), response),
+            handler.MakeGenericType(user));
+    }
+
 }

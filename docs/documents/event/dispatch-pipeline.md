@@ -4,8 +4,9 @@ The bus separates publishing from handler invocation through a transactional out
 runs the publish-side advisor pipeline, records an audit row, and returns; it does not call
 handlers. The `EventOutboxDispatcher` background service later claims that row and replays it through
 the handler resolver, the consume-side advisor pipeline, and the lifecycle observers.
-`SendAsync` is the exception: request/reply runs its single handler inline because the caller awaits
-the response.
+
+The bus is broadcast-only. Request/reply is a different shape — one handler, one answer — and lives
+on `IRequestDispatcher` in [Messaging](../messaging/overview.md).
 
 ## Where the code lives
 
@@ -25,8 +26,42 @@ the response.
    - `Continue` proceeds; `Block` throws `InvalidOperationException("Event publish blocked by advisor.")`;
      `Handle` with a value stashed in `AdviceContext` sets `Result` and returns without recording.
 4. Notifies every `IEventLifecycleObserver.OnPublishedAsync`. The audit observer writes a
-   `SchemataEvent` row in state `Pending` (because `RequiresOutboxDelivery` is set).
+   `SchemataEvent` row in state `Pending` (because `RequiresOutboxDelivery` is set) only when
+   the application has registered the Event audit Name advisor described in
+   [Audit row names](#audit-row-names); without it the canonical-name resolve throws and the
+   observer call exits without a row.
 5. Wakes the `EventOutboxDispatcher` via `NotifyPending()` and returns. No handler has run.
+
+## Audit row names
+
+The `SchemataEvent` row written by `SchemataEventAuditObserver` carries a canonical name
+(`CanonicalName`) derived from the entity's `[CanonicalName("events/{event}")]` pattern
+(see `Schemata.Event.Skeleton.Entities.SchemataEvent`). The leaf placeholder `{event}` binds to
+`ICanonicalName.Name` via `ResourceNameDescriptor`, so `CanonicalName` resolves to
+`events/{Name}` at add time. `Name` itself is not set by the observer; the observer copies the
+wire event type into `EventType` and leaves `Name` to the add pipeline.
+
+An application using `Schemata.Event.Foundation` audit persistence must therefore register an
+`IRepositoryAddAdvisor<SchemataEvent>` that copies `EventType` into `Name` before the canonical
+resolve runs. The relevant prefix of the built-in add-advisor chain is:
+
+1. `AdviceAddIdentifier<SchemataEvent>` at order `90_000_000` assigns `Uid`.
+2. `AdviceAddTimestamp<SchemataEvent>` at order `100_000_000` assigns creation and update times.
+3. `AdviceAddConcurrency<SchemataEvent>` at order `110_000_000` assigns the concurrency token.
+4. `AdviceAddCanonicalName<SchemataEvent>` at order `120_000_000` resolves `CanonicalName`.
+
+The application Name advisor runs at order `50_000_000`, before this built-in prefix.
+`AdviceAddCanonicalName<TEntity>` delegates to `ResourceNameDescriptor.Resolve`, which throws
+`ValidationException` when a required placeholder value is empty. With no Name advisor, `Name`
+is `null`, `Resolve` throws on `events/{event}`, and the audit observer's `AddAsync` call
+never commits a row.
+
+`InProcessEventBus.NotifyPublishedAsync` (see `Schemata.Event.Foundation.Internal.InProcessEventBus`)
+catches that exception, logs the literal
+`IEventLifecycleObserver.OnPublishedAsync threw for event '{EventType}'.` at `Warning`, and
+continues to the next observer. `PublishAsync` then wakes the outbox dispatcher and returns
+successfully. Storage contains no audit row. Application monitoring can treat that warning
+literal as an audit misconfiguration signal.
 
 ## Outbox dispatch
 
@@ -62,7 +97,9 @@ The in-process publisher (`InProcessEventOutboxPublisher.PublishAsync`) and the 
 3. Invoke handlers through `HandlerResolver.InvokeEventHandlersAsync` under the type's
    `EventRouting`.
 4. In a `finally` block, run the `IEventConsumeAdvisor` pipeline, then notify every
-   `IEventLifecycleObserver.OnConsumedAsync`.
+   `IEventLifecycleObserver.OnConsumedAsync`. The first observer failure is captured into
+   `EventContext.Exception` while the remaining observers still run; the captured exception is
+   rethrown after the loop (see [IEventLifecycleObserver](#ieventlifecycleobserver)).
 
 `EventContext.Result` (or `Exception`) reflects the handler outcome before the consume pipeline runs.
 
@@ -99,8 +136,20 @@ public interface IEventLifecycleObserver
 
 Registered through `TryAddEnumerable` as scoped. `OnPublishedAsync` fires after the publish advisor
 returns `Continue`; `OnDeliveredAsync` fires after a durable broker confirms a publish (the outbox
-path); `OnConsumedAsync` fires after handler dispatch settles. Observer failures in the consume
-notification are logged at `Warning` and swallowed so they cannot mask a handler exception.
+path); `OnConsumedAsync` fires after handler dispatch settles.
+
+Failure handling differs by callback:
+
+- `OnPublishedAsync`: the in-process bus catches each failure, logs it at `Warning`, and runs the
+  next observer, so a publish stays successful when an observer throws (see
+  [Audit row names](#audit-row-names)).
+- `OnDeliveredAsync`: a failure propagates. In the in-process replay it escapes before any handler
+  runs; in both outbox publishers it escapes to `EventOutboxDispatcher`'s failure path, which
+  returns the row to `Pending`, increments `RetryCount`, and records `RecentError`.
+- `OnConsumedAsync`: the first failure is captured into `EventContext.Exception` and the remaining
+  observers still run, so the audit observer can record `Failed` with `RecentError`; the captured
+  exception is then rethrown. `InProcessEventOutboxPublisher` and `RabbitMqConsumerHost` share the
+  pattern, and the rethrow reaches the outbox failure path or the RabbitMQ consumer loop.
 
 The built-in `SchemataEventAuditObserver`:
 
@@ -119,9 +168,11 @@ The built-in `SchemataEventAuditObserver`:
 - `CompetingConsumers` — invokes only the first registered `IEventHandler<TEvent>`.
 
 When no `IEventHandler<TEvent>` is registered, the resolver falls back to `IEventHandler<IEvent>`
-instances; with neither, it throws `InvalidOperationException`. For `SendAsync`,
-`InvokeRequestHandlerAsync<TRequest, TResponse>` requires exactly one
-`IRequestHandler<TRequest, TResponse>` and throws if zero or more than one are registered.
+instances; with neither, it throws `InvalidOperationException`.
+
+The resolver handles events only. `IRequest<TResponse>` and `IRequestHandler<TRequest, TResponse>`
+belong to `Schemata.Messaging.Skeleton`, and their dispatch belongs to `IRequestDispatcher` — see
+[Messaging](../messaging/overview.md).
 
 ## IEventDispatchContext
 
@@ -171,12 +222,10 @@ The default is `Broadcast`.
 
 - `PublishAsync` returns before any handler runs. Handler effects are observable only after the
   outbox dispatcher drains the row.
-- The consume advisor pipeline runs even when the publish advisor short-circuits via `Handle` on the
-  `SendAsync` path; `EventContext.Result` is set and `Exception` is null.
-- `IRequestHandler<TRequest, TResponse>` is single-handler only. Two registrations for the same
-  request type throw at dispatch.
 - `IEventHandler<IEvent>` is a fallback: it receives any event with no more specific handler
   registered.
+- An `IEventLifecycleObserver` that throws inside `OnDeliveredAsync` or `OnConsumedAsync` fails the
+  delivery; `OnPublishedAsync` failures in the in-process bus are isolated at `Warning`.
 
 ## See also
 

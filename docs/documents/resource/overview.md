@@ -4,7 +4,8 @@
 standard CRUD operations — List, Get, Create, Update, Delete — for one resource. Each operation executes a
 fixed sequence of advisor stages: a gate check, an operation-specific request chain, an optional entity-level
 chain, persistence, and a response chain. The handler holds no `HttpContext`; the HTTP and gRPC transports
-both call it, passing a `ClaimsPrincipal?` pulled from their own request context.
+reach it only through `IRequestDispatcher.SendAsync`, passing a `ClaimsPrincipal?` pulled from their own
+request context — see [Internal command dispatch](#internal-command-dispatch).
 
 ## Where the code lives
 
@@ -63,7 +64,7 @@ builder.UseSchemata(schema => {
 });
 ```
 
-`SchemataResourceFeature.DefaultPriority` is `Orders.Extension + 90_000_000` (490M). It declares
+`SchemataResourceFeature.DefaultPriority` is `Orders.Extension + 100_000_000` (500M).
 `[DependsOn<SchemataRoutingFeature>]`, so routing auto-registers. Anonymous-access plumbing
 (`AnonymousAccess`, `AnonymousGranted`) lives in `Schemata.Security.Skeleton`, which the resource feature
 consumes without pulling in `SchemataSecurityFeature`.
@@ -159,9 +160,9 @@ full filter pipeline (language resolution, residual evaluation, ordering) is cov
 
 ## Purge scoping
 
-`PurgeRequest` carries an optional `Parent` that narrows an AIP-165 purge to the child collection of
-one parent resource, applied through `ResourceIdentifiers.ApplyParent`. `Force = false` is a preview:
-the `PurgeJob` reports the matching rows (up to a 100-row sample) without deleting them. See
+`PurgeResourceRequest<TEntity>` (the AIP-165 purge wire DTO) carries an optional `Parent` that narrows a purge to
+the child collection of one parent resource, applied through `ResourceIdentifiers.ApplyParent`. `Force = false`
+is a preview: the `PurgeJob` reports the matching rows (up to a 100-row sample) without deleting them. See
 [Delete Pipeline](delete-pipeline.md).
 
 ## Handler stages
@@ -191,6 +192,45 @@ or the lowerCamelCase verb for an AIP-136 custom method. Each stage runs through
 
 Custom methods run through `ResourceMethodOperationHandler<TEntity, TRequest, TResponse>`, which mirrors the
 sequence with verb-scoped advisor sockets. See [Custom Methods](custom-methods.md).
+
+## Internal command dispatch
+
+`CreateResourceRequest<,,>`, `UpdateResourceRequest<,,>`, and `DeleteResourceRequest<,>` are
+`ICommand<TResult>`; `GetResourceQueryRequest<,>` and `ListResourceQueryRequest<,>` are
+`IQuery<TResult>`. Registering a resource with `Use<...>()` / `AddResource<T>()` registers the
+matching `Default{Create|Get|List|Update|Delete}ResourceHandler<TEntity,TRequest,TDetail,TSummary>`
+as `IRequestHandler<TRequest, TResponse>` (keyed `ResourceConstants.Handlers.Default`, with an
+unkeyed alias every dispatcher resolves through). Each default handler is a one-line forward into
+`ResourceOperationHandler`'s matching verb method — the stage pipeline above is the actual
+orchestration; the handler is just how the dispatcher reaches it.
+
+The HTTP controller and the gRPC service are the only production callers: both resolve
+`IRequestDispatcher` and call `SendAsync<TRequest, TResponse>` for every verb — there is no facade
+method that wraps the dispatcher the way `IFlowRunner`/`IScheduler`/`IInsightService` do for their
+modules. A registered `ICommandAdvisor<TRequest>` / `IQueryAdvisor<TRequest>`
+(`Schemata.Messaging.Skeleton.Advisors`) runs before the handler on every dispatch.
+
+**Unlike Flow, Scheduling, and Insight, `ResourceOperationHandler` does not dispatch — it *is* the
+continuation point for the CRUD verbs above.** Its `CreateAsync`/`GetAsync`/etc. read
+`AdviceContext.Current` (`ResourceAdviceContext.Create`) rather than resolving a dispatcher
+themselves, throwing `InvalidOperationException` when no ambient context exists; the dispatcher is
+the only caller that reaches it, so whatever a command/query advisor stashed with `ctx.Set<T>(...)`
+on the way in is visible to the resource advisors on the way through.
+
+**AIP-136 custom methods are not a continuation of the CRUD pipeline above — they are a second,
+independent ambient root whose own dispatch flows through `IRequestDispatcher` to the verb's
+`IRequestHandler<TRequest, TResponse>`.** `ResourceMethodOperationHandler` does not call
+`ResourceOperationHandler`; it runs its own advisor stages (`IResourceMethodRequestAdvisor` /
+`IResourceMethodAdvisor` / etc., see [Handler stages](#handler-stages) above) and is entered directly
+by `ResourceMethodController` / `ResourceCustomMethod` for authorization and target validation. It
+establishes its own `AdviceContext` when none is ambient — on the same footing as the dispatcher, not a
+downstream consumer of the CRUD dispatcher — then assigns `request.Principal = principal` and calls
+`IRequestDispatcher.SendAsync<TRequest, TResponse>(request, ct)`. The dispatcher runs any registered
+`ICommandAdvisor<TRequest>` / `IQueryAdvisor<TRequest>` before invoking the verb's single
+`IRequestHandler<TRequest, TResponse>`. The built-in soft-delete verbs (`undelete`, `expunge`, `purge`)
+follow the same path with their own `IRequestHandler<TRequest, TResponse>` implementations registered
+in DI as scoped. See [Messaging](../messaging/overview.md#ambient-advicecontext-root-establishes-downstream-continues)
+for the ambient `AdviceContext` rules and its sanctioned roots.
 
 ## Operation results
 
@@ -254,8 +294,8 @@ Each operation returns a thin result base carrying the response DTO:
   before persistence.
 - Implement `IResourceResponseAdvisor<TEntity, TDetail>` to post-process the response DTO (freshness,
   idempotency cache).
-- Implement `IResourceMethodHandler<TEntity, TRequest, TResponse>` for AIP-136 custom verbs; see
-  [Custom Methods](custom-methods.md).
+- Implement `IRequestHandler<TRequest, TResponse>` (`Schemata.Messaging.Skeleton`) for AIP-136 custom verbs
+  and reference the handler type from `[ResourceMethod]`; see [Custom Methods](custom-methods.md).
 - Register the advisors as scoped through `services.TryAddEnumerable(ServiceDescriptor.Scoped(...))`. Pick an
   `Order` outside the reserved `[100_000_000, 900_000_000]` window.
 

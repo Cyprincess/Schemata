@@ -6,11 +6,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Common;
 using Schemata.Entity.Repository;
+using Schemata.Messaging.Skeleton;
 using Schemata.Report.Foundation;
+using Schemata.Report.Foundation.Commands;
 using Schemata.Report.Skeleton;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -28,9 +31,13 @@ public class ReportGenerationJobShould
             context   = triggerContext;
             triggered = execution;
         });
+        var operations = new Mock<IOperationService>(MockBehavior.Strict);
         using var provider = ReportTestHost.Create(
             ReportTestHost.CreateDriver(ReportTestRows.Create(1)),
-            configure: services => services.AddSingleton(scheduler.Object));
+            configure: services => {
+                services.AddSingleton(scheduler.Object);
+                services.AddSingleton(operations.Object);
+            });
         var service = provider.GetRequiredService<IReportService>();
 
         var operation = await service.GenerateAsync(ReportTestHost.InlineRequest());
@@ -50,10 +57,17 @@ public class ReportGenerationJobShould
 
     [Fact]
     public async Task Job_Replays_Request_From_ArgsJson() {
-        var reportService = ReportTestHost.CreateReportService(new());
+        var runHandler = new Mock<IRequestHandler<RunReportRequest, ReportResult>>(MockBehavior.Strict);
+        runHandler.Setup(value => value.HandleAsync(
+                             It.Is<RunReportRequest>(replayed =>
+                                 replayed.Request.Persist
+                              && replayed.Request.Query != null
+                              && replayed.Principal == null),
+                             It.IsAny<CancellationToken>()))
+                  .ReturnsAsync(new ReportResult());
         using var provider = ReportTestHost.Create(
             ReportTestHost.CreateDriver(ReportTestRows.Create(1)),
-            configure: services => services.AddSingleton(reportService.Object));
+            configure: services => ReplaceRunHandler(services, runHandler.Object));
         var job = CreateJob(provider);
         var request = ReportTestHost.InlineRequest(persist: true);
 
@@ -61,22 +75,19 @@ public class ReportGenerationJobShould
             ArgsJson = JsonSerializer.Serialize(request, SchemataJson.Default),
         }, CancellationToken.None);
 
-        reportService.Verify(
-            value => value.RunAsync(
-                It.Is<ReportRequest>(replayed => replayed.Persist && replayed.Query != null),
-                null,
-                It.IsAny<CancellationToken>()),
-            Times.Once);
+        runHandler.VerifyAll();
     }
 
     [Fact]
     public async Task Job_Writes_Snapshot_Ref_To_Output() {
-        var reportService = ReportTestHost.CreateReportService(new() {
-            Snapshot = "reports/daily/snapshots/s1",
-        });
+        var expected = new ReportResult { Snapshot = "reports/daily/snapshots/s1" };
+        var runHandler = new Mock<IRequestHandler<RunReportRequest, ReportResult>>(MockBehavior.Strict);
+        runHandler.Setup(value => value.HandleAsync(
+                             It.IsAny<RunReportRequest>(), It.IsAny<CancellationToken>()))
+                  .ReturnsAsync(expected);
         using var provider = ReportTestHost.Create(
             ReportTestHost.CreateDriver(ReportTestRows.Create(1)),
-            configure: services => services.AddSingleton(reportService.Object));
+            configure: services => ReplaceRunHandler(services, runHandler.Object));
         var job = CreateJob(provider);
         var execution = new SchemataJobExecution { Uid = Guid.NewGuid() };
 
@@ -96,11 +107,14 @@ public class ReportGenerationJobShould
         response.Response.Rows.Add(new Dictionary<string, object?>());
         response.Response.Rows.Add(new Dictionary<string, object?>());
         response.Response.Rows.Add(new Dictionary<string, object?>());
-        var reportService = ReportTestHost.CreateReportService(response);
+        var runHandler = new Mock<IRequestHandler<RunReportRequest, ReportResult>>(MockBehavior.Strict);
+        runHandler.Setup(value => value.HandleAsync(
+                             It.IsAny<RunReportRequest>(), It.IsAny<CancellationToken>()))
+                  .ReturnsAsync(response);
         using var provider = ReportTestHost.Create(
             ReportTestHost.CreateDriver(ReportTestRows.Create(1)),
             maxInlineRows: 2,
-            configure: services => services.AddSingleton(reportService.Object));
+            configure: services => ReplaceRunHandler(services, runHandler.Object));
         var job = CreateJob(provider);
 
         var exception = await Assert.ThrowsAsync<ReportException>(async () => {
@@ -140,6 +154,22 @@ public class ReportGenerationJobShould
         Assert.Equal(SnapshotState.Cancelled, Assert.Single(state.Snapshots).State);
         Assert.Equal(2, state.Chunks.Count);
         Assert.Equal(0, state.ExecutionCommitCount);
+
+        var cancelledSnapshot = state.Snapshots[0];
+        Assert.Equal(
+            new[] { SnapshotState.Pending, SnapshotState.Running, SnapshotState.Cancelled },
+            state.SnapshotStateSequence);
+        Assert.Equal(2, state.ChunkAddSequence.Count);
+        for (var index = 0; index < state.ChunkAddSequence.Count; index++) {
+            var chunk = state.ChunkAddSequence[index];
+            Assert.Equal($"chunk-{index}", chunk.Name);
+            Assert.Equal(index, chunk.Index);
+            Assert.Equal($"{cancelledSnapshot.CanonicalName}/chunks/chunk-{index}", chunk.CanonicalName);
+            Assert.Equal(cancelledSnapshot.Report, chunk.Report);
+            Assert.Equal(cancelledSnapshot.Name, chunk.Snapshot);
+            Assert.Equal(2, chunk.RowCount);
+        }
+        Assert.Equal(2, state.ChunkRepositoryInstances);
     }
 
     [Fact]
@@ -204,6 +234,16 @@ public class ReportGenerationJobShould
         }, CancellationToken.None);
 
         Assert.Equal(ReportRunKind.Scheduled, Assert.Single(state.Snapshots).RunKind);
+    }
+
+    private static void ReplaceRunHandler(
+        IServiceCollection                                            services,
+        IRequestHandler<RunReportRequest, ReportResult> handler
+    ) {
+        services.RemoveAll<IRequestHandler<RunReportRequest, ReportResult>>();
+        services.RemoveAll<IReportService>();
+        services.AddSingleton(new Mock<IReportService>(MockBehavior.Strict).Object);
+        services.AddSingleton(handler);
     }
 
     private static ReportGenerationJob<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk> CreateJob(

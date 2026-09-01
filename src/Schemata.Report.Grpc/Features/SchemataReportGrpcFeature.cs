@@ -42,12 +42,12 @@ public sealed class SchemataReportGrpcFeature<TReport, TSnapshot, TChunk> : Feat
         };
         resources.Use<TReport, TReport, TReport, TReport>(
             [GrpcResourceAttribute.Name],
-            resource => resource.Methods = ReportResourceRegistration<TReport, TSnapshot>.ReportMethods);
+            resource => resource.Methods = ReportResourceRegistration<TReport, TSnapshot, TChunk>.ReportMethods);
         resources.Use<TSnapshot, TSnapshot, TSnapshot, TSnapshot>(
             [GrpcResourceAttribute.Name],
             resource => {
-                resource.Operations = ReportResourceRegistration<TReport, TSnapshot>.SnapshotOperations;
-                resource.Methods    = ReportResourceRegistration<TReport, TSnapshot>.SnapshotMethods;
+                resource.Operations = ReportResourceRegistration<TReport, TSnapshot, TChunk>.SnapshotOperations;
+                resource.Methods    = ReportResourceRegistration<TReport, TSnapshot, TChunk>.SnapshotMethods;
             });
     }
 }

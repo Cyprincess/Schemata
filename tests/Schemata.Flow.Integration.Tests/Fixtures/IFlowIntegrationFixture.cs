@@ -34,15 +34,7 @@ internal static class FlowFixtureServices
 
     internal static void AddFlowServices(IServiceCollection services) {
         services.AddLogging();
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddIdentifier<>)));
-        services.TryAddSingleton<IProcessRegistry, ProcessRegistry>();
-        services.TryAddSingleton<ProcessPersistence>();
-        services.TryAddScoped<ProcessLifecycleNotifier>();
-        services.TryAddScoped<FlowRunner>();
-        services.TryAddScoped<IFlowRunner>(sp => sp.GetRequiredService<FlowRunner>());
-        services.TryAddScoped<CorrelateMessageHandler>();
-        services.TryAddScoped<ThrowSignalHandler>();
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IFlowSourceAdvisor<>), typeof(AdviceSourceProjection<>)));
+        services.AddSchemataFlow();
         services.TryAddKeyedSingleton<IFlowRuntime, StateMachineEngine>(FlowConstants.Engines.StateMachine);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowEngineValidator, StateMachineFlowEngineValidator>());
         services.TryAddKeyedSingleton<IFlowRuntime, BpmnEngine>(FlowConstants.Engines.Bpmn);

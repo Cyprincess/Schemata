@@ -1,15 +1,19 @@
+using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using ProtoBuf.Grpc;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
+using Schemata.Messaging.Skeleton;
 using Schemata.Resource.Foundation;
+using Schemata.Resource.Foundation.Commands;
 
 namespace Schemata.Resource.Grpc;
 
 /// <summary>
 ///     Default gRPC service implementation that delegates every operation to
-///     <see cref="ResourceOperationHandler{TEntity,TRequest,TDetail,TSummary}" />,
+///     registered request handlers,
 ///     passing the current <see cref="HttpContext.User" /> and cancellation token.
 /// </summary>
 /// <typeparam name="TEntity">The persistent entity type.</typeparam>
@@ -29,20 +33,20 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary>
     protected readonly IHttpContextAccessor                                                Accessor;
 
     /// <summary>
-    ///     Handles resource operations for this service.
+    ///     Resolves request handlers for this service.
     /// </summary>
-    protected readonly ResourceOperationHandler<TEntity, TRequest, TDetail, TSummary>      Handler;
+    protected readonly IServiceProvider                                                    Services;
 
     /// <summary>
-    ///     Initializes a new instance with the operation handler and HTTP context accessor.
+    ///     Initializes a new instance with the scoped service provider and HTTP context accessor.
     /// </summary>
-    /// <param name="handler">The <see cref="ResourceOperationHandler{TEntity,TRequest,TDetail,TSummary}" />.</param>
+    /// <param name="services">The scoped service provider used to resolve request handlers.</param>
     /// <param name="accessor">The HTTP context accessor for retrieving the current user and cancellation token.</param>
     public ResourceService(
-        ResourceOperationHandler<TEntity, TRequest, TDetail, TSummary> handler,
-        IHttpContextAccessor                                           accessor
+        IServiceProvider     services,
+        IHttpContextAccessor accessor
     ) {
-        Handler  = handler;
+        Services = services;
         Accessor = accessor;
     }
 
@@ -54,30 +58,39 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary>
     #region IResourceService<TEntity,TRequest,TDetail,TSummary> Members
 
     public virtual async ValueTask<ListResultBase<TSummary>> ListAsync(ListRequest request, CallContext context = default) {
-        return await Handler.ListAsync(request, Http?.User, context.CancellationToken);
+        var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
+        return await dispatcher.SendAsync<ListResourceQueryRequest<TEntity, TSummary>, ListResultBase<TSummary>>(
+            new(request, Http?.User), context.CancellationToken);
     }
 
     public virtual async ValueTask<TDetail> GetAsync(GetRequest request, CallContext context = default) {
-        var result = await Handler.GetAsync(request, Http?.User, context.CancellationToken);
+        var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
+        var result = await dispatcher.SendAsync<GetResourceQueryRequest<TEntity, TDetail>, GetResultBase<TDetail>>(
+            new(request, Http?.User), context.CancellationToken);
 
         return result.Detail!;
     }
 
     public virtual async ValueTask<TDetail> CreateAsync(TRequest request, CallContext context = default) {
-        var result = await Handler.CreateAsync(request, Http?.User, context.CancellationToken);
+        var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
+        var result = await dispatcher.SendAsync<CreateResourceRequest<TEntity, TRequest, TDetail>, CreateResultBase<TDetail>>(
+            new(request, Http?.User), context.CancellationToken);
 
         return result.Detail!;
     }
 
     public virtual async ValueTask<TDetail> UpdateAsync(TRequest request, CallContext context = default) {
-        var result = await Handler.UpdateAsync(request.CanonicalName!, request, Http?.User, context.CancellationToken);
+        var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
+        var result = await dispatcher.SendAsync<UpdateResourceRequest<TEntity, TRequest, TDetail>, UpdateResultBase<TDetail>>(
+            new(request.CanonicalName!, request, Http?.User), context.CancellationToken);
 
         return result.Detail!;
     }
 
     public virtual async ValueTask<TDetail?> DeleteAsync(DeleteRequest request, CallContext context = default) {
-        var result = await Handler.DeleteAsync(
-            request.CanonicalName!, request.Etag, Http?.User, context.CancellationToken, request.AllowMissing);
+        var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
+        var result = await dispatcher.SendAsync<DeleteResourceRequest<TEntity, TDetail>, DeleteResultBase<TDetail>>(
+            new(request.CanonicalName!, request.Etag, Http?.User, request.AllowMissing), context.CancellationToken);
 
         return result.Detail;
     }

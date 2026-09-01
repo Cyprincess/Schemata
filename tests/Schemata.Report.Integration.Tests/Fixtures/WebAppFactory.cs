@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using Grpc.Net.Client;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,5 +30,10 @@ public sealed class WebAppFactory : WebApplicationFactory<Program>
         if (_configure is not null) {
             builder.ConfigureServices(_configure);
         }
+    }
+
+    public GrpcChannel CreateGrpcChannel() {
+        var client = CreateClient(new() { BaseAddress = new("http://localhost") });
+        return GrpcChannel.ForAddress(client.BaseAddress!, new() { HttpClient = client });
     }
 }

@@ -7,7 +7,7 @@ The scheduler persists job definitions and execution history in two tables: `Sch
 | Package                          | Key files                                                                                                                                                                                                                                                                                          |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Schemata.Scheduling.Skeleton`   | `Entities/SchemataJob.cs`, `Entities/SchemataJobExecution.cs`, `Entities/ScheduleType.cs`, `Entities/JobState.cs`, `Entities/ExecutionState.cs`, `ScheduleDefinitionMapper.cs`, `JobContext.cs`                                                                                                    |
-| `Schemata.Scheduling.Foundation` | `SchedulingInitializer.cs`, `JobExecutionDispatcher.cs`, `Observers/SchemataJobAuditObserver.cs`, `Internal/DefaultScheduler.Schedule.cs`, `Internal/DefaultScheduler.Trigger.cs`, `SchedulingResourceRegistration.cs`, `RunJobHandler.cs`, `CancelOperationHandler.cs`, `WaitOperationHandler.cs` |
+| `Schemata.Scheduling.Foundation` | `SchedulingInitializer.cs`, `JobExecutionDispatcher.cs`, `Internal/SchemataJobWriteGate.cs`, `Handlers/DefaultStageJobExecutionResultHandler.cs`, `Internal/DefaultScheduler.Schedule.cs`, `Internal/DefaultScheduler.Trigger.cs`, `SchedulingResourceRegistration.cs`, `RunJobHandler.cs`, `CancelOperationHandler.cs`, `WaitOperationHandler.cs` |
 
 ## SchemataJob
 
@@ -121,11 +121,22 @@ Resource purge uses `TriggerAsync<PurgeJob<TEntity>>`. `PurgeHandler<TEntity>` s
 
 ## Advancing NextRunTime
 
-After a successful fire, a skipped fire, or a blocked fire, `JobExecutionDispatcher` updates the in-memory job row and notifies observers. For one-time jobs, the job becomes `Completed` and `NextRunTime` becomes `null` unless the execution failed. For recurring jobs, the dispatcher computes the next run time from the job's current `NextRunTime` (falling back to now) and calls `IScheduler.ScheduleAsync` so the next `Pending` row is materialized.
+After a successful, skipped, or blocked fire, `JobExecutionDispatcher` computes the job row's post-fire fields and dispatches `StageJobExecutionResultRequest` carrying `State`, `RecentRunTime`, `RecentError`, and `NextRunTime`. `DefaultStageJobExecutionResultHandler` fresh-reads the persisted row, writes those four fields in one update, and for a recurring `Active` job materializes the next `Pending` execution row and arms its timer. A failed one-time job stages `Failed`; a failed recurring job stays `Active` so its next occurrence still fires. A one-time job that succeeds, skips, or blocks stages `Completed` with a `null` `NextRunTime`.
 
 Periodic jobs advance by adding `IntervalTicks` to the previous `NextRunTime`. Cron jobs and other mapped schedules round-trip through `ScheduleDefinitionMapper.ToDefinition(job)`, evaluating the next occurrence after the job's current `NextRunTime` when one is set.
 
 `MissedFirePolicy.FireAll` replays every missed occurrence through the dispatcher's advance loop, bounded by `SchemataSchedulingOptions.MaxMissedWalk` (default 100,000) so a long-down host cannot materialize an unbounded backlog.
+
+## Row writers and lock order
+
+Writer sets overlap across the two tables:
+
+- `SchemataJobExecution`: `JobExecutionDispatcher` writes execution rows only; it claims and finalizes them. `DefaultTriggerJobHandler` materializes a one-shot `Pending` row; the schedule handler's `EnsurePendingExecutionAsync` and the stage handler materialize `Pending` rows alongside their job-row writes; `CancelOperationHandler` and the unschedule path's future-`Pending` cancellation write `Cancelled`; `SchedulingInitializer` fails orphaned `Running` rows at startup. Claims and updates to a pre-existing row serialize through its concurrency token (see [Scaling out](#scaling-out)); `AddAsync` materialization inserts a new row and has no pre-existing token to check.
+- `SchemataJob`: the scheduling command handlers are the only writers. `DefaultScheduleJobHandler` writes configuration, `State`, and `NextRunTime` (`DefaultRescheduleJobHandler` delegates to it). `DefaultUnscheduleJobHandler` writes `State` as `Paused`. `DefaultStageJobExecutionResultHandler` writes all four result fields after a fire and is the sole writer of `RecentRunTime` and `RecentError`.
+
+Each job-row writer holds the process-wide `SchemataJobWriteGate` semaphore across its fresh read, single write, commit, and timer install, so a finishing execution and a concurrent schedule command serialize instead of racing on the row. Timer-table manipulation inside that section takes `DefaultScheduler.Gate`; the nesting order is `SchemataJobWriteGate` → `DefaultScheduler.Gate`, and acquiring the two in reverse deadlocks. Database I/O runs under the write gate alone, keeping the scheduler gate's hold time limited to in-memory state.
+
+A concurrency-token conflict on the job row throws out of the handler and propagates to the caller; the scheduling handlers do not retry it. Across processes the write gate cannot serialize writers, so the token detects the race and the losing write fails fast.
 
 ## Restart durability
 

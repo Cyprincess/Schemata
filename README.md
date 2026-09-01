@@ -96,26 +96,38 @@ An extension feature can be activated in the same way as a built-in feature.
 | 420_000_000 | Schemata.Transport.Grpc            | Transport.Grpc           | Shared gRPC plumbing: `AddCodeFirstGrpc`, interceptor, reflection  |
 | 430_000_000 | Schemata.Identity.Foundation       | Identity                 | ASP.NET Core Identity integration                                  |
 | 440_000_000 | Schemata.Event.Foundation          | Event                    | Pub/sub bus, type registry, publish/consume advisor pipeline       |
-| 450_000_000 | Schemata.Authorization.Foundation  | Authorization            | OAuth 2.0 / OpenID Connect server                                  |
-| 460_000_000 | Schemata.Mapping.Foundation        | Mapping                  | Unified object mapper abstraction                                  |
-| 470_000_000 | Schemata.Scheduling.Foundation     | Scheduling               | Persistent cron / periodic / one-time job scheduler                |
-| 470_100_000 | Schemata.Scheduling.Event          | Scheduling.Event         | Lifecycle event publisher bridging the scheduler to the event bus  |
-| 470_200_000 | Schemata.Scheduling.Http           | Scheduling.Http          | HTTP resource bridge for jobs and long-running operations          |
-| 470_300_000 | Schemata.Scheduling.Grpc           | Scheduling.Grpc          | gRPC resource bridge for jobs and long-running operations          |
-| 480_000_000 | Schemata.Flow.Foundation           | Flow                     | BPMN process engine and state-machine runtime                      |
-| 480_060_000 | Schemata.Flow.Bpmn                 | Flow.Bpmn                | Full BPMN 2.0.2 engine (multi-token, subprocesses, compensation, transactions) |
-| 480_100_000 | Schemata.Flow.Http                 | Flow (`MapHttp`)     | HTTP resource bridge for process instances and transitions         |
-| 480_200_000 | Schemata.Flow.Grpc                 | Flow (`MapGrpc`)     | gRPC resource bridge for process instances and transitions         |
-| 480_300_000 | Schemata.Flow.Event                | Flow.Event               | Bridges BPMN message/signal catches to the event bus               |
-| 480_400_000 | Schemata.Flow.Scheduling           | Flow.Scheduling          | Bridges BPMN timer catches to the scheduler                        |
-| 490_000_000 | Schemata.Resource.Foundation       | Resource                 | Google AIP-compliant resource service                              |
-| 490_100_000 | Schemata.Resource.Http             | Resource (`MapHttp`)     | HTTP/REST endpoint                                                 |
-| 490_200_000 | Schemata.Resource.Grpc             | Resource (`MapGrpc`)     | gRPC endpoint                                                      |
-| 500_000_000 | Schemata.Report.Foundation         | Report                   | Report definitions, snapshots, and generation                     |
-| 500_100_000 | Schemata.Report.Http               | Report (`MapHttp`)       | HTTP resource bridge for reports and snapshots                    |
-| 500_200_000 | Schemata.Report.Grpc               | Report (`MapGrpc`)       | gRPC resource bridge for reports and snapshots                    |
-| 500_400_000 | Schemata.Report.Scheduling         | Report.Scheduling        | Periodic report generation bridge                                  |
-| 520_000_000 | Schemata.Modular                   | Modular                  | Module discovery and loading                                       |
+| 450_000_000 | Schemata.Actor.Foundation          | Actor                    | In-process actor system                                            |
+| 450_100_000 | Schemata.Actor.Event               | Actor.Event               | Bridges published events to actor mailboxes via explicit routes    |
+| 450_200_000 | Schemata.Actor.Scheduling          | Actor.Scheduling          | Durable, restart-surviving actor reminders on top of the scheduler |
+| 460_000_000 | Schemata.Authorization.Foundation  | Authorization            | OAuth 2.0 / OpenID Connect server                                  |
+| 460_100_000 | Schemata.Authorization.Identity    | AuthorizationIdentity    | Bridge Identity claims into the authorization server             |
+| 470_000_000 | Schemata.Mapping.Foundation        | Mapping                  | Unified object mapper abstraction                                  |
+| 480_000_000 | Schemata.Scheduling.Foundation     | Scheduling               | Persistent cron / periodic / one-time job scheduler                |
+| 480_100_000 | Schemata.Scheduling.Event          | Scheduling.Event         | Lifecycle event publisher bridging the scheduler to the event bus  |
+| 480_200_000 | Schemata.Scheduling.Http           | Scheduling.Http          | HTTP resource bridge for jobs and long-running operations          |
+| 480_300_000 | Schemata.Scheduling.Grpc           | Scheduling.Grpc          | gRPC resource bridge for jobs and long-running operations          |
+| 490_000_000 | Schemata.Flow.Foundation           | Flow                     | BPMN process engine and state-machine runtime                      |
+| 490_060_000 | Schemata.Flow.Bpmn                 | Flow.Bpmn                | Full BPMN 2.0.2 engine (multi-token, subprocesses, compensation, transactions) |
+| 490_100_000 | Schemata.Flow.Http                 | Flow (`MapHttp`)     | HTTP resource bridge for process instances and transitions         |
+| 490_200_000 | Schemata.Flow.Grpc                 | Flow (`MapGrpc`)     | gRPC resource bridge for process instances and transitions         |
+| 490_300_000 | Schemata.Flow.Event                | Flow.Event               | Bridges BPMN message/signal catches to the event bus               |
+| 490_400_000 | Schemata.Flow.Scheduling           | Flow.Scheduling          | Bridges BPMN timer catches to the scheduler                        |
+| 490_600_000 | Schemata.Flow.Actor                | Flow.Actor               | Per-process serialization: routes process commands through a per-process actor |
+| 500_000_000 | Schemata.Resource.Foundation       | Resource                 | Google AIP-compliant resource service                              |
+| 500_100_000 | Schemata.Resource.Http             | Resource (`MapHttp`)     | HTTP/REST endpoint                                                 |
+| 500_200_000 | Schemata.Resource.Grpc             | Resource (`MapGrpc`)     | gRPC endpoint                                                      |
+| 510_000_000 | Schemata.Insight.Foundation        | Insight                  | Federated query planning and execution over resource entities     |
+| 510_100_000 | Schemata.Insight.Http              | Insight (`MapHttp`)      | HTTP/REST endpoint for federated queries                          |
+| 510_200_000 | Schemata.Insight.Grpc              | Insight (`MapGrpc`)      | gRPC endpoint for federated queries                               |
+| 520_000_000 | Schemata.Push.Foundation           | Push                     | Push notification fan-out                                         |
+| 520_400_000 | Schemata.Push.Scheduling           | Push.Scheduling          | Deferred push dispatch through the scheduler                            |
+| 520_600_000 | Schemata.Push.Actor                | Push.Actor               | Per-subscription serialization: routes subscription writes through a per-key actor |
+| 530_000_000 | Schemata.Report.Foundation         | Report                   | Report definitions, snapshots, and generation                     |
+| 530_100_000 | Schemata.Report.Http               | Report (`MapHttp`)       | HTTP resource bridge for reports and snapshots                    |
+| 530_200_000 | Schemata.Report.Grpc               | Report (`MapGrpc`)       | gRPC resource bridge for reports and snapshots                    |
+| 530_400_000 | Schemata.Report.Scheduling         | Report.Scheduling        | Periodic report generation bridge                                  |
+| 530_600_000 | Schemata.Report.Actor              | Report.Actor             | Per-report serialization: routes report generations through a per-name actor |
+| 540_000_000 | Schemata.Modular                   | Modular                  | Module discovery and loading                                       |
 
 ## Compliance
 

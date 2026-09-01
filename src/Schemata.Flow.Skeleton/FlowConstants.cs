@@ -20,4 +20,15 @@ public static class FlowConstants
     }
 
     #endregion
+
+    #region Nested type: Handlers
+
+    /// <summary>Well-known keys for Flow request-handler registrations.</summary>
+    public static class Handlers
+    {
+        /// <summary>The Foundation handler used when no optional wrapper replaces the unkeyed alias.</summary>
+        public const string Default = "default";
+    }
+
+    #endregion
 }

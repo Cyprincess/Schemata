@@ -7,17 +7,24 @@ using Schemata.Resource.Foundation.Advisors;
 namespace Schemata.Resource.Foundation;
 
 /// <summary>
-///     Creates advisor contexts populated with resource-wide suppression markers from options.
+///     Continues the ambient <see cref="AdviceContext" /> for a resource operation, seeding
+///     resource-wide suppression markers from options.
 /// </summary>
 internal static class ResourceAdviceContext
 {
     /// <summary>
-    ///     Builds an <see cref="AdviceContext" /> for a resource operation.
+    ///     Continues the ambient <see cref="AdviceContext" /> established by the pipeline root
+    ///     (<c>IRequestDispatcher</c>) for a resource operation, seeding configured suppression
+    ///     markers into it.
     /// </summary>
     /// <param name="sp">The service provider for resolving resource options.</param>
-    /// <returns>The advisor context carrying configured suppression markers.</returns>
+    /// <returns>The ambient advisor context carrying configured suppression markers.</returns>
+    /// <exception cref="InvalidOperationException">
+    ///     No ambient <see cref="AdviceContext" /> is established; the resource pipeline must be
+    ///     entered through <c>IRequestDispatcher</c> rather than invoked directly.
+    /// </exception>
     public static AdviceContext Create(IServiceProvider sp) {
-        var ctx = new AdviceContext(sp);
+        var ctx = AdviceContext.Require();
 
         var options = sp.GetService<IOptions<SchemataResourceOptions>>()?.Value;
         if (options is null) {

@@ -22,8 +22,6 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         SchemataOptions         schemata
     ) {
-        FlowResourceRegistration.RegisterHandlers(services);
-
         var resources = new SchemataResourceBuilder(schemata, services) {
             AuthenticationScheme = schemata.Get<string>(FlowResourceRegistration.AuthenticationSchemeKey),
         };

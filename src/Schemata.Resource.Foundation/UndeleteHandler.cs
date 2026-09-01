@@ -1,12 +1,13 @@
 using System;
-using System.Security.Claims;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Resource;
 using Schemata.Common.Errors;
 using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
+using Schemata.Messaging.Skeleton;
+using Schemata.Resource.Foundation.Commands;
 
 namespace Schemata.Resource.Foundation;
 
@@ -16,7 +17,8 @@ namespace Schemata.Resource.Foundation;
 /// <typeparam name="TEntity">The soft-deletable resource entity type.</typeparam>
 /// <typeparam name="TDetail">The resource detail response type.</typeparam>
 /// <seealso href="https://google.aip.dev/164">AIP-164: Soft delete</seealso>
-public sealed class UndeleteHandler<TEntity, TDetail> : IResourceMethodHandler<TEntity, EmptyResourceRequest, TDetail>
+public sealed class UndeleteHandler<TEntity, TDetail>
+    : IRequestHandler<UndeleteResourceRequest<TEntity, TDetail>, TDetail>
     where TEntity : class, ICanonicalName, ISoftDelete
     where TDetail : class, ICanonicalName
 {
@@ -33,18 +35,23 @@ public sealed class UndeleteHandler<TEntity, TDetail> : IResourceMethodHandler<T
         _mapper     = mapper;
     }
 
-    public async ValueTask<TDetail> InvokeAsync(
-        string?              name,
-        EmptyResourceRequest request,
-        TEntity?             entity,
-        ClaimsPrincipal?     principal,
-        CancellationToken    ct
+    public async Task<TDetail> HandleAsync(
+        UndeleteResourceRequest<TEntity, TDetail> request,
+        CancellationToken                         ct = default
     ) {
-        ArgumentNullException.ThrowIfNull(entity);
+        TEntity? entity;
+        using (_repository.SuppressQuerySoftDelete()) {
+            entity = await _repository.SingleOrDefaultAsync(
+                q => q.Where(e => e.CanonicalName == request.CanonicalName), ct);
+        }
+
+        if (entity is null) {
+            throw SchemataResourceErrors.NotFound<TEntity>(request.CanonicalName);
+        }
 
         if (entity.DeleteTime is null) {
             throw SchemataResourceErrors.AlreadyExists<TEntity>(
-                name ?? entity.CanonicalName,
+                request.CanonicalName,
                 "Resource is not deleted.");
         }
 

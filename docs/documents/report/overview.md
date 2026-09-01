@@ -84,10 +84,10 @@ derived type re-declares the report canonical-name and display-name attributes e
 
 | Feature | Activation | Priority |
 | --- | --- | ---: |
-| `SchemataReportFeature<TReport, TSnapshot, TChunk>` | `schema.UseReport()` | 500,000,000 |
-| `SchemataReportHttpFeature<TReport, TSnapshot, TChunk>` | `.MapHttp()` | 500,100,000 |
-| `SchemataReportGrpcFeature<TReport, TSnapshot, TChunk>` | `.MapGrpc()` | 500,200,000 |
-| `SchemataReportSchedulingFeature<TReport, TSnapshot, TChunk>` | `.UseScheduling()` on the Report builder | 500,400,000 |
+| `SchemataReportFeature<TReport, TSnapshot, TChunk>` | `schema.UseReport()` | 530,000,000 |
+| `SchemataReportHttpFeature<TReport, TSnapshot, TChunk>` | `.MapHttp()` | 530,100,000 |
+| `SchemataReportGrpcFeature<TReport, TSnapshot, TChunk>` | `.MapGrpc()` | 530,200,000 |
+| `SchemataReportSchedulingFeature<TReport, TSnapshot, TChunk>` | `.UseScheduling()` on the Report builder | 530,400,000 |
 
 ## Extension points
 

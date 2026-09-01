@@ -7,13 +7,13 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Advice;
 using Schemata.Common;
 using Schemata.Entity.Repository;
+using Schemata.Event.Foundation.Observers;
 using Schemata.Event.Skeleton;
 using Schemata.Event.Skeleton.Advisors;
 using Schemata.Event.Skeleton.Entities;
@@ -23,11 +23,9 @@ namespace Schemata.Event.Foundation.Internal;
 /// <summary>Replays outbox rows through in-process event handlers.</summary>
 /// <param name="services">Root service provider for creating replay scopes.</param>
 /// <param name="json">JSON options for deserializing event payloads.</param>
-/// <param name="logger">Logger for observer failures.</param>
 public sealed class InProcessEventOutboxPublisher(
-    IServiceProvider                        services,
-    IOptions<JsonSerializerOptions>         json,
-    ILogger<InProcessEventOutboxPublisher>? logger = null
+    IServiceProvider                services,
+    IOptions<JsonSerializerOptions> json
 ) : IEventOutboxPublisher
 {
     private readonly JsonSerializerOptions _json = json.Value;
@@ -63,7 +61,11 @@ public sealed class InProcessEventOutboxPublisher(
             Source        = CreateSource(message),
         };
 
-        var observers = scope.ServiceProvider.GetServices<IEventLifecycleObserver>().ToList();
+        // Application observers run before the audit observer: consumed failures reach the audit
+        // record, while a delivered failure prevents the audit transition from being committed.
+        var observers = scope.ServiceProvider.GetServices<IEventLifecycleObserver>()
+                             .OrderBy(observer => observer is SchemataEventAuditObserver)
+                             .ToList();
         await NotifyDeliveredAsync(observers, eventCtx, ct);
 
         try {
@@ -75,6 +77,7 @@ public sealed class InProcessEventOutboxPublisher(
             eventCtx.Exception = ex;
         } finally {
             var consumeAdviceCtx = new AdviceContext(scope.ServiceProvider);
+            using var _ = AdviceContext.Establish(consumeAdviceCtx);
             switch (await Advisor.For<IEventConsumeAdvisor>()
                                  .RunAsync(consumeAdviceCtx, eventCtx, ct)) {
                 case AdviseResult.Continue:
@@ -84,14 +87,22 @@ public sealed class InProcessEventOutboxPublisher(
                     break;
             }
 
+            Exception? observerFailure = null;
             foreach (var observer in observers) {
                 try {
                     await observer.OnConsumedAsync(eventCtx, ct);
                 } catch (Exception ex) {
-                    logger?.LogWarning(ex,
-                                       "IEventLifecycleObserver.OnConsumedAsync threw for event '{EventType}'.",
-                                       eventCtx.EventType);
+                    // The audit observer runs last in the enforced audit-last order, so it persists the
+                    // first failure through EventContext.Exception before it escapes to the dispatcher.
+                    if (observerFailure is null) {
+                        observerFailure    = ex;
+                        eventCtx.Exception = ex;
+                    }
                 }
+            }
+
+            if (observerFailure is not null) {
+                ExceptionDispatchInfo.Capture(observerFailure).Throw();
             }
         }
 
@@ -107,13 +118,7 @@ public sealed class InProcessEventOutboxPublisher(
         CancellationToken                      ct
     ) {
         foreach (var observer in observers) {
-            try {
-                await observer.OnDeliveredAsync(context, ct);
-            } catch (Exception ex) {
-                logger?.LogWarning(ex,
-                                   "IEventLifecycleObserver.OnDeliveredAsync threw for event '{EventType}'.",
-                                   context.EventType);
-            }
+            await observer.OnDeliveredAsync(context, ct);
         }
     }
 

@@ -1,38 +1,28 @@
 using System;
 using System.Collections.Generic;
-using System.Security.Claims;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Messaging.Skeleton;
 using Schemata.Report.Skeleton;
 
 namespace Schemata.Report.Foundation;
 
-/// <summary>Reads a bounded page of rows from an instance-scoped report snapshot.</summary>
-/// <typeparam name="TSnapshot">The report snapshot entity type.</typeparam>
 public sealed class ReadSnapshotHandler<TSnapshot>(
     IReportSnapshotStore            snapshots,
     IOptions<SchemataReportOptions> options
-)
-    : IResourceMethodHandler<TSnapshot, ReadSnapshotRequest, ReadSnapshotResponse>
+) : IRequestHandler<ReadSnapshotRequest, ReadSnapshotResponse>
     where TSnapshot : SchemataReportSnapshot
 {
     private const int DefaultPageSize = 1_000;
 
-    /// <inheritdoc />
-    public async ValueTask<ReadSnapshotResponse> InvokeAsync(
-        string?             name,
-        ReadSnapshotRequest request,
-        TSnapshot?          entity,
-        ClaimsPrincipal?    principal,
-        CancellationToken   ct
-    ) {
+    public async Task<ReadSnapshotResponse> HandleAsync(ReadSnapshotRequest request, CancellationToken ct = default)
+    {
         ArgumentNullException.ThrowIfNull(request);
-        var snapshotName = name ?? entity?.CanonicalName;
+        var snapshotName = request.CanonicalName ?? request.Name;
         if (string.IsNullOrWhiteSpace(snapshotName)) {
             throw new InvalidArgumentException(message: "Snapshot name is required.");
         }
@@ -45,7 +35,7 @@ public sealed class ReadSnapshotHandler<TSnapshot>(
         var maxPageSize = options.Value.MaxReadPageSize > 0 ? options.Value.MaxReadPageSize : DefaultPageSize;
         var pageSize    = requested > maxPageSize ? maxPageSize : requested;
 
-        var header = entity ?? await snapshots.GetAsync(snapshotName, ct)
+        var header = await snapshots.GetAsync(snapshotName, ct)
                      ?? throw new InvalidArgumentException(message: "Report snapshot was not found.");
         var token = string.IsNullOrWhiteSpace(request.PageToken)
             ? new ReportReadPageToken(0, 0)

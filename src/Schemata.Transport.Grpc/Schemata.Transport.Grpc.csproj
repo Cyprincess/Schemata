@@ -25,6 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Schemata.Common\Schemata.Common.csproj" />
     <ProjectReference Include="..\Schemata.Core\Schemata.Core.csproj" />
+    <ProjectReference Include="..\Schemata.Messaging.Skeleton\Schemata.Messaging.Skeleton.csproj" />
   </ItemGroup>
 
 </Project>

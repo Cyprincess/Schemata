@@ -49,7 +49,7 @@ public class SchemataReportTransportShould
 
         var generate = Assert.Single(registry.GetMethods(typeof(SchemataReport)));
         Assert.Equal(Verbs.Generate, generate.Verb);
-        Assert.Equal(typeof(GenerateHandler<SchemataReport>), generate.Handler);
+        Assert.Equal(typeof(GenerateHandler<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>), generate.Handler);
 
         var read = Assert.Single(registry.GetMethods(typeof(SchemataReportSnapshot)));
         Assert.Equal(Verbs.Read, read.Verb);
@@ -67,7 +67,7 @@ public class SchemataReportTransportShould
         using var app   = builder.Build();
         using var scope = app.Services.CreateScope();
 
-        Assert.NotNull(scope.ServiceProvider.GetRequiredService<GenerateHandler<SchemataReport>>());
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<GenerateHandler<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>());
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<ReadSnapshotHandler<SchemataReportSnapshot>>());
     }
 

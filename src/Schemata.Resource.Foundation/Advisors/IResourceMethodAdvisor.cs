@@ -1,14 +1,15 @@
 using System.Security.Claims;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Messaging.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
 /// <summary>
 ///     Advises on an AIP-136 custom method dispatch after request-stage advisors
-///     have run but before the registered
-///     <see cref="Schemata.Abstractions.Resource.IResourceMethodHandler{TEntity, TRequest, TResponse}" />
-///     is invoked. Parallels <see cref="IResourceCreateAdvisor{TEntity, TRequest}" /> --
+///     have run but before the registered <see cref="IRequestHandler{TRequest,TResponse}" />
+///     is invoked by the dispatcher. Parallels
+///     <see cref="IResourceCreateAdvisor{TEntity, TRequest}" /> --
 ///     advisors can stash a pre-computed response in the
 ///     <see cref="AdviceContext" /> and return <see cref="AdviseResult.Handle" />
 ///     to short-circuit the handler invocation entirely.

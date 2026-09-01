@@ -19,6 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Schemata.Common\Schemata.Common.csproj" />
     <ProjectReference Include="..\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
+    <ProjectReference Include="..\Schemata.Messaging.Skeleton\Schemata.Messaging.Skeleton.csproj" />
   </ItemGroup>
 
   <ItemGroup>

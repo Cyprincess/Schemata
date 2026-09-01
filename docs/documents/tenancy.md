@@ -16,10 +16,11 @@ adds the feature, middleware, resolvers, and the fluent builder.
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `Schemata.Tenancy.Skeleton`   | `Entities/SchemataTenant.cs`, `Entities/SchemataTenantHost.cs`                                                                                                                                                                                                                                   |
 | `Schemata.Tenancy.Skeleton`   | `ITenantResolver.cs`, `ITenantContextAccessor.cs`, `ITenantContextInitializer.cs`, `ITenantManager.cs`, `ITenantServiceScopeFactory.cs`, `ITenantServiceProviderFactory.cs`, `ITenantProviderCache.cs`, `ITenantProviderLease.cs`, `SchemataTenancyOptions.cs`                                   |
-| `Schemata.Tenancy.Skeleton`   | `Services/` — `SchemataTenantContextAccessor`, `SchemataTenantManager`, `SchemataTenantServiceProviderFactory`, `SchemataTenantServiceScopeFactory`, `MemoryCacheTenantProviderCache`, `TenantCompositeServiceProvider`, `CompositeScope`, `CompositeScopeFactory`, `TenantBoundContextAccessor` |
-| `Schemata.Tenancy.Foundation` | `Features/SchemataTenancyFeature.cs`, `Middlewares/SchemataTenancyMiddleware.cs`, `SchemataTenancyBuilder.cs`                                                                                                                                                                                    |
-| `Schemata.Tenancy.Foundation` | `Extensions/SchemataTenancyBuilderExtensions.cs` (resolvers), `Extensions/SchemataTenancyBuilderOverrideExtensions.cs` (overrides)                                                                                                                                                               |
-| `Schemata.Tenancy.Foundation` | `Resolvers/Request{Header,Host,Path,Principal,Query}Resolver.cs`, `Resolvers/TenantId.cs`                                                                                                                                                                                                        |
+| `Schemata.Tenancy.Foundation` | `Services/` — `SchemataTenantContextAccessor`, `SchemataTenantManager`, `SchemataTenantServiceProviderFactory`, `SchemataTenantServiceScopeFactory`, `MemoryCacheTenantProviderCache`, `TenantCompositeServiceProvider`, `CompositeScope`, `CompositeScopeFactory`, `TenantBoundContextAccessor` |
+| `Schemata.Tenancy.Foundation` | `Commands/`, `Queries/`, `Handlers/` — the six provisioning commands, three lookup queries, and their explicitly closed handlers |
+| `Schemata.Tenancy.Foundation` | `Features/SchemataTenancyFeature.cs`, `Middlewares/SchemataTenancyMiddleware.cs`, `SchemataTenancyBuilder.cs` |
+| `Schemata.Tenancy.Foundation` | `Extensions/SchemataTenancyBuilderExtensions.cs` (resolvers), `Extensions/SchemataTenancyBuilderOverrideExtensions.cs` (overrides) |
+| `Schemata.Tenancy.Foundation` | `Resolvers/Request{Header,Host,Path,Principal,Query}Resolver.cs`, `Resolvers/TenantId.cs` |
 
 ## Enabling the feature
 
@@ -38,7 +39,8 @@ registrations. Constraints: `TTenant : SchemataTenant` and, for the three-argume
 `TManager : class, ITenantManager<TTenant>`.
 
 `SchemataTenancyFeature<TManager, TTenant>` has `Priority = SchemataHttpsFeature.DefaultPriority +
-10_000_000 = 160,000,000` and `Order = Orders.Max = 900,000,000`. `ConfigureServices` registers:
+10_000_000 = 160,000,000` and `Order = Orders.Max = 900,000,000`. `ConfigureServices` registers the
+shared dispatcher aliases, nine exact closed `IRequestHandler<,>` implementations for `TTenant`, and:
 
 ```csharp
 services.AddOptions<SchemataTenancyOptions>();
@@ -190,7 +192,7 @@ a container with no bound tenant.
 | Interface                                | Purpose                                                           |
 | ---------------------------------------- | ----------------------------------------------------------------- |
 | `ITenantResolver`                        | Add a resolution strategy (register directly to combine sources). |
-| `ITenantManager<TTenant>`                | Replace the Repository-backed manager.                            |
+| `ITenantManager<TTenant>`                | Replace the dispatcher-backed manager.                            |
 | `ITenantServiceProviderFactory<TTenant>` | Replace the lease-based factory.                                  |
 | `ITenantProviderCache`                   | Plug in a different cache while preserving lease semantics.       |
 | `SchemataTenancyOptions`                 | Tune capacity, sliding expiration, and overrides.                 |

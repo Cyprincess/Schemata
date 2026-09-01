@@ -1,8 +1,7 @@
-using System;
-using System.Security.Claims;
+using Schemata.Abstractions.Resource;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions.Resource;
+using Schemata.Messaging.Skeleton;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 
@@ -13,21 +12,12 @@ namespace Schemata.Scheduling.Foundation;
 ///     Delegates cancellation semantics to <see cref="IOperationService" />.
 /// </summary>
 public sealed class CancelOperationHandler(IOperationService operations)
-    : IResourceMethodHandler<SchemataJobExecution, EmptyResourceRequest, Operation>
+    : IRequestHandler<CancelOperationRequest, Operation>
 {
-    #region IResourceMethodHandler<SchemataJobExecution, EmptyResourceRequest, Operation> Members
-
-    public async ValueTask<Operation> InvokeAsync(
-        string?               name,
-        EmptyResourceRequest  request,
-        SchemataJobExecution? entity,
-        ClaimsPrincipal?      principal,
-        CancellationToken     ct
+    public async Task<Operation> HandleAsync(
+        CancelOperationRequest request,
+        CancellationToken ct = default
     ) {
-        ArgumentNullException.ThrowIfNull(entity);
-
-        return await operations.CancelAsync(entity.CanonicalName ?? $"operations/{entity.Uid:n}", ct);
+        return await operations.CancelAsync(request.CanonicalName ?? string.Empty, ct);
     }
-
-    #endregion
 }

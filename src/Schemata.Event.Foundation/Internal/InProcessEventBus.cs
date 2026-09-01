@@ -49,60 +49,6 @@ public sealed class InProcessEventBus : IEventBus
         await PublishCoreAsync(@event, sourceEntity, ct);
     }
 
-    public async Task<TResponse> SendAsync<TRequest, TResponse>(TRequest request, CancellationToken ct = default)
-        where TRequest : IRequest<TResponse> {
-        using var scope    = _services.CreateScope();
-        var       resolver = scope.ServiceProvider.GetRequiredService<HandlerResolver>();
-        var       registry = scope.ServiceProvider.GetRequiredService<IEventTypeRegistry>();
-
-        // Same RegisterEvent contract as PublishAsync: the wire name is mandatory so the
-        // audit record and any handler-observed EventContext.EventType match the registry.
-        var name = registry.RequireName(typeof(TRequest));
-
-        var eventCtx = new EventContext(request, name) {
-            Payload       = JsonSerializer.Serialize(request, _json),
-            CorrelationId = Identifiers.NewUid().ToString("n"),
-        };
-        var adviceCtx = new AdviceContext(scope.ServiceProvider);
-
-        switch (await Advisor.For<IEventPublishAdvisor>()
-                             .RunAsync(adviceCtx, eventCtx, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when adviceCtx.TryGet<TResponse>(out var r) && r is not null:
-                eventCtx.Result = r;
-                return r;
-            case AdviseResult.Block:
-            default:
-                throw new InvalidOperationException("Request blocked by advisor.");
-        }
-
-        var observers = scope.ServiceProvider.GetServices<IEventLifecycleObserver>().ToList();
-        await NotifyPublishedAsync(observers, eventCtx, ct);
-
-        try {
-            var result = await resolver.InvokeRequestHandlerAsync<TRequest, TResponse>(request, ct);
-            eventCtx.Result = result;
-            return result;
-        } catch (Exception ex) {
-            eventCtx.Exception = ex;
-            throw;
-        } finally {
-            // PublishAsync uses the same observational consume-advisor contract; the
-            // handler has either returned or thrown, so all three advice results converge.
-            var consumeAdviceCtx = new AdviceContext(scope.ServiceProvider);
-            switch (await Advisor.For<IEventConsumeAdvisor>()
-                                 .RunAsync(consumeAdviceCtx, eventCtx, ct)) {
-                case AdviseResult.Continue:
-                case AdviseResult.Handle:
-                case AdviseResult.Block:
-                default:
-                    break;
-            }
-            await NotifyConsumedAsync(observers, eventCtx, ct);
-        }
-    }
-
     #endregion
 
     private async Task PublishCoreAsync<TEvent>(TEvent @event, object? source, CancellationToken ct)
@@ -122,6 +68,7 @@ public sealed class InProcessEventBus : IEventBus
             Source                 = source,
         };
         var adviceCtx = new AdviceContext(scope.ServiceProvider);
+        using var _ = AdviceContext.Establish(adviceCtx);
 
         switch (await Advisor.For<IEventPublishAdvisor>()
                              .RunAsync(adviceCtx, ctx, ct)) {
@@ -155,18 +102,4 @@ public sealed class InProcessEventBus : IEventBus
         }
     }
 
-    private async Task NotifyConsumedAsync(
-        IReadOnlyList<IEventLifecycleObserver> observers,
-        EventContext                           context,
-        CancellationToken                      ct
-    ) {
-        foreach (var observer in observers) {
-            try {
-                await observer.OnConsumedAsync(context, ct);
-            } catch (Exception ex) {
-                _logger?.LogWarning(ex, "IEventLifecycleObserver.OnConsumedAsync threw for event '{EventType}'.",
-                                    context.EventType);
-            }
-        }
-    }
 }

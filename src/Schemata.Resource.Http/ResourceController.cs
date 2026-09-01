@@ -1,12 +1,16 @@
+using System;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Messaging.Skeleton;
 using Schemata.Resource.Foundation;
+using Schemata.Resource.Foundation.Commands;
 using HttpResourceIdentifiers = Schemata.Resource.Http.Internal.ResourceIdentifiers;
 
 namespace Schemata.Resource.Http;
@@ -14,7 +18,7 @@ namespace Schemata.Resource.Http;
 /// <summary>
 ///     Generic REST controller that exposes CRUD endpoints for a resource per
 ///     <seealso href="https://google.aip.dev/127">AIP-127</seealso>, delegating to
-///     <see cref="ResourceOperationHandler{TEntity,TRequest,TDetail,TSummary}" />.
+///     registered request handlers.
 /// </summary>
 [ApiController]
 [Route("~/Resource")]
@@ -25,20 +29,20 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     where TSummary : class, ICanonicalName
 {
     /// <summary>
-    ///     Handles resource operations for this controller.
+    ///     Resolves request handlers for this controller.
     /// </summary>
-    protected readonly ResourceOperationHandler<TEntity, TRequest, TDetail, TSummary> Handler;
+    protected readonly IServiceProvider Services;
 
     /// <summary>
-    ///     Initializes a new instance with the operation handler and JSON serializer options.
+    ///     Initializes a new instance with the scoped service provider and JSON serializer options.
     /// </summary>
-    /// <param name="handler">The <see cref="ResourceOperationHandler{TEntity,TRequest,TDetail,TSummary}" />.</param>
+    /// <param name="services">The scoped service provider used to resolve request handlers.</param>
     /// <param name="json">The host's <see cref="JsonSerializerOptions" />.</param>
     public ResourceController(
-        ResourceOperationHandler<TEntity, TRequest, TDetail, TSummary> handler,
-        IOptions<JsonSerializerOptions>                                json
+        IServiceProvider                 services,
+        IOptions<JsonSerializerOptions> json
     ) {
-        Handler     = handler;
+        Services    = services;
         JsonOptions = json.Value;
     }
 
@@ -59,7 +63,9 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     public virtual async Task<IActionResult> ListAsync([FromQuery] ListRequest request) {
         request.Parent ??= ResourceNameDescriptor.ForType<TEntity>().ResolveParent(HttpContext.Request.RouteValues);
 
-        var result = await Handler.ListAsync(request, HttpContext.User, HttpContext.RequestAborted);
+        var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
+        var result = await dispatcher.SendAsync<ListResourceQueryRequest<TEntity, TSummary>, ListResultBase<TSummary>>(
+            new(request, HttpContext.User), HttpContext.RequestAborted);
 
         return new JsonResult(result, JsonOptions);
     }
@@ -74,7 +80,9 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             CanonicalName = BuildFullName(name),
         };
 
-        var result = await Handler.GetAsync(request, HttpContext.User, HttpContext.RequestAborted);
+        var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
+        var result = await dispatcher.SendAsync<GetResourceQueryRequest<TEntity, TDetail>, GetResultBase<TDetail>>(
+            new(request, HttpContext.User), HttpContext.RequestAborted);
 
         return new JsonResult(result.Detail, JsonOptions);
     }
@@ -87,7 +95,9 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
     public virtual async Task<IActionResult> CreateAsync([FromBody] TRequest request) {
         ResourceNameDescriptor.ForType<TEntity>().SetParentFromRouteValues(request, HttpContext.Request.RouteValues);
 
-        var result = await Handler.CreateAsync(request, HttpContext.User, HttpContext.RequestAborted);
+        var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
+        var result = await dispatcher.SendAsync<CreateResourceRequest<TEntity, TRequest, TDetail>, CreateResultBase<TDetail>>(
+            new(request, HttpContext.User), HttpContext.RequestAborted);
 
         HttpContext.Response.Headers.Location = Url.Action("Get", new { name = result.Detail!.Name });
 
@@ -113,12 +123,9 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             }
         }
 
-        var result = await Handler.UpdateAsync(
-            BuildFullName(name),
-            request,
-            HttpContext.User,
-            HttpContext.RequestAborted
-        );
+        var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
+        var result = await dispatcher.SendAsync<UpdateResourceRequest<TEntity, TRequest, TDetail>, UpdateResultBase<TDetail>>(
+            new(BuildFullName(name), request, HttpContext.User), HttpContext.RequestAborted);
 
         return new JsonResult(result.Detail, JsonOptions);
     }
@@ -143,13 +150,9 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
             tag = HttpContext.Request.Headers.IfMatch.ToString();
         }
 
-        var result = await Handler.DeleteAsync(
-            BuildFullName(name),
-            tag,
-            HttpContext.User,
-            HttpContext.RequestAborted,
-            allowMissing
-        );
+        var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
+        var result = await dispatcher.SendAsync<DeleteResourceRequest<TEntity, TDetail>, DeleteResultBase<TDetail>>(
+            new(BuildFullName(name), tag, HttpContext.User, allowMissing), HttpContext.RequestAborted);
 
         if (result.Detail is not null) {
             return new JsonResult(result.Detail, JsonOptions);

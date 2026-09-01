@@ -4,8 +4,8 @@
 
 A BPMN process that parks at an intermediate timer catch and resumes automatically after a delay.
 `UseScheduling()` on the flow builder wires `FlowTimerCatchHandler`, which schedules a one-shot
-job as the instance starts waiting. When the job fires, `FlowTimerJob` invokes the keyed engine
-runtime directly and the instance advances.
+job as the instance starts waiting. When the job fires, `FlowTimerJob` dispatches a
+`RunEventRequest` through the unified request pipeline and the instance advances.
 
 ## Prerequisites
 
@@ -68,7 +68,7 @@ builder.UseSchemata(schema => {
 
 `MapHttp()` exposes the process verbs over HTTP; the start call in Step 3 goes through it.
 
-The flow-builder `UseScheduling()` adds `SchemataFlowSchedulingFeature` (priority `480_400_000`). It
+The flow-builder `UseScheduling()` adds `SchemataFlowSchedulingFeature` (priority `490_400_000`). It
 depends on `SchemataFlowFeature` and `SchemataSchedulingFeature`, so both are pulled in if missing.
 The feature registers `FlowTimerCatchHandler` as a scoped `IFlowCatchHandler` and
 `FlowTimerJob` as a scheduled job under its declared key, `schemata.flow.timer`.
@@ -95,24 +95,29 @@ The engine advances through `Review` and stops at the timer catch, setting `Wait
 `FlowTimerCatchHandler` runs inside the transition's unit of work and resolves `IScheduler`,
 converts the `TimerDefinition` to a schedule, and schedules a `SchemataJob`:
 
-- `Name` = `flow-{process.CanonicalName}-{timerCatchElementName}`.
+- `Name` = `flow-{processLeaf}-{elementName}-{token}` — the leaf segment of the process canonical
+  name, the timer catch element name, and the leaf segment of the waiting token's canonical name.
+  Resource-name segments cannot contain `/`, so the full canonicals stay in the job variables.
 - `JobKey` = `FlowTimerJob`'s registry key, `schemata.flow.timer`.
 - `State` = `JobState.Active`.
-- Job variables carry `processName` (the canonical name) and `timerDef`.
+- Job variables carry `processName` (the full process canonical name), `tokenName` (the waiting
+  token's canonical name), and `timerDef` (the serialized `TimerDefinition`).
 
 A timer catch with no scheduler registered throws `FailedPreconditionException`, aborting the
 transition rather than parking on a timer nothing will fire.
 
 **Check:** the instance waits at the timer catch; the scheduler holds a job named
-`flow-{canonicalName}-{timerCatchElementName}`.
+`flow-{processLeaf}-{elementName}-{token}`.
 
 ## Step 4: Watch the timer fire
 
 When the scheduled time arrives, the scheduler activates `FlowTimerJob` from the DI scope by its job
-key. `FlowTimerJob.ExecuteAsync` reads `processName` and `timerDef` from `JobContext.Variables`,
-loads the process, resolves the keyed `IFlowRuntime`, and calls `engine.TriggerAsync(definition,
-process, tokens, context, timerDef, payload: null, tokenName: null, ct)` directly — the timer
-path drives the engine itself rather than going through `IFlowRunner`.
+key. `FlowTimerJob.ExecuteAsync` reads `processName`, `tokenName`, and `timerDef` from
+`JobContext.Variables`, opens a fresh DI scope, and sends
+`new RunEventRequest(processName, tokenName, timerDef, Payload: null)` through
+`IRequestDispatcher.SendAsync<RunEventRequest, ProcessSnapshot>(...)` — the timer fire travels the
+same unified request pipeline as every other Flow entry point, and the unkeyed `RunEventRequest`
+handler drives the transition.
 
 The engine advances the instance from the timer catch to `Approve` and on to the end event. The
 advisor runs again, cancels the now-fired job, and adds nothing because the instance is complete.
@@ -153,15 +158,15 @@ exclusive gateway after the catch to leave the cycle once a process condition ho
 ## Common pitfalls
 
 **`FlowTimerJob` runs outside any request scope.** The scheduler activates it by its job key
-(`FlowTimerJob.JobKey`); the job opens its own DI scope and resolves `ProcessPersistence`,
-`IProcessRegistry`, and the keyed `IFlowRuntime` from there. Anything ambient to a web request
+(`FlowTimerJob.JobKey`); the job opens its own DI scope and resolves `IRequestDispatcher` from
+there. Anything ambient to a web request
 (current user, tenant context from the request) is absent when the timer fires.
 
 **The scheduler call sits outside the database commit.** `FlowTimerCatchHandler` runs inside the
 transition's unit of work and writes subscription or timer metadata atomically. The scheduler
 itself is an external side effect. If the database commit later fails, the scheduled job survives
 the rollback and the instance is gone; reconcile by dropping scheduler jobs whose `Name` matches
-the `flow-{canonicalName}-{elementName}` pattern but no waiting instance is parked at that catch.
+the `flow-{processLeaf}-{elementName}-{token}` pattern but no waiting instance is parked at that catch.
 
 **Duration is not cron.** `PT24H` is a duration relative to now; `0 0 * * *` is an absolute cron.
 Passing a duration string with `TimerType.Cycle` builds a `CronSchedule` that fails to parse it.

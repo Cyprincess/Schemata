@@ -2,8 +2,9 @@
 
 The push subsystem is a broadcast fan-out delivery layer. A single `SendAsync` call hands one
 `PushContext` to every registered `IPushTransport` concurrently; each transport inspects the target
-and its own subscription state to decide whether it delivers or skips. Results stream back in
-completion order. Push owns no transport itself — it defines the contracts and the dispatch
+and its own subscription state to decide whether it delivers or skips. `SendAsync` collects every
+transport's result and returns the whole set together, ordered by completion. Push owns no transport
+itself — it defines the contracts and the dispatch
 mechanics, and transport packages (FCM, SignalR, SMTP, …) plug in. A `SchemataPushSubscription`
 addressing table maps an owner to a transport endpoint.
 
@@ -18,8 +19,8 @@ addressing table maps an owner to a transport endpoint.
 ## Startup
 
 `UsePush()` on `SchemataBuilder` activates
-`Schemata.Push.Foundation.Features.SchemataPushFeature` (Priority `Orders.Extension + 100_000_000` =
-500,000,000) and returns a `SchemataPushBuilder`:
+`Schemata.Push.Foundation.Features.SchemataPushFeature` (Priority `Orders.Extension + 120_000_000` =
+520,000,000) and returns a `SchemataPushBuilder`:
 
 ```csharp
 builder.UseSchemata(schema => {
@@ -121,8 +122,8 @@ and `DefaultPushSubscriptionManager` manage the rows. See [Subscriptions](subscr
 
 | Feature                         | Priority    |
 | ------------------------------- | ----------- |
-| `SchemataPushFeature`           | 500,000,000 |
-| `SchemataPushSchedulingFeature` | 500,400,000 |
+| `SchemataPushFeature`           | 520,000,000 |
+| `SchemataPushSchedulingFeature` | 520,400,000 |
 
 ## Extension points
 

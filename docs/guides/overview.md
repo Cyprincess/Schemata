@@ -28,13 +28,15 @@ Most guides extend the application from the previous one. Three stand apart: [Au
 | 10  | [Authorization](authorization.md)                         | OAuth 2.0 / OpenID Connect server                             |
 | 11  | [gRPC Transport](grpc-transport.md)                       | gRPC endpoints alongside HTTP                                 |
 | 12  | [Multi-Tenancy](multi-tenancy.md)                         | Tenant resolution and data isolation                          |
-| 13  | [Flow](flow.md)                                           | BPMN process engine with typed DSL                            |
-| 14  | [Event Bus](event-bus.md)                                 | In-process event publishing and handling                      |
-| 15  | [Scheduling](scheduling.md)                               | Cron and periodic background jobs                             |
-| 16  | [Push](push.md)                                           | Broadcast notification fan-out across transports              |
-| 17  | [Insight](insight.md)                                     | Federated read query across registered sources                |
-| 18  | [Reports](report.md)                                      | Persisted report snapshots and paged snapshot reads           |
-| 19  | [Modular](modular.md)                                     | Module discovery and assembly loading                         |
+| 13  | [Messaging](messaging.md)                                 | Typed request/command/query dispatch with advisors            |
+| 14  | [Flow](flow.md)                                           | BPMN process engine with typed DSL                             |
+| 15  | [Event Bus](event-bus.md)                                 | In-process event publishing and handling                       |
+| 16  | [Scheduling](scheduling.md)                               | Cron and periodic background jobs                              |
+| 17  | [Actor](actor.md)                                         | Per-instance mailbox serialization for concurrent writers       |
+| 18  | [Push](push.md)                                           | Broadcast notification fan-out across transports                |
+| 19  | [Insight](insight.md)                                     | Federated read query across registered sources                  |
+| 20  | [Reports](report.md)                                      | Persisted report snapshots and paged snapshot reads             |
+| 21  | [Modular](modular.md)                                     | Module discovery and assembly loading                           |
 
 ## What the guides don't cover
 

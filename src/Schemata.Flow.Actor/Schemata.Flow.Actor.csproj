@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Flow Actor Integration</Description>
+    <PackageTags>application;business;framework;flow;workflow;actor</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Actor.Foundation\Schemata.Actor.Foundation.csproj" />
+    <ProjectReference Include="..\Schemata.Flow.Foundation\Schemata.Flow.Foundation.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -5,14 +5,14 @@
 ride the standard Resource pipeline as AIP-136 custom methods, and the package adds a small
 controller that lists registered process definitions. `MapHttp()` activates
 `SchemataFlowHttpFeature` (priority
-`SchemataFlowFeature.DefaultPriority + 100_000` = `480_100_000`).
+`SchemataFlowFeature.DefaultPriority + 100_000` = `490_100_000`).
 
 ## Where the code lives
 
 | Package                    | Key files                                                                                                                                                                                                                                                                                        |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `Schemata.Flow.Http`       | `Features/SchemataFlowHttpFeature.cs`, `Controllers/ProcessDefinitionsController.cs`, `Extensions/SchemataBuilderExtensions.cs`                                                                                                                                                                |
-| `Schemata.Flow.Foundation` | `StartProcessHandler.cs`, `FlowStartProcessHandler.cs`, `CompleteActivityHandler.cs`, `CorrelateMessageHandler.cs`, `ThrowSignalHandler.cs`, `TerminateProcessHandler.cs`, `CancelTokenHandler.cs`, `FlowResourceRegistration.cs`, `FlowRunner.cs`, `ProcessRegistry.cs`, `ProcessDefinitionQueryService.cs` |
+| `Schemata.Flow.Foundation` | `StartProcessHandler.cs`, `FlowStartProcessHandler.cs`, `CompleteActivityHandler.cs`, `CorrelateMessageHandler.cs`, `ThrowSignalHandler.cs`, `TerminateProcessHandler.cs`, `CancelTokenHandler.cs`, `FlowResourceRegistration.cs`, `FlowRunner.cs`, `ProcessRegistry.cs`, `Commands/ListProcessDefinitionsQuery.cs`, `Handlers/DefaultListProcessDefinitionsHandler.cs` |
 | `Schemata.Flow.Skeleton`   | `Models/StartProcessInstanceRequest.cs`, `Models/CompleteActivityRequest.cs`, `Models/CorrelateMessageRequest.cs`, `Models/ThrowSignalRequest.cs`, `Entities/SchemataProcess.cs`, `Entities/SchemataProcessToken.cs`, `Entities/SchemataProcessTransition.cs`, `Models/ProcessDefinitionInfo.cs` |
 
 ## Activation
@@ -95,11 +95,11 @@ collection; instance-scoped verbs bind to `{name}`:
 | `signal`    | `POST ~/v1/processes:signal`           | `ThrowSignalHandler`      | `FlowRunner.ThrowSignalAsync` |
 | `terminate` | `POST ~/v1/processes/{name}:terminate` | `TerminateProcessHandler`     | `FlowRunner.TerminateAsync`   |
 
-Each handler implements `IResourceMethodHandler<SchemataProcess, TRequest, TResponse>`. Its
-`InvokeAsync(name, request, entity, principal, ct)` receives the resolved entity (null for
-collection-scoped verbs), resolves source or payload types through the registry, and calls the
-runner. `principal` is the request's `ClaimsPrincipal`; authorization runs earlier in the resource
-advisor pipeline when the host enables `WithAuthorization` on the resource builder.
+Each handler implements `IRequestHandler<TRequest, TResponse>` for its dedicated wire request.
+`ResourceMethodOperationHandler` runs resource authorization and instance-target validation, copies
+the path canonical name and `HttpContext.User` onto the request, then dispatches it through
+`IRequestDispatcher`. The public Flow handler translates that request into the internal Flow
+command handled by the runner pipeline.
 
 `FlowStartProcessHandler` delegates source loading to `FlowSourceLoader`: the loader resolves the
 optional `Source` canonical name through `IResourceTypeResolver`, checks the resolved type against
@@ -113,8 +113,8 @@ the no-source `StartAsync` overload.
 | -------- | -------------------------------------------------- | -------------------- | ----------------------------- |
 | `cancel` | `POST ~/v1/processes/{name}/tokens/{token}:cancel` | `CancelTokenHandler` | `FlowRunner.CancelTokenAsync` |
 
-`CancelTokenHandler` takes an empty request body (`EmptyResourceRequest`) and returns the
-post-cancel snapshot.
+`CancelTokenHandler` accepts `CancelTokenResourceRequest`, whose canonical name comes from the
+route, and returns the post-cancel snapshot.
 
 ### Read operations
 
@@ -132,8 +132,9 @@ The `Get` and `List` operations come from the resource registration, not a hand-
 ### Definitions endpoint
 
 `ProcessDefinitionsController` is the only hand-written controller. Mounted at
-`~/v1/processes:definitions`, its single `GET` lists registered definitions through
-`ProcessDefinitionQueryService` and returns the result unchanged. Each row carries
+`~/v1/processes:definitions`, its single `GET` dispatches a
+`ListProcessDefinitionsQuery` through `IQueryDispatcher` and returns the result unchanged. The
+internal `DefaultListProcessDefinitionsHandler` reads the registry and projects the rows. Each row carries
 `CanonicalName`, the four `IDescriptive` label fields, `messages` (declared message names with
 their labels), and the definition graph:
 

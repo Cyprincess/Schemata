@@ -141,7 +141,7 @@ for any field that has neither a source expression, an ignore, nor a converter.
 
 | Feature                     | Priority                                      |
 | --------------------------- | --------------------------------------------- |
-| `SchemataMappingFeature<T>` | `Orders.Extension + 60_000_000` (460,000,000) |
+| `SchemataMappingFeature<T>` | `Orders.Extension + 70_000_000` (470,000,000) |
 
 ## Extension points
 

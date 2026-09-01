@@ -17,7 +17,7 @@ public sealed class SchemataReportFeature<TReport, TSnapshot, TChunk> : FeatureB
     where TChunk : SchemataReportSnapshotChunk, new()
 {
     /// <summary>Default feature priority for Report service registration.</summary>
-    public const int DefaultPriority = Orders.Extension + 100_000_000;
+    public const int DefaultPriority = Orders.Extension + 130_000_000;
 
     /// <inheritdoc />
     public override int Priority => DefaultPriority;

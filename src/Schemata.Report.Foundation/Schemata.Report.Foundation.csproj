@@ -26,6 +26,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Schemata.Advice\Schemata.Advice.csproj" />
     <ProjectReference Include="..\Schemata.Insight.Foundation\Schemata.Insight.Foundation.csproj" />
+    <ProjectReference Include="..\Schemata.Messaging.Skeleton\Schemata.Messaging.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Report.Skeleton\Schemata.Report.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Scheduling.Skeleton\Schemata.Scheduling.Skeleton.csproj" />
   </ItemGroup>

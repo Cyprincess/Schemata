@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Authorization.Foundation.Features;
+using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Identity.Foundation.Features;
@@ -18,7 +19,7 @@ namespace Schemata.Authorization.Identity.Features;
 public sealed class SchemataAuthorizationIdentityFeature : FeatureBase
 {
     /// <summary>Default feature priority for Identity-backed authorization integration.</summary>
-    public const int DefaultPriority = Orders.Extension + 50_100_000;
+    public const int DefaultPriority = SchemataAuthorizationFeature<SchemataApplication, SchemataAuthorization, SchemataScope, SchemataToken>.DefaultPriority + 100_000;
 
     public override int Priority => DefaultPriority;
 

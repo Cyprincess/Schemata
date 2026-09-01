@@ -116,14 +116,7 @@ public sealed class PlanExecutor
             throw new InsightValidationException(InsightReasons.InvalidArgument, "The plan has no source.");
         }
 
-        var driver = _services.GetKeyedService<ISourceDriver>(source.Config.DriverName);
-        if (driver is null) {
-            throw new InsightValidationException(
-                InsightReasons.Unimplemented,
-                $"No driver '{source.Config.DriverName}' is registered."
-            );
-        }
-
+        var driver = await OpenSourceAsync(source, request, principal, ct);
         var (pushable, localStages) = Split(root, driver.Capabilities);
         var subPlan = new SubPlan(pushable, source.Alias, source.Config) { EnforceSecurity = enforceSecurity };
 
@@ -181,14 +174,7 @@ public sealed class PlanExecutor
             throw new InsightValidationException(InsightReasons.InvalidArgument, "The plan has no source.");
         }
 
-        var driver = _services.GetKeyedService<ISourceDriver>(source.Config.DriverName);
-        if (driver is null) {
-            throw new InsightValidationException(
-                InsightReasons.Unimplemented,
-                $"No driver '{source.Config.DriverName}' is registered."
-            );
-        }
-
+        var driver = await OpenSourceAsync(source, request, principal, ct);
         var (pushable, localStages) = Split(root, driver.Capabilities);
         var subPlan = new SubPlan(pushable, source.Alias, source.Config) { EnforceSecurity = enforceSecurity };
         var result = await driver.ExecuteAsync(subPlan, request, principal, ct);
@@ -282,14 +268,7 @@ public sealed class PlanExecutor
             throw new InsightValidationException(InsightReasons.InvalidArgument, "A join input has no source.");
         }
 
-        var driver = _services.GetKeyedService<ISourceDriver>(source.Config.DriverName);
-        if (driver is null) {
-            throw new InsightValidationException(
-                InsightReasons.Unimplemented,
-                $"No driver '{source.Config.DriverName}' is registered."
-            );
-        }
-
+        var driver = await OpenSourceAsync(source, request, principal, ct);
         var (pushable, localStages) = Split(node, driver.Capabilities);
         var subPlan = new SubPlan(pushable, source.Alias, source.Config) { EnforceSecurity = enforceSecurity };
 
@@ -298,6 +277,44 @@ public sealed class PlanExecutor
         await foreach (var row in _local.RunAsync(result.Rows, source.Alias, localStages, ct)) {
             yield return row;
         }
+    }
+
+    // Resolves the keyed driver for a source, then gives every registered IInsightSourceAdvisor a
+    // chance to block it before it opens. This is the single point all three per-source call sites
+    // (single-source execution, single-source materialization, and join-input driving) route through,
+    // so a source is never opened without first passing every advisor.
+    private async ValueTask<ISourceDriver> OpenSourceAsync(
+        SourceNode           source,
+        QueryInsightRequest  request,
+        ClaimsPrincipal?     principal,
+        CancellationToken    ct
+    ) {
+        var driver = _services.GetKeyedService<ISourceDriver>(source.Config.DriverName);
+        if (driver is null) {
+            throw new InsightValidationException(
+                InsightReasons.Unimplemented,
+                $"No driver '{source.Config.DriverName}' is registered."
+            );
+        }
+
+        var binding = FindBinding(request, source.Alias);
+        foreach (var advisor in _services.GetServices<IInsightSourceAdvisor>()) {
+            await advisor.AdviseAsync(binding, source.Config, principal, ct);
+        }
+
+        return driver;
+    }
+
+    // The request's own binding for a source alias; falls back to alias-as-name for a source that was
+    // not built from the request's bindings (e.g. a nested-selection child source resolved locally).
+    private static SourceBinding FindBinding(QueryInsightRequest request, string alias) {
+        foreach (var binding in request.Sources) {
+            if (string.Equals(binding.Alias, alias, StringComparison.Ordinal)) {
+                return binding;
+            }
+        }
+
+        return new(alias, alias);
     }
 
     // Built before the lazy per-source drivers open; field descriptors stay generic and follow

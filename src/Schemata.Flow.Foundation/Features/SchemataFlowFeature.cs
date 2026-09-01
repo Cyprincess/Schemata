@@ -14,7 +14,7 @@ public sealed class SchemataFlowFeature : FeatureBase
     public const int DefaultOrder = DefaultPriority;
 
     /// <summary>Default <see cref="FeatureBase.Priority" /> for the Flow feature.</summary>
-    public const int DefaultPriority = SchemataConstants.Orders.Extension + 80_000_000;
+    public const int DefaultPriority = SchemataConstants.Orders.Extension + 90_000_000;
 
     public override int Order => DefaultOrder;
 

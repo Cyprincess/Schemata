@@ -6,9 +6,11 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Identity.Foundation.Commands;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Models;
+using Schemata.Messaging.Skeleton;
 
 namespace Schemata.Identity.Foundation.Controllers;
 
@@ -18,7 +20,8 @@ public sealed partial class AuthenticateController<TUser>
     /// <summary>Registers a user and signs in the created account.</summary>
     [HttpPost(nameof(Register))]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request, CancellationToken ct) {
-        var result = await handler.RegisterAsync(request, HttpContext.User, ct);
+        var result = await dispatcher.SendAsync<RegisterUserRequest<TUser>, IdentityResult<ClaimsPrincipal>>(
+            new(request, HttpContext.User), ct);
         return result.Status switch {
             IdentityStatus.Success   => await BearerSignInAsync(result.Data!, request.UseCookies == true),
             IdentityStatus.Challenge => Challenge(),
@@ -29,7 +32,8 @@ public sealed partial class AuthenticateController<TUser>
     /// <summary>Authenticates a user and issues sign-in credentials.</summary>
     [HttpPost(nameof(Login))]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken ct) {
-        var result = await handler.LoginAsync(request, HttpContext.User, ct);
+        var result = await dispatcher.SendAsync<LoginUserRequest<TUser>, IdentityResult<ClaimsPrincipal>>(
+            new(request, HttpContext.User), ct);
         return result.Status switch {
             IdentityStatus.Success   => await BearerSignInAsync(result.Data!, request.UseCookies == true),
             IdentityStatus.Challenge => Challenge(),
@@ -46,7 +50,8 @@ public sealed partial class AuthenticateController<TUser>
         }
 
         var ticket = protector.Unprotect(request.RefreshToken);
-        var result = await handler.RefreshAsync(ticket, HttpContext.User, ct);
+        var result = await dispatcher.SendAsync<RefreshUserRequest<TUser>, IdentityResult<ClaimsPrincipal>>(
+            new(ticket, HttpContext.User), ct);
         return result.Status switch {
             IdentityStatus.Success   => await BearerSignInAsync(result.Data!),
             IdentityStatus.Challenge => Challenge(),

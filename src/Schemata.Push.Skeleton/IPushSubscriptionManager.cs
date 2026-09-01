@@ -12,7 +12,7 @@ namespace Schemata.Push.Skeleton;
 /// </summary>
 public interface IPushSubscriptionManager
 {
-    /// <summary>Streams an owner's subscriptions, optionally narrowed to a single transport.</summary>
+    /// <summary>Returns an owner's materialized subscriptions, optionally narrowed to one transport.</summary>
     /// <param name="owner">The owner canonical name.</param>
     /// <param name="provider">An optional transport name filter.</param>
     /// <param name="ct">A cancellation token.</param>

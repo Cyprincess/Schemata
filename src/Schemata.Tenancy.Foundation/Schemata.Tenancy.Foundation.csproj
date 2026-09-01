@@ -15,7 +15,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Schemata.Actor.Skeleton\Schemata.Actor.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Core\Schemata.Core.csproj" />
+    <ProjectReference Include="..\Schemata.Messaging.Skeleton\Schemata.Messaging.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Tenancy.Skeleton\Schemata.Tenancy.Skeleton.csproj" />
   </ItemGroup>
 

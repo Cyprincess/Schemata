@@ -9,6 +9,10 @@ snapshot once the commit boundary has closed rather than firing during the mutat
 The event bus records every publish in a durable outbox and drains it from a background dispatcher,
 so delivery is at-least-once even though the advisor calls `PublishAsync` after the commit.
 
+Production code rarely writes this advisor by hand: the `Schemata.Entity.Event` bridge ships it as
+`UseEvent()` on the repository builder (Step 3). This recipe still walks the hand-rolled advisor so
+the mechanism underneath is visible.
+
 ## Prerequisites
 
 - The `Student` entity and CRUD setup from [guides/getting-started.md](../guides/getting-started.md).
@@ -18,6 +22,7 @@ so delivery is at-least-once even though the advisor calls `PublishAsync` after 
 ## Step 1: Define the domain event
 
 ```csharp
+using System;
 using Schemata.Event.Skeleton;
 
 public sealed class StudentCreated : IEvent
@@ -50,7 +55,67 @@ via `RequireName(type)` before recording the outbox row; an unregistered type th
 
 **Assertion:** the application starts without throwing on `IEventTypeRegistry.RequireName`.
 
-## Step 3: Write the committed advisor
+## Step 3: Prefer the built-in `UseEvent()` bridge
+
+`Schemata.Entity.Event` ships the committed advisor already written. The aggregate buffers events
+on itself through `IHasPendingEvents` (`Schemata.Event.Skeleton`); the bridge's
+`AdviceCommittedPendingEvents<TEntity>` drains the buffer onto `IEventBus` after the commit
+succeeds, at `Order = Orders.Max - 1_000`.
+
+```csharp
+using System;
+using Schemata.Domain.Skeleton;
+
+public sealed class StudentCreated : IDomainEvent   // narrows IEvent by intent only
+{
+    public string         StudentName { get; init; } = string.Empty;
+    public DateTimeOffset CreatedAt   { get; init; }
+}
+
+public sealed class Student : AggregateBase
+{
+    public string? Name { get; set; }
+
+    public void Enroll(string name)
+    {
+        Name = name;
+        Raise(new StudentCreated { StudentName = name, CreatedAt = DateTimeOffset.UtcNow });
+    }
+}
+```
+
+`AggregateBase` (`Schemata.Domain.Skeleton`) implements `IAggregateRoot` and `IHasPendingEvents`:
+`Raise(IEvent)` buffers the event, and `DequeuePendingEvents()` hands the buffer to the drain and
+clears it. Buffering instead of publishing is the point — an event raised by a transaction that
+later rolls back never reaches a subscriber. `IDomainEvent` narrows `IEvent` by intent only; the
+flush collects `IEvent`, so any entity implementing `IHasPendingEvents` directly participates the
+same way, with no aggregate vocabulary required.
+
+Register the bridge on the repository builder:
+
+```csharp
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Entity.EntityFrameworkCore;
+
+services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
+        .UseEvent();
+```
+
+`UseEvent()` appends `AdviceCommittedPendingEvents<>` through `TryAddEnumerable` as an open-generic
+scoped `IRepositoryCommittedAdvisor<>`, so it joins the committed-advisor chain for every entity
+type. The advisor takes `IEventBus` as a hard constructor dependency, so a missing bus registration
+fails on the first commit instead of silently dropping events. It walks all three commit
+collections — `Added`, `Updated`, and `Removed`: a removed aggregate can still carry events it
+raised before the delete, and draining only `Added` would drop them. The hand-rolled advisor below
+reads `Added` alone only because its scenario is create-only.
+
+**Assertion:** with no advisor written by hand, committing a `Student` whose `Enroll` ran publishes
+`StudentCreated` through the bus.
+
+## Step 4: Write the committed advisor
+
+Hand-rolling the same advisor shows what `UseEvent()` does for you:
 
 ```csharp
 using System;
@@ -96,7 +161,7 @@ boundary.
 
 **Assertion:** the advisor compiles and `Order` is accessible.
 
-## Step 4: Register the advisor
+## Step 5: Register the advisor
 
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
@@ -121,7 +186,7 @@ scoped bus as a captive dependency.
 **Assertion:** `IEnumerable<IRepositoryCommittedAdvisor<Student>>` resolves from DI and contains
 `PublishStudentCreatedAdvisor`.
 
-## Step 5: Implement the handler
+## Step 6: Implement the handler
 
 ```csharp
 public sealed class StudentCreatedHandler : IEventHandler<StudentCreated>
@@ -145,6 +210,63 @@ response has returned.
 **Assertion:** `POST /v1/students` with a valid body logs `"Student 'Alice' created at ..."` shortly
 after the repository commit succeeds.
 
+## Step 7: Name the event audit row
+
+`Schemata.Event.Foundation` routes each publish that reaches lifecycle observers through
+`SchemataEventAuditObserver`. The observer sets `EventType` from the wire name, while the `Name`
+and `CanonicalName` fields are resolved by the repository add
+pipeline against the entity's `[CanonicalName("events/{event}")]` pattern. The built-in
+canonical-name advisor at order `120_000_000` throws `ValidationException` when `Name` is empty,
+so every host that wants audit persistence must register a Name advisor that runs before that
+chain. The feature's audit observer constructs `EventType`; the application's advisor fills
+`Name`; the repository pipeline resolves `CanonicalName`.
+
+```csharp
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions.Advisors;
+using Schemata.Entity.Repository;
+using Schemata.Entity.Repository.Advisors;
+using Schemata.Event.Skeleton.Entities;
+
+public sealed class EventAuditNameAdvisor : IRepositoryAddAdvisor<SchemataEvent>
+{
+    public int Order => 50_000_000;
+
+    public Task<AdviseResult> AdviseAsync(
+        AdviceContext              context,
+        IRepository<SchemataEvent> repository,
+        SchemataEvent              entity,
+        CancellationToken          ct)
+    {
+        entity.Name = entity.EventType;
+        return Task.FromResult(AdviseResult.Continue);
+    }
+}
+
+services.TryAddEnumerable(
+    ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataEvent>, EventAuditNameAdvisor>());
+```
+
+Trace, line by line:
+
+- `EventAuditNameAdvisor` implements `IRepositoryAddAdvisor<SchemataEvent>`; the audit observer's
+  `AddAsync` walks every `IRepositoryAddAdvisor<SchemataEvent>` registered with the host.
+- `Order => 50_000_000` runs before `AdviceAddIdentifier` at `90_000_000`,
+  `AdviceAddTimestamp` at `100_000_000`, `AdviceAddConcurrency` at `110_000_000`, and
+  `AdviceAddCanonicalName` at `120_000_000`.
+- `entity.EventType` holds the wire name the audit observer set when constructing the record.
+  The wire name (e.g. `students/student-created`) copies into `entity.Name`, providing the value
+  for the `events/{event}` placeholder.
+- The advisor returns `AdviseResult.Continue` so the chain proceeds. `AdviceAddCanonicalName`
+  then resolves `CanonicalName` to `events/{wireName}`.
+
+
+**Assertion:** publishing `StudentCreated` after `EventAuditNameAdvisor` is registered writes a
+`SchemataEvent` row with `CanonicalName = "events/students/student-created"`.
+
 ## Common pitfalls
 
 **Calling `PublishAsync` from a create/update/remove advisor.** Mutation advisors run before the
@@ -159,6 +281,12 @@ so handlers must be idempotent.
 **Publishing unregistered event types.** Register every published type with `RegisterEvent<T>(name)`
 during startup; a missing registration throws `InvalidOperationException` from the committed advisor
 at publish time.
+
+**Missing event audit Name advisor.** When `EventAuditNameAdvisor` is absent,
+`InProcessEventBus.NotifyPublishedAsync` logs
+`IEventLifecycleObserver.OnPublishedAsync threw for event '{EventType}'.` at `Warning`, the
+`SchemataEvent` row does not persist, and `PublishAsync` returns successfully. Treat that warning
+literal as an audit-misconfiguration signal.
 
 **Scoped advisor captured as singleton.** `IEventBus` is scoped. Registering the advisor as a
 singleton captures the first bus instance and reuses it across requests. Register the advisor as

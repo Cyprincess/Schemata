@@ -88,7 +88,7 @@ var builder = WebApplication.CreateBuilder(args)
     });
 ```
 
-`UseAuthorization()` installs `SchemataAuthorizationFeature` at priority 450,000,000. It depends on
+`UseAuthorization()` installs `SchemataAuthorizationFeature` at priority 460,000,000. It depends on
 `SchemataAuthenticationFeature`, `SchemataTransportHttpFeature`, and `SchemataWellKnownFeature`,
 pulled in automatically. `UseCodeFlow()` adds the authorize and token endpoints plus the PKCE,
 consent, and interaction advisors; `UseRefreshTokenFlow()` adds the refresh grant; `UseUserInfo()`

@@ -6,13 +6,13 @@ shared Schemata error model.
 
 ## Feature priorities
 
-`SchemataInsightFeature.DefaultPriority` is `Orders.Extension + 95_000_000` = 495,000,000.
+`SchemataInsightFeature.DefaultPriority` is `Orders.Extension + 110_000_000` = 510,000,000.
 
 | Feature                      | Priority    | Depends on                                               |
 | ---------------------------- | ----------- | -------------------------------------------------------- |
-| `SchemataInsightFeature`     | 495,000,000 | none                                                     |
-| `SchemataInsightHttpFeature` | 495,100,000 | `SchemataInsightFeature`, `SchemataTransportHttpFeature` |
-| `SchemataInsightGrpcFeature` | 495,200,000 | `SchemataInsightFeature`, `SchemataTransportGrpcFeature` |
+| `SchemataInsightFeature`     | 510,000,000 | none                                                     |
+| `SchemataInsightHttpFeature` | 510,100,000 | `SchemataInsightFeature`, `SchemataTransportHttpFeature` |
+| `SchemataInsightGrpcFeature` | 510,200,000 | `SchemataInsightFeature`, `SchemataTransportGrpcFeature` |
 
 HTTP and gRPC transports are activated from the `SchemataInsightBuilder` returned by `UseInsight()`:
 

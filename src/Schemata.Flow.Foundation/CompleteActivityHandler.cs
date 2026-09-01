@@ -1,29 +1,30 @@
 using System;
-using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
+using Schemata.Common.Errors;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Messaging.Skeleton;
+using CompleteProcessRequest = Schemata.Flow.Foundation.Commands.CompleteActivityRequest;
 
 namespace Schemata.Flow.Foundation;
 
-/// <summary>Resource method handler that completes the current activity for a process instance.</summary>
-public sealed class CompleteActivityHandler(FlowRunner runner)
-    : IResourceMethodHandler<SchemataProcess, CompleteActivityRequest, ProcessSnapshot>
+/// <summary>
+///     Handles process-instance activity-completion requests dispatched through the resource-method pipeline.
+/// </summary>
+public sealed class CompleteActivityHandler(IRequestDispatcher dispatcher)
+    : IRequestHandler<CompleteActivityRequest, ProcessSnapshot>
 {
-    #region IResourceMethodHandler<SchemataProcess,CompleteActivityRequest,ProcessSnapshot> Members
-
-    public ValueTask<ProcessSnapshot> InvokeAsync(
-        string?                 name,
+    /// <inheritdoc />
+    public async Task<ProcessSnapshot> HandleAsync(
         CompleteActivityRequest request,
-        SchemataProcess?        entity,
-        ClaimsPrincipal?        principal,
-        CancellationToken       ct
-    ) {
-        ArgumentNullException.ThrowIfNull(entity);
-        return runner.CompleteAsync(entity, request.Token, principal, ct);
+        CancellationToken ct = default)
+    {
+        var canonicalName = request.CanonicalName
+            ?? throw new InvalidOperationException("Instance method requires a target canonical name.");
+        return await dispatcher.SendAsync<CompleteProcessRequest, ProcessSnapshot>(new(
+            canonicalName, request.Token, request.Principal), ct);
     }
-
-    #endregion
 }

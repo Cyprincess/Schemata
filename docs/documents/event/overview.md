@@ -11,7 +11,8 @@ string end to end. Publishing a type with no registration throws at the publish 
 
 | Package                     | Key files                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Schemata.Event.Skeleton`   | `IEventBus.cs`, `IEvent.cs`, `IRequest.cs`, `IEventHandler.cs`, `IRequestHandler.cs`, `IEventTypeRegistry.cs`, `EventContext.cs`, `EventRouting.cs`, `IEventLifecycleObserver.cs`, `IEventOutboxPublisher.cs`, `EventOutboxMessage.cs`, `EventOutboxDelivery.cs`, `EventSourceContract.cs`, `IEventDispatchContext.cs`, `Entities/SchemataEvent.cs`, `Entities/EventState.cs`, `Entities/SchemataEventSubscription.cs`, `Advisors/IEventPublishAdvisor.cs`, `Advisors/IEventConsumeAdvisor.cs` |
+| `Schemata.Messaging.Skeleton` | `IMessage.cs`, `IRequest.cs`, `IRequestHandler.cs`, `IRequestDispatcher.cs`, `MessageContext.cs`, `IMessageContextPropagator.cs`, `MessageContexts.cs` |
+| `Schemata.Event.Skeleton`   | `IEventBus.cs`, `IEvent.cs`, `IEventHandler.cs`, `IHasPendingEvents.cs`, `IEventTypeRegistry.cs`, `EventContext.cs`, `EventRouting.cs`, `IEventLifecycleObserver.cs`, `IEventOutboxPublisher.cs`, `EventOutboxMessage.cs`, `EventOutboxDelivery.cs`, `EventSourceContract.cs`, `IEventDispatchContext.cs`, `Entities/SchemataEvent.cs`, `Entities/EventState.cs`, `Entities/SchemataEventSubscription.cs`, `Advisors/IEventPublishAdvisor.cs`, `Advisors/IEventConsumeAdvisor.cs` |
 | `Schemata.Event.Foundation` | `Features/SchemataEventFeature.cs`, `Builders/EventBuilder.cs`, `Builders/EventProducerBuilder.cs`, `Builders/EventConsumerBuilder.cs`, `Extensions/SchemataBuilderExtensions.cs`, `Observers/SchemataEventAuditObserver.cs`, `EventOutboxDispatcher.cs`, `Internal/InProcessEventBus.cs`, `Internal/InProcessEventOutboxPublisher.cs`, `Internal/DefaultEventTypeRegistry.cs`, `SchemataEventSubscriptionExtensions.cs`, `Internal/HandlerResolver.cs`                                        |
 | `Schemata.Event.RabbitMq`   | `RabbitMqEventOptions.cs`, `Internal/RabbitMqEventBus.cs`, `Internal/RabbitMqConsumerHost.cs`, `Internal/RabbitMqEventOutboxPublisher.cs`, `Extensions/EventProducerBuilderRabbitMqExtensions.cs`, `Extensions/EventConsumerBuilderRabbitMqExtensions.cs`                                                                                                                                                                                                                                |
 | `Schemata.Transport.RabbitMq` | `RabbitMqConnectionOptions.cs`, `IRabbitMqConnectionProvider.cs`, `CorrelationTracker.cs`, `Internal/RabbitMqConnectionProvider.cs`, `Extensions/ServiceCollectionExtensions.cs`                                                                                                                                                                                                                                                                                                    |
@@ -66,7 +67,6 @@ no built-in advisor ships.
 | `UseProducer(Action<EventProducerBuilder>?)`  | Configures the producer (the `IEventBus` implementation).                                     |
 | `UseConsumer(Action<EventConsumerBuilder>?)`  | Configures the consumer (subscription store, handler resolver, dispatch context).             |
 | `UseHandler<TEvent, THandler>()`              | Registers a scoped `IEventHandler<TEvent>` via `TryAddEnumerable`; multiple handlers per event type coexist.   |
-| `UseHandler<TRequest, TResponse, THandler>()` | Registers a scoped `IRequestHandler<TRequest, TResponse>` via `TryAddEnumerable`.                              |
 | `ConfigureRouting<TEvent>(EventRouting)`      | Sets the per-type `EventRouting` mode.                                                        |
 
 ## IEventBus
@@ -80,17 +80,17 @@ public interface IEventBus
     Task PublishAsync<TEvent>(TEvent @event, object sourceEntity, CancellationToken ct = default)
         where TEvent : IEvent;
 
-    Task<TResponse> SendAsync<TRequest, TResponse>(TRequest request, CancellationToken ct = default)
-        where TRequest : IRequest<TResponse>;
 }
 ```
+
+**The bus is broadcast-only.** `IEvent` extends `IMessage`, and request/reply — `IRequest<TResponse>`,
+`IRequestHandler<TRequest, TResponse>`, `IRequestDispatcher` — lives in `Schemata.Messaging.Skeleton`
+instead. A request is a message, not an event, so request/reply is usable without taking on the event
+domain at all. See [Messaging](../messaging/overview.md).
 
 `PublishAsync` is fire-and-forget (one-to-many). It does not run handlers inline: it records an
 outbox audit row and returns. The `EventOutboxDispatcher` drains that row and invokes handlers. See
 [Dispatch Pipeline](dispatch-pipeline.md).
-
-`SendAsync` is request/reply (one-to-one) and runs the single registered handler inline, returning
-its response.
 
 The `(@event, sourceEntity, ct)` overload attaches an originating business entity to the publish.
 `sourceEntity` must implement both `Schemata.Abstractions.Entities.ICanonicalName` and
@@ -181,14 +181,12 @@ stored in `IEventTypeRegistry` alongside the wire name, and read back through `G
 
 - `PublishAsync` does not invoke handlers before it returns. Handlers run when the outbox dispatcher
   drains the row, so delivery is asynchronous and at-least-once; handlers must be idempotent.
-- `RequireName(type)` throws for unregistered types. Register every event and request type used in
-  `PublishAsync`/`SendAsync` during startup.
+- `RequireName(type)` throws for unregistered types. Register every event type used in
+  `PublishAsync` during startup.
 - The source-entity overload throws before publishing if the source does not implement both
   `ICanonicalName` and `IConcurrency`.
 - `UseHandler` registrations accumulate (`TryAddEnumerable`): several `IEventHandler<TEvent>`
   implementations for one event all run (fan-out, or first-wins under `CompetingConsumers` routing).
-  Request/reply still expects exactly one `IRequestHandler<TRequest, TResponse>`; a second
-  registration makes `SendAsync` throw `InvalidOperationException`.
 - `SchemataEvent.EventType` stores the wire name. Queries against this column key on that string,
   not on a CLR type.
 
