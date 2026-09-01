@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Insight.Foundation.Features;
+using Schemata.Insight.Foundation;
 using Schemata.Transport.Http.Features;
 
 namespace Schemata.Insight.Http.Features;
@@ -31,5 +33,10 @@ public sealed class SchemataInsightHttpFeature : FeatureBase
         IWebHostEnvironment environment
     ) {
         services.AddSchemataApplicationPart<InsightController>();
+
+        var scheme = schemata.Get<string>(SchemataInsightBuilder.AuthenticationSchemeKey);
+        if (!string.IsNullOrWhiteSpace(scheme)) {
+            services.PostConfigure<MvcOptions>(options => options.Conventions.Add(new InsightControllerConvention(scheme)));
+        }
     }
 }

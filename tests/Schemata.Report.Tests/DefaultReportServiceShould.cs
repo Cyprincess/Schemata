@@ -1,3 +1,4 @@
+using Schemata.Report.Tests.Fixtures;
 using System;
 using System.Collections.Generic;
 using System.Security.Claims;
@@ -8,10 +9,14 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Drivers;
+using Schemata.Insight.Skeleton.Plan;
 using Schemata.Report.Skeleton;
 using Schemata.Scheduling.Skeleton;
 using Xunit;
+using Schemata.Insight.Skeleton.Queries;
+using Schemata.Report.Skeleton.Advisors;
+using Schemata.Report.Skeleton.Enums;
 
 namespace Schemata.Report.Tests;
 

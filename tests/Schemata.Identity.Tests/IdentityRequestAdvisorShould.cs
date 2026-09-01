@@ -1,3 +1,4 @@
+using Schemata.Identity.Tests.Fixtures;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
@@ -6,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
-using Schemata.Advice;
 using Schemata.Identity.Foundation.Handlers;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Advisors;

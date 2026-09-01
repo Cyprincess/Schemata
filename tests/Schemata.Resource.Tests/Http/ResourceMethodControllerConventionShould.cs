@@ -1,4 +1,4 @@
-using System;
+using Schemata.Core.Building;
 using System.Linq;
 using System.Reflection;
 using System.Security.Claims;
@@ -11,7 +11,6 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Messaging.Skeleton;
-using Schemata.Resource.Foundation;
 using Schemata.Resource.Http;
 using Xunit;
 

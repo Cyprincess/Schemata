@@ -10,7 +10,7 @@ namespace Schemata.Resource.Foundation.Features;
 /// <summary>
 ///     Core feature that registers the resource advisor pipeline. Individual resources are registered
 ///     explicitly through <c>SchemataResourceBuilder.AddResource&lt;TEntity&gt;()</c> or
-///     <c>Use&lt;TEntity, TRequest, TDetail, TSummary&gt;()</c>.
+///     <c>Use&lt;TEntity,TRequest,TDetail,TSummary&gt;()</c>.
 /// </summary>
 [DependsOn<SchemataRoutingFeature>]
 public sealed class SchemataResourceFeature : FeatureBase
@@ -28,5 +28,5 @@ public sealed class SchemataResourceFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) => services.AddSchemataResources();
+    ) => services.AddSchemataResources(schemata);
 }

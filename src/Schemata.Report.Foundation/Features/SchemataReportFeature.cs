@@ -4,8 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Insight.Foundation.Features;
-using Schemata.Report.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
+using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Foundation.Features;
 
@@ -19,10 +19,8 @@ public sealed class SchemataReportFeature<TReport, TSnapshot, TChunk> : FeatureB
     /// <summary>Default feature priority for Report service registration.</summary>
     public const int DefaultPriority = Orders.Extension + 130_000_000;
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,

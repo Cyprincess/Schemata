@@ -6,7 +6,6 @@ using Schemata.Authorization.Foundation.Features;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Core;
-using Schemata.Core.Features;
 using Schemata.Scheduling.Foundation.Features;
 using Schemata.Scheduling.Skeleton;
 using Xunit;

@@ -1,8 +1,9 @@
 using ProtoBuf;
 using ProtoBuf.Meta;
 using Schemata.Abstractions.Resource;
+using Schemata.Core.Building;
 using Schemata.Resource.Foundation;
-using Schemata.Resource.Grpc.Internal;
+using Schemata.Resource.Grpc.Runtime;
 using Schemata.Transport.Grpc.Proto;
 
 namespace Schemata.Resource.Grpc;
@@ -17,7 +18,7 @@ internal static class RuntimeTypeModelConfigurator
     /// </summary>
     /// <param name="registry">The registered resources.</param>
     /// <returns>The configured protobuf-net runtime model.</returns>
-    public static RuntimeTypeModel Configure(IResourceRegistry registry) {
+    public static RuntimeTypeModel Configure(ResourceRegistry registry) {
         var model = RuntimeTypeModel.Create();
 
         model.DefaultCompatibilityLevel = CompatibilityLevel.Level300;

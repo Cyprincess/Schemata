@@ -85,7 +85,7 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
         var expiry = now + options.Value.DeviceCodeLifetime;
 
         var dc = new TToken {
-            Name        = Identifiers.NewUid().ToString("n"),
+            Name        = Guid.NewGuid().ToString("n"),
             Application = application.CanonicalName,
             Type            = TokenTypes.DeviceCode,
             Status          = TokenStatuses.Valid,
@@ -100,7 +100,7 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
         await tokens.CreateAsync(dc, ct);
 
         var uc = new TToken {
-            Name        = Identifiers.NewUid().ToString("n"),
+            Name        = Guid.NewGuid().ToString("n"),
             Application = application.CanonicalName,
             Type            = TokenTypes.UserCode,
             Status          = TokenStatuses.Valid,

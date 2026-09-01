@@ -8,6 +8,12 @@ using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Insight.Foundation;
 using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Advisors;
+using Schemata.Insight.Skeleton.Catalog;
+using Schemata.Insight.Skeleton.Drivers;
+using Schemata.Insight.Skeleton.Models;
+using Schemata.Insight.Skeleton.Plan;
+using Schemata.Insight.Skeleton.Queries;
 using Schemata.Messaging.Skeleton.Advisors;
 using Xunit;
 

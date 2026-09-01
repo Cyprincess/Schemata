@@ -58,7 +58,6 @@ public sealed class DistributedCacheProvider : ICacheProvider
         return _cache.SetAsync(key, value, ToDistributedOptions(options), ct);
     }
 
-    /// <inheritdoc />
     /// <remarks>
     ///     The insert-if-absent check-then-act is serialized by a striped in-process lock
     ///     (<see cref="IndexLocks" />), so it is atomic only within a single process. The backing
@@ -83,7 +82,6 @@ public sealed class DistributedCacheProvider : ICacheProvider
         return true;
     }
 
-    /// <inheritdoc />
     /// <remarks>
     ///     The compare-and-swap is serialized by a striped in-process lock (<see cref="IndexLocks" />),
     ///     so it is atomic only within a single process. The backing <see cref="IDistributedCache" />
@@ -109,7 +107,6 @@ public sealed class DistributedCacheProvider : ICacheProvider
         return true;
     }
 
-    /// <inheritdoc />
     /// <remarks>
     ///     The compare-and-delete is serialized by a striped in-process lock (<see cref="IndexLocks" />),
     ///     so it is atomic only within a single process. The backing <see cref="IDistributedCache" />

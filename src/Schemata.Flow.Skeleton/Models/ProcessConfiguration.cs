@@ -1,5 +1,4 @@
 using System;
-using Schemata.Abstractions;
 
 namespace Schemata.Flow.Skeleton.Models;
 

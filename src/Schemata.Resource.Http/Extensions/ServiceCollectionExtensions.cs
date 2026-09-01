@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Options;
-using Schemata.Resource.Foundation;
+using Schemata.Core.Building;
 using Schemata.Resource.Http;
 
 // ReSharper disable once CheckNamespace
@@ -27,7 +27,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IActionDescriptorChangeProvider>(provider);
 
         services.AddOptions<MvcOptions>()
-                .Configure<IResourceRegistry, IOptions<SchemataResourceOptions>>((mvc, registry, opts) => {
+                .Configure<ResourceRegistry, IOptions<SchemataResourceOptions>>((mvc, registry, opts) => {
                      mvc.Conventions.Add(new ResourceControllerConvention(registry, opts.Value.AuthenticationScheme));
                      mvc.Conventions.Add(new ResourceMethodControllerConvention(registry, opts.Value.AuthenticationScheme));
                  });

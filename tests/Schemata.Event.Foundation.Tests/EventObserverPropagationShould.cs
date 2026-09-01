@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Entity.Repository;
-using Schemata.Event.Foundation.Internal;
+using Schemata.Event.Foundation.Runtime;
 using Schemata.Event.Foundation.Observers;
 using Schemata.Event.Skeleton;
 using Schemata.Event.Skeleton.Entities;

@@ -4,6 +4,8 @@ using Schemata.Common;
 using Schemata.Report.Skeleton;
 using Xunit;
 
+using Schemata.Report.Skeleton.Models;
+
 namespace Schemata.Report.Tests;
 
 public class ReportResultsShould

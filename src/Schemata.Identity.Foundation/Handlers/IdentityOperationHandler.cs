@@ -1,6 +1,5 @@
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
-using Schemata.Abstractions.Advisors;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Managers;
 using Schemata.Identity.Skeleton.Services;

@@ -1,5 +1,4 @@
 using System;
-using Schemata.Common;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 
@@ -24,7 +23,7 @@ public static class TokenFactory
         ArgumentNullException.ThrowIfNull(process);
         ArgumentNullException.ThrowIfNull(resolved);
 
-        var leaf      = Identifiers.NewUid().ToString("n");
+        var leaf      = Guid.NewGuid().ToString("n");
         var canonical = $"{process.CanonicalName}/tokens/{leaf}";
 
         return new() {
@@ -53,7 +52,7 @@ public static class TokenFactory
         ArgumentNullException.ThrowIfNull(resolved);
         ArgumentNullException.ThrowIfNull(spawner);
 
-        var leaf      = Identifiers.NewUid().ToString("n");
+        var leaf      = Guid.NewGuid().ToString("n");
         var canonical = $"{process.CanonicalName}/tokens/{leaf}";
 
         return new() {

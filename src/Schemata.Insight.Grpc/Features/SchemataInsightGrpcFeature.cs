@@ -1,4 +1,5 @@
 using Grpc.AspNetCore.Server.Model;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Routing;
@@ -8,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Insight.Foundation.Features;
+using Schemata.Insight.Foundation;
 using Schemata.Transport.Grpc.Features;
 
 namespace Schemata.Insight.Grpc.Features;
@@ -43,6 +45,10 @@ public sealed class SchemataInsightGrpcFeature : FeatureBase
         IConfiguration        configuration,
         IWebHostEnvironment   environment
     ) {
-        endpoints.MapGrpcService<InsightGrpcService>();
+        var service = endpoints.MapGrpcService<InsightGrpcService>();
+        var scheme = app.ApplicationServices.GetRequiredService<SchemataOptions>().Get<string>(SchemataInsightBuilder.AuthenticationSchemeKey);
+        if (!string.IsNullOrWhiteSpace(scheme)) {
+            service.RequireAuthorization(new AuthorizationPolicyBuilder(scheme).RequireAuthenticatedUser().Build());
+        }
     }
 }

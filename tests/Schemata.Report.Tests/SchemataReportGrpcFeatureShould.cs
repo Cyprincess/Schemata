@@ -1,3 +1,4 @@
+using Schemata.Core.Building;
 using System;
 using System.Linq;
 using Microsoft.AspNetCore.Builder;
@@ -6,14 +7,14 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Messaging.Skeleton;
 using Schemata.Common;
 using Schemata.Core;
-using Schemata.Report.Foundation;
 using Schemata.Report.Foundation.Features;
 using Schemata.Report.Grpc.Features;
-using Schemata.Report.Skeleton;
-using Schemata.Resource.Foundation;
-using Schemata.Resource.Grpc.Internal;
+using Schemata.Resource.Grpc.Runtime;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
+using Schemata.Report.Foundation.Handlers;
+using Schemata.Report.Foundation.Queries;
+using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Tests;
 
@@ -29,7 +30,7 @@ public class SchemataReportGrpcFeatureShould
         });
 
         using var app      = builder.Build();
-        var       registry = app.Services.GetRequiredService<IResourceRegistry>();
+        var       registry = app.Services.GetRequiredService<ResourceRegistry>();
 
         Assert.True(schemata!.HasFeature<SchemataReportGrpcFeature<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>());
         Assert.Equal(
@@ -59,7 +60,7 @@ public class SchemataReportGrpcFeatureShould
         builder.UseSchemata(schema => schema.UseReport().MapGrpc().MapGrpc());
 
         using var app      = builder.Build();
-        var       registry = app.Services.GetRequiredService<IResourceRegistry>();
+        var       registry = app.Services.GetRequiredService<ResourceRegistry>();
 
         Assert.Single(registry.GetMethods(typeof(SchemataReport)), method => method.Verb == Verbs.Generate);
         Assert.Single(registry.GetMethods(typeof(SchemataReportSnapshot)), method => method.Verb == Verbs.Read);

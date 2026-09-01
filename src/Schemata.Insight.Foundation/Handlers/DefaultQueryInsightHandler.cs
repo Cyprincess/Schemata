@@ -2,7 +2,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Advice;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Foundation.Execution;
+using Schemata.Insight.Foundation.Planning;
+using Schemata.Insight.Skeleton.Advisors;
+using Schemata.Insight.Skeleton.Queries;
+using Schemata.Insight.Skeleton.Models;
+using Schemata.Insight.Skeleton.Plan;
 using Schemata.Messaging.Skeleton;
 
 namespace Schemata.Insight.Foundation.Handlers;

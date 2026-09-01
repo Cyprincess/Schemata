@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Grpc.Wire;
+using Schemata.Insight.Skeleton.Models;
+using Schemata.Insight.Skeleton.Queries;
 
-namespace Schemata.Insight.Grpc;
+namespace Schemata.Insight.Grpc.Mapping;
 
 /// <summary>
 ///     Maps between the gRPC edge messages and the protobuf-free core wire types: the request graph

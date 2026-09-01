@@ -4,9 +4,10 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using Humanizer;
 using Schemata.Common;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Foundation.Execution;
+using Schemata.Insight.Skeleton.Plan;
 
-namespace Schemata.Insight.Foundation;
+namespace Schemata.Insight.Foundation.Materialization;
 
 public static class RowMaterializer
 {

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Schemata.Abstractions.Resource;
 using Schemata.Expressions.Skeleton;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Catalog;
 
 namespace Schemata.Insight.Foundation;
 

@@ -1,10 +1,4 @@
-using Schemata.Domain.Skeleton;
-using Schemata.Event.Skeleton;
-
 namespace Schemata.Domain.Skeleton.Tests.Fixtures;
-
-/// <summary>A domain event carrying enough state to tell two raises apart.</summary>
-public sealed record WidgetRenamed(string Name) : IDomainEvent;
 
 /// <summary>
 ///     Minimal aggregate exposing <see cref="AggregateBase.Raise" /> through a domain operation, so

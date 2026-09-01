@@ -1,9 +1,9 @@
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Messaging.RabbitMq.Internal;
+using Schemata.Messaging.RabbitMq.Runtime;
 using Schemata.Messaging.Skeleton;
-using Schemata.Messaging.Skeleton.Internal;
+using Schemata.Messaging.Skeleton.Runtime;
 using Xunit;
 
 namespace Schemata.Messaging.RabbitMq.Tests;

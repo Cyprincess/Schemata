@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Drivers;
+using Schemata.Insight.Skeleton.Models;
 
-namespace Schemata.Insight.Foundation;
+namespace Schemata.Insight.Foundation.Drivers;
 
 /// <summary>
 ///     A repository source result that retains its execution scope while its lazy rows are available.
@@ -37,10 +38,8 @@ public sealed class RepositorySourceResult : ISourceResult
         _scope = scope;
     }
 
-    /// <inheritdoc />
     public IAsyncEnumerable<IReadOnlyDictionary<string, object?>> Rows { get; }
 
-    /// <inheritdoc />
     public IReadOnlyList<FieldDescriptor> Schema { get; }
 
     /// <summary>Disposes the execution scope retained for lazy repository row enumeration.</summary>

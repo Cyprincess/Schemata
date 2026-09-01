@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Abstractions;
 using Schemata.Core;
+using Schemata.Core.Building;
 using Schemata.Core.Features;
 using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Security.Skeleton;
 
 namespace Schemata.Flow.Foundation.Builders;
 
@@ -12,7 +14,7 @@ namespace Schemata.Flow.Foundation.Builders;
 ///     Fluent builder for configuring the flow system. Process definitions registered through
 ///     <c>Use&lt;TProcess&gt;</c> are written directly to <see cref="SchemataFlowOptions" />.
 /// </summary>
-public sealed class SchemataFlowBuilder
+public sealed class SchemataFlowBuilder : IResourceBuilder
 {
     /// <summary>Initializes the builder bound to the given options and service collection.</summary>
     /// <param name="schemata">Receives the feature registrations added through <see cref="AddFeature{T}" />.</param>
@@ -20,9 +22,15 @@ public sealed class SchemataFlowBuilder
     public SchemataFlowBuilder(SchemataOptions schemata, IServiceCollection services) {
         Schemata = schemata;
         Services = services;
+        var registrations = Schemata.Get<Dictionary<IResourceBuilder, ResourceSecurityRegistration>>(nameof(ResourceSecurityRegistration)) ?? new();
+        Schemata.Set(nameof(ResourceSecurityRegistration), registrations);
+        registrations[this] = new(
+            services => services.AddFlowAuthentication(),
+            services => services.AddFlowAuthorization(),
+            scheme => Schemata.Set(FlowResourceRegistration.AuthenticationSchemeKey, scheme));
     }
 
-    private SchemataOptions Schemata { get; }
+    public SchemataOptions Schemata { get; }
 
     /// <summary>Service collection that receives process registrations.</summary>
     public IServiceCollection Services { get; }
@@ -35,21 +43,6 @@ public sealed class SchemataFlowBuilder
         Schemata.AddFeature<T>();
     }
 
-    /// <summary>
-    ///     Requires <paramref name="scheme" /> on the Flow resource endpoints, overriding the
-    ///     resource system's global default for the Flow resources alone. Call it before
-    ///     <c>MapHttp()</c> / <c>MapGrpc()</c>, which read the scheme when they register the
-    ///     resources.
-    /// </summary>
-    /// <param name="scheme">
-    ///     The authentication scheme; <see langword="null" /> restores the global default.
-    /// </param>
-    /// <returns>This builder for chaining.</returns>
-    public SchemataFlowBuilder WithAuthorization(string? scheme = null) {
-        Schemata.Set(FlowResourceRegistration.AuthenticationSchemeKey, scheme);
-
-        return this;
-    }
 
     /// <summary>
     ///     Registers a code-first process definition type, writing its

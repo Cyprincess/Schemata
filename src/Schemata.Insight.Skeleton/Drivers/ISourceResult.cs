@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
+using Schemata.Insight.Skeleton.Models;
 
-namespace Schemata.Insight.Skeleton;
+namespace Schemata.Insight.Skeleton.Drivers;
 
 /// <summary>
 ///     A source driver's streamed result: nested string-keyed rows and the schema describing them.

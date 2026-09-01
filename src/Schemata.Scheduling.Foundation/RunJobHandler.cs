@@ -8,7 +8,6 @@ using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
-using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Scheduling.Skeleton;
@@ -64,7 +63,7 @@ public sealed class RunJobHandler(
         var context = new JobContext {
             Job          = entity.CanonicalName ?? jobType.Name,
             Variables    = request.Variables ?? new Dictionary<string, string?>(),
-            ExecutionUid = Identifiers.NewUid(),
+            ExecutionUid = Guid.NewGuid(),
         };
 
         var trigger = TriggerOpenMethod.MakeGenericMethod(jobType);

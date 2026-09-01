@@ -3,9 +3,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Catalog;
 
-namespace Schemata.Insight.Foundation;
+namespace Schemata.Insight.Foundation.Catalog;
 
 /// <summary>
 ///     A source catalog backed by a dictionary loaded at builder time; suitable for sources known at

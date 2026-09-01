@@ -1,11 +1,6 @@
 # Flow HTTP Transport
 
-`Schemata.Flow.Http` exposes process execution over HTTP. It registers `SchemataProcess`,
-`SchemataProcessToken`, and `SchemataProcessTransition` as Schemata resources. Process operations
-ride the standard Resource pipeline as AIP-136 custom methods, and the package adds a small
-controller that lists registered process definitions. `MapHttp()` activates
-`SchemataFlowHttpFeature` (priority
-`SchemataFlowFeature.DefaultPriority + 100_000` = `490_100_000`).
+`Schemata.Flow.Http` exposes process execution over HTTP. Its `MapHttp()` extension activates `SchemataFlowHttpFeature`; the feature's dependencies provide the shared Resource HTTP transport. Process verbs use `ResourceMethodRequest` envelopes, so dispatcher-wrap authentication and coarse authorization run before their Resource handler stages.
 
 ## Where the code lives
 
@@ -60,25 +55,16 @@ using Schemata.Flow.Foundation;
 
 resource.Operations = [Operations.Get, Operations.List];
 resource.Methods = [
-    new("start",     typeof(FlowStartProcessHandler),    ResourceMethodScope.Collection),
+    new("start",     typeof(FlowStartProcessHandler), ResourceMethodScope.Collection),
     new("complete",  typeof(CompleteActivityHandler)),
     new("correlate", typeof(CorrelateMessageHandler)),
-    new("signal",    typeof(ThrowSignalHandler),     ResourceMethodScope.Collection),
+    new("signal",    typeof(ThrowSignalHandler), ResourceMethodScope.Collection),
     new("terminate", typeof(TerminateProcessHandler)),
 ];
 ```
 
-`SchemataProcessToken` carries `Operations.Get`, `Operations.List`, and one custom method:
+`SchemataProcessToken` carries `Operations.Get`, `Operations.List`, and the `cancel` custom method. `SchemataProcessTransition` is registered read-only (`Get`, `List`).
 
-```csharp
-using Schemata.Abstractions.Entities;
-using Schemata.Flow.Foundation;
-
-resource.Operations = [Operations.Get, Operations.List];
-resource.Methods    = [new("cancel", typeof(CancelTokenHandler))];
-```
-
-`SchemataProcessTransition` is registered read-only (`Get`, `List`).
 
 ## Routing and method mapping
 
@@ -95,11 +81,7 @@ collection; instance-scoped verbs bind to `{name}`:
 | `signal`    | `POST ~/v1/processes:signal`           | `ThrowSignalHandler`      | `FlowRunner.ThrowSignalAsync` |
 | `terminate` | `POST ~/v1/processes/{name}:terminate` | `TerminateProcessHandler`     | `FlowRunner.TerminateAsync`   |
 
-Each handler implements `IRequestHandler<TRequest, TResponse>` for its dedicated wire request.
-`ResourceMethodOperationHandler` runs resource authorization and instance-target validation, copies
-the path canonical name and `HttpContext.User` onto the request, then dispatches it through
-`IRequestDispatcher`. The public Flow handler translates that request into the internal Flow
-command handled by the runner pipeline.
+Each handler implements `IRequestHandler<TRequest,TResponse>` for its dedicated wire request. `ResourceMethodOperationHandler` constructs the method envelope with the route target and `HttpContext.User`, then sends it through `IRequestDispatcher`. The Flow handler translates the inner request into the runner command.
 
 `FlowStartProcessHandler` delegates source loading to `FlowSourceLoader`: the loader resolves the
 optional `Source` canonical name through `IResourceTypeResolver`, checks the resolved type against
@@ -225,10 +207,8 @@ runtime catalog of registered process definitions; there is no separate reflecti
 
 ## Extension points
 
-- Add `[ResourceMethod]` advisors or replace a handler to change a verb's behavior; the methods ride
-  the same Resource advisor pipeline as any custom method.
-- Add `[Anonymous(Operations.Method)]` on `SchemataProcess` in your own derived registration to
-  bypass authorization for the verbs.
+- Register a closed `IRequestPipelineAdvisor<...>` for envelope-wide Flow method behavior, or use Resource method-stage advisors for behavior requiring the loaded target.
+- `[Anonymous]` on the resource operation bypasses authentication and coarse authorization for that operation. Entitlement filtering remains active.
 
 ## Caveats
 

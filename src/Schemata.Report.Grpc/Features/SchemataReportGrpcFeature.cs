@@ -6,9 +6,9 @@ using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Report.Foundation;
 using Schemata.Report.Foundation.Features;
-using Schemata.Report.Skeleton;
-using Schemata.Resource.Foundation;
+using Schemata.Core.Building;
 using Schemata.Resource.Grpc.Features;
+using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Grpc.Features;
 
@@ -26,10 +26,8 @@ public sealed class SchemataReportGrpcFeature<TReport, TSnapshot, TChunk> : Feat
     /// <summary>Default <see cref="FeatureBase.Priority" /> for Report gRPC endpoints.</summary>
     public const int DefaultPriority = SchemataReportFeature<TReport, TSnapshot, TChunk>.DefaultPriority + 200_000;
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,
@@ -38,7 +36,7 @@ public sealed class SchemataReportGrpcFeature<TReport, TSnapshot, TChunk> : Feat
         IWebHostEnvironment environment
     ) {
         var resources = new SchemataResourceBuilder(schemata, services) {
-            AuthenticationScheme = schemata.Get<string>(SchemataReportBuilder<TReport, TSnapshot, TChunk>.AuthenticationSchemeKey),
+            AuthenticationScheme = schemata.Get<string>(Foundation.SchemataReportBuilder<TReport, TSnapshot, TChunk>.AuthenticationSchemeKey),
         };
         resources.Use<TReport, TReport, TReport, TReport>(
             [GrpcResourceAttribute.Name],

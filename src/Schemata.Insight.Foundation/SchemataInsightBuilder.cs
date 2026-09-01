@@ -1,11 +1,17 @@
+using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
+using Schemata.Core.Building;
 using Schemata.Core.Features;
 using Schemata.Expressions.Skeleton;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Foundation.Catalog;
+using Schemata.Insight.Foundation.Drivers;
+using Schemata.Insight.Skeleton.Catalog;
+using Schemata.Insight.Skeleton.Drivers;
+using Schemata.Security.Skeleton;
 
 namespace Schemata.Insight.Foundation;
 
@@ -13,14 +19,22 @@ namespace Schemata.Insight.Foundation;
 ///     Fluent builder for the Insight module: enabled expression languages, the default language, the
 ///     total-size mode, registered sources, and source drivers.
 /// </summary>
-public sealed class SchemataInsightBuilder : IExpressionLanguageBuilder
+public sealed class SchemataInsightBuilder : IExpressionLanguageBuilder, IResourceBuilder
 {
+    internal const string AuthenticationSchemeKey = "Insight:AuthenticationScheme";
+
     /// <summary>Creates the builder and binds the enabled languages to the module options.</summary>
     /// <param name="schemata">The Schemata options.</param>
     /// <param name="services">The service collection.</param>
     public SchemataInsightBuilder(SchemataOptions schemata, IServiceCollection services) {
         Schemata = schemata;
         Services = services;
+        var registrations = Schemata.Get<Dictionary<IResourceBuilder, ResourceSecurityRegistration>>(nameof(ResourceSecurityRegistration)) ?? new();
+        Schemata.Set(nameof(ResourceSecurityRegistration), registrations);
+        registrations[this] = new(
+            _ => { },
+            _ => throw new InvalidOperationException("Insight authorization is configured through InsightSecurityGate per-source authorization."),
+            scheme => Schemata.Set(AuthenticationSchemeKey, scheme));
 
         Services.Configure<SchemataInsightOptions>(o => {
             if (Languages.Languages.Count > 0) {
@@ -29,12 +43,10 @@ public sealed class SchemataInsightBuilder : IExpressionLanguageBuilder
         });
     }
 
-    private SchemataOptions Schemata { get; }
+    public SchemataOptions Schemata { get; }
 
-    /// <inheritdoc />
     public IServiceCollection Services { get; }
 
-    /// <inheritdoc />
     public ExpressionLanguageProfile Languages { get; } = new();
 
     /// <summary>Adds a feature to the Schemata configuration.</summary>

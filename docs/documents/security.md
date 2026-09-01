@@ -1,191 +1,64 @@
 # Security
 
-`Schemata.Security.Foundation` enforces access at two points: an `IAccessProvider<T, TRequest>`
-gate that decides whether a principal may perform an operation, and an
-`IEntitlementProvider<T, TRequest>` that narrows a repository query to the rows the principal may
-see. `UseSecurity()` registers the feature and the default providers; the resource pipeline calls
-them through the authorize advisors that `WithAuthorization()` installs.
+`UseSecurity()` registers the default permission resolver, permission matcher, access provider, and entitlement provider. A domain builder opts into request authentication and authorization with the shared `IResourceBuilder` extensions from `Schemata.Security.Foundation`.
 
-## Where the code lives
+## Packages
 
-| Package                        | Key files                                                                                                                                                           |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Schemata.Security.Skeleton`   | `IAccessProvider.cs`, `IEntitlementProvider.cs`, `IPermissionResolver.cs`, `IPermissionMatcher.cs`, `AccessContext.cs`, `AnonymousAccess.cs`, `AnonymousGranted.cs` |
-| `Schemata.Security.Foundation` | `Extensions/SchemataBuilderExtensions.cs` (`UseSecurity`), `Features/SchemataSecurityFeature.cs`, `SchemataSecurityOptions.cs`                                      |
-| `Schemata.Security.Foundation` | `DefaultAccessProvider.cs`, `DefaultEntitlementProvider.cs`, `DefaultPermissionResolver.cs`, `DefaultPermissionMatcher.cs`                                          |
-| `Schemata.Resource.Foundation` | `Advisors/Advice{List,Get,Create,Update,Delete}RequestAuthorize.cs`, `SchemataResourceBuilder.WithAuthorization`                                                    |
+| Package | Role |
+| --- | --- |
+| `Schemata.Security.Skeleton` | Security contracts, `SecurityOrders`, `AnonymousAccess`, and `ResourceSecurityRegistration` |
+| `Schemata.Security.Foundation` | Default providers, dispatcher-wrap authentication and authorization advisors, and shared builder extensions |
+| domain Foundation package | Registers the closed advisors and handler-stage access and entitlement advisors for its request envelopes |
 
-## The two providers
+## Enabling security
 
-Both interfaces live in `Schemata.Security.Skeleton` and are open generic over the entity type
-`T` and the request DTO `TRequest`. Both receive an `AccessContext<TRequest>` carrying the
-operation name and the request payload:
-
-```csharp
-public class AccessContext<TRequest>
-{
-    public string?  Operation { get; set; }   // "List", "Get", "Create", "Update", "Delete"
-    public TRequest? Request  { get; set; }
-}
-```
-
-`IAccessProvider<T, TRequest>` returns a yes/no decision:
-
-```csharp
-Task<bool> HasAccessAsync(
-    T?                      entity,
-    AccessContext<TRequest> context,
-    ClaimsPrincipal?        principal,
-    CancellationToken       ct = default);
-```
-
-`IEntitlementProvider<T, TRequest>` returns a predicate, or `null` for no filtering:
-
-```csharp
-Task<Expression<Func<T, bool>>?> GenerateEntitlementExpressionAsync(
-    AccessContext<TRequest> context,
-    ClaimsPrincipal?        principal,
-    CancellationToken       ct = default);
-```
-
-## Enabling the feature
+Call `UseSecurity()` to register the default services. Call the two extensions independently on an external domain builder:
 
 ```csharp
 builder.UseSchemata(schema => {
     schema.UseSecurity();
-    schema.UseSecurity(o => o.PermissionClaimType = "permissions"); // override the claim type
+    schema.UseResource()
+          .WithAuthentication("Bearer")
+          .WithAuthorization()
+          .MapHttp()
+          .Use<Student, StudentRequest, StudentDetail, StudentSummary>();
 });
 ```
 
-`Microsoft.AspNetCore.Builder.SchemataBuilderExtensions.UseSecurity` stores the optional
-`Action<SchemataSecurityOptions>` and calls `builder.AddFeature<SchemataSecurityFeature>()`.
+`WithAuthentication<TBuilder>(TBuilder, string?)` records the transport scheme through that builder's `ResourceSecurityRegistration` and registers its closed authentication advisors. `WithAuthorization<TBuilder>(TBuilder)` registers the corresponding coarse dispatcher advisors and domain handler advisors. Both return the same builder type. A builder without a registration throws `InvalidOperationException` rather than silently configuring another domain.
 
-`SchemataSecurityFeature` has `Priority = Orders.Extension = 400_000_000` and no declared
-dependencies. `ConfigureServices` registers four services, all with `TryAddScoped`:
+Each domain builder stores a `ResourceSecurityRegistration` in `SchemataOptions`. Its three delegates register authentication, register authorization, and store an optional scheme. The shared extensions call those delegates without inspecting the service collection. `SchemataResourceBuilder`, Flow, Report, Scheduling, Insight, and the Identity and Authorization management builders implement `IResourceBuilder`.
 
-```csharp
-services.TryAddScoped<IPermissionResolver, DefaultPermissionResolver>();
-services.TryAddScoped<IPermissionMatcher, DefaultPermissionMatcher>();
-services.TryAddScoped(typeof(IAccessProvider<,>), typeof(DefaultAccessProvider<,>));
-services.TryAddScoped(typeof(IEntitlementProvider<,>), typeof(DefaultEntitlementProvider<,>));
-```
+## Three authorization responsibilities
 
-Replacement works differently per shape. For `IPermissionResolver` and `IPermissionMatcher`, a
-custom registration wins wherever it lands: added before the feature, the feature's `TryAdd`
-becomes a no-op; added after, the later descriptor wins single resolution. For the two
-open-generic providers, a closed-generic registration such as
-`IAccessProvider<Student, StudentRequest>` always takes precedence — the container matches the
-exact constructed type before falling back to the open generic — and the open-generic default
-fills in every other entity.
+Security assigns work according to the information an advisor needs.
 
-## Default access decision
+| Responsibility | Pipeline position | Behavior |
+| --- | --- | --- |
+| Authentication | `IRequestPipelineAdvisor<TRequest,TResponse>` before continuation | Checks `Principal.Identity.IsAuthenticated` for a non-anonymous operation and throws `UnauthenticatedException`. |
+| Coarse authorization | `IRequestPipelineAdvisor<TRequest,TResponse>` after authentication and before continuation | Resolves an operation and entity permission through `IPermissionResolver`, matches it through `IPermissionMatcher`, and throws the result of the AIP-211 existence probe. |
+| Instance authorization and entitlement | Domain handler stages | Calls `IAccessProvider<TEntity,TRequest>` with the loaded entity or `null` for Create, and applies an `IEntitlementProvider<TEntity,TRequest>` expression to query containers. |
 
-`DefaultAccessProvider<T, TRequest>` is a claims-based gate composing `IPermissionResolver` and
-`IPermissionMatcher`:
+Both wrap advisors call `AnonymousAccess.IsAnonymous(entity, operation)` themselves. An anonymous operation therefore bypasses authentication and coarse authorization without a marker passed from another advisor. Handler-stage access checks also skip anonymous operations, while entitlement predicates still apply to anonymous queries.
 
-1. An unauthenticated principal (`principal?.Identity?.IsAuthenticated != true`) is denied.
-2. A missing operation name is denied.
-3. Otherwise it resolves a permission string and asks the matcher whether the principal holds it.
+`SecurityOrders` fixes the outer chain order: `Authentication`, `Authorization`, `Sanitize`, `Validation`, `Idempotency`, then the response family. Before segments run in ascending order. After segments unwind in reverse order.
 
-`DefaultPermissionResolver.Resolve(operation, entity)` produces `{entity}.{operation}` in
-kebab-case via Humanizer's `Kebaberize()`. `Resolve("Create", typeof(OrderItem))` returns
-`"order-item.create"`.
+Authentication and coarse authorization are independently enabled. Authentication throws `UNAUTHENTICATED` for a non-anonymous caller without an authenticated identity. Coarse authorization uses `IPermissionResolver` and `IPermissionMatcher`. A denied Get returns `NOT_FOUND`; a denied Update or Delete returns `PERMISSION_DENIED` only when the principal matches the corresponding Get permission, otherwise `NOT_FOUND`. Create, List, and method operations return `PERMISSION_DENIED` on a coarse denial.
 
-`DefaultPermissionMatcher` reads claims of type `SchemataSecurityOptions.PermissionClaimType`
-(default `"role"`) and matches the resolved permission against them:
+`SchemataSecurityFeature` registers `IPermissionResolver`, `IPermissionMatcher`, `IAccessProvider<,>`, and `IEntitlementProvider<,>` with `TryAddScoped`.
 
-- An exact string match succeeds.
-- A claim may contain a single `*` wildcard segment. The claim and permission must have the same
-  number of dot-separated segments; each non-wildcard segment must match positionally.
-- The wildcard may not be the first segment when the permission has more than two segments, and a
-  claim with two or more wildcards never matches.
+`DefaultPermissionResolver` creates a kebab-case `{entity}.{operation}` permission. `DefaultPermissionMatcher` matches claims of `SchemataSecurityOptions.PermissionClaimType`, which defaults to `role`; it supports one wildcard segment subject to its segment-count checks.
 
-So `student.*` grants every operation on `Student`, and `*.list` grants `List` on any single-word
-entity, while a bare `*` matches nothing.
+The default access provider is the instance-level implementation. Coarse authorization uses the resolver and matcher directly. Replace the resolver or matcher to customize coarse permissions. Register a closed `IAccessProvider<TEntity,TRequest>` to customize instance authorization for one resource, or replace the open generic to change the default. An entitlement provider returns an expression or `null`; domain request stages apply a returned expression to the repository query.
 
-| Claim            | Matches `student.create`? |
-| ---------------- | ------------------------- |
-| `student.create` | yes (exact)               |
-| `student.*`      | yes                       |
-| `*.create`       | yes                       |
-| `*`              | no                        |
-| `student.*.*`    | no (two wildcards)        |
+## Transport and management surfaces
 
-## Default entitlement
+A transport scheme populates the request principal. The authentication wrap advisor is the single `IsAuthenticated` decision point. `MapHttp()` and `MapGrpc()` are domain-specific extensions that activate their domain feature; shared transport behavior is declared through those features' dependencies.
 
-`DefaultEntitlementProvider<T, TRequest>.GenerateEntitlementExpressionAsync` returns `null`, so no
-row-level filter is applied. A custom provider returns an `Expression<Func<T, bool>>` to narrow
-results, or `null` to opt out for a given request.
-
-## How the resource pipeline invokes security
-
-The security providers are dormant until the resource builder opts an entity in:
-
-```csharp
-schema.UseResource()
-      .WithAuthorization()
-      .MapHttp()
-      .Use<Student, StudentRequest, StudentDetail, StudentSummary>();
-```
-
-`SchemataResourceBuilder.WithAuthorization(string? scheme = null)` registers two advisor families
-per operation via `TryAddEnumerable`:
-
-| Advisor family                                                 | Order                       | Role                                                                                                         |
-| -------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `Advice{List,Get,Create,Update,Delete,Method}RequestAnonymous` | `Orders.Base` = 100,000,000 | Stashes `AnonymousGranted` in `AdviceContext` when the entity's `[Anonymous]` attribute covers the operation |
-| `Advice{List,Get,Create,Update,Delete,Method}RequestAuthorize` | 110,000,000                 | Calls the access and entitlement providers                                                                   |
-
-Each authorize advisor builds an `AccessContext<TRequest>` with the operation name, then:
-
-1. Calls `IEntitlementProvider.GenerateEntitlementExpressionAsync` and passes the result to
-   `container.ApplyWhere(expression)`. A non-null predicate becomes a `.Where(...)` on the
-   composed query, narrowing the result set at the data layer. Entitlement filtering runs on List,
-   Get, Update, and Delete regardless of the anonymous marker; Create has no entitlement step.
-2. Skips the access check when `AdviceContext.Has<AnonymousGranted>()`; otherwise calls
-   `AuthorizeHelper.EnsureAsync(access, context, parent, principal, ct)`, which throws
-   `PermissionDeniedException` (HTTP 403) when access is denied.
-
-`AnonymousGranted` is set by the anonymous advisors, which consult `AnonymousAccess.IsAnonymous`.
-That helper reads the `[Anonymous]` attribute on the entity: no operation list grants all
-operations; a list grants only the named ones (case-insensitive).
-
-If the resource is mapped without `WithAuthorization()`, neither advisor family is registered and
-the providers are never called.
-
-## Extension points
-
-| Interface                           | Purpose                                                                                                               |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `IAccessProvider<T, TRequest>`      | Decide whether a principal may run an operation. A closed-generic registration overrides the default for that entity. |
-| `IEntitlementProvider<T, TRequest>` | Return a query predicate for row-level filtering. Same registration pattern.                                          |
-| `IPermissionResolver`               | Map operation + entity type to a permission string.                                                                   |
-| `IPermissionMatcher`                | Decide whether a principal holds a resolved permission.                                                               |
-
-`SchemataSecurityOptions` carries one property, `PermissionClaimType` (default `"role"`), used by
-`DefaultPermissionMatcher`.
-
-## Design rationale
-
-The split is deliberate: the access provider answers "may this principal touch this kind of thing
-at all", while the entitlement provider answers "which specific rows". The entitlement predicate
-runs in the database, so a List that the principal is allowed to call still returns only the rows
-they own. Replacing `DefaultAccessProvider` with a domain check and `DefaultEntitlementProvider`
-with an ownership predicate covers most row-level security needs without touching the resource
-pipeline.
-
-## Caveats
-
-- The defaults deny unauthenticated callers and require a matching permission claim. Mapping an
-  entity with `WithAuthorization()` and no claims yields 403 until the principal carries the right
-  permission or the entity is marked `[Anonymous]`.
-- `DefaultPermissionResolver` kebab-cases the bare type name, not the namespace. Two entities with
-  the same short name resolve to the same permission.
-- A `*` wildcard claim only matches permissions with the same segment count. `student.*` does not
-  match a three-segment permission.
+Identity User and Role management resources and Authorization Application, Scope, and Token management resources require an explicit `MapHttp()` or `MapGrpc()` call. The IdentityCore endpoints and Authorization protocol endpoints retain their own transport paths.
 
 ## See also
 
-- [Access Control](../guides/access-control.md) — a worked roles-and-row-level-security setup
-- [Built-in Features](core/built-in-features.md) — feature priority table
-- [Ownership](repository/ownership.md) — `UseOwner()` for automatic ownership filtering
+- [Resource overview](resource/overview.md)
+- [Messaging](messaging/overview.md)
+- [Access Control](../guides/access-control.md)

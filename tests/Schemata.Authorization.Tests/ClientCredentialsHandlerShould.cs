@@ -29,7 +29,7 @@ public class ClientCredentialsHandlerShould
         Guid   uid      = default
     ) {
         var app = new SchemataApplication {
-            Uid         = uid == Guid.Empty ? Identifiers.NewUid() : uid,
+            Uid         = uid == Guid.Empty ? Guid.NewGuid() : uid,
             ClientId    = clientId,
             ClientType  = type,
             Permissions = new List<string>(),

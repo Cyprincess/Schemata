@@ -14,6 +14,7 @@
     <ProjectReference Include="..\..\src\Schemata.Scheduling.Event\Schemata.Scheduling.Event.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Scheduling.Grpc\Schemata.Scheduling.Grpc.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Scheduling.Http\Schemata.Scheduling.Http.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Security.Foundation\Schemata.Security.Foundation.csproj" />
   </ItemGroup>
 
 </Project>

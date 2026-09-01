@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,7 +17,7 @@ internal sealed class DefaultTriggerJobHandler(SchedulingHandlerSupport support)
     public async Task<SchemataJobExecution> HandleAsync(TriggerJobRequest request, CancellationToken ct = default) {
         var scheduler = support.Scheduler;
         if (scheduler.IsStopped) {
-            throw new System.InvalidOperationException("Scheduler is stopped; TriggerAsync is not accepting new fires.");
+            throw new InvalidOperationException("Scheduler is stopped; TriggerAsync is not accepting new fires.");
         }
 
         var registry = scheduler.Services.GetRequiredService<IScheduledJobRegistry>();
@@ -53,7 +54,7 @@ internal sealed class DefaultTriggerJobHandler(SchedulingHandlerSupport support)
     }
 
     private static SchemataJobExecution BuildExecution(SchemataJob job, JobContext context) {
-        var name       = (context.ExecutionUid ?? Identifiers.NewUid()).ToString("n");
+        var name       = (context.ExecutionUid ?? Guid.NewGuid()).ToString("n");
         var descriptor = ResourceNameDescriptor.ForType<SchemataJobExecution>();
 
         return new() {

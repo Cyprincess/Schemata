@@ -15,6 +15,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Schemata.Authorization.Foundation\Schemata.Authorization.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Security.Foundation\Schemata.Security.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Caching.Distributed\Schemata.Caching.Distributed.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Mapping.Mapster\Schemata.Mapping.Mapster.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Authorization.Http\Schemata.Authorization.Http.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Core\Schemata.Core.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Entity.EntityFrameworkCore\Schemata.Entity.EntityFrameworkCore.csproj" />
   </ItemGroup>

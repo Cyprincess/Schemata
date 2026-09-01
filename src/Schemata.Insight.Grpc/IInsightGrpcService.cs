@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using ProtoBuf.Grpc;
 using ProtoBuf.Grpc.Configuration;
+using Schemata.Insight.Grpc.Wire;
 
 namespace Schemata.Insight.Grpc;
 

@@ -6,6 +6,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Insight.Foundation;
 using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Drivers;
+using Schemata.Insight.Skeleton.Models;
+using Schemata.Insight.Skeleton.Plan;
+using Schemata.Insight.Skeleton.Queries;
 using Xunit;
 
 namespace Schemata.Insight.Tests;

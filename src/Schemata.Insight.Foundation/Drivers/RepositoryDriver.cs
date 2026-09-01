@@ -15,9 +15,14 @@ using Schemata.Abstractions.Entities;
 using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Expressions.Skeleton;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Foundation.Materialization;
+using Schemata.Insight.Foundation.Planning;
+using Schemata.Insight.Foundation.Security;
+using Schemata.Insight.Skeleton.Drivers;
+using Schemata.Insight.Skeleton.Plan;
+using Schemata.Insight.Skeleton.Queries;
 
-namespace Schemata.Insight.Foundation;
+namespace Schemata.Insight.Foundation.Drivers;
 
 public sealed class RepositoryDriver(IServiceProvider services) : ISourceDriver
 {
@@ -145,7 +150,7 @@ public sealed class RepositoryDriver(IServiceProvider services) : ISourceDriver
             }
 
             var path = item.FieldPath.StartsWith(prefix, StringComparison.Ordinal) ? item.FieldPath[prefix.Length..] : item.FieldPath;
-            yield return string.Join('.', path.Split('.', StringSplitOptions.RemoveEmptyEntries).Select(segment => segment.Pascalize()));
+            yield return string.Join('.', Enumerable.Select<string, string>(path.Split('.', StringSplitOptions.RemoveEmptyEntries), segment => InflectorExtensions.Pascalize(segment)));
         }
     }
 

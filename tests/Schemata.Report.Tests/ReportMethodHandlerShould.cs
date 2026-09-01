@@ -1,3 +1,4 @@
+using Schemata.Report.Tests.Fixtures;
 // PipelineHandler is a pipeline seam participant exercised through ResourceMethodOperationHandler.
 using System;
 using System.Collections.Generic;
@@ -12,16 +13,24 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Entity.Repository;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Plan;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Commands;
-using Schemata.Messaging.Skeleton.Internal;
+using Schemata.Messaging.Skeleton.Runtime;
 using Schemata.Resource.Foundation.Handlers;
 using Schemata.Report.Foundation;
 using Schemata.Report.Skeleton;
 using Schemata.Resource.Foundation;
 using Schemata.Scheduling.Skeleton;
 using Xunit;
+
+using Schemata.Report.Skeleton.Models;
+using Schemata.Insight.Skeleton.Queries;
+using Schemata.Report.Foundation.Commands;
+using Schemata.Report.Foundation.Handlers;
+using Schemata.Report.Foundation.Jobs;
+using Schemata.Report.Foundation.Queries;
+using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Tests;
 

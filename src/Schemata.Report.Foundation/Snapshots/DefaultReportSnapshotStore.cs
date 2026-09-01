@@ -8,8 +8,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Entities;
 
-namespace Schemata.Report.Foundation;
+namespace Schemata.Report.Foundation.Snapshots;
 
 /// <summary>Reads report snapshot headers and decodes one persisted chunk at a time.</summary>
 /// <typeparam name="TSnapshot">Persisted snapshot-header entity type.</typeparam>
@@ -18,7 +19,6 @@ public sealed class DefaultReportSnapshotStore<TSnapshot, TChunk>(IServiceScopeF
     where TSnapshot : SchemataReportSnapshot
     where TChunk : SchemataReportSnapshotChunk
 {
-    /// <inheritdoc />
     public async IAsyncEnumerable<SchemataReportSnapshot> ListAsync(
         string reportName,
         [EnumeratorCancellation] CancellationToken ct = default
@@ -31,14 +31,12 @@ public sealed class DefaultReportSnapshotStore<TSnapshot, TChunk>(IServiceScopeF
         }
     }
 
-    /// <inheritdoc />
     public async ValueTask<SchemataReportSnapshot?> GetAsync(string snapshotName, CancellationToken ct = default) {
         await using var scope = scopes.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IRepository<TSnapshot>>();
         return await repository.FirstOrDefaultAsync(query => query.Where(candidate => candidate.CanonicalName == snapshotName), ct);
     }
 
-    /// <inheritdoc />
     public async ValueTask<SchemataReportSnapshotChunk?> GetChunkAsync(
         string            snapshotName,
         int               index,
@@ -51,7 +49,6 @@ public sealed class DefaultReportSnapshotStore<TSnapshot, TChunk>(IServiceScopeF
                    query => query.Where(candidate => candidate.Snapshot == snapshot && candidate.Index == index), ct);
     }
 
-    /// <inheritdoc />
     public async IAsyncEnumerable<IReadOnlyDictionary<string, object?>> ReadRowsAsync(
         string snapshotName,
         [EnumeratorCancellation] CancellationToken ct = default

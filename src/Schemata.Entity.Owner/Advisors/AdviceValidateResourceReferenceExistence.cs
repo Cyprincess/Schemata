@@ -73,7 +73,6 @@ public sealed class AdviceValidateResourceReferenceExistence<TEntity> :
     /// <inheritdoc cref="IRepositoryAddAdvisor{TEntity}" />
     public int Order => AdviceValidateResourceReferenceExistence.DefaultOrder;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext        ctx,
         IRepository<TEntity> repository,

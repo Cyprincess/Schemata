@@ -1,8 +1,11 @@
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Insight.Skeleton.Catalog;
+using Schemata.Insight.Skeleton.Plan;
+using Schemata.Insight.Skeleton.Queries;
 
-namespace Schemata.Insight.Skeleton;
+namespace Schemata.Insight.Skeleton.Drivers;
 
 /// <summary>
 ///     Lowers a single-source plan subtree into a backend-native query and streams the result. A

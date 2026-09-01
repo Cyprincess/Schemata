@@ -1,11 +1,10 @@
 using Schemata.Report.Actor.Features;
-using Schemata.Report.Foundation;
-using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Entities;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
 
-/// <summary><see cref="SchemataReportBuilder{TReport,TSnapshot,TChunk}" /> extensions for the Report.Actor bridge.</summary>
+/// <summary><see cref="Schemata.Report.Foundation.SchemataReportBuilder{TReport,TSnapshot,TChunk}" /> extensions for the Report.Actor bridge.</summary>
 public static class SchemataReportBuilderActorExtensions
 {
     /// <summary>Enables the <see cref="SchemataReportActorFeature{TReport,TSnapshot,TChunk}" />.</summary>
@@ -14,8 +13,8 @@ public static class SchemataReportBuilderActorExtensions
     /// <typeparam name="TChunk">Persisted report-snapshot chunk entity type.</typeparam>
     /// <param name="builder">The report builder.</param>
     /// <returns>The builder for chaining.</returns>
-    public static SchemataReportBuilder<TReport, TSnapshot, TChunk> UseActor<TReport, TSnapshot, TChunk>(
-        this SchemataReportBuilder<TReport, TSnapshot, TChunk> builder
+    public static Schemata.Report.Foundation.SchemataReportBuilder<TReport, TSnapshot, TChunk> UseActor<TReport, TSnapshot, TChunk>(
+        this Schemata.Report.Foundation.SchemataReportBuilder<TReport, TSnapshot, TChunk> builder
     )
         where TReport : SchemataReport, new()
         where TSnapshot : SchemataReportSnapshot, new()

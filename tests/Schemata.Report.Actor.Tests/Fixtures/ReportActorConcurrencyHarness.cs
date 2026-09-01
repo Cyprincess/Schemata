@@ -14,8 +14,8 @@ using Schemata.Entity.Repository.Advisors;
 using Schemata.Expressions.Aip;
 using Schemata.Expressions.Cel;
 using Schemata.Expressions.Order;
-using Schemata.Insight.Foundation;
-using Schemata.Report.Skeleton;
+using Schemata.Insight.Foundation.Drivers;
+using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Actor.Tests.Fixtures;
 

@@ -8,7 +8,7 @@ using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Expressions.Aip;
 using Schemata.Expressions.Cel;
 using Schemata.Expressions.Order;
-using Schemata.Insight.Foundation;
+using Schemata.Insight.Foundation.Drivers;
 using Schemata.Insight.Grpc.Integration.Tests.Fixtures;
 
 var options = new WebApplicationOptions { Args = args };
@@ -20,11 +20,16 @@ connection.Open();
 builder.UseSchemata(schema => {
     var insight = schema.UseInsight(i => {
         i.WithTotalSize(TotalSizeMode.Exact);
+        if (builder.Environment.EnvironmentName == "Authenticated") {
+            i.WithAuthentication("InsightTest");
+        }
+
         i.AddRepositorySource("buyers", "buyers")
          .AddSourceDriver<RepositoryDriver>(RepositoryDriver.DriverName);
     });
     insight.UseAip().UseCel().UseOrdering();
     insight.MapGrpc();
+    schema.UseAuthentication((Microsoft.AspNetCore.Authentication.AuthenticationBuilder _) => { });
 
     schema.Services.AddDbContextFactory<TestDbContext>(opts => opts.UseSqlite(connection));
     schema.Services.AddRepository<Buyer, EfCoreRepository<TestDbContext, Buyer>>();

@@ -1,8 +1,8 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
-using Schemata.Common;
 
 namespace Schemata.Entity.Repository.Advisors;
 
@@ -42,7 +42,7 @@ public sealed class AdviceAddConcurrency<TEntity> : IRepositoryAddAdvisor<TEntit
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        concurrency.Timestamp = Identifiers.NewUid();
+        concurrency.Timestamp = Guid.NewGuid();
 
         return Task.FromResult(AdviseResult.Continue);
     }

@@ -1,3 +1,4 @@
+using Schemata.Scheduling.Tests.Fixtures;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,9 +9,8 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Entity.Repository;
 using Schemata.Scheduling.Foundation;
-using Schemata.Scheduling.Foundation.Internal;
+using Schemata.Scheduling.Foundation.Runtime;
 using Schemata.Scheduling.Skeleton;
-using Schemata.Scheduling.Skeleton.Attributes;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;
 
@@ -24,7 +24,7 @@ public class ScheduledJobIdentityShould
     public void DropAssemblyQualificationAndArity_FromAClosedGenericJobKey() {
         var key = new DefaultScheduledJobRegistry().ResolveKey(typeof(ProbeJob<ProbePayload>));
 
-        Assert.Equal("Schemata.Scheduling.Tests.ProbeJob.ProbePayload", key);
+        Assert.Equal("Schemata.Scheduling.Tests.Fixtures.ProbeJob.ProbePayload", key);
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public class ScheduledJobIdentityShould
 
         Assert.Equal(2, armed.Count);
         Assert.All(armed, job => Assert.Equal(job.JobKey, job.Name));
-        Assert.Equal(["Schemata.Scheduling.Tests.ProbeJob.ProbePayload", DeclaredProbeJob.JobKey],
+        Assert.Equal(["Schemata.Scheduling.Tests.Fixtures.ProbeJob.ProbePayload", DeclaredProbeJob.JobKey],
                      armed.Select(job => job.Name));
     }
 
@@ -109,20 +109,4 @@ public class ScheduledJobIdentityShould
             await Task.CompletedTask;
         }
     }
-}
-
-public sealed class ProbePayload;
-
-public sealed class ProbeJob<TPayload> : IScheduledJob
-    where TPayload : class
-{
-    public Task ExecuteAsync(JobContext context, CancellationToken ct) { return Task.CompletedTask; }
-}
-
-[ScheduledJob(JobKey)]
-public sealed class DeclaredProbeJob : IScheduledJob
-{
-    public const string JobKey = "schemata.tests.declared";
-
-    public Task ExecuteAsync(JobContext context, CancellationToken ct) { return Task.CompletedTask; }
 }

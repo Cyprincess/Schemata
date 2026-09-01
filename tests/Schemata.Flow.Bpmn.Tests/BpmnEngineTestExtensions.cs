@@ -10,7 +10,7 @@ using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
 
-namespace Schemata.Flow.Bpmn;
+namespace Schemata.Flow.Bpmn.Tests;
 
 internal static class BpmnEngineTestExtensions
 {

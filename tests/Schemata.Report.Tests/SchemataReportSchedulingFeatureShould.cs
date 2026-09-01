@@ -1,4 +1,3 @@
-using System.Linq;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,6 +10,7 @@ using Schemata.Report.Scheduling.Advisors;
 using Schemata.Report.Scheduling.Features;
 using Schemata.Report.Skeleton;
 using Xunit;
+using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Tests;
 

@@ -5,6 +5,8 @@ using System.Text.Json;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 
+using Schemata.Report.Skeleton.Models;
+
 namespace Schemata.Report.Skeleton;
 
 /// <summary>Converts completed report-generation operations into report results.</summary>

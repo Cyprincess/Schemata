@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Schemata.Resource.Foundation;
+using Schemata.Core.Building;
 using Schemata.Resource.Http;
 
 // ReSharper disable once CheckNamespace
@@ -23,7 +22,7 @@ public static class ApplicationBuilderExtensions
 
         var provider       = sp.GetRequiredService<ResourceControllerFeatureProvider>();
         var methodProvider = sp.GetRequiredService<ResourceMethodControllerFeatureProvider>();
-        var registry       = sp.GetRequiredService<IResourceRegistry>();
+        var registry       = sp.GetRequiredService<ResourceRegistry>();
 
         provider.Registry       = registry;
         methodProvider.Registry = registry;

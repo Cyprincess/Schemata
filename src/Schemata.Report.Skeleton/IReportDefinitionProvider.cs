@@ -1,7 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Insight.Skeleton;
-
+using Schemata.Insight.Skeleton.Queries;
 namespace Schemata.Report.Skeleton;
 
 /// <summary>Provides the query definition for a program-backed report.</summary>

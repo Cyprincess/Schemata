@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Features;
-using Schemata.Resource.Foundation;
+using Schemata.Core.Building;
 using Schemata.Resource.Grpc.Features;
 using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Foundation.Features;

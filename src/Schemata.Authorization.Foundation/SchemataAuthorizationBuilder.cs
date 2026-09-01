@@ -3,6 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Authorization.Foundation.Features;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Core;
+using Schemata.Core.Building;
+using Schemata.Core.Features;
+using Microsoft.AspNetCore.Builder;
+using Schemata.Security.Skeleton;
 
 namespace Schemata.Authorization.Foundation;
 
@@ -13,12 +17,14 @@ namespace Schemata.Authorization.Foundation;
 /// <typeparam name="TAuth">The authorization entity type.</typeparam>
 /// <typeparam name="TScope">The scope entity type.</typeparam>
 /// <typeparam name="TToken">The token entity type.</typeparam>
-public sealed class SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken>
+public sealed class SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> : IResourceBuilder
     where TApp : SchemataApplication
     where TAuth : SchemataAuthorization
     where TScope : SchemataScope
     where TToken : SchemataToken
 {
+    public const string AuthenticationSchemeKey = "Authorization:AuthenticationScheme";
+
     /// <summary>
     ///     Creates an authorization builder over the host options, configurator store, and service collection.
     /// </summary>
@@ -33,6 +39,18 @@ public sealed class SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken>
         Schemata      = schemata;
         Configurators = configurators;
         Services      = services;
+        var registrations = Schemata.Get<Dictionary<IResourceBuilder, ResourceSecurityRegistration>>(nameof(ResourceSecurityRegistration)) ?? new();
+        Schemata.Set(nameof(ResourceSecurityRegistration), registrations);
+        registrations[this] = new(
+            services => new SchemataResourceBuilder(Schemata, services).WithAuthentication(),
+            services => new SchemataResourceBuilder(Schemata, services).WithAuthorization(),
+            scheme => Schemata.Set(AuthenticationSchemeKey, scheme));
+    }
+
+
+    public void AddFeature<T>()
+        where T : ISimpleFeature {
+        Schemata.AddFeature<T>();
     }
 
     /// <summary>

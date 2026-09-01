@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Schemata.Actor.Foundation;
-using Schemata.Actor.Foundation.Internal;
+using Schemata.Actor.Foundation.Runtime;
 using Schemata.Actor.Skeleton;
 
 // ReSharper disable once CheckNamespace

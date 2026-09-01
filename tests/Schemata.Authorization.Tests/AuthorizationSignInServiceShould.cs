@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Text.Json;
@@ -14,7 +13,6 @@ using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
-using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;

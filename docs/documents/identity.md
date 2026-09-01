@@ -37,6 +37,20 @@ The supporting join entities — `SchemataUserClaim`, `SchemataRoleClaim`, `Sche
 `SchemataUserLogin`, `SchemataUserToken` — each carry their own `[Table]` and `[PrimaryKey]`
 attributes, so an `IdentityDbContext` over these types needs no extra Fluent configuration.
 
+## Resource management surface
+
+`UseIdentity()` returns `SchemataIdentityBuilder<TUser,TRole>`, which implements `IResourceBuilder`. Identity's User and Role management resources are exposed only after an explicit transport call:
+
+```csharp
+schema.UseSecurity();
+schema.UseIdentity()
+      .WithAuthentication("Bearer")
+      .WithAuthorization()
+      .MapHttp();
+```
+
+The shared Security extensions configure the management resource pipeline. `MapHttp()` and `MapGrpc()` are concrete Identity transport extensions that activate their domain features. The existing IdentityCore API endpoints remain separate from this resource surface.
+
 ## Enabling the feature
 
 Three overloads chain into one another; each takes the same four optional delegates:

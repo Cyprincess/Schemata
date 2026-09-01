@@ -7,9 +7,12 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Expressions.Skeleton;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Catalog;
+using Schemata.Insight.Skeleton.Models;
+using Schemata.Insight.Skeleton.Plan;
+using Schemata.Insight.Skeleton.Queries;
 
-namespace Schemata.Insight.Foundation;
+namespace Schemata.Insight.Foundation.Planning;
 
 /// <summary>
 ///     Builds the single-source logical plan for a request: source resolution, a filter / order /

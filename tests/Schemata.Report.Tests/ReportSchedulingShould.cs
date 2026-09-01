@@ -1,3 +1,4 @@
+using Schemata.Report.Tests.Fixtures;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +10,6 @@ using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Core;
 using Schemata.Entity.Repository;
-using Schemata.Insight.Skeleton;
 using Schemata.Messaging.Skeleton;
 using Schemata.Report.Foundation;
 using Schemata.Report.Foundation.Commands;
@@ -19,6 +19,13 @@ using Schemata.Report.Skeleton;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;
+
+using Schemata.Report.Skeleton.Models;
+using Schemata.Insight.Skeleton.Queries;
+using Schemata.Report.Foundation.Definitions;
+using Schemata.Report.Foundation.Jobs;
+using Schemata.Report.Skeleton.Entities;
+using Schemata.Report.Skeleton.Enums;
 
 namespace Schemata.Report.Tests;
 
@@ -42,7 +49,7 @@ public class ReportSchedulingShould
         var records = new List<SchemataReport> { PeriodicReport("database", "0 * * * *") };
         var persistence = new ReportPersistenceState();
         var services = new ServiceCollection();
-        var reports = new SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
+        var reports = new Foundation.SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
             new SchemataOptions(),
             services);
         reports.Define("dsl", definition => definition.Periodic(cron: "0 0 * * *"));

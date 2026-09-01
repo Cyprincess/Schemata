@@ -5,8 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Common;
-using Schemata.Messaging.Skeleton;
 using Schemata.Tenancy.Foundation.Messaging;
 using Schemata.Tenancy.Foundation.Services;
 using Schemata.Tenancy.Skeleton;
@@ -19,7 +17,7 @@ public class TenantMessageContextPropagatorShould
 {
     [Fact]
     public async Task Capture_Then_RestoreAsync_RoundTrips_TheResolvedTenant() {
-        var tenant = new SchemataTenant { Uid = Identifiers.NewUid() };
+        var tenant = new SchemataTenant { Uid = Guid.NewGuid() };
 
         var manager = new Mock<ITenantManager<SchemataTenant>>();
         manager.Setup(m => m.FindByTenantId(tenant.Uid, It.IsAny<CancellationToken>())).ReturnsAsync(tenant);
@@ -70,7 +68,7 @@ public class TenantMessageContextPropagatorShould
 
     [Fact]
     public async Task RestoreAsync_Throws_TenantResolveException_WhenTheCapturedTenantNoLongerExists() {
-        var tenantId = Identifiers.NewUid();
+        var tenantId = Guid.NewGuid();
         var manager = new Mock<ITenantManager<SchemataTenant>>();
         manager.Setup(m => m.FindByTenantId(tenantId, It.IsAny<CancellationToken>())).ReturnsAsync((SchemataTenant?)null);
 

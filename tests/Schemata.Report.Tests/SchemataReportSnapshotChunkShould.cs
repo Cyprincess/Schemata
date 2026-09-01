@@ -1,6 +1,6 @@
 using Schemata.Common;
-using Schemata.Report.Skeleton;
 using Xunit;
+using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Tests;
 

@@ -1,7 +1,7 @@
 using System;
 using Schemata.Abstractions.Entities;
 
-namespace Schemata.Report.Skeleton;
+namespace Schemata.Report.Skeleton.Entities;
 
 /// <summary>Internal persisted row-data chunk belonging to a report snapshot.</summary>
 [CanonicalName("reports/{report}/snapshots/{snapshot}/chunks/{chunk}")]

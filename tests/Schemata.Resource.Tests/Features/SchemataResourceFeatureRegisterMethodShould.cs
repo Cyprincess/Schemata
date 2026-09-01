@@ -1,3 +1,4 @@
+using Schemata.Core.Building;
 using System;
 using System.Linq;
 using System.Security.Claims;
@@ -9,7 +10,7 @@ using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Messaging.Skeleton;
 using Schemata.Resource.Foundation;
-using Schemata.Resource.Foundation.Features;
+using Schemata.Resource.Foundation.Handlers;
 using Xunit;
 
 namespace Schemata.Resource.Tests.Features;
@@ -19,6 +20,8 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void LeaveMethodsEmpty_WhenResourceHasNoResourceMethodAttribute() {
         var services = new ServiceCollection();
+        var options = new SchemataOptions();
+        services.AddSchemataResources(options);
         var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<PlainEntity>();
 
@@ -30,6 +33,8 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void StoreBuiltInMethods_WhenResourceIsSoftDeletable() {
         var services = new ServiceCollection();
+        var options = new SchemataOptions();
+        services.AddSchemataResources(options);
         var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<SoftEntity>();
 
@@ -52,6 +57,8 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void LeaveMethodsEmpty_WhenResourceIsNotSoftDeletable() {
         var services = new ServiceCollection();
+        var options = new SchemataOptions();
+        services.AddSchemataResources(options);
         var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<PlainEntity>();
 
@@ -63,6 +70,8 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void PreserveUserDeclaredVerb_WhenSoftDeletableResourceOverridesBuiltIn() {
         var services = new ServiceCollection();
+        var options = new SchemataOptions();
+        services.AddSchemataResources(options);
         var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<SoftOverrideEntity, SoftOverrideEntity>();
 
@@ -83,6 +92,8 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void HonorOperationsWhitelist_ForPurge() {
         var services = new ServiceCollection();
+        var options = new SchemataOptions();
+        services.AddSchemataResources(options);
         var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<SoftEntity> {
             Operations = [Operations.Get, Operations.List, Operations.Undelete, Operations.Expunge],
@@ -98,6 +109,8 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void PreserveUserDeclaredPurge_WhenSoftDeletableResourceOverridesBuiltIn() {
         var services = new ServiceCollection();
+        var options = new SchemataOptions();
+        services.AddSchemataResources(options);
         var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<SoftPurgeOverrideEntity, SoftPurgeOverrideEntity>();
 
@@ -112,6 +125,8 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void StoreSingleMethod_WhenResourceDeclaresOneVerb() {
         var services = new ServiceCollection();
+        var options = new SchemataOptions();
+        services.AddSchemataResources(options);
         var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<SingleVerbEntity, RunRequest>();
 
@@ -127,6 +142,8 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void StoreSingleMethod_WhenResourceSuppliesProgrammaticVerb() {
         var services = new ServiceCollection();
+        var options = new SchemataOptions();
+        services.AddSchemataResources(options);
         var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<PlainEntity, RunRequest> {
             Methods = [new("run", typeof(PlainRunHandler))],
@@ -162,6 +179,8 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void StoreAllVerbs_WhenResourceDeclaresMultipleMethods() {
         var services = new ServiceCollection();
+        var options = new SchemataOptions();
+        services.AddSchemataResources(options);
         var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<MultiVerbEntity, RunRequest>();
 
@@ -179,6 +198,8 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void Throw_WhenHandlerDoesNotImplementRequiredInterface() {
         var services = new ServiceCollection();
+        var options = new SchemataOptions();
+        services.AddSchemataResources(options);
         var registry = new ResourceRegistry();
         var resource = new ResourceAttribute<InvalidHandlerEntity>();
 
@@ -192,6 +213,8 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void RegisterOneMethod_WhenTheSameResourceIsDeclaredTwice() {
         var services = new ServiceCollection();
+        var options = new SchemataOptions();
+        services.AddSchemataResources(options);
         var registry = new ResourceRegistry();
 
         services.AddResource(new ResourceAttribute<SingleVerbEntity, RunRequest>(), registry);
@@ -204,6 +227,8 @@ public class SchemataResourceFeatureRegisterMethodShould
     [Fact]
     public void LeaveAnAttributedEntityUnregistered_UntilItIsAddedExplicitly() {
         var services = new ServiceCollection();
+        var options = new SchemataOptions();
+        services.AddSchemataResources(options);
         var registry = new ResourceRegistry();
 
         services.AddResource(new ResourceAttribute<PlainEntity>(), registry);
@@ -216,12 +241,14 @@ public class SchemataResourceFeatureRegisterMethodShould
     public void Share_One_Registry_Across_Builders_Over_The_Same_Options() {
         var schemata = new SchemataOptions();
         var services = new ServiceCollection();
+        var options = new SchemataOptions();
+        services.AddSchemataResources(options);
 
         new SchemataResourceBuilder(schemata, services).AddResource<ScanResource>();
         new SchemataResourceBuilder(schemata, services).Use<PlainEntity, PlainEntity, PlainEntity, PlainEntity>();
 
         using var provider = services.BuildServiceProvider();
-        var       registry = provider.GetRequiredService<IResourceRegistry>();
+        var       registry = provider.GetRequiredService<ResourceRegistry>();
 
         Assert.NotNull(registry.GetResource(typeof(ScanResource)));
         Assert.NotNull(registry.GetResource(typeof(PlainEntity)));

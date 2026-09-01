@@ -5,9 +5,9 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Event.Foundation.Features;
-using Schemata.Event.Foundation.Internal;
+using Schemata.Event.Foundation.Runtime;
 using Schemata.Scheduling.Event.Events;
-using Schemata.Scheduling.Event.Internal;
+using Schemata.Scheduling.Event.Runtime;
 using Schemata.Scheduling.Foundation.Features;
 using Schemata.Scheduling.Skeleton;
 

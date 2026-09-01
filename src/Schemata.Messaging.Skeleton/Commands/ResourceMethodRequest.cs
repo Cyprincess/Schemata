@@ -25,6 +25,5 @@ public sealed record ResourceMethodRequest<TEntity, TRequest, TResponse>(
     where TRequest : class, IRequest<TResponse>
     where TResponse : class
 {
-    /// <inheritdoc />
     public ClaimsPrincipal? Principal { get; set; } = Principal;
 }

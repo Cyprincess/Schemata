@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
+using Schemata.Core.Building;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 
 namespace Schemata.Resource.Foundation;
 
 /// <summary>
-///     Reverse-resolves an entity type from a resource name against <see cref="IResourceRegistry" />.
+///     Reverse-resolves an entity type from a resource name against <see cref="ResourceRegistry" />.
 ///     Two indexes are built at construction — the registry is complete once the container exists —
 ///     a collection-name dictionary for bare-segment lookup, and a pattern trie that matches a full
 ///     canonical name segment-by-segment with placeholder backtracking.
@@ -20,7 +21,7 @@ public sealed class DefaultResourceTypeResolver : IResourceTypeResolver
 
     /// <summary>Creates the resolver over the registered resource descriptors.</summary>
     /// <param name="registry">The registered resources.</param>
-    public DefaultResourceTypeResolver(IResourceRegistry registry) {
+    public DefaultResourceTypeResolver(ResourceRegistry registry) {
         _byCollection = BuildCollectionIndex(registry);
         _trie         = BuildPatternTrie(registry);
     }
@@ -78,7 +79,7 @@ public sealed class DefaultResourceTypeResolver : IResourceTypeResolver
         }
     }
 
-    private static Dictionary<string, Type> BuildCollectionIndex(IResourceRegistry registry) {
+    private static Dictionary<string, Type> BuildCollectionIndex(ResourceRegistry registry) {
         var index = new Dictionary<string, Type>(StringComparer.Ordinal);
         foreach (var resource in registry.Resources) {
             var entity     = resource.Entity;
@@ -91,7 +92,7 @@ public sealed class DefaultResourceTypeResolver : IResourceTypeResolver
         return index;
     }
 
-    private static TrieNode BuildPatternTrie(IResourceRegistry registry) {
+    private static TrieNode BuildPatternTrie(ResourceRegistry registry) {
         var root = new TrieNode();
         foreach (var resource in registry.Resources) {
             var entity     = resource.Entity;

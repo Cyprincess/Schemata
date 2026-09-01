@@ -1,7 +1,7 @@
 using System;
 using System.Xml;
 using Microsoft.Extensions.Time.Testing;
-using Schemata.Flow.Scheduling.Internal;
+using Schemata.Flow.Scheduling.Runtime;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Scheduling.Skeleton;
 using Xunit;

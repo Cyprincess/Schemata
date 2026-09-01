@@ -1,15 +1,14 @@
-using System;
 using System.Reflection;
 using System.Threading.Tasks;
 using Grpc.AspNetCore.Server.Model;
 using Grpc.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Core.Building;
 using Schemata.Resource.Foundation;
 using Schemata.Messaging.Skeleton;
-using Schemata.Resource.Grpc.Internal;
+using Schemata.Resource.Grpc.Runtime;
 using Schemata.Transport.Grpc;
 
 namespace Schemata.Resource.Grpc;
@@ -36,7 +35,7 @@ internal static class ResourceCustomMethod
     public static void Register<TService>(
         ServiceMethodProviderContext<TService> context,
         ResourceBinderConfiguration            config,
-        IResourceRegistry                      registry
+        ResourceRegistry                      registry
     ) where TService : class {
         var serviceType = typeof(TService);
         if (!serviceType.IsGenericType || serviceType.GetGenericTypeDefinition() != typeof(ResourceService<,,,>)) {

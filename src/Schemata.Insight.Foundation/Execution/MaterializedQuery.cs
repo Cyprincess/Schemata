@@ -2,9 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Threading.Tasks;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Drivers;
+using Schemata.Insight.Skeleton.Models;
 
-namespace Schemata.Insight.Foundation;
+namespace Schemata.Insight.Foundation.Execution;
 
 /// <summary>
 ///     A single-pass, unpaged query result. Disposing the result closes the source driver result that

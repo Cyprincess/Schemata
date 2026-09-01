@@ -1,9 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
-using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Messaging.Skeleton;
 using ThrowProcessSignalRequest = Schemata.Flow.Foundation.Commands.ThrowSignalRequest;
@@ -16,7 +14,6 @@ namespace Schemata.Flow.Foundation;
 public sealed class ThrowSignalHandler(IRequestDispatcher dispatcher)
     : IRequestHandler<ThrowSignalRequest, EmptyResourceResponse>
 {
-    /// <inheritdoc />
     public async Task<EmptyResourceResponse> HandleAsync(
         ThrowSignalRequest request,
         CancellationToken ct = default)

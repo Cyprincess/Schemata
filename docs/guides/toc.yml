@@ -2,6 +2,8 @@
   href: overview.md
 - name: Getting Started
   href: getting-started.md
+- name: AIP Resource Design
+  href: aip-resource-design.md
 - name: Unit of Work
   href: unit-of-work.md
 - name: Object Mapping

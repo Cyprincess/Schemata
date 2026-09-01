@@ -225,7 +225,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
         // [ResourceReference] contracts on SchemataAuthorization / SchemataToken; the OAuth
         // wire `client_id` keeps mapping to SchemataApplication.Name via FindByClientIdAsync.
         var authorization = new TAuth {
-            Name                = Identifiers.NewUid().ToString("n"),
+            Name                = Guid.NewGuid().ToString("n"),
             Application         = application.CanonicalName,
             Subject             = subject,
             Type                = AuthorizationTypes.AdHoc,

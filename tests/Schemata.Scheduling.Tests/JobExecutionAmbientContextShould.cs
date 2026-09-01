@@ -6,10 +6,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Advisors;
-using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Scheduling.Foundation;
-using Schemata.Scheduling.Foundation.Internal;
+using Schemata.Scheduling.Foundation.Runtime;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Advisors;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -28,7 +27,7 @@ public class JobExecutionAmbientContextShould
     [Fact]
     public async Task Establish_TheAdviceContext_AsAmbient_ForTheAdvisorAndTheJobBody() {
         var execution = new SchemataJobExecution {
-            Uid = Identifiers.NewUid(), JobKey = "jobs.ambient", State = ExecutionState.Pending,
+            Uid = Guid.NewGuid(), JobKey = "jobs.ambient", State = ExecutionState.Pending,
             StartTime = DateTime.UtcNow.AddMinutes(-1),
         };
 

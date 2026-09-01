@@ -8,12 +8,17 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Advisors;
-using Schemata.Advice;
 using Schemata.Abstractions.Resource;
+using Schemata.Advice;
 using Schemata.Expressions.Skeleton;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Foundation.Planning;
+using Schemata.Insight.Skeleton.Advisors;
+using Schemata.Insight.Skeleton.Drivers;
+using Schemata.Insight.Skeleton.Models;
+using Schemata.Insight.Skeleton.Plan;
+using Schemata.Insight.Skeleton.Queries;
 
-namespace Schemata.Insight.Foundation;
+namespace Schemata.Insight.Foundation.Execution;
 
 /// <summary>
 ///     Executes a plan: it strips the top-level pagination, then for a single source splits the plan
@@ -133,7 +138,7 @@ public sealed class PlanExecutor
         int?                                                   estimate = null;
         if (estimateSuperset) {
             var buffer = new List<IReadOnlyDictionary<string, object?>>();
-            await foreach (var row in result.Rows.WithCancellation(ct)) {
+            await foreach (var row in TaskAsyncEnumerableExtensions.WithCancellation<IReadOnlyDictionary<string, object?>>(result.Rows, ct)) {
                 buffer.Add(row);
             }
 

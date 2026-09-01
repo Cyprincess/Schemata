@@ -5,9 +5,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Entity.Repository;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Catalog;
+using Schemata.Insight.Skeleton.Entities;
 
-namespace Schemata.Insight.Foundation;
+namespace Schemata.Insight.Foundation.Catalog;
 
 /// <summary>
 ///     A source catalog backed by <see cref="IRepository{TEntity}" /> over
@@ -31,7 +32,7 @@ public sealed class DatabaseInsightSourceCatalog : IInsightSourceCatalog
         var repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataInsightSource>>();
 
         var record = await repository
-                          .FirstOrDefaultAsync<SchemataInsightSource>(q => q.Where(s => s.Name == name), ct)
+                          .FirstOrDefaultAsync<SchemataInsightSource>(q => Queryable.Where(q, s => s.Name == name), ct)
                           ;
 
         return record?.Driver is { } driver

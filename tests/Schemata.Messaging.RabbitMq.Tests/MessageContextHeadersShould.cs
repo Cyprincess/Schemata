@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Text;
-using Schemata.Messaging.RabbitMq.Internal;
+using Schemata.Messaging.RabbitMq.Runtime;
 using Schemata.Messaging.Skeleton;
 using Xunit;
 

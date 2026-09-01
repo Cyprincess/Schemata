@@ -1,6 +1,6 @@
 using System;
+using Schemata.Core.Building;
 using Schemata.Abstractions.Entities;
-using Schemata.Resource.Foundation;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;

@@ -8,6 +8,7 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
 using Schemata.Resource.Foundation;
+using Schemata.Resource.Foundation.Commands;
 using Schemata.Resource.Tests.Fixtures;
 using Xunit;
 

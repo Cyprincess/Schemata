@@ -4,8 +4,8 @@ using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
-using Schemata.Resource.Foundation;
-using Schemata.Resource.Http.Internal;
+using Schemata.Core.Building;
+using Schemata.Resource.Http.Runtime;
 
 namespace Schemata.Resource.Http;
 
@@ -17,7 +17,7 @@ namespace Schemata.Resource.Http;
 ///     <see cref="ResourceAttribute.Operations" /> whitelist excludes.
 /// </summary>
 public sealed class ResourceControllerConvention(
-    IResourceRegistry registry,
+    ResourceRegistry registry,
     string?           scheme = null
 ) : IControllerModelConvention
 {

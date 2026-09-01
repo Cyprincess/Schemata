@@ -10,7 +10,6 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Actor.Tests.Fixtures;
 using Schemata.Flow.Foundation;
-using Schemata.Flow.Foundation.Commands;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using CompleteActivityRequest = Schemata.Flow.Foundation.Commands.CompleteActivityRequest;

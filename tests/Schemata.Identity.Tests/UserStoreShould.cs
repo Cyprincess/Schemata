@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Moq;
-using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Stores;
@@ -16,8 +15,8 @@ public class UserStoreShould
 {
     [Fact]
     public async Task DeleteUser_RemovesAllDependentRowsAtomically() {
-        var user  = new SchemataUser { Uid         = Identifiers.NewUid() };
-        var link  = new SchemataUserRole { UserId  = user.Uid, RoleId = Identifiers.NewUid() };
+        var user  = new SchemataUser { Uid         = Guid.NewGuid() };
+        var link  = new SchemataUserRole { UserId  = user.Uid, RoleId = Guid.NewGuid() };
         var claim = new SchemataUserClaim { UserId = user.Uid };
         var login = new SchemataUserLogin { UserId = user.Uid, LoginProvider = "google", ProviderKey = "k" };
         var token = new SchemataUserToken { UserId = user.Uid, LoginProvider = "google", Name        = "refresh" };

@@ -8,7 +8,6 @@ using Schemata.Abstractions;
 using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Scheduling.Foundation.Commands;
-using Schemata.Scheduling.Foundation.Internal;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 

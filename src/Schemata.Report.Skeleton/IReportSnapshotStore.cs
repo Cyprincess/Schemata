@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Skeleton;
 

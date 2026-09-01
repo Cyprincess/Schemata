@@ -1,12 +1,10 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Resource;
-using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Messaging.Skeleton;
 using TerminateProcessCommand = Schemata.Flow.Foundation.Commands.TerminateProcessRequest;
+using Schemata.Flow.Foundation.Commands;
 
 namespace Schemata.Flow.Foundation;
 
@@ -16,7 +14,6 @@ namespace Schemata.Flow.Foundation;
 public sealed class TerminateProcessHandler(IRequestDispatcher dispatcher)
     : IRequestHandler<TerminateProcessResourceRequest, ProcessSnapshot>
 {
-    /// <inheritdoc />
     public async Task<ProcessSnapshot> HandleAsync(
         TerminateProcessResourceRequest request,
         CancellationToken ct = default)

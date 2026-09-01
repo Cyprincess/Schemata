@@ -80,7 +80,7 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
                 : null;
 
             var claims = new List<Claim> {
-                new(Claims.JwtId, Identifiers.NewUid().ToString("n")),
+                new(Claims.JwtId, Guid.NewGuid().ToString("n")),
                 new(Claims.Events, "{\"" + EventTypes.LogoutEvent + "\":{}}", JsonClaimValueTypes.Json),
             };
 

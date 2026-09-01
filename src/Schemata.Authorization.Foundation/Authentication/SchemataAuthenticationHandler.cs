@@ -135,7 +135,7 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         TimeProvider          time,
         CancellationToken     ct
     ) {
-        var jti         = Identifiers.NewUid().ToString("n");
+        var jti         = Guid.NewGuid().ToString("n");
         var tokenClaims = new List<Claim>(claims) { new(Claims.JwtId, jti) };
 
         string value;

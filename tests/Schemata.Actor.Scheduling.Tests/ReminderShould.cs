@@ -14,7 +14,6 @@ using Schemata.Actor.Scheduling.Tests.Fixtures;
 using Schemata.Actor.Skeleton;
 using Schemata.Core;
 using Schemata.Entity.EntityFrameworkCore;
-using Schemata.Entity.Repository;
 using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;

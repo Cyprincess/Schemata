@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,7 +18,7 @@ namespace Schemata.Authorization.Tests;
 public class ClientSecretPostHandlerShould
 {
     private static readonly SchemataApplication TestApp = new() {
-        Uid = Identifiers.NewUid(), ClientId = "my-client", ClientType = "confidential",
+        Uid = Guid.NewGuid(), ClientId = "my-client", ClientType = "confidential",
     };
 
     private static ClientSecretPostAuthentication<SchemataApplication> CreateHandler(

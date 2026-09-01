@@ -4,9 +4,10 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Expressions.Skeleton;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Models;
+using Schemata.Insight.Skeleton.Plan;
 
-namespace Schemata.Insight.Foundation;
+namespace Schemata.Insight.Foundation.Execution;
 
 /// <summary>
 ///     Runs the local relational stages a driver could not push, over dictionary rows with explicit

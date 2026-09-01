@@ -1,7 +1,8 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Queries;
+using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Skeleton;
 

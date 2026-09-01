@@ -27,7 +27,6 @@ public sealed class SchemataModelCustomizer : ModelCustomizer
     /// <param name="dependencies">EF Core service dependencies for the base customizer.</param>
     public SchemataModelCustomizer(ModelCustomizerDependencies dependencies) : base(dependencies) { }
 
-    /// <inheritdoc />
     public override void Customize(ModelBuilder modelBuilder, DbContext context) {
         base.Customize(modelBuilder, context);
 

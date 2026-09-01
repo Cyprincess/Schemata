@@ -1,14 +1,15 @@
+using Schemata.Core.Building;
 using System;
 using System.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
-using Schemata.Report.Foundation;
 using Schemata.Report.Skeleton;
-using Schemata.Resource.Foundation;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
+using Schemata.Report.Foundation.Handlers;
+using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Tests;
 
@@ -20,7 +21,7 @@ public class SchemataReportTransportShould
         builder.UseSchemata(schema => schema.UseReport().MapHttp().MapGrpc());
 
         using var app      = builder.Build();
-        var       registry = app.Services.GetRequiredService<IResourceRegistry>();
+        var       registry = app.Services.GetRequiredService<ResourceRegistry>();
 
         Assert.NotNull(registry.GetResource(typeof(SchemataReport)));
         Assert.NotNull(registry.GetResource(typeof(SchemataReportSnapshot)));
@@ -45,7 +46,7 @@ public class SchemataReportTransportShould
         builder.UseSchemata(schema => schema.UseReport().MapHttp().MapGrpc());
 
         using var app      = builder.Build();
-        var       registry = app.Services.GetRequiredService<IResourceRegistry>();
+        var       registry = app.Services.GetRequiredService<ResourceRegistry>();
 
         var generate = Assert.Single(registry.GetMethods(typeof(SchemataReport)));
         Assert.Equal(Verbs.Generate, generate.Verb);
@@ -74,11 +75,11 @@ public class SchemataReportTransportShould
     [Fact]
     public void UseReport_Without_Transports_Registers_No_Resources() {
         var builder = WebApplication.CreateBuilder();
-        builder.Services.AddSingleton<IResourceRegistry>(new ResourceRegistry());
+        builder.Services.AddSingleton<ResourceRegistry>(new ResourceRegistry());
         builder.UseSchemata(schema => schema.UseReport());
 
         using var app      = builder.Build();
-        var       registry = app.Services.GetRequiredService<IResourceRegistry>();
+        var       registry = app.Services.GetRequiredService<ResourceRegistry>();
 
         Assert.Null(registry.GetResource(typeof(SchemataReport)));
         Assert.Null(registry.GetResource(typeof(SchemataReportSnapshot)));

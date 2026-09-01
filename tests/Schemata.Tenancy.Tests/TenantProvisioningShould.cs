@@ -1,15 +1,13 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Moq;
-using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
-using static Schemata.Tenancy.Tests.TenancyTestHost;
+using static Schemata.Tenancy.Tests.Fixtures.TenancyTestHost;
 using Xunit;
 
 namespace Schemata.Tenancy.Tests;
@@ -277,7 +275,7 @@ public class TenantProvisioningShould
     }
 
     private static SchemataTenant Tenant(string name) {
-        return new() { Uid = Identifiers.NewUid(), Name = name };
+        return new() { Uid = Guid.NewGuid(), Name = name };
     }
 
     private static async IAsyncEnumerable<T> ToAsync<T>(IEnumerable<T> rows) {

@@ -20,6 +20,8 @@
     <Project Path="src/Schemata.Advice/Schemata.Advice.csproj" />
     <Project Path="src/Schemata.Authorization.Foundation/Schemata.Authorization.Foundation.csproj" />
     <Project Path="src/Schemata.Authorization.Identity/Schemata.Authorization.Identity.csproj" />
+    <Project Path="src/Schemata.Authorization.Grpc/Schemata.Authorization.Grpc.csproj" />
+    <Project Path="src/Schemata.Authorization.Http/Schemata.Authorization.Http.csproj" />
     <Project Path="src/Schemata.Authorization.Skeleton/Schemata.Authorization.Skeleton.csproj" />
     <Project Path="src/Schemata.Caching.Distributed/Schemata.Caching.Distributed.csproj" />
     <Project Path="src/Schemata.Caching.Redis/Schemata.Caching.Redis.csproj" />
@@ -50,6 +52,8 @@
     <Project Path="src/Schemata.Flow.Skeleton/Schemata.Flow.Skeleton.csproj" />
     <Project Path="src/Schemata.Flow.StateMachine/Schemata.Flow.StateMachine.csproj" />
     <Project Path="src/Schemata.Identity.Foundation/Schemata.Identity.Foundation.csproj" />
+    <Project Path="src/Schemata.Identity.Grpc/Schemata.Identity.Grpc.csproj" />
+    <Project Path="src/Schemata.Identity.Http/Schemata.Identity.Http.csproj" />
     <Project Path="src/Schemata.Identity.Skeleton/Schemata.Identity.Skeleton.csproj" />
     <Project Path="src/Schemata.Insight.Foundation/Schemata.Insight.Foundation.csproj" />
     <Project Path="src/Schemata.Insight.Grpc/Schemata.Insight.Grpc.csproj" />
@@ -129,6 +133,7 @@
     <Project Path="tests/Schemata.Expressions.Skeleton.Tests/Schemata.Expressions.Skeleton.Tests.csproj" />
     <Project Path="tests/Schemata.Flow.Actor.Tests/Schemata.Flow.Actor.Tests.csproj" />
     <Project Path="tests/Schemata.Flow.Bpmn.Conformance.Tests/Schemata.Flow.Bpmn.Conformance.Tests.csproj" />
+    <Project Path="tests/Schemata.Identity.Integration.Tests/Schemata.Identity.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Flow.Bpmn.Tests/Schemata.Flow.Bpmn.Tests.csproj" />
     <Project Path="tests/Schemata.Flow.Integration.Tests/Schemata.Flow.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Flow.Tests/Schemata.Flow.Tests.csproj" />

@@ -4,11 +4,11 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Insight.Skeleton;
-using Schemata.Report.Foundation.Definitions;
+using Schemata.Insight.Skeleton.Queries;
 using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Entities;
 
-namespace Schemata.Report.Foundation;
+namespace Schemata.Report.Foundation.Definitions;
 
 /// <summary>Composes ordered report-definition sources with configuration definitions taking precedence.</summary>
 /// <remarks>
@@ -19,7 +19,6 @@ public sealed class CompositeReportDefinitionStore(IServiceProvider services) : 
 {
     private readonly IReadOnlyList<IReportDefinitionSource> _sources = [.. services.GetServices<IReportDefinitionSource>()];
 
-    /// <inheritdoc />
     public async ValueTask<(SchemataReport Report, QueryInsightRequest Query)?> ResolveAsync(
         string            name,
         CancellationToken ct = default
@@ -34,7 +33,6 @@ public sealed class CompositeReportDefinitionStore(IServiceProvider services) : 
         return null;
     }
 
-    /// <inheritdoc />
     public async IAsyncEnumerable<SchemataReport> ListPeriodicAsync(
         [EnumeratorCancellation] CancellationToken ct = default
     ) {

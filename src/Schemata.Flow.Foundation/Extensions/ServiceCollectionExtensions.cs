@@ -11,7 +11,7 @@ using Schemata.Flow.Skeleton.Observers;
 using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Commands;
-using Schemata.Messaging.Skeleton.Internal;
+using Schemata.Messaging.Skeleton.Runtime;
 using ProcessDefinitionInfo = Schemata.Flow.Skeleton.Models.ProcessDefinitionInfo;
 using ProcessSnapshot = Schemata.Flow.Skeleton.Models.ProcessSnapshot;
 

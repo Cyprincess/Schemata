@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Schemata.Abstractions;
 using Schemata.Authorization.Foundation.Commands;
-using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Models;
 
 namespace Schemata.Authorization.Foundation.Controllers;

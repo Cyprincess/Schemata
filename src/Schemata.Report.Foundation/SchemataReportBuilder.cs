@@ -1,18 +1,19 @@
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Core;
+using Schemata.Core.Building;
 using Schemata.Core.Features;
+using Schemata.Security.Skeleton;
+using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Foundation;
 
 /// <summary>Fluent builder for Report features and options.</summary>
-public sealed partial class SchemataReportBuilder<TReport, TSnapshot, TChunk>
+public sealed partial class SchemataReportBuilder<TReport, TSnapshot, TChunk> : IResourceBuilder
+    where TReport : SchemataReport, new()
+    where TSnapshot : SchemataReportSnapshot, new()
+    where TChunk : SchemataReportSnapshotChunk, new()
 {
-    /// <summary>
-    ///     Options-bag key carrying the authentication scheme set through
-    ///     <see cref="WithAuthorization" />, read by the transport packages when they register the
-    ///     Report resources.
-    /// </summary>
     internal const string AuthenticationSchemeKey = "Report:AuthenticationScheme";
 
     private readonly HashSet<string> _definitionNames = new(System.StringComparer.Ordinal);
@@ -23,9 +24,15 @@ public sealed partial class SchemataReportBuilder<TReport, TSnapshot, TChunk>
     public SchemataReportBuilder(SchemataOptions schemata, IServiceCollection services) {
         Schemata = schemata;
         Services = services;
+        var registrations = Schemata.Get<Dictionary<IResourceBuilder, ResourceSecurityRegistration>>(nameof(ResourceSecurityRegistration)) ?? new();
+        Schemata.Set(nameof(ResourceSecurityRegistration), registrations);
+        registrations[this] = new(
+            services => services.AddReportAuthentication<TReport, TSnapshot, TChunk>(),
+            services => services.AddReportAuthorization<TReport, TSnapshot, TChunk>(),
+            scheme => Schemata.Set(AuthenticationSchemeKey, scheme));
     }
 
-    private SchemataOptions Schemata { get; }
+    public SchemataOptions Schemata { get; }
 
     /// <summary>The service collection receiving Report registrations.</summary>
     public IServiceCollection Services { get; }
@@ -37,19 +44,4 @@ public sealed partial class SchemataReportBuilder<TReport, TSnapshot, TChunk>
         Schemata.AddFeature<T>();
     }
 
-    /// <summary>
-    ///     Requires <paramref name="scheme" /> on the Report resource endpoints, overriding the
-    ///     resource system's global default for the Report resources alone. Call it before
-    ///     <c>MapHttp()</c> / <c>MapGrpc()</c>, which read the scheme when they register the
-    ///     resources.
-    /// </summary>
-    /// <param name="scheme">
-    ///     The authentication scheme; <see langword="null" /> restores the global default.
-    /// </param>
-    /// <returns>This builder for chaining.</returns>
-    public SchemataReportBuilder<TReport, TSnapshot, TChunk> WithAuthorization(string? scheme = null) {
-        Schemata.Set(AuthenticationSchemeKey, scheme);
-
-        return this;
-    }
 }

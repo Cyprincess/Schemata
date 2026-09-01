@@ -1,7 +1,6 @@
 using System;
 using System.Linq;
 using System.Xml;
-using Humanizer;
 using Schemata.Abstractions.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;

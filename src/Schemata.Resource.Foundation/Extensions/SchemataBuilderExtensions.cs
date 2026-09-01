@@ -1,5 +1,6 @@
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Core;
-using Schemata.Resource.Foundation;
+using Schemata.Core.Building;
 using Schemata.Resource.Foundation.Features;
 
 // ReSharper disable once CheckNamespace
@@ -14,10 +15,12 @@ public static class SchemataBuilderExtensions
     ///     Enables the resource system and returns a <see cref="SchemataResourceBuilder" />
     ///     for further configuration.
     /// </summary>
-    /// <param name="builder">The <see cref="SchemataBuilder" />.</param>
+    /// <param name="builder">The Schemata builder.</param>
     /// <returns>A <see cref="SchemataResourceBuilder" /> for chaining resource configuration.</returns>
     public static SchemataResourceBuilder UseResource(this SchemataBuilder builder) {
         builder.AddFeature<SchemataResourceFeature>();
+
+        builder.Services.AddSchemataResources(builder.Options);
 
         return new(builder.Options, builder.Services);
     }

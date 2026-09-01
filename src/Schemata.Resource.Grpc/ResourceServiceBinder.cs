@@ -2,7 +2,7 @@ using System;
 using System.Reflection;
 using ProtoBuf.Grpc.Configuration;
 using Schemata.Common;
-using Schemata.Resource.Grpc.Internal;
+using Schemata.Resource.Grpc.Runtime;
 
 namespace Schemata.Resource.Grpc;
 

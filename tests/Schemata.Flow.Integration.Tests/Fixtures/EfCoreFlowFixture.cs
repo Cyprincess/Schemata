@@ -6,11 +6,8 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Moq;
-using Schemata.Abstractions.Advisors;
-using Schemata.Common;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton;
@@ -23,7 +20,7 @@ namespace Schemata.Flow.Integration.Tests.Fixtures;
 
 public sealed class EfCoreFlowFixture : IAsyncLifetime, IFlowIntegrationFixture
 {
-    private readonly string _dbPath = $"{Identifiers.NewUid():n}.db";
+    private readonly string _dbPath = $"{Guid.NewGuid():n}.db";
 
     private ServiceProvider? _root;
 

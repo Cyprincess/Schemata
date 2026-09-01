@@ -64,6 +64,12 @@
   items:
     - name: Overview
       href: resource/overview.md
+    - name: AIP Modeling
+      href: resource/aip-modeling.md
+    - name: AIP Interactions
+      href: resource/aip-interactions.md
+    - name: AIP Business Logic
+      href: resource/aip-business-logic.md
     - name: Create Pipeline
       href: resource/create-pipeline.md
     - name: Read Pipeline

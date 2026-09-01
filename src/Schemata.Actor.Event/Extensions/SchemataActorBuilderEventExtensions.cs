@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Actor.Event;
 using Schemata.Actor.Event.Features;
-using Schemata.Actor.Event.Internal;
+using Schemata.Actor.Event.Handlers;
 using Schemata.Actor.Foundation;
 using Schemata.Event.Skeleton;
 

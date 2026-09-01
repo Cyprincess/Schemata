@@ -12,11 +12,10 @@ using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Advisors;
-using Schemata.Push.Foundation;
 using Schemata.Push.Foundation.Commands;
 using Schemata.Push.Foundation.Handlers;
 using Schemata.Push.Scheduling.Features;
-using Schemata.Push.Scheduling.Internal;
+using Schemata.Push.Scheduling.Handlers;
 using Schemata.Push.Skeleton;
 using Schemata.Push.Skeleton.Entities;
 using Schemata.Scheduling.Skeleton;
@@ -111,10 +110,10 @@ public class PushEntryEquivalenceShould
 
         AssertHandler<SendPushRequest, ImmutableArray<TransportResult>, SendPushHandler>(provider);
         AssertHandler<AddPushSubscriptionRequest, PushSubscriptionResult, AddPushSubscriptionHandler>(provider);
-        AssertHandler<RemovePushSubscriptionRequest, Schemata.Abstractions.Unit, RemovePushSubscriptionHandler>(provider);
+        AssertHandler<RemovePushSubscriptionRequest, Abstractions.Unit, RemovePushSubscriptionHandler>(provider);
         AssertHandler<GetPushSubscriptionsQuery, IReadOnlyList<SchemataPushSubscription>, GetPushSubscriptionsHandler>(provider);
         AssertHandler<ExistsPushSubscriptionQuery, bool, ExistsPushSubscriptionHandler>(provider);
-        AssertHandler<SchedulePushRequest, Schemata.Abstractions.Resource.Operation, SchedulePushHandler>(provider);
+        AssertHandler<SchedulePushRequest, Abstractions.Resource.Operation, SchedulePushHandler>(provider);
 
         var send = RoundTrip(new SendPushRequest(
             new PushContext("send-message", new BroadcastTarget())));

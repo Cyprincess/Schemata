@@ -6,12 +6,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Resource;
 using Schemata.Messaging.Skeleton;
 using Schemata.Common;
 using Schemata.Resource.Foundation;
-using Schemata.Resource.Http.Internal;
-using HttpResourceIdentifiers = Schemata.Resource.Http.Internal.ResourceIdentifiers;
+using Schemata.Resource.Http.Runtime;
+using HttpResourceIdentifiers = Schemata.Resource.Http.Runtime.ResourceIdentifiers;
 
 namespace Schemata.Resource.Http;
 

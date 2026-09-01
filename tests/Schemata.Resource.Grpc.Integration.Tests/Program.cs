@@ -10,10 +10,8 @@ using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Expressions.Aip;
 using Schemata.Expressions.Order;
-using Schemata.Resource.Grpc.Integration.Tests;
 using Schemata.Resource.Grpc.Integration.Tests.Fixtures;
 using Schemata.Flow.Skeleton.Entities;
-using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 
 var options = new WebApplicationOptions { Args = args };

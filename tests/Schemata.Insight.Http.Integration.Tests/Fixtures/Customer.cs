@@ -24,13 +24,3 @@ public class Customer : IIdentifier, ICanonicalName
 
     #endregion
 }
-
-[Microsoft.EntityFrameworkCore.PrimaryKey(nameof(Uid))]
-public class Order
-{
-    public Guid    Uid    { get; set; }
-    public int     Number { get; set; }
-    public string? Status { get; set; }
-    public int     Amount { get; set; }
-    public int     Placed { get; set; }
-}

@@ -1,3 +1,4 @@
+// ReSharper disable once CheckNamespace
 namespace System.Linq;
 
 /// <summary>Composes offset pagination onto query functions.</summary>

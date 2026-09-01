@@ -10,7 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Caching.Distributed;
 using Schemata.Caching.Skeleton;
-using Schemata.Common;
 using Schemata.Entity.Repository;
 using Xunit;
 
@@ -18,7 +17,7 @@ namespace Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
 
 public class IntegrationFixture : IAsyncLifetime
 {
-    private readonly string _dbPath = $"{Identifiers.NewUid():n}.db";
+    private readonly string _dbPath = $"{Guid.NewGuid():n}.db";
     private readonly bool _useQueryCache;
 
     private ServiceProvider? _root;

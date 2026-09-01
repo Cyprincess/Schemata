@@ -30,7 +30,7 @@ public class DeviceInteractionHandlerShould
         var authOpts = Options.Create(new SchemataAuthorizationOptions { SessionIdClaimType = "sid" });
 
         var app = new SchemataApplication {
-            Uid           = Identifiers.NewUid(),
+            Uid           = Guid.NewGuid(),
             ClientId      = "device-client",
             Name          = "device-client",
             CanonicalName = "applications/device-client",
@@ -46,7 +46,7 @@ public class DeviceInteractionHandlerShould
             new DeviceCodePayload { Scope = "openid profile", ClientId = "device-client" }, jsonOpts.Value);
 
         var device = new SchemataToken {
-            Uid         = Identifiers.NewUid(),
+            Uid         = Guid.NewGuid(),
             Name        = "device-1",
             Type        = TokenTypes.DeviceCode,
             Status      = TokenStatuses.Valid,
@@ -61,7 +61,7 @@ public class DeviceInteractionHandlerShould
             }, jsonOpts.Value);
 
         var userCode = new SchemataToken {
-            Uid         = Identifiers.NewUid(),
+            Uid         = Guid.NewGuid(),
             Name        = "user-1",
             Type        = TokenTypes.UserCode,
             Status      = TokenStatuses.Valid,
@@ -75,7 +75,7 @@ public class DeviceInteractionHandlerShould
         tokens.Setup(t => t.FindByNameAsync(device.Name!, It.IsAny<CancellationToken>())).ReturnsAsync(device);
 
         var openid = new SchemataScope {
-            Uid          = Identifiers.NewUid(),
+            Uid          = Guid.NewGuid(),
             Name         = "openid",
             DisplayName  = "Sign you in",
             DisplayNames = new() { ["zh-Hans"] = "登录" },

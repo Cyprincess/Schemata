@@ -4,9 +4,9 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Plan;
 
-namespace Schemata.Insight.Foundation;
+namespace Schemata.Insight.Foundation.Execution;
 
 public sealed partial class LocalPipelineExecutor
 {
@@ -19,7 +19,7 @@ public sealed partial class LocalPipelineExecutor
         var order   = new List<string>();
 
         await foreach (var row in rows.WithCancellation(ct)) {
-            var key = string.Join('\u001f', group.Keys.Select(k => Resolve(row, k)?.ToString() ?? "\u0000"));
+            var key = string.Join('\u001f', ImmutableArrayExtensions.Select<string, string>(group.Keys, k => Resolve(row, k)?.ToString() ?? "\u0000"));
             if (!buckets.TryGetValue(key, out var bucket)) {
                 bucket       = [];
                 buckets[key] = bucket;

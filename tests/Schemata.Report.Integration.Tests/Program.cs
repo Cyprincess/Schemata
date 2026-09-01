@@ -5,21 +5,20 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Common;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Expressions.Aip;
 using Schemata.Expressions.Cel;
 using Schemata.Expressions.Order;
-using Schemata.Insight.Foundation;
+using Schemata.Insight.Foundation.Drivers;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
-using Schemata.Report.Skeleton;
 using Schemata.Report.Integration.Tests.Fixtures;
+using Schemata.Report.Skeleton.Entities;
 
 var options = new WebApplicationOptions { Args = args };
 var builder = WebApplication.CreateBuilder(options);
-var dbPath = Path.Combine(Path.GetTempPath(), $"report-integration-{Identifiers.NewUid():n}.db");
+var dbPath = Path.Combine(Path.GetTempPath(), $"report-integration-{Guid.NewGuid():n}.db");
 var useScheduling = !string.Equals(builder.Environment.EnvironmentName, "WithoutScheduling", StringComparison.Ordinal);
 builder.UseSchemata(schema => {
     schema.UseDeveloperExceptionPage();

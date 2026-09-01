@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Entity.Repository;
-using Schemata.Push.Foundation;
 using Schemata.Push.Skeleton;
 using Schemata.Push.Skeleton.Entities;
 using Xunit;

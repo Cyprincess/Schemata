@@ -4,9 +4,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Models;
+using Schemata.Insight.Skeleton.Queries;
 using Schemata.Messaging.Skeleton;
 
-namespace Schemata.Insight.Foundation;
+namespace Schemata.Insight.Foundation.Execution;
 
 /// <summary>
 ///     Preserves the public Insight facade while dispatching queries through the registered request dispatcher.

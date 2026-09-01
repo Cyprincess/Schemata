@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Schemata.Insight.Skeleton;
+namespace Schemata.Insight.Skeleton.Catalog;
 
 /// <summary>
 ///     Resolves a registered source name to its driver and parameters, hiding the backend, connection

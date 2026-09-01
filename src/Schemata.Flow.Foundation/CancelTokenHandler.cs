@@ -2,15 +2,13 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Exceptions;
-using Schemata.Abstractions.Resource;
 using Schemata.Common.Errors;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Messaging.Skeleton;
 using CancelProcessTokenRequest = Schemata.Flow.Foundation.Commands.CancelTokenRequest;
+using Schemata.Flow.Foundation.Commands;
 
 namespace Schemata.Flow.Foundation;
 
@@ -22,7 +20,6 @@ public sealed class CancelTokenHandler(
     IRepository<SchemataProcessToken> tokens)
     : IRequestHandler<CancelTokenResourceRequest, ProcessSnapshot>
 {
-    /// <inheritdoc />
     public async Task<ProcessSnapshot> HandleAsync(
         CancelTokenResourceRequest request,
         CancellationToken ct = default)

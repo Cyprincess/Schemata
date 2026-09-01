@@ -3,17 +3,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Common;
 using Schemata.Entity.Repository;
-using Schemata.Event.Foundation.Internal;
-using Schemata.Event.Skeleton;
-using Schemata.Event.Skeleton.Entities;
-using Schemata.Flow.Event.Internal;
+using Schemata.Event.Foundation.Runtime;
+using Schemata.Flow.Event.Handlers;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Integration.Tests.Fixtures;
-using Schemata.Flow.Skeleton.Builders;
 using Schemata.Flow.Skeleton.Entities;
-using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
 using Xunit;
 
@@ -65,10 +60,10 @@ public sealed class BridgeBehaviorShould : IClassFixture<EfCoreFlowFixture>
         using var scope      = _fixture.CreateScope();
         var       repository = scope.ServiceProvider.GetRequiredService<IRepository<Order>>();
         var order = new Order {
-            Uid           = Identifiers.NewUid(),
-            Name          = Identifiers.NewUid().ToString("n"),
-            CanonicalName = $"orders/{Identifiers.NewUid():n}",
-            Timestamp     = Identifiers.NewUid(),
+            Uid           = Guid.NewGuid(),
+            Name          = Guid.NewGuid().ToString("n"),
+            CanonicalName = $"orders/{Guid.NewGuid():n}",
+            Timestamp     = Guid.NewGuid(),
             State         = "new",
         };
 
@@ -99,31 +94,4 @@ public sealed class BridgeBehaviorShould : IClassFixture<EfCoreFlowFixture>
         Assert.NotNull(token);
         return token!;
     }
-}
-
-public sealed class ApprovalProcess : ProcessDefinition
-{
-    public ApprovalProcess() {
-        BindSource<Order>(projection: FlowSourceProjection.None);
-        this.Start().Go(Review);
-        this.During(Review).Await(
-            this.On(Payment).Decide(
-                this.When<Order, ApprovalPayload>(Payment, (_, payload) => payload.Approved).Go(Approved),
-                this.Otherwise().Go(Rejected)));
-        this.During(Approved).End();
-        this.During(Rejected).End();
-    }
-
-    public NoneTask Review { get; } = null!;
-
-    public UserTask Approved { get; } = null!;
-
-    public UserTask Rejected { get; } = null!;
-
-    public Message<ApprovalPayload> Payment { get; } = null!;
-}
-
-public sealed class ApprovalPayload : IEvent
-{
-    public bool Approved { get; init; }
 }

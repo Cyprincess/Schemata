@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using Schemata.Messaging.Skeleton;
-using Schemata.Push.Foundation;
 
 namespace Schemata.Push.Foundation.Commands;
 
@@ -19,6 +18,5 @@ public sealed record AddPushSubscriptionRequest(
     Dictionary<string, string?>? Metadata = null
 ) : ICommand<PushSubscriptionResult>, ISubscriptionScoped
 {
-    /// <inheritdoc />
     public string SubscriptionKey => $"{Owner}|{Provider}|{ProviderKey}";
 }

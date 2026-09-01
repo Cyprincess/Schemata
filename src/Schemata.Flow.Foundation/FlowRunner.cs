@@ -9,7 +9,6 @@ using Schemata.Flow.Foundation.Commands;
 using Schemata.Flow.Foundation.Handlers;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
-using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Commands;
 using CompleteProcessRequest = Schemata.Flow.Foundation.Commands.CompleteActivityRequest;

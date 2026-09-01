@@ -82,15 +82,3 @@ public abstract class CompensationPersistenceShould
         return rows;
     }
 }
-
-[Trait("Category", "Integration")]
-public sealed class EfCoreCompensationPersistenceShould : CompensationPersistenceShould, IClassFixture<EfCoreFlowFixture>
-{
-    public EfCoreCompensationPersistenceShould(EfCoreFlowFixture fixture) : base(fixture) { }
-}
-
-[Trait("Category", "Integration")]
-public sealed class LinqToDbCompensationPersistenceShould : CompensationPersistenceShould, IClassFixture<LinqToDbFlowFixture>
-{
-    public LinqToDbCompensationPersistenceShould(LinqToDbFlowFixture fixture) : base(fixture) { }
-}

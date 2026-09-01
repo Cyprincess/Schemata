@@ -1,9 +1,9 @@
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Queries;
 using Schemata.Report.Skeleton;
 
-namespace Schemata.Report.Foundation;
+namespace Schemata.Report.Foundation.Dsl;
 
 internal sealed class ProgramReportDefinitionProvider(
     ReportDefinitionBuilder definition

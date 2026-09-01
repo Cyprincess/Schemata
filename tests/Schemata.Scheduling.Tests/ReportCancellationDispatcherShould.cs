@@ -8,7 +8,7 @@ using Moq;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Scheduling.Foundation;
-using Schemata.Scheduling.Foundation.Internal;
+using Schemata.Scheduling.Foundation.Runtime;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;

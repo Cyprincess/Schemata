@@ -1,6 +1,5 @@
 using System.Linq;
 using System.Security.Claims;
-using Schemata.Abstractions;
 using Schemata.Authorization.Skeleton;
 
 namespace Schemata.Authorization.Foundation.Extensions;

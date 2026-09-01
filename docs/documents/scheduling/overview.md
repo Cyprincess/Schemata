@@ -32,6 +32,20 @@ builder.UseSchemata(schema => {
 
 `SchedulingInitializer` populates the registry from `SchemataSchedulingOptions.Jobs`, starts the scheduler, fails orphaned `Running` rows left by a restart, arms configured scheduled jobs, and reloads persisted `Active` jobs.
 
+## Resource security
+
+`SchedulingBuilder` implements `IResourceBuilder`. Configure scheduler resource authentication and authorization through the shared extensions before activating a transport:
+
+```csharp
+schema.UseSecurity();
+schema.UseScheduling()
+      .WithAuthentication("Bearer")
+      .WithAuthorization()
+      .MapHttp();
+```
+
+Scheduling methods, including `trigger` and the resource `run` method, carry their verbs in method envelopes. Authentication and coarse authorization wrap the envelope. Resource handler stages apply instance access and entitlement filtering.
+
 ## SchedulingBuilder
 
 `Schemata.Scheduling.Foundation.Builders.SchedulingBuilder` registers jobs:
@@ -91,11 +105,7 @@ unkeyed alias), hold the actual materialization logic described above.
 
 `StageJobExecutionResultRequest` is the fifth scheduling command. `JobExecutionDispatcher` sends it after an execution reaches its terminal state, carrying `State`, `RecentRunTime`, `RecentError`, and `NextRunTime`; `DefaultStageJobExecutionResultHandler` writes those fields under the process-wide `SchemataJobWriteGate` and materializes the next `Pending` execution with its timer for a recurring `Active` job. The job-row writers are `DefaultScheduleJobHandler`, `DefaultUnscheduleJobHandler`, and `DefaultStageJobExecutionResultHandler`, and all three persist under the same gate (`DefaultRescheduleJobHandler` delegates to the schedule handler), so schedule commands and execution finalization serialize on the job row, and a concurrency conflict propagates to the caller. `DefaultTriggerJobHandler` writes only the `SchemataJobExecution` row and does not take the gate.
 
-A registered `ICommandAdvisor<TRequest>` (`Schemata.Messaging.Skeleton.Advisors`) therefore runs
-for every fire, whether it originates from `IScheduler.TriggerAsync` or a raw
-`IRequestDispatcher.SendAsync<TriggerJobRequest, SchemataJobExecution>` call — both resolve the
-same dispatcher and run the same handler. See [Messaging](../messaging/overview.md) for the
-dispatcher, the advisor chains, and the ambient `AdviceContext` rules.
+Registered `IRequestPipelineAdvisor<TRequest,TResponse>` wraps run for each scheduling command, whether it originates from `IScheduler` or a raw dispatcher call. The command closure selects the wrap registration and handler. See [Messaging](../messaging/overview.md) for dispatcher and ambient-context behavior.
 
 ## Execution model
 

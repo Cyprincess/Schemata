@@ -10,6 +10,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Schemata.Security.Foundation\Schemata.Security.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Flow.Foundation\Schemata.Flow.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Report.Foundation\Schemata.Report.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Scheduling.Foundation\Schemata.Scheduling.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Insight.Foundation\Schemata.Insight.Foundation.csproj" />
   </ItemGroup>
 
 </Project>

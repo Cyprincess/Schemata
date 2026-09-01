@@ -11,7 +11,7 @@ using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Advisors;
 using Schemata.Scheduling.Foundation.Commands;
-using Schemata.Scheduling.Foundation.Internal;
+using Schemata.Scheduling.Foundation.Runtime;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;

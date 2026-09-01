@@ -7,8 +7,9 @@ using ProtoBuf.Meta;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Core.Building;
 using Schemata.Resource.Foundation;
-using Schemata.Resource.Grpc.Internal;
+using Schemata.Resource.Grpc.Runtime;
 using WellKnownReflection = Google.Protobuf.WellKnownTypes;
 
 namespace Schemata.Resource.Grpc;
@@ -28,7 +29,7 @@ internal static class FileDescriptorBridge
     public static IReadOnlyList<ServiceDescriptor> BuildServiceDescriptors(
         RuntimeTypeModel  model,
         Type[]            serviceTypes,
-        IResourceRegistry registry
+        ResourceRegistry registry
     ) {
         var results = new List<ServiceDescriptor>();
 

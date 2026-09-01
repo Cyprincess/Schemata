@@ -6,7 +6,6 @@ using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Identity.Foundation.Features;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Authorization.Identity.Features;
 

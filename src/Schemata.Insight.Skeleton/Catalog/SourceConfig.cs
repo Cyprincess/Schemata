@@ -1,6 +1,7 @@
 using System.Collections.Generic;
+using Schemata.Insight.Skeleton.Drivers;
 
-namespace Schemata.Insight.Skeleton;
+namespace Schemata.Insight.Skeleton.Catalog;
 
 /// <summary>
 ///     The catalog-resolved binding for a source name: the driver that serves it and the

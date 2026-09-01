@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Routing;
 using Schemata.Abstractions.Entities;
 using Schemata.Common;
 using Xunit;
-using HttpResourceIdentifiers = Schemata.Resource.Http.Internal.ResourceIdentifiers;
+using HttpResourceIdentifiers = Schemata.Resource.Http.Runtime.ResourceIdentifiers;
 
 namespace Schemata.Resource.Http.Integration.Tests;
 

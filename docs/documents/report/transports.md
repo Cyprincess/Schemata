@@ -1,19 +1,19 @@
 # Report transports
 
-`Schemata.Report.Http` and `Schemata.Report.Grpc` compose Report resources through the transport
-features. `SchemataReportHttpFeature<TReport, TSnapshot, TChunk>` and
-`SchemataReportGrpcFeature<TReport, TSnapshot, TChunk>` register `TReport` and `TSnapshot`; chunks
-remain internal storage and receive no HTTP or gRPC resource registration.
+`Schemata.Report.Http` and `Schemata.Report.Grpc` expose Report resources through their domain transport features. `MapHttp()` and `MapGrpc()` activate one feature each; shared Resource transport behavior is supplied through feature dependencies. Report, snapshot, and method envelopes receive dispatcher-wrap security when the Report builder enables it.
 
 ```csharp
 using Microsoft.AspNetCore.Builder;
 
 builder.UseSchemata(schema => {
+    schema.UseSecurity();
     schema.UseScheduling().MapHttp();
 
-    var reports = schema.UseReport();
-    reports.MapHttp().MapGrpc();
-});
+    schema.UseReport()
+          .WithAuthentication("Bearer")
+          .WithAuthorization()
+          .MapHttp()
+          .MapGrpc();
 ```
 
 The host-level `MapHttp()` on Scheduling exposes operation polling. The Report-level `MapHttp()`

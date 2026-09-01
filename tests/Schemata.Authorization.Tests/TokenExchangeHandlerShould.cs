@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
@@ -21,7 +22,7 @@ namespace Schemata.Authorization.Tests;
 public class TokenExchangeHandlerShould
 {
     private static readonly SchemataApplication
-        TestApp = new() { Uid = Identifiers.NewUid(), ClientId = "test-client" };
+        TestApp = new() { Uid = Guid.NewGuid(), ClientId = "test-client" };
 
     private static (TokenExchangeHandler<SchemataApplication> Handler, System.IServiceProvider Sp) CreateHandler(
         Mock<IClientAuthenticationService<SchemataApplication>>                            clientAuth,

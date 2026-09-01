@@ -9,8 +9,8 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Entity.Repository;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Flow.Foundation;
-using Schemata.Flow.Foundation.Commands;
 using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
@@ -18,6 +18,8 @@ using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Advisors;
 using Schemata.Messaging.Skeleton.Commands;
+using Schemata.Security.Foundation;
+using Schemata.Security.Skeleton;
 using Xunit;
 using CompleteActivityRequest = Schemata.Flow.Foundation.Commands.CompleteActivityRequest;
 using StartProcessRequest = Schemata.Flow.Foundation.Commands.StartProcessRequest;
@@ -120,6 +122,49 @@ public sealed class FlowMethodEnvelopeShould
         Assert.Equal("processes/p1", observed.Name);
         Assert.Equal(typeof(SchemataProcess), observed.Entity);
         Assert.Equal(1, command.Count);
+    }
+
+    [Fact]
+    public async Task Authorization_Only_Denies_And_Matching_Permission_Allows_Start() {
+        var denied = CreateHarness(services => {
+            services.Configure<SchemataSecurityOptions>(_ => { });
+            services.AddScoped<IPermissionResolver, DefaultPermissionResolver>();
+            services.AddScoped<IPermissionMatcher, DefaultPermissionMatcher>();
+            services.AddFlowAuthorization();
+        });
+        var deniedDispatcher = denied.Services.GetRequiredService<IRequestDispatcher>();
+        var principal = new ClaimsPrincipal(new ClaimsIdentity("test"));
+
+        await Assert.ThrowsAsync<PermissionDeniedException>(() => deniedDispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>, SchemataProcess>(
+            new(FlowOperations.Start, null, new("envelope-process", null, null, null, null, principal), principal), CancellationToken.None));
+
+        var allowed = CreateHarness(services => {
+            services.Configure<SchemataSecurityOptions>(_ => { });
+            services.AddScoped<IPermissionResolver, DefaultPermissionResolver>();
+            services.AddScoped<IPermissionMatcher, DefaultPermissionMatcher>();
+            services.AddFlowAuthorization();
+        });
+        var allowedDispatcher = allowed.Services.GetRequiredService<IRequestDispatcher>();
+        var allowedPrincipal = new ClaimsPrincipal(new ClaimsIdentity([new Claim("role", "schemata-process.start")], "test"));
+
+        var result = await allowedDispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>, SchemataProcess>(
+            new(FlowOperations.Start, null, new("envelope-process", null, null, null, null, allowedPrincipal), allowedPrincipal), CancellationToken.None);
+        Assert.NotNull(result.CanonicalName);
+    }
+
+    [Fact]
+    public async Task Combined_Security_Rejects_Unauthenticated_Start() {
+        var harness = CreateHarness(services => {
+            services.Configure<SchemataSecurityOptions>(_ => { });
+            services.AddScoped<IPermissionResolver, DefaultPermissionResolver>();
+            services.AddScoped<IPermissionMatcher, DefaultPermissionMatcher>();
+            services.AddFlowAuthentication();
+            services.AddFlowAuthorization();
+        });
+        var dispatcher = harness.Services.GetRequiredService<IRequestDispatcher>();
+
+        await Assert.ThrowsAsync<UnauthenticatedException>(() => dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>, SchemataProcess>(
+            new(FlowOperations.Start, null, new("envelope-process", null, null, null, null, null), null), CancellationToken.None));
     }
 
     private static Harness CreateHarness(Action<IServiceCollection>? advisors = null) {

@@ -4,11 +4,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Integration.Tests.Fixtures;
-using Schemata.Flow.Scheduling.Internal;
+using Schemata.Flow.Scheduling.Runtime;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;
@@ -139,10 +138,10 @@ public sealed class FlowTimerBridgeShould : IClassFixture<TimerBridgeFixture>
         using var scope      = _fixture.CreateScope();
         var       repository = scope.ServiceProvider.GetRequiredService<IRepository<Order>>();
         var order = new Order {
-            Uid           = Identifiers.NewUid(),
-            Name          = Identifiers.NewUid().ToString("n"),
-            CanonicalName = $"orders/{Identifiers.NewUid():n}",
-            Timestamp     = Identifiers.NewUid(),
+            Uid           = Guid.NewGuid(),
+            Name          = Guid.NewGuid().ToString("n"),
+            CanonicalName = $"orders/{Guid.NewGuid():n}",
+            Timestamp     = Guid.NewGuid(),
             State         = "new",
             TaskValue     = "before",
         };

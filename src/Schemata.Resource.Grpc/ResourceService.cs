@@ -6,7 +6,6 @@ using ProtoBuf.Grpc;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Messaging.Skeleton;
-using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Commands;
 
 namespace Schemata.Resource.Grpc;

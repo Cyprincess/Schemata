@@ -1,10 +1,6 @@
 # Flow gRPC Transport
 
-`Schemata.Flow.Grpc` exposes process execution over gRPC. It registers `SchemataProcess`,
-`SchemataProcessToken`, and `SchemataProcessTransition` as Schemata resources. Process operations
-ride the standard Resource pipeline as AIP-136 custom methods, and the package maps a small code-first
-service that lists registered process definitions. `MapGrpc()` activates `SchemataFlowGrpcFeature`
-(priority `SchemataFlowFeature.DefaultPriority + 200_000` = `490_200_000`).
+`Schemata.Flow.Grpc` exposes process execution over gRPC. Its `MapGrpc()` extension activates `SchemataFlowGrpcFeature`; the feature's dependencies provide shared Resource gRPC transport behavior. Process verbs enter the dispatcher in `ResourceMethodRequest` envelopes, enabling wrap-position authentication and coarse authorization.
 
 ## Where the code lives
 
@@ -59,25 +55,16 @@ using Schemata.Flow.Foundation;
 
 resource.Operations = [Operations.Get, Operations.List];
 resource.Methods = [
-    new("start",     typeof(FlowStartProcessHandler),    ResourceMethodScope.Collection),
+    new("start",     typeof(FlowStartProcessHandler), ResourceMethodScope.Collection),
     new("complete",  typeof(CompleteActivityHandler)),
     new("correlate", typeof(CorrelateMessageHandler)),
-    new("signal",    typeof(ThrowSignalHandler),     ResourceMethodScope.Collection),
+    new("signal",    typeof(ThrowSignalHandler), ResourceMethodScope.Collection),
     new("terminate", typeof(TerminateProcessHandler)),
 ];
 ```
 
-`SchemataProcessToken` carries `Operations.Get`, `Operations.List`, and one custom method:
+`SchemataProcessToken` carries `Operations.Get`, `Operations.List`, and the `cancel` custom method. `SchemataProcessTransition` is registered read-only (`Get`, `List`).
 
-```csharp
-using Schemata.Abstractions.Entities;
-using Schemata.Flow.Foundation;
-
-resource.Operations = [Operations.Get, Operations.List];
-resource.Methods    = [new("cancel", typeof(CancelTokenHandler))];
-```
-
-`SchemataProcessTransition` is registered read-only (`Get`, `List`).
 
 ## Service synthesis
 
@@ -127,10 +114,7 @@ HTTP URI; it does not require a singular noun:
 
 `cancel` is instance-scoped on `TokenService`.
 
-Each handler implements `IRequestHandler<TRequest, TResponse>` for the same dedicated wire request
-used by HTTP. `ResourceMethodOperationHandler` runs resource authorization and target validation,
-copies the gRPC call's `HttpContext.User` onto the request, and dispatches it through
-`IRequestDispatcher`.
+Each handler implements `IRequestHandler<TRequest,TResponse>` for the dedicated wire request shared with HTTP. `ResourceMethodOperationHandler` constructs the method envelope with the gRPC principal and target, then dispatches it. The Flow handler processes the inner request after Resource handler stages complete.
 
 `FlowStartProcessHandler` delegates source loading to `FlowSourceLoader`: the loader resolves the
 optional `Source` canonical name through `IResourceTypeResolver`, checks the resolved type against

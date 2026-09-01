@@ -1,3 +1,4 @@
+using Schemata.Core.Building;
 using System;
 using Schemata.Abstractions.Resource;
 using Schemata.Resource.Foundation;

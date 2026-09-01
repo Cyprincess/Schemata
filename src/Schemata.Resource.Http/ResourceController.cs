@@ -9,9 +9,8 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Messaging.Skeleton;
-using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Commands;
-using HttpResourceIdentifiers = Schemata.Resource.Http.Internal.ResourceIdentifiers;
+using HttpResourceIdentifiers = Schemata.Resource.Http.Runtime.ResourceIdentifiers;
 
 namespace Schemata.Resource.Http;
 

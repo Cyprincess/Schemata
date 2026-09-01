@@ -15,10 +15,10 @@
   </ItemGroup>
 
   <ItemGroup>
-  </ItemGroup>
-
-  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Abstractions\Schemata.Abstractions.csproj" />
     <ProjectReference Include="..\Schemata.Common\Schemata.Common.csproj" />
+    <ProjectReference Include="..\Schemata.Security.Skeleton\Schemata.Security.Skeleton.csproj" />
+    <ProjectReference Include="..\Schemata.Expressions.Skeleton\Schemata.Expressions.Skeleton.csproj" />
   </ItemGroup>
 
 </Project>

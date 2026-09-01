@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Common;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
@@ -371,7 +370,7 @@ public sealed class EscalationBoundaryHandler
         SchemataProcessToken   throwing,
         TargetState            resolved
     ) {
-        var leaf      = Identifiers.NewUid().ToString("n");
+        var leaf      = Guid.NewGuid().ToString("n");
         var canonical = $"{process.CanonicalName}/tokens/{leaf}";
 
         return new() {

@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Common;
 using Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
 using Schemata.Entity.Repository;
 using Xunit;
@@ -30,14 +29,14 @@ public class UnitOfWorkShould : IAsyncLifetime
                 var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork<TestDataConnection>>();
                 repo.Join(uow);
                 await repo.AddAsync(new() {
-                                        Uid      = Identifiers.NewUid(),
+                                        Uid      = Guid.NewGuid(),
                                         FullName = "UoW-Alice",
                                         Age      = 18,
                                         Grade    = 1,
                                         Name     = "uow-alice",
                                     });
                 await repo.AddAsync(new() {
-                                        Uid      = Identifiers.NewUid(),
+                                        Uid      = Guid.NewGuid(),
                                         FullName = "UoW-Bob",
                                         Age      = 19,
                                         Grade    = 2,
@@ -64,7 +63,7 @@ public class UnitOfWorkShould : IAsyncLifetime
                 var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork<TestDataConnection>>();
                 repo.Join(uow);
                 await repo.AddAsync(new() {
-                                        Uid      = Identifiers.NewUid(),
+                                        Uid      = Guid.NewGuid(),
                                         FullName = "Rollback-Alice",
                                         Age      = 18,
                                         Grade    = 1,
@@ -91,7 +90,7 @@ public class UnitOfWorkShould : IAsyncLifetime
                 var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork<TestDataConnection>>();
                 repo.Join(uow);
                 await repo.AddAsync(new() {
-                                        Uid      = Identifiers.NewUid(),
+                                        Uid      = Guid.NewGuid(),
                                         FullName = "Dispose-Alice",
                                         Age      = 18,
                                         Grade    = 1,
@@ -116,7 +115,7 @@ public class UnitOfWorkShould : IAsyncLifetime
         using (scope) {
             repo.Join(uow);
             await repo.AddAsync(new() {
-                                    Uid      = Identifiers.NewUid(),
+                                    Uid      = Guid.NewGuid(),
                                     FullName = "Enlisted",
                                     Age      = 18,
                                     Grade    = 1,
@@ -135,14 +134,14 @@ public class UnitOfWorkShould : IAsyncLifetime
                 studentRepo.Join(uow);
                 courseRepo.Join(uow);
                 await studentRepo.AddAsync(new() {
-                                               Uid      = Identifiers.NewUid(),
+                                               Uid      = Guid.NewGuid(),
                                                FullName = "Cross-Alice",
                                                Age      = 18,
                                                Grade    = 1,
                                                Name     = "cross-alice",
                                            });
                 await courseRepo.AddAsync(new() {
-                                              Uid     = Identifiers.NewUid(),
+                                              Uid     = Guid.NewGuid(),
                                               Title   = "Cross-Course",
                                               Credits = 3,
                                               Name    = "cross-course",
@@ -176,7 +175,7 @@ public class UnitOfWorkShould : IAsyncLifetime
         var (repo, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
             await repo.AddAsync(new() {
-                                    Uid      = Identifiers.NewUid(),
+                                    Uid      = Guid.NewGuid(),
                                     FullName = "Self-Read",
                                     Age      = 18,
                                     Grade    = 1,
@@ -198,7 +197,7 @@ public class UnitOfWorkShould : IAsyncLifetime
         var (repo, _, uow, scope) = _fixture.CreateScopeWithUoW();
         using (scope) {
             await repo.AddAsync(new() {
-                                    Uid      = Identifiers.NewUid(),
+                                    Uid      = Guid.NewGuid(),
                                     FullName = "Uncommitted",
                                     Age      = 18,
                                     Grade    = 1,
@@ -222,7 +221,7 @@ public class UnitOfWorkShould : IAsyncLifetime
             // bind to the unit of work's connection.
             repo.Join(uow);
             await repo.AddAsync(new() {
-                                    Uid      = Identifiers.NewUid(),
+                                    Uid      = Guid.NewGuid(),
                                     FullName = "Rebind",
                                     Age      = 18,
                                     Grade    = 1,
@@ -241,7 +240,7 @@ public class UnitOfWorkShould : IAsyncLifetime
         var (repo, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
             await repo.AddAsync(new() {
-                                    Uid      = Identifiers.NewUid(),
+                                    Uid      = Guid.NewGuid(),
                                     FullName = "Double-Commit",
                                     Age      = 18,
                                     Grade    = 1,
@@ -260,7 +259,7 @@ public class UnitOfWorkShould : IAsyncLifetime
             var (repo, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 await repo.AddAsync(new() {
-                                        Uid      = Identifiers.NewUid(),
+                                        Uid      = Guid.NewGuid(),
                                         FullName = "Before-Commit",
                                         Age      = 18,
                                         Grade    = 1,
@@ -271,7 +270,7 @@ public class UnitOfWorkShould : IAsyncLifetime
                 // The repository reopened its own unit of work, so the second write stages into a new
                 // one and stays uncommitted until its own CommitAsync.
                 await repo.AddAsync(new() {
-                    Uid      = Identifiers.NewUid(),
+                    Uid      = Guid.NewGuid(),
                     FullName = "After-Commit",
                     Age      = 1,
                     Grade    = 1,

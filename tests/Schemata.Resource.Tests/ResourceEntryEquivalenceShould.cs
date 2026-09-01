@@ -16,7 +16,6 @@ using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Caching.Skeleton;
-using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
 using Schemata.Messaging.Skeleton;

@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using Schemata.Abstractions.Entities;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Queries;
+using Schemata.Report.Skeleton.Enums;
+using Schemata.Report.Skeleton.Models;
 
-namespace Schemata.Report.Skeleton;
+namespace Schemata.Report.Skeleton.Entities;
 
 /// <summary>Persisted definition of an expression-backed or program-backed report.</summary>
 [CanonicalName("reports/{report}")]

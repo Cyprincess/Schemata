@@ -1,4 +1,4 @@
-namespace Schemata.Report.Skeleton;
+namespace Schemata.Report.Skeleton.Enums;
 
 /// <summary>Describes how a report snapshot was generated.</summary>
 public enum ReportRunKind

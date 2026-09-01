@@ -3,8 +3,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
-using Schemata.Common;
-using Schemata.Entity.Repository;
 
 namespace Schemata.Entity.Repository.Advisors;
 
@@ -32,7 +30,7 @@ public sealed class AdviceAddIdentifier<TEntity> : IRepositoryAddAdvisor<TEntity
         CancellationToken    ct
     ) {
         if (entity is IIdentifier { Uid: var uid } identified && uid == Guid.Empty) {
-            identified.Uid = Identifiers.NewUid();
+            identified.Uid = Guid.NewGuid();
         }
 
         return Task.FromResult(AdviseResult.Continue);

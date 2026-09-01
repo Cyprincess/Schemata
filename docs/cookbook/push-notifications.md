@@ -125,34 +125,39 @@ device and reports `Sent`; a transport with no matching subscription reports `Sk
 ## Step 5: Block a dispatch with an advisor
 
 ```csharp
+using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions.Advisors;
+using Schemata.Messaging.Skeleton.Advisors;
 using Schemata.Push.Skeleton;
-using Schemata.Push.Skeleton.Advisors;
 
-public sealed class QuietHoursPushAdvisor : IPushSendAdvisor
+public sealed class QuietHoursPushAdvisor
+    : IRequestPipelineAdvisor<SendPushRequest, ImmutableArray<TransportResult>>
 {
     public int Order => 0;
 
-    public Task<AdviseResult> AdviseAsync(AdviceContext ctx, PushContext context, CancellationToken ct = default)
-    {
-        var hour = DateTime.UtcNow.Hour;
-        return Task.FromResult(hour is >= 22 or < 7 ? AdviseResult.Block : AdviseResult.Continue);
+    public Task<ImmutableArray<TransportResult>> AdviseAsync(
+        AdviceContext ctx,
+        SendPushRequest request,
+        RequestHandlerContinuation<ImmutableArray<TransportResult>> next,
+        CancellationToken ct = default) {
+        return DateTime.UtcNow.Hour is >= 22 or < 7
+            ? Task.FromResult(ImmutableArray<TransportResult>.Empty)
+            : next(ct);
     }
 }
-```
 
-Register it with `TryAddEnumerable`:
-
-```csharp
 schema.ConfigureServices(services => {
-    services.TryAddEnumerable(ServiceDescriptor.Scoped<IPushSendAdvisor, QuietHoursPushAdvisor>());
+    services.TryAddEnumerable(ServiceDescriptor.Scoped<
+        IRequestPipelineAdvisor<SendPushRequest, ImmutableArray<TransportResult>>,
+        QuietHoursPushAdvisor>());
 });
 ```
 
-`AdviseResult.Block` aborts the dispatch before any transport runs, so `SendAsync` yields nothing
-during quiet hours.
+The advisor returns an empty result without calling the continuation during quiet hours, so no transport runs.
 
 **Assertion:** during 22:00–07:00 UTC, `SendAsync` produces no results and the console prints nothing.
 

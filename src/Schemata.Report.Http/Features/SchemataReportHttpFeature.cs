@@ -7,9 +7,9 @@ using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Report.Foundation;
 using Schemata.Report.Foundation.Features;
-using Schemata.Report.Skeleton;
-using Schemata.Resource.Foundation;
+using Schemata.Core.Building;
 using Schemata.Resource.Http.Features;
+using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Http.Features;
 
@@ -27,10 +27,8 @@ public sealed class SchemataReportHttpFeature<TReport, TSnapshot, TChunk> : Feat
     /// <summary>Default <see cref="FeatureBase.Priority" /> for Report HTTP endpoints.</summary>
     public const int DefaultPriority = SchemataReportFeature<TReport, TSnapshot, TChunk>.DefaultPriority + 100_000;
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,

@@ -3,6 +3,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Resource;
 
+using Schemata.Report.Skeleton.Models;
+using Schemata.Report.Skeleton.Advisors;
+
 namespace Schemata.Report.Skeleton;
 
 /// <summary>Dispatches report requests for immediate results or long-running operations.</summary>

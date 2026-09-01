@@ -1,10 +1,10 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
-using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
-using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Integration.Tests.Fixtures;
 
@@ -19,7 +19,7 @@ internal sealed class AdviceAddReportName : IRepositoryAddAdvisor<SchemataReport
         CancellationToken             ct
     ) {
         if (string.IsNullOrWhiteSpace(entity.Name)) {
-            entity.Name = $"report-{Identifiers.NewUid():n}";
+            entity.Name = $"report-{Guid.NewGuid():n}";
         }
 
         return Task.FromResult(AdviseResult.Continue);

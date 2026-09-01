@@ -1,3 +1,4 @@
+using Schemata.Core.Building;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Tests.Fixtures;
 using Xunit;

@@ -11,16 +11,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Schemata.Abstractions;
-using Schemata.Common;
-using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
-using Schemata.Entity.Repository.Advisors;
 using Schemata.Flow.Bpmn;
-using Schemata.Flow.Foundation;
-using Schemata.Flow.Foundation.Advisors;
 using Schemata.Flow.Scheduling.Features;
 using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Entities;
@@ -36,7 +30,7 @@ namespace Schemata.Flow.Integration.Tests.Fixtures;
 
 public sealed class TimerBridgeFixture : IAsyncLifetime
 {
-    private readonly string _connectionString = $"Data Source=flow-timer-{Identifiers.NewUid():n};Mode=Memory;Cache=Shared";
+    private readonly string _connectionString = $"Data Source=flow-timer-{Guid.NewGuid():n};Mode=Memory;Cache=Shared";
 
     private SqliteConnection? _connection;
     private ServiceProvider?  _root;

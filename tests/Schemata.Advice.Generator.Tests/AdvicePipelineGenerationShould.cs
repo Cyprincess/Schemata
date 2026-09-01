@@ -3,16 +3,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Advisors;
-using Schemata.Advice;
 using Xunit;
 
 namespace Schemata.Advice.Generator.Tests;
-
-public interface IDirectTestAdvisor : IAdvisor<string>;
-
-public interface ITestAdvisorBase : IAdvisor<string>;
-
-public interface IIndirectTestAdvisor : ITestAdvisorBase;
 
 public sealed class AdvicePipelineGenerationShould
 {

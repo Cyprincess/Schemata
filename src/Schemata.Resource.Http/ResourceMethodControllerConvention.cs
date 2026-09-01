@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.ActionConstraints;
@@ -8,8 +6,9 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Routing;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Core.Building;
 using Schemata.Resource.Foundation;
-using Schemata.Resource.Http.Internal;
+using Schemata.Resource.Http.Runtime;
 
 namespace Schemata.Resource.Http;
 
@@ -20,7 +19,7 @@ namespace Schemata.Resource.Http;
 ///     <c>{name}:{verb}</c> (Instance scope) or <c>:{verb}</c> (Collection scope).
 /// </summary>
 public sealed class ResourceMethodControllerConvention(
-    IResourceRegistry registry,
+    ResourceRegistry registry,
     string?           scheme = null
 ) : IControllerModelConvention
 {

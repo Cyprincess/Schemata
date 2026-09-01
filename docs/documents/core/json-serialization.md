@@ -147,3 +147,5 @@ time.
 - [Error Model](error-model.md) — how `IErrorDetail` and `@type` appear in error responses
 - [Built-in Features](built-in-features.md) — `SchemataJsonSerializerFeature` (240M)
 - [Feature System](feature-system.md) — the `Configurators.PopOrDefault` pattern
+- [AIP Modeling](../resource/aip-modeling.md) — internal traits versus the final HTTP and gRPC contracts
+- [AIP Interactions](../resource/aip-interactions.md) — operation-level wire tracing and transport limits

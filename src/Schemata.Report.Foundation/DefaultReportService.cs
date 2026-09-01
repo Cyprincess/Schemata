@@ -7,6 +7,8 @@ using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Commands;
 using Schemata.Report.Foundation.Commands;
 using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Models;
+using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Foundation;
 

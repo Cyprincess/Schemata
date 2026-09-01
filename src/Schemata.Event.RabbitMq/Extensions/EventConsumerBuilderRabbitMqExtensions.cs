@@ -2,7 +2,7 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Event.Foundation.Builders;
 using Schemata.Event.RabbitMq;
-using Schemata.Event.RabbitMq.Internal;
+using Schemata.Event.RabbitMq.Runtime;
 using Schemata.Transport.RabbitMq;
 
 // ReSharper disable once CheckNamespace

@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -8,8 +7,8 @@ using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Primitives;
 using Schemata.Common;
-using Schemata.Resource.Foundation;
-using Schemata.Resource.Http.Internal;
+using Schemata.Core.Building;
+using Schemata.Resource.Http.Runtime;
 
 namespace Schemata.Resource.Http;
 
@@ -26,7 +25,7 @@ public sealed class ResourceControllerFeatureProvider : IApplicationFeatureProvi
     /// <summary>
     ///     Gets or sets the registry whose resources should produce HTTP controllers.
     /// </summary>
-    public IResourceRegistry? Registry { get; set; }
+    public ResourceRegistry? Registry { get; set; }
 
     #region IActionDescriptorChangeProvider Members
 

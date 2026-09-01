@@ -3,7 +3,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using LinqToDB;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Common;
 using Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
 using Schemata.Entity.Repository.Advisors;
 using Xunit;
@@ -24,7 +23,7 @@ public class QueryCacheUnitOfWorkShould : IAsyncLifetime
         var (repository, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
             repository.AdviceContext.Set(new UniquenessSuppressed());
-            await repository.AddAsync(new() { Uid = Identifiers.NewUid(), FullName = "Pending" });
+            await repository.AddAsync(new() { Uid = Guid.NewGuid(), FullName = "Pending" });
 
             Assert.NotNull(await repository.FirstOrDefaultAsync<Student>(null));
         }
@@ -41,7 +40,7 @@ public class QueryCacheUnitOfWorkShould : IAsyncLifetime
         var (repository, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
             repository.AdviceContext.Set(new UniquenessSuppressed());
-            await repository.AddAsync(new() { Uid = Identifiers.NewUid(), FullName = "Committed" });
+            await repository.AddAsync(new() { Uid = Guid.NewGuid(), FullName = "Committed" });
             await repository.CommitAsync();
         }
 

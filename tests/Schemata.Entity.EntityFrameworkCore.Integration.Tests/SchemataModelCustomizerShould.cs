@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Entities;
-using Schemata.Common;
 using Xunit;
 
 namespace Schemata.Entity.EntityFrameworkCore.Integration.Tests;
@@ -14,7 +13,7 @@ namespace Schemata.Entity.EntityFrameworkCore.Integration.Tests;
 [Trait("Category", "Integration")]
 public class SchemataModelCustomizerShould : IAsyncLifetime
 {
-    private readonly string           _dbPath = $"{Identifiers.NewUid():n}.db";
+    private readonly string           _dbPath = $"{Guid.NewGuid():n}.db";
     private          ServiceProvider? _root;
 
     #region IAsyncLifetime Members
@@ -57,7 +56,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
 
             var book = new Book {
-                Uid           = Identifiers.NewUid(),
+                Uid           = Guid.NewGuid(),
                 Name          = "dict-test",
                 CanonicalName = "books/dict-test",
                 Metadata = new() {
@@ -89,7 +88,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
 
             var book = new Book {
-                Uid           = Identifiers.NewUid(),
+                Uid           = Guid.NewGuid(),
                 Name          = "nullable-dict-test",
                 CanonicalName = "books/nullable-dict-test",
                 Annotations = new() {
@@ -121,7 +120,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
 
             var book = new Book {
-                Uid           = Identifiers.NewUid(),
+                Uid           = Guid.NewGuid(),
                 Name          = "list-test",
                 CanonicalName = "books/list-test",
                 Tags          = ["classic", "french", "novel"],
@@ -150,7 +149,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
 
             var book = new Book {
-                Uid           = Identifiers.NewUid(),
+                Uid           = Guid.NewGuid(),
                 Name          = "interface-list-test",
                 CanonicalName = "books/interface-list-test",
                 Aliases       = ["les-mis", "the-miserables"],
@@ -178,7 +177,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
 
             var book = new Book {
-                Uid           = Identifiers.NewUid(),
+                Uid           = Guid.NewGuid(),
                 Name          = "int-dict-test",
                 CanonicalName = "books/int-dict-test",
                 Counters = new() {
@@ -210,7 +209,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
 
             var book = new Book {
-                Uid           = Identifiers.NewUid(),
+                Uid           = Guid.NewGuid(),
                 Name          = "int-list-test",
                 CanonicalName = "books/int-list-test",
                 Ratings       = [1, 2, 3],
@@ -238,7 +237,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
 
             var book = new Book {
-                Uid           = Identifiers.NewUid(),
+                Uid           = Guid.NewGuid(),
                 Name          = "int-dict-mutation-test",
                 CanonicalName = "books/int-dict-mutation-test",
                 Counters = new() {
@@ -278,7 +277,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
 
             var book = new Book {
-                Uid           = Identifiers.NewUid(),
+                Uid           = Guid.NewGuid(),
                 Name          = "enum-test",
                 CanonicalName = "books/enum-test",
                 Genres        = [Book.Shelf.Fiction, Book.Shelf.Science],

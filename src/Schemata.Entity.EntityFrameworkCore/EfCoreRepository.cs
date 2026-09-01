@@ -7,7 +7,6 @@ using Microsoft.EntityFrameworkCore;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Advice;
-using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 
@@ -81,7 +80,7 @@ public class EfCoreRepository<TContext, TEntity> : RepositoryBase<TEntity>
         Context.Update(entity);
 
         if (IsConcurrencyControlled) {
-            Context.Entry(entity).Property(nameof(IConcurrency.Timestamp)).CurrentValue = Identifiers.NewUid();
+            Context.Entry(entity).Property(nameof(IConcurrency.Timestamp)).CurrentValue = Guid.NewGuid();
         }
     }
 

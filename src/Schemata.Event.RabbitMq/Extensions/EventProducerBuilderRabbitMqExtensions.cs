@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Event.Foundation.Builders;
 using Schemata.Event.RabbitMq;
-using Schemata.Event.RabbitMq.Internal;
+using Schemata.Event.RabbitMq.Runtime;
 using Schemata.Event.Skeleton;
 using Schemata.Transport.RabbitMq;
 

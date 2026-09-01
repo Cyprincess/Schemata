@@ -1,11 +1,10 @@
-using Schemata.Report.Foundation;
 using Schemata.Report.Scheduling.Features;
-using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Entities;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
 
-/// <summary><see cref="SchemataReportBuilder{TReport,TSnapshot,TChunk}"/> extensions for periodic scheduling.</summary>
+/// <summary><see cref="Schemata.Report.Foundation.SchemataReportBuilder{TReport,TSnapshot,TChunk}"/> extensions for periodic scheduling.</summary>
 public static class ReportSchedulingBuilderExtensions
 {
     /// <summary>Adds periodic report generation through the scheduler.</summary>
@@ -14,8 +13,8 @@ public static class ReportSchedulingBuilderExtensions
     /// <typeparam name="TChunk">Persisted report-snapshot chunk entity type.</typeparam>
     /// <param name="builder">The Report builder returned by <c>UseReport</c>.</param>
     /// <returns>The supplied <paramref name="builder"/>.</returns>
-    public static SchemataReportBuilder<TReport, TSnapshot, TChunk> UseScheduling<TReport, TSnapshot, TChunk>(
-        this SchemataReportBuilder<TReport, TSnapshot, TChunk> builder
+    public static Schemata.Report.Foundation.SchemataReportBuilder<TReport, TSnapshot, TChunk> UseScheduling<TReport, TSnapshot, TChunk>(
+        this Schemata.Report.Foundation.SchemataReportBuilder<TReport, TSnapshot, TChunk> builder
     )
         where TReport : SchemataReport, new()
         where TSnapshot : SchemataReportSnapshot, new()

@@ -2,11 +2,10 @@ using System.Threading.Tasks;
 using System.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Identity.Foundation;
-using Schemata.Identity.Foundation.Internal;
+using Schemata.Identity.Foundation.Runtime;
 using Xunit;
 
 namespace Schemata.Identity.Tests;

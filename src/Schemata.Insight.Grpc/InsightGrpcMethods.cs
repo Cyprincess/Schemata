@@ -1,5 +1,6 @@
 using Grpc.Core;
 using ProtoBuf.Meta;
+using Schemata.Insight.Grpc.Wire;
 using Schemata.Transport.Grpc;
 
 namespace Schemata.Insight.Grpc;

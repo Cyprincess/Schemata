@@ -1,6 +1,7 @@
 using System;
+using Schemata.Insight.Foundation.Planning;
 
-namespace Schemata.Insight.Foundation;
+namespace Schemata.Insight.Foundation.Execution;
 
 /// <summary>
 ///     Encodes the next-page skip offset as an opaque token. This phase uses plain offset paging;

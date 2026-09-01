@@ -9,8 +9,7 @@ using Schemata.Core;
 using Schemata.Push.Skeleton;
 using Schemata.Core.Features;
 using Schemata.Messaging.Skeleton;
-using Schemata.Push.Actor.Internal;
-using Schemata.Push.Foundation;
+using Schemata.Push.Actor.Handlers;
 using Schemata.Push.Foundation.Commands;
 using Schemata.Push.Foundation.Features;
 
@@ -19,7 +18,7 @@ namespace Schemata.Push.Actor.Features;
 /// <summary>
 ///     Installs the Push.Actor bridge: replaces the unkeyed default handler of both
 ///     subscription-scoped commands with <see cref="ActorSerializingHandler{TRequest,TResult}" />
-///     and registers the shared <see cref="Schemata.Actor.Foundation.Internal.RequestDispatchingActor" />
+///     and registers the shared <see cref="Schemata.Actor.Foundation.Runtime.RequestDispatchingActor" />
 ///     under the <c>"push"</c> route keyed by the subscription triple, so every entry point that
 ///     resolves the unkeyed handler — facade, dispatcher, transports — serializes concurrent writers
 ///     to the same subscription.
@@ -51,7 +50,7 @@ public sealed class SchemataPushActorFeature : FeatureBase
             IRequestHandler<RemovePushSubscriptionRequest, Unit>,
             ActorSerializingHandler<RemovePushSubscriptionRequest, Unit>>());
 
-        new SchemataActorBuilder(schemata, services).Register<Schemata.Actor.Foundation.Internal.RequestDispatchingActor>(
+        new SchemataActorBuilder(schemata, services).Register<Schemata.Actor.Foundation.Runtime.RequestDispatchingActor>(
             "push", PushConstants.Handlers.Default);
     }
 }

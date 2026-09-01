@@ -1,10 +1,21 @@
+using System;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Schemata.Abstractions.Advisors;
 using Schemata.Insight.Http.Integration.Tests.Fixtures;
+using Schemata.Insight.Skeleton.Advisors;
+using Schemata.Insight.Skeleton.Catalog;
+using Schemata.Insight.Skeleton.Models;
 using Xunit;
 
 namespace Schemata.Insight.Http.Integration.Tests;
@@ -15,6 +26,32 @@ public class InsightHttpIntegrationShould : IClassFixture<WebAppFactory>
     private readonly WebAppFactory _factory;
 
     public InsightHttpIntegrationShould(WebAppFactory factory) { _factory = factory; }
+
+    [Fact]
+    public async Task Query_ConfiguredScheme_Returns401WithoutCredentials() {
+        using var factory = _factory.WithAuthentication().WithServices(ConfigureAuthentication);
+        var client = factory.CreateClient(new() { AllowAutoRedirect = false });
+
+        var response = await Query(client, """{"sources":[{"alias":"s","name":"students"}]}""");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Query_ConfiguredScheme_PopulatesPrincipalForAuthenticatedRequest() {
+        ClaimsPrincipal? principal = null;
+        using var factory = _factory.WithAuthentication().WithServices(services => {
+            ConfigureAuthentication(services);
+            services.AddScoped<IInsightSourceAdvisor>(_ => new PrincipalProbeAdvisor(value => principal = value));
+        });
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new(TestAuthenticationHandler.TestScheme);
+
+        var response = await Query(client, """{"sources":[{"alias":"s","name":"students"}]}""");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("insight-test-user", principal?.Identity?.Name);
+    }
 
     [Fact]
     public async Task Query_AllStudents_Returns200WithRowsAndTotal() {
@@ -170,6 +207,45 @@ public class InsightHttpIntegrationShould : IClassFixture<WebAppFactory>
         Assert.Equal(2, body.GetProperty("rows").GetArrayLength());
         Assert.Contains(body.GetProperty("rows").EnumerateArray(),
                         r => r.GetProperty("full_name").GetString() == "Ada");
+    }
+
+    private static void ConfigureAuthentication(IServiceCollection services) {
+        services.AddAuthentication()
+                .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(TestAuthenticationHandler.TestScheme, _ => { });
+    }
+
+    private sealed class PrincipalProbeAdvisor(Action<ClaimsPrincipal?> probe) : IInsightSourceAdvisor
+    {
+        public int Order => 0;
+
+        public Task<AdviseResult> AdviseAsync(
+            AdviceContext       ctx,
+            SourceBinding       binding,
+            SourceConfig        config,
+            ClaimsPrincipal?    principal,
+            System.Threading.CancellationToken ct = default
+        ) {
+            probe(principal);
+            return Task.FromResult(AdviseResult.Continue);
+        }
+    }
+
+    private sealed class TestAuthenticationHandler(
+        IOptionsMonitor<AuthenticationSchemeOptions> options,
+        ILoggerFactory                               logger,
+        UrlEncoder                                    encoder
+    ) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
+    {
+        public const string TestScheme = "InsightTest";
+
+        protected override Task<AuthenticateResult> HandleAuthenticateAsync() {
+            if (Request.Headers.Authorization != TestScheme) {
+                return Task.FromResult(AuthenticateResult.NoResult());
+            }
+
+            var principal = new ClaimsPrincipal(new ClaimsIdentity([new(ClaimTypes.Name, "insight-test-user")], TestScheme));
+            return Task.FromResult(AuthenticateResult.Success(new(principal, TestScheme)));
+        }
     }
 
     private static Task<HttpResponseMessage> Query(HttpClient client, string json) {

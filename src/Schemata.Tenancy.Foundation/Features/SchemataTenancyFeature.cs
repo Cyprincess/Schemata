@@ -11,7 +11,7 @@ using Schemata.Actor.Skeleton;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Messaging.Skeleton;
-using Schemata.Messaging.Skeleton.Internal;
+using Schemata.Messaging.Skeleton.Runtime;
 using Schemata.Tenancy.Foundation.Commands;
 using Schemata.Tenancy.Foundation.Handlers;
 using Schemata.Tenancy.Foundation.Messaging;

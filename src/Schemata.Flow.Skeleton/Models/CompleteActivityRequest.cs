@@ -2,7 +2,6 @@ using System.Security.Claims;
 using System.Text.Json.Serialization;
 using Schemata.Abstractions.Entities;
 using Schemata.Messaging.Skeleton;
-using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Models;
 

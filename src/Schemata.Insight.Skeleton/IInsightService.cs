@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Insight.Skeleton.Models;
+using Schemata.Insight.Skeleton.Queries;
 
 namespace Schemata.Insight.Skeleton;
 

@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -6,7 +7,6 @@ using Moq;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Caching.Skeleton;
-using Schemata.Common;
 using Schemata.Entity.Cache.Advisors;
 using Schemata.Entity.Cache.Tests.Fixtures;
 using Schemata.Entity.Repository;
@@ -31,7 +31,7 @@ public class AdviceCommittedEvictCacheShould
     public async Task AdviseAsync_WhenEntitiesUpdated_RemovesAllKeysInCollection() {
         var cacheKey1 = "first-key";
         var cacheKey2 = "second-key";
-        var uid       = Identifiers.NewUid();
+        var uid       = Guid.NewGuid();
         var indexKey  = ReverseIndex.BuildKey(typeof(Student), new Student { Uid = uid });
         Assert.NotNull(indexKey);
 
@@ -55,7 +55,7 @@ public class AdviceCommittedEvictCacheShould
     [Fact]
     public async Task AdviseAsync_WhenEntitiesRemoved_RemovesAllKeysInCollection() {
         var cacheKey = "remove-key";
-        var uid      = Identifiers.NewUid();
+        var uid      = Guid.NewGuid();
         var indexKey = ReverseIndex.BuildKey(typeof(Student), new Student { Uid = uid });
         Assert.NotNull(indexKey);
 
@@ -81,7 +81,7 @@ public class AdviceCommittedEvictCacheShould
         var advisor = new AdviceCommittedEvictCache<Student>(mock.Object, DefaultOptions());
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repo    = Mock.Of<IRepository<Student>>();
-        var changes = new CommitChanges<Student> { Added = [new() { Uid = Identifiers.NewUid() }] };
+        var changes = new CommitChanges<Student> { Added = [new() { Uid = Guid.NewGuid() }] };
 
         var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
 
@@ -99,7 +99,7 @@ public class AdviceCommittedEvictCacheShould
         ctx.Set(new QueryCacheEvictionSuppressed());
         var repo = Mock.Of<IRepository<Student>>();
         var changes = new CommitChanges<Student> {
-            Updated = [new() { Uid = Identifiers.NewUid() }], Removed = [new() { Uid = Identifiers.NewUid() }],
+            Updated = [new() { Uid = Guid.NewGuid() }], Removed = [new() { Uid = Guid.NewGuid() }],
         };
 
         var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
@@ -118,7 +118,7 @@ public class AdviceCommittedEvictCacheShould
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repo    = Mock.Of<IRepository<Student>>();
         var changes = new CommitChanges<Student> {
-            Updated = [new() { Uid = Identifiers.NewUid() }], Removed = [new() { Uid = Identifiers.NewUid() }],
+            Updated = [new() { Uid = Guid.NewGuid() }], Removed = [new() { Uid = Guid.NewGuid() }],
         };
 
         var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
@@ -137,7 +137,7 @@ public class AdviceCommittedEvictCacheShould
         var advisor = new AdviceCommittedEvictCache<Student>(mock.Object, DefaultOptions());
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repo    = Mock.Of<IRepository<Student>>();
-        var changes = new CommitChanges<Student> { Updated = [new() { Uid = Identifiers.NewUid() }] };
+        var changes = new CommitChanges<Student> { Updated = [new() { Uid = Guid.NewGuid() }] };
 
         var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
 
@@ -146,12 +146,12 @@ public class AdviceCommittedEvictCacheShould
 
     [Fact]
     public async Task AdviseAsync_DoesNotEvictEntriesForDifferentEntityId() {
-        var otherUid   = Identifiers.NewUid();
+        var otherUid   = Guid.NewGuid();
         var other      = new Student { Uid = otherUid };
         var otherIndex = ReverseIndex.BuildKey(typeof(Student), other);
         Assert.NotNull(otherIndex);
 
-        var targetUid   = Identifiers.NewUid();
+        var targetUid   = Guid.NewGuid();
         var targetIndex = ReverseIndex.BuildKey(typeof(Student), new Student { Uid = targetUid });
         Assert.NotNull(targetIndex);
 

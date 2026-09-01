@@ -2,7 +2,7 @@ using System;
 using Schemata.Core;
 using Schemata.Report.Foundation;
 using Schemata.Report.Foundation.Features;
-using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Entities;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;

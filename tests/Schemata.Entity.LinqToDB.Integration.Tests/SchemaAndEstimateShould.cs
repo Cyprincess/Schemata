@@ -1,7 +1,7 @@
+using System;
 using System.Threading.Tasks;
 using LinqToDB.Data;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Common;
 using Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
 using Xunit;
 
@@ -42,7 +42,7 @@ public class SchemaAndEstimateShould : IAsyncLifetime
         var (repository, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
             for (var i = 0; i < 3; i++) {
-                await repository.AddAsync(new() { Uid = Identifiers.NewUid(), FullName = $"Student {i}" });
+                await repository.AddAsync(new() { Uid = Guid.NewGuid(), FullName = $"Student {i}" });
             }
 
             await repository.CommitAsync();

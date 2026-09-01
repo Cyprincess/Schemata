@@ -1,8 +1,6 @@
 # HTTP Transport
 
-The HTTP transport exposes resources as REST endpoints through MVC controllers synthesized per resource at
-startup. `MapHttp()` on `SchemataResourceBuilder` adds `SchemataHttpResourceFeature`, which builds a
-`ResourceController<TEntity, TRequest, TDetail, TSummary>` for each registered resource.
+The HTTP transport exposes resources as REST endpoints through MVC controllers synthesized per resource at startup. `MapHttp()` is the concrete Resource extension that activates `SchemataHttpResourceFeature`; that feature depends on the shared HTTP transport feature.
 
 ## Where the code lives
 
@@ -22,19 +20,9 @@ schema.UseResource()
       .Use<Student>();
 ```
 
-`MapHttp()` adds `SchemataHttpResourceFeature` (`DefaultPriority = SchemataResourceFeature.DefaultPriority +
-100_000`) and returns the same `SchemataResourceBuilder`, so registrations and transports chain without an
-intermediate builder. A plain `Use<...>()` exposes the resource on every active transport; to restrict it to
-HTTP, pass a selector — `Use<Student>(r => r.MapHttp())` — which tags the resource with
-`HttpResourceAttribute.Name` (`"HTTP"`) so the feature provider synthesizes a controller for it.
+`MapHttp()` activates `SchemataHttpResourceFeature` and returns the same `SchemataResourceBuilder`. A plain `Use<...>()` exposes a resource on every active transport; `Use<Student>(r => r.MapHttp())` restricts that resource to the HTTP endpoint.
 
-`SchemataHttpResourceFeature` declares `[DependsOn]` on `SchemataResourceFeature` and `SchemataTransportHttpFeature`.
-The transport feature (`DefaultPriority = Orders.Extension + 10_000_000`) installs the exception handler and the
-JSON wire-name traits. `ConfigureServices` registers `ResourceControllerFeatureProvider` and
-`ResourceMethodControllerFeatureProvider`, and adds `ResourceControllerConvention` and
-`ResourceMethodControllerConvention` to `MvcOptions.Conventions`. `ConfigureApplication` assigns the discovered
-resources and methods to the providers and calls `Commit()` so MVC rebuilds its action-descriptor cache before
-the first request.
+`SchemataHttpResourceFeature` depends on `SchemataResourceFeature` and `SchemataTransportHttpFeature`. The shared feature installs exception handling and JSON traits. The Resource feature supplies dynamic controller and custom-method controller discovery.
 
 ## Controller synthesis
 
@@ -128,10 +116,7 @@ skips synthesizing the generated one.
 ## Caveats
 
 - The HTTP transport is unary. For streaming, use gRPC.
-- `WithAuthorization(scheme)` adds an always-pass `AuthorizeFilter` so the authentication middleware runs for the
-  scheme; the actual authorization decision happens in the advisor pipeline. A resource that sets
-  `ResourceAttribute.AuthenticationScheme` overrides that default, which is how the Flow, Report and Scheduling
-  builders demand their own scheme without changing the global one.
+- `WithAuthentication("scheme")` configures the transport scheme for this builder and registers authentication wrap advisors. `WithAuthorization()` separately registers coarse and handler-stage authorization advisors. The Resource attribute's authentication scheme overrides the builder default for its endpoint.
 
 ## See also
 
@@ -139,3 +124,5 @@ skips synthesizing the generated one.
 - [gRPC Transport](grpc-transport.md)
 - [Custom Methods](custom-methods.md)
 - [Resource Naming](resource-naming.md)
+- [AIP Interactions](aip-interactions.md)
+- [AIP Business Logic](aip-business-logic.md)

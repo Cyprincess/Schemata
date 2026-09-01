@@ -1,3 +1,4 @@
+using Schemata.Report.Tests.Fixtures;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,6 +19,11 @@ using Schemata.Report.Skeleton;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;
+
+using Schemata.Report.Skeleton.Models;
+using Schemata.Report.Foundation.Jobs;
+using Schemata.Report.Skeleton.Entities;
+using Schemata.Report.Skeleton.Enums;
 
 namespace Schemata.Report.Tests;
 

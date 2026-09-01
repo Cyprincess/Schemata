@@ -1,131 +1,33 @@
 # Update Pipeline
 
-`ResourceOperationHandler.UpdateAsync` takes a name, a `TRequest`, and a `ClaimsPrincipal?`. It loads the
-existing entity, runs the update stages, applies the changes, persists, and returns an `UpdateResultBase<TDetail>`.
-Authorization is checked before the entity loads, per AIP-211. The stage order is fixed; advisor `Order` only
-sequences advisors within a stage.
+An Update request enters the dispatcher as `UpdateResourceRequest<TEntity,TRequest,TDetail>` and returns `UpdateResultBase<TDetail>`. The dispatcher runs envelope-wide stages before the handler loads the target entity.
 
-## Where the code lives
+## Wrap stages
 
-| Package                        | Key files                                                                                                                                                      |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Schemata.Resource.Foundation` | `ResourceOperationHandler.Update.cs`                                                                                                                             |
-| `Schemata.Common`              | `ResourceWireNameRules.cs`                                                                                                                                        |
-| `Schemata.Resource.Foundation` | `Advisors/AdviceUpdateRequestSanitize.cs`, `Advisors/AdviceUpdateRequestValidation.cs`                                                                         |
-| `Schemata.Resource.Foundation` | `Advisors/AdviceUpdateRequestIdempotency.cs`, `Advisors/AdviceApplyChildParent.cs`, `Advisors/AdviceUpdateSoftDeleted.cs`, `Advisors/AdviceUpdateFreshness.cs` |
-| `Schemata.Abstractions`        | `Resource/UpdateResultBase.cs`, `Resource/IUpdateMask.cs`                                                                                                      |
+`SecurityOrders` fixes this chain: authentication, coarse authorization, sanitize, validation, idempotency, response shaping. Before segments run in that order. The response detail is shaped before the idempotency wrap commits its cache record.
 
-## Stages
+The sanitize wrap clears the same server-managed fields as Create. The validation wrap runs `IValidationAdvisor<TRequest>` unless `UpdateRequestValidationSuppressed` is present. The idempotency wrap replays a completed response for a matching request ID and payload hash or reserves a pending record.
 
-### 1. Parent clearing and name binding
+## Handler stages
 
-`ResourceNameDescriptor.ClearParentProperties(request)` nulls every parent channel on the request — the
-parent-segment properties and `IChild.Parent` — so a client cannot re-parent the resource through the body. The
-URI is the only parent input on this path. The handler then sets `request.CanonicalName = name` so the AIP-155 idempotency key
-distinguishes updates to different resources that share a `RequestId`. `ResourceIdentifiers.Apply` adds the leaf
-and parent `Where` predicates to the `ResourceRequestContainer<TEntity>`.
+The handler binds the URI name to the request and applies its name predicates to a `ResourceRequestContainer<TEntity>`. Entitlement advisors add any row predicate to that container. The handler loads the entity under soft-delete suppression.
 
-### 2. Update request — `IResourceUpdateRequestAdvisor<TEntity, TRequest>`
+`IResourceUpdateAdvisor<TEntity,TRequest>` runs after the entity loads. The instance access advisor calls `IAccessProvider<TEntity,TRequest>` with that entity and the update request. `AdviceUpdateSoftDeleted` rejects an update of a tombstoned entity. `AdviceUpdateFreshness` compares a supplied ETag to the entity tag and throws `AbortedException` for a mismatch.
 
-| Advisor                          | What it does                                                                 |
-| -------------------------------- | ---------------------------------------------------------------------------- |
-| `AdviceUpdateRequestAnonymous`   | Grants anonymous access when configured                                      |
-| `AdviceUpdateRequestAuthorize`   | Authorizes the request through the access provider                           |
-| `AdviceUpdateRequestSanitize`    | Clears server-managed fields (the same `SystemFields` list as Create)        |
-| `AdviceUpdateRequestValidation`  | Runs validation; skipped when `UpdateRequestValidationSuppressed` is present |
-| `AdviceUpdateRequestIdempotency` | On a `RequestId` hit returns the cached result; on a miss reserves the key   |
+The mapper applies every field when the update mask is absent or `*`; otherwise it maps the selected wire paths. It persists and commits the entity, maps `TDetail`, and returns. The response wrap derives `IChild.Parent` from the detail canonical name and requests an ETag from `IEntityTagProvider` when applicable.
 
-### 3. Entity load
+## Security behavior
 
-The entity is loaded inside `_repository.SuppressQuerySoftDelete()`, so a
-tombstoned resource can be updated. A null result throws `ResourceNotFound(name)` — unless the request implements
-`Schemata.Abstractions.Resource.IAllowMissing` with `AllowMissing = true`, in which case the handler runs the
-create path (`CreateMissingAsync`): the request is mapped to a new entity, the create-request advisor chain
-runs, and the entity is added instead of updated. The update mask is ignored on this path, per AIP-134.
-`CreateMissingAsync` performs no container-scoped load, so request-advisor predicates apply only to the initial
-existing-entity lookup.
-
-### 4. Update entity — `IResourceUpdateAdvisor<TEntity, TRequest>`
-
-| Advisor                   | What it does                                                                                                             |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `AdviceApplyChildParent`  | No-op on update: the handler cleared both parent channels off the request, so the entity keeps its parent                 |
-| `AdviceUpdateSoftDeleted` | Rejects updates to a soft-deleted entity with `FailedPreconditionException`; runs before freshness                       |
-| `AdviceUpdateFreshness`   | Validates the request ETag against the entity's freshness tag per AIP-154; skipped when `FreshnessSuppressed` is present |
-
-`AdviceUpdateFreshness` fires when the request implements `IFreshness` and supplies a non-empty `EntityTag`: any
-value differing from the entity's current weak tag throws `AbortedException` with reason
-`CONCURRENCY_MISMATCH` (transports surface 409 / `ABORTED`). Only an absent or whitespace tag opts out.
-
-### 5. Mapping (field mask)
-
-```csharp
-var mask = (request as IUpdateMask)?.UpdateMask;
-if (mask is null || mask.Trim() == Wildcards.Any) {
-    _mapper.Map(request, entity);
-} else {
-    _mapper.Map(request, entity, ResolveMaskFields(mask));
-}
-```
-
-With no mask (or `update_mask=*`) the mapper merges the whole request. With a mask, `ResolveMaskFields` converts
-the wire paths to CLR leaf paths through `MaskTree.FromWire(typeof(TEntity), mask, false, ResourceWireNameRules.ResolveClrName)`
-and copies only those fields. An unknown segment throws `ValidationException` (`InvalidUpdateMask`).
-
-### 6. Persistence
-
-`_repository.UpdateAsync(entity, ct)` then `_repository.CommitAsync(ct)`.
-
-### 7. Response — `IResourceResponseAdvisor<TEntity, TDetail>`
-
-The updated entity is mapped to `TDetail` and the response chain runs (`AdviceResponseParent` derives
-`IChild.Parent`; `AdviceResponseFreshness` writes the new ETag). The response chain maps the full detail and
-does not project selected response fields.
-
-## Field masks (AIP-161)
-
-`UpdateMask` carries wire-format (snake_case) field paths, comma-separated as `google.protobuf.FieldMask`
-serializes them. AIP-161 defines the `.` traversal character for nested fields; the whole-resource `*` value
-comes from AIP-134, which requires update masks to accept it as full replacement.
-`ResourceWireNameRules.ResolveClrName` maps the AIP wire aliases (`name` to the canonical-name property, `etag`
-to the entity-tag property, and the plural collection field) before falling back to PascalCase. Only the listed
-fields are applied.
-
-```csharp
-public class StudentRequest : ICanonicalName, IUpdateMask {
-    public string? Name          { get; set; }
-    public string? CanonicalName { get; set; }
-    public string? FullName      { get; set; }
-    public ProfileRequest? Profile { get; set; }
-    public string? UpdateMask    { get; set; }
-}
-
-// PATCH /v1/students/alice
-// { "profile": { "display_name": "Alice Smith" }, "update_mask": "profile.display_name" }
-```
+Coarse authorization uses the Update verb and entity type before the load. Its probe returns `PERMISSION_DENIED` only when the principal matches the corresponding Get permission; otherwise it returns `NOT_FOUND`. Instance access remains a handler-stage check because it needs the loaded entity.
 
 ## Extension points
 
-- Implement `IResourceUpdateRequestAdvisor<TEntity, TRequest>` for pre-load logic.
-- Implement `IResourceUpdateAdvisor<TEntity, TRequest>` for entity-level logic after load (state transitions).
-- Implement `IResourceResponseAdvisor<TEntity, TDetail>` to post-process the detail.
-
-## Design rationale
-
-Authorization runs in the request stage, before the entity is loaded, so an unauthorized caller cannot probe
-existence by timing a not-found against an authorization failure.
-
-## Caveats
-
-- `UpdateMask` is excluded from `SystemFields`, so `AdviceUpdateRequestSanitize` leaves it on the request and it
-  reaches the mapping step.
-- `SuppressFreshness = true` on `SchemataResourceOptions` places `FreshnessSuppressed` on `AdviceContext`, which
-  bypasses both `AdviceUpdateFreshness` and the ETag written by `AdviceResponseFreshness`.
-- `AdviceUpdateRequestIdempotency` keys the cache under `nameof(Operations.Update)`, disjoint from Create and
-  custom-method verbs.
+- Implement `IRequestPipelineAdvisor<UpdateResourceRequest<TEntity,TRequest,TDetail>,UpdateResultBase<TDetail>>` for envelope-wide behavior.
+- Implement `IResourceUpdateAdvisor<TEntity,TRequest>` for mapped entity behavior.
+- Implement `IResourceUpdateRequestAdvisor<TEntity,TRequest>` for container-scoped request behavior.
 
 ## See also
 
-- [Resource Overview](overview.md)
-- [Create Pipeline](create-pipeline.md)
-- [Delete Pipeline](delete-pipeline.md)
+- [Resource overview](overview.md)
+- [Create pipeline](create-pipeline.md)
+- [Delete pipeline](delete-pipeline.md)

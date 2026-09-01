@@ -1,6 +1,6 @@
 using System;
 
-namespace Schemata.Insight.Skeleton;
+namespace Schemata.Insight.Skeleton.Drivers;
 
 /// <summary>
 ///     The relational operators a source driver can lower into its native query. The splitter pushes

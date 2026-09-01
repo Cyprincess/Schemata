@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Schemata.Common;
 using Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
 using Xunit;
 
@@ -92,7 +91,7 @@ public class AddRangeShould : IAsyncLifetime
         var batch = new List<Student>();
         for (var i = 0; i < count; i++) {
             batch.Add(new() {
-                          Uid      = Identifiers.NewUid(),
+                          Uid      = Guid.NewGuid(),
                           FullName = $"{prefix}-{i}",
                           Name     = $"{prefix}-{i}",
                           Age      = 20 + i,

@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using Schemata.Insight.Skeleton;
-using Schemata.Report.Skeleton;
+using Schemata.Insight.Skeleton.Models;
+using Schemata.Insight.Skeleton.Queries;
+using Schemata.Report.Skeleton.Enums;
+using Schemata.Report.Skeleton.Models;
 
-namespace Schemata.Report.Foundation;
+namespace Schemata.Report.Foundation.Dsl;
 
 /// <summary>Builds a program-backed report query and its periodic retention metadata.</summary>
 public sealed class ReportDefinitionBuilder

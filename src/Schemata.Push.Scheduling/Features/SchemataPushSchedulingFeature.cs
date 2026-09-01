@@ -8,7 +8,8 @@ using Schemata.Core.Features;
 using Schemata.Messaging.Skeleton;
 using Schemata.Push.Foundation.Commands;
 using Schemata.Push.Foundation.Features;
-using Schemata.Push.Scheduling.Internal;
+using Schemata.Push.Scheduling.Handlers;
+using Schemata.Push.Scheduling.Runtime;
 using Schemata.Push.Skeleton;
 using Schemata.Scheduling.Foundation.Features;
 

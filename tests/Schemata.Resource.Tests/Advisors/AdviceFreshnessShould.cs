@@ -6,7 +6,6 @@ using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Common;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Tests.Fixtures;
 using Xunit;
@@ -31,7 +30,7 @@ public class AdviceFreshnessShould
     public async Task UpdateFreshness_MismatchedETag_ThrowsAborted() {
         var advisor = new AdviceUpdateFreshness<Student, Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var entity  = new Student { Timestamp = Identifiers.NewUid() };
+        var entity  = new Student { Timestamp = Guid.NewGuid() };
         var request = new Student { EntityTag = "W/\"intentionally-wrong\"" };
 
         var ex = await Assert.ThrowsAsync<AbortedException>(
@@ -43,7 +42,7 @@ public class AdviceFreshnessShould
     public async Task UpdateFreshness_MatchingETag_Continues() {
         var advisor   = new AdviceUpdateFreshness<Student, Student>();
         var ctx       = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var timestamp = Identifiers.NewUid();
+        var timestamp = Guid.NewGuid();
         var etag = $"W/\"{
             Convert.ToBase64String(timestamp.ToByteArray()).TrimEnd('=').Replace('+', '-').Replace('/', '_')
         }\"";
@@ -60,7 +59,7 @@ public class AdviceFreshnessShould
         var advisor = new AdviceUpdateFreshness<Student, Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         ctx.Set(new FreshnessSuppressed());
-        var entity  = new Student { Timestamp = Identifiers.NewUid() };
+        var entity  = new Student { Timestamp = Guid.NewGuid() };
         var request = new Student { EntityTag = "W/\"wrong\"" };
 
         var result = await advisor.AdviseAsync(ctx, request, entity, null);
@@ -72,7 +71,7 @@ public class AdviceFreshnessShould
     public async Task UpdateFreshness_StrongFormatETag_ThrowsAborted() {
         var advisor = new AdviceUpdateFreshness<Student, Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var entity  = new Student { Timestamp = Identifiers.NewUid() };
+        var entity  = new Student { Timestamp = Guid.NewGuid() };
         var request = new Student { EntityTag = "\"strong-tag\"" };
 
         var ex = await Assert.ThrowsAsync<AbortedException>(
@@ -84,7 +83,7 @@ public class AdviceFreshnessShould
     public async Task UpdateFreshness_AbsentETag_Continues() {
         var advisor = new AdviceUpdateFreshness<Student, Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var entity  = new Student { Timestamp = Identifiers.NewUid() };
+        var entity  = new Student { Timestamp = Guid.NewGuid() };
         var request = new Student { EntityTag = null };
 
         var result = await advisor.AdviseAsync(ctx, request, entity, null);
@@ -96,7 +95,7 @@ public class AdviceFreshnessShould
     public async Task DeleteFreshness_StrongFormatETag_ThrowsAborted() {
         var advisor = new AdviceDeleteFreshness<Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var entity  = new Student { Timestamp = Identifiers.NewUid() };
+        var entity  = new Student { Timestamp = Guid.NewGuid() };
 
         var ex = await Assert.ThrowsAsync<AbortedException>(
             () => advisor.AdviseAsync(ctx, new() { Etag = "\"strong-tag\"" }, entity, null));
@@ -113,7 +112,7 @@ public class AdviceFreshnessShould
     public async Task DeleteFreshness_AbsentETag_Continues() {
         var advisor = new AdviceDeleteFreshness<Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var entity  = new Student { Timestamp = Identifiers.NewUid() };
+        var entity  = new Student { Timestamp = Guid.NewGuid() };
 
         var result = await advisor.AdviseAsync(ctx, new() { Etag = null }, entity, null);
 
@@ -124,7 +123,7 @@ public class AdviceFreshnessShould
     public async Task MethodFreshness_StrongFormatETag_ThrowsConcurrencyException() {
         var advisor = new AdviceMethodFreshness<Student, Student, Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var entity  = new Student { Timestamp = Identifiers.NewUid() };
+        var entity  = new Student { Timestamp = Guid.NewGuid() };
         var request = new Student { EntityTag = "\"strong-tag\"" };
 
         await Assert.ThrowsAsync<AbortedException>(() => advisor.AdviseAsync(ctx, request, entity, null));

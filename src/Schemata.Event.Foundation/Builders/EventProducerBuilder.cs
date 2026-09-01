@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Event.Foundation.Internal;
+using Schemata.Event.Foundation.Runtime;
 using Schemata.Event.Skeleton;
 
 namespace Schemata.Event.Foundation.Builders;

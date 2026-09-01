@@ -1,3 +1,4 @@
+using Schemata.Tenancy.Tests.Fixtures;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -9,7 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
-using Schemata.Advice;
 using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
@@ -18,7 +18,6 @@ using Schemata.Tenancy.Foundation.Commands;
 using Schemata.Tenancy.Foundation.Handlers;
 using Schemata.Tenancy.Foundation.Queries;
 using Schemata.Tenancy.Foundation.Services;
-using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
 using Xunit;
 
@@ -28,7 +27,7 @@ public class TenancyEntryEquivalenceShould
 {
     [Fact]
     public async Task Facade_Dispatches_All_Nine_Verbs_With_Equivalent_Payloads() {
-        var tenant = new SchemataTenant { Uid = Identifiers.NewUid(), Name = "acme" };
+        var tenant = new SchemataTenant { Uid = Guid.NewGuid(), Name = "acme" };
         var names  = new Dictionary<string, string?> { ["en"] = "Acme" };
         ImmutableArray<string> hosts = ["one.test", "two.test"];
         var requests     = new List<object>();
@@ -114,7 +113,7 @@ public class TenancyEntryEquivalenceShould
 
     [Fact]
     public void All_Nine_Contracts_Round_Trip_Through_Default_Json() {
-        var tenant = new SchemataTenant { Uid = Identifiers.NewUid(), Name = "acme" };
+        var tenant = new SchemataTenant { Uid = Guid.NewGuid(), Name = "acme" };
 
         Assert.Equal("acme", RoundTrip(new CreateTenantRequest<SchemataTenant>(tenant)).Tenant.Name);
         Assert.Equal("acme", RoundTrip(new UpdateTenantRequest<SchemataTenant>(tenant)).Tenant.Name);
@@ -132,7 +131,7 @@ public class TenancyEntryEquivalenceShould
 
     [Fact]
     public async Task Facade_And_Bare_Dispatcher_Run_Equivalent_Advisor_Chains() {
-        var tenant  = new SchemataTenant { Uid = Identifiers.NewUid(), Name = "acme" };
+        var tenant  = new SchemataTenant { Uid = Guid.NewGuid(), Name = "acme" };
         var tenants = new Mock<IRepository<SchemataTenant>>();
         tenants.Setup(value => value.AddAsync(tenant, It.IsAny<CancellationToken>()))
                .Returns(Task.CompletedTask);

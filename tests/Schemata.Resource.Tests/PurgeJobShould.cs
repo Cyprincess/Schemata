@@ -11,6 +11,7 @@ using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Resource.Foundation;
+using Schemata.Resource.Foundation.Commands;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;

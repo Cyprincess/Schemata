@@ -63,7 +63,7 @@ public class DeviceAuthorizeHandlerShould
 
     [Fact]
     public async Task DeviceAuthorizeAsync_WithOpenIdScope_ReturnsResponseWithDeviceCodeUserCodeVerificationUriLifetimeAndInterval() {
-        var app = new SchemataApplication { Uid = Identifiers.NewUid(), ClientId = "test-client" };
+        var app = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test-client" };
         var (handler, _, sp) = CreateHandler(app);
         using var ambient = AdviceContext.Establish(new AdviceContext(sp));
 
@@ -82,7 +82,7 @@ public class DeviceAuthorizeHandlerShould
 
     [Fact]
     public async Task DeviceUserCode_FollowsCrockfordAlphabetWithHyphenAtIndexFour() {
-        var app = new SchemataApplication { Uid = Identifiers.NewUid(), ClientId = "test-client" };
+        var app = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test-client" };
         var (handler, _, sp) = CreateHandler(app);
         using var ambient = AdviceContext.Establish(new AdviceContext(sp));
 
@@ -102,7 +102,7 @@ public class DeviceAuthorizeHandlerShould
 
     [Fact]
     public async Task Creates_DeviceCodeAndUserCodeTokens() {
-        var app = new SchemataApplication { Uid = Identifiers.NewUid(), ClientId = "test-client" };
+        var app = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test-client" };
         var (handler, tokens, sp) = CreateHandler(app);
         using var ambient = AdviceContext.Establish(new AdviceContext(sp));
 

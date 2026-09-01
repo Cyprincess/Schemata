@@ -12,7 +12,7 @@ using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Commands;
 using Schemata.Resource.Foundation.Advisors;
-using Schemata.Resource.Foundation.Internal;
+using Schemata.Resource.Foundation.Runtime;
 
 namespace Schemata.Resource.Foundation;
 
@@ -81,9 +81,7 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
     /// </summary>
     /// <param name="verb">
     ///     The verb in lowerCamelCase as declared by
-    ///     <see cref="Schemata.Abstractions.Resource.ResourceMethodAttribute" />. Stashed in the
-    ///     <see cref="Schemata.Abstractions.Advisors.AdviceContext" /> as
-    ///     <see cref="ResourceMethodVerb" /> so the legacy method request advisors can key on it.
+    ///     <see cref="Schemata.Abstractions.Resource.ResourceMethodAttribute" />.
     /// </param>
     /// <param name="name">
     ///     The canonical name of the target resource for instance-scoped methods, or
@@ -131,6 +129,7 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
             if (entity is null) {
                 throw ResourceNotFound(name);
             }
+
 
             var methodResult = await ResourcePipelineRunner<string>.RunAsync<TResponse>(
                 ctx,

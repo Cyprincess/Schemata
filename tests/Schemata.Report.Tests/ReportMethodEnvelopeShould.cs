@@ -1,3 +1,4 @@
+using Schemata.Report.Tests.Fixtures;
 using System;
 using System.Collections.Generic;
 using System.Security.Claims;
@@ -14,7 +15,13 @@ using Schemata.Report.Foundation;
 using Schemata.Report.Foundation.Commands;
 using Schemata.Report.Skeleton;
 using Schemata.Scheduling.Skeleton;
+using Schemata.Abstractions.Exceptions;
+using Schemata.Security.Foundation;
+using Schemata.Security.Skeleton;
 using Xunit;
+
+using Schemata.Report.Skeleton.Models;
+using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Tests;
 
@@ -104,6 +111,50 @@ public class ReportMethodEnvelopeShould
         Assert.Equal(ReportOperations.Generate, observed.Verb);
         Assert.Equal(typeof(SchemataReport), observed.Entity);
         Assert.Same(principal, forwarded);
+    }
+
+    [Fact]
+    public async Task Authorization_Only_Denies_And_Matching_Permission_Allows_Run() {
+        using var denied = ReportTestHost.Create(ReportTestHost.CreateDriver(ReportTestRows.Create(1)), configure: services => {
+            services.Configure<SchemataSecurityOptions>(_ => { });
+            services.AddScoped<IPermissionResolver, DefaultPermissionResolver>();
+            services.AddScoped<IPermissionMatcher, DefaultPermissionMatcher>();
+            services.AddReportAuthorization<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>();
+        });
+        var deniedRequest = new ResourceMethodRequest<SchemataReport, RunReportRequest, ReportResult>(
+            ReportOperations.Run, null, new(ReportTestHost.InlineRequest(), new(new ClaimsIdentity("test"))), new(new ClaimsIdentity("test")));
+
+        await Assert.ThrowsAsync<PermissionDeniedException>(() => denied.GetRequiredService<IRequestDispatcher>()
+            .SendAsync<ResourceMethodRequest<SchemataReport, RunReportRequest, ReportResult>, ReportResult>(deniedRequest));
+
+        var principal = new ClaimsPrincipal(new ClaimsIdentity([new Claim("role", "schemata-report.run")], "test"));
+        using var allowed = ReportTestHost.Create(ReportTestHost.CreateDriver(ReportTestRows.Create(1)), configure: services => {
+            services.Configure<SchemataSecurityOptions>(_ => { });
+            services.AddScoped<IPermissionResolver, DefaultPermissionResolver>();
+            services.AddScoped<IPermissionMatcher, DefaultPermissionMatcher>();
+            services.AddReportAuthorization<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>();
+        });
+
+        var result = await allowed.GetRequiredService<IRequestDispatcher>()
+            .SendAsync<ResourceMethodRequest<SchemataReport, RunReportRequest, ReportResult>, ReportResult>(
+                new(ReportOperations.Run, null, new(ReportTestHost.InlineRequest(), principal), principal));
+
+        Assert.Single(result.Response.Rows);
+    }
+
+    [Fact]
+    public async Task Combined_Security_Rejects_Unauthenticated_Run() {
+        using var provider = ReportTestHost.Create(ReportTestHost.CreateDriver(ReportTestRows.Create(1)), configure: services => {
+            services.Configure<SchemataSecurityOptions>(_ => { });
+            services.AddScoped<IPermissionResolver, DefaultPermissionResolver>();
+            services.AddScoped<IPermissionMatcher, DefaultPermissionMatcher>();
+            services.AddReportAuthentication<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>();
+            services.AddReportAuthorization<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>();
+        });
+
+        await Assert.ThrowsAsync<UnauthenticatedException>(() => provider.GetRequiredService<IRequestDispatcher>()
+            .SendAsync<ResourceMethodRequest<SchemataReport, RunReportRequest, ReportResult>, ReportResult>(
+                new(ReportOperations.Run, null, new(ReportTestHost.InlineRequest(), null), null)));
     }
 
     private sealed class RecordingRunEnvelopeAdvisor : IRequestPipelineAdvisor<ResourceMethodRequest<SchemataReport, RunReportRequest, ReportResult>, ReportResult>

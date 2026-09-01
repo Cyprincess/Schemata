@@ -1,11 +1,15 @@
+using Schemata.Report.Tests.Fixtures;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Report.Foundation;
 using Schemata.Report.Skeleton;
 using Xunit;
+
+using Schemata.Report.Skeleton.Models;
+using Schemata.Report.Foundation.Snapshots;
+using Schemata.Report.Skeleton.Entities;
+using Schemata.Report.Skeleton.Enums;
 
 namespace Schemata.Report.Tests;
 

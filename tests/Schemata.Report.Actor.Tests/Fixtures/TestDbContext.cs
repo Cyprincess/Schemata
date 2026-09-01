@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Entities;
 using Schemata.Scheduling.Skeleton.Entities;
 
 namespace Schemata.Report.Actor.Tests.Fixtures;

@@ -7,7 +7,6 @@ using LinqToDB.Mapping;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Common;
 using Schemata.Entity.LinqToDB;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
@@ -17,7 +16,7 @@ namespace Schemata.Flow.Integration.Tests.Fixtures;
 
 public sealed class LinqToDbFlowFixture : IAsyncLifetime, IFlowIntegrationFixture
 {
-    private readonly string _dbPath = $"{Identifiers.NewUid():n}.db";
+    private readonly string _dbPath = $"{Guid.NewGuid():n}.db";
 
     private ServiceProvider? _root;
 

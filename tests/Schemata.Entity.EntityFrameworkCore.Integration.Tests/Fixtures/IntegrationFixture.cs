@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Common;
 using Schemata.Entity.Repository;
 using Xunit;
 
@@ -12,7 +11,7 @@ namespace Schemata.Entity.EntityFrameworkCore.Integration.Tests.Fixtures;
 
 public class IntegrationFixture : IAsyncLifetime
 {
-    private readonly string _dbPath = $"{Identifiers.NewUid():n}.db";
+    private readonly string _dbPath = $"{Guid.NewGuid():n}.db";
 
     private ServiceProvider? _root;
 

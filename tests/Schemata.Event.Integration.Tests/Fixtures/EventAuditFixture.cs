@@ -1,4 +1,3 @@
-using System;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +12,7 @@ using Schemata.Core;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
-using Schemata.Event.Foundation.Internal;
+using Schemata.Event.Foundation.Runtime;
 using Schemata.Event.Skeleton;
 using Schemata.Event.Skeleton.Entities;
 using Xunit;

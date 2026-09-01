@@ -1,7 +1,6 @@
 using Schemata.Abstractions;
 using Schemata.Messaging.Skeleton;
 
-using Schemata.Push.Foundation;
 namespace Schemata.Push.Foundation.Commands;
 
 /// <summary>Requests removal of an existing push subscription.</summary>
@@ -14,6 +13,5 @@ public sealed record RemovePushSubscriptionRequest(
     string ProviderKey
 ) : ICommand<Unit>, ISubscriptionScoped
 {
-    /// <inheritdoc />
     public string SubscriptionKey => $"{Owner}|{Provider}|{ProviderKey}";
 }

@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Identity.Foundation.Controllers;
-using Schemata.Identity.Foundation.Internal;
+using Schemata.Identity.Foundation.Runtime;
 using Schemata.Identity.Skeleton.Entities;
 using Xunit;
 

@@ -6,9 +6,7 @@ using System.Xml;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Common;
 using Schemata.Entity.Repository;
-using Schemata.Entity.Repository.Advisors;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Integration.Tests.Fixtures;
 using Schemata.Flow.Skeleton.Entities;
@@ -103,7 +101,7 @@ public sealed class SourceOwnerSuppressionShould : IClassFixture<OwnedSourceFixt
 
     private async Task<OwnedOrder> CreateOrderAsync(string owner, bool deleted = false) {
         AmbientOwner.Current.Value = owner;
-        var leaf = Identifiers.NewUid().ToString("n");
+        var leaf = Guid.NewGuid().ToString("n");
         var order = new OwnedOrder {
             Name          = leaf,
             CanonicalName = $"ownedOrders/{leaf}",

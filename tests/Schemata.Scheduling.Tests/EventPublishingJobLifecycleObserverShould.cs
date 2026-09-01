@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Core;
 using Schemata.Event.Skeleton;
-using Schemata.Scheduling.Foundation.Internal;
+using Schemata.Scheduling.Foundation.Runtime;
 using Schemata.Scheduling.Event.Events;
 using Schemata.Scheduling.Event.Features;
 using Schemata.Scheduling.Skeleton;

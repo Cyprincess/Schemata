@@ -2,9 +2,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using ProtoBuf;
 using ProtoBuf.Meta;
-using Schemata.Insight.Skeleton;
 using Schemata.Transport.Grpc.Proto;
 using Xunit;
+using Schemata.Insight.Skeleton.Models;
+using Schemata.Insight.Skeleton.Queries;
 
 namespace Schemata.Report.Tests;
 

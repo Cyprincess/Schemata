@@ -1,4 +1,4 @@
-namespace Schemata.Report.Skeleton;
+namespace Schemata.Report.Skeleton.Enums;
 
 /// <summary>Describes the recurrence form of a periodic report.</summary>
 public enum ReportScheduleKind

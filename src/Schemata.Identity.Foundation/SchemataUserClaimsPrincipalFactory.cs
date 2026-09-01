@@ -32,7 +32,6 @@ public class SchemataUserClaimsPrincipalFactory<TUser, TRole> : UserClaimsPrinci
         IOptions<IdentityOptions> optionsAccessor
     ) : base(userManager, roleManager, optionsAccessor) { }
 
-    /// <inheritdoc />
     protected override async Task<ClaimsIdentity> GenerateClaimsAsync(TUser user) {
         var identity = await base.GenerateClaimsAsync(user);
 

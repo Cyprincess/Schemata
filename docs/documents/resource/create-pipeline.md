@@ -1,97 +1,40 @@
 # Create Pipeline
 
-`ResourceOperationHandler.CreateAsync` takes a `TRequest` and a `ClaimsPrincipal?`, runs the create stages,
-persists the new entity, and returns a `CreateResultBase<TDetail>`. The stage order is fixed; advisor `Order`
-only sequences advisors within a stage.
+A Create request enters the dispatcher as `CreateResourceRequest<TEntity,TRequest,TDetail>` and returns `CreateResultBase<TDetail>`. The dispatcher wraps the Resource handler, so envelope-wide policy runs before handler-stage entity work.
 
-## Where the code lives
+## Wrap stages
 
-| Package                        | Key files                                                                                                          |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| `Schemata.Resource.Foundation` | `ResourceOperationHandler.Create.cs`                                                                               |
-| `Schemata.Resource.Foundation` | `Advisors/AdviceCreateRequestSanitize.cs`, `Advisors/AdviceCreateRequestValidation.cs`                             |
-| `Schemata.Resource.Foundation` | `Advisors/AdviceCreateRequestIdempotency.cs`, `Advisors/AdviceApplyChildParent.cs`                                 |
-| `Schemata.Resource.Foundation` | `Advisors/AdviceResponseFreshness.cs`, `Advisors/AdviceResponseIdempotency.cs`, `Advisors/AdviceResponseParent.cs` |
-| `Schemata.Abstractions`        | `Resource/CreateResultBase.cs`                                                                                     |
+The ordered wrap chain performs these steps:
 
-## Stages
+1. Authentication checks a non-anonymous caller when `WithAuthentication()` registered the closed advisor.
+2. Coarse authorization checks the Create permission when `WithAuthorization()` registered it.
+3. The sanitize wrap clears server-managed fields from `TRequest`.
+4. The validation wrap runs `IValidationAdvisor<TRequest>` unless `CreateRequestValidationSuppressed` is present.
+5. The idempotency wrap replays a finalized AIP-155 result or reserves its key.
+6. The handler maps, persists, and returns its result.
+7. The detail-response wrap derives a child parent and obtains an ETag.
+8. The idempotency wrap commits the shaped detail.
 
-### 1. Create request — `IResourceCreateRequestAdvisor<TEntity, TRequest>`
+The sanitizer clears `Name`, `CanonicalName`, `Timestamp`, `EntityTag`, `Uid`, `Owner`, `State`, `CreateTime`, `UpdateTime`, `DeleteTime`, and `PurgeTime` when the request exposes those properties. The request reference reaches the handler after sanitization.
 
-Receives the `TRequest`, a `ResourceRequestContainer<TEntity>`, and the principal. Built-in advisors run in
-`Order` sequence:
+## Handler stages
 
-| Advisor                          | What it does                                                                        |
-| -------------------------------- | ----------------------------------------------------------------------------------- |
-| `AdviceCreateRequestAnonymous`   | Grants anonymous access when the resource is configured for it                      |
-| `AdviceCreateRequestAuthorize`   | Authorizes the request through the access provider                                  |
-| `AdviceCreateRequestSanitize`    | Clears server-managed fields on the request                                         |
-| `AdviceCreateRequestValidation`  | Runs validation; skipped when `CreateRequestValidationSuppressed` is present        |
-| `AdviceCreateRequestIdempotency` | On an AIP-155 `RequestId` hit returns the cached result; on a miss reserves the key |
+The handler maps `TRequest` to `TEntity`; a null mapping throws `ValidationException` with `INVALID_PAYLOAD`. `IResourceCreateAdvisor<TEntity,TRequest>` runs after mapping. `AdviceApplyChildParent` derives a mode-A parent field from the request parent when applicable. The repository adds and commits the entity, then the handler maps it to `TDetail`.
 
-`AdviceCreateRequestSanitize.SystemFields` is the property-name list cleared from the request:
-`Name`, `CanonicalName`, `Timestamp` (`IConcurrency`), `EntityTag` (`IFreshness`), `Uid`, `Owner`, `State`,
-`CreateTime`, `UpdateTime`, `DeleteTime`, `PurgeTime`. Names absent from `TRequest` are skipped.
+Instance access receives the mapped entity and the Create request so an overridden access provider can evaluate both. Create has no row query to which entitlement can apply.
+## Idempotency
 
-### 2. Mapping
-
-`_mapper.Map<TRequest, TEntity>(request)` converts the sanitized request to an entity. A `null` result throws
-`ValidationException` with `Reason = INVALID_PAYLOAD`.
-
-### 3. Create entity — `IResourceCreateAdvisor<TEntity, TRequest>`
-
-Receives the original request and the freshly mapped entity. This is the socket for entity-level logic that must
-run before persistence. `AdviceApplyChildParent` reverse-parses `request.Parent` into the entity's mode-A parent
-field for `IChild` DTOs. The transport has already overwritten `Parent` from the route when the URI carries every
-parent segment, so the body's parent applies only where the route supplies none. Other trait behavior such as
-timestamp, canonical name, and uniqueness is applied by repository add advisors during `AddAsync`.
-
-### 4. Persistence
-
-`_repository.AddAsync(entity, ct)` then `_repository.CommitAsync(ct)`. When the handler runs non-finalizing
-(inside a batched operation), it maps the staged entity to `TDetail` and returns without committing or running
-response advisors.
-
-### 5. Response mapping and advisors
-
-`_mapper.Map<TEntity, TDetail>(entity)` maps the persisted entity (with server-assigned fields populated), then
-`IResourceResponseAdvisor<TEntity, TDetail>` runs:
-
-| Advisor                     | What it does                                                                                              |
-| --------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `AdviceResponseParent`      | Derives `IChild.Parent` from the entity's canonical name; runs before freshness                           |
-| `AdviceResponseFreshness`   | Sets the ETag on `TDetail` when it implements `IFreshness`; skipped when `FreshnessSuppressed` is present |
-| `AdviceResponseIdempotency` | Caches the result under the reserved `RequestId` key                                                      |
-
-Schemata returns the full detail and provides no AIP-157 partial-response selection stage or response-stage trimming.
+The idempotency wrap derives its key from `IRequestIdentification.RequestId`, `Create`, entity type, principal, target, and payload hash. A finalized matching record returns `CreateResultBase<TDetail>` without invoking the handler. A pending record waits for completion or throws `AbortedException`. Reservation data is local to the wrap invocation; the ambient context carries only pipeline markers such as suppression.
 
 ## Extension points
 
-- Implement `IResourceCreateRequestAdvisor<TEntity, TRequest>` for pre-persistence logic (quota checks,
-  enrichment).
-- Implement `IResourceCreateAdvisor<TEntity, TRequest>` for entity-level logic after mapping (computed fields).
-- Implement `IResourceResponseAdvisor<TEntity, TDetail>` to post-process the detail.
-- Register advisors as scoped via `services.TryAddEnumerable(ServiceDescriptor.Scoped(...))`.
-
-## Design rationale
-
-Sanitization runs before validation so validators never see server-managed fields a client should not supply.
-Idempotency runs last in the request chain so authorization, sanitization, and validation are evaluated on a
-request's first arrival; a cached result is returned only after that request would itself have been valid.
-
-## Caveats
-
-- `AdviceCreateRequestIdempotency` keys the cache on `IRequestIdentification.RequestId` under
-  `nameof(Operations.Create)`. Update and each custom-method verb write under their own operation token, so one
-  `RequestId` can legitimately appear in several cache entries.
-- `CreateRequestValidationSuppressed` is placed on `AdviceContext` by `ResourceAdviceContext.Create` when
-  `SchemataResourceOptions.SuppressCreateValidation` is set; it affects only the current request scope.
-- Create request advisors receive a `ResourceRequestContainer<TEntity>`, but Create performs no
-  container-scoped entity load — the path maps and persists a new entity — so container predicates
-  have no effect on this path.
+- Implement `IRequestPipelineAdvisor<CreateResourceRequest<TEntity,TRequest,TDetail>,CreateResultBase<TDetail>>` for envelope-wide behavior.
+- Implement `IResourceCreateAdvisor<TEntity,TRequest>` for policy requiring the mapped entity.
+- Implement `IValidationAdvisor<TRequest>` for validation collection.
+- Register advisors with `TryAddEnumerable`.
 
 ## See also
 
-- [Resource Overview](overview.md)
-- [Update Pipeline](update-pipeline.md)
-- [Delete Pipeline](delete-pipeline.md)
+- [Resource overview](overview.md)
+- [Update pipeline](update-pipeline.md)
+- [Security](../security.md)

@@ -1,4 +1,4 @@
-namespace Schemata.Report.Skeleton;
+namespace Schemata.Report.Skeleton.Enums;
 
 /// <summary>Describes how a report definition is supplied.</summary>
 public enum ReportSourceKind

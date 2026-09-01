@@ -1,6 +1,6 @@
 using Schemata.Report.Foundation;
 using Schemata.Report.Grpc.Features;
-using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Entities;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;

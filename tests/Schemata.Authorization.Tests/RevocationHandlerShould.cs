@@ -43,7 +43,7 @@ public class RevocationHandlerShould
         var tokenService = new TokenService(opts);
 
         var app = new SchemataApplication {
-            Uid           = Identifiers.NewUid(),
+            Uid           = Guid.NewGuid(),
             ClientId      = "test-app",
             Name          = "test-app",
             CanonicalName = "applications/test-app",
@@ -75,7 +75,7 @@ public class RevocationHandlerShould
         string  type    = TokenTypes.AccessToken
     ) {
         return new() {
-            Uid         = Identifiers.NewUid(),
+            Uid         = Guid.NewGuid(),
             Type        = type,
             Application = appName,
             ReferenceId = referenceId,
@@ -131,7 +131,7 @@ public class RevocationHandlerShould
         using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
 
         var claims = new List<Claim> {
-            new(Claims.JwtId, Identifiers.NewUid().ToString()),
+            new(Claims.JwtId, Guid.NewGuid().ToString()),
             new(IdentityClaims.Subject, "user-42"),
             new(Claims.Audience, "api"),
         };
@@ -170,7 +170,7 @@ public class RevocationHandlerShould
         using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
 
         var claims = new List<Claim> {
-            new(Claims.JwtId, Identifiers.NewUid().ToString()),
+            new(Claims.JwtId, Guid.NewGuid().ToString()),
             new(IdentityClaims.Subject, "user-42"),
             new(Claims.Audience, "api"),
         };

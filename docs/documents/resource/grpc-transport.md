@@ -1,9 +1,6 @@
 # gRPC Transport
 
-The gRPC transport exposes resources as code-first gRPC services using protobuf-net (ProtoBuf.Grpc). `MapGrpc()`
-on `SchemataResourceBuilder` adds `SchemataGrpcResourceFeature`, which synthesizes a
-`ResourceService<TEntity, TRequest, TDetail, TSummary>` for each registered resource and maps it as a gRPC
-endpoint.
+The gRPC transport exposes resources as code-first gRPC services using protobuf-net. `MapGrpc()` is the concrete Resource extension that activates `SchemataGrpcResourceFeature`; its dependencies provide the shared gRPC runtime and map each registered `ResourceService<TEntity,TRequest,TDetail,TSummary>`.
 
 ## Where the code lives
 
@@ -22,19 +19,9 @@ schema.UseResource()
       .Use<Student>();
 ```
 
-`MapGrpc()` adds `SchemataGrpcResourceFeature` (`DefaultPriority = SchemataResourceFeature.DefaultPriority +
-200_000`) and returns the same `SchemataResourceBuilder`, so registrations and transports chain without an
-intermediate builder. A plain `Use<...>()` exposes the resource on every active transport; to restrict it to
-gRPC, pass a selector — `Use<Student>(r => r.MapGrpc())` — which tags the resource with
-`GrpcResourceAttribute.Name` (`"gRPC"`).
+`MapGrpc()` activates `SchemataGrpcResourceFeature` and returns the same `SchemataResourceBuilder`. A plain `Use<...>()` exposes a resource on every active transport; `Use<Student>(r => r.MapGrpc())` restricts that resource to the gRPC endpoint.
 
-`SchemataGrpcResourceFeature` declares `[DependsOn]` on `SchemataResourceFeature` and `SchemataTransportGrpcFeature`.
-The transport feature (`DefaultPriority = Orders.Extension + 20_000_000`) calls `AddCodeFirstGrpc`, registers
-`ExceptionMappingInterceptor`, configures `RuntimeTypeModel.Default`, and maps the reflection services.
-`ConfigureServices` registers the open-generic `ResourceService<,,,>` as scoped, a singleton
-`ResourceBinderConfiguration` (the `RuntimeTypeModel` plus a `BinderConfiguration` from `ResourceServiceBinder`),
-the open-generic `ResourceServiceMethodProvider<>` as `IServiceMethodProvider<>`, and
-`ResourceGrpcServiceDescriptorContributor` as `IGrpcServiceDescriptorContributor`.
+`SchemataGrpcResourceFeature` depends on `SchemataResourceFeature` and `SchemataTransportGrpcFeature`. The shared feature registers code-first gRPC, the exception-mapping interceptor, the runtime model, and reflection.
 
 ## Service synthesis
 
@@ -72,14 +59,7 @@ responds with the updated detail per AIP-164, a hard-deletable entity with `goog
 
 ### Custom methods
 
-`ResourceCustomMethod.Register` runs inside `ResourceServiceMethodProvider` and adds one unary RPC per declared
-method to the resource's existing service. The RPC name is
-`GrpcResourceNaming.CustomMethodName(descriptor, verb)` = `{PascalVerb}{Singular}` (`run` + `Job` → `RunJob`). The
-unary handler resolves the closed `ResourceMethodOperationHandler<TEntity, TRequest, TResponse>` from DI and
-calls its `InvokeAsync(verb, name, request, principal, ct)` — that operation handler is the resource pipeline
-root that runs authorization and target validation, binds the principal onto the request, and dispatches
-through `IRequestDispatcher` to the `IRequestHandler<TRequest, TResponse>` declared by the verb. The transport
-does not resolve or invoke the handler itself. See [Custom Methods](custom-methods.md).
+`ResourceCustomMethod.Register` adds one unary RPC for each declared method. The RPC name is `{PascalVerb}{Singular}` (`run` plus `Job` becomes `RunJob`). It resolves `ResourceMethodOperationHandler<TEntity,TRequest,TResponse>`, which packages the verb, target, request, and principal in `ResourceMethodRequest<TEntity,TRequest,TResponse>` and dispatches it. The method envelope runs wrap policy before Resource method handler stages and inner handler dispatch.
 
 ## Request and response wire format
 
@@ -119,12 +99,7 @@ the full schema.
 
 ## Caveats
 
-- `ExceptionMappingInterceptor` is required for status mapping; without it every exception surfaces as
-  `INTERNAL`.
-- `WithAuthorization(scheme)` applies the authentication scheme to the gRPC endpoints; the authorization decision
-  happens in the advisor pipeline. A resource that sets `ResourceAttribute.AuthenticationScheme` overrides that
-  default, which is how the Flow, Report and Scheduling builders demand their own scheme without changing the
-  global one.
+- `WithAuthentication("scheme")` configures the builder transport scheme and registers authentication wraps. `WithAuthorization()` separately registers coarse and handler-stage authorization advisors. A `ResourceAttribute.AuthenticationScheme` overrides the builder default for its endpoint.
 
 ## See also
 
@@ -132,3 +107,5 @@ the full schema.
 - [HTTP Transport](http-transport.md)
 - [Custom Methods](custom-methods.md)
 - [Resource Naming](resource-naming.md)
+- [AIP Interactions](aip-interactions.md)
+- [AIP Business Logic](aip-business-logic.md)

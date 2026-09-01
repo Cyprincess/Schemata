@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
-using Schemata.Event.Foundation.Internal;
+using Schemata.Event.Foundation.Runtime;
 using Schemata.Event.Skeleton;
 using Schemata.Messaging.Skeleton;
 using Xunit;

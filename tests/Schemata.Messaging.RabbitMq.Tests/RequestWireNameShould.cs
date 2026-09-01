@@ -1,5 +1,4 @@
 using System;
-using Schemata.Messaging.RabbitMq;
 using Schemata.Messaging.Skeleton;
 using Xunit;
 

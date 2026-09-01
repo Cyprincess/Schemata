@@ -4,9 +4,9 @@ using System.Reflection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Routing;
 using Schemata.Abstractions.Resource;
-using Schemata.Resource.Foundation;
+using Schemata.Core.Building;
 using Schemata.Resource.Grpc;
-using Schemata.Resource.Grpc.Internal;
+using Schemata.Resource.Grpc.Runtime;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
@@ -38,7 +38,7 @@ public static class EndpointBuilderExtensions
     /// <returns>The endpoint route builder for chaining.</returns>
     public static IEndpointRouteBuilder MapSchemataGrpcResources(
         this IEndpointRouteBuilder endpoints,
-        IResourceRegistry          registry,
+        ResourceRegistry          registry,
         string?                    scheme = null
     ) {
         foreach (var resource in registry.Resources) {

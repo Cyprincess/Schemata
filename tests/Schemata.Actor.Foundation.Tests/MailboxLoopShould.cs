@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using Schemata.Actor.Foundation.Internal;
+using Schemata.Actor.Foundation.Runtime;
 using Schemata.Actor.Foundation.Tests.Fixtures;
 using Schemata.Actor.Skeleton;
 using Xunit;

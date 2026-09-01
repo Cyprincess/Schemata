@@ -7,15 +7,18 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Advisors;
 using Schemata.Messaging.Skeleton.Commands;
 using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Foundation.Commands;
-using Schemata.Scheduling.Foundation.Internal;
+using Schemata.Scheduling.Foundation.Runtime;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
+using Schemata.Security.Foundation;
+using Schemata.Security.Skeleton;
 using Xunit;
 
 namespace Schemata.Scheduling.Tests;
@@ -66,6 +69,49 @@ public sealed class SchedulingMethodEnvelopeShould
         Assert.Equal(typeof(SchemataJob), observed.Entity);
         Assert.Equal("sample", execution.Job);
         Assert.Equal(1, command.Count);
+    }
+
+    [Fact]
+    public async Task Authorization_Only_Denies_And_Matching_Permission_Allows_Trigger() {
+        var denied = await CreateStartedHarnessAsync(services => {
+            services.Configure<SchemataSecurityOptions>(_ => { });
+            services.AddScoped<IPermissionResolver, DefaultPermissionResolver>();
+            services.AddScoped<IPermissionMatcher, DefaultPermissionMatcher>();
+            services.AddSchedulingAuthorization();
+        });
+        var deniedDispatcher = denied.Services.GetRequiredService<IRequestDispatcher>();
+        var principal = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity("test"));
+
+        await Assert.ThrowsAsync<PermissionDeniedException>(() => deniedDispatcher.SendAsync<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>(
+            new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new JobContext { Job = "sample" }), principal), CancellationToken.None));
+
+        var allowed = await CreateStartedHarnessAsync(services => {
+            services.Configure<SchemataSecurityOptions>(_ => { });
+            services.AddScoped<IPermissionResolver, DefaultPermissionResolver>();
+            services.AddScoped<IPermissionMatcher, DefaultPermissionMatcher>();
+            services.AddSchedulingAuthorization();
+        });
+        var allowedPrincipal = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity([new System.Security.Claims.Claim("role", "schemata-job.trigger")], "test"));
+
+        var execution = await allowed.Services.GetRequiredService<IRequestDispatcher>().SendAsync<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>(
+            new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new JobContext { Job = "sample" }), allowedPrincipal), CancellationToken.None);
+
+        Assert.Equal("sample", execution.Job);
+    }
+
+    [Fact]
+    public async Task Combined_Security_Rejects_Unauthenticated_Trigger() {
+        var harness = await CreateStartedHarnessAsync(services => {
+            services.Configure<SchemataSecurityOptions>(_ => { });
+            services.AddScoped<IPermissionResolver, DefaultPermissionResolver>();
+            services.AddScoped<IPermissionMatcher, DefaultPermissionMatcher>();
+            services.AddSchedulingAuthentication();
+            services.AddSchedulingAuthorization();
+        });
+
+        await Assert.ThrowsAsync<UnauthenticatedException>(() => harness.Services.GetRequiredService<IRequestDispatcher>()
+            .SendAsync<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>(
+                new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new JobContext { Job = "sample" }), null), CancellationToken.None));
     }
 
     private static async Task<Harness> CreateStartedHarnessAsync(Action<IServiceCollection>? advisors = null) {

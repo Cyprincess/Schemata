@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Event.Skeleton;
-using Schemata.Flow.Event.Internal;
+using Schemata.Flow.Event.Runtime;
 using Schemata.Flow.Skeleton.Entities;
 using Xunit;
 

@@ -22,36 +22,6 @@ using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Services;
 
-/// <summary>Transport-neutral OAuth/OIDC callback parameters.</summary>
-public sealed record AuthorizationCallbackResponse(
-    string                       RedirectUri,
-    Dictionary<string, string?> Parameters,
-    string?                      ResponseMode
-);
-
-/// <summary>Issued token or authorization callback returned to an HTTP edge.</summary>
-public sealed record AuthorizationSignInResponse(
-    TokenResponse?                 Token,
-    AuthorizationCallbackResponse? Callback
-);
-
-/// <summary>Selects token issuance or authorization callback issuance.</summary>
-public enum AuthorizationSignInResponseKind
-{
-    Token,
-    Callback,
-}
-
-/// <summary>Issues protocol responses from an authorized principal without writing HTTP state.</summary>
-public interface IAuthorizationSignInService
-{
-    Task<AuthorizationSignInResponse> IssueAsync(
-        ClaimsPrincipal                       principal,
-        IDictionary<string, string?>?          properties,
-        AuthorizationSignInResponseKind        kind,
-        CancellationToken                     ct = default);
-}
-
 /// <summary>Default transport-neutral sign-in issuer.</summary>
 /// <typeparam name="TApp">Application entity type.</typeparam>
 /// <typeparam name="TToken">Token entity type.</typeparam>
@@ -261,7 +231,7 @@ public sealed class AuthorizationSignInService<TApp, TToken>(
         var reference = issuer.CreateReference();
         var now       = _time.GetUtcNow().UtcDateTime;
         var entity = new TToken {
-            Name              = Identifiers.NewUid().ToString("n"),
+            Name              = Guid.NewGuid().ToString("n"),
             Type              = TokenTypes.AuthorizationCode,
             Status            = TokenStatuses.Valid,
             ReferenceId       = reference,

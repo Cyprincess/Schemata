@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Common;
 using Schemata.Entity.EntityFrameworkCore.Integration.Tests.Fixtures;
 using Schemata.Entity.Repository.Advisors;
 using Xunit;
@@ -56,7 +55,7 @@ public class CommitFailureShould : IAsyncLifetime
     }
 
     private async Task<Guid> SeedAsync(string name) {
-        var id = Identifiers.NewUid();
+        var id = Guid.NewGuid();
         var (repository, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
             await repository.AddAsync(new() {

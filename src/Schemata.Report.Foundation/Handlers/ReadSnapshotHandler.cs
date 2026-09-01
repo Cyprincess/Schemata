@@ -7,9 +7,11 @@ using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Common;
 using Schemata.Messaging.Skeleton;
+using Schemata.Report.Foundation.Queries;
 using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Entities;
 
-namespace Schemata.Report.Foundation;
+namespace Schemata.Report.Foundation.Handlers;
 
 public sealed class ReadSnapshotHandler<TSnapshot>(
     IReportSnapshotStore            snapshots,

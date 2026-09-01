@@ -4,12 +4,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Moq;
-using Schemata.Common;
 using Schemata.Entity.Repository;
-using Schemata.Tenancy.Foundation.Services;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
-using static Schemata.Tenancy.Tests.TenancyTestHost;
+using static Schemata.Tenancy.Tests.Fixtures.TenancyTestHost;
 using Xunit;
 
 namespace Schemata.Tenancy.Tests;
@@ -18,7 +16,7 @@ public class SchemataTenantManagerShould
 {
     [Fact]
     public async Task DeleteAsync_Evicts_Tenant_Provider_From_Cache() {
-        var tenantId = Identifiers.NewUid();
+        var tenantId = Guid.NewGuid();
         var tenant   = new SchemataTenant { Uid = tenantId };
 
         var tenants = new Mock<IRepository<SchemataTenant>>();
@@ -41,8 +39,8 @@ public class SchemataTenantManagerShould
 
     [Fact]
     public async Task DeleteTenant_RemovesHostsAtomically() {
-        var tenant = new SchemataTenant { Uid     = Identifiers.NewUid(), Name   = "acme" };
-        var host   = new SchemataTenantHost { Uid = Identifiers.NewUid(), Tenant = "acme", Host = "a.test" };
+        var tenant = new SchemataTenant { Uid     = Guid.NewGuid(), Name   = "acme" };
+        var host   = new SchemataTenantHost { Uid = Guid.NewGuid(), Tenant = "acme", Host = "a.test" };
 
         var tenants = new Mock<IRepository<SchemataTenant>>();
         var hosts   = new Mock<IRepository<SchemataTenantHost>>();
@@ -86,10 +84,10 @@ public class SchemataTenantManagerShould
 
     [Fact]
     public async Task FindByHost_Resolves_Tenant_Through_Association_Table() {
-        var tenantUid = Identifiers.NewUid();
+        var tenantUid = Guid.NewGuid();
         var tenant    = new SchemataTenant { Uid = tenantUid, Name = "acme" };
         var host = new SchemataTenantHost {
-            Uid = Identifiers.NewUid(), Tenant = "acme", Host = "example.test",
+            Uid = Guid.NewGuid(), Tenant = "acme", Host = "example.test",
         };
 
         var tenants = new Mock<IRepository<SchemataTenant>>();

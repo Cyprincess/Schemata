@@ -2,8 +2,8 @@ using System;
 using System.ComponentModel;
 using Microsoft.AspNetCore.Builder;
 using Schemata.Abstractions.Entities;
-using Schemata.Report.Skeleton;
 using Xunit;
+using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Tests;
 

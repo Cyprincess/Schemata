@@ -82,18 +82,13 @@ advisor: it returns `AdviseResult.Block` when the violation list is non-empty, o
 
 ## Resource pipeline integration
 
-The resource request pipeline runs the `IValidationAdvisor<TRequest>` chain through
-`AdviceCreateRequestValidation` / `AdviceUpdateRequestValidation`, after the authorize and sanitize
-advisors. `Schemata.Resource.Foundation.Advisors.ValidationHelper.ValidateAsync` drives the chain:
+The Create and Update validation wraps call `ValidationHelper.ValidateAsync` after sanitization and before idempotency. `IValidationAdvisor<TRequest>` instances receive a fresh `List<ErrorFieldViolation>`:
 
-1. Runs the `IValidationAdvisor<TRequest>` advisors over a fresh `List<ErrorFieldViolation>`.
-2. On `AdviseResult.Block`, throws `Schemata.Abstractions.Exceptions.ValidationException(errors)`,
-   which maps to `INVALID_ARGUMENT` / HTTP 422 with a `BadRequestDetail`.
-3. When the request implements `IValidation` with `ValidateOnly = true`, throws
-   `NoContentException` after validation passes, so a dry run never persists.
+1. Collector advisors add violations to the list.
+2. A blocking result produces `ValidationException(errors)`, mapped to `INVALID_ARGUMENT` and HTTP 422.
+3. A request implementing `IValidation` with `ValidateOnly = true` produces `NoContentException` after successful validation.
 
-A request type with no registered `IValidator<T>` makes `AdviceValidation<T>` return immediately;
-the chain produces no violations and the operation proceeds.
+`CreateRequestValidationSuppressed` and `UpdateRequestValidationSuppressed` are pipeline markers on the ambient `AdviceContext`. A request type with no registered validator leaves the violation list empty.
 
 ## Validator implementation
 

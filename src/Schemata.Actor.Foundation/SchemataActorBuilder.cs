@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Actor.Foundation.Internal;
+using Schemata.Actor.Foundation.Runtime;
 using Schemata.Actor.Skeleton;
 using Schemata.Core;
 using Schemata.Core.Features;

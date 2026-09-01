@@ -1,3 +1,4 @@
+using Schemata.Core.Building;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -5,7 +6,6 @@ using Microsoft.AspNetCore.Mvc.Controllers;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Messaging.Skeleton;
-using Schemata.Resource.Foundation;
 using Schemata.Resource.Http;
 using Xunit;
 

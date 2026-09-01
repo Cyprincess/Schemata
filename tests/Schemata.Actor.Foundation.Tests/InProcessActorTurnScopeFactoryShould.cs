@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Actor.Foundation.Internal;
+using Schemata.Actor.Foundation.Runtime;
 using Schemata.Messaging.Skeleton;
 using Xunit;
 

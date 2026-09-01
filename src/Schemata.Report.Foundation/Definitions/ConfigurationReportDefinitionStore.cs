@@ -7,13 +7,15 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Common;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Queries;
 using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Entities;
+using Schemata.Report.Skeleton.Enums;
 
-namespace Schemata.Report.Foundation;
+namespace Schemata.Report.Foundation.Definitions;
 
 /// <summary>Resolves configuration and DSL report definitions from the immutable options snapshot.</summary>
-public sealed class ConfigurationReportDefinitionStore : Definitions.IReportDefinitionSource
+public sealed class ConfigurationReportDefinitionStore : IReportDefinitionSource
 {
     private readonly SchemataReportOptions _options;
     private readonly IServiceScopeFactory  _scopes;
@@ -29,7 +31,6 @@ public sealed class ConfigurationReportDefinitionStore : Definitions.IReportDefi
         _options  = options.Value;
     }
 
-    /// <inheritdoc />
     public async ValueTask<(SchemataReport Report, QueryInsightRequest Query)?> ResolveAsync(
         string            name,
         CancellationToken ct
@@ -53,7 +54,6 @@ public sealed class ConfigurationReportDefinitionStore : Definitions.IReportDefi
         return (report, await provider.GetDefinitionAsync(ct));
     }
 
-    /// <inheritdoc />
     public async IAsyncEnumerable<SchemataReport> ListPeriodicAsync(
         [EnumeratorCancellation] CancellationToken ct
     ) {

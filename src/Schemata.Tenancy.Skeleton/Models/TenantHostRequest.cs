@@ -11,7 +11,6 @@ public class TenantHostRequest : ICanonicalName, IFreshness, IChild
 
     #region IChild Members
 
-    /// <inheritdoc />
     public string? Parent { get; set; }
 
     #endregion

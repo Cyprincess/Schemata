@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Flow.Scheduling.Internal;
+using Schemata.Flow.Scheduling.Runtime;
 using Schemata.Scheduling.Skeleton;
 using Xunit;
 using SystemTask = System.Threading.Tasks.Task;

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
@@ -23,7 +22,7 @@ public class IdentitySubjectProviderShould
     [Fact]
     public async Task Resolve_Canonical_Subject_Through_Canonical_Name_Lookup() {
         var user = new SchemataUser {
-            Uid = Identifiers.NewUid(), Name = "aB3x9Q", CanonicalName = "users/aB3x9Q", UserName = "alice",
+            Uid = Guid.NewGuid(), Name = "aB3x9Q", CanonicalName = "users/aB3x9Q", UserName = "alice",
         };
         var store = NewStore();
         store.Setup(s => s.FindByIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -39,7 +38,7 @@ public class IdentitySubjectProviderShould
 
     [Fact]
     public async Task Resolve_Guid_Subject_Through_Id_Lookup() {
-        var uid  = Identifiers.NewUid();
+        var uid  = Guid.NewGuid();
         var user = new SchemataUser { Uid = uid, UserName = "alice" };
         var store = NewStore();
         store.Setup(s => s.FindByIdAsync(uid.ToString(), It.IsAny<CancellationToken>()))
@@ -53,7 +52,7 @@ public class IdentitySubjectProviderShould
 
     [Fact]
     public async Task Reject_A_Guid_Leaf_Under_A_Foreign_Collection() {
-        var uid   = Identifiers.NewUid();
+        var uid   = Guid.NewGuid();
         var store = NewStore();
         store.Setup(s => s.FindByIdAsync(uid.ToString(), It.IsAny<CancellationToken>()))
              .ReturnsAsync(new SchemataUser { Uid = uid, UserName = "alice" });

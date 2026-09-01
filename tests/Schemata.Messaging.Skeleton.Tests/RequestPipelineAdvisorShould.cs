@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
-using Schemata.Messaging.Skeleton.Advisors;
 using Schemata.Messaging.Skeleton.Tests.Fixtures;
 using Xunit;
 

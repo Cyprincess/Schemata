@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Humanizer;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository;

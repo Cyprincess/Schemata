@@ -6,9 +6,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Common;
 using Schemata.Messaging.Skeleton;
-using Schemata.Push.Foundation;
 using Schemata.Push.Foundation.Commands;
-using Schemata.Push.Scheduling.Internal;
+using Schemata.Push.Scheduling.Handlers;
+using Schemata.Push.Scheduling.Runtime;
 using Schemata.Push.Skeleton;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -99,7 +99,7 @@ public class ScheduledPushServiceShould
         var services = new ServiceCollection();
         services.AddSingleton(scheduler);
         services.AddSchemataPush();
-        services.AddSingleton<IRequestHandler<SchedulePushRequest, Schemata.Abstractions.Resource.Operation>,
+        services.AddSingleton<IRequestHandler<SchedulePushRequest, Abstractions.Resource.Operation>,
             SchedulePushHandler>();
         return services.BuildServiceProvider();
     }

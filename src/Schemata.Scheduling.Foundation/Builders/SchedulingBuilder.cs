@@ -1,14 +1,17 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Core;
+using Schemata.Core.Building;
 using Schemata.Core.Features;
 using Schemata.Scheduling.Skeleton;
+using Schemata.Security.Skeleton;
 
 namespace Schemata.Scheduling.Foundation.Builders;
 
 /// <summary>Fluent builder for registering scheduled jobs with the Scheduling feature.</summary>
-public sealed class SchedulingBuilder
+public sealed class SchedulingBuilder : IResourceBuilder
 {
     private readonly TimeProvider _time;
 
@@ -20,9 +23,15 @@ public sealed class SchedulingBuilder
         Schemata = schemata;
         Services = services;
         _time    = time ?? TimeProvider.System;
+        var registrations = Schemata.Get<Dictionary<IResourceBuilder, ResourceSecurityRegistration>>(nameof(ResourceSecurityRegistration)) ?? new();
+        Schemata.Set(nameof(ResourceSecurityRegistration), registrations);
+        registrations[this] = new(
+            services => services.AddSchedulingAuthentication(),
+            services => services.AddSchedulingAuthorization(),
+            scheme => Schemata.Set(SchedulingResourceRegistration.AuthenticationSchemeKey, scheme));
     }
 
-    private SchemataOptions Schemata { get; }
+    public SchemataOptions Schemata { get; }
 
     /// <summary>Service collection that receives job registrations and scheduler options.</summary>
     public IServiceCollection Services { get; }
@@ -36,21 +45,6 @@ public sealed class SchedulingBuilder
         Schemata.AddFeature<T>();
     }
 
-    /// <summary>
-    ///     Requires <paramref name="scheme" /> on the Scheduling resource endpoints, overriding the
-    ///     resource system's global default for the Scheduling resources alone. Call it before
-    ///     <c>MapHttp()</c> / <c>MapGrpc()</c>, which read the scheme when they register the
-    ///     resources.
-    /// </summary>
-    /// <param name="scheme">
-    ///     The authentication scheme; <see langword="null" /> restores the global default.
-    /// </param>
-    /// <returns>This builder for chaining.</returns>
-    public SchedulingBuilder WithAuthorization(string? scheme = null) {
-        Schemata.Set(SchedulingResourceRegistration.AuthenticationSchemeKey, scheme);
-
-        return this;
-    }
 
     /// <summary>
     ///     Registers <typeparamref name="T" /> for keying without a schedule, so a job triggered

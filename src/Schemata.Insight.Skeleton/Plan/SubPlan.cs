@@ -1,4 +1,6 @@
-namespace Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Catalog;
+
+namespace Schemata.Insight.Skeleton.Plan;
 
 /// <summary>
 ///     A plan subtree the splitter routes to a single source's driver. It references exactly one

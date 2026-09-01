@@ -1,3 +1,4 @@
+using Schemata.Core.Building;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,17 +12,17 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
-using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Advisors;
-using Schemata.Messaging.Skeleton.Internal;
+using Schemata.Messaging.Skeleton.Runtime;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Foundation.Commands;
 using Schemata.Resource.Foundation.Handlers;
 using Schemata.Security.Skeleton;
+using Schemata.Security.Skeleton.Advisors;
 using Schemata.Validation.Skeleton.Advisors;
 using Xunit;
 
@@ -204,6 +205,53 @@ public class ResourceRequestPipelineAdvisorShould
         Assert.False(validator.Invoked);
     }
 
+
+    [Fact]
+    public async Task Update_Authorization_Sees_Client_System_Fields_Before_Sanitize_And_Handler_Sees_Scrubbed_Payload() {
+        var request = new Request {
+            Name       = "entities/forged",
+            CreateTime = DateTime.UtcNow,
+            UpdateMask = "display_name,create_time",
+        };
+        var (repository, mapper) = CreateDoubles();
+        Request? mapped = null;
+        mapper.Setup(value => value.Map<Request, Entity>(It.IsAny<Request>(), It.IsAny<Entity>(), It.IsAny<IEnumerable<string>>()))
+              .Callback((Request value, Entity _, IEnumerable<string> _) => mapped = value);
+        Request? authorized = null;
+        string? authorizedName = null;
+        DateTime? authorizedCreateTime = null;
+        string? authorizedUpdateMask = null;
+        var permissionResolver = new Mock<IPermissionResolver>();
+        permissionResolver.Setup(value => value.Resolve(nameof(Operations.Update), typeof(Entity))).Returns("entities.update");
+        var permissionMatcher = new Mock<IPermissionMatcher>();
+        permissionMatcher.Setup(value => value.IsMatch(It.IsAny<System.Security.Claims.ClaimsPrincipal>(), "entities.update")).Returns(true);
+        var authorization = new AuthorizationPipelineAdvisor<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>(
+            envelope => {
+                authorized = envelope.Request;
+                authorizedName = envelope.Request.Name;
+                authorizedCreateTime = envelope.Request.CreateTime;
+                authorizedUpdateMask = envelope.Request.UpdateMask;
+                return (nameof(Operations.Update), typeof(Entity));
+            }, permissionResolver.Object, permissionMatcher.Object);
+        using var services = BuildServices(repository.Object, mapper.Object, service => {
+            service.AddSingleton<IRequestPipelineAdvisor<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>>(authorization);
+            service.AddSingleton<IRequestPipelineAdvisor<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>>(
+                new ResourceUpdateSanitizePipelineAdvisor<Entity, Request, Detail>());
+        });
+        var principal = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity("test"));
+        var dispatcher = new InProcessRequestDispatcher(services);
+
+        await dispatcher.SendAsync<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>(
+            new("entities/e1", request, principal), CancellationToken.None);
+
+        Assert.Same(request, authorized);
+        Assert.Equal("entities/forged", authorizedName);
+        Assert.NotNull(authorizedCreateTime);
+        Assert.Equal("display_name,create_time", authorizedUpdateMask);
+        Assert.Null(mapped!.Name);
+        Assert.Null(mapped.CreateTime);
+        Assert.Equal("display_name", mapped.UpdateMask);
+    }
     [Fact]
     public void Wrap_Orders_Follow_SecurityOrders() {
         Assert.Equal(SecurityOrders.Sanitize, new ResourceCreateSanitizePipelineAdvisor<Entity, Request, Detail>().Order);

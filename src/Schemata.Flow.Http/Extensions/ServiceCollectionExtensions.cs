@@ -2,7 +2,7 @@ using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Skeleton.Entities;
-using Schemata.Resource.Foundation;
+using Schemata.Core.Building;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;

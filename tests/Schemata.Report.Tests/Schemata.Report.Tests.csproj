@@ -13,6 +13,7 @@
     <ProjectReference Include="..\..\src\Schemata.Report.Scheduling\Schemata.Report.Scheduling.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Report.Skeleton\Schemata.Report.Skeleton.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Security.Foundation\Schemata.Security.Foundation.csproj" />
   </ItemGroup>
 
 </Project>

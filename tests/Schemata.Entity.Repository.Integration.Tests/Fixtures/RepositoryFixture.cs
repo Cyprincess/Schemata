@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Entity.EntityFrameworkCore;
-using Schemata.Entity.Repository;
 using Schemata.Event.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Push.Skeleton.Entities;

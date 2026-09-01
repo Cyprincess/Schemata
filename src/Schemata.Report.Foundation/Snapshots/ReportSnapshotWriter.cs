@@ -9,11 +9,14 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Advice;
 using Schemata.Common;
 using Schemata.Entity.Repository;
-using Schemata.Insight.Foundation;
-using Schemata.Insight.Skeleton;
-using Schemata.Report.Skeleton;
+using Schemata.Insight.Foundation.Execution;
+using Schemata.Insight.Skeleton.Models;
+using Schemata.Report.Skeleton.Advisors;
+using Schemata.Report.Skeleton.Entities;
+using Schemata.Report.Skeleton.Enums;
+using Schemata.Report.Skeleton.Models;
 
-namespace Schemata.Report.Foundation;
+namespace Schemata.Report.Foundation.Snapshots;
 
 /// <summary>Writes materialized report rows to bounded persisted snapshot chunks.</summary>
 /// <typeparam name="TReport">Persisted report-definition entity type.</typeparam>
@@ -143,7 +146,7 @@ public sealed class ReportSnapshotWriter<TReport, TSnapshot, TChunk>
 
     private static TSnapshot CreateHeader(SchemataReport? report, ReportRunKind kind, string? operation) {
         var reportName = report?.Name ?? "inline";
-        var name       = Identifiers.NewUid().ToString("n");
+        var name       = Guid.NewGuid().ToString("n");
         return new() {
             Name          = name,
             Report        = reportName,

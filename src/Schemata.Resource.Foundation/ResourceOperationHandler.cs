@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Schemata.Core.Building;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
@@ -11,7 +12,7 @@ using Schemata.Common;
 using Schemata.Common.Errors;
 using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
-using Schemata.Resource.Foundation.Internal;
+using Schemata.Resource.Foundation.Runtime;
 using Schemata.Resource.Foundation.Models;
 
 namespace Schemata.Resource.Foundation;
@@ -78,7 +79,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             return TotalSizeMode.Exact;
         }
 
-        var resource = _sp.GetService<IResourceRegistry>()?.GetResource(typeof(TEntity));
+        var resource = _sp.GetService<ResourceRegistry>()?.GetResource(typeof(TEntity));
         if (resource is not null && resource.TotalSize is not TotalSizeMode.Default) {
             return resource.TotalSize;
         }

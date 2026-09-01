@@ -5,10 +5,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Insight.Foundation;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Foundation.Planning;
 using Schemata.Messaging.Skeleton;
 
+using Schemata.Insight.Skeleton.Models;
+using Schemata.Insight.Skeleton.Queries;
 namespace Schemata.Insight.Http;
 
 /// <summary>

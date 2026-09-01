@@ -3,29 +3,6 @@ using Schemata.Abstractions.Entities;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
-/// <summary>Discriminator values distinguishing a reserved PENDING entry from a finalized DONE envelope.</summary>
-internal static class IdempotencyKind
-{
-    /// <summary>
-    ///     Discriminator for reserved idempotency entries.
-    /// </summary>
-    public const string Pending = "PENDING";
-
-    /// <summary>
-    ///     Discriminator for finalized idempotency entries.
-    /// </summary>
-    public const string Done    = "DONE";
-}
-
-/// <summary>Reads only the <see cref="Kind" /> discriminator so a cached value can be classified before its full shape is known.</summary>
-internal sealed class IdempotencyHeader
-{
-    /// <summary>
-    ///     The cached idempotency entry discriminator.
-    /// </summary>
-    public string? Kind { get; set; }
-}
-
 /// <summary>
 ///     The reservation value written by the request idempotency advisors before an operation
 ///     runs, per <seealso href="https://google.aip.dev/155">AIP-155: Request identification</seealso>.

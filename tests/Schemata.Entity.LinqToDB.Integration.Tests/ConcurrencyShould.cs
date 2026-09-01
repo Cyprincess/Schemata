@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Common;
 using Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
 using Schemata.Entity.Repository;
 using Xunit;
@@ -92,7 +91,7 @@ public class ConcurrencyShould : IAsyncLifetime
     }
 
     private async Task<Guid> SeedAsync(string name) {
-        var id = Identifiers.NewUid();
+        var id = Guid.NewGuid();
         var (repository, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
             await repository.AddAsync(new() {

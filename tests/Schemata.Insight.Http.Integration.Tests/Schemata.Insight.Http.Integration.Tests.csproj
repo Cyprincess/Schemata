@@ -17,6 +17,7 @@
     <ProjectReference Include="..\..\src\Schemata.Expressions.Cel\Schemata.Expressions.Cel.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Expressions.Order\Schemata.Expressions.Order.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Entity.EntityFrameworkCore\Schemata.Entity.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Security.Foundation\Schemata.Security.Foundation.csproj" />
   </ItemGroup>
 
   <ItemGroup>

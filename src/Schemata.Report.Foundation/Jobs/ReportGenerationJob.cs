@@ -9,13 +9,16 @@ using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Report.Foundation.Commands;
-using Schemata.Report.Foundation.Internal;
+using Schemata.Report.Foundation.Runtime;
 using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Entities;
+using Schemata.Report.Skeleton.Enums;
+using Schemata.Report.Skeleton.Models;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Attributes;
 using Schemata.Scheduling.Skeleton.Entities;
 
-namespace Schemata.Report.Foundation;
+namespace Schemata.Report.Foundation.Jobs;
 
 /// <summary>Restart-durable scheduled report executor for one-shot and periodic generations.</summary>
 /// <typeparam name="TReport">Persisted report-definition entity type.</typeparam>
@@ -30,7 +33,6 @@ public sealed class ReportGenerationJob<TReport, TSnapshot, TChunk>(
     where TSnapshot : SchemataReportSnapshot, new()
     where TChunk : SchemataReportSnapshotChunk, new()
 {
-    /// <inheritdoc />
     public async Task ExecuteAsync(JobContext context, CancellationToken ct) {
         var (request, kind) = ReadRequest(context);
         await using var scope = scopes.CreateAsyncScope();

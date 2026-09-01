@@ -7,10 +7,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Report.Actor.Tests.Fixtures;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Report.Foundation;
 using Schemata.Report.Foundation.Commands;
-using Schemata.Report.Skeleton;
 using Schemata.Messaging.Skeleton;
+using Schemata.Report.Foundation.Jobs;
+using Schemata.Report.Skeleton.Entities;
+using Schemata.Report.Skeleton.Enums;
+using Schemata.Report.Skeleton.Models;
 using Schemata.Scheduling.Skeleton;
 using Xunit;
 
@@ -106,5 +108,3 @@ public class ReportActorConcurrencyShould
                             .ToListAsync();
     }
 }
-
-internal sealed record ConcurrencyOutcome(IReadOnlyList<Exception> Conflicts);

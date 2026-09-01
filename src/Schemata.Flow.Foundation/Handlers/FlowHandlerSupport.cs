@@ -421,7 +421,7 @@ internal sealed class FlowHandlerSupport(
     }
 
     internal static string NewLeafId() {
-        return Identifiers.NewUid().ToString("n");
+        return Guid.NewGuid().ToString("n");
     }
 
     private static IEnumerable<FlowEvent> ResolveExternalCatches(

@@ -2,12 +2,11 @@ using System;
 using System.Reflection;
 using Grpc.AspNetCore.Server.Model;
 using Grpc.Core;
-using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
-using Schemata.Resource.Foundation;
-using Schemata.Resource.Grpc.Internal;
+using Schemata.Core.Building;
+using Schemata.Resource.Grpc.Runtime;
 using Schemata.Transport.Grpc;
 using Empty = Google.Protobuf.WellKnownTypes.Empty;
 
@@ -20,12 +19,12 @@ namespace Schemata.Resource.Grpc;
 internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodProvider<TService>
     where TService : class
 {
-    private static readonly Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, IResourceRegistry>? Registrar;
+    private static readonly Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, ResourceRegistry>? Registrar;
 
     private static readonly Marshaller<Empty> EmptyMarshaller = new((_, ctx) => ctx.Complete([]), _ => new());
 
     private readonly ResourceBinderConfiguration _config;
-    private readonly IResourceRegistry           _registry;
+    private readonly ResourceRegistry           _registry;
 
     static ResourceServiceMethodProvider() {
         var t = typeof(TService);
@@ -36,7 +35,7 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
         var args   = t.GetGenericArguments();
         var method = typeof(ResourceServiceMethodProvider<TService>).GetMethod(nameof(RegisterAll), BindingFlags.Static | BindingFlags.NonPublic)!.MakeGenericMethod(args[0], args[1], args[2], args[3]);
 
-        Registrar = (Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, IResourceRegistry>)Delegate.CreateDelegate(typeof(Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, IResourceRegistry>), method);
+        Registrar = (Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, ResourceRegistry>)Delegate.CreateDelegate(typeof(Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, ResourceRegistry>), method);
     }
 
     /// <summary>
@@ -46,7 +45,7 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
     /// <param name="registry">The registered resources.</param>
     public ResourceServiceMethodProvider(
         ResourceBinderConfiguration config,
-        IResourceRegistry           registry
+        ResourceRegistry           registry
     ) {
         _config   = config;
         _registry = registry;
@@ -64,7 +63,7 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
     private static void RegisterAll<TEntity, TRequest, TDetail, TSummary>(
         ServiceMethodProviderContext<TService> context,
         ResourceBinderConfiguration            config,
-        IResourceRegistry                      registry
+        ResourceRegistry                      registry
     )
         where TEntity : class, ICanonicalName
         where TRequest : class, ICanonicalName

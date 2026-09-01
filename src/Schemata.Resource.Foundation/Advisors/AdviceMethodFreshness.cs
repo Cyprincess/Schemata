@@ -5,18 +5,13 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
+using Schemata.Security.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
-/// <summary>
-///     Default order constants for <see cref="AdviceMethodFreshness{TEntity, TRequest, TResponse}" />.
-/// </summary>
 public static class AdviceMethodFreshness
 {
-    /// <summary>
-    ///     Default order: runs after <see cref="AdviceMethodEntityAuthorize{TEntity,TRequest,TResponse}" />.
-    /// </summary>
-    public const int DefaultOrder = AdviceMethodEntityAuthorize.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = SecurityOrders.ResponseFamily;
 }
 
 /// <summary>

@@ -1,15 +1,6 @@
 # Scheduling HTTP Transport
 
-The scheduling HTTP transport exposes the scheduler's two persistent entities — `SchemataJob`
-(scheduled entries) and `SchemataJobExecution` (each fire) — as Schemata resources. `:run` is an
-AIP-136 custom method on a job. `:cancel` and `:wait` are Schemata operation routes on an execution:
-they correspond to `CancelOperation` and `WaitOperation` on `google.longrunning.Operations`, while
-AIP-151 defines `Operation`'s `name`, `metadata`, `done`, and `error` / `response` result shape. `operations.proto` binds `CancelOperation` to HTTP and
-leaves `WaitOperation` without an HTTP binding; Schemata supplies both routes. The transport inherits
-its controller synthesis, routing, JSON wire format, and exception handler from the
-Resource HTTP transport; this feature only registers the resources and their custom-method
-handlers. `MapHttp()` on `SchedulingBuilder` activates `SchemataSchedulingHttpFeature` (priority
-`SchemataSchedulingFeature.DefaultPriority + 200_000` = `480_200_000`).
+The Scheduling HTTP transport exposes `SchemataJob` and `SchemataJobExecution` as resources. `MapHttp()` is the concrete Scheduling extension that activates `SchemataSchedulingHttpFeature`; its dependencies supply Resource HTTP behavior. Resource and method requests enter dispatcher wraps, including enabled authentication and coarse authorization, before Scheduling handler stages.
 
 ## Where the code lives
 
@@ -27,10 +18,7 @@ schema.UseScheduling()
       .WithJob<HelloJob>("*/5 * * * *");
 ```
 
-`MapHttp()` adds `SchemataSchedulingHttpFeature` and returns the same `SchedulingBuilder`, so job
-registrations and transports chain. The feature declares `[DependsOn<SchemataSchedulingFeature>]`
-and `[DependsOn<SchemataHttpResourceFeature>]`, pulling in the scheduler and the resource HTTP
-transport (canonical-name routing, JSON traits, exception handler) when missing.
+`MapHttp()` activates `SchemataSchedulingHttpFeature` and returns the same `SchedulingBuilder`. The feature depends on Scheduling and Resource HTTP features; those dependencies provide scheduling runtime and shared HTTP transport behavior.
 
 ## Feature registration
 

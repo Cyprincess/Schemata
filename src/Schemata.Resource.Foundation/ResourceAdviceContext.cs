@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Schemata.Core.Building;
 using Schemata.Abstractions.Advisors;
 using Schemata.Resource.Foundation.Advisors;
 

@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Models;
 
-namespace Schemata.Report.Foundation;
+namespace Schemata.Report.Foundation.Dsl;
 
 /// <summary>Configures aggregations emitted by a report group-by transformation.</summary>
 public sealed class ReportAggregationBuilder

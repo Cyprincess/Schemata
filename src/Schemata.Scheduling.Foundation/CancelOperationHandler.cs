@@ -2,6 +2,7 @@ using Schemata.Abstractions.Resource;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Messaging.Skeleton;
+using Schemata.Scheduling.Foundation.Commands;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 

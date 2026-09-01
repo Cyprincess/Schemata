@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Schemata.Core.Building;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Caching.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;

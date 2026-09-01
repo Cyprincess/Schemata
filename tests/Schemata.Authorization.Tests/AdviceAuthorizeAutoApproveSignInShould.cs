@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
@@ -6,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Abstractions.Advisors;
-using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton;
@@ -46,7 +46,7 @@ public class AdviceAuthorizeAutoApproveSignInShould
         var claims = new List<Claim> { new(IdentityClaims.Subject, subject), new("sid", sid) };
         return new() {
             Application     = new() {
-                Uid           = Identifiers.NewUid(),
+                Uid           = Guid.NewGuid(),
                 ClientId      = clientId,
                 Name          = clientId,
                 CanonicalName = $"applications/{clientId}",

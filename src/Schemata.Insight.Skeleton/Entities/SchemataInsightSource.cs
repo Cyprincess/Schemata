@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using Schemata.Abstractions.Entities;
+using Schemata.Insight.Skeleton.Drivers;
 
-namespace Schemata.Insight.Skeleton;
+namespace Schemata.Insight.Skeleton.Entities;
 
 /// <summary>
 ///     A persisted source registration for the database-backed catalog: the driver name and its

@@ -6,14 +6,21 @@ using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
-using Schemata.Insight.Foundation;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Foundation.Execution;
+using Schemata.Insight.Foundation.Planning;
+using Schemata.Insight.Skeleton.Models;
+using Schemata.Insight.Skeleton.Plan;
+using Schemata.Insight.Skeleton.Queries;
 using Schemata.Messaging.Skeleton;
 using Schemata.Report.Foundation.Commands;
-using Schemata.Report.Foundation.Internal;
+using Schemata.Report.Foundation.Runtime;
+using Schemata.Report.Foundation.Snapshots;
 using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Advisors;
+using Schemata.Report.Skeleton.Entities;
+using Schemata.Report.Skeleton.Models;
 
-namespace Schemata.Report.Foundation;
+namespace Schemata.Report.Foundation.Handlers;
 
 /// <summary>Runs the advisor-gated Report definition, planning, materialization, and snapshot pipeline.</summary>
 public sealed class RunReportHandler<TReport, TSnapshot, TChunk>(

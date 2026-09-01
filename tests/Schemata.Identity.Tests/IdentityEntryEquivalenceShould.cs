@@ -1,3 +1,4 @@
+using Schemata.Identity.Tests.Fixtures;
 using System;
 using System.Security.Claims;
 using System.Text.Json;
@@ -8,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
-using Schemata.Advice;
 using Schemata.Common;
 using Schemata.Identity.Foundation.Commands;
 using Schemata.Identity.Foundation.Handlers;

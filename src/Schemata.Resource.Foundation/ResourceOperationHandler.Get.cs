@@ -69,6 +69,12 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         if (entity is null) {
             throw ResourceNotFound(name);
         }
+        var entityResult = await RunPipelineAsync<GetResultBase<TDetail>>(
+            ctx, () => Advisor.For<IResourceGetAdvisor<TEntity>>().RunAsync(ctx, request, entity, principal, ct.Value),
+            () => ResourceNotFound(name));
+        if (entityResult is not null) {
+            return entityResult;
+        }
 
         var detail = _mapper.Map<TEntity, TDetail>(entity);
 

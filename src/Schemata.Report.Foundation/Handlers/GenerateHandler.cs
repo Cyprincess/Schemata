@@ -8,12 +8,14 @@ using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Messaging.Skeleton;
 using Schemata.Report.Foundation.Commands;
-using Schemata.Report.Foundation.Internal;
-using Schemata.Report.Skeleton;
+using Schemata.Report.Foundation.Jobs;
+using Schemata.Report.Foundation.Runtime;
+using Schemata.Report.Skeleton.Entities;
+using Schemata.Report.Skeleton.Models;
 using Schemata.Scheduling.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 
-namespace Schemata.Report.Foundation;
+namespace Schemata.Report.Foundation.Handlers;
 
 /// <summary>Handles the AIP-136 report generation request through the Report command pipeline.</summary>
 public sealed class GenerateHandler<TReport, TSnapshot, TChunk>(
@@ -39,7 +41,7 @@ public sealed class GenerateHandler<TReport, TSnapshot, TChunk>(
             var scheduler = services.GetService<IScheduler>()
                             ?? throw new FailedPreconditionException(message: "Report generation requires a scheduler.");
             var context = new JobContext {
-                ExecutionUid = Identifiers.NewUid(),
+                ExecutionUid = Guid.NewGuid(),
                 Method       = Verbs.Generate,
                 ArgsJson     = JsonSerializer.Serialize(reportRequest, SchemataJson.Default),
             };
@@ -47,7 +49,7 @@ public sealed class GenerateHandler<TReport, TSnapshot, TChunk>(
             return OperationMapper.FromExecution(scheduled);
         }
 
-        var uid = Identifiers.NewUid();
+        var uid = Guid.NewGuid();
         try {
             execution.Operation = $"operations/{uid:n}";
             var result = await dispatcher.SendAsync<RunReportRequest, ReportResult>(

@@ -38,6 +38,20 @@ Both take an optional `Action<SchemataAuthorizationOptions>`, store it, map the 
 endpoints into the well-known pipeline, add `SchemataAuthorizationFeature<...>`, and return a
 `SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken>` for chaining.
 
+## Resource management surface
+
+`SchemataAuthorizationBuilder<TApp,TAuth,TScope,TToken>` implements `IResourceBuilder`. Application, Scope, and Token management resources are exposed only after an explicit transport activation:
+
+```csharp
+schema.UseSecurity();
+schema.UseAuthorization()
+      .WithAuthentication("Bearer")
+      .WithAuthorization()
+      .MapHttp();
+```
+
+The shared Security extensions configure only this resource management surface. `MapHttp()` and `MapGrpc()` activate the concrete Authorization transport features. The `/Connect` OAuth and OpenID Connect endpoints retain their protocol pipeline.
+
 ## What the core feature registers
 
 `SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken>` (`Priority = Orders.Extension +

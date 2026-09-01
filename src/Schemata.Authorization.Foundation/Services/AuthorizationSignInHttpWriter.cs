@@ -6,18 +6,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Options;
-using Schemata.Authorization.Foundation.Authentication;
 
 namespace Schemata.Authorization.Foundation.Services;
-
-/// <summary>Writes an issued authorization response for compatibility authentication-scheme calls.</summary>
-public interface IAuthorizationSignInHttpWriter
-{
-    Task WriteAsync(
-        HttpContext                 context,
-        AuthorizationSignInResponse response,
-        CancellationToken           ct = default);
-}
 
 internal sealed class AuthorizationSignInHttpWriter(IOptions<JsonSerializerOptions> json)
     : IAuthorizationSignInHttpWriter

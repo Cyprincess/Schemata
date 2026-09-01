@@ -1,4 +1,4 @@
-using Schemata.Resource.Foundation;
+using Schemata.Core.Building;
 using Schemata.Resource.Http.Features;
 
 // ReSharper disable once CheckNamespace

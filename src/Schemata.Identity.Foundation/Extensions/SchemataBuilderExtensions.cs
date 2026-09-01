@@ -19,8 +19,8 @@ public static class SchemataBuilderExtensions
     /// <param name="configure">ASP.NET Core Identity options callback.</param>
     /// <param name="build">Identity builder callback.</param>
     /// <param name="bearer">Bearer token options callback.</param>
-    /// <returns>The Schemata builder.</returns>
-    public static SchemataBuilder UseIdentity(
+    /// <returns>The Identity resource-management builder.</returns>
+    public static SchemataIdentityBuilder<SchemataUser, SchemataRole> UseIdentity(
         this SchemataBuilder             builder,
         Action<SchemataIdentityOptions>? identify  = null,
         Action<IdentityOptions>?         configure = null,
@@ -38,8 +38,8 @@ public static class SchemataBuilderExtensions
     /// <param name="configure">ASP.NET Core Identity options callback.</param>
     /// <param name="build">Identity builder callback.</param>
     /// <param name="bearer">Bearer token options callback.</param>
-    /// <returns>The Schemata builder.</returns>
-    public static SchemataBuilder UseIdentity<TUser, TRole>(
+    /// <returns>The Identity resource-management builder.</returns>
+    public static SchemataIdentityBuilder<TUser, TRole> UseIdentity<TUser, TRole>(
         this SchemataBuilder             builder,
         Action<SchemataIdentityOptions>? identify  = null,
         Action<IdentityOptions>?         configure = null,
@@ -61,8 +61,8 @@ public static class SchemataBuilderExtensions
     /// <param name="configure">ASP.NET Core Identity options callback.</param>
     /// <param name="build">Identity builder callback.</param>
     /// <param name="bearer">Bearer token options callback.</param>
-    /// <returns>The Schemata builder.</returns>
-    public static SchemataBuilder UseIdentity<TUser, TRole, TUserStore, TRoleStore>(
+    /// <returns>The Identity resource-management builder.</returns>
+    public static SchemataIdentityBuilder<TUser, TRole> UseIdentity<TUser, TRole, TUserStore, TRoleStore>(
         this SchemataBuilder             builder,
         Action<SchemataIdentityOptions>? identify  = null,
         Action<IdentityOptions>?         configure = null,
@@ -87,6 +87,6 @@ public static class SchemataBuilderExtensions
 
         builder.AddFeature<SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore>>();
 
-        return builder;
+        return new(builder.Options, builder.Services);
     }
 }

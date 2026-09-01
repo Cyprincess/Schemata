@@ -5,8 +5,9 @@ using System.Threading.Tasks;
 using Moq;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
-using Schemata.Resource.Foundation;
+using Schemata.Resource.Foundation.Handlers;
 using Schemata.Resource.Tests.Fixtures;
+using Schemata.Resource.Foundation.Commands;
 using Xunit;
 
 namespace Schemata.Resource.Tests.ResourceMethodHandler;

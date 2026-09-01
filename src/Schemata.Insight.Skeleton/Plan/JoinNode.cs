@@ -1,4 +1,6 @@
-namespace Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Models;
+
+namespace Schemata.Insight.Skeleton.Plan;
 
 /// <summary>
 ///     Combines two source subtrees on a predicate. The predicate resolves against the merged

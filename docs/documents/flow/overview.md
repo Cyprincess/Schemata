@@ -77,14 +77,19 @@ builder.UseSchemata(schema => {
 The engine, its validator, and the `IFlowRuntime` keyed registrations come from
 `SchemataFlowStateMachineFeature`, which `[DependsOn<SchemataFlowFeature]`.
 
-## Authorization
+## Security
 
-Flow endpoints ride the Resource pipeline: enable authorization through the resource builder —
-`schema.UseResource().WithAuthorization(scheme)` — and the flow resources and verbs pass through
-the resource anonymous + authorize advisors, which call the access and entitlement providers with
-the verb as the operation. Per-definition rules belong to custom `IAccessProvider` implementations
-reading the request; in-process engine paths (event and scheduling bridges) carry no principal and
-no authorization. See [Security](../security.md).
+`SchemataFlowBuilder` implements `IResourceBuilder`. Configure transport authentication and authorization on that builder:
+
+```csharp
+schema.UseSecurity();
+schema.UseFlow()
+      .WithAuthentication("Bearer")
+      .WithAuthorization()
+      .MapHttp();
+```
+
+Flow method envelopes carry verbs such as `start`, `complete`, and `signal` through the dispatcher. Authentication and coarse authorization wrap those envelopes. Instance access and entitlement remain in Flow's Resource handler stages. `IFlowTransitionAdvisor` and `IFlowSourceAdvisor` continue the ambient `AdviceContext` when a dispatch established one; a direct Flow entry creates its local context only when none exists. See [Security](../security.md).
 
 ## Feature priority table
 
@@ -158,25 +163,9 @@ facade), by `Flow.Scheduling`'s `FlowTimerJob` on a timer catch's fire. `Flow.Ev
 `FlowEventHandler` dispatches the other two bridge-relevant requests instead — `CorrelateMessageRequest`
 for a matched message correlation and `ThrowSignalRequest` for a matched signal — not `RunEventRequest`.
 
-`FlowRunner` itself is a thin request constructor: `CompleteAsync(process, token, principal, ct)` resolves
-`IRequestDispatcher` and calls `SendAsync<CompleteActivityRequest, ProcessSnapshot>(...)` — it does
-not orchestrate the transition itself. The internal `Default*Handler` classes registered as
-`IRequestHandler<TRequest, TResponse>` (keyed `FlowConstants.Handlers.Default`, with an unkeyed
-alias every entry resolves through the dispatcher) hold the actual orchestration: they load the
-process, resolve the engine, run the transition, arm catch handlers, and persist the snapshot.
+`FlowRunner` is a thin request constructor. `CompleteAsync(process, token, principal, ct)` resolves `IRequestDispatcher` and sends `CompleteActivityRequest`. The registered Flow handlers load a process, resolve an engine, run a transition, arm catch handlers, and persist the snapshot.
 
-Because every entry dispatches the same request type, a registered `ICommandAdvisor<TRequest>`
-(`Schemata.Messaging.Skeleton.Advisors`) runs before the handler regardless of which entry point
-was called — the facade, a transport, and a raw `IRequestDispatcher.SendAsync` call are the same
-pipeline, not three independent ones. See [Messaging](../messaging/overview.md) for the dispatcher,
-the advisor chains, and the ambient `AdviceContext` rules.
-
-The definition listing rides the same pipeline on the query side. The HTTP and gRPC definition
-endpoints construct a `ListProcessDefinitionsQuery` (`IQuery<IReadOnlyList<ProcessDefinitionInfo>>`)
-and dispatch it through `IQueryDispatcher`; the internal `DefaultListProcessDefinitionsHandler`,
-registered keyed `FlowConstants.Handlers.Default` with the same unkeyed alias, reads
-`IProcessRegistry` and projects each `ProcessDefinitionInfo`. A registered
-`IQueryAdvisor<ListProcessDefinitionsQuery>` runs before the handler.
+Because every entry dispatches the same request type, registered `IRequestPipelineAdvisor<TRequest,TResponse>` wraps run before and after the Flow handler regardless of whether the caller is the facade, a transport, or raw `IRequestDispatcher`. The definition listing sends `ListProcessDefinitionsQuery` through the same dispatcher pattern.
 
 ## Extension points
 

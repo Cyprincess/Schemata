@@ -9,7 +9,7 @@ using Moq;
 using Schemata.Common;
 using Schemata.Messaging.Skeleton;
 using Schemata.Push.Foundation.Commands;
-using Schemata.Push.Scheduling.Internal;
+using Schemata.Push.Scheduling.Runtime;
 using Schemata.Push.Skeleton;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;

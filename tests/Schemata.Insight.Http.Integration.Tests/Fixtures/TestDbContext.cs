@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Entities;
 
 namespace Schemata.Insight.Http.Integration.Tests.Fixtures;
 

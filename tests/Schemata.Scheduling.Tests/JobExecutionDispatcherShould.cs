@@ -6,11 +6,10 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Advisors;
-using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Scheduling.Foundation;
-using Schemata.Scheduling.Foundation.Internal;
+using Schemata.Scheduling.Foundation.Runtime;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Advisors;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -23,7 +22,7 @@ public class JobExecutionDispatcherShould
     [Fact]
     public async Task DispatchPendingAsync_MissingJobKey_MarksExecutionFailed() {
         var execution = new SchemataJobExecution {
-            Uid       = Identifiers.NewUid(),
+            Uid       = Guid.NewGuid(),
             Job       = "jobs/missing",
             JobKey    = "jobs.missing",
             State     = ExecutionState.Pending,
@@ -58,7 +57,7 @@ public class JobExecutionDispatcherShould
     [Fact]
     public async Task DispatchPendingAsync_CarriesExecutionVariables_IntoJobBody() {
         var execution = new SchemataJobExecution {
-            Uid       = Identifiers.NewUid(),
+            Uid       = Guid.NewGuid(),
             JobKey    = "jobs.capturing",
             State     = ExecutionState.Pending,
             StartTime = DateTime.UtcNow.AddMinutes(-1),
@@ -192,7 +191,7 @@ public class JobExecutionDispatcherShould
         ExecutionState expected
     ) {
         var execution = new SchemataJobExecution {
-            Uid = Identifiers.NewUid(), JobKey = "jobs.gated", State = ExecutionState.Pending,
+            Uid = Guid.NewGuid(), JobKey = "jobs.gated", State = ExecutionState.Pending,
             StartTime = DateTime.UtcNow.AddMinutes(-1),
         };
         var executions = new Mock<IRepository<SchemataJobExecution>>();
@@ -230,7 +229,7 @@ public class JobExecutionDispatcherShould
     [Fact]
     public async Task DispatchPendingAsync_MissingJobRepository_Throws() {
         var execution = new SchemataJobExecution {
-            Uid       = Identifiers.NewUid(),
+            Uid       = Guid.NewGuid(),
             JobKey    = "jobs.completing",
             State     = ExecutionState.Pending,
             StartTime = DateTime.UtcNow.AddMinutes(-1),
@@ -253,7 +252,7 @@ public class JobExecutionDispatcherShould
     [Fact]
     public async Task DispatchPendingAsync_MissingRequestDispatcher_Throws() {
         var execution = new SchemataJobExecution {
-            Uid       = Identifiers.NewUid(),
+            Uid       = Guid.NewGuid(),
             Job       = "jobs/completing",
             JobKey    = "jobs.completing",
             State     = ExecutionState.Pending,

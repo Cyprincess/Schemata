@@ -12,6 +12,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Schemata.Identity.Foundation\Schemata.Identity.Foundation.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Messaging.Skeleton\Schemata.Messaging.Skeleton.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Identity.Grpc\Schemata.Identity.Grpc.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Identity.Http\Schemata.Identity.Http.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
   </ItemGroup>
 
 </Project>

@@ -4,8 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
-using Schemata.Actor.Skeleton;
-using Schemata.Common;
 using Schemata.Messaging.Skeleton;
 using Schemata.Tenancy.Foundation.Messaging;
 using Schemata.Tenancy.Foundation.Services;
@@ -21,7 +19,7 @@ public class TenantActorTurnScopeFactoryShould
 
     [Fact]
     public async Task CreateAsync_ResolvesTenantIdentity_InTheBootstrapScope_BeforeBuildingTheTurnScope() {
-        var tenant = new SchemataTenant { Uid = Identifiers.NewUid() };
+        var tenant = new SchemataTenant { Uid = Guid.NewGuid() };
         var disposalLog = new List<string>();
         var (root, providerFactory) = BuildRoot(tenant, disposalLog, tenantOnlyProvider: new ServiceCollection().BuildServiceProvider());
 
@@ -37,7 +35,7 @@ public class TenantActorTurnScopeFactoryShould
 
     [Fact]
     public async Task CreateAsync_BuildsTheTurnScope_FromTheTenantIsolatedProvider() {
-        var tenant = new SchemataTenant { Uid = Identifiers.NewUid() };
+        var tenant = new SchemataTenant { Uid = Guid.NewGuid() };
         var disposalLog = new List<string>();
         var tenantOnlyProvider = new ServiceCollection().AddScoped<TenantOnlyMarker>().BuildServiceProvider();
         var (root, _) = BuildRoot(tenant, disposalLog, tenantOnlyProvider);
@@ -54,7 +52,7 @@ public class TenantActorTurnScopeFactoryShould
 
     [Fact]
     public async Task DisposeAsync_ReleasesTheFinalScope_BeforeTheBootstrapScope() {
-        var tenant = new SchemataTenant { Uid = Identifiers.NewUid() };
+        var tenant = new SchemataTenant { Uid = Guid.NewGuid() };
         var disposalLog = new List<string>();
         var (root, _) = BuildRoot(tenant, disposalLog, tenantOnlyProvider: new ServiceCollection().BuildServiceProvider());
 

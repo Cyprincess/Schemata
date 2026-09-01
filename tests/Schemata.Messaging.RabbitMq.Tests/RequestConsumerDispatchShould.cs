@@ -5,10 +5,10 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
-using Schemata.Messaging.RabbitMq.Internal;
+using Schemata.Messaging.RabbitMq.Runtime;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Advisors;
-using Schemata.Messaging.Skeleton.Internal;
+using Schemata.Messaging.Skeleton.Runtime;
 using Xunit;
 
 namespace Schemata.Messaging.RabbitMq.Tests;

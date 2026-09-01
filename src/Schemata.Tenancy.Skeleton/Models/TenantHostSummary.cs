@@ -11,7 +11,6 @@ public class TenantHostSummary : IIdentifier, ICanonicalName, ITimestamp, IChild
 
     #region IChild Members
 
-    /// <inheritdoc />
     public string? Parent { get; set; }
 
     #endregion

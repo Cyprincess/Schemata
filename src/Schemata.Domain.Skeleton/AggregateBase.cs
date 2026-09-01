@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Schemata.Abstractions.Entities;
 using Schemata.Event.Skeleton;
 
 namespace Schemata.Domain.Skeleton;
@@ -20,17 +19,14 @@ public abstract class AggregateBase : IAggregateRoot, IHasPendingEvents
 
     #region IAggregateRoot Members
 
-    /// <inheritdoc />
     public virtual Guid Uid { get; set; }
 
-    /// <inheritdoc />
     public virtual Guid Timestamp { get; set; }
 
     #endregion
 
     #region IHasPendingEvents Members
 
-    /// <inheritdoc />
     public IReadOnlyList<IEvent> DequeuePendingEvents() {
         if (_pending.Count == 0) {
             return [];

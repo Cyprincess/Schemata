@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Humanizer;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Schemata.Core.Building;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;

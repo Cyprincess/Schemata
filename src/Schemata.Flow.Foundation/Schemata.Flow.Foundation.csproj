@@ -31,6 +31,8 @@
     <ProjectReference Include="..\Schemata.Expressions.Skeleton\Schemata.Expressions.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Flow.Skeleton\Schemata.Flow.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Messaging.Skeleton\Schemata.Messaging.Skeleton.csproj" />
+    <ProjectReference Include="..\Schemata.Security.Skeleton\Schemata.Security.Skeleton.csproj" />
+    <ProjectReference Include="..\Schemata.Security.Foundation\Schemata.Security.Foundation.csproj" />
   </ItemGroup>
 
 </Project>

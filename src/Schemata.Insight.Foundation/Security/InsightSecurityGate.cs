@@ -7,10 +7,10 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Queries;
 using Schemata.Security.Skeleton;
 
-namespace Schemata.Insight.Foundation;
+namespace Schemata.Insight.Foundation.Security;
 
 /// <summary>
 ///     Enforces source-level access and produces a row-level entitlement expression for a source's

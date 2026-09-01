@@ -5,7 +5,7 @@ using Schemata.Flow.Foundation;
 using Schemata.Flow.Grpc;
 using Schemata.Flow.Grpc.Services;
 using Schemata.Flow.Skeleton.Entities;
-using Schemata.Resource.Foundation;
+using Schemata.Core.Building;
 using Schemata.Transport.Grpc;
 
 // ReSharper disable once CheckNamespace

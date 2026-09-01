@@ -8,7 +8,7 @@ using Schemata.Core.Features;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Report.Foundation.Features;
 using Schemata.Report.Scheduling.Advisors;
-using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Entities;
 using Schemata.Scheduling.Foundation.Features;
 
 namespace Schemata.Report.Scheduling.Features;
@@ -27,10 +27,8 @@ public sealed class SchemataReportSchedulingFeature<TReport, TSnapshot, TChunk> 
     /// <summary>Default feature priority for the Report.Scheduling bridge.</summary>
     public const int DefaultPriority = SchemataReportFeature<TReport, TSnapshot, TChunk>.DefaultPriority + 400_000;
 
-    /// <inheritdoc />
     public override int Priority => DefaultPriority;
 
-    /// <inheritdoc />
     public override void ConfigureServices(
         IServiceCollection  services,
         SchemataOptions     schemata,

@@ -12,6 +12,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Schemata.Authorization.Foundation\Schemata.Authorization.Foundation.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Authorization.Identity\Schemata.Authorization.Identity.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Authorization.Grpc\Schemata.Authorization.Grpc.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Authorization.Http\Schemata.Authorization.Http.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Scheduling.Foundation\Schemata.Scheduling.Foundation.csproj" />
   </ItemGroup>
 

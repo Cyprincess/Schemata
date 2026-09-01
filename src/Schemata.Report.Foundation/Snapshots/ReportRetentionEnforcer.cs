@@ -6,9 +6,11 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Entity.Repository;
-using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Entities;
+using Schemata.Report.Skeleton.Enums;
+using Schemata.Report.Skeleton.Models;
 
-namespace Schemata.Report.Foundation;
+namespace Schemata.Report.Foundation.Snapshots;
 
 /// <summary>Reclaims expired persisted snapshots and their chunks for a retained report definition.</summary>
 /// <typeparam name="TSnapshot">Persisted snapshot-header entity type.</typeparam>

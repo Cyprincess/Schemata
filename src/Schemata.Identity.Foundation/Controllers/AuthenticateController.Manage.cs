@@ -10,7 +10,6 @@ using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Claims;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Models;
-using Schemata.Messaging.Skeleton;
 
 namespace Schemata.Identity.Foundation.Controllers;
 

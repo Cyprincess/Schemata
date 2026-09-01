@@ -11,7 +11,7 @@ using Schemata.Identity.Foundation.Advisors;
 using Schemata.Identity.Foundation.Commands;
 using Schemata.Identity.Foundation.Controllers;
 using Schemata.Identity.Foundation.Handlers;
-using Schemata.Identity.Foundation.Internal;
+using Schemata.Identity.Foundation.Runtime;
 using Schemata.Identity.Foundation.Queries;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Advisors;
@@ -22,7 +22,7 @@ using Schemata.Identity.Skeleton.Managers;
 using Schemata.Identity.Skeleton.Models;
 using Schemata.Identity.Skeleton.Services;
 using Schemata.Messaging.Skeleton;
-using Schemata.Messaging.Skeleton.Internal;
+using Schemata.Messaging.Skeleton.Runtime;
 using static Schemata.Abstractions.SchemataConstants;
 
 // ReSharper disable once CheckNamespace

@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
-using Schemata.Push.Skeleton;
 using Schemata.Push.Skeleton.Entities;
 
 namespace Schemata.Push.Foundation.Features;

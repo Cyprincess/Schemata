@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
@@ -66,7 +65,7 @@ public sealed class CallActivityExecutor
         parentToken.StateName     = callActivity.Name;
         parentToken.WaitingAtName = callActivity.Name;
 
-        var leaf = Identifiers.NewUid().ToString("n");
+        var leaf = Guid.NewGuid().ToString("n");
         var childProcess = new SchemataProcess {
             Name           = leaf,
             CanonicalName  = $"processes/{leaf}",
@@ -209,9 +208,3 @@ public sealed class CallActivityExecutor
         string         eventName
     ) => TransitionFactory.New(processName, tokenCanonical, previous, posterior, kind, eventName);
 }
-
-/// <summary>Terminal child-process status observed when a <see cref="CallActivity" /> can resume its parent token.</summary>
-public sealed record CallActivityCompletion(
-    string  ChildProcess,
-    string  State,
-    bool    Failed);

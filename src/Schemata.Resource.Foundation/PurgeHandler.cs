@@ -7,6 +7,7 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Messaging.Skeleton;
+using Schemata.Resource.Foundation.Commands;
 using Schemata.Scheduling.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -40,7 +41,7 @@ public sealed class PurgeHandler<TEntity> : IRequestHandler<PurgeResourceRequest
             throw new InvalidOperationException("Purge requires a scheduler.");
         }
 
-        var uid = Identifiers.NewUid();
+        var uid = Guid.NewGuid();
         var args = JsonSerializer.Serialize(new PurgeOperationArgs {
             Filter   = request.Filter,
             Language = request.Language,

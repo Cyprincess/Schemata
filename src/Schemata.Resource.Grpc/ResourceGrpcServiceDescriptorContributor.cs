@@ -2,9 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Schemata.Resource.Foundation;
-using Schemata.Resource.Grpc.Internal;
+using Schemata.Core.Building;
+using Schemata.Resource.Grpc.Runtime;
 using Schemata.Transport.Grpc;
 using ProtoServiceDescriptor = Google.Protobuf.Reflection.ServiceDescriptor;
 
@@ -22,7 +21,7 @@ internal sealed class ResourceGrpcServiceDescriptorContributor : IGrpcServiceDes
 
     public IReadOnlyList<ProtoServiceDescriptor> GetServiceDescriptors(IServiceProvider serviceProvider) {
         var config   = serviceProvider.GetRequiredService<ResourceBinderConfiguration>();
-        var registry = serviceProvider.GetRequiredService<IResourceRegistry>();
+        var registry = serviceProvider.GetRequiredService<ResourceRegistry>();
 
         var types = registry.Resources
                             .Where(GrpcResourceHelper.IsGrpcEnabled)

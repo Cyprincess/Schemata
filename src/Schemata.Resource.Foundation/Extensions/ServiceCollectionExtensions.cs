@@ -3,13 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Core;
+using Schemata.Core.Building;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Commands;
 using Schemata.Messaging.Skeleton.Advisors;
-using Schemata.Messaging.Skeleton.Internal;
+using Schemata.Messaging.Skeleton.Runtime;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Foundation.Commands;
@@ -65,6 +67,42 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
+
+    /// <summary>
+    ///     Registers the shared resource pipeline over the registry carried by <paramref name="schemata" />,
+    ///     attaching the per-resource wiring this package supplies. Resources and security activations
+    ///     recorded before this call are replayed through the wiring.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="schemata">The Schemata options carrying the shared resource registry.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddSchemataResources(this IServiceCollection services, SchemataOptions schemata) {
+        AddSchemataResources(services);
+
+        var registry = GetOrAddRegistry(schemata, services);
+        registry.Attach(new(
+            (collection, resource, methods) => AddResource(collection, resource, registry),
+            ResourceAuthorizationRegistration.RegisterAuthentication,
+            ResourceAuthorizationRegistration.RegisterAuthorization,
+            ResourceAuthorizationRegistration.AddResourceAuthorizationAdvisors
+        ));
+
+        return services;
+    }
+
+    private static ResourceRegistry GetOrAddRegistry(SchemataOptions schemata, IServiceCollection services) {
+        var registry = schemata.Get<ResourceRegistry>(RegistryKey);
+        if (registry is not null) {
+            return registry;
+        }
+
+        registry = new();
+        schemata.Set(RegistryKey, registry);
+        services.TryAddSingleton<ResourceRegistry>(registry);
+        return registry;
+    }
+
+    internal const string RegistryKey = "Schemata.Resource.Registry";
 
     /// <summary>
     ///     Registers a single resource: resolves endpoints, adds the idempotency advisor
@@ -156,8 +194,8 @@ public static class ServiceCollectionExtensions
                 services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceMethodAdvisor<,,>).MakeGenericType(entity, methodRequest, methodResponse), typeof(AdviceMethodFreshness<,,>).MakeGenericType(entity, methodRequest, methodResponse)));
             }
         }
-
         registry.Add(resource, methods);
+
 
         return services;
     }

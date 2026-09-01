@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Advisors;
 using Schemata.Messaging.Skeleton.Advisors;
-using Schemata.Push.Foundation;
 using Schemata.Push.Foundation.Commands;
 using Schemata.Push.Skeleton;
 using Xunit;

@@ -56,7 +56,7 @@ public class AuthorizationCodeHandlerShould
         };
 
         return new() {
-            Uid         = Identifiers.NewUid(),
+            Uid         = Guid.NewGuid(),
             Type        = TokenTypes.AuthorizationCode,
             Status      = status,
             ExpireTime  = expireTime ?? Anchor.AddMinutes(5),
@@ -86,7 +86,7 @@ public class AuthorizationCodeHandlerShould
         var jsonOpts = Options.Create(JsonOptions);
         var codeOpts = Options.Create(new CodeFlowOptions());
         var app = new SchemataApplication {
-            Uid           = Identifiers.NewUid(),
+            Uid           = Guid.NewGuid(),
             ClientId      = TestClientId,
             CanonicalName = $"applications/{TestClientId}",
         };

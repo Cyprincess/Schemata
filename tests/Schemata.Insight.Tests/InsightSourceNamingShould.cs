@@ -1,5 +1,5 @@
 using Schemata.Common;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Entities;
 using Xunit;
 
 namespace Schemata.Insight.Tests;

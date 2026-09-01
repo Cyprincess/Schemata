@@ -1,3 +1,4 @@
+using Schemata.Report.Tests.Fixtures;
 using System;
 using System.Security.Claims;
 using System.Text.Json;
@@ -7,16 +8,19 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Resource;
-using Schemata.Advice;
 using Schemata.Common;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Advisors;
-using Schemata.Report.Foundation;
 using Schemata.Report.Foundation.Commands;
 using Schemata.Report.Skeleton;
 using Schemata.Scheduling.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 using Xunit;
+
+using Schemata.Report.Skeleton.Models;
+using Schemata.Report.Foundation.Handlers;
+using Schemata.Report.Skeleton.Advisors;
+using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Tests;
 

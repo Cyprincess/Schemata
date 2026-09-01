@@ -1,10 +1,10 @@
+using Schemata.Core.Building;
 using System;
 using System.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
-using Schemata.Resource.Foundation;
 using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;
@@ -20,7 +20,7 @@ public class SchedulingTransportShould
         builder.UseSchemata(schema => schema.UseScheduling().MapHttp().MapGrpc());
 
         using var app      = builder.Build();
-        var       registry = app.Services.GetRequiredService<IResourceRegistry>();
+        var       registry = app.Services.GetRequiredService<ResourceRegistry>();
 
         Assert.NotNull(registry.GetResource(typeof(SchemataJob)));
         Assert.NotNull(registry.GetResource(typeof(SchemataJobExecution)));
@@ -41,7 +41,7 @@ public class SchedulingTransportShould
         builder.UseSchemata(schema => schema.UseScheduling().MapHttp().MapGrpc());
 
         using var app      = builder.Build();
-        var       registry = app.Services.GetRequiredService<IResourceRegistry>();
+        var       registry = app.Services.GetRequiredService<ResourceRegistry>();
 
         var run = Assert.Single(registry.GetMethods(typeof(SchemataJob)));
         Assert.Equal(Verbs.Run, run.Verb);

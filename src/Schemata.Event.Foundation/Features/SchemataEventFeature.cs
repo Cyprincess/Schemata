@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
-using Schemata.Event.Foundation.Internal;
+using Schemata.Event.Foundation.Runtime;
 using Schemata.Event.Foundation.Observers;
 using Schemata.Event.Skeleton;
 

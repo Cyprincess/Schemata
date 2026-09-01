@@ -79,12 +79,3 @@ internal static class EstimateQueries
         }
     }
 }
-
-internal enum EstimateProvider
-{
-    None,
-    PostgreSql,
-    MySql,
-    SqlServer,
-    Sqlite,
-}

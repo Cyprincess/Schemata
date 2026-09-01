@@ -14,7 +14,14 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Expressions.Skeleton;
 using Schemata.Insight.Foundation;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Foundation.Drivers;
+using Schemata.Insight.Foundation.Execution;
+using Schemata.Insight.Foundation.Planning;
+using Schemata.Insight.Skeleton.Drivers;
+using Schemata.Insight.Skeleton.Entities;
+using Schemata.Insight.Skeleton.Models;
+using Schemata.Insight.Skeleton.Plan;
+using Schemata.Insight.Skeleton.Queries;
 using Schemata.Security.Skeleton;
 using Xunit;
 

@@ -7,11 +7,8 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Caching.Skeleton;
-using Schemata.Common;
 using Schemata.Messaging.Skeleton;
-using Schemata.Messaging.Skeleton.Commands;
 using Schemata.Messaging.Skeleton.Advisors;
-using Schemata.Resource.Foundation.Commands;
 using Schemata.Security.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
@@ -109,7 +106,7 @@ public class ResourceIdempotencyPipelineAdvisor<TEntity, TRequest, TEnvelope, TD
             }
 
             var record = new PendingIdempotencyRecord {
-                OwnerToken    = Identifiers.NewUid().ToString("n"),
+                OwnerToken    = Guid.NewGuid().ToString("n"),
                 Operation     = operationToken,
                 RequestId     = requestId,
                 Principal     = principal,
@@ -160,70 +157,3 @@ public class ResourceIdempotencyPipelineAdvisor<TEntity, TRequest, TEnvelope, TD
 
     #endregion
 }
-
-/// <summary>
-///     Closes <see cref="ResourceIdempotencyPipelineAdvisor{TEntity,TRequest,TEnvelope,TDetail,TResponse}" />
-///     for Create dispatches: the key target comes from the payload, and replays and commits shape
-///     <see cref="CreateResultBase{TDetail}" />.
-/// </summary>
-/// <typeparam name="TEntity">The entity type being created.</typeparam>
-/// <typeparam name="TRequest">The request DTO type carrying creation data.</typeparam>
-/// <typeparam name="TDetail">The resource detail response type.</typeparam>
-public sealed class ResourceCreateIdempotencyPipelineAdvisor<TEntity, TRequest, TDetail>(ICacheProvider cache)
-    : ResourceIdempotencyPipelineAdvisor<TEntity, TRequest, CreateResourceRequest<TEntity, TRequest, TDetail>, TDetail, CreateResultBase<TDetail>>(
-        cache,
-        static _ => nameof(Operations.Create),
-        static envelope => envelope.Request,
-        static envelope => envelope.Request.CanonicalName ?? envelope.Request.Name ?? string.Empty,
-        static ctx => ctx.Has<CreateIdempotencySuppressed>(),
-        static detail => new CreateResultBase<TDetail> { Detail = detail },
-        static response => response.Detail)
-    where TEntity : class, ICanonicalName
-    where TRequest : class, ICanonicalName
-    where TDetail : class, ICanonicalName;
-
-/// <summary>
-///     Closes <see cref="ResourceIdempotencyPipelineAdvisor{TEntity,TRequest,TEnvelope,TDetail,TResponse}" />
-///     for Update dispatches: the key target comes from the inner request's canonical name or name
-///     (falling back to empty for server-named creates), so the same RequestId on different URI targets
-///     aliases to the same idempotency key. Replays and commits shape
-///     <see cref="UpdateResultBase{TDetail}" />.
-/// </summary>
-/// <typeparam name="TEntity">The entity type being updated.</typeparam>
-/// <typeparam name="TRequest">The request DTO type carrying update data.</typeparam>
-/// <typeparam name="TDetail">The resource detail response type.</typeparam>
-public sealed class ResourceUpdateIdempotencyPipelineAdvisor<TEntity, TRequest, TDetail>(ICacheProvider cache)
-    : ResourceIdempotencyPipelineAdvisor<TEntity, TRequest, UpdateResourceRequest<TEntity, TRequest, TDetail>, TDetail, UpdateResultBase<TDetail>>(
-        cache,
-        static _ => nameof(Operations.Update),
-        static envelope => envelope.Request,
-        static envelope => envelope.Request.CanonicalName ?? envelope.Request.Name ?? string.Empty,
-        static ctx => ctx.Has<UpdateIdempotencySuppressed>(),
-        static detail => new UpdateResultBase<TDetail> { Detail = detail },
-        static response => response.Detail)
-    where TEntity : class, ICanonicalName
-    where TRequest : class, ICanonicalName
-    where TDetail : class, ICanonicalName;
-
-/// <summary>
-///     Closes <see cref="ResourceIdempotencyPipelineAdvisor{TEntity,TRequest,TEnvelope,TDetail,TResponse}" />
-///     for AIP-136 custom-method dispatches: the verb is the operation token, the key target is the
-///     envelope's instance name (falling back to the inner request's own canonical name or name,
-///     matching the reservation key the in-pipeline advisor produced), and replays and commits are
-///     the identity pair over the method's own response.
-/// </summary>
-/// <typeparam name="TEntity">The resource entity type behind the method.</typeparam>
-/// <typeparam name="TRequest">The custom method's request DTO type.</typeparam>
-/// <typeparam name="TResponse">The custom method's response type.</typeparam>
-public sealed class ResourceMethodIdempotencyPipelineAdvisor<TEntity, TRequest, TResponse>(ICacheProvider cache)
-    : ResourceIdempotencyPipelineAdvisor<TEntity, TRequest, ResourceMethodRequest<TEntity, TRequest, TResponse>, TResponse, TResponse>(
-        cache,
-        static envelope => envelope.Verb,
-        static envelope => envelope.Request,
-        static envelope => envelope.Name ?? envelope.Request.CanonicalName ?? envelope.Request.Name ?? string.Empty,
-        static ctx => ctx.Has<MethodIdempotencySuppressed>(),
-        static response => response!,
-        static response => response)
-    where TEntity : class, ICanonicalName
-    where TRequest : class, ICanonicalName, IRequest<TResponse>
-    where TResponse : class, ICanonicalName;

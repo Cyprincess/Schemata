@@ -42,7 +42,7 @@ public class IntrospectionHandlerShould
         var tokensMock   = new Mock<ITokenManager<SchemataToken>>(MockBehavior.Loose);
         var tokenService = new TokenService(opts);
 
-        var app        = new SchemataApplication { Uid = Identifiers.NewUid(), ClientId = callerAppName };
+        var app        = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = callerAppName };
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
         clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
                                                   It.IsAny<Dictionary<string, List<string?>>?>(),
@@ -70,7 +70,7 @@ public class IntrospectionHandlerShould
         string  type    = TokenTypes.AccessToken
     ) {
         return new() {
-            Uid         = Identifiers.NewUid(),
+            Uid         = Guid.NewGuid(),
             Type        = type,
             Application = appName,
             ReferenceId = referenceId,
@@ -122,7 +122,7 @@ public class IntrospectionHandlerShould
         using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
 
         var claims = new List<Claim> {
-            new(Claims.JwtId, Identifiers.NewUid().ToString()),
+            new(Claims.JwtId, Guid.NewGuid().ToString()),
             new(IdentityClaims.Subject, "users/u-42"),
             new(Claims.ClientId, "test-client"),
             new(Claims.Scope, "openid profile"),
@@ -153,7 +153,7 @@ public class IntrospectionHandlerShould
         using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
 
         var claims = new List<Claim> {
-            new(Claims.JwtId, Identifiers.NewUid().ToString()),
+            new(Claims.JwtId, Guid.NewGuid().ToString()),
             new(IdentityClaims.Subject, "user-42"),
             new(Claims.ClientId, "other-client"),
             new(Claims.Audience, "api"),
@@ -177,7 +177,7 @@ public class IntrospectionHandlerShould
         using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
 
         var claims = new List<Claim> {
-            new(Claims.JwtId, Identifiers.NewUid().ToString()),
+            new(Claims.JwtId, Guid.NewGuid().ToString()),
             new(IdentityClaims.Subject, "user-42"),
             new(Claims.Audience, "api"),
         };

@@ -24,7 +24,7 @@ public class DeviceCodeHandlerShould
     private static Fixture CreateFixture(string? approvedScope = "openid profile email") {
         var jsonOpts = Options.Create(new JsonSerializerOptions());
 
-        var app        = new SchemataApplication { Uid = Identifiers.NewUid(), ClientId = "test-client" };
+        var app        = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test-client" };
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
         clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
                                                   It.IsAny<Dictionary<string, List<string?>>?>(),
@@ -36,7 +36,7 @@ public class DeviceCodeHandlerShould
                                                jsonOpts.Value);
 
         var device = new SchemataToken {
-            Uid           = Identifiers.NewUid(),
+            Uid           = Guid.NewGuid(),
             Name          = "device-1",
             Type          = TokenTypes.DeviceCode,
             Status        = TokenStatuses.Authorized,

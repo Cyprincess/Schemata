@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Common;
 using Schemata.Tenancy.Foundation.Services;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
@@ -16,7 +15,7 @@ public class SchemataTenantContextAccessorShould
 {
     [Fact]
     public async Task InitializeAsync_Throws_TenantResolveException_When_Tenant_Not_Found() {
-        var id = Identifiers.NewUid();
+        var id = Guid.NewGuid();
 
         var resolver = new Mock<ITenantResolver>();
         resolver.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(id);

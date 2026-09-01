@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json.Serialization;
 using Schemata.Messaging.Skeleton;
-using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Models;
 
 namespace Schemata.Report.Foundation.Commands;
 
@@ -14,7 +14,6 @@ public sealed record RunReportRequest(ReportRequest Request, ClaimsPrincipal? Pr
     [JsonIgnore]
     public ClaimsPrincipal? Principal { get; set; } = Principal;
 
-    /// <inheritdoc />
     [JsonIgnore]
     public string? ReportKey => Request?.Name;
 }

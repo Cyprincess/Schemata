@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Queries;
 using Schemata.Security.Skeleton;
 
 namespace Schemata.Report.Integration.Tests.Fixtures;

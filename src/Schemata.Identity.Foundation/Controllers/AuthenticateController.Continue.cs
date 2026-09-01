@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Identity.Foundation.Internal;
+using Schemata.Identity.Foundation.Runtime;
 using Schemata.Identity.Skeleton.Entities;
 
 namespace Schemata.Identity.Foundation.Controllers;

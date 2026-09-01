@@ -91,7 +91,7 @@ public sealed class AuthorizeHandler<TApp, TToken>(
         var payload   = JsonSerializer.Serialize(authz.Request, json.Value);
 
         var interaction = new TToken {
-            Name        = Identifiers.NewUid().ToString("n"),
+            Name        = Guid.NewGuid().ToString("n"),
             Application = authz.Application.CanonicalName,
             Type        = TokenTypes.Interaction,
             Status      = TokenStatuses.Valid,

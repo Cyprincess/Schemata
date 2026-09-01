@@ -1,11 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
-using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
-using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
@@ -82,7 +81,7 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
         var at  = authz.Principal?.FindFirstValue(Claims.AuthTime);
 
         var authorization = new TAuth {
-            Name                = Identifiers.NewUid().ToString("n"),
+            Name                = Guid.NewGuid().ToString("n"),
             Application         = authz.Application.CanonicalName,
             Subject             = subject,
             Type                = AuthorizationTypes.AdHoc,

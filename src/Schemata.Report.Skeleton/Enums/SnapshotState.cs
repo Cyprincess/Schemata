@@ -1,4 +1,4 @@
-namespace Schemata.Report.Skeleton;
+namespace Schemata.Report.Skeleton.Enums;
 
 /// <summary>Lifecycle state of a report snapshot materialization.</summary>
 public enum SnapshotState

@@ -1,8 +1,8 @@
 using System;
-using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Entities;
 using Schemata.Scheduling.Skeleton;
 
-namespace Schemata.Report.Foundation;
+namespace Schemata.Report.Foundation.Jobs;
 
 /// <summary>Stable scheduler key shared by every closed <see cref="ReportJobKeyResolver{TReport, TSnapshot, TChunk}" />.</summary>
 public static class ReportJobKeyResolver
@@ -20,14 +20,12 @@ public sealed class ReportJobKeyResolver<TReport, TSnapshot, TChunk> : ISchedule
     where TSnapshot : SchemataReportSnapshot, new()
     where TChunk : SchemataReportSnapshotChunk, new()
 {
-    /// <inheritdoc />
     public Type? ResolveType(string key) {
         return string.Equals(key, ReportJobKeyResolver.Key, StringComparison.Ordinal)
             ? typeof(ReportGenerationJob<TReport, TSnapshot, TChunk>)
             : null;
     }
 
-    /// <inheritdoc />
     public string? ResolveKey(Type jobType) {
         return jobType == typeof(ReportGenerationJob<TReport, TSnapshot, TChunk>) ? ReportJobKeyResolver.Key : null;
     }

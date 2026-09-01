@@ -1,4 +1,3 @@
-using System;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -11,6 +10,7 @@ using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Resource.Foundation;
+using Schemata.Resource.Foundation.Commands;
 using Schemata.Resource.Http.Integration.Tests.Fixtures;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;

@@ -8,14 +8,16 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Common;
 using Schemata.Entity.Repository;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Queries;
 using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Entities;
+using Schemata.Report.Skeleton.Enums;
 
-namespace Schemata.Report.Foundation;
+namespace Schemata.Report.Foundation.Definitions;
 
 /// <summary>Resolves persisted report definitions through a fresh repository scope per call.</summary>
 /// <typeparam name="TReport">Persisted report-definition entity type.</typeparam>
-public sealed class DatabaseReportDefinitionStore<TReport> : Definitions.IReportDefinitionSource
+public sealed class DatabaseReportDefinitionStore<TReport> : IReportDefinitionSource
     where TReport : SchemataReport
 {
     private readonly IServiceScopeFactory _scopes;
@@ -24,7 +26,6 @@ public sealed class DatabaseReportDefinitionStore<TReport> : Definitions.IReport
     /// <param name="scopes">Scope factory used to resolve repositories and keyed providers per call.</param>
     public DatabaseReportDefinitionStore(IServiceScopeFactory scopes) { _scopes = scopes; }
 
-    /// <inheritdoc />
     public async ValueTask<(SchemataReport Report, QueryInsightRequest Query)?> ResolveAsync(
         string            name,
         CancellationToken ct
@@ -40,7 +41,6 @@ public sealed class DatabaseReportDefinitionStore<TReport> : Definitions.IReport
         return (report, await ResolveQueryAsync(scope.ServiceProvider, report, ct));
     }
 
-    /// <inheritdoc />
     public async IAsyncEnumerable<SchemataReport> ListPeriodicAsync(
         [EnumeratorCancellation] CancellationToken ct
     ) {

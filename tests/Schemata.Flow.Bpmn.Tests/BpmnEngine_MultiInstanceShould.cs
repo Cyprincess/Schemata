@@ -198,10 +198,10 @@ public class BpmnEngine_MultiInstanceShould
             SourceEntities = [];
 
             var services = new ServiceCollection();
-            services.AddSingleton<IRepository<SchemataProcessToken>>(BpmnEngine_MultiInstanceShould.CreateRepository(Tokens).Object);
-            services.AddSingleton<IRepository<SchemataProcessTransition>>(BpmnEngine_MultiInstanceShould.CreateRepository(Transitions).Object);
-            services.AddSingleton<IRepository<SchemataProcessSource>>(BpmnEngine_MultiInstanceShould.CreateRepository(Sources).Object);
-            services.AddSingleton<IRepository<SourceEntity>>(BpmnEngine_MultiInstanceShould.CreateRepository(SourceEntities).Object);
+            services.AddSingleton<IRepository<SchemataProcessToken>>(CreateRepository(Tokens).Object);
+            services.AddSingleton<IRepository<SchemataProcessTransition>>(CreateRepository(Transitions).Object);
+            services.AddSingleton<IRepository<SchemataProcessSource>>(CreateRepository(Sources).Object);
+            services.AddSingleton<IRepository<SourceEntity>>(CreateRepository(SourceEntities).Object);
             Services = services.BuildServiceProvider();
             Engine   = new();
         }

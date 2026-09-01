@@ -8,7 +8,7 @@ using Moq;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Messaging.Skeleton.Advisors;
-using Schemata.Messaging.Skeleton.Internal;
+using Schemata.Messaging.Skeleton.Runtime;
 using Schemata.Messaging.Skeleton.Tests.Fixtures;
 using Xunit;
 

@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions;
 using Schemata.Messaging.Skeleton;
-using Schemata.Messaging.Skeleton.Internal;
+using Schemata.Messaging.Skeleton.Runtime;
 using Schemata.Push.Foundation;
 using Schemata.Push.Foundation.Commands;
 using Schemata.Push.Foundation.Handlers;

@@ -3,9 +3,6 @@ using Schemata.Event.Skeleton;
 
 namespace Schemata.Entity.Event.Tests.Fixtures;
 
-/// <summary>A domain event carrying enough state to tell two raises apart.</summary>
-public sealed record WidgetRenamed(string Name) : IEvent;
-
 /// <summary>
 ///     Buffers events without implementing any aggregate marker — the flush mechanism is
 ///     deliberately available to plain entities, not only to DDD aggregates.
@@ -29,10 +26,4 @@ public sealed class Widget : IHasPendingEvents
     #endregion
 
     public void Rename(string name) { _pending.Add(new WidgetRenamed(name)); }
-}
-
-/// <summary>An entity that buffers nothing, so the advisor must leave it alone.</summary>
-public sealed class Plain
-{
-    public string Name { get; init; } = string.Empty;
 }

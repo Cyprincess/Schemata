@@ -197,7 +197,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         }
 
         var authorization = new TAuth {
-            Name        = Identifiers.NewUid().ToString("n"),
+            Name        = Guid.NewGuid().ToString("n"),
             Application = application.CanonicalName,
             Subject     = subject,
             Type        = AuthorizationTypes.Device,

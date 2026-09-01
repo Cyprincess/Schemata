@@ -1,10 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Resource;
-using Schemata.Common.Errors;
-using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Messaging.Skeleton;
 using CompleteProcessRequest = Schemata.Flow.Foundation.Commands.CompleteActivityRequest;
@@ -17,7 +13,6 @@ namespace Schemata.Flow.Foundation;
 public sealed class CompleteActivityHandler(IRequestDispatcher dispatcher)
     : IRequestHandler<CompleteActivityRequest, ProcessSnapshot>
 {
-    /// <inheritdoc />
     public async Task<ProcessSnapshot> HandleAsync(
         CompleteActivityRequest request,
         CancellationToken ct = default)

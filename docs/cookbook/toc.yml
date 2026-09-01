@@ -28,6 +28,8 @@
   href: canonical-name-routing.md
 - name: Adding a Resource
   href: adding-a-resource.md
+- name: Resource Business Action
+  href: resource-business-action.md
 - name: Distributed Cache
   href: distributed-cache.md
 - name: Custom Advisor

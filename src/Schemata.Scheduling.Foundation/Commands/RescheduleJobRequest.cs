@@ -12,6 +12,5 @@ public sealed record RescheduleJobRequest(
     JobContext? PreparedContext
 ) : ICommand, IJobScoped
 {
-    /// <inheritdoc />
     public string JobCanonicalName => Job.CanonicalName ?? Job.Name ?? string.Empty;
 }

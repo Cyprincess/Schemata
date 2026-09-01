@@ -3,8 +3,8 @@ using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
-using Schemata.Report.Scheduling.Internal;
-using Schemata.Report.Skeleton;
+using Schemata.Report.Scheduling.Runtime;
+using Schemata.Report.Skeleton.Entities;
 using Schemata.Scheduling.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -19,10 +19,8 @@ namespace Schemata.Report.Scheduling.Advisors;
 public sealed class AdviceReportScheduleSync<TReport>(IScheduler scheduler) : IRepositoryCommittedAdvisor<TReport>
     where TReport : SchemataReport
 {
-    /// <inheritdoc />
     public int Order => Orders.Extension;
 
-    /// <inheritdoc />
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         IRepository<TReport>   repository,

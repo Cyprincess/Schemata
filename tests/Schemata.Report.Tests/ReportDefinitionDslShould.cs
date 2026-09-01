@@ -8,10 +8,14 @@ using Microsoft.Extensions.Options;
 using Schemata.Common;
 using Schemata.Core;
 using Schemata.Expressions.Skeleton;
-using Schemata.Insight.Skeleton;
 using Schemata.Report.Foundation;
 using Schemata.Report.Skeleton;
 using Xunit;
+using Schemata.Insight.Skeleton.Models;
+using Schemata.Insight.Skeleton.Queries;
+using Schemata.Report.Foundation.Definitions;
+using Schemata.Report.Skeleton.Entities;
+using Schemata.Report.Skeleton.Enums;
 
 namespace Schemata.Report.Tests;
 
@@ -129,10 +133,10 @@ public class ReportDefinitionDslShould
         Assert.Contains("name", empty.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk> CreateBuilder(
+    private static Foundation.SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk> CreateBuilder(
         IServiceCollection services
     ) {
-        var builder = new SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
+        var builder = new Foundation.SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
             new SchemataOptions(),
             services
         );

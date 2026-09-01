@@ -1,6 +1,6 @@
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Entities;
-using Schemata.Scheduling.Foundation.Internal;
+using Schemata.Scheduling.Foundation.Runtime;
 using Xunit;
 
 namespace Schemata.Authorization.Tests;

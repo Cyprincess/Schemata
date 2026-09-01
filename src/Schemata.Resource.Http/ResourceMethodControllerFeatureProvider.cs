@@ -1,11 +1,10 @@
-using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Mvc.Controllers;
-using Schemata.Abstractions.Resource;
+using Schemata.Core.Building;
 using Schemata.Resource.Foundation;
-using Schemata.Resource.Http.Internal;
+using Schemata.Resource.Http.Runtime;
 
 namespace Schemata.Resource.Http;
 
@@ -19,7 +18,7 @@ public sealed class ResourceMethodControllerFeatureProvider : IApplicationFeatur
     /// <summary>
     ///     Gets or sets the registry supplying the resources and their AIP-136 custom methods.
     /// </summary>
-    public IResourceRegistry? Registry { get; set; }
+    public ResourceRegistry? Registry { get; set; }
 
     #region IApplicationFeatureProvider<ControllerFeature> Members
 

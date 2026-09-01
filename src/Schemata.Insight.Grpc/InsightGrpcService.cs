@@ -4,11 +4,14 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoBuf.Grpc;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Insight.Foundation;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Foundation.Planning;
+using Schemata.Insight.Grpc.Mapping;
+using Schemata.Insight.Grpc.Wire;
 using Schemata.Messaging.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 
+using Schemata.Insight.Skeleton.Models;
+using Schemata.Insight.Skeleton.Queries;
 namespace Schemata.Insight.Grpc;
 
 /// <summary>

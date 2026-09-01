@@ -3,10 +3,11 @@ using System.Linq.Expressions;
 using Humanizer;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Schemata.Core.Building;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Abstractions.Resource;
 using Schemata.Expressions.Skeleton;
+using Schemata.Resource.Foundation.Commands;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation;

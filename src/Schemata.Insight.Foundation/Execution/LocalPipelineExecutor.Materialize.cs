@@ -5,9 +5,11 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Expressions.Skeleton;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Foundation.Materialization;
+using Schemata.Insight.Foundation.Planning;
+using Schemata.Insight.Skeleton.Plan;
 
-namespace Schemata.Insight.Foundation;
+namespace Schemata.Insight.Foundation.Execution;
 
 public sealed partial class LocalPipelineExecutor
 {
@@ -16,14 +18,13 @@ public sealed partial class LocalPipelineExecutor
         SelectionNode                                         selection,
         [EnumeratorCancellation] CancellationToken             ct
     ) {
-        var computed = selection.Items
-                                .Where(item => item.Kind is SelectionKind.Expression && item.Expression is not null)
-                                .Select(item => (item.Alias,
-                                                 Value: ExpressionCache.GetOrAddDelegate(
-                                                     Compiler(item.Expression!.Language)
-                                                        .Compile<IReadOnlyDictionary<string, object?>, object>(
-                                                             item.Expression!.Tree))))
-                                .ToArray();
+        var computed = ImmutableArrayExtensions.Where(selection.Items, item => item.Kind is SelectionKind.Expression && item.Expression is not null)
+                                               .Select(item => (item.Alias,
+                                                                Value: ExpressionCache.GetOrAddDelegate(
+                                                                    Compiler(item.Expression!.Language)
+                                                                       .Compile<IReadOnlyDictionary<string, object?>, object>(
+                                                                            item.Expression!.Tree))))
+                                               .ToArray<(string Alias, Func<IReadOnlyDictionary<string, object>, object> Value)>();
 
         await foreach (var row in rows.WithCancellation(ct)) {
             if (selection.Items.IsDefaultOrEmpty) {

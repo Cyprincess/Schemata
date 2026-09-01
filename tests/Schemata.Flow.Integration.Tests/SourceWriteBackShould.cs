@@ -5,7 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Advisors;
-using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Skeleton.Entities;
@@ -92,10 +91,10 @@ public abstract class SourceWriteBackShould
         using var scope      = _fixture.CreateScope();
         var       repository = scope.ServiceProvider.GetRequiredService<IRepository<Order>>();
         var order = new Order {
-            Uid           = Identifiers.NewUid(),
-            Name          = Identifiers.NewUid().ToString("n"),
-            CanonicalName = $"orders/{Identifiers.NewUid():n}",
-            Timestamp     = Identifiers.NewUid(),
+            Uid           = Guid.NewGuid(),
+            Name          = Guid.NewGuid().ToString("n"),
+            CanonicalName = $"orders/{Guid.NewGuid():n}",
+            Timestamp     = Guid.NewGuid(),
             State         = state,
             TaskValue     = "before",
         };
@@ -173,16 +172,4 @@ public abstract class SourceWriteBackShould
         Assert.Equal(AdviseResult.Continue, result);
         await uow.CommitAsync();
     }
-}
-
-[Trait("Category", "Integration")]
-public sealed class EfCoreSourceWriteBackShould : SourceWriteBackShould, IClassFixture<EfCoreFlowFixture>
-{
-    public EfCoreSourceWriteBackShould(EfCoreFlowFixture fixture) : base(fixture) { }
-}
-
-[Trait("Category", "Integration")]
-public sealed class LinqToDbSourceWriteBackShould : SourceWriteBackShould, IClassFixture<LinqToDbFlowFixture>
-{
-    public LinqToDbSourceWriteBackShould(LinqToDbFlowFixture fixture) : base(fixture) { }
 }

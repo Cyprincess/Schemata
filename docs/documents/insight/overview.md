@@ -1,176 +1,50 @@
 # Insight
 
-Insight is a federated read-query subsystem. A client sends one `QueryInsightRequest` with named
-sources, joins, transformations, selections, and pagination metadata. The service resolves each source
-through a catalog, builds a logical plan, pushes the single-source prefix into a driver, and runs the
-remaining stages in the local dictionary-row pipeline. HTTP and gRPC transports expose the same query
-surface.
+Insight executes federated read queries. A `QueryInsightRequest` binds named sources, joins, transformations, selections, and paging data; HTTP and gRPC submit the same request through `IRequestDispatcher`.
 
-## Where the code lives
+## Packages
 
-| Package                       | Key files                                                                                                                                                                                                                                                                                                                                                                                          |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Schemata.Insight.Skeleton`   | `IInsightService.cs`, `Wire/QueryInsightRequest.cs`, `Wire/QueryInsightResponse.cs`, `Wire/SelectionSpec.cs`, `Wire/Transformations.cs`, `Drivers/ISourceDriver.cs`, `Drivers/DriverCapabilities.cs`, `Catalog/IInsightSourceCatalog.cs`, `Catalog/SourceConfig.cs`, `Entities/SchemataInsightSource.cs`, `Plan/*.cs`                                                                              |
-| `Schemata.Insight.Foundation` | `SchemataInsightBuilder.cs`, `SchemataInsightOptions.cs`, `Features/SchemataInsightFeature.cs`, `Planning/InsightPlanBuilder.cs`, `Execution/DefaultInsightService.cs`, `Execution/PlanExecutor.cs`, `Execution/LocalPipelineExecutor*.cs`, `Drivers/RepositoryDriver.cs`, `Catalog/InMemoryInsightSourceCatalog.cs`, `Catalog/DatabaseInsightSourceCatalog.cs`, `Security/InsightSecurityGate.cs` |
-| `Schemata.Insight.Http`       | `InsightController.cs`, `Features/SchemataInsightHttpFeature.cs`, `Extensions/SchemataInsightBuilderExtensions.cs`                                                                                                                                                                                                                                                                                 |
-| `Schemata.Insight.Grpc`       | `IInsightGrpcService.cs`, `InsightGrpcService.cs`, `InsightServiceMethodProvider.cs`, `InsightGrpcMethods.cs`, `Mapping/InsightStructMapper.cs`, `Wire/*.cs`, `Features/SchemataInsightGrpcFeature.cs`                                                                                                                                                                                             |
+| Package | Role |
+| --- | --- |
+| `Schemata.Insight.Skeleton` | Query wire contracts, source catalog contracts, drivers, plans, and entities |
+| `Schemata.Insight.Foundation` | Builder, planning, execution, catalog implementations, and `InsightSecurityGate` |
+| `Schemata.Insight.Http` / `Schemata.Insight.Grpc` | HTTP controller and gRPC service activation |
 
 ## Startup
 
-`UseInsight()` on `SchemataBuilder` activates
-`Schemata.Insight.Foundation.Features.SchemataInsightFeature` (Priority
-`Orders.Extension + 110_000_000` = 510,000,000) and returns a `SchemataInsightBuilder`:
-
 ```csharp
-using Microsoft.AspNetCore.Builder;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Schemata.Abstractions.Resource;
-using Schemata.Entity.EntityFrameworkCore;
-using Schemata.Expressions.Aip;
-using Schemata.Expressions.Cel;
-using Schemata.Expressions.Order;
-using Schemata.Insight.Foundation;
-
 builder.UseSchemata(schema => {
+    schema.UseSecurity();
     var insight = schema.UseInsight(i => {
-        i.WithTotalSize(TotalSizeMode.Exact);
         i.AddRepositorySource("students", "students")
          .AddSourceDriver<RepositoryDriver>(RepositoryDriver.DriverName);
     });
 
-    insight.UseAip().UseCel().UseOrdering();
-    insight.MapHttp();
-
-    schema.Services.AddDbContextFactory<AppDbContext>(opts => opts.UseSqlite(connectionString));
-    schema.Services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>();
+    insight.WithAuthentication("Bearer")
+           .MapHttp();
 });
 ```
 
-`SchemataInsightFeature.ConfigureServices` registers:
+`SchemataInsightBuilder` implements `IResourceBuilder`. `WithAuthentication` stores the selected transport scheme through its `ResourceSecurityRegistration`. `WithAuthorization` throws for Insight because source access is configured through `InsightSecurityGate`, which evaluates providers for each source row type.
 
-1. `InMemoryInsightSourceCatalog` as an `IInsightSourceCatalog` singleton.
-2. `InsightPlanBuilder` and `LocalPipelineExecutor` as singletons; `PlanExecutor` as scoped, so its
-   per-source `IInsightSourceAdvisor` resolution runs against the calling request's own scope.
-3. `DefaultInsightService` as `IInsightService` (singleton, `TryAdd`).
+`MapHttp()` and `MapGrpc()` are concrete Insight transport extensions. Each activates its domain transport feature; shared transport behavior comes from that feature's dependencies.
 
-The feature registers the in-memory catalog from `SchemataInsightOptions.Sources`. Calling
-`UseDatabaseCatalog()` adds `DatabaseInsightSourceCatalog` before the in-memory catalog, so runtime rows
-in `SchemataInsightSource` can resolve names and builder-registered names remain as fallback.
+## Dispatch and advisors
 
-## SchemataInsightBuilder
+`QueryInsightRequest` is a query. The dispatcher establishes `AdviceContext`, composes registered `IRequestPipelineAdvisor<QueryInsightRequest,QueryInsightResponse>` wraps, and invokes `DefaultQueryInsightHandler`.
 
-| Member                                                                                           | Effect                                                                                                               |
-| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `DefaultLanguage(string language)`                                                               | Sets the expression language used when a slot and the request omit `language`; default is `ExpressionLanguages.Aip`. |
-| `WithTotalSize(TotalSizeMode mode)`                                                              | Sets the `total_size` behavior. `Default` is treated as `Exact`.                                                     |
-| `AddSource(string name, string driver, IReadOnlyDictionary<string, object?>? parameters = null)` | Adds an in-memory source binding.                                                                                    |
-| `AddRepositorySource(string name, string resource)`                                              | Adds a source served by `RepositoryDriver` with the `resource` parameter.                                            |
-| `AddSourceDriver<TDriver>(string name)`                                                          | Registers a keyed singleton `ISourceDriver`.                                                                         |
-| `UseDatabaseCatalog()`                                                                           | Resolves source names through `IRepository<SchemataInsightSource>` before the in-memory catalog.                     |
-| `AddFeature<T>()`                                                                                | Adds a feature to the Schemata configuration.                                                                        |
+The handler builds the plan, places the `PlanNode` in the ambient context for plan-stage coordination, runs `IInsightPlanAdvisor`, and executes the plan. `PlanExecutor` runs `IInsightSourceAdvisor` for each source. Direct calls to the executor create a context only when no ambient context exists.
 
-Insight also implements `IExpressionLanguageBuilder`, so expression packages can attach their languages
-to the same builder with `UseAip()`, `UseCel()`, and `UseOrdering()`.
+Register `IRequestPipelineAdvisor<QueryInsightRequest,QueryInsightResponse>` for request-wide rejection or response shaping. Register `IInsightPlanAdvisor` or `IInsightSourceAdvisor` for work that requires the plan or source binding.
 
-## Request and response wire types
+## Source security
 
-`QueryInsightRequest` carries the query graph:
-
-| Field                           | Meaning                                                                                       |
-| ------------------------------- | --------------------------------------------------------------------------------------------- |
-| `Sources`                       | `SourceBinding(alias, name)` entries. `name` is catalog-facing; `alias` is request-facing.    |
-| `Joins`                         | `JoinSpec(left, right, kind, on)` entries over source aliases.                                |
-| `Transformations`               | Ordered `Filter`, `Compute`, `GroupBy`, `OrderBy`, `Top`, or `Skip` operations.               |
-| `Selections`                    | GraphQL-style `SelectionSpec` items for fields, computed expressions, and nested child lists. |
-| `PageSize`, `Skip`, `PageToken` | Top-level paging controls.                                                                    |
-| `Language`                      | Request-level default for expression slots.                                                   |
-
-`QueryInsightResponse` returns:
-
-| Field           | Meaning                                                                         |
-| --------------- | ------------------------------------------------------------------------------- |
-| `Rows`          | Nested string-keyed row dictionaries.                                           |
-| `Schema`        | `FieldDescriptor` tree for response fields.                                     |
-| `NextPageToken` | Opaque continuation token, currently an encoded skip offset.                    |
-| `TotalSize`     | Exact or estimated count, depending on `SchemataInsightOptions.TotalSize`.      |
-| `Unreachable`   | Source names that could not be reached; reserved for AIP-217 partial responses. |
-
-## Catalog and driver model
-
-`IInsightSourceCatalog` hides backend details from the caller. A catalog resolves a source name to a
-`SourceConfig`, which contains a driver name and driver-specific parameters. The built-in repository
-source stores the resource collection in `Params["resource"]`.
-
-`ISourceDriver` lowers one `SubPlan` into its backend. The driver advertises its pushdown surface with
-`DriverCapabilities`; `PlanExecutor` splits a single-source plan at the first local barrier. The
-pushable prefix goes to the driver, and the residual stages run through `LocalPipelineExecutor`.
-
-The built-in `RepositoryDriver` resolves the resource collection to an entity type with
-`ResourceNameDescriptor`, reads through `IRepository<TEntity>`, pushes filter and order stages when the
-expression planner can lower them, applies residual filters in memory, and materializes rows and schema
-from the selected entity properties.
-
-## Security gate
-
-Drivers call `InsightSecurityGate.AuthorizeAsync<TEntity>` before opening the source, passing the row
-type they are already generic over. The gate resolves `IAccessProvider<TEntity, QueryInsightRequest>`
-and `IEntitlementProvider<TEntity, QueryInsightRequest>` from the container:
-
-- an access provider can deny the entire source for the request and principal;
-- an entitlement provider can return an `Expression<Func<TEntity, bool>>` row predicate;
-- a missing provider leaves that layer ungated.
-
-`RepositoryDriver` applies the entitlement expression before filter pushdown so row security remains in
-the backend query when the provider returns an expression.
-
-## Internal command dispatch
-
-`QueryInsightRequest : IInsightQuery<QueryInsightResponse>`, and `IInsightQuery<TResult> : IQuery<TResult>`
-(`Schemata.Messaging.Skeleton`) — a query is dispatched, not called directly. `DefaultInsightService.QueryAsync`
-(the `IInsightService` facade), `InsightController.QueryAsync` (HTTP), and `InsightGrpcService.QueryAsync`
-(gRPC) each resolve `IRequestDispatcher` and call `SendAsync<QueryInsightRequest, QueryInsightResponse>` —
-the facade is not a special path the transports route through; all three are independent dispatcher callers
-sending the same request type. `DefaultQueryInsightHandler`, registered as
-`IRequestHandler<QueryInsightRequest, QueryInsightResponse>` (keyed `InsightConstants.Handlers.Default`, with
-an unkeyed alias), is the sole handler: it runs `IInsightRequestAdvisor` before planning,
-`IInsightPlanAdvisor` over the built plan, `PlanExecutor.ExecuteAsync`, then `IInsightResponseAdvisor` over
-the response — the four Insight-specific advisor contracts, distinct from the dispatcher-level
-`IQueryAdvisor<QueryInsightRequest>` chain described below.
-
-Because every entry dispatches the same request, a registered `IQueryAdvisor<QueryInsightRequest>`
-(`Schemata.Messaging.Skeleton.Advisors`) runs before `DefaultQueryInsightHandler` regardless of which entry
-point was called. See [Messaging](../messaging/overview.md) for the dispatcher, the advisor chains, and the
-ambient `AdviceContext` rules.
-
-## Feature priority table
-
-| Feature                      | Priority    |
-| `SchemataInsightFeature`     | 510,000,000 |
-| `SchemataInsightHttpFeature` | 510,100,000 |
-| `SchemataInsightGrpcFeature` | 510,200,000 |
-
-## Extension points
-
-- Implement `ISourceDriver` and register it with `AddSourceDriver<TDriver>(name)` for a new backend.
-- Implement `IInsightSourceCatalog` to resolve source names from configuration, a database, or another
-  registry.
-- Register `IInsightRequestAdvisor`, `IInsightPlanAdvisor`, `IInsightSourceAdvisor`, or
-  `IInsightResponseAdvisor` for validation, rewrites, source gating, and response shaping.
-- Register Security `IAccessProvider<TEntity, QueryInsightRequest>` or
-  `IEntitlementProvider<TEntity, QueryInsightRequest>` to restrict source access.
-
-## Caveats
-
-- A query must bind at least one source. Multiple sources must be connected by joins.
-- Top-level `Top` and `Skip` transformations are rejected; use `PageSize` and `Skip` on the request.
-- Joins run locally with a bounded buffered side because a single backend query cannot span
-  heterogeneous sources.
-- `RepositoryDriver` needs a repository for each registered resource entity.
+Drivers call `InsightSecurityGate.AuthorizeAsync<TEntity>` before opening a source. The gate resolves `IAccessProvider<TEntity,QueryInsightRequest>` and `IEntitlementProvider<TEntity,QueryInsightRequest>` from the source scope. An access provider can reject the source; an entitlement provider can return an expression that the Repository driver applies to its backend query.
 
 ## See also
 
-- [Planning](planning.md) — logical plan construction, expression slot resolution, and validation
-- [Drivers](drivers.md) — pushdown, residual stages, `RepositoryDriver`, and custom drivers
-- [Transports](transports.md) — HTTP and gRPC surfaces
-- [Insight Guide](../../guides/insight.md) — first federated query walkthrough
+- [Planning](planning.md)
+- [Drivers](drivers.md)
+- [Transports](transports.md)
+- [Security](../security.md)
+- [Messaging](../messaging/overview.md)

@@ -1,4 +1,4 @@
-using Schemata.Common;
+using System;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 
@@ -17,7 +17,7 @@ public static class TransitionFactory
         string         eventName
     ) {
         return new() {
-            Name      = Identifiers.NewUid().ToString("n"),
+            Name      = Guid.NewGuid().ToString("n"),
             Process   = processName,
             Token     = tokenCanonical,
             Kind      = kind,

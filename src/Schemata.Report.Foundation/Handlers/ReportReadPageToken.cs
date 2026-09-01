@@ -1,7 +1,7 @@
 using System;
 using Schemata.Abstractions.Exceptions;
 
-namespace Schemata.Report.Foundation;
+namespace Schemata.Report.Foundation.Handlers;
 
 internal readonly record struct ReportReadPageToken(int ChunkIndex, int Offset)
 {

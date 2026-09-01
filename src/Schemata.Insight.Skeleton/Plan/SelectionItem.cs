@@ -1,14 +1,6 @@
 using System.Collections.Immutable;
 
-namespace Schemata.Insight.Skeleton;
-
-/// <summary>The kind of a selection item.</summary>
-public enum SelectionKind
-{
-    Field,
-    Expression,
-    Nested,
-}
+namespace Schemata.Insight.Skeleton.Plan;
 
 /// <summary>
 ///     One projected item: a field path, a computed value expression, or a nested object with its own

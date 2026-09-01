@@ -16,10 +16,7 @@ persisted path, and the optional scheduling bridge materializes periodic definit
 
 ## Startup
 
-`UseReport()` returns a `SchemataReportBuilder<SchemataReport, SchemataReportSnapshot,
-SchemataReportSnapshotChunk>`. It depends on `SchemataInsightFeature`, so the host configures Insight
-and its expression languages before reports execute a query. `MapHttp()` and `MapGrpc()` add the
-transport-specific resource registrations; `UseReport()` by itself registers no resources.
+`UseReport()` returns a `SchemataReportBuilder<SchemataReport,SchemataReportSnapshot,SchemataReportSnapshotChunk>`. It implements `IResourceBuilder`. `MapHttp()` and `MapGrpc()` are concrete Report transport extensions that each activate one Report transport feature; their dependencies provide shared Resource transport behavior. `UseReport()` alone does not expose Report resources.
 
 ```csharp
 using Microsoft.AspNetCore.Builder;
@@ -39,8 +36,10 @@ builder.UseSchemata(schema => {
         options.ChunkSize     = 1_000;
         options.MaxInlineRows = 10_000;
     });
-    reports.MapHttp().MapGrpc();
-});
+    reports.WithAuthentication("Bearer")
+           .WithAuthorization()
+           .MapHttp()
+           .MapGrpc();
 ```
 
 `UseScheduling()` on the host builder supplies the scheduler used for asynchronous generation and

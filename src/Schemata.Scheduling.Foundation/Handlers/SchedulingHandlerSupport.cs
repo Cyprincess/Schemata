@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Common;
 using Schemata.Entity.Repository;
-using Schemata.Scheduling.Foundation.Internal;
+using Schemata.Scheduling.Foundation.Runtime;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 
@@ -102,7 +102,7 @@ internal sealed class SchedulingHandlerSupport(DefaultScheduler scheduler, Schem
         if (existing is not null) {
             return;
         }
-        var name       = Identifiers.NewUid().ToString("n");
+        var name       = Guid.NewGuid().ToString("n");
         var descriptor = ResourceNameDescriptor.ForType<SchemataJobExecution>();
         var execution = new SchemataJobExecution {
             Name          = name,

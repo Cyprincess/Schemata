@@ -1,6 +1,6 @@
 using Schemata.Abstractions.Entities;
 using Schemata.Common;
-using Schemata.Resource.Grpc.Internal;
+using Schemata.Resource.Grpc.Runtime;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;
 

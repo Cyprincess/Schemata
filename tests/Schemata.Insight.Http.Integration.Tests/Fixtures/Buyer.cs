@@ -23,25 +23,3 @@ public class Buyer : IIdentifier, ICanonicalName
 
     #endregion
 }
-
-[CanonicalName("purchases/{purchase}")]
-[Microsoft.EntityFrameworkCore.PrimaryKey(nameof(Uid))]
-public class Purchase : IIdentifier, ICanonicalName
-{
-    public int     BuyerId { get; set; }
-    public int     Amount  { get; set; }
-    public string? Status  { get; set; }
-
-    #region ICanonicalName Members
-
-    public string? Name          { get; set; }
-    public string? CanonicalName { get; set; }
-
-    #endregion
-
-    #region IIdentifier Members
-
-    public Guid Uid { get; set; }
-
-    #endregion
-}

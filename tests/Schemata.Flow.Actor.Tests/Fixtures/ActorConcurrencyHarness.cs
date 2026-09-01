@@ -10,8 +10,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Core;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
-using Schemata.Entity.Repository.Advisors;
-using Schemata.Flow.Foundation.Commands;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;

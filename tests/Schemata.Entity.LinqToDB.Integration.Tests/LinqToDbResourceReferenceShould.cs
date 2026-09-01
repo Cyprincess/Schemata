@@ -9,7 +9,6 @@ using LinqToDB.Mapping;
 using Microsoft.Data.Sqlite;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
-using Schemata.Common;
 using Xunit;
 using TableAttribute = System.ComponentModel.DataAnnotations.Schema.TableAttribute;
 
@@ -18,7 +17,7 @@ namespace Schemata.Entity.LinqToDB.Integration.Tests;
 [Trait("Category", "Integration")]
 public class LinqToDbResourceReferenceShould : IAsyncLifetime
 {
-    private readonly string _dbPath = $"{Identifiers.NewUid():n}.db";
+    private readonly string _dbPath = $"{Guid.NewGuid():n}.db";
 
     private DataOptions _options = null!;
 
@@ -54,12 +53,12 @@ public class LinqToDbResourceReferenceShould : IAsyncLifetime
     public void AssociationJoin_OnResourceReferencedField_ResolvesTheReferencedRow() {
         using var connection = new DataConnection(_options);
         connection.Insert(new Book {
-            Uid           = Identifiers.NewUid(),
+            Uid           = Guid.NewGuid(),
             Name          = "les-miserables",
             CanonicalName = "books/les-miserables",
         });
         connection.Insert(new Review {
-            Uid               = Identifiers.NewUid(),
+            Uid               = Guid.NewGuid(),
             BookCanonicalName = "books/les-miserables",
             Rating            = 5,
         });
@@ -82,7 +81,7 @@ public class LinqToDbResourceReferenceShould : IAsyncLifetime
                                 .ToList();
         Assert.Contains("Annotations", columns);
 
-        var uid = Identifiers.NewUid();
+        var uid = Guid.NewGuid();
         {
             using var connection = new DataConnection(_options);
             connection.Insert(new Book {
@@ -113,7 +112,7 @@ public class LinqToDbResourceReferenceShould : IAsyncLifetime
                                 .ToList();
         Assert.Contains("Metadata", columns);
 
-        var uid = Identifiers.NewUid();
+        var uid = Guid.NewGuid();
         {
             using var connection = new DataConnection(_options);
             connection.Insert(new Book {
@@ -144,7 +143,7 @@ public class LinqToDbResourceReferenceShould : IAsyncLifetime
                                 .ToList();
         Assert.Contains("Counters", columns);
 
-        var uid = Identifiers.NewUid();
+        var uid = Guid.NewGuid();
         {
             using var connection = new DataConnection(_options);
             connection.Insert(new Book {
@@ -175,7 +174,7 @@ public class LinqToDbResourceReferenceShould : IAsyncLifetime
                                 .ToList();
         Assert.Contains("Ratings", columns);
 
-        var uid = Identifiers.NewUid();
+        var uid = Guid.NewGuid();
         {
             using var connection = new DataConnection(_options);
             connection.Insert(new Book {
@@ -202,7 +201,7 @@ public class LinqToDbResourceReferenceShould : IAsyncLifetime
                                 .ToList();
         Assert.Contains("Tags", columns);
 
-        var uid = Identifiers.NewUid();
+        var uid = Guid.NewGuid();
         {
             using var connection = new DataConnection(_options);
             connection.Insert(new Book {
@@ -229,7 +228,7 @@ public class LinqToDbResourceReferenceShould : IAsyncLifetime
                                 .ToList();
         Assert.Contains("Aliases", columns);
 
-        var uid = Identifiers.NewUid();
+        var uid = Guid.NewGuid();
         {
             using var connection = new DataConnection(_options);
             connection.Insert(new Book {
@@ -257,7 +256,7 @@ public class LinqToDbResourceReferenceShould : IAsyncLifetime
         Assert.Contains("Genres", columns);
         Assert.Contains("ShelfByName", columns);
 
-        var uid = Identifiers.NewUid();
+        var uid = Guid.NewGuid();
         {
             using var connection = new DataConnection(_options);
             connection.Insert(new Book {
@@ -285,7 +284,7 @@ public class LinqToDbResourceReferenceShould : IAsyncLifetime
                                 .ToList();
         Assert.Contains("Payload", columns);
 
-        var uid = Identifiers.NewUid();
+        var uid = Guid.NewGuid();
         var payload = new byte[] { 1, 2, 3, };
         {
             using var connection = new DataConnection(_options);

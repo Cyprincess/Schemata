@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Common;
 using Schemata.Flow.Bpmn.Runtime;
 using Schemata.Flow.Bpmn.Runtime.Boundary;
 using Schemata.Flow.Bpmn.Runtime.Compensation;
@@ -1167,8 +1166,8 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         var resolved  = await ResolveTargetAsync(definition, startOutgoing.Target, variables, TokenView(parent), execution, process, parent);
 
         var child = new SchemataProcessToken {
-            Name          = Identifiers.NewUid().ToString("n"),
-            CanonicalName = $"{process.CanonicalName}/tokens/{Identifiers.NewUid():n}",
+            Name          = Guid.NewGuid().ToString("n"),
+            CanonicalName = $"{process.CanonicalName}/tokens/{Guid.NewGuid():n}",
             Process       = process.Name!,
             Spawner       = parent.CanonicalName,
             ScopeName       = sp.Name,

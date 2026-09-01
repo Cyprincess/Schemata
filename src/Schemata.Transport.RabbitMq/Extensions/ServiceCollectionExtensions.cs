@@ -1,7 +1,7 @@
 using System;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Transport.RabbitMq;
-using Schemata.Transport.RabbitMq.Internal;
+using Schemata.Transport.RabbitMq.Runtime;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;

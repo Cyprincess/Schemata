@@ -57,18 +57,16 @@ public class PushActorConcurrencyShould
     [Fact]
     public async Task Concurrent_Adds_Without_Actor_Bridge_Race_The_Uniqueness_Guard() {
         await using var harness = await PushActorConcurrencyHarness.BuildAsync(withActor: false);
-        using var       scope   = harness.Root.CreateScope();
 
-        var handler = scope.ServiceProvider.GetRequiredService<
-            IRequestHandler<AddPushSubscriptionRequest, PushSubscriptionResult>>();
-
+        using var ready = new Barrier(Concurrency);
         var tasks = Enumerable.Range(0, Concurrency)
                               .Select(_ => Task.Run(async () => {
+                                  await using var inner = harness.Root.CreateAsyncScope();
+                                  var handler = inner.ServiceProvider.GetRequiredService<
+                                      IRequestHandler<AddPushSubscriptionRequest, PushSubscriptionResult>>();
+                                  ready.SignalAndWait();
                                   try {
-                                      await using var inner = harness.Root.CreateAsyncScope();
-                                      await inner.ServiceProvider.GetRequiredService<
-                                                     IRequestHandler<AddPushSubscriptionRequest, PushSubscriptionResult>>()
-                                                 .HandleAsync(new("owners/one", "email", "primary"), CancellationToken.None);
+                                      await handler.HandleAsync(new("owners/one", "email", "primary"), CancellationToken.None);
                                       return (Exception?)null;
                                   }
                                   catch (Exception ex) {

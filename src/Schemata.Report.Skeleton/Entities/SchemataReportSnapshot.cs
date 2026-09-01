@@ -1,8 +1,9 @@
 using System;
 using Schemata.Abstractions.Entities;
-using Schemata.Insight.Skeleton;
+using Schemata.Insight.Skeleton.Models;
+using Schemata.Report.Skeleton.Enums;
 
-namespace Schemata.Report.Skeleton;
+namespace Schemata.Report.Skeleton.Entities;
 
 /// <summary>Metadata header for a persisted report snapshot whose rows are stored in chunks.</summary>
 [CanonicalName("reports/{report}/snapshots/{snapshot}")]

@@ -3,7 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Actor.Foundation.Features;
-using Schemata.Actor.Scheduling.Internal;
+using Schemata.Actor.Scheduling.Runtime;
 using Schemata.Actor.Skeleton;
 using Schemata.Core;
 using Schemata.Core.Features;

@@ -9,9 +9,8 @@ using Microsoft.Extensions.Options;
 using ProtoBuf.Grpc.Configuration;
 using Schemata.Core;
 using Schemata.Core.Features;
-using Schemata.Resource.Foundation;
+using Schemata.Core.Building;
 using Schemata.Resource.Foundation.Features;
-using Schemata.Resource.Grpc.Internal;
 using Schemata.Transport.Grpc;
 using Schemata.Transport.Grpc.Features;
 
@@ -46,7 +45,7 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
         services.TryAddScoped(typeof(ResourceService<,,,>));
 
         services.TryAddSingleton(sp => {
-            var registry   = sp.GetRequiredService<IResourceRegistry>();
+            var registry   = sp.GetRequiredService<ResourceRegistry>();
             var model      = RuntimeTypeModelConfigurator.Configure(registry);
             var marshaller = ProtoBufMarshallerFactory.Create(model);
             var binder     = BinderConfiguration.Create([marshaller], new ResourceServiceBinder());
@@ -66,6 +65,6 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
         IConfiguration        configuration,
         IWebHostEnvironment   environment
     ) => endpoints.MapSchemataGrpcResources(
-        app.ApplicationServices.GetRequiredService<IResourceRegistry>(),
+        app.ApplicationServices.GetRequiredService<ResourceRegistry>(),
         app.ApplicationServices.GetRequiredService<IOptions<SchemataResourceOptions>>().Value.AuthenticationScheme);
 }

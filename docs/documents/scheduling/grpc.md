@@ -1,14 +1,6 @@
 # Scheduling gRPC Transport
 
-The scheduling gRPC transport exposes the scheduler's two persistent entities — `SchemataJob`
-(scheduled entries) and `SchemataJobExecution` (each fire) — as Schemata resources. `Run` is an
-AIP-136 custom method on a job. `Cancel` and `Wait` are Schemata operation methods corresponding to
-`CancelOperation` and `WaitOperation` on `google.longrunning.Operations`; AIP-151 defines the
-`Operation` `name`, `metadata`, `done`, and `error` / `response` result shape. `WaitOperation` has no
-upstream HTTP binding. The transport inherits its service synthesis, routing, protobuf-net wire format, exception interceptor, and
-reflection from the Resource gRPC transport; this feature only registers the resources and their
-custom-method handlers. `MapGrpc()` on `SchedulingBuilder` activates `SchemataSchedulingGrpcFeature`
-(priority `SchemataSchedulingFeature.DefaultPriority + 300_000` = `480_300_000`).
+The Scheduling gRPC transport exposes `SchemataJob` and `SchemataJobExecution` as resources. `MapGrpc()` is the concrete Scheduling extension that activates `SchemataSchedulingGrpcFeature`; its dependencies supply Resource gRPC behavior. Resource and method requests enter dispatcher wraps, including enabled authentication and coarse authorization, before Scheduling handler stages.
 
 ## Where the code lives
 
@@ -26,11 +18,7 @@ schema.UseScheduling()
       .WithJob<HelloJob>("*/5 * * * *");
 ```
 
-`MapGrpc()` adds `SchemataSchedulingGrpcFeature` and returns the same `SchedulingBuilder`, so job
-registrations and transports chain. The feature declares `[DependsOn<SchemataSchedulingFeature>]`
-and `[DependsOn<SchemataGrpcResourceFeature>]`, pulling in the scheduler and the resource gRPC
-transport (code-first gRPC stack, exception interceptor, reflection, `RuntimeTypeModel`) when
-missing.
+`MapGrpc()` activates `SchemataSchedulingGrpcFeature` and returns the same `SchedulingBuilder`. The feature depends on Scheduling and Resource gRPC features; those dependencies provide scheduling runtime and shared gRPC transport behavior.
 
 ## Feature registration
 
