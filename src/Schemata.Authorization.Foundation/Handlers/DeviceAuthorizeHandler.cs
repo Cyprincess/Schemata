@@ -40,7 +40,6 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
     IClientAuthenticationService<TApp>     client,
     ITokenManager<TToken>                  tokens,
     IOptions<SchemataAuthorizationOptions> options,
-    IServiceProvider                       sp,
     IOptions<JsonSerializerOptions>        json,
     TimeProvider?                          time = null
 ) : DeviceAuthorizeEndpoint
@@ -66,8 +65,7 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
             );
         }
 
-        var ctx = new AdviceContext(sp);
-        using var _ = AdviceContext.Establish(ctx);
+        var ctx = AdviceContext.Require();
 
         switch (await Advisor.For<IDeviceAuthorizeAdvisor<TApp>>()
                              .RunAsync(ctx, application, request, ct)) {

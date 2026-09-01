@@ -54,7 +54,7 @@ public sealed class PermissiveFlowCatchHandler : IFlowCatchHandler
 ///     advisor chain, so a test can assert the chain ran exactly once per caller-side dispatch and
 ///     never again inside the actor's turn.
 /// </summary>
-public sealed class RecordingCompleteActivityAdvisor : ICommandAdvisor<CompleteActivityRequest>
+public sealed class RecordingCompleteActivityAdvisor : IRequestPipelineAdvisor<CompleteActivityRequest, ProcessSnapshot>
 {
     private int _invocationCount;
 
@@ -63,9 +63,13 @@ public sealed class RecordingCompleteActivityAdvisor : ICommandAdvisor<CompleteA
     /// <summary>Total number of times this advisor has run across every dispatch so far.</summary>
     public int InvocationCount => Volatile.Read(ref _invocationCount);
 
-    public Task<AdviseResult> AdviseAsync(AdviceContext ctx, CompleteActivityRequest request, CancellationToken ct = default) {
+    public Task<ProcessSnapshot> AdviseAsync(
+        AdviceContext                              ctx,
+        CompleteActivityRequest                    request,
+        RequestHandlerContinuation<ProcessSnapshot> next,
+        CancellationToken                          ct = default) {
         Interlocked.Increment(ref _invocationCount);
 
-        return Task.FromResult(AdviseResult.Continue);
+        return next(ct);
     }
 }

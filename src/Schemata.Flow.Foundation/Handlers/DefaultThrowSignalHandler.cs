@@ -5,7 +5,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Flow.Foundation.Commands;
+using Schemata.Flow.Skeleton.Entities;
 using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Commands;
 
 namespace Schemata.Flow.Foundation.Handlers;
 
@@ -87,12 +89,14 @@ internal sealed class DefaultThrowSignalHandler(FlowHandlerSupport support)
         try {
             await using var scope = support.Scopes.CreateAsyncScope();
             var dispatcher = scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
-            var result = await dispatcher.SendAsync<DeliverSignalRequest, SignalDeliveryResult>(new(
+            var inner = new DeliverSignalRequest(
                 processCanonicalName,
                 request.SignalName,
                 request.Payload,
                 request.Token,
-                request.Principal), ct);
+                request.Principal);
+            var result = await dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, DeliverSignalRequest, SignalDeliveryResult>, SignalDeliveryResult>(
+                new(FlowOperations.Deliver, processCanonicalName, inner, request.Principal), ct);
             return (index, result);
         } catch (OperationCanceledException) when (ct.IsCancellationRequested) {
             return (index, new(processCanonicalName, SignalDeliveryStatus.Canceled));

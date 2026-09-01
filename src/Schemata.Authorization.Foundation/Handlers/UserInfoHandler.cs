@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
@@ -30,11 +29,10 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     and finally filters claims by <see cref="IDestinationAdvisor" /> to
 ///     only include those allowed for the <c>userinfo</c> destination.
 /// </summary>
-public sealed class UserInfoHandler(IServiceProvider sp) : UserInfoEndpoint
+public sealed class UserInfoHandler : UserInfoEndpoint
 {
     public override async Task<AuthorizationResult> HandleAsync(ClaimsPrincipal principal, CancellationToken ct) {
-        var ctx = new AdviceContext(sp);
-        using var _ = AdviceContext.Establish(ctx);
+        var ctx = AdviceContext.Require();
 
         var sub    = principal.FindFirstValue(IdentityClaims.Subject);
         var scope  = principal.FindFirstValue(Claims.Scope);

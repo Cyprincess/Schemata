@@ -33,8 +33,8 @@ namespace Schemata.Resource.Tests;
 ///     Proves the production HTTP entry (<see cref="ResourceController{TEntity,TRequest,TDetail,TSummary}" />,
 ///     driven with a fabricated <see cref="ControllerContext" /> exactly as ASP.NET Core would construct
 ///     one per request) and a raw <see cref="IRequestDispatcher" /> entry run the exact same Create/Get
-///     pipeline: equal results, the registered <see cref="ICommandAdvisor{TCommand}" /> /
-///     <see cref="IQueryAdvisor{TQuery}" /> firing once per entry, and identical exception payloads.
+///     pipeline: equal results, the registered <see cref="IRequestPipelineAdvisor{TRequest,TResponse}" />
+///     firing once per entry, and identical exception payloads.
 ///     Both entries resolve <see cref="IRequestDispatcher" /> from the same
 ///     <see cref="AddSchemataResources" />-configured container — neither entry stubs the real
 ///     <see cref="DefaultCreateResourceHandler{TEntity,TRequest,TDetail,TSummary}" /> /
@@ -176,8 +176,8 @@ public sealed class ResourceEntryEquivalenceShould
 
     private static ServiceProvider BuildServices(
         (Mock<IRepository<Entity>> Repository, Mock<ISimpleMapper> Mapper)      doubles,
-        ICommandAdvisor<CreateResourceRequest<Entity, Request, Detail>>? commandAdvisor = null,
-        IQueryAdvisor<GetResourceQueryRequest<Entity, Detail>>?          queryAdvisor   = null
+        IRequestPipelineAdvisor<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>? commandAdvisor = null,
+        IRequestPipelineAdvisor<GetResourceQueryRequest<Entity, Detail>, GetResultBase<Detail>>?          queryAdvisor   = null
     ) {
         var services = new ServiceCollection();
         services.AddSchemataResources();
@@ -202,36 +202,38 @@ public sealed class ResourceEntryEquivalenceShould
     }
 
     /// <summary>Records every dispatch of <see cref="CreateResourceRequest{TEntity,TRequest,TDetail}" /> it observes.</summary>
-    private sealed class RecordingCommandAdvisor : ICommandAdvisor<CreateResourceRequest<Entity, Request, Detail>>
+    private sealed class RecordingCommandAdvisor : IRequestPipelineAdvisor<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>
     {
         public int Count { get; private set; }
 
         public int Order => 0;
 
-        public Task<AdviseResult> AdviseAsync(
-            AdviceContext                                  ctx,
-            CreateResourceRequest<Entity, Request, Detail> a1,
-            CancellationToken                              ct = default
+        public Task<CreateResultBase<Detail>> AdviseAsync(
+            AdviceContext                                              ctx,
+            CreateResourceRequest<Entity, Request, Detail>             a1,
+            RequestHandlerContinuation<CreateResultBase<Detail>>       next,
+            CancellationToken                                          ct = default
         ) {
             Count++;
-            return Task.FromResult(AdviseResult.Continue);
+            return next(ct);
         }
     }
 
     /// <summary>Records every dispatch of <see cref="GetResourceQueryRequest{TEntity,TDetail}" /> it observes.</summary>
-    private sealed class RecordingQueryAdvisor : IQueryAdvisor<GetResourceQueryRequest<Entity, Detail>>
+    private sealed class RecordingQueryAdvisor : IRequestPipelineAdvisor<GetResourceQueryRequest<Entity, Detail>, GetResultBase<Detail>>
     {
         public int Count { get; private set; }
 
         public int Order => 0;
 
-        public Task<AdviseResult> AdviseAsync(
-            AdviceContext                          ctx,
-            GetResourceQueryRequest<Entity, Detail> a1,
-            CancellationToken                       ct = default
+        public Task<GetResultBase<Detail>> AdviseAsync(
+            AdviceContext                                    ctx,
+            GetResourceQueryRequest<Entity, Detail>          a1,
+            RequestHandlerContinuation<GetResultBase<Detail>> next,
+            CancellationToken                                ct = default
         ) {
             Count++;
-            return Task.FromResult(AdviseResult.Continue);
+            return next(ct);
         }
     }
 

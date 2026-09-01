@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -30,8 +29,7 @@ namespace Schemata.Authorization.Foundation.Handlers;
 /// </summary>
 public sealed class RevocationHandler<TApp, TToken>(
     IClientAuthenticationService<TApp> client,
-    ITokenManager<TToken>              tokens,
-    IServiceProvider                   sp
+    ITokenManager<TToken>              tokens
 ) : RevocationEndpoint
     where TApp : SchemataApplication
     where TToken : SchemataToken
@@ -72,8 +70,7 @@ public sealed class RevocationHandler<TApp, TToken>(
             return;
         }
 
-        var ctx = new AdviceContext(sp);
-        using var _ = AdviceContext.Establish(ctx);
+        var ctx = AdviceContext.Require();
 
         switch (await Advisor.For<IRevocationAdvisor<TApp, TToken>>()
                              .RunAsync(ctx, application, request, entity, ct)) {

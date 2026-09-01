@@ -3,6 +3,7 @@ using System.Threading;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions;
 using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Commands;
 using Schemata.Messaging.Skeleton.Internal;
 using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Foundation.Commands;
@@ -54,6 +55,8 @@ public static class SchemataSchedulingServiceCollectionExtensions
         services.TryAddTransient<IRequestHandler<TriggerJobRequest, SchemataJobExecution>>(provider =>
             provider.GetRequiredKeyedService<IRequestHandler<TriggerJobRequest, SchemataJobExecution>>(
                 SchedulingConstants.Handlers.Default));
+
+        services.TryAddTransient<IRequestHandler<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>, ResourceMethodForwardHandler<SchemataJob, TriggerJobRequest, SchemataJobExecution>>();
 
         services.TryAddKeyedTransient<IRequestHandler<RescheduleJobRequest, Unit>, DefaultRescheduleJobHandler>(
             SchedulingConstants.Handlers.Default);

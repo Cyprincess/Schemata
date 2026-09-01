@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Commands;
 using Schemata.Messaging.Skeleton.Internal;
 using Schemata.Report.Foundation;
 using Schemata.Report.Foundation.Commands;
@@ -52,6 +53,13 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<GenerateHandler<TReport, TSnapshot, TChunk>>();
         AddHandler<RunReportRequest, ReportResult, RunReportHandler<TReport, TSnapshot, TChunk>>(services);
         AddHandler<GenerateReportRequest, Operation, GenerateHandler<TReport, TSnapshot, TChunk>>(services);
+
+        // Facade method envelopes forward to the command handlers above. The generate envelope's
+        // forwarder also serves the transport ':generate' method, whose resource pipeline is a
+        // pass-through for this non-ICanonicalName wire command; TryAdd keeps exactly one envelope
+        // handler per closure.
+        services.TryAddTransient<IRequestHandler<ResourceMethodRequest<TReport, RunReportRequest, ReportResult>, ReportResult>, ResourceMethodForwardHandler<TReport, RunReportRequest, ReportResult>>();
+        services.TryAddTransient<IRequestHandler<ResourceMethodRequest<TReport, GenerateReportRequest, Operation>, Operation>, ResourceMethodForwardHandler<TReport, GenerateReportRequest, Operation>>();
         services.TryAddScoped<ReadSnapshotHandler<TSnapshot>>();
 
         services.TryAddSingleton<ReportRetentionEnforcer<TSnapshot, TChunk>>();

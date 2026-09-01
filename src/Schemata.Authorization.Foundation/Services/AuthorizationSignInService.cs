@@ -80,8 +80,8 @@ public sealed class AuthorizationSignInService<TApp, TToken>(
             ? new Dictionary<string, string?>()
             : new Dictionary<string, string?>(properties);
         var callback = kind == AuthorizationSignInResponseKind.Callback;
-        var ctx = new AdviceContext(services);
-        using var _ = AdviceContext.Establish(ctx);
+        var ctx = AdviceContext.Current;
+        using var ambient = ctx is null ? AdviceContext.Establish(ctx = new AdviceContext(services)) : null;
 
         if (principal.Identity is not ClaimsIdentity identity) {
             throw new InvalidOperationException(

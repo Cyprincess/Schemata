@@ -17,11 +17,7 @@ sequences advisors within a stage.
 
 ## Stages
 
-### 1. Gate — `IResourceRequestAdvisor<TEntity>`
-
-Receives the principal and the token `nameof(Operations.Update)`. `Block` throws `ResourceNotFound(name)`.
-
-### 2. Parent clearing and name binding
+### 1. Parent clearing and name binding
 
 `ResourceNameDescriptor.ClearParentProperties(request)` nulls every parent channel on the request — the
 parent-segment properties and `IChild.Parent` — so a client cannot re-parent the resource through the body. The
@@ -29,7 +25,7 @@ URI is the only parent input on this path. The handler then sets `request.Canoni
 distinguishes updates to different resources that share a `RequestId`. `ResourceIdentifiers.Apply` adds the leaf
 and parent `Where` predicates to the `ResourceRequestContainer<TEntity>`.
 
-### 3. Update request — `IResourceUpdateRequestAdvisor<TEntity, TRequest>`
+### 2. Update request — `IResourceUpdateRequestAdvisor<TEntity, TRequest>`
 
 | Advisor                          | What it does                                                                 |
 | -------------------------------- | ---------------------------------------------------------------------------- |
@@ -39,7 +35,7 @@ and parent `Where` predicates to the `ResourceRequestContainer<TEntity>`.
 | `AdviceUpdateRequestValidation`  | Runs validation; skipped when `UpdateRequestValidationSuppressed` is present |
 | `AdviceUpdateRequestIdempotency` | On a `RequestId` hit returns the cached result; on a miss reserves the key   |
 
-### 4. Entity load
+### 3. Entity load
 
 The entity is loaded inside `_repository.SuppressQuerySoftDelete()`, so a
 tombstoned resource can be updated. A null result throws `ResourceNotFound(name)` — unless the request implements
@@ -49,7 +45,7 @@ runs, and the entity is added instead of updated. The update mask is ignored on 
 `CreateMissingAsync` performs no container-scoped load, so request-advisor predicates apply only to the initial
 existing-entity lookup.
 
-### 5. Update entity — `IResourceUpdateAdvisor<TEntity, TRequest>`
+### 4. Update entity — `IResourceUpdateAdvisor<TEntity, TRequest>`
 
 | Advisor                   | What it does                                                                                                             |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -61,7 +57,7 @@ existing-entity lookup.
 value differing from the entity's current weak tag throws `AbortedException` with reason
 `CONCURRENCY_MISMATCH` (transports surface 409 / `ABORTED`). Only an absent or whitespace tag opts out.
 
-### 6. Mapping (field mask)
+### 5. Mapping (field mask)
 
 ```csharp
 var mask = (request as IUpdateMask)?.UpdateMask;
@@ -76,11 +72,11 @@ With no mask (or `update_mask=*`) the mapper merges the whole request. With a ma
 the wire paths to CLR leaf paths through `MaskTree.FromWire(typeof(TEntity), mask, false, ResourceWireNameRules.ResolveClrName)`
 and copies only those fields. An unknown segment throws `ValidationException` (`InvalidUpdateMask`).
 
-### 7. Persistence
+### 6. Persistence
 
 `_repository.UpdateAsync(entity, ct)` then `_repository.CommitAsync(ct)`.
 
-### 8. Response — `IResourceResponseAdvisor<TEntity, TDetail>`
+### 7. Response — `IResourceResponseAdvisor<TEntity, TDetail>`
 
 The updated entity is mapped to `TDetail` and the response chain runs (`AdviceResponseParent` derives
 `IChild.Parent`; `AdviceResponseFreshness` writes the new ETag). The response chain maps the full detail and

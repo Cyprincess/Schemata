@@ -3,9 +3,9 @@ using System.Collections.Generic;
 namespace Schemata.Push.Skeleton;
 
 /// <summary>
-///     Per-dispatch context flowing through the <see cref="Advisors.IPushSendAdvisor" /> pipeline and into
-///     each <see cref="IPushTransport" />. The message is carried as <see cref="object" /> so the
-///     advisor pipeline targets one non-generic type; transports cast or reflect as needed.
+///     Per-dispatch context flowing through the dispatch pipeline into
+///     each <see cref="IPushTransport" />. The message is carried as <see cref="object" /> so one
+///     context type serves every message shape; transports cast or reflect as needed.
 /// </summary>
 public class PushContext
 {

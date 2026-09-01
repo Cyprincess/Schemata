@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Skeleton.Entities;
@@ -53,9 +54,9 @@ public class DeviceCodeHandlerShould
 
         var sp = new ServiceCollection().BuildServiceProvider();
         var handler = new DeviceCodeHandler<SchemataApplication, SchemataToken>(
-            clientAuth.Object, tokens.Object, sp, jsonOpts);
+            clientAuth.Object, tokens.Object, jsonOpts);
 
-        return new(handler, tokens, device, app);
+        return new(handler, tokens, device, app, sp);
     }
 
     private static TokenRequest CreateRequest(string? scope = null, string deviceCode = "dev-ref") {
@@ -70,6 +71,7 @@ public class DeviceCodeHandlerShould
     [Fact]
     public async Task ThrowsInvalidGrant_WhenDeviceCodeEmpty() {
         var f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
         var request = CreateRequest(deviceCode: string.Empty);
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
@@ -81,6 +83,7 @@ public class DeviceCodeHandlerShould
     [Fact]
     public async Task ThrowsInvalidGrant_WhenDeviceCodeNotFound() {
         var f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
         var request = CreateRequest(deviceCode: "missing");
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
@@ -92,6 +95,7 @@ public class DeviceCodeHandlerShould
     [Fact]
     public async Task UsesApprovedScope_WhenRequestScopeOmitted() {
         var f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
         var request = CreateRequest();
 
         var result = await f.Handler.HandleAsync(request, null, CancellationToken.None);
@@ -103,6 +107,7 @@ public class DeviceCodeHandlerShould
     [Fact]
     public async Task UsesRequestScope_WhenNarrowerThanApproved() {
         var f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
         var request = CreateRequest("profile");
 
         var result = await f.Handler.HandleAsync(request, null, CancellationToken.None);
@@ -113,6 +118,7 @@ public class DeviceCodeHandlerShould
     [Fact]
     public async Task UsesRequestScope_WhenEqualToApproved() {
         var f       = CreateFixture("openid profile");
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
         var request = CreateRequest("openid profile");
 
         var result = await f.Handler.HandleAsync(request, null, CancellationToken.None);
@@ -123,6 +129,7 @@ public class DeviceCodeHandlerShould
     [Fact]
     public async Task ThrowsInvalidScope_WhenRequestScopeIntroducesNewScope() {
         var f       = CreateFixture("openid profile");
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
         var request = CreateRequest("openid profile email");
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
@@ -134,6 +141,7 @@ public class DeviceCodeHandlerShould
     [Fact]
     public async Task ThrowsInvalidScope_WhenNoScopeApprovedButClientRequestsOne() {
         var f       = CreateFixture(null);
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
         var request = CreateRequest("openid");
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
@@ -145,6 +153,7 @@ public class DeviceCodeHandlerShould
     [Fact]
     public async Task PropagatesAuthorizationNameAndSessionId_OnSuccessfulExchange() {
         var f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
         var request = CreateRequest();
 
         var result = await f.Handler.HandleAsync(request, null, CancellationToken.None);
@@ -157,6 +166,7 @@ public class DeviceCodeHandlerShould
     [Fact]
     public async Task ThrowsInvalidGrant_WhenPayloadMissing() {
         var f = CreateFixture();
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
         f.Device.Payload = null;
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
@@ -171,7 +181,8 @@ public class DeviceCodeHandlerShould
         DeviceCodeHandler<SchemataApplication, SchemataToken> Handler,
         Mock<ITokenManager<SchemataToken>>                    Tokens,
         SchemataToken                                         Device,
-        SchemataApplication                                   App
+        SchemataApplication                                   App,
+        IServiceProvider                                      Sp
     );
 
     #endregion

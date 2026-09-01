@@ -7,10 +7,10 @@ using Schemata.Common;
 namespace Schemata.Resource.Foundation.Advisors;
 
 /// <summary>
-///     Advises on a get request
-///     per <seealso href="https://google.aip.dev/131">AIP-131: Standard methods: Get</seealso> after the general
-///     <see cref="IResourceRequestAdvisor{TEntity}" /> has run. Advisors can modify the query
-///     via the <see cref="ResourceRequestContainer{TEntity}" />.
+///     The first advisor stage for a get request
+///     per <seealso href="https://google.aip.dev/131">AIP-131: Standard methods: Get</seealso>. Advisors
+///     authorize the caller and can modify the query via the
+///     <see cref="ResourceRequestContainer{TEntity}" />.
 /// </summary>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 public interface IResourceGetRequestAdvisor<TEntity> : IAdvisor<GetRequest, ResourceRequestContainer<TEntity>, ClaimsPrincipal?>

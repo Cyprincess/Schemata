@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
@@ -35,8 +34,7 @@ namespace Schemata.Authorization.Foundation.Handlers;
 public sealed class IntrospectionHandler<TApp, TToken>(
     IClientAuthenticationService<TApp> client,
     TokenService                       issuer,
-    ITokenManager<TToken>              tokens,
-    IServiceProvider                   sp
+    ITokenManager<TToken>              tokens
 ) : IntrospectionEndpoint
     where TApp : SchemataApplication
     where TToken : SchemataToken
@@ -74,8 +72,7 @@ public sealed class IntrospectionHandler<TApp, TToken>(
             return new() { Active = false };
         }
 
-        var ctx = new AdviceContext(sp);
-        using var _ = AdviceContext.Establish(ctx);
+        var ctx = AdviceContext.Require();
 
         var introspection = new IntrospectionContext<TApp, TToken> {
             Application = application,

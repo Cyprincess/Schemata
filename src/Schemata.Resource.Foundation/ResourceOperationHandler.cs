@@ -24,7 +24,7 @@ namespace Schemata.Resource.Foundation;
 ///     <seealso href="https://google.aip.dev/134">AIP-134: Standard methods: Update</seealso>, and
 ///     <seealso href="https://google.aip.dev/135">AIP-135: Standard methods: Delete</seealso> by running an advisor
 ///     pipeline around each
-///     step: general request check -> operation-specific request advisor -> entity advisor -> persistence -> response
+///     step: operation-specific request advisor -> entity advisor -> persistence -> response
 ///     advisor.
 /// </summary>
 /// <typeparam name="TEntity">

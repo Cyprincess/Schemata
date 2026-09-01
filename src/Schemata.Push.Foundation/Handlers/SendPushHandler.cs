@@ -5,15 +5,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Advisors;
-using Schemata.Advice;
 using Schemata.Messaging.Skeleton;
 using Schemata.Push.Foundation.Commands;
 using Schemata.Push.Skeleton;
-using Schemata.Push.Skeleton.Advisors;
 
 namespace Schemata.Push.Foundation.Handlers;
 
-/// <summary>Runs the advisor-gated concurrent push transport fan-out.</summary>
+/// <summary>Runs the concurrent push transport fan-out.</summary>
 public sealed class SendPushHandler(IServiceProvider services)
     : IRequestHandler<SendPushRequest, ImmutableArray<TransportResult>>
 {
@@ -21,12 +19,7 @@ public sealed class SendPushHandler(IServiceProvider services)
         SendPushRequest   request,
         CancellationToken ct = default
     ) {
-        var ctx = AdviceContext.Require();
-        var advice = await Advisor.For<IPushSendAdvisor>().RunAsync(ctx, request.Context, ct);
-        if (advice is not AdviseResult.Continue) {
-            return [];
-        }
-
+        _ = AdviceContext.Require();
         var pending = services.GetServices<IPushTransport>()
                               .Select(transport => InvokeAsync(transport, request.Context, ct))
                               .ToList();

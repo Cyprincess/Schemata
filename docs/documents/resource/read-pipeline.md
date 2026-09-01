@@ -18,24 +18,20 @@ the repository. The stage order is fixed; advisor `Order` only sequences advisor
 
 `ListAsync` takes a `ListRequest` and returns a `ListResultBase<TSummary>`.
 
-### 1. Gate — `IResourceRequestAdvisor<TEntity>`
-
-Receives the principal and the token `nameof(Operations.List)`. `Block` throws `CollectionNotFound()`.
-
-### 2. List request — `IResourceListRequestAdvisor<TEntity>`
+### 1. List request — `IResourceListRequestAdvisor<TEntity>`
 
 Receives the `ListRequest`, a `ResourceRequestContainer<TEntity>`, and the principal. Authorization advisors run
 here when `WithAuthorization()` is configured; an entitlement advisor adds predicates via
 `container.ApplyWhere`.
 
-### 3. Parent scoping
+### 2. Parent scoping
 
 When `request.Parent` is set, `ResourceNameDescriptor.ParseParent` matches it against the entity's pattern. A
 parent that fails to match throws `ValidationException` (`INVALID_PARENT`). A `-` wildcard segment on an entity
 without `[ReadAcross]` throws `ValidationException` (`CROSS_PARENT_UNSUPPORTED`). Otherwise
 `BuildParentPredicate` produces a `Where` predicate applied via `container.ApplyWhere`.
 
-### 4. Page token and paging parameters
+### 3. Page token and paging parameters
 
 `PageToken.FromStringAsync` decodes `request.PageToken`; a token that fails to decode throws `ValidationException`
 (`INVALID_PAGE_TOKEN`). A decoded token whose `Parent`, `Filter`, `OrderBy`, or `ShowDeleted` differ from the
@@ -43,7 +39,7 @@ current request throws `ValidationException` (`INVALID_PAGE_TOKEN`). A negative 
 `ValidationException` (`INVALID_PAGE_SIZE`); `<= 0` defaults to 25 and `> 100` is capped at 100. `Skip` accumulates
 onto the token and is floored at 0.
 
-### 5. Filter compilation
+### 4. Filter compilation
 
 When `request.Filter` is set, the handler resolves the requested language from the resource expression profile,
 then resolves `IExpressionCompiler` keyed by `resolved.Language`. It parses and compiles the filter to
@@ -51,14 +47,14 @@ then resolves `IExpressionCompiler` keyed by `resolved.Language`. It parses and 
 Residual mode also resolves `IExpressionPushdownPlanner` with the same language key. An `ExpressionException` or
 `ArgumentException` becomes `ValidationException` (`INVALID_FILTER`). See [Filtering](filtering.md).
 
-### 6. Order compilation
+### 5. Order compilation
 
 When `request.OrderBy` is set, the handler resolves the non-keyed `IOrderCompiler` and compiles to
 `Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>>`. A parse failure becomes `ValidationException`
 (`INVALID_ORDER_BY`). `KeyOrdering<TEntity>.Compose` appends a deterministic key ordering after any `order_by`,
 keeping page boundaries stable.
 
-### 7. Count and fetch
+### 6. Count and fetch
 
 `ResolveTotalSizeMode()` selects the count strategy: `None` skips counting (`TotalSize` is null), `Estimated`
 calls `_repository.EstimateCountAsync`, otherwise `_repository.CountAsync`. The query fetches one look-ahead row
@@ -68,7 +64,7 @@ removed; `next_page_token` is sealed only when `hasMore`, so an exactly-full las
 When `request.ShowDeleted` is true, the count and row fetch run inside `_repository.SuppressQuerySoftDelete()`
 so tombstoned rows are included.
 
-### 8. List response — `IResourceListResponseAdvisor<TSummary>`
+### 7. List response — `IResourceListResponseAdvisor<TSummary>`
 
 Receives the immutable summary array and the principal. `AdviceListResponseParent` derives
 `IChild.Parent` on each summary. Schemata returns full summaries and provides no AIP-157 partial-response
@@ -78,26 +74,22 @@ selection stage or response trimming in this chain.
 
 `GetAsync` accepts a name string or a `GetRequest` and returns a `GetResultBase<TDetail>`.
 
-### 1. Gate — `IResourceRequestAdvisor<TEntity>`
-
-Receives the principal and the token `nameof(Operations.Get)`. `Block` throws `ResourceNotFound(name)`.
-
-### 2. Name predicates
+### 1. Name predicates
 
 `ResourceIdentifiers.Apply` resolves the name (`request.CanonicalName ?? request.Name`) into leaf and parent
 `Where` predicates on the container.
 
-### 3. Get request — `IResourceGetRequestAdvisor<TEntity>`
+### 2. Get request — `IResourceGetRequestAdvisor<TEntity>`
 
 Receives the `GetRequest`, the container, and the principal. Authorization advisors run here when configured.
 
-### 4. Entity load
+### 3. Entity load
 
 Get loads the entity inside `_repository.SuppressQuerySoftDelete()`, so Get returns
 tombstoned rows and the caller can inspect `DeleteTime`. A null result throws `ResourceNotFound(name)` carrying a
 `ResourceInfoDetail`.
 
-### 5. Response — `IResourceResponseAdvisor<TEntity, TDetail>`
+### 4. Response — `IResourceResponseAdvisor<TEntity, TDetail>`
 
 The entity is mapped to `TDetail`, then the response chain runs: `AdviceResponseParent` derives
 `IChild.Parent`, `AdviceResponseFreshness` sets the ETag, `AdviceResponseIdempotency` is a no-op for

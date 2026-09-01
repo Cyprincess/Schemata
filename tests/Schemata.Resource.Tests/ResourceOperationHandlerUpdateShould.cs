@@ -23,7 +23,7 @@ namespace Schemata.Resource.Tests;
 public class ResourceOperationHandlerUpdateShould
 {
     [Fact]
-    public async Task MissingResource_WithAllowMissing_CreatesThroughCreateAndResponsePipelines() {
+    public async Task MissingResource_WithAllowMissing_CreatesThroughTheCreatePipeline() {
         var request = new Student {
             Name = "missing",
             CanonicalName = "students/missing",
@@ -43,8 +43,6 @@ public class ResourceOperationHandlerUpdateShould
         mapper.Setup(m => m.Map<Student, Student>(entity)).Returns(detail);
 
         var createCalled = false;
-        var responseCalled = false;
-        Student? advisedEntity = null;
         var create = new Mock<IResourceCreateRequestAdvisor<Student, Student>>();
         create.SetupGet(advisor => advisor.Order).Returns(0);
         create.Setup(advisor => advisor.AdviseAsync(
@@ -55,20 +53,7 @@ public class ResourceOperationHandlerUpdateShould
                     It.IsAny<CancellationToken>()))
               .Callback(() => createCalled = true)
               .Returns(Task.FromResult(AdviseResult.Continue));
-        var response = new Mock<IResourceResponseAdvisor<Student, Student>>();
-        response.SetupGet(advisor => advisor.Order).Returns(0);
-        response.Setup(advisor => advisor.AdviseAsync(
-                      It.IsAny<AdviceContext>(),
-                      It.IsAny<Student?>(),
-                      It.IsAny<Student?>(),
-                      It.IsAny<ClaimsPrincipal?>(),
-                      It.IsAny<CancellationToken>()))
-                .Callback((AdviceContext context, Student? entity, Student? detail, ClaimsPrincipal? principal, CancellationToken cancellationToken) => {
-                    responseCalled = true;
-                    advisedEntity = entity;
-                })
-                .Returns(Task.FromResult(AdviseResult.Continue));
-        using var services = Services<Student, Student, Student>(create: create.Object, response: response.Object);
+        using var services = Services<Student, Student, Student>(create: create.Object);
         using var ambient = AdviceContext.Establish(new AdviceContext(services));
         var handler = new ResourceOperationHandler<Student, Student, Student, Student>(
             services, repository.Object, mapper.Object);
@@ -76,8 +61,6 @@ public class ResourceOperationHandlerUpdateShould
         var result = await handler.UpdateAsync("students/missing", request, null, CancellationToken.None);
 
         Assert.True(createCalled);
-        Assert.True(responseCalled);
-        Assert.Same(entity, advisedEntity);
         Assert.Same(detail, result.Detail);
         repository.Verify(r => r.AddAsync(entity, CancellationToken.None), Times.Once);
         repository.Verify(r => r.CommitAsync(CancellationToken.None), Times.Once);
@@ -223,6 +206,32 @@ public class ResourceOperationHandlerUpdateShould
             "students/missing", new RequestWithoutAllowMissing(), null, CancellationToken.None));
     }
 
+    [Fact]
+    public async Task CreateCoreAsync_FinalizeTrue_CommitsAfterAddAsync() {
+        var request = new Student { Name = "s1" };
+        var detail  = new Student { Name = "s1", CanonicalName = "students/s1" };
+
+        var repository = new Mock<IRepository<Student>>();
+        repository.Setup(r => r.AddAsync(It.IsAny<Student>(), It.IsAny<CancellationToken>()))
+                  .Returns(Task.CompletedTask);
+        repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>()))
+                  .Returns(Task.CompletedTask);
+
+        var mapper = new Mock<ISimpleMapper>();
+        mapper.Setup(m => m.Map<Student, Student>(It.IsAny<Student>())).Returns(detail);
+
+        using var services = Services<Student, Student, Student>();
+        using var ambient = AdviceContext.Establish(new AdviceContext(services));
+        var handler = new ResourceOperationHandler<Student, Student, Student, Student>(
+            services, repository.Object, mapper.Object);
+
+        var ctx = ResourceAdviceContext.Create(services);
+        var result = await handler.CreateCoreAsync(ctx, request, null, CancellationToken.None, true);
+
+        repository.Verify(r => r.AddAsync(It.IsAny<Student>(), It.IsAny<CancellationToken>()), Times.Once);
+        repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     private static Mock<IRepository<T>> MissingRepository<T>() where T : class {
         var repository = new Mock<IRepository<T>>();
         repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Mock.Of<IDisposable>());
@@ -235,8 +244,7 @@ public class ResourceOperationHandlerUpdateShould
 
     private static ServiceProvider Services<TEntity, TRequest, TDetail>(
         IResourceCreateRequestAdvisor<TEntity, TRequest>? create = null,
-        IResourceCreateAdvisor<TEntity, TRequest>?        createEntity = null,
-        IResourceResponseAdvisor<TEntity, TDetail>?       response = null
+        IResourceCreateAdvisor<TEntity, TRequest>?        createEntity = null
     )
         where TEntity : class, ICanonicalName
         where TRequest : class, ICanonicalName
@@ -249,10 +257,6 @@ public class ResourceOperationHandlerUpdateShould
 
         if (createEntity is not null) {
             services.AddSingleton(createEntity);
-        }
-
-        if (response is not null) {
-            services.AddSingleton(response);
         }
 
         return services.BuildServiceProvider();

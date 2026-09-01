@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Skeleton;
@@ -22,7 +23,7 @@ public class TokenExchangeHandlerShould
     private static readonly SchemataApplication
         TestApp = new() { Uid = Identifiers.NewUid(), ClientId = "test-client" };
 
-    private static TokenExchangeHandler<SchemataApplication> CreateHandler(
+    private static (TokenExchangeHandler<SchemataApplication> Handler, System.IServiceProvider Sp) CreateHandler(
         Mock<IClientAuthenticationService<SchemataApplication>>                            clientAuth,
         params (string tokenType, Mock<ITokenExchangeHandler<SchemataApplication>> mock)[] subHandlers
     ) {
@@ -31,8 +32,8 @@ public class TokenExchangeHandlerShould
             services.AddKeyedScoped<ITokenExchangeHandler<SchemataApplication>>(tokenType, (_, _) => mock.Object);
         }
 
-        var handler = new TokenExchangeHandler<SchemataApplication>(clientAuth.Object, services.BuildServiceProvider());
-        return handler;
+        var sp = services.BuildServiceProvider();
+        return (new(clientAuth.Object, sp), sp);
     }
 
     private static Mock<IClientAuthenticationService<SchemataApplication>> MockClientAuth() {
@@ -48,7 +49,8 @@ public class TokenExchangeHandlerShould
     [Fact]
     public async Task ThrowInvalidRequest_WhenSubjectTokenEmpty() {
         var clientAuth = MockClientAuth();
-        var handler    = CreateHandler(clientAuth);
+        var (handler, sp) = CreateHandler(clientAuth);
+        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
         var request = new TokenRequest {
             GrantType        = GrantTypes.TokenExchange,
             SubjectToken     = "",
@@ -64,7 +66,8 @@ public class TokenExchangeHandlerShould
     [Fact]
     public async Task ThrowInvalidRequest_WhenSubjectTokenTypeEmpty() {
         var clientAuth = MockClientAuth();
-        var handler    = CreateHandler(clientAuth);
+        var (handler, sp) = CreateHandler(clientAuth);
+        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
         var request = new TokenRequest {
             GrantType = GrantTypes.TokenExchange, SubjectToken = "some-token", SubjectTokenType = "",
         };
@@ -78,7 +81,8 @@ public class TokenExchangeHandlerShould
     [Fact]
     public async Task ThrowInvalidRequest_WhenSubjectTokenTypeNotSupported() {
         var clientAuth = MockClientAuth();
-        var handler    = CreateHandler(clientAuth);
+        var (handler, sp) = CreateHandler(clientAuth);
+        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
 
         var request = new TokenRequest {
             GrantType = GrantTypes.TokenExchange, SubjectToken = "ref-1", SubjectTokenType = "urn:unknown:type",
@@ -93,7 +97,8 @@ public class TokenExchangeHandlerShould
     [Fact]
     public async Task ThrowInvalidRequest_WhenRequestedTokenTypeNotSupported() {
         var clientAuth = MockClientAuth();
-        var handler    = CreateHandler(clientAuth);
+        var (handler, sp) = CreateHandler(clientAuth);
+        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
 
         var request = new TokenRequest {
             GrantType          = GrantTypes.TokenExchange,
@@ -111,7 +116,8 @@ public class TokenExchangeHandlerShould
     [Fact]
     public async Task ThrowInvalidRequest_WhenActorTokenMissingType() {
         var clientAuth = MockClientAuth();
-        var handler    = CreateHandler(clientAuth);
+        var (handler, sp) = CreateHandler(clientAuth);
+        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
 
         var request = new TokenRequest {
             GrantType        = GrantTypes.TokenExchange,
@@ -129,7 +135,8 @@ public class TokenExchangeHandlerShould
     [Fact]
     public async Task ThrowInvalidRequest_WhenActorTokenTypeMissingToken() {
         var clientAuth = MockClientAuth();
-        var handler    = CreateHandler(clientAuth);
+        var (handler, sp) = CreateHandler(clientAuth);
+        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
 
         var request = new TokenRequest {
             GrantType        = GrantTypes.TokenExchange,
@@ -155,7 +162,8 @@ public class TokenExchangeHandlerShould
                   .ReturnsAsync(expected);
 
         var clientAuth = MockClientAuth();
-        var handler    = CreateHandler(clientAuth, (tokenType, subHandler));
+        var (handler, sp) = CreateHandler(clientAuth, (tokenType, subHandler));
+        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
 
         var request = new TokenRequest {
             GrantType          = GrantTypes.TokenExchange,
@@ -181,7 +189,8 @@ public class TokenExchangeHandlerShould
                   .ReturnsAsync(expected);
 
         var clientAuth = MockClientAuth();
-        var handler    = CreateHandler(clientAuth, (tokenType, subHandler));
+        var (handler, sp) = CreateHandler(clientAuth, (tokenType, subHandler));
+        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
 
         var request = new TokenRequest {
             GrantType = GrantTypes.TokenExchange, SubjectToken = "ref-1", SubjectTokenType = tokenType,

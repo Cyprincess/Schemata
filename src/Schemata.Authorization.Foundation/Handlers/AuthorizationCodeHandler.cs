@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Text.Json;
@@ -39,7 +38,6 @@ namespace Schemata.Authorization.Foundation.Handlers;
 public sealed class AuthorizationCodeHandler<TApp, TToken>(
     IClientAuthenticationService<TApp> client,
     ITokenManager<TToken>              tokens,
-    IServiceProvider                   sp,
     IOptions<JsonSerializerOptions>    json,
     IOptions<CodeFlowOptions>          options
 ) : IGrantHandler
@@ -82,8 +80,7 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
             );
         }
 
-        var ctx = new AdviceContext(sp);
-        using var _ = AdviceContext.Establish(ctx);
+        var ctx = AdviceContext.Require();
 
         switch (await Advisor.For<ITokenRequestAdvisor<TApp>>()
                              .RunAsync(ctx, application, request, ct)) {

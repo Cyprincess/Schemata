@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Resource;
 using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Commands;
 using Schemata.Report.Foundation.Commands;
 using Schemata.Report.Skeleton;
 
@@ -21,7 +22,8 @@ public sealed class DefaultReportService<TReport, TSnapshot, TChunk>(IRequestDis
         CancellationToken ct        = default
     ) {
         ArgumentNullException.ThrowIfNull(request);
-        return new(dispatcher.SendAsync<RunReportRequest, ReportResult>(new(request, principal), ct));
+        return new(dispatcher.SendAsync<ResourceMethodRequest<TReport, RunReportRequest, ReportResult>, ReportResult>(
+            new(ReportOperations.Run, request.Name, new(request, principal), principal), ct));
     }
 
     public ValueTask<Operation> GenerateAsync(
@@ -34,6 +36,7 @@ public sealed class DefaultReportService<TReport, TSnapshot, TChunk>(IRequestDis
             Query   = request.Query,
             Persist = request.Persist,
         };
-        return new(dispatcher.SendAsync<GenerateReportRequest, Operation>(command, ct));
+        return new(dispatcher.SendAsync<ResourceMethodRequest<TReport, GenerateReportRequest, Operation>, Operation>(
+            new(ReportOperations.Generate, request.Name, command, null), ct));
     }
 }

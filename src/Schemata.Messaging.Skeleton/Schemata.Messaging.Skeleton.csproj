@@ -16,15 +16,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Schemata.Abstractions\Schemata.Abstractions.csproj" />
-    <!--
-      Required by Schemata.Advice.Generator, not by hand-written code here. The generator uses a
-      syntax provider, so it only emits the RunAsync overload for an advisor interface in the
-      compilation that DECLARES it, and only when Schemata.Advice.AdvicePipeline`1 is in scope.
-      Schemata.Event.Skeleton carries the same reference for the same reason; the
-      ICommandAdvisor<>/IQueryAdvisor<> pair declared here needs it too, and
-      InProcessRequestDispatcher needs Advisor.For<>() from the same package at runtime.
-    -->
-    <ProjectReference Include="..\Schemata.Advice\Schemata.Advice.csproj" />
   </ItemGroup>
 
 </Project>

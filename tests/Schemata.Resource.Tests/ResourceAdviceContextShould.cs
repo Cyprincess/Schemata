@@ -50,8 +50,8 @@ public class ResourceAdviceContextShould
 
         Assert.True(facadeSpy.SawMarker);
 
-        // Dispatcher entry: the ICommandAdvisor<CreateResourceRequest<...>> chain stashes the
-        // marker during dispatch; the resource pipeline continues that same ambient context.
+        // Dispatcher entry: the IRequestPipelineAdvisor<CreateResourceRequest<...>, CreateResultBase<Detail>> chain
+        // stashes the marker during dispatch; the resource pipeline continues that same ambient context.
         var (dispatcherRepository, dispatcherMapper) = CreatePipelineDoubles();
         var dispatcherSpy = new SpyCreateRequestAdvisor();
         using var dispatcherServices = BuildDispatcherServices(
@@ -66,7 +66,7 @@ public class ResourceAdviceContextShould
 
     [Fact]
     public async Task Seed_Options_Suppression_Into_Ambient() {
-        var options = new SchemataResourceOptions { SuppressCreateValidation = true };
+        var options = new SchemataResourceOptions { SuppressFreshness = true };
 
         // Facade entry.
         var (facadeRepository, facadeMapper) = CreatePipelineDoubles();
@@ -142,7 +142,7 @@ public class ResourceAdviceContextShould
             IRequestHandler<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>,
             DefaultCreateResourceHandler<Entity, Request, Detail, Summary>>();
         services.AddSingleton<
-            ICommandAdvisor<CreateResourceRequest<Entity, Request, Detail>>, SetMarkerCommandAdvisor>();
+            IRequestPipelineAdvisor<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>, SetMarkerCommandAdvisor>();
         if (options is not null) {
             services.AddSingleton<IOptions<SchemataResourceOptions>>(Options.Create(options));
         }
@@ -153,17 +153,18 @@ public class ResourceAdviceContextShould
     private sealed record TestMarker;
 
     /// <summary>Dispatcher-level command advisor that stashes <see cref="TestMarker" /> on the ambient context.</summary>
-    private sealed class SetMarkerCommandAdvisor : ICommandAdvisor<CreateResourceRequest<Entity, Request, Detail>>
+    private sealed class SetMarkerCommandAdvisor : IRequestPipelineAdvisor<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>
     {
         public int Order => 0;
 
-        public Task<AdviseResult> AdviseAsync(
-            AdviceContext                                     ctx,
-            CreateResourceRequest<Entity, Request, Detail>    a1,
-            CancellationToken                                 ct = default
+        public Task<CreateResultBase<Detail>> AdviseAsync(
+            AdviceContext                                        ctx,
+            CreateResourceRequest<Entity, Request, Detail>       a1,
+            RequestHandlerContinuation<CreateResultBase<Detail>> next,
+            CancellationToken                                    ct = default
         ) {
             ctx.Set(new TestMarker());
-            return Task.FromResult(AdviseResult.Continue);
+            return next(ct);
         }
     }
 
@@ -182,7 +183,7 @@ public class ResourceAdviceContextShould
             CancellationToken                ct = default
         ) {
             SawMarker      = ctx.TryGet<TestMarker>(out _);
-            SawSuppression = ctx.Has<CreateRequestValidationSuppressed>();
+            SawSuppression = ctx.Has<FreshnessSuppressed>();
             return Task.FromResult(AdviseResult.Continue);
         }
     }

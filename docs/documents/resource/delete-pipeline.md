@@ -16,18 +16,12 @@ entity loads, per AIP-211. The stage order is fixed; advisor `Order` only sequen
 
 ## Stages
 
-### 1. Gate — `IResourceRequestAdvisor<TEntity>`
-
-Receives the principal and the token `nameof(Operations.Delete)`. `Block` throws `ResourceNotFound(name)`.
-`Handle` returns the stashed result, or the fallback `() => new()` (an empty delete result). The handler then
-builds a `DeleteRequest { Name, Etag, AllowMissing }`.
-
-### 2. Name predicates
+### 1. Name predicates
 
 `ResourceIdentifiers.Apply` adds the leaf and parent `Where` predicates to the
 `ResourceRequestContainer<TEntity>`.
 
-### 3. Delete request — `IResourceDeleteRequestAdvisor<TEntity>`
+### 2. Delete request — `IResourceDeleteRequestAdvisor<TEntity>`
 
 Receives the `DeleteRequest`, the container, and the principal. Authorization advisors run here when
 `WithAuthorization()` is configured:
@@ -37,14 +31,14 @@ Receives the `DeleteRequest`, the container, and the principal. Authorization ad
 | `AdviceDeleteRequestAnonymous` | Grants anonymous access when configured            |
 | `AdviceDeleteRequestAuthorize` | Authorizes the request through the access provider |
 
-### 4. Entity load
+### 3. Entity load
 
 The entity is loaded inside `_repository.SuppressQuerySoftDelete()`, so an
 already-tombstoned entity can be hard-deleted. A null result throws `ResourceNotFound(name)` — unless `DeleteRequest.AllowMissing` is set
 (AIP-135), in which case the delete returns an empty success without committing. Over HTTP the flag is the
 `allow_missing` query parameter; over gRPC it is `DeleteRequest.AllowMissing`.
 
-### 5. Delete entity — `IResourceDeleteAdvisor<TEntity>`
+### 4. Delete entity — `IResourceDeleteAdvisor<TEntity>`
 
 | Advisor                 | What it does                                                                                                                 |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
@@ -54,7 +48,7 @@ already-tombstoned entity can be hard-deleted. A null result throws `ResourceNot
 throws `AbortedException` with reason `CONCURRENCY_MISMATCH` (transports surface 409 / `ABORTED`). Only an
 absent or whitespace tag opts out.
 
-### 6. Persistence and soft-delete branching
+### 5. Persistence and soft-delete branching
 
 `_repository.RemoveAsync(entity, ct)` then `_repository.CommitAsync(ct)`. For an `ISoftDelete` entity, a
 repository remove advisor turns the physical delete into an update that sets `DeleteTime`. After commit the

@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Advisors;
-using Schemata.Advice;
 using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
@@ -19,7 +18,6 @@ using Schemata.Push.Foundation.Handlers;
 using Schemata.Push.Scheduling.Features;
 using Schemata.Push.Scheduling.Internal;
 using Schemata.Push.Skeleton;
-using Schemata.Push.Skeleton.Advisors;
 using Schemata.Push.Skeleton.Entities;
 using Schemata.Scheduling.Skeleton;
 using Xunit;
@@ -33,8 +31,8 @@ public class PushEntryEquivalenceShould
         var captured      = new TaskCompletionSource<PushContext>();
         var pushAdvisor   = new CapturingPushAdvisor(captured);
         var services      = new ServiceCollection();
-        services.AddSingleton<ICommandAdvisor<SendPushRequest>, MarkerCommandAdvisor>();
-        services.AddSingleton<IPushSendAdvisor>(pushAdvisor);
+        services.AddSingleton<IRequestPipelineAdvisor<SendPushRequest, ImmutableArray<TransportResult>>, MarkerCommandAdvisor>();
+        services.AddSingleton<IRequestPipelineAdvisor<SendPushRequest, ImmutableArray<TransportResult>>>(pushAdvisor);
         services.AddSingleton<IPushTransport>(new ImmediateTransport("sent"));
         services.AddSingleton<IPushTransport>(new ThrowingTransport("failed"));
         services.AddSchemataPush();
@@ -176,34 +174,35 @@ public class PushEntryEquivalenceShould
 
     private sealed record Marker;
 
-    private sealed class MarkerCommandAdvisor : ICommandAdvisor<SendPushRequest>
+    private sealed class MarkerCommandAdvisor : IRequestPipelineAdvisor<SendPushRequest, ImmutableArray<TransportResult>>
     {
         public int Order => 0;
 
-        public Task<AdviseResult> AdviseAsync(
-            AdviceContext     ctx,
-            SendPushRequest   request,
-            CancellationToken ct = default
-        ) {
+        public Task<ImmutableArray<TransportResult>> AdviseAsync(
+            AdviceContext                                            ctx,
+            SendPushRequest                                          request,
+            RequestHandlerContinuation<ImmutableArray<TransportResult>> next,
+            CancellationToken                                        ct = default) {
             ctx.Set(new Marker());
-            return Task.FromResult(AdviseResult.Continue);
+            return next(ct);
         }
     }
 
-    private sealed class CapturingPushAdvisor(TaskCompletionSource<PushContext> capture) : IPushSendAdvisor
+    private sealed class CapturingPushAdvisor(TaskCompletionSource<PushContext> capture)
+        : IRequestPipelineAdvisor<SendPushRequest, ImmutableArray<TransportResult>>
     {
         public int Order => 0;
         public bool SawMarker { get; private set; }
 
-
-        public Task<AdviseResult> AdviseAsync(
-            AdviceContext     ctx,
-            PushContext       context,
-            CancellationToken ct = default
+        public Task<ImmutableArray<TransportResult>> AdviseAsync(
+            AdviceContext                                               ctx,
+            SendPushRequest                                             request,
+            RequestHandlerContinuation<ImmutableArray<TransportResult>> next,
+            CancellationToken                                           ct = default
         ) {
             SawMarker = ctx.TryGet<Marker>(out _);
-            capture.TrySetResult(context);
-            return Task.FromResult(AdviseResult.Continue);
+            capture.TrySetResult(request.Context);
+            return next(ct);
         }
     }
 

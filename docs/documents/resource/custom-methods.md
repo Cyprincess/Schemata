@@ -106,13 +106,12 @@ pipeline's transport-facing root for authorization and target validation; the di
 ```
 ResourceMethodController (HTTP) / ResourceCustomMethod (gRPC)
   -> ResourceMethodOperationHandler.InvokeAsync(verb, name, request, principal, ct)
-       1. IResourceRequestAdvisor<TEntity>            gate; operation token is the verb itself
-       2. IResourceMethodRequestAdvisor<TEntity, TRequest>   request stage
-       3. (instance scope) load entity, then IResourceMethodAdvisor<TEntity, TRequest, TResponse>
-       4. request.Principal = principal
+       1. IResourceMethodRequestAdvisor<TEntity, TRequest>   request stage (authorizes; operation token is the verb)
+       2. (instance scope) load entity, then IResourceMethodAdvisor<TEntity, TRequest, TResponse>
+       3. request.Principal = principal
           -> IRequestDispatcher.SendAsync<TRequest, TResponse>(request, ct)
                 -> IRequestHandler<TRequest, TResponse>.HandleAsync(request, ct)
-       5. IResourceResponseAdvisor<TEntity, TResponse>   response stage
+       4. IResourceResponseAdvisor<TEntity, TResponse>   response stage
 ```
 
 A `Block` at any stage throws `NotFoundException` (`Blocked(name)`); a `Handle` returns a `TResponse` stashed in

@@ -69,15 +69,6 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
 
         var ctx = CreateAdviceContext();
 
-        var gate = await RunPipelineAsync<DeleteResultBase<TDetail>>(
-            ctx,
-            () => Advisor.For<IResourceRequestAdvisor<TEntity>>()
-                         .RunAsync(ctx, principal, nameof(Operations.Delete), ct.Value), () => ResourceNotFound(name),
-            () => new());
-        if (gate is not null) {
-            return (gate, null);
-        }
-
         var req = new DeleteRequest {
             Name = name, Etag = etag, AllowMissing = allowMissing,
         };
@@ -128,14 +119,6 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         // carries the updated resource per AIP-164.
         if (entity is ISoftDelete { DeleteTime: not null }) {
             var detail = _mapper.Map<TEntity, TDetail>(entity);
-
-            var responseResult = await RunPipelineAsync<DeleteResultBase<TDetail>>(
-                ctx,
-                () => Advisor.For<IResourceResponseAdvisor<TEntity, TDetail>>()
-                             .RunAsync(ctx, entity, detail, principal, ct.Value), () => ResourceNotFound(name));
-            if (responseResult is not null) {
-                return (responseResult, entity);
-            }
 
             return (new() { Detail = detail }, entity);
         }

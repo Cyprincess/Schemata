@@ -7,6 +7,8 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Commands;
+using Schemata.Messaging.Skeleton.Advisors;
 using Schemata.Messaging.Skeleton.Internal;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Advisors;
@@ -41,22 +43,18 @@ public static class ServiceCollectionExtensions
         services.AddHttpContextAccessor();
         services.AddDataProtection();
 
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateRequestAdvisor<,>), typeof(AdviceCreateRequestSanitize<,>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateRequestAdvisor<,>), typeof(AdviceCreateRequestValidation<,>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateRequestAdvisor<,>), typeof(AdviceUpdateRequestSanitize<,>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateRequestAdvisor<,>), typeof(AdviceUpdateRequestValidation<,>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateAdvisor<,>), typeof(AdviceApplyChildParent<,>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateAdvisor<,>), typeof(AdviceApplyChildParent<,>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateAdvisor<,>), typeof(AdviceUpdateSoftDeleted<,>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateAdvisor<,>), typeof(AdviceUpdateFreshness<,>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceDeleteAdvisor<>), typeof(AdviceDeleteFreshness<>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceResponseAdvisor<,>), typeof(AdviceResponseParent<,>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceResponseAdvisor<,>), typeof(AdviceResponseFreshness<,>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceListResponseAdvisor<>), typeof(AdviceListResponseParent<>)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceResponseAdvisor<,>), typeof(AdviceResponseIdempotency<,>)));
 
         // Reverse-resolves an entity type from a resource name / collection segment.
         services.TryAddSingleton<IResourceTypeResolver, DefaultResourceTypeResolver>();
+
+        // The response ETag source for detail responses; overriding it swaps the weak-timestamp tag
+        // for a domain-specific one.
+        services.TryAddSingleton<IEntityTagProvider, DefaultEntityTagProvider>();
 
         // The built-in AIP-165 purge runs as the restart-durable PurgeJob<TEntity>. One open-generic
         // registration resolves the job for any soft-deletable entity, and one resolver maps the
@@ -96,8 +94,30 @@ public static class ServiceCollectionExtensions
 
         AddStandardHandlers(services, entity, request, detail, summary);
 
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateRequestAdvisor<,>).MakeGenericType(entity, request), typeof(AdviceCreateRequestIdempotency<,,>).MakeGenericType(entity, request, detail)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateRequestAdvisor<,>).MakeGenericType(entity, request), typeof(AdviceUpdateRequestIdempotency<,,>).MakeGenericType(entity, request, detail)));
+        var createRequest  = typeof(CreateResourceRequest<,,>).MakeGenericType(entity, request, detail);
+        var createResponse = typeof(CreateResultBase<>).MakeGenericType(detail);
+        var updateRequest  = typeof(UpdateResourceRequest<,,>).MakeGenericType(entity, request, detail);
+        var updateResponse = typeof(UpdateResultBase<>).MakeGenericType(detail);
+
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(createRequest, createResponse), typeof(ResourceCreateSanitizePipelineAdvisor<,,>).MakeGenericType(entity, request, detail)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(createRequest, createResponse), typeof(ResourceCreateValidationPipelineAdvisor<,,>).MakeGenericType(entity, request, detail)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(updateRequest, updateResponse), typeof(ResourceUpdateSanitizePipelineAdvisor<,,>).MakeGenericType(entity, request, detail)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(updateRequest, updateResponse), typeof(ResourceUpdateValidationPipelineAdvisor<,,>).MakeGenericType(entity, request, detail)));
+
+        var listRequest  = typeof(ListResourceQueryRequest<,>).MakeGenericType(entity, summary);
+        var listResponse = typeof(ListResultBase<>).MakeGenericType(summary);
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(listRequest, listResponse), typeof(ResourceListResponsePipelineAdvisor<,>).MakeGenericType(entity, summary)));
+        var getRequest  = typeof(GetResourceQueryRequest<,>).MakeGenericType(entity, detail);
+        var getResponse = typeof(GetResultBase<>).MakeGenericType(detail);
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(getRequest, getResponse), typeof(ResourceGetResponsePipelineAdvisor<,>).MakeGenericType(entity, detail)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(createRequest, createResponse), typeof(ResourceCreateResponsePipelineAdvisor<,,>).MakeGenericType(entity, request, detail)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(updateRequest, updateResponse), typeof(ResourceUpdateResponsePipelineAdvisor<,,>).MakeGenericType(entity, request, detail)));
+
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(createRequest, createResponse), typeof(ResourceCreateIdempotencyPipelineAdvisor<,,>).MakeGenericType(entity, request, detail)));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(updateRequest, updateResponse), typeof(ResourceUpdateIdempotencyPipelineAdvisor<,,>).MakeGenericType(entity, request, detail)));
+        var deleteRequest  = typeof(DeleteResourceRequest<,>).MakeGenericType(entity, detail);
+        var deleteResponse = typeof(DeleteResultBase<>).MakeGenericType(detail);
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(deleteRequest, deleteResponse), typeof(ResourceDeleteResponsePipelineAdvisor<,>).MakeGenericType(entity, detail)));
 
         var methods = entity.GetCustomAttributes<ResourceMethodAttribute>().ToList();
         if (resource.Methods is not null) {
@@ -119,9 +139,20 @@ public static class ServiceCollectionExtensions
 
             var methodRequest  = descriptor.Request;
             var methodResponse = descriptor.Response;
+            var envelope       = typeof(ResourceMethodRequest<,,>).MakeGenericType(entity, methodRequest, methodResponse);
+
+            // TryAdd keeps one envelope handler per closure: a domain foundation that forwards its
+            // own method command through the envelope registers its forwarder first.
+            services.TryAddScoped(typeof(IRequestHandler<,>).MakeGenericType(envelope, methodResponse),
+                                  typeof(ResourceMethodDispatchHandler<,,>).MakeGenericType(entity, methodRequest, methodResponse));
+            services.TryAddEnumerable(ServiceDescriptor.Scoped(
+                typeof(IRequestPipelineAdvisor<,>).MakeGenericType(envelope, methodResponse),
+                typeof(ResourceMethodResponsePipelineAdvisor<,,>).MakeGenericType(entity, methodRequest, methodResponse)));
 
             if (typeof(ICanonicalName).IsAssignableFrom(methodRequest)) {
-                services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceMethodRequestAdvisor<,>).MakeGenericType(entity, methodRequest), typeof(AdviceMethodRequestIdempotency<,,>).MakeGenericType(entity, methodRequest, methodResponse)));
+                services.TryAddEnumerable(ServiceDescriptor.Scoped(
+                    typeof(IRequestPipelineAdvisor<,>).MakeGenericType(envelope, methodResponse),
+                    typeof(ResourceMethodIdempotencyPipelineAdvisor<,,>).MakeGenericType(entity, methodRequest, methodResponse)));
                 services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceMethodAdvisor<,,>).MakeGenericType(entity, methodRequest, methodResponse), typeof(AdviceMethodFreshness<,,>).MakeGenericType(entity, methodRequest, methodResponse)));
             }
         }

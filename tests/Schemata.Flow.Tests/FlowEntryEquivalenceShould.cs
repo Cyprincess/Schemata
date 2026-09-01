@@ -13,6 +13,7 @@ using Schemata.Flow.Foundation;
 using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Flow.Skeleton.Observers;
 using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Advisors;
@@ -25,7 +26,7 @@ namespace Schemata.Flow.Tests;
 ///     Proves the facade (<see cref="FlowRunner.CompleteAsync" />) and the unified
 ///     <see cref="IRequestDispatcher" /> entry run the exact same <see cref="CompleteActivityRequest" />
 ///     pipeline: equal <see cref="ProcessSnapshot" /> results, the registered
-///     <see cref="ICommandAdvisor{TCommand}" /> firing on both entries, and identical exception shapes
+///     <see cref="IRequestPipelineAdvisor{TRequest,TResponse}" /> firing on both entries, and identical exception shapes
 ///     when the addressed process does not exist. Neither entry stubs the real
 ///     <c>DefaultCompleteActivityHandler</c> — only the state-machine engine and repositories are test
 ///     doubles, matching this project's existing <c>FlowRunnerTransitionAdvisorShould</c> fixture shape.
@@ -75,7 +76,32 @@ public sealed class FlowEntryEquivalenceShould
             new("processes/missing", null, null), CancellationToken.None));
     }
 
-    private static Harness CreateHarness(ICommandAdvisor<CompleteActivityRequest>? advisor) {
+    [Fact]
+    public async Task Dispatch_Continues_The_Ambient_Context_Into_Transition_Advisors() {
+        var marker     = new MarkerCommandAdvisor();
+        var observed   = (AdviceContext?)null;
+        var transition = new Mock<IFlowTransitionAdvisor>();
+        transition.Setup(a => a.AdviseAsync(
+                      It.IsAny<AdviceContext>(), It.IsAny<FlowTransitionContext>(), It.IsAny<CancellationToken>()))
+                  .Returns((AdviceContext ctx, FlowTransitionContext _, CancellationToken _) => {
+                      observed = ctx;
+                      return Task.FromResult(AdviseResult.Continue);
+                  });
+        var harness    = CreateHarness(marker, transition.Object);
+        var dispatcher = harness.Services.GetRequiredService<IRequestDispatcher>();
+
+        await dispatcher.SendAsync<CompleteActivityRequest, ProcessSnapshot>(
+            new(harness.Process.CanonicalName!, null, null), CancellationToken.None);
+
+        Assert.NotNull(observed);
+        Assert.True(observed.TryGet<Marker>(out var value));
+        Assert.Same(marker.Value, value);
+    }
+
+    private static Harness CreateHarness(
+        IRequestPipelineAdvisor<CompleteActivityRequest, ProcessSnapshot>? advisor,
+        IFlowTransitionAdvisor?                                            transitionAdvisor = null
+    ) {
         var registration = new ProcessRegistration {
             Name          = "equivalence-process",
             Engine        = FlowConstants.Engines.StateMachine,
@@ -115,6 +141,9 @@ public sealed class FlowEntryEquivalenceShould
 
         if (advisor is not null) {
             collection.AddSingleton(advisor);
+        }
+        if (transitionAdvisor is not null) {
+            collection.AddSingleton(transitionAdvisor);
         }
 
         collection.AddSchemataFlow();
@@ -186,17 +215,40 @@ public sealed class FlowEntryEquivalenceShould
     }
 
     /// <summary>Records every dispatch of <see cref="CompleteActivityRequest" /> it observes.</summary>
-    private sealed class RecordingCommandAdvisor : ICommandAdvisor<CompleteActivityRequest>
+    private sealed class RecordingCommandAdvisor : IRequestPipelineAdvisor<CompleteActivityRequest, ProcessSnapshot>
     {
         public int Count { get; private set; }
 
         public int Order => 0;
 
-        public Task<AdviseResult> AdviseAsync(AdviceContext ctx, CompleteActivityRequest a1, CancellationToken ct = default) {
+        public Task<ProcessSnapshot> AdviseAsync(
+            AdviceContext                               ctx,
+            CompleteActivityRequest                     a1,
+            RequestHandlerContinuation<ProcessSnapshot> next,
+            CancellationToken                           ct = default) {
             Count++;
-            return Task.FromResult(AdviseResult.Continue);
+            return next(ct);
         }
     }
+
+    /// <summary>Stamps a <see cref="Marker" /> onto the dispatch's ambient context.</summary>
+    private sealed class MarkerCommandAdvisor : IRequestPipelineAdvisor<CompleteActivityRequest, ProcessSnapshot>
+    {
+        public Marker Value { get; } = new();
+
+        public int Order => 0;
+
+        public Task<ProcessSnapshot> AdviseAsync(
+            AdviceContext                               ctx,
+            CompleteActivityRequest                     request,
+            RequestHandlerContinuation<ProcessSnapshot> next,
+            CancellationToken                           ct = default) {
+            ctx.Set(Value);
+            return next(ct);
+        }
+    }
+
+    private sealed record Marker;
 
     private sealed class EquivalenceProcess : ProcessDefinition;
 }

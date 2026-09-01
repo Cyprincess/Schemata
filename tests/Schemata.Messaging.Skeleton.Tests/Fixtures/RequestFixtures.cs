@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,100 +13,125 @@ public sealed record RenameWidget(string Name) : ICommand<string>;
 /// <summary>A command with no result, exercising the <see cref="Schemata.Abstractions.Unit" /> path.</summary>
 public sealed record RetireWidget(string Name) : ICommand;
 
-/// <summary>A query, so the query advisor chain has a payload that is not a command.</summary>
+/// <summary>A query, so the query pipeline chain has a payload that is not a command.</summary>
 public sealed record CountWidgets : IQuery<int>;
 
-/// <summary>A plain request that is neither a command nor a query, so no advisor chain runs for it.</summary>
+/// <summary>A plain request that is neither a command nor a query, so no pipeline chain runs for it.</summary>
 public sealed record PlainRequest(string Value) : IRequest<string>;
 
 /// <summary>
-///     Appends its own <paramref name="tag" /> to a shared trail, then returns
-///     <paramref name="result" />. Hand-written rather than a Moq proxy because the trail has to be
-///     appended to from inside the advise call — which is what proves ordering — and because it
-///     records the <see cref="AdviceContext" /> instance it observed, which the ambient-context
-///     test compares against the one the handler sees.
+///     Records the order of its before segment, the continuation, and its after segment onto a
+///     shared trail, and appends a suffix to the response so the after segment's rewrite is
+///     observable.
 /// </summary>
-public sealed class TracingCommandAdvisor(int order, string tag, List<string> trail, AdviseResult result)
-    : ICommandAdvisor<RenameWidget>
+public sealed class TracingPipelineAdvisor(List<string> trail) : IRequestPipelineAdvisor<RenameWidget, string>
+{
+    public int Order => 0;
+
+    public async Task<string> AdviseAsync(
+        AdviceContext                      ctx,
+        RenameWidget                       request,
+        RequestHandlerContinuation<string> next,
+        CancellationToken                  ct = default) {
+        trail.Add("before");
+        var response = await next(ct);
+        trail.Add("after");
+        return $"{response}::after";
+    }
+}
+
+/// <summary>Returns its own value without calling the continuation, proving the short-circuit path.</summary>
+public sealed class ShortCircuitPipelineAdvisor(string value) : IRequestPipelineAdvisor<RenameWidget, string>
+{
+    public int Order => 0;
+
+    public Task<string> AdviseAsync(
+        AdviceContext                      ctx,
+        RenameWidget                       request,
+        RequestHandlerContinuation<string> next,
+        CancellationToken                  ct = default) {
+        return Task.FromResult(value);
+    }
+}
+
+/// <summary>
+///     A configurable wrap advisor over <see cref="RenameWidget" />. It records the ambient context
+///     it observed and appends before and after markers to a shared trail. When
+///     <paramref name="callNext" /> is <see langword="false" /> it returns its own short-circuit
+///     value without invoking the continuation.
+/// </summary>
+public sealed class OrderedRenameAdvisor(int order, string tag, List<string> trail, bool callNext)
+    : IRequestPipelineAdvisor<RenameWidget, string>
 {
     public int Order => order;
 
     public AdviceContext? ObservedContext { get; private set; }
 
-    public Task<AdviseResult> AdviseAsync(AdviceContext ctx, RenameWidget a1, CancellationToken ct = default) {
+    public async Task<string> AdviseAsync(
+        AdviceContext                      ctx,
+        RenameWidget                       request,
+        RequestHandlerContinuation<string> next,
+        CancellationToken                  ct = default) {
         ObservedContext = ctx;
+        trail.Add($"{tag}:before");
+        if (!callNext) {
+            return $"{tag}:short";
+        }
+
+        var response = await next(ct);
+        trail.Add($"{tag}:after");
+        return response;
+    }
+}
+
+/// <summary>Throws from its before segment, so the dispatcher surfaces the advisor's own exception.</summary>
+public sealed class ThrowingRenameAdvisor(Exception error) : IRequestPipelineAdvisor<RenameWidget, string>
+{
+    public int Order => 0;
+
+    public Task<string> AdviseAsync(
+        AdviceContext                      ctx,
+        RenameWidget                       request,
+        RequestHandlerContinuation<string> next,
+        CancellationToken                  ct = default) {
+        throw error;
+    }
+}
+
+/// <summary>Appends its own tag to a shared trail, so a query pipeline chain running is observable.</summary>
+public sealed class QueryTracingPipelineAdvisor(string tag, List<string> trail) : IRequestPipelineAdvisor<CountWidgets, int>
+{
+    public int Order => 0;
+
+    public Task<int> AdviseAsync(
+        AdviceContext                   ctx,
+        CountWidgets                    request,
+        RequestHandlerContinuation<int> next,
+        CancellationToken               ct = default) {
         trail.Add(tag);
-        return Task.FromResult(result);
+        return next(ct);
     }
 }
 
-/// <summary>Records that it ran, returns <see cref="AdviseResult.Handle" /> after seeding the result.</summary>
-public sealed class HandlingCommandAdvisor(string value) : ICommandAdvisor<RenameWidget>
+/// <summary>Records whether it ran; registered against <see cref="PlainRequest" /> to prove a plain request never runs a chain.</summary>
+public sealed class RecordingPlainPipelineAdvisor : IRequestPipelineAdvisor<PlainRequest, string>
 {
     public int Order => 0;
 
     public bool Ran { get; private set; }
 
-    public Task<AdviseResult> AdviseAsync(AdviceContext ctx, RenameWidget a1, CancellationToken ct = default) {
+    public Task<string> AdviseAsync(
+        AdviceContext                      ctx,
+        PlainRequest                       request,
+        RequestHandlerContinuation<string> next,
+        CancellationToken                  ct = default) {
         Ran = true;
-        ctx.Set(value);
-        return Task.FromResult(AdviseResult.Handle);
+        return next(ct);
     }
 }
 
-/// <summary>Returns <see cref="AdviseResult.Handle" /> without seeding a result, to prove the dispatcher guards it.</summary>
-public sealed class UnsetHandlingCommandAdvisor : ICommandAdvisor<RenameWidget>
+/// <summary>An empty provider for advisor-unit tests that never resolve a service.</summary>
+public sealed class EmptyServiceProvider : IServiceProvider
 {
-    public int Order => 0;
-
-    public Task<AdviseResult> AdviseAsync(AdviceContext ctx, RenameWidget a1, CancellationToken ct = default) {
-        return Task.FromResult(AdviseResult.Handle);
-    }
-}
-
-/// <summary>Blocks every command it sees.</summary>
-public sealed class BlockingCommandAdvisor : ICommandAdvisor<RenameWidget>
-{
-    public int Order => 0;
-
-    public Task<AdviseResult> AdviseAsync(AdviceContext ctx, RenameWidget a1, CancellationToken ct = default) {
-        return Task.FromResult(AdviseResult.Block);
-    }
-}
-
-/// <summary>Appends its own tag to a shared trail, so a query advisor chain running is observable.</summary>
-public sealed class TracingQueryAdvisor(string tag, List<string> trail) : IQueryAdvisor<CountWidgets>
-{
-    public int Order => 0;
-
-    public Task<AdviseResult> AdviseAsync(AdviceContext ctx, CountWidgets a1, CancellationToken ct = default) {
-        trail.Add(tag);
-        return Task.FromResult(AdviseResult.Continue);
-    }
-}
-
-/// <summary>Records if it ran; registered against <see cref="PlainRequest" /> to prove that a plain request never runs the command chain.</summary>
-public sealed class RecordingCommandAdvisorForPlainRequest : ICommandAdvisor<PlainRequest>
-{
-    public int Order => 0;
-
-    public bool Ran { get; private set; }
-
-    public Task<AdviseResult> AdviseAsync(AdviceContext ctx, PlainRequest a1, CancellationToken ct = default) {
-        Ran = true;
-        return Task.FromResult(AdviseResult.Continue);
-    }
-}
-
-/// <summary>Records if it ran; registered against <see cref="PlainRequest" /> to prove that a plain request never runs the query chain.</summary>
-public sealed class RecordingQueryAdvisorForPlainRequest : IQueryAdvisor<PlainRequest>
-{
-    public int Order => 0;
-
-    public bool Ran { get; private set; }
-
-    public Task<AdviseResult> AdviseAsync(AdviceContext ctx, PlainRequest a1, CancellationToken ct = default) {
-        Ran = true;
-        return Task.FromResult(AdviseResult.Continue);
-    }
+    public object? GetService(Type serviceType) => null;
 }

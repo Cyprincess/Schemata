@@ -171,17 +171,16 @@ Every operation runs the same fixed stage sequence. The stage order is hard-code
 `Order` only sequences advisors within one stage.
 
 ```
-IResourceRequestAdvisor<TEntity>             gate (all operations; second arg is the operation token)
-  IResource{Create|Get|List|Update|Delete}RequestAdvisor   operation-specific request chain
-    mapper.Map<TRequest, TEntity>            Create only
-      IResource{Create|Update|Delete}Advisor entity-level chain (Create/Update/Delete)
-        repository.AddAsync / UpdateAsync / RemoveAsync, then CommitAsync
-          mapper.Map<TEntity, TDetail>
-            IResourceResponseAdvisor<TEntity, TDetail>   response chain
+IResource{Create|Get|List|Update|Delete}RequestAdvisor   operation-specific request chain (authorizes, shapes the query)
+  mapper.Map<TRequest, TEntity>            Create only
+    IResource{Create|Update|Delete}Advisor entity-level chain (Create/Update/Delete)
+      repository.AddAsync / UpdateAsync / RemoveAsync, then CommitAsync
+        mapper.Map<TEntity, TDetail>
+          IResourceResponseAdvisor<TEntity, TDetail>   response chain
 ```
 
-The gate's second argument is a `string`: `nameof(Operations.List | Get | Create | Update | Delete)` for CRUD,
-or the lowerCamelCase verb for an AIP-136 custom method. Each stage runs through
+The request stage receives the operation's request DTO, a `ResourceRequestContainer<TEntity>`, and the
+`ClaimsPrincipal?`. Each stage runs through
 `ResourcePipelineRunner<Operations>.RunAsync`, which interprets the `AdviseResult`:
 
 - `Continue` — proceed to the next stage.

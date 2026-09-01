@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Handlers;
@@ -63,7 +64,7 @@ public class RefreshTokenHandlerShould
         var handler = new RefreshTokenHandler<SchemataApplication, SchemataToken>(
             clientAuth.Object, tokens.Object, tokenService, refreshOpts, sp);
 
-        return new(handler, tokens, refreshToken);
+        return new(handler, tokens, refreshToken, sp);
     }
 
     private static TokenRequest CreateRequest(string? scope = null, string? refresh = "rt-ref") {
@@ -81,6 +82,7 @@ public class RefreshTokenHandlerShould
     [InlineData("  ")]
     public async Task ThrowsInvalidGrant_WhenRefreshTokenEmpty(string? refreshToken) {
         var f = CreateFixture();
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
                                                               CreateRequest(refresh: refreshToken), null,
@@ -92,6 +94,7 @@ public class RefreshTokenHandlerShould
     [Fact]
     public async Task PropagatesAuthorizationNameAndSessionId_OnRotation() {
         var f = CreateFixture(authName: "auth-42", sessionId: "session-xyz");
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
 
         var result = await f.Handler.HandleAsync(CreateRequest(), null, CancellationToken.None);
 
@@ -104,6 +107,7 @@ public class RefreshTokenHandlerShould
     [Fact]
     public async Task OmitsAuthorizationNameAndSessionId_WhenOriginalTokenHasNone() {
         var f = CreateFixture(authName: null, sessionId: null);
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
 
         var result = await f.Handler.HandleAsync(CreateRequest(), null, CancellationToken.None);
 
@@ -117,7 +121,8 @@ public class RefreshTokenHandlerShould
     private record Fixture(
         RefreshTokenHandler<SchemataApplication, SchemataToken> Handler,
         Mock<ITokenManager<SchemataToken>>                      Tokens,
-        SchemataToken                                           RefreshToken
+        SchemataToken                                           RefreshToken,
+        IServiceProvider                                        Sp
     );
 
     #endregion

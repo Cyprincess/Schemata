@@ -10,6 +10,7 @@ using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Observers;
 using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Commands;
 using Schemata.Messaging.Skeleton.Internal;
 using ProcessDefinitionInfo = Schemata.Flow.Skeleton.Models.ProcessDefinitionInfo;
 using ProcessSnapshot = Schemata.Flow.Skeleton.Models.ProcessSnapshot;
@@ -109,6 +110,15 @@ public static class ServiceCollectionExtensions
         services.TryAddTransient<IRequestHandler<CancelTokenRequest, ProcessSnapshot>>(sp =>
             sp.GetRequiredKeyedService<IRequestHandler<CancelTokenRequest, ProcessSnapshot>>(
                 FlowConstants.Handlers.Default));
+
+        services.TryAddTransient<IRequestHandler<ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>, SchemataProcess>, ResourceMethodForwardHandler<SchemataProcess, StartProcessRequest, SchemataProcess>>();
+        services.TryAddTransient<IRequestHandler<ResourceMethodRequest<SchemataProcess, CompleteActivityRequest, ProcessSnapshot>, ProcessSnapshot>, ResourceMethodForwardHandler<SchemataProcess, CompleteActivityRequest, ProcessSnapshot>>();
+        services.TryAddTransient<IRequestHandler<ResourceMethodRequest<SchemataProcess, CorrelateMessageRequest, ProcessSnapshot>, ProcessSnapshot>, ResourceMethodForwardHandler<SchemataProcess, CorrelateMessageRequest, ProcessSnapshot>>();
+        services.TryAddTransient<IRequestHandler<ResourceMethodRequest<SchemataProcess, ThrowSignalRequest, IReadOnlyList<SignalDeliveryResult>>, IReadOnlyList<SignalDeliveryResult>>, ResourceMethodForwardHandler<SchemataProcess, ThrowSignalRequest, IReadOnlyList<SignalDeliveryResult>>>();
+        services.TryAddTransient<IRequestHandler<ResourceMethodRequest<SchemataProcess, DeliverSignalRequest, SignalDeliveryResult>, SignalDeliveryResult>, ResourceMethodForwardHandler<SchemataProcess, DeliverSignalRequest, SignalDeliveryResult>>();
+        services.TryAddTransient<IRequestHandler<ResourceMethodRequest<SchemataProcess, TerminateProcessRequest, ProcessSnapshot>, ProcessSnapshot>, ResourceMethodForwardHandler<SchemataProcess, TerminateProcessRequest, ProcessSnapshot>>();
+        services.TryAddTransient<IRequestHandler<ResourceMethodRequest<SchemataProcessToken, CancelTokenRequest, ProcessSnapshot>, ProcessSnapshot>, ResourceMethodForwardHandler<SchemataProcessToken, CancelTokenRequest, ProcessSnapshot>>();
+        services.TryAddTransient<IRequestHandler<ResourceMethodRequest<SchemataProcess, RunEventRequest, ProcessSnapshot>, ProcessSnapshot>, ResourceMethodForwardHandler<SchemataProcess, RunEventRequest, ProcessSnapshot>>();
 
         services.TryAddKeyedTransient<
             IRequestHandler<ListProcessDefinitionsQuery, IReadOnlyList<ProcessDefinitionInfo>>,

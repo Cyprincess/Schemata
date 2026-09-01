@@ -1,14 +1,13 @@
-using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions.Advisors;
+using Schemata.Advice;
 using Schemata.Insight.Skeleton;
 using Schemata.Messaging.Skeleton;
 
 namespace Schemata.Insight.Foundation.Handlers;
 
 internal sealed class DefaultQueryInsightHandler(
-    IServiceProvider   services,
     InsightPlanBuilder planner,
     PlanExecutor       executor
 ) : IRequestHandler<QueryInsightRequest, QueryInsightResponse>
@@ -17,19 +16,14 @@ internal sealed class DefaultQueryInsightHandler(
         QueryInsightRequest request,
         CancellationToken  ct = default
     ) {
-        foreach (var advisor in services.GetServices<IInsightRequestAdvisor>()) {
-            await advisor.AdviseAsync(request, request.Principal, ct);
-        }
+        var ctx = AdviceContext.Require();
 
         var plan = await planner.BuildAsync(request, ct);
-        foreach (var advisor in services.GetServices<IInsightPlanAdvisor>()) {
-            plan = await advisor.AdviseAsync(plan, request, ct);
-        }
+        ctx.Set(plan);
+        await Advisor.For<IInsightPlanAdvisor>().RunAsync(ctx, request, ct);
+        plan = ctx.Get<PlanNode>()!;
 
         var response = await executor.ExecuteAsync(plan, request, request.Principal, ct);
-        foreach (var advisor in services.GetServices<IInsightResponseAdvisor>()) {
-            await advisor.AdviseAsync(response, request, ct);
-        }
 
         return response;
     }

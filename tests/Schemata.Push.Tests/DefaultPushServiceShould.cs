@@ -1,14 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Advisors;
-using Schemata.Advice;
+using Schemata.Messaging.Skeleton.Advisors;
 using Schemata.Push.Foundation;
+using Schemata.Push.Foundation.Commands;
 using Schemata.Push.Skeleton;
-using Schemata.Push.Skeleton.Advisors;
 using Xunit;
 
 namespace Schemata.Push.Tests;
@@ -27,7 +28,7 @@ public class DefaultPushServiceShould
             => send(context, ct);
     }
 
-    sealed class OrderedAdvisor : IPushSendAdvisor
+    sealed class OrderedAdvisor : IRequestPipelineAdvisor<SendPushRequest, ImmutableArray<TransportResult>>
     {
         private readonly int _order;
         private readonly IList<int> _log;
@@ -39,25 +40,27 @@ public class DefaultPushServiceShould
 
         public int Order => _order;
 
-        public Task<AdviseResult> AdviseAsync(
-            AdviceContext ctx,
-            PushContext context,
-            CancellationToken ct = default
+        public Task<ImmutableArray<TransportResult>> AdviseAsync(
+            AdviceContext                                               ctx,
+            SendPushRequest                                             request,
+            RequestHandlerContinuation<ImmutableArray<TransportResult>> next,
+            CancellationToken                                           ct = default
         ) {
             _log.Add(_order);
-            return Task.FromResult(AdviseResult.Continue);
+            return next(ct);
         }
     }
 
-    sealed class BlockingAdvisor : IPushSendAdvisor
+    sealed class BlockingAdvisor : IRequestPipelineAdvisor<SendPushRequest, ImmutableArray<TransportResult>>
     {
         public int Order => 0;
 
-        public Task<AdviseResult> AdviseAsync(
-            AdviceContext ctx,
-            PushContext context,
-            CancellationToken ct = default
-        ) => Task.FromResult(AdviseResult.Block);
+        public Task<ImmutableArray<TransportResult>> AdviseAsync(
+            AdviceContext                                               ctx,
+            SendPushRequest                                             request,
+            RequestHandlerContinuation<ImmutableArray<TransportResult>> next,
+            CancellationToken                                           ct = default
+        ) => Task.FromResult(ImmutableArray<TransportResult>.Empty);
     }
 
 
@@ -65,9 +68,9 @@ public class DefaultPushServiceShould
     public async Task Run_Advisors_In_Ascending_Order() {
         var log = new List<int>();
         var services = new ServiceCollection();
-        services.AddSingleton<IPushSendAdvisor>(new OrderedAdvisor(order: 3, log));
-        services.AddSingleton<IPushSendAdvisor>(new OrderedAdvisor(order: 1, log));
-        services.AddSingleton<IPushSendAdvisor>(new OrderedAdvisor(order: 2, log));
+        services.AddSingleton<IRequestPipelineAdvisor<SendPushRequest, ImmutableArray<TransportResult>>>(new OrderedAdvisor(order: 3, log));
+        services.AddSingleton<IRequestPipelineAdvisor<SendPushRequest, ImmutableArray<TransportResult>>>(new OrderedAdvisor(order: 1, log));
+        services.AddSingleton<IRequestPipelineAdvisor<SendPushRequest, ImmutableArray<TransportResult>>>(new OrderedAdvisor(order: 2, log));
         services.AddSingleton<IPushTransport>(new FakeTransport("t1", (_, _) =>
             new ValueTask<TransportResult>(TransportResult.Sent("t1"))));
 
@@ -84,8 +87,8 @@ public class DefaultPushServiceShould
         var invoked      = false;
         var advisorCalls = new List<int>();
         var services     = new ServiceCollection();
-        services.AddSingleton<IPushSendAdvisor>(new BlockingAdvisor());
-        services.AddSingleton<IPushSendAdvisor>(new OrderedAdvisor(order: 1, advisorCalls));
+        services.AddSingleton<IRequestPipelineAdvisor<SendPushRequest, ImmutableArray<TransportResult>>>(new BlockingAdvisor());
+        services.AddSingleton<IRequestPipelineAdvisor<SendPushRequest, ImmutableArray<TransportResult>>>(new OrderedAdvisor(order: 1, advisorCalls));
         services.AddSingleton<IPushTransport>(new FakeTransport("t1", (_, _) => {
             invoked = true;
             return new ValueTask<TransportResult>(TransportResult.Sent("t1"));

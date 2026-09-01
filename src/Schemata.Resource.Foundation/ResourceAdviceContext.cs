@@ -7,15 +7,15 @@ using Schemata.Resource.Foundation.Advisors;
 namespace Schemata.Resource.Foundation;
 
 /// <summary>
-///     Continues the ambient <see cref="AdviceContext" /> for a resource operation, seeding
-///     resource-wide suppression markers from options.
+///     Continues the ambient <see cref="AdviceContext" /> for a resource operation, seeding the
+///     freshness suppression marker from options.
 /// </summary>
 internal static class ResourceAdviceContext
 {
     /// <summary>
     ///     Continues the ambient <see cref="AdviceContext" /> established by the pipeline root
-    ///     (<c>IRequestDispatcher</c>) for a resource operation, seeding configured suppression
-    ///     markers into it.
+    ///     (<c>IRequestDispatcher</c>) for a resource operation, seeding the configured freshness
+    ///     suppression marker into it.
     /// </summary>
     /// <param name="sp">The service provider for resolving resource options.</param>
     /// <returns>The ambient advisor context carrying configured suppression markers.</returns>
@@ -29,14 +29,6 @@ internal static class ResourceAdviceContext
         var options = sp.GetService<IOptions<SchemataResourceOptions>>()?.Value;
         if (options is null) {
             return ctx;
-        }
-
-        if (options.SuppressCreateValidation) {
-            ctx.Set<CreateRequestValidationSuppressed>(null);
-        }
-
-        if (options.SuppressUpdateValidation) {
-            ctx.Set<UpdateRequestValidationSuppressed>(null);
         }
 
         if (options.SuppressFreshness) {

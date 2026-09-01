@@ -16,14 +16,7 @@ only sequences advisors within a stage.
 
 ## Stages
 
-### 1. Gate — `IResourceRequestAdvisor<TEntity>`
-
-Runs first, receiving the `ClaimsPrincipal?` and the operation token `nameof(Operations.Create)`. `Block`
-throws `CollectionNotFound()` (a `NotFoundException` naming the collection). `Handle` returns a stashed
-`CreateResultBase<TDetail>`. The authorization advisors (`AdviceCreateRequestAnonymous`,
-`AdviceCreateRequestAuthorize`) sit in the request stage below and run only when `WithAuthorization()` is set.
-
-### 2. Create request — `IResourceCreateRequestAdvisor<TEntity, TRequest>`
+### 1. Create request — `IResourceCreateRequestAdvisor<TEntity, TRequest>`
 
 Receives the `TRequest`, a `ResourceRequestContainer<TEntity>`, and the principal. Built-in advisors run in
 `Order` sequence:
@@ -40,12 +33,12 @@ Receives the `TRequest`, a `ResourceRequestContainer<TEntity>`, and the principa
 `Name`, `CanonicalName`, `Timestamp` (`IConcurrency`), `EntityTag` (`IFreshness`), `Uid`, `Owner`, `State`,
 `CreateTime`, `UpdateTime`, `DeleteTime`, `PurgeTime`. Names absent from `TRequest` are skipped.
 
-### 3. Mapping
+### 2. Mapping
 
 `_mapper.Map<TRequest, TEntity>(request)` converts the sanitized request to an entity. A `null` result throws
 `ValidationException` with `Reason = INVALID_PAYLOAD`.
 
-### 4. Create entity — `IResourceCreateAdvisor<TEntity, TRequest>`
+### 3. Create entity — `IResourceCreateAdvisor<TEntity, TRequest>`
 
 Receives the original request and the freshly mapped entity. This is the socket for entity-level logic that must
 run before persistence. `AdviceApplyChildParent` reverse-parses `request.Parent` into the entity's mode-A parent
@@ -53,13 +46,13 @@ field for `IChild` DTOs. The transport has already overwritten `Parent` from the
 parent segment, so the body's parent applies only where the route supplies none. Other trait behavior such as
 timestamp, canonical name, and uniqueness is applied by repository add advisors during `AddAsync`.
 
-### 5. Persistence
+### 4. Persistence
 
 `_repository.AddAsync(entity, ct)` then `_repository.CommitAsync(ct)`. When the handler runs non-finalizing
 (inside a batched operation), it maps the staged entity to `TDetail` and returns without committing or running
 response advisors.
 
-### 6. Response mapping and advisors
+### 5. Response mapping and advisors
 
 `_mapper.Map<TEntity, TDetail>(entity)` maps the persisted entity (with server-assigned fields populated), then
 `IResourceResponseAdvisor<TEntity, TDetail>` runs:

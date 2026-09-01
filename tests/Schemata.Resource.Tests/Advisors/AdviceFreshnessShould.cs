@@ -129,34 +129,4 @@ public class AdviceFreshnessShould
 
         await Assert.ThrowsAsync<AbortedException>(() => advisor.AdviseAsync(ctx, request, entity, null));
     }
-
-    [Fact]
-    public async Task ResponseFreshness_EmptyTimestamp_ProducesNoETag() {
-        var advisor = new AdviceResponseFreshness<Student, Student>();
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var entity  = new Student { Timestamp = Guid.Empty };
-        var detail  = new Student();
-
-        var result = await advisor.AdviseAsync(ctx, entity, detail, null);
-
-        Assert.Equal(AdviseResult.Continue, result);
-        Assert.Null(detail.EntityTag);
-    }
-
-    [Fact]
-    public async Task ResponseFreshness_Timestamp_ProducesWeakETag() {
-        var advisor   = new AdviceResponseFreshness<Student, Student>();
-        var ctx       = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var timestamp = Identifiers.NewUid();
-        var expected = $"W/\"{
-            Convert.ToBase64String(timestamp.ToByteArray()).TrimEnd('=').Replace('+', '-').Replace('/', '_')
-        }\"";
-        var entity = new Student { Timestamp = timestamp };
-        var detail = new Student();
-
-        var result = await advisor.AdviseAsync(ctx, entity, detail, null);
-
-        Assert.Equal(AdviseResult.Continue, result);
-        Assert.Equal(expected, detail.EntityTag);
-    }
 }

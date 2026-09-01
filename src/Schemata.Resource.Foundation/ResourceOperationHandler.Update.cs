@@ -69,19 +69,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         CancellationToken ct,
         bool              finalize
     ) {
-        var gate = await RunPipelineAsync<UpdateResultBase<TDetail>>(
-            ctx,
-            () => Advisor.For<IResourceRequestAdvisor<TEntity>>()
-                         .RunAsync(ctx, principal, nameof(Operations.Update), ct), () => ResourceNotFound(name));
-        if (gate is not null) {
-            return gate;
-        }
-
         ResourceNameDescriptor.ForType<TEntity>().ClearParentProperties(request);
-
-        // The URI identifies the resource being updated; carry it on the request so the AIP-155
-        // idempotency key distinguishes updates to different resources that share a request id.
-        request.CanonicalName = name;
 
         var container = new ResourceRequestContainer<TEntity>();
         ResourceIdentifiers.Apply(container, name);
@@ -133,11 +121,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
 
         var detail = _mapper.Map<TEntity, TDetail>(entity);
 
-        var responseResult = await RunPipelineAsync<UpdateResultBase<TDetail>>(
-            ctx,
-            () => Advisor.For<IResourceResponseAdvisor<TEntity, TDetail>>()
-                         .RunAsync(ctx, entity, detail, principal, ct), () => ResourceNotFound(name));
-        return responseResult ?? new() { Detail = detail };
+        return new() { Detail = detail };
     }
 
     private async Task<UpdateResultBase<TDetail>> CreateMissingAsync(
@@ -186,11 +170,8 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         await _repository.CommitAsync(ct);
 
         var detail = _mapper.Map<TEntity, TDetail>(entity);
-        var responseResult = await RunPipelineAsync<UpdateResultBase<TDetail>>(
-            ctx,
-            () => Advisor.For<IResourceResponseAdvisor<TEntity, TDetail>>()
-                         .RunAsync(ctx, entity, detail, principal, ct), CollectionNotFound);
-        return responseResult ?? new() { Detail = detail };
+
+        return new() { Detail = detail };
     }
 
     private static List<string> ResolveMaskFields(string mask) {

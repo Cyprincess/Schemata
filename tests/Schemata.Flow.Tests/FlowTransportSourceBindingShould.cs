@@ -125,6 +125,28 @@ public class FlowTransportSourceBindingShould
         Assert.Contains(nameof(IRepository<Order>), exception.Message);
     }
 
+    [Fact]
+    public async Task Dispatch_Continues_The_Ambient_Context_Into_Source_Advisors() {
+        var observed = (AdviceContext?)null;
+        var advisor  = new Mock<IFlowSourceAdvisor<Order>>();
+        advisor.Setup(a => a.AdviseAsync(
+                          It.IsAny<AdviceContext>(),
+                          It.IsAny<FlowTransitionContext>(),
+                          It.IsAny<Order>(),
+                          It.IsAny<CancellationToken>()))
+               .Returns((AdviceContext ctx, FlowTransitionContext _, Order _, CancellationToken _) => {
+                   observed = ctx;
+                   return Task.FromResult(AdviseResult.Continue);
+               });
+        var harness = new Harness(runtime: DuplicateTransitionRuntime(), sourceAdvisor: advisor.Object);
+
+        await harness.Runner.StartAsync("approval", harness.Order);
+
+        Assert.NotNull(observed);
+        Assert.True(observed.TryGet<Marker>(out var value));
+        Assert.Same(harness.StartPrincipalAdvisor.Value, value);
+    }
+
     private static StartProcessInstanceRequest Request(ClaimsPrincipal? principal = null) {
         return new() { DefinitionName = "approval", Source = "orders/o1", Principal = principal };
     }
@@ -161,7 +183,7 @@ public class FlowTransportSourceBindingShould
                 services.AddSingleton(sourceAdvisor);
             }
             StartPrincipalAdvisor = new();
-            services.AddSingleton<ICommandAdvisor<StartProcessRequest>>(StartPrincipalAdvisor);
+            services.AddSingleton<IRequestPipelineAdvisor<StartProcessRequest, SchemataProcess>>(StartPrincipalAdvisor);
 
             services.AddKeyedSingleton<IFlowRuntime>("StateMachine", runtime ?? DefaultRuntime());
             services.AddSchemataFlow();
@@ -189,21 +211,26 @@ public class FlowTransportSourceBindingShould
         public FlowStartProcessHandler StartHandler { get; }
     }
 
-    private sealed class RecordingStartPrincipalAdvisor : ICommandAdvisor<StartProcessRequest>
+    private sealed class RecordingStartPrincipalAdvisor : IRequestPipelineAdvisor<StartProcessRequest, SchemataProcess>
     {
         public int Order => 0;
 
+        public Marker Value { get; } = new();
+
         public ClaimsPrincipal? Principal { get; private set; }
 
-        public Task<AdviseResult> AdviseAsync(
-            AdviceContext       ctx,
-            StartProcessRequest request,
-            CancellationToken   ct = default
-        ) {
+        public Task<SchemataProcess> AdviseAsync(
+            AdviceContext                             ctx,
+            StartProcessRequest                       request,
+            RequestHandlerContinuation<SchemataProcess> next,
+            CancellationToken                         ct = default) {
+            ctx.Set(Value);
             Principal = request.Principal;
-            return Task.FromResult(AdviseResult.Continue);
+            return next(ct);
         }
     }
+
+    private sealed record Marker;
 
     private static Mock<IProcessRegistry> RegistryMock(IReadOnlyDictionary<string, FlowSourceDescriptor>? sourceTypes = null) {
         var registration = new ProcessRegistration {

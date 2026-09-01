@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
@@ -78,9 +79,10 @@ public class AuthorizationCodeHandlerShould
         };
     }
 
-    private static AuthorizationCodeHandler<SchemataApplication, SchemataToken> CreateHandler(
-        Mock<ITokenManager<SchemataToken>> tokens
-    ) {
+    private static (AuthorizationCodeHandler<SchemataApplication, SchemataToken> Handler, System.IServiceProvider Sp)
+        CreateHandler(
+            Mock<ITokenManager<SchemataToken>> tokens
+        ) {
         var jsonOpts = Options.Create(JsonOptions);
         var codeOpts = Options.Create(new CodeFlowOptions());
         var app = new SchemataApplication {
@@ -102,7 +104,7 @@ public class AuthorizationCodeHandlerShould
             new AdviceCodeExchangeValidation<SchemataApplication, SchemataToken>(Clock));
         var sp = services.BuildServiceProvider();
 
-        return new(clientAuth.Object, tokens.Object, sp, jsonOpts, codeOpts);
+        return (new(clientAuth.Object, tokens.Object, jsonOpts, codeOpts), sp);
     }
 
     [Theory]
@@ -111,7 +113,8 @@ public class AuthorizationCodeHandlerShould
     [InlineData("  ")]
     public async Task ThrowsInvalidGrant_WhenCodeEmpty(string? code) {
         var tokens  = new Mock<ITokenManager<SchemataToken>>();
-        var handler = CreateHandler(tokens);
+        var (handler, sp) = CreateHandler(tokens);
+        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
         var request = CreateRequest(code);
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
@@ -126,7 +129,8 @@ public class AuthorizationCodeHandlerShould
         tokens.Setup(t => t.FindByReferenceIdAsync(TestCode, It.IsAny<CancellationToken>()))
               .ReturnsAsync((SchemataToken?)null);
 
-        var handler = CreateHandler(tokens);
+        var (handler, sp) = CreateHandler(tokens);
+        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
         var request = CreateRequest();
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
@@ -141,7 +145,8 @@ public class AuthorizationCodeHandlerShould
         var tokens = new Mock<ITokenManager<SchemataToken>>();
         tokens.Setup(t => t.FindByReferenceIdAsync(TestCode, It.IsAny<CancellationToken>())).ReturnsAsync(token);
 
-        var handler = CreateHandler(tokens);
+        var (handler, sp) = CreateHandler(tokens);
+        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
         var request = CreateRequest();
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
@@ -156,7 +161,8 @@ public class AuthorizationCodeHandlerShould
         var tokens = new Mock<ITokenManager<SchemataToken>>();
         tokens.Setup(t => t.FindByReferenceIdAsync(TestCode, It.IsAny<CancellationToken>())).ReturnsAsync(token);
 
-        var handler = CreateHandler(tokens);
+        var (handler, sp) = CreateHandler(tokens);
+        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
         var request = CreateRequest();
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
@@ -171,7 +177,8 @@ public class AuthorizationCodeHandlerShould
         var tokens = new Mock<ITokenManager<SchemataToken>>();
         tokens.Setup(t => t.FindByReferenceIdAsync(TestCode, It.IsAny<CancellationToken>())).ReturnsAsync(token);
 
-        var handler = CreateHandler(tokens);
+        var (handler, sp) = CreateHandler(tokens);
+        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
         var request = CreateRequest();
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
@@ -186,7 +193,8 @@ public class AuthorizationCodeHandlerShould
         var tokens = new Mock<ITokenManager<SchemataToken>>();
         tokens.Setup(t => t.FindByReferenceIdAsync(TestCode, It.IsAny<CancellationToken>())).ReturnsAsync(token);
 
-        var handler = CreateHandler(tokens);
+        var (handler, sp) = CreateHandler(tokens);
+        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
         var request = CreateRequest();
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
@@ -201,7 +209,8 @@ public class AuthorizationCodeHandlerShould
         var tokens = new Mock<ITokenManager<SchemataToken>>();
         tokens.Setup(t => t.FindByReferenceIdAsync(TestCode, It.IsAny<CancellationToken>())).ReturnsAsync(token);
 
-        var handler = CreateHandler(tokens);
+        var (handler, sp) = CreateHandler(tokens);
+        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
         var request = CreateRequest();
 
         await handler.HandleAsync(request, null, CancellationToken.None);
@@ -216,7 +225,8 @@ public class AuthorizationCodeHandlerShould
         var tokens = new Mock<ITokenManager<SchemataToken>>();
         tokens.Setup(t => t.FindByReferenceIdAsync(TestCode, It.IsAny<CancellationToken>())).ReturnsAsync(token);
 
-        var handler = CreateHandler(tokens);
+        var (handler, sp) = CreateHandler(tokens);
+        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
         var request = CreateRequest();
 
         var result = await handler.HandleAsync(request, null, CancellationToken.None);

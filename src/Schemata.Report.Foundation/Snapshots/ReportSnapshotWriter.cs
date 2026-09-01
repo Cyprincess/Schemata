@@ -26,7 +26,6 @@ public sealed class ReportSnapshotWriter<TReport, TSnapshot, TChunk>
 {
     private readonly SchemataReportOptions                 _options;
     private readonly ReportRetentionEnforcer<TSnapshot, TChunk> _retention;
-    private readonly IServiceProvider                       _services;
     private readonly IServiceScopeFactory                  _scopes;
     private readonly TimeProvider                          _time;
 
@@ -34,19 +33,16 @@ public sealed class ReportSnapshotWriter<TReport, TSnapshot, TChunk>
     /// <param name="scopes">Factory creating independent repositories for every persisted write.</param>
     /// <param name="options">Limits for each persisted chunk.</param>
     /// <param name="retention">Write-path cleanup for snapshots governed by parent retention.</param>
-    /// <param name="services">Service provider resolving snapshot advisors.</param>
     /// <param name="time">Clock stamping snapshot capture times; defaults to the system clock.</param>
     public ReportSnapshotWriter(
         IServiceScopeFactory                         scopes,
         IOptions<SchemataReportOptions>             options,
         ReportRetentionEnforcer<TSnapshot, TChunk> retention,
-        IServiceProvider                             services,
         TimeProvider?                                time = null
     ) {
         _scopes    = scopes;
         _options   = options.Value;
         _retention = retention;
-        _services  = services;
         _time      = time ?? TimeProvider.System;
     }
 
@@ -112,7 +108,7 @@ public sealed class ReportSnapshotWriter<TReport, TSnapshot, TChunk>
 
             response.TotalSize = rowCount;
             await Advisor.For<IReportSnapshotAdvisor>().RunAsync(
-                new AdviceContext(_services),
+                AdviceContext.Require(),
                 new ReportSnapshotContext(header, response),
                 ct);
 

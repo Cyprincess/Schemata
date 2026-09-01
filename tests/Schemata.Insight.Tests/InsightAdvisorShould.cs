@@ -5,17 +5,23 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using Schemata.Abstractions.Advisors;
 using Schemata.Insight.Foundation;
 using Schemata.Insight.Skeleton;
+using Schemata.Messaging.Skeleton.Advisors;
 using Xunit;
 
 namespace Schemata.Insight.Tests;
 
 /// <summary>
-///     Covers the wiring of the four Insight advisor contracts into the query pipeline: request
-///     advisors run before planning, plan advisors may rewrite the plan the executor consumes,
-///     source advisors may block a source before it is opened, response advisors may redact the
-///     response in place, and same-typed advisors run in registration order.
+///     Covers the wiring of the Insight advisor contracts into the query pipeline: request and
+///     response aspects wrap the dispatch as
+///     <see cref="IRequestPipelineAdvisor{TRequest,TResponse}" /> of
+///     <see cref="QueryInsightRequest" />/<see cref="QueryInsightResponse" /> (a request advisor runs
+///     before the handler and rejects by throwing; a response advisor runs after it and may redact
+///     the response in place), plan advisors may rewrite the plan the executor consumes, source
+///     advisors may block a source before it is opened, and same-typed wrap advisors run in ascending
+///     <see cref="IAdvisor.Order" />.
 /// </summary>
 public sealed class InsightAdvisorShould
 {
@@ -157,16 +163,32 @@ public sealed class InsightAdvisorShould
         Assert.Equal(["first", "second"], order);
     }
 
+    [Fact]
+    public async Task Advisors_Run_In_Ascending_Order_Not_Registration_Order() {
+        var driver = CreateDriver(ValueRows(1));
+        var order  = new List<string>();
+        // Registered high-Order first, low-Order second: Order, not registration, must decide.
+        var late  = new OrderedRequestAdvisor(20, "late", order);
+        var early = new OrderedRequestAdvisor(10, "early", order);
+
+        await using var provider = CreateProvider(driver.Object, requestAdvisors: [late, early]);
+        var insight = provider.GetRequiredService<IInsightService>();
+
+        await insight.QueryAsync(Request(), null);
+
+        Assert.Equal(["early", "late"], order);
+    }
+
     private static QueryInsightRequest Request(int pageSize = 25) {
         return new() { Sources = [new("source", "orders")], PageSize = pageSize };
     }
 
     private static ServiceProvider CreateProvider(
-        ISourceDriver                         driver,
-        IEnumerable<IInsightRequestAdvisor>?  requestAdvisors = null,
-        IEnumerable<IInsightPlanAdvisor>?     planAdvisors = null,
-        IEnumerable<IInsightSourceAdvisor>?   sourceAdvisors = null,
-        IEnumerable<IInsightResponseAdvisor>? responseAdvisors = null
+        ISourceDriver                                                    driver,
+        IEnumerable<IRequestPipelineAdvisor<QueryInsightRequest, QueryInsightResponse>>? requestAdvisors = null,
+        IEnumerable<IInsightPlanAdvisor>?                                planAdvisors = null,
+        IEnumerable<IInsightSourceAdvisor>?                              sourceAdvisors = null,
+        IEnumerable<IRequestPipelineAdvisor<QueryInsightRequest, QueryInsightResponse>>? responseAdvisors = null
     ) {
         var services = new ServiceCollection();
         services.Configure<SchemataInsightOptions>(options =>
@@ -230,35 +252,85 @@ public sealed class InsightAdvisorShould
     private sealed class ProbeException(string message) : Exception(message);
 
     private sealed class RequestAdvisor(Func<QueryInsightRequest, ClaimsPrincipal?, CancellationToken, ValueTask> advise)
-        : IInsightRequestAdvisor
+        : IRequestPipelineAdvisor<QueryInsightRequest, QueryInsightResponse>
     {
-        public ValueTask AdviseAsync(QueryInsightRequest request, ClaimsPrincipal? principal, CancellationToken ct)
-            => advise(request, principal, ct);
+        public int Order => 0;
+
+        public async Task<QueryInsightResponse> AdviseAsync(
+            AdviceContext                                    ctx,
+            QueryInsightRequest                              request,
+            RequestHandlerContinuation<QueryInsightResponse> next,
+            CancellationToken                                ct = default
+        ) {
+            await advise(request, request.Principal, ct);
+            return await next(ct);
+        }
+    }
+
+    private sealed class OrderedRequestAdvisor(int order, string tag, List<string> trail)
+        : IRequestPipelineAdvisor<QueryInsightRequest, QueryInsightResponse>
+    {
+        public int Order => order;
+
+        public async Task<QueryInsightResponse> AdviseAsync(
+            AdviceContext                                    ctx,
+            QueryInsightRequest                              request,
+            RequestHandlerContinuation<QueryInsightResponse> next,
+            CancellationToken                                ct = default
+        ) {
+            trail.Add(tag);
+            return await next(ct);
+        }
     }
 
     private sealed class PlanAdvisor(Func<PlanNode, QueryInsightRequest, CancellationToken, ValueTask<PlanNode>> advise)
         : IInsightPlanAdvisor
     {
-        public ValueTask<PlanNode> AdviseAsync(PlanNode plan, QueryInsightRequest request, CancellationToken ct)
-            => advise(plan, request, ct);
+        public int Order => 0;
+
+        public async Task<AdviseResult> AdviseAsync(
+            AdviceContext       ctx,
+            QueryInsightRequest request,
+            CancellationToken   ct = default
+        ) {
+            var plan = ctx.Get<PlanNode>()!;
+            ctx.Set(await advise(plan, request, ct));
+            return AdviseResult.Continue;
+        }
     }
 
     private sealed class SourceAdvisor(
         Func<SourceBinding, SourceConfig, ClaimsPrincipal?, CancellationToken, ValueTask> advise
     ) : IInsightSourceAdvisor
     {
-        public ValueTask AdviseAsync(
+        public int Order => 0;
+
+        public async Task<AdviseResult> AdviseAsync(
+            AdviceContext     ctx,
             SourceBinding     binding,
             SourceConfig      config,
             ClaimsPrincipal?  principal,
-            CancellationToken ct
-        ) => advise(binding, config, principal, ct);
+            CancellationToken ct = default
+        ) {
+            await advise(binding, config, principal, ct);
+            return AdviseResult.Continue;
+        }
     }
 
     private sealed class ResponseAdvisor(Func<QueryInsightResponse, QueryInsightRequest, CancellationToken, ValueTask> advise)
-        : IInsightResponseAdvisor
+        : IRequestPipelineAdvisor<QueryInsightRequest, QueryInsightResponse>
     {
-        public ValueTask AdviseAsync(QueryInsightResponse response, QueryInsightRequest request, CancellationToken ct)
-            => advise(response, request, ct);
+        public int Order => 0;
+
+        public async Task<QueryInsightResponse> AdviseAsync(
+            AdviceContext                                    ctx,
+            QueryInsightRequest                              request,
+            RequestHandlerContinuation<QueryInsightResponse> next,
+            CancellationToken                                ct = default
+        ) {
+            var response = await next(ct);
+            await advise(response, request, ct);
+            return response;
+        }
     }
 }

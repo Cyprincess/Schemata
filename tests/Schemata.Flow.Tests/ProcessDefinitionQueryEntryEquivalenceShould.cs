@@ -26,7 +26,7 @@ namespace Schemata.Flow.Tests;
 ///     <see cref="ProcessDefinitionsController" />, and the gRPC <see cref="ProcessDefinitionService" />
 ///     run the exact same <see cref="ListProcessDefinitionsQuery" /> pipeline: equivalent
 ///     <see cref="ProcessDefinitionInfo" /> projections and the registered
-///     <see cref="IQueryAdvisor{TQuery}" /> firing once per entry. The process registry is the only
+///     <see cref="IRequestPipelineAdvisor{TRequest,TResponse}" /> firing once per entry. The process registry is the only
 ///     mocked dependency.
 /// </summary>
 public sealed class ProcessDefinitionQueryEntryEquivalenceShould
@@ -41,7 +41,7 @@ public sealed class ProcessDefinitionQueryEntryEquivalenceShould
 
         await using var services = new ServiceCollection()
                                   .AddSingleton(registry.Object)
-                                  .AddSingleton<IQueryAdvisor<ListProcessDefinitionsQuery>>(advisor)
+                                  .AddSingleton<IRequestPipelineAdvisor<ListProcessDefinitionsQuery, IReadOnlyList<ProcessDefinitionInfo>>>(advisor)
                                   .AddSchemataFlow()
                                   .BuildServiceProvider();
 
@@ -160,19 +160,19 @@ public sealed class ProcessDefinitionQueryEntryEquivalenceShould
     }
 
     /// <summary>Records every dispatch of <see cref="ListProcessDefinitionsQuery" /> it observes.</summary>
-    private sealed class RecordingQueryAdvisor : IQueryAdvisor<ListProcessDefinitionsQuery>
+    private sealed class RecordingQueryAdvisor : IRequestPipelineAdvisor<ListProcessDefinitionsQuery, IReadOnlyList<ProcessDefinitionInfo>>
     {
         public int Count { get; private set; }
 
         public int Order => 0;
 
-        public Task<AdviseResult> AdviseAsync(
-            AdviceContext                ctx,
-            ListProcessDefinitionsQuery  a1,
-            CancellationToken            ct = default
-        ) {
+        public Task<IReadOnlyList<ProcessDefinitionInfo>> AdviseAsync(
+            AdviceContext                                                    ctx,
+            ListProcessDefinitionsQuery                                      a1,
+            RequestHandlerContinuation<IReadOnlyList<ProcessDefinitionInfo>> next,
+            CancellationToken                                                ct = default) {
             Count++;
-            return Task.FromResult(AdviseResult.Continue);
+            return next(ct);
         }
     }
 }

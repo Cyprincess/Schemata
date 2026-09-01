@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Advisors;
@@ -6,14 +7,15 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Resource.Foundation.Advisors;
+using Schemata.Resource.Foundation.Commands;
 using Xunit;
 
 namespace Schemata.Resource.Tests.Advisors;
 
-public class AdviceSanitizeShould
+public class ResourceSanitizePipelineAdvisorShould
 {
     [Fact]
-    public async Task Create_Sanitize_ClearsSystemManagedFields() {
+    public async Task Create_ClearsSystemManagedFields() {
         var request = new ManagedRequest {
             Name        = "managed/forged",
             Owner       = "hacker",
@@ -28,13 +30,17 @@ public class AdviceSanitizeShould
             DisplayName = "keep-me",
         };
 
-        var advisor   = new AdviceCreateRequestSanitize<ManagedEntity, ManagedRequest>();
-        var ctx       = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var container = new ResourceRequestContainer<ManagedEntity>();
+        var advisor  = new ResourceCreateSanitizePipelineAdvisor<ManagedEntity, ManagedRequest, ManagedDetail>();
+        var ctx      = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var envelope = new CreateResourceRequest<ManagedEntity, ManagedRequest, ManagedDetail>(request, null);
 
-        var result = await advisor.AdviseAsync(ctx, request, container, null);
+        var continued = false;
+        await advisor.AdviseAsync(ctx, envelope, _ => {
+            continued = true;
+            return Task.FromResult(new CreateResultBase<ManagedDetail>());
+        }, CancellationToken.None);
 
-        Assert.Equal(AdviseResult.Continue, result);
+        Assert.True(continued);
         Assert.Null(request.Name);
         Assert.Null(request.Uid);
         Assert.Null(request.Owner);
@@ -50,7 +56,7 @@ public class AdviceSanitizeShould
     }
 
     [Fact]
-    public async Task Update_Sanitize_ClearsParentAndStripsMaskEntries() {
+    public async Task Update_ClearsParentAndStripsMaskEntries() {
         var request = new ManagedRequest {
             Name        = "managed/target",
             Owner       = "hacker",
@@ -59,13 +65,17 @@ public class AdviceSanitizeShould
             UpdateMask  = "display_name,owner,parent,name",
         };
 
-        var advisor   = new AdviceUpdateRequestSanitize<ManagedEntity, ManagedRequest>();
-        var ctx       = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var container = new ResourceRequestContainer<ManagedEntity>();
+        var advisor  = new ResourceUpdateSanitizePipelineAdvisor<ManagedEntity, ManagedRequest, ManagedDetail>();
+        var ctx      = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var envelope = new UpdateResourceRequest<ManagedEntity, ManagedRequest, ManagedDetail>("managed/target", request, null);
 
-        var result = await advisor.AdviseAsync(ctx, request, container, null);
+        var continued = false;
+        await advisor.AdviseAsync(ctx, envelope, _ => {
+            continued = true;
+            return Task.FromResult(new UpdateResultBase<ManagedDetail>());
+        }, CancellationToken.None);
 
-        Assert.Equal(AdviseResult.Continue, result);
+        Assert.True(continued);
         Assert.Null(request.Name);
         Assert.Null(request.Owner);
         Assert.Equal("parents/new", request.Parent);
@@ -74,17 +84,17 @@ public class AdviceSanitizeShould
     }
 
     [Fact]
-    public async Task Create_Sanitize_ClearsCanonicalNameAndEntityTag() {
+    public async Task Create_ClearsCanonicalNameAndEntityTag() {
         var request = new ManagedRequest {
             CanonicalName = "managed/forged", EntityTag = "forged-etag", DisplayName = "keep-me",
         };
 
-        var advisor = new AdviceCreateRequestSanitize<ManagedEntity, ManagedRequest>();
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var advisor  = new ResourceCreateSanitizePipelineAdvisor<ManagedEntity, ManagedRequest, ManagedDetail>();
+        var ctx      = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var envelope = new CreateResourceRequest<ManagedEntity, ManagedRequest, ManagedDetail>(request, null);
 
-        var result = await advisor.AdviseAsync(ctx, request, new(), null);
+        await advisor.AdviseAsync(ctx, envelope, _ => Task.FromResult(new CreateResultBase<ManagedDetail>()), CancellationToken.None);
 
-        Assert.Equal(AdviseResult.Continue, result);
         // CanonicalName and EntityTag are the CLR targets of the wire fields name/etag, so clearing
         // them blocks a client from forging the resource name or its concurrency tag on create.
         Assert.Null(request.CanonicalName);
@@ -93,13 +103,14 @@ public class AdviceSanitizeShould
     }
 
     [Fact]
-    public async Task Update_Sanitize_StripsWireNameAndEtagFromMask() {
+    public async Task Update_StripsWireNameAndEtagFromMask() {
         var request = new ManagedRequest { UpdateMask = "display_name,etag,canonical_name,name" };
 
-        var advisor = new AdviceUpdateRequestSanitize<ManagedEntity, ManagedRequest>();
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var advisor  = new ResourceUpdateSanitizePipelineAdvisor<ManagedEntity, ManagedRequest, ManagedDetail>();
+        var ctx      = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var envelope = new UpdateResourceRequest<ManagedEntity, ManagedRequest, ManagedDetail>("managed/target", request, null);
 
-        await advisor.AdviseAsync(ctx, request, new(), null);
+        await advisor.AdviseAsync(ctx, envelope, _ => Task.FromResult(new UpdateResultBase<ManagedDetail>()), CancellationToken.None);
 
         // Wire "etag" resolves to EntityTag and "name" to CanonicalName; both, plus the explicit
         // canonical_name, are system-managed and stripped from the mask.
@@ -107,41 +118,43 @@ public class AdviceSanitizeShould
     }
 
     [Fact]
-    public async Task Update_Sanitize_EmptyMask_StaysEmpty() {
+    public async Task Update_EmptyMask_StaysEmpty() {
         var request = new ManagedRequest { Name = "managed/target", UpdateMask = "" };
 
-        var advisor = new AdviceUpdateRequestSanitize<ManagedEntity, ManagedRequest>();
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var advisor  = new ResourceUpdateSanitizePipelineAdvisor<ManagedEntity, ManagedRequest, ManagedDetail>();
+        var ctx      = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var envelope = new UpdateResourceRequest<ManagedEntity, ManagedRequest, ManagedDetail>("managed/target", request, null);
 
-        await advisor.AdviseAsync(ctx, request, new(), null);
+        await advisor.AdviseAsync(ctx, envelope, _ => Task.FromResult(new UpdateResultBase<ManagedDetail>()), CancellationToken.None);
 
         Assert.Equal("", request.UpdateMask);
     }
 
     [Fact]
-    public async Task Update_Sanitize_NestedMask_StripsOnlySystemFirstSegment() {
+    public async Task Update_NestedMask_StripsOnlySystemFirstSegment() {
         var request = new ManagedRequest {
             UpdateMask = "owner.display_name,display_name.value,parent.child,name.value",
         };
 
-        var advisor = new AdviceUpdateRequestSanitize<ManagedEntity, ManagedRequest>();
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var advisor  = new ResourceUpdateSanitizePipelineAdvisor<ManagedEntity, ManagedRequest, ManagedDetail>();
+        var ctx      = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var envelope = new UpdateResourceRequest<ManagedEntity, ManagedRequest, ManagedDetail>("managed/target", request, null);
 
-        await advisor.AdviseAsync(ctx, request, new(), null);
+        await advisor.AdviseAsync(ctx, envelope, _ => Task.FromResult(new UpdateResultBase<ManagedDetail>()), CancellationToken.None);
 
         Assert.Equal("display_name.value,parent.child", request.UpdateMask);
     }
 
     [Fact]
-    public async Task Create_Sanitize_RequestWithoutSystemProperties_DoesNotThrow() {
+    public async Task Create_RequestWithoutSystemProperties_DoesNotThrow() {
         var request = new MinimalRequest { Name = "minimal/1", Label = "preserve" };
 
-        var advisor = new AdviceCreateRequestSanitize<MinimalEntity, MinimalRequest>();
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var advisor  = new ResourceCreateSanitizePipelineAdvisor<MinimalEntity, MinimalRequest, MinimalDetail>();
+        var ctx      = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var envelope = new CreateResourceRequest<MinimalEntity, MinimalRequest, MinimalDetail>(request, null);
 
-        var result = await advisor.AdviseAsync(ctx, request, new(), null);
+        await advisor.AdviseAsync(ctx, envelope, _ => Task.FromResult(new CreateResultBase<MinimalDetail>()), CancellationToken.None);
 
-        Assert.Equal(AdviseResult.Continue, result);
         Assert.Null(request.Name);
         Assert.Equal("preserve", request.Label);
     }
@@ -191,6 +204,16 @@ public class AdviceSanitizeShould
         #endregion
     }
 
+    public sealed class ManagedDetail : ICanonicalName
+    {
+        #region ICanonicalName Members
+
+        public string? Name          { get; set; }
+        public string? CanonicalName { get; set; }
+
+        #endregion
+    }
+
     public sealed class MinimalEntity : ICanonicalName
     {
         #region ICanonicalName Members
@@ -205,6 +228,16 @@ public class AdviceSanitizeShould
     {
         public string? Label { get; set; }
 
+        #region ICanonicalName Members
+
+        public string? Name          { get; set; }
+        public string? CanonicalName { get; set; }
+
+        #endregion
+    }
+
+    public sealed class MinimalDetail : ICanonicalName
+    {
         #region ICanonicalName Members
 
         public string? Name          { get; set; }

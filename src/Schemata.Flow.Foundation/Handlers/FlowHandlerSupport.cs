@@ -180,7 +180,8 @@ internal sealed class FlowHandlerSupport(
                 Principal  = execution.Principal,
             };
 
-            await Advisor.For<IFlowTransitionAdvisor>().RunAsync(new AdviceContext(services), context, ct);
+            var ctx = AdviceContext.Current ?? new AdviceContext(services);
+            await Advisor.For<IFlowTransitionAdvisor>().RunAsync(ctx, context, ct);
             foreach (var handler in handlers) {
                 await handler.ArmAsync(context, ct);
             }
@@ -592,7 +593,7 @@ internal sealed class FlowHandlerSupport(
                 return;
             }
 
-            var advice = new AdviceContext(provider);
+            var advice = AdviceContext.Current ?? new AdviceContext(provider);
             advice.Set(new FlowSourceWriteBack(execution));
             await Advisor.For<IFlowSourceAdvisor<TSource>>().RunAsync(advice, context, entity, ct);
         }

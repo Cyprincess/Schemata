@@ -13,9 +13,11 @@ using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Flow.Foundation.Commands;
 using Schemata.Flow.Skeleton.Entities;
+using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Flow.StateMachine.Extensions;
 using Schemata.Messaging.Skeleton.Advisors;
+using CompleteActivityRequest = Schemata.Flow.Foundation.Commands.CompleteActivityRequest;
 
 namespace Schemata.Flow.Actor.Tests.Fixtures;
 
@@ -62,7 +64,7 @@ public sealed class ActorConcurrencyHarness : IAsyncDisposable
 
 
         var advisor = new RecordingCompleteActivityAdvisor();
-        services.AddSingleton<ICommandAdvisor<CompleteActivityRequest>>(advisor);
+        services.AddSingleton<IRequestPipelineAdvisor<CompleteActivityRequest, ProcessSnapshot>>(advisor);
 
         var builder = new SchemataBuilder(new ConfigurationBuilder().Build(), null!);
         var flow    = builder.UseFlow().Use<ConcurrentActivityProcess>().UseStateMachine();

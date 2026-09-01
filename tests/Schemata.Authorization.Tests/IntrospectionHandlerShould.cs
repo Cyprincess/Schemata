@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Moq;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
@@ -56,8 +57,8 @@ public class IntrospectionHandlerShould
         var sp = services.BuildServiceProvider();
 
         var handler = new IntrospectionHandler<SchemataApplication, SchemataToken>(
-            clientAuth.Object, tokenService, tokensMock.Object, sp);
-        return new(handler, tokensMock, tokenService);
+            clientAuth.Object, tokenService, tokensMock.Object);
+        return new(handler, tokensMock, tokenService, sp);
     }
 
     private static SchemataToken CreateTokenEntity(
@@ -83,6 +84,7 @@ public class IntrospectionHandlerShould
     [Fact]
     public async Task ReturnsInactive_WhenTokenNotResolved() {
         var f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
         var request = new IntrospectRequest { Token = "invalid-jwt-string" };
 
         var response = await f.Handler.HandleAsync(request, null, CancellationToken.None);
@@ -93,6 +95,7 @@ public class IntrospectionHandlerShould
     [Fact]
     public async Task ThrowsInvalidRequest_WhenTokenEmpty() {
         var f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
         var request = new IntrospectRequest { Token = "" };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
@@ -104,6 +107,7 @@ public class IntrospectionHandlerShould
     [Fact]
     public async Task ThrowsInvalidRequest_WhenTokenWhitespace() {
         var f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
         var request = new IntrospectRequest { Token = "   " };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
@@ -115,6 +119,7 @@ public class IntrospectionHandlerShould
     [Fact]
     public async Task ReturnsActive_WhenJwtTokenResolved() {
         var f = CreateFixture();
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
 
         var claims = new List<Claim> {
             new(Claims.JwtId, Identifiers.NewUid().ToString()),
@@ -145,6 +150,7 @@ public class IntrospectionHandlerShould
         // RFC 7662 introspection callers are protected resources, with access gated
         // upstream via the ep:introspection permission.
         var f = CreateFixture("resource-server");
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
 
         var claims = new List<Claim> {
             new(Claims.JwtId, Identifiers.NewUid().ToString()),
@@ -168,6 +174,7 @@ public class IntrospectionHandlerShould
     [Fact]
     public async Task ReturnsInactive_WhenEntityStatusNotValid() {
         var f = CreateFixture();
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
 
         var claims = new List<Claim> {
             new(Claims.JwtId, Identifiers.NewUid().ToString()),
@@ -191,7 +198,8 @@ public class IntrospectionHandlerShould
     private record Fixture(
         IntrospectionHandler<SchemataApplication, SchemataToken> Handler,
         Mock<ITokenManager<SchemataToken>>                       Tokens,
-        TokenService                                             TokenService
+        TokenService                                             TokenService,
+        IServiceProvider                                         Sp
     );
 
     #endregion

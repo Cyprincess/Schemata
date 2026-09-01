@@ -27,16 +27,6 @@ internal sealed class IdempotencyHeader
 }
 
 /// <summary>
-///     Stashed in the <see cref="Schemata.Abstractions.Advisors.AdviceContext" /> by a request
-///     idempotency advisor after it reserves the cache key, so the response advisor can swap the
-///     exact reserved <see cref="PendingBytes" /> for the finalized envelope via compare-and-swap.
-/// </summary>
-/// <param name="Key">The cache key reserved by the request advisor.</param>
-/// <param name="PayloadHash">The request payload hash associated with the reservation.</param>
-/// <param name="PendingBytes">The serialized pending value used for compare-and-swap finalization.</param>
-internal sealed record IdempotencyReservation(string Key, string PayloadHash, byte[] PendingBytes);
-
-/// <summary>
 ///     The reservation value written by the request idempotency advisors before an operation
 ///     runs, per <seealso href="https://google.aip.dev/155">AIP-155: Request identification</seealso>.
 ///     <see cref="OwnerToken" /> identifies the writing attempt so the response advisor can swap

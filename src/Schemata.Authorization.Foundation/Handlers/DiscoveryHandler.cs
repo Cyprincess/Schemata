@@ -37,8 +37,7 @@ namespace Schemata.Authorization.Foundation.Handlers;
 /// </summary>
 public sealed class DiscoveryHandler<TScope>(
     IOptions<SchemataAuthorizationOptions> options,
-    IScopeManager<TScope>                  scopes,
-    IServiceProvider                       sp
+    IScopeManager<TScope>                  scopes
 )
     where TScope : SchemataScope
 {
@@ -66,8 +65,7 @@ public sealed class DiscoveryHandler<TScope>(
             AuthorizationResponseIssParameterSupported = !string.IsNullOrWhiteSpace(issuer),
         };
 
-        var ctx = new AdviceContext(sp);
-        using var _ = AdviceContext.Establish(ctx);
+        var ctx = AdviceContext.Require();
         var discovery = new DiscoveryContext {
             Issuer                           = issuer,
             Document                         = document,

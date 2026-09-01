@@ -21,12 +21,12 @@ internal static class FlowResourceRegistration
     internal static readonly Operations[] TransitionOperations = [Operations.Get, Operations.List];
 
     internal static readonly ResourceMethodAttribute[] ProcessMethods = [
-        new("start",    typeof(FlowStartProcessHandler),  ResourceMethodScope.Collection),
-        new("complete", typeof(CompleteActivityHandler)),
-        new("correlate",typeof(CorrelateMessageHandler)),
-        new("signal",   typeof(ThrowSignalHandler),      ResourceMethodScope.Collection),
-        new("terminate",typeof(TerminateProcessHandler)),
+        new(FlowOperations.Start,     typeof(FlowStartProcessHandler),  ResourceMethodScope.Collection),
+        new(FlowOperations.Complete,  typeof(CompleteActivityHandler)),
+        new(FlowOperations.Correlate, typeof(CorrelateMessageHandler)),
+        new(FlowOperations.Signal,    typeof(ThrowSignalHandler),      ResourceMethodScope.Collection),
+        new(FlowOperations.Terminate, typeof(TerminateProcessHandler)),
     ];
 
-    internal static readonly ResourceMethodAttribute[] TokenMethods = [new("cancel", typeof(CancelTokenHandler))];
+    internal static readonly ResourceMethodAttribute[] TokenMethods = [new(FlowOperations.Cancel, typeof(CancelTokenHandler))];
 }

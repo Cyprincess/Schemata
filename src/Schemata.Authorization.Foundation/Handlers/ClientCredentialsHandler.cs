@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
@@ -30,7 +29,7 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     </seealso>
 ///     .
 /// </summary>
-public sealed class ClientCredentialsHandler<TApp>(IClientAuthenticationService<TApp> client, IServiceProvider sp) : IGrantHandler
+public sealed class ClientCredentialsHandler<TApp>(IClientAuthenticationService<TApp> client) : IGrantHandler
     where TApp : SchemataApplication
 {
     #region IGrantHandler Members
@@ -59,8 +58,7 @@ public sealed class ClientCredentialsHandler<TApp>(IClientAuthenticationService<
             );
         }
 
-        var ctx = new AdviceContext(sp);
-        using var _ = AdviceContext.Establish(ctx);
+        var ctx = AdviceContext.Require();
 
         switch (await Advisor.For<ITokenRequestAdvisor<TApp>>()
                              .RunAsync(ctx, application, request, ct)) {

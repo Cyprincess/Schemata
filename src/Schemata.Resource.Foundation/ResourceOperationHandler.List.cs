@@ -45,14 +45,6 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
 
         var ctx = CreateAdviceContext();
 
-        var gate = await RunPipelineAsync<ListResultBase<TSummary>>(
-            ctx,
-            () => Advisor.For<IResourceRequestAdvisor<TEntity>>()
-                         .RunAsync(ctx, principal, nameof(Operations.List), ct.Value), CollectionNotFound);
-        if (gate is not null) {
-            return gate;
-        }
-
         var container = new ResourceRequestContainer<TEntity>();
 
         var requestResult = await RunPipelineAsync<ListResultBase<TSummary>>(
@@ -214,18 +206,8 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
 
         string? nextPageToken = hasMore ? await token.ToStringAsync(Protector) : null;
 
-        var immutable = summaries.ToImmutableArray();
-
-        var responseResult = await RunPipelineAsync<ListResultBase<TSummary>>(
-            ctx,
-            () => Advisor.For<IResourceListResponseAdvisor<TSummary>>().RunAsync(ctx, immutable, principal, ct.Value),
-            CollectionNotFound);
-        if (responseResult is not null) {
-            return responseResult;
-        }
-
         return new() {
-            TotalSize = totalSize, Entities = immutable, NextPageToken = nextPageToken,
+            TotalSize = totalSize, Entities = summaries.ToImmutableArray(), NextPageToken = nextPageToken,
         };
     }
 

@@ -14,6 +14,9 @@ using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Insight.Skeleton;
 using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Commands;
+using Schemata.Messaging.Skeleton.Internal;
+using Schemata.Resource.Foundation.Handlers;
 using Schemata.Report.Foundation;
 using Schemata.Report.Skeleton;
 using Schemata.Resource.Foundation;
@@ -207,17 +210,18 @@ public class ReportMethodHandlerShould
 
     [Fact]
     public async Task Generate_Request_Flows_Through_Collection_Method_Pipeline() {
-        using var services = new ServiceCollection().BuildServiceProvider();
-        var handler    = new PipelineHandler();
-        var request    = new GenerateReportRequest { Name = "reports/daily" };
-        var dispatcher = new Mock<IRequestDispatcher>(MockBehavior.Strict);
-        dispatcher.Setup(value => value.SendAsync<GenerateReportRequest, Operation>(
-                             request, It.IsAny<CancellationToken>()))
-                  .Returns((GenerateReportRequest sent, CancellationToken ct) => handler.HandleAsync(sent, ct));
-        var operation = new ResourceMethodOperationHandler<SchemataReport, GenerateReportRequest, Operation>(
-            new Mock<IRepository<SchemataReport>>(MockBehavior.Strict).Object,
-            services,
-            dispatcher.Object);
+        var handler = new PipelineHandler();
+        var request = new GenerateReportRequest { Name = "reports/daily" };
+        var collection = new ServiceCollection();
+        collection.AddSingleton(Mock.Of<IRepository<SchemataReport>>(MockBehavior.Strict));
+        collection.AddSingleton<IRequestHandler<GenerateReportRequest, Operation>>(handler);
+        collection.AddSingleton(sp => new ResourceMethodOperationHandler<SchemataReport, GenerateReportRequest, Operation>(
+            sp.GetRequiredService<IRepository<SchemataReport>>(), sp, new InProcessRequestDispatcher(sp)));
+        collection.AddSingleton<
+            IRequestHandler<ResourceMethodRequest<SchemataReport, GenerateReportRequest, Operation>, Operation>,
+            ResourceMethodDispatchHandler<SchemataReport, GenerateReportRequest, Operation>>();
+        using var services = collection.BuildServiceProvider();
+        var operation = services.GetRequiredService<ResourceMethodOperationHandler<SchemataReport, GenerateReportRequest, Operation>>();
 
         var response = await operation.InvokeAsync("generate", null, request, null, default);
 

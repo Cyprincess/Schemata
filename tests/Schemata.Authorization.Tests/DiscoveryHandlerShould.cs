@@ -35,7 +35,7 @@ public class DiscoveryHandlerShould
             SigningKey = signingKey, SigningAlgorithm = algorithm,
         });
 
-        return new(opts, new Mock<IScopeManager<SchemataScope>>().Object, new Mock<IServiceProvider>().Object);
+        return new(opts, new Mock<IScopeManager<SchemataScope>>().Object);
     }
 
     private static JsonElement GetOnlyKey(AuthorizationResult result) {

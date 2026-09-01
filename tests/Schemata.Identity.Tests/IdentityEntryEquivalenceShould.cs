@@ -109,10 +109,12 @@ public class IdentityEntryEquivalenceShould
         commandAdvisor.Verify(value => value.AdviseAsync(
                                   It.IsAny<AdviceContext>(),
                                   It.IsAny<RegisterUserRequest<SchemataUser>>(),
+                                  It.IsAny<RequestHandlerContinuation<IdentityResult<ClaimsPrincipal>>>(),
                                   It.IsAny<CancellationToken>()), Times.Exactly(2));
         queryAdvisor.Verify(value => value.AdviseAsync(
                                 It.IsAny<AdviceContext>(),
                                 It.IsAny<GetUserProfileQuery<SchemataUser>>(),
+                                It.IsAny<RequestHandlerContinuation<IdentityResult<ClaimsStore>>>(),
                                 It.IsAny<CancellationToken>()), Times.Exactly(2));
         registerAdvisor.Verify(value => value.AdviseAsync(
                                    It.IsAny<AdviceContext>(),
@@ -138,30 +140,32 @@ public class IdentityEntryEquivalenceShould
         Assert.Contains("ambient AdviceContext is required", exception.Message, StringComparison.Ordinal);
     }
 
-    private static Mock<ICommandAdvisor<RegisterUserRequest<SchemataUser>>> CommandAdvisor() {
-        var advisor = new Mock<ICommandAdvisor<RegisterUserRequest<SchemataUser>>>();
+    private static Mock<IRequestPipelineAdvisor<RegisterUserRequest<SchemataUser>, IdentityResult<ClaimsPrincipal>>> CommandAdvisor() {
+        var advisor = new Mock<IRequestPipelineAdvisor<RegisterUserRequest<SchemataUser>, IdentityResult<ClaimsPrincipal>>>();
         advisor.SetupGet(value => value.Order).Returns(0);
         advisor.Setup(value => value.AdviseAsync(
                           It.IsAny<AdviceContext>(),
                           It.IsAny<RegisterUserRequest<SchemataUser>>(),
+                          It.IsAny<RequestHandlerContinuation<IdentityResult<ClaimsPrincipal>>>(),
                           It.IsAny<CancellationToken>()))
-               .Returns((AdviceContext ctx, RegisterUserRequest<SchemataUser> _, CancellationToken _) => {
+               .Returns((AdviceContext ctx, RegisterUserRequest<SchemataUser> _, RequestHandlerContinuation<IdentityResult<ClaimsPrincipal>> next, CancellationToken ct) => {
                    ctx.Set(new Marker());
-                   return Task.FromResult(AdviseResult.Continue);
+                   return next(ct);
                });
         return advisor;
     }
 
-    private static Mock<IQueryAdvisor<GetUserProfileQuery<SchemataUser>>> QueryAdvisor() {
-        var advisor = new Mock<IQueryAdvisor<GetUserProfileQuery<SchemataUser>>>();
+    private static Mock<IRequestPipelineAdvisor<GetUserProfileQuery<SchemataUser>, IdentityResult<ClaimsStore>>> QueryAdvisor() {
+        var advisor = new Mock<IRequestPipelineAdvisor<GetUserProfileQuery<SchemataUser>, IdentityResult<ClaimsStore>>>();
         advisor.SetupGet(value => value.Order).Returns(0);
         advisor.Setup(value => value.AdviseAsync(
                           It.IsAny<AdviceContext>(),
                           It.IsAny<GetUserProfileQuery<SchemataUser>>(),
+                          It.IsAny<RequestHandlerContinuation<IdentityResult<ClaimsStore>>>(),
                           It.IsAny<CancellationToken>()))
-               .Returns((AdviceContext ctx, GetUserProfileQuery<SchemataUser> _, CancellationToken _) => {
+               .Returns((AdviceContext ctx, GetUserProfileQuery<SchemataUser> _, RequestHandlerContinuation<IdentityResult<ClaimsStore>> next, CancellationToken ct) => {
                    ctx.Set(new Marker());
-                   return Task.FromResult(AdviseResult.Continue);
+                   return next(ct);
                });
         return advisor;
     }

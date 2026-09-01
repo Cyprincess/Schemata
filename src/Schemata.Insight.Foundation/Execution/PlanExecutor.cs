@@ -7,6 +7,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions.Advisors;
+using Schemata.Advice;
 using Schemata.Abstractions.Resource;
 using Schemata.Expressions.Skeleton;
 using Schemata.Insight.Skeleton;
@@ -298,9 +300,8 @@ public sealed class PlanExecutor
         }
 
         var binding = FindBinding(request, source.Alias);
-        foreach (var advisor in _services.GetServices<IInsightSourceAdvisor>()) {
-            await advisor.AdviseAsync(binding, source.Config, principal, ct);
-        }
+        var ctx = AdviceContext.Current ?? new AdviceContext(_services);
+        await Advisor.For<IInsightSourceAdvisor>().RunAsync(ctx, binding, source.Config, principal, ct);
 
         return driver;
     }

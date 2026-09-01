@@ -9,8 +9,10 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Common;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Foundation.Commands;
+using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Commands;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Attributes;
 
@@ -40,7 +42,8 @@ public sealed class FlowTimerJob : IScheduledJob
 
         using var scope = _services.CreateScope();
         var dispatcher = scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
-        await dispatcher.SendAsync<RunEventRequest, ProcessSnapshot>(new(processName, tokenName, timerDef, Payload: null), ct);
+        await dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, RunEventRequest, ProcessSnapshot>, ProcessSnapshot>(
+            new(FlowOperations.RunEvent, processName, new(processName, tokenName, timerDef, Payload: null), null), ct);
     }
 
     #endregion

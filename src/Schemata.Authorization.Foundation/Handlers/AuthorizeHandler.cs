@@ -40,7 +40,6 @@ public sealed class AuthorizeHandler<TApp, TToken>(
     ITokenManager<TToken>                  tokens,
     TokenService                           issuer,
     IOptions<SchemataAuthorizationOptions> options,
-    IServiceProvider                       sp,
     IOptions<JsonSerializerOptions>        json,
     TimeProvider?                          time = null
 ) : AuthorizeEndpoint
@@ -54,8 +53,7 @@ public sealed class AuthorizeHandler<TApp, TToken>(
         ClaimsPrincipal   principal,
         CancellationToken ct
     ) {
-        var ctx = new AdviceContext(sp);
-        using var _ = AdviceContext.Establish(ctx);
+        var ctx = AdviceContext.Require();
         var authz = new AuthorizeContext<TApp> {
             Request      = request,
             Principal    = principal,

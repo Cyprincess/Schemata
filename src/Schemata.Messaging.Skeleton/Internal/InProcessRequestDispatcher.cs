@@ -1,27 +1,28 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
-using Schemata.Advice;
 using Schemata.Messaging.Skeleton.Advisors;
 
 namespace Schemata.Messaging.Skeleton.Internal;
 
 /// <summary>
 ///     Dispatches commands and queries inside the current process: establishes the ambient
-///     <see cref="AdviceContext" /> for the call, runs the matching advisor chain — the
-///     <see cref="ICommandAdvisor{TCommand}" /> chain for a <see cref="ICommand" /> or
-///     <see cref="ICommand{TResult}" />, the <see cref="IQueryAdvisor{TQuery}" /> chain for a
-///     <see cref="IQuery{TResult}" /> — then invokes the request's single handler.
+///     <see cref="AdviceContext" /> for the call, composes the registered
+///     <see cref="IRequestPipelineAdvisor{TRequest,TResponse}" /> chain around the request's single
+///     handler for a <see cref="ICommand" />, <see cref="ICommand{TResult}" /> or
+///     <see cref="IQuery{TResult}" />, and invokes it. A plain <see cref="IRequest{TResponse}" />
+///     that is neither a command nor a query runs no chain and falls straight through to the handler.
 /// </summary>
 /// <remarks>
 ///     Public and unifying: a single implementation answers <see cref="ICommandDispatcher" />,
-///     <see cref="IQueryDispatcher" /> and the plain <see cref="IRequestDispatcher" />, so a caller
-///     that only holds an <see cref="IRequest{TResponse}" /> that is neither a command nor a query
-///     still dispatches through the same path, just without an advisor chain.
+///     <see cref="IQueryDispatcher" /> and the plain <see cref="IRequestDispatcher" />. The handler
+///     is resolved lazily at the tail of the chain, so an advisor that short-circuits without calling
+///     its continuation never triggers the missing-handler guard.
 /// </remarks>
 /// <param name="services">
 ///     The root <see cref="IServiceProvider" /> used both to resolve the request's handler and to
@@ -35,41 +36,34 @@ public sealed class InProcessRequestDispatcher(IServiceProvider services) : ICom
         var ctx = new AdviceContext(services);
         using var _ = AdviceContext.Establish(ctx);
 
-        if (request is ICommand or ICommand<TResponse>) {
-            switch (await Advisor.For<ICommandAdvisor<TRequest>>().RunAsync(ctx, request, ct)) {
-                case AdviseResult.Continue:
-                    break;
-                case AdviseResult.Handle when ctx.TryGet<TResponse>(out var handled) && handled is not null:
-                    return handled;
-                case AdviseResult.Handle:
-                    throw new InvalidOperationException(
-                        $"A command advisor for {typeof(TRequest)} returned Handle without setting a {typeof(TResponse)} result.");
-                default:
-                    throw new InvalidOperationException($"A command advisor blocked {typeof(TRequest)}.");
-            }
-        } else if (request is IQuery<TResponse>) {
-            switch (await Advisor.For<IQueryAdvisor<TRequest>>().RunAsync(ctx, request, ct)) {
-                case AdviseResult.Continue:
-                    break;
-                case AdviseResult.Handle when ctx.TryGet<TResponse>(out var handled) && handled is not null:
-                    return handled;
-                case AdviseResult.Handle:
-                    throw new InvalidOperationException(
-                        $"A query advisor for {typeof(TRequest)} returned Handle without setting a {typeof(TResponse)} result.");
-                default:
-                    throw new InvalidOperationException($"A query advisor blocked {typeof(TRequest)}.");
-            }
+        Task<TResponse> Handle(CancellationToken token) {
+            var handlers = services.GetServices<IRequestHandler<TRequest, TResponse>>().ToList();
+
+            return handlers.Count switch {
+                1 => handlers[0].HandleAsync(request, token),
+                0 => throw new InvalidOperationException(
+                    $"No request handler registered for request type '{typeof(TRequest).FullName}'."),
+                _ => throw new InvalidOperationException(
+                    $"Multiple request handlers registered for request type '{typeof(TRequest).FullName}'. Expected exactly one."),
+            };
         }
 
-        var handlers = services.GetServices<IRequestHandler<TRequest, TResponse>>().ToList();
+        if (request is not (ICommand or ICommand<TResponse> or IQuery<TResponse>)) {
+            return await Handle(ct);
+        }
 
-        return handlers.Count switch {
-            1 => await handlers[0].HandleAsync(request, ct),
-            0 => throw new InvalidOperationException(
-                $"No request handler registered for request type '{typeof(TRequest).FullName}'."),
-            _ => throw new InvalidOperationException(
-                $"Multiple request handlers registered for request type '{typeof(TRequest).FullName}'. Expected exactly one."),
-        };
+        var advisors = services.GetServices<IRequestPipelineAdvisor<TRequest, TResponse>>()
+                               .OrderBy(advisor => advisor.Order)
+                               .ToList();
+
+        RequestHandlerContinuation<TResponse> next = Handle;
+        for (var i = advisors.Count - 1; i >= 0; i--) {
+            var advisor    = advisors[i];
+            var downstream = next;
+            next = token => advisor.AdviseAsync(ctx, request, downstream, token);
+        }
+
+        return await next(ct);
     }
 
     /// <inheritdoc cref="ICommandDispatcher.SendAsync{TCommand}" />

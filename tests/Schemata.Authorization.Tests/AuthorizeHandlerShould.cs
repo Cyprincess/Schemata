@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Handlers;
@@ -20,7 +21,8 @@ namespace Schemata.Authorization.Tests;
 
 public class AuthorizeHandlerShould
 {
-    private static AuthorizeHandler<SchemataApplication, SchemataToken> CreateHandler() {
+    private static (AuthorizeHandler<SchemataApplication, SchemataToken> Handler, System.IServiceProvider Sp)
+        CreateHandler() {
         var opts = new SchemataAuthorizationOptions();
         opts.AddEphemeralSigningKey();
         opts.Issuer         = "https://localhost";
@@ -36,7 +38,7 @@ public class AuthorizeHandlerShould
         var services = new ServiceCollection();
         var sp       = services.BuildServiceProvider();
 
-        return new(tokens.Object, tokenService, Options.Create(opts), sp, jsonOpts);
+        return (new(tokens.Object, tokenService, Options.Create(opts), jsonOpts), sp);
     }
 
     private static ClaimsPrincipal AuthenticatedUser(string subject = "user-1") {
@@ -46,7 +48,8 @@ public class AuthorizeHandlerShould
     [Fact]
     public async Task ThrowInvalidClient_WhenApplicationMissing() {
         // An empty advisor pipeline leaves the application unresolved.
-        var handler = CreateHandler();
+        var (handler, sp) = CreateHandler();
+        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
         var request = new AuthorizeRequest { ClientId = "test", ResponseType = "code" };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.AuthorizeAsync(

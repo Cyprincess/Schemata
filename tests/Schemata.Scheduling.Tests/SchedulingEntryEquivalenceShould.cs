@@ -22,7 +22,7 @@ namespace Schemata.Scheduling.Tests;
 ///     Proves the facade (<see cref="IScheduler.TriggerAsync{TJob}" />, which itself dispatches through
 ///     <see cref="IRequestDispatcher" />) and a raw <see cref="IRequestDispatcher" /> entry run the exact
 ///     same <see cref="TriggerJobRequest" /> pipeline: equivalent <see cref="SchemataJobExecution" />
-///     results, the registered <see cref="ICommandAdvisor{TCommand}" /> firing once per entry, and
+///     results, the registered <see cref="IRequestPipelineAdvisor{TRequest,TResponse}" /> firing once per entry, and
 ///     identical exception shapes when the scheduler has not started. Neither entry stubs the real
 ///     <c>DefaultTriggerJobHandler</c>.
 /// </summary>
@@ -63,13 +63,13 @@ public sealed class SchedulingEntryEquivalenceShould
             new("sample", typeof(SampleJob), new JobContext { Job = "sample" }), CancellationToken.None));
     }
 
-    private static async Task<Harness> CreateStartedHarnessAsync(ICommandAdvisor<TriggerJobRequest>? advisor) {
+    private static async Task<Harness> CreateStartedHarnessAsync(IRequestPipelineAdvisor<TriggerJobRequest, SchemataJobExecution>? advisor) {
         var harness = CreateHarness(advisor);
         await harness.Scheduler.StartAsync(CancellationToken.None);
         return harness;
     }
 
-    private static Harness CreateHarness(ICommandAdvisor<TriggerJobRequest>? advisor) {
+    private static Harness CreateHarness(IRequestPipelineAdvisor<TriggerJobRequest, SchemataJobExecution>? advisor) {
         var harness = new Harness();
 
         var registry = new Mock<IScheduledJobRegistry>();
@@ -120,15 +120,19 @@ public sealed class SchedulingEntryEquivalenceShould
     }
 
     /// <summary>Records every dispatch of <see cref="TriggerJobRequest" /> it observes.</summary>
-    private sealed class RecordingCommandAdvisor : ICommandAdvisor<TriggerJobRequest>
+    private sealed class RecordingCommandAdvisor : IRequestPipelineAdvisor<TriggerJobRequest, SchemataJobExecution>
     {
         public int Count { get; private set; }
 
         public int Order => 0;
 
-        public Task<AdviseResult> AdviseAsync(AdviceContext ctx, TriggerJobRequest a1, CancellationToken ct = default) {
+        public Task<SchemataJobExecution> AdviseAsync(
+            AdviceContext                                  ctx,
+            TriggerJobRequest                              a1,
+            RequestHandlerContinuation<SchemataJobExecution> next,
+            CancellationToken                              ct = default) {
             Count++;
-            return Task.FromResult(AdviseResult.Continue);
+            return next(ct);
         }
     }
 

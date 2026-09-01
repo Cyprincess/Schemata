@@ -11,6 +11,7 @@ using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Commands;
 using CompleteProcessRequest = Schemata.Flow.Foundation.Commands.CompleteActivityRequest;
 using CorrelateProcessRequest = Schemata.Flow.Foundation.Commands.CorrelateMessageRequest;
 using ThrowProcessSignalRequest = Schemata.Flow.Foundation.Commands.ThrowSignalRequest;
@@ -33,13 +34,15 @@ public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
         }
 
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<StartProcessRequest, SchemataProcess>(new(
+        var inner = new StartProcessRequest(
             definitionName,
             source,
             typeof(TState),
             source.CanonicalName,
             options,
-            Principal: null), ct));
+            Principal: null);
+        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>, SchemataProcess>(
+            new(FlowOperations.Start, null, inner, null), ct));
     }
 
     public ValueTask<SchemataProcess> StartAsync(
@@ -48,13 +51,15 @@ public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
         CancellationToken    ct      = default
     ) {
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<StartProcessRequest, SchemataProcess>(new(
+        var inner = new StartProcessRequest(
             definitionName,
             Source: null,
             SourceType: null,
             SourceCanonicalName: null,
             options,
-            Principal: null), ct));
+            Principal: null);
+        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>, SchemataProcess>(
+            new(FlowOperations.Start, null, inner, null), ct));
     }
 
     public ValueTask<ProcessSnapshot> CompleteAsync(
@@ -65,7 +70,8 @@ public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
     ) {
         var canonicalName = RequireCanonicalName(process.CanonicalName, nameof(process));
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<CompleteProcessRequest, ProcessSnapshot>(new(canonicalName, token, principal), ct));
+        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, CompleteProcessRequest, ProcessSnapshot>, ProcessSnapshot>(
+            new(FlowOperations.Complete, canonicalName, new(canonicalName, token, principal), principal), ct));
     }
 
     public ValueTask<ProcessSnapshot> CorrelateAsync(
@@ -78,7 +84,8 @@ public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
     ) {
         var canonicalName = RequireCanonicalName(process.CanonicalName, nameof(process));
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<CorrelateProcessRequest, ProcessSnapshot>(new(canonicalName, messageName, payload, token, principal), ct));
+        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, CorrelateProcessRequest, ProcessSnapshot>, ProcessSnapshot>(
+            new(FlowOperations.Correlate, canonicalName, new(canonicalName, messageName, payload, token, principal), principal), ct));
     }
 
     public ValueTask<ProcessSnapshot> CorrelateAsync(
@@ -91,12 +98,11 @@ public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
     ) {
         var canonicalName = RequireCanonicalName(process.CanonicalName, nameof(process));
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<CorrelateProcessRequest, ProcessSnapshot>(new(
-            canonicalName,
-            messageName,
-            FlowHandlerSupport.PreserveTypedPayload(payload),
-            token,
-            principal), ct));
+        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, CorrelateProcessRequest, ProcessSnapshot>, ProcessSnapshot>(
+            new(FlowOperations.Correlate,
+                canonicalName,
+                new(canonicalName, messageName, FlowHandlerSupport.PreserveTypedPayload(payload), token, principal),
+                principal), ct));
     }
 
     public ValueTask<IReadOnlyList<SignalDeliveryResult>> ThrowSignalAsync(
@@ -107,8 +113,8 @@ public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
         CancellationToken  ct
     ) {
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<ThrowProcessSignalRequest, IReadOnlyList<SignalDeliveryResult>>(
-            new(signalName, payload, token, principal), ct));
+        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, ThrowProcessSignalRequest, IReadOnlyList<SignalDeliveryResult>>, IReadOnlyList<SignalDeliveryResult>>(
+            new(FlowOperations.Signal, null, new(signalName, payload, token, principal), principal), ct));
     }
 
     public ValueTask<IReadOnlyList<SignalDeliveryResult>> ThrowSignalAsync(
@@ -119,11 +125,11 @@ public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
         CancellationToken  ct
     ) {
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<ThrowProcessSignalRequest, IReadOnlyList<SignalDeliveryResult>>(new(
-            signalName,
-            FlowHandlerSupport.PreserveTypedPayload(payload),
-            token,
-            principal), ct));
+        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, ThrowProcessSignalRequest, IReadOnlyList<SignalDeliveryResult>>, IReadOnlyList<SignalDeliveryResult>>(
+            new(FlowOperations.Signal,
+                null,
+                new(signalName, FlowHandlerSupport.PreserveTypedPayload(payload), token, principal),
+                principal), ct));
     }
 
     public ValueTask<ProcessSnapshot> TerminateAsync(
@@ -133,7 +139,8 @@ public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
     ) {
         var canonicalName = RequireCanonicalName(process.CanonicalName, nameof(process));
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<TerminateProcessRequest, ProcessSnapshot>(new(canonicalName, principal), ct));
+        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, TerminateProcessRequest, ProcessSnapshot>, ProcessSnapshot>(
+            new(FlowOperations.Terminate, canonicalName, new(canonicalName, principal), principal), ct));
     }
 
     public ValueTask<ProcessSnapshot> CancelTokenAsync(
@@ -143,7 +150,8 @@ public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
     ) {
         var tokenCanonicalName = RequireCanonicalName(token.CanonicalName, nameof(token));
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<CancelTokenRequest, ProcessSnapshot>(new($"processes/{token.Process}", tokenCanonicalName, principal), ct));
+        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcessToken, CancelTokenRequest, ProcessSnapshot>, ProcessSnapshot>(
+            new(FlowOperations.Cancel, tokenCanonicalName, new($"processes/{token.Process}", tokenCanonicalName, principal), principal), ct));
     }
 
     #endregion
@@ -157,13 +165,15 @@ public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
         CancellationToken    ct
     ) {
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<StartProcessRequest, SchemataProcess>(new(
+        var inner = new StartProcessRequest(
             definitionName,
             Source: null,
             SourceType: null,
             SourceCanonicalName: source,
             options,
-            principal), ct));
+            principal);
+        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>, SchemataProcess>(
+            new(FlowOperations.Start, null, inner, principal), ct));
     }
 
     /// <summary>Starts a process from a resource request without a source entity.</summary>
@@ -174,13 +184,15 @@ public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
         CancellationToken    ct
     ) {
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<StartProcessRequest, SchemataProcess>(new(
+        var inner = new StartProcessRequest(
             definitionName,
             Source: null,
             SourceType: null,
             SourceCanonicalName: null,
             options,
-            principal), ct));
+            principal);
+        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>, SchemataProcess>(
+            new(FlowOperations.Start, null, inner, principal), ct));
     }
 
     /// <summary>Starts a process from a resource request and binds a loaded source entity.</summary>
@@ -196,13 +208,15 @@ public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
         }
 
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<StartProcessRequest, SchemataProcess>(new(
+        var inner = new StartProcessRequest(
             definitionName,
             source,
             typeof(TState),
             source.CanonicalName,
             options,
-            principal), ct));
+            principal);
+        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>, SchemataProcess>(
+            new(FlowOperations.Start, null, inner, principal), ct));
     }
 
     /// <summary>Triggers an addressed internal event through the process request handler.</summary>
@@ -214,7 +228,8 @@ public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
         CancellationToken ct
     ) {
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<RunEventRequest, ProcessSnapshot>(new(processName, tokenName, trigger, payload), ct));
+        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, RunEventRequest, ProcessSnapshot>, ProcessSnapshot>(
+            new(FlowOperations.RunEvent, processName, new(processName, tokenName, trigger, payload), null), ct));
     }
 
     private static string RequireCanonicalName(string? canonicalName, string parameterName) {

@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Moq;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
@@ -61,8 +62,8 @@ public class RevocationHandlerShould
         var sp = services.BuildServiceProvider();
 
         var handler = new RevocationHandler<SchemataApplication, SchemataToken>(
-            clientAuth.Object, tokensMock.Object, sp);
-        return new(handler, tokensMock, tokenService);
+            clientAuth.Object, tokensMock.Object);
+        return new(handler, tokensMock, tokenService, sp);
     }
 
     private static SchemataToken CreateTokenEntity(
@@ -88,6 +89,7 @@ public class RevocationHandlerShould
     [Fact]
     public async Task ThrowsInvalidRequest_WhenTokenEmpty() {
         var f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
         var request = new RevokeRequest { Token = "" };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
@@ -99,6 +101,7 @@ public class RevocationHandlerShould
     [Fact]
     public async Task ThrowsInvalidRequest_WhenTokenWhitespace() {
         var f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
         var request = new RevokeRequest { Token = "   " };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
@@ -110,6 +113,7 @@ public class RevocationHandlerShould
     [Fact]
     public async Task DoesNotThrow_WhenTokenNotFound() {
         var f = CreateFixture();
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
 
         f.Tokens.Setup(m => m.FindByReferenceIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
          .ReturnsAsync((SchemataToken?)null);
@@ -124,6 +128,7 @@ public class RevocationHandlerShould
     [Fact]
     public async Task RevokesToken_WhenJwtTokenResolved() {
         var f = CreateFixture();
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
 
         var claims = new List<Claim> {
             new(Claims.JwtId, Identifiers.NewUid().ToString()),
@@ -146,6 +151,7 @@ public class RevocationHandlerShould
     [Fact]
     public async Task FallsBackToReferenceIdLookup_WhenResolverReturnsNull() {
         var f      = CreateFixture();
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
         var refId  = "opaque-ref-123";
         var entity = CreateTokenEntity(refId, "reference");
 
@@ -161,6 +167,7 @@ public class RevocationHandlerShould
     [Fact]
     public async Task DoesNotRevoke_WhenEntityStatusRevoked() {
         var f = CreateFixture();
+        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
 
         var claims = new List<Claim> {
             new(Claims.JwtId, Identifiers.NewUid().ToString()),
@@ -185,7 +192,8 @@ public class RevocationHandlerShould
     private record Fixture(
         RevocationHandler<SchemataApplication, SchemataToken> Handler,
         Mock<ITokenManager<SchemataToken>>                    Tokens,
-        TokenService                                          TokenService
+        TokenService                                          TokenService,
+        IServiceProvider                                      Sp
     );
 
     #endregion

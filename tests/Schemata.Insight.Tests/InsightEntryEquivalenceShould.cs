@@ -20,7 +20,7 @@ namespace Schemata.Insight.Tests;
 ///     Proves the facade (<see cref="DefaultInsightService.QueryAsync" />, which itself dispatches
 ///     through <see cref="IRequestDispatcher" />) and a raw <see cref="IRequestDispatcher" /> entry run
 ///     the exact same <see cref="QueryInsightRequest" /> pipeline: equivalent
-///     <see cref="QueryInsightResponse" /> results, the registered <see cref="IQueryAdvisor{TQuery}" />
+///     <see cref="QueryInsightResponse" /> results, the registered <see cref="IRequestPipelineAdvisor{TRequest,TResponse}" />
 ///     firing once per entry, and identical exception shapes when the request is malformed. Neither
 ///     entry stubs the real <c>DefaultQueryInsightHandler</c>.
 /// </summary>
@@ -83,7 +83,7 @@ public sealed class InsightEntryEquivalenceShould
         return new() { Sources = [new("source", "orders")], PageSize = pageSize };
     }
 
-    private static ServiceProvider CreateProvider(ISourceDriver driver, IQueryAdvisor<QueryInsightRequest>? advisor) {
+    private static ServiceProvider CreateProvider(ISourceDriver driver, IRequestPipelineAdvisor<QueryInsightRequest, QueryInsightResponse>? advisor) {
         var services = new ServiceCollection();
         services.Configure<SchemataInsightOptions>(options =>
             options.Sources["orders"] = new(DriverName, new Dictionary<string, object?>()));
@@ -131,15 +131,19 @@ public sealed class InsightEntryEquivalenceShould
     }
 
     /// <summary>Records every dispatch of <see cref="QueryInsightRequest" /> it observes.</summary>
-    private sealed class RecordingQueryAdvisor : IQueryAdvisor<QueryInsightRequest>
+    private sealed class RecordingQueryAdvisor : IRequestPipelineAdvisor<QueryInsightRequest, QueryInsightResponse>
     {
         public int Count { get; private set; }
 
         public int Order => 0;
 
-        public Task<AdviseResult> AdviseAsync(AdviceContext ctx, QueryInsightRequest a1, CancellationToken ct = default) {
+        public Task<QueryInsightResponse> AdviseAsync(
+            AdviceContext                                    ctx,
+            QueryInsightRequest                              a1,
+            RequestHandlerContinuation<QueryInsightResponse> next,
+            CancellationToken                                ct = default) {
             Count++;
-            return Task.FromResult(AdviseResult.Continue);
+            return next(ct);
         }
     }
 }

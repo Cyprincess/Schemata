@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions.Advisors;
 using Schemata.Authorization.Foundation;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Features;
@@ -75,10 +76,12 @@ public static class SchemataBuilderExtensions
             wk.Map(Endpoints.Discovery, async (
                        DiscoveryHandler<TScope>               handler,
                        IOptions<SchemataAuthorizationOptions> options,
-                       HttpContext                            _,
+                       HttpContext                            http,
                        CancellationToken                      ct
                    ) => {
                        var issuer = options.Value.Issuer!;
+                       // The well-known route is the pipeline root here; the handler continues the ambient.
+                       using var ambient = AdviceContext.Establish(new AdviceContext(http.RequestServices));
                        var result = await handler.GetDiscoveryDocumentAsync(issuer, ct);
                        return Results.Json(result.Data);
                    });

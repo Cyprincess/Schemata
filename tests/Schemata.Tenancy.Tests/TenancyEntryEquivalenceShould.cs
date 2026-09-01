@@ -142,20 +142,22 @@ public class TenancyEntryEquivalenceShould
                           It.IsAny<Func<IQueryable<SchemataTenant>, IQueryable<SchemataTenant>>>(),
                           It.IsAny<CancellationToken>()))
                .ReturnsAsync(tenant);
-        var commandAdvisor = new Mock<ICommandAdvisor<CreateTenantRequest<SchemataTenant>>>();
+        var commandAdvisor = new Mock<IRequestPipelineAdvisor<CreateTenantRequest<SchemataTenant>, Unit>>();
         commandAdvisor.SetupGet(value => value.Order).Returns(0);
         commandAdvisor.Setup(value => value.AdviseAsync(
                                  It.IsAny<AdviceContext>(),
                                  It.IsAny<CreateTenantRequest<SchemataTenant>>(),
+                                 It.IsAny<RequestHandlerContinuation<Unit>>(),
                                  It.IsAny<CancellationToken>()))
-                      .ReturnsAsync(AdviseResult.Continue);
-        var queryAdvisor = new Mock<IQueryAdvisor<FindTenantByIdQuery<SchemataTenant>>>();
+                      .Returns((AdviceContext _, CreateTenantRequest<SchemataTenant> _, RequestHandlerContinuation<Unit> next, CancellationToken ct) => next(ct));
+        var queryAdvisor = new Mock<IRequestPipelineAdvisor<FindTenantByIdQuery<SchemataTenant>, SchemataTenant?>>();
         queryAdvisor.SetupGet(value => value.Order).Returns(0);
         queryAdvisor.Setup(value => value.AdviseAsync(
                                It.IsAny<AdviceContext>(),
                                It.IsAny<FindTenantByIdQuery<SchemataTenant>>(),
+                               It.IsAny<RequestHandlerContinuation<SchemataTenant?>>(),
                                It.IsAny<CancellationToken>()))
-                    .ReturnsAsync(AdviseResult.Continue);
+                    .Returns((AdviceContext _, FindTenantByIdQuery<SchemataTenant> _, RequestHandlerContinuation<SchemataTenant?> next, CancellationToken ct) => next(ct));
         using var provider = TenancyTestHost.CreateProvider(
             tenants,
             configure: services => {
@@ -175,10 +177,12 @@ public class TenancyEntryEquivalenceShould
         commandAdvisor.Verify(value => value.AdviseAsync(
                                   It.IsAny<AdviceContext>(),
                                   It.IsAny<CreateTenantRequest<SchemataTenant>>(),
+                                  It.IsAny<RequestHandlerContinuation<Unit>>(),
                                   It.IsAny<CancellationToken>()), Times.Exactly(2));
         queryAdvisor.Verify(value => value.AdviseAsync(
                                 It.IsAny<AdviceContext>(),
                                 It.IsAny<FindTenantByIdQuery<SchemataTenant>>(),
+                                It.IsAny<RequestHandlerContinuation<SchemataTenant?>>(),
                                 It.IsAny<CancellationToken>()), Times.Exactly(2));
         Assert.Same(tenant, facadeFound);
         Assert.Same(facadeFound, directFound);

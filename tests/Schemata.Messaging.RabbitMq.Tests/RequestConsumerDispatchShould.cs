@@ -34,7 +34,7 @@ public class RequestConsumerDispatchShould
 
         var services = new ServiceCollection();
         services.AddScoped<InProcessRequestDispatcher>();
-        services.AddSingleton<ICommandAdvisor<Ping>>(advisor);
+        services.AddSingleton<IRequestPipelineAdvisor<Ping, Unit>>(advisor);
         services.AddScoped<IRequestHandler<Ping, Unit>>(
             _ => new PingHandler(() => observedByHandler = AdviceContext.Current));
 
@@ -65,7 +65,7 @@ public class RequestConsumerDispatchShould
 
         var services = new ServiceCollection();
         services.AddRabbitMqRequestDispatcher(_ => { });
-        services.AddSingleton<ICommandAdvisor<Ping>>(advisor);
+        services.AddSingleton<IRequestPipelineAdvisor<Ping, Unit>>(advisor);
         services.AddScoped<IRequestHandler<Ping, Unit>>(
             _ => new PingHandler(() => observedByHandler = AdviceContext.Current));
 
@@ -85,7 +85,7 @@ public class RequestConsumerDispatchShould
 
     private sealed record Ping : ICommand;
 
-    private sealed class RecordingCommandAdvisor : ICommandAdvisor<Ping>
+    private sealed class RecordingCommandAdvisor : IRequestPipelineAdvisor<Ping, Unit>
     {
         public bool Invoked { get; private set; }
 
@@ -93,10 +93,14 @@ public class RequestConsumerDispatchShould
 
         public int Order => 0;
 
-        public Task<AdviseResult> AdviseAsync(AdviceContext ctx, Ping a1, CancellationToken ct = default) {
+        public Task<Unit> AdviseAsync(
+            AdviceContext                    ctx,
+            Ping                             a1,
+            RequestHandlerContinuation<Unit> next,
+            CancellationToken                ct = default) {
             Invoked         = true;
             ObservedContext = ctx;
-            return Task.FromResult(AdviseResult.Continue);
+            return next(ct);
         }
     }
 

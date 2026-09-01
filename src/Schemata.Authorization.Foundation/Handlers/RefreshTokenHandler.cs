@@ -92,8 +92,7 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
             );
         }
 
-        var ctx = new AdviceContext(sp);
-        using var _ = AdviceContext.Establish(ctx);
+        var ctx = AdviceContext.Require();
 
         switch (await Advisor.For<ITokenRequestAdvisor<TApp>>()
                              .RunAsync(ctx, application, request, ct)) {
