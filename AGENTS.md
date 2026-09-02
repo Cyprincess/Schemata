@@ -134,5 +134,5 @@ Avoid these AIP errors:
 - **Layers:** `tests/Schemata.*.Tests` (unit/component) and `tests/Schemata.*.Integration.Tests` (integration; `GenerateProgramFile=false`, own `Program`/`WebApplicationFactory`). Integration tests use **local SQLite only** — no Docker, Testcontainers, or live broker. Coverage runs via coverlet (`Coverage=true` for `tests/*`).
 - **Fixtures:** static `*TestHost` helpers for DI setup (`tests/Schemata.Report.Tests/ReportTestHost.cs`); `IAsyncLifetime` fixtures for SQLite integration; `WebApplicationFactory<Program>` via `IClassFixture` for HTTP/gRPC.
 - **Conformance suites** read from `specs/` submodules and are gated:
-  - BPMN MIWG (`tests/Schemata.Flow.Bpmn.Conformance.Tests`) runs Windows-only in CI: `dotnet test ... --filter "Pending!=true"` (exclusions in `PendingCatalog.cs`).
+  - BPMN MIWG (`tests/Schemata.Flow.Bpmn.Conformance.Tests`) runs Windows-only in CI: `dotnet test ... --filter "Speed!=Fast"`; exclusions live in `PendingCatalog.cs`, a guard theory re-runs catalogued vectors to catch stale entries, and `Speed=Fast` picks one vector per MIWG case id for local loops.
   - CEL spec (`tests/Schemata.Expressions.Cel.Tests/Conformance/`) skips cases listed in `cel-spec-skips.txt`.

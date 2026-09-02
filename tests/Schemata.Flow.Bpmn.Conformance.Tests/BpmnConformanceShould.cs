@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Exceptions;
@@ -31,27 +33,10 @@ public class BpmnConformanceShould
     [Trait(ConformanceTraits.Speed, "Full")]
     [MemberData(nameof(Vectors.AllVectors), MemberType = typeof(Vectors))]
     public async Task ExecutesAccordingToVector(string vectorPath) {
-        ProcessDefinition definition;
-        try {
-            definition = BpmnXmlAdapter.Parse(Vectors.AbsolutePath(vectorPath));
-        } catch (NotSupportedException ex) {
-            FailUncatalogued(PendingReason(ex));
-            return;
-        }
-
-        try {
-            BpmnValidator.Validate(definition);
-        } catch (FailedPreconditionException ex) when (IsPendingValidation(ex)) {
-            FailUncatalogued(PendingReason(ex));
-            return;
-        }
-
-        try {
-            var snapshot = await ExecuteUntilTerminal(definition);
-            Assert.True(TerminalStates.Contains(snapshot.Process.State ?? string.Empty), $"Process ended in '{snapshot.Process.State}'.");
-        } catch (NotImplementedException ex) when (IsPhaseMarker(ex)) {
-            FailUncatalogued(PendingReason(ex));
-        }
+        var (outcome, reason) = await TryExecuteVector(vectorPath);
+        Assert.True(outcome == Outcome.Terminal, outcome == Outcome.NonTerminal
+            ? $"Vector '{vectorPath}' ended in '{reason}'."
+            : $"Pending catalog missing: {reason}");
     }
 
     [Theory(DisplayName = "Fast MIWG BPMN vector executes according to supported engine semantics")]
@@ -60,7 +45,52 @@ public class BpmnConformanceShould
     [MemberData(nameof(Vectors.FastSubset), MemberType = typeof(Vectors))]
     public Task ExecutesAccordingToVectorFast(string vectorPath) { return ExecutesAccordingToVector(vectorPath); }
 
-    private static async Task<ProcessSnapshot> ExecuteUntilTerminal(ProcessDefinition definition) {
+    [Theory(DisplayName = "Catalogued MIWG BPMN vector stays outside the executable subset")]
+    [Trait(ConformanceTraits.Category, ConformanceTraits.Conformance)]
+    [Trait(ConformanceTraits.Speed, "Full")]
+    [MemberData(nameof(Vectors.PendingVectors), MemberType = typeof(Vectors))]
+    public async Task StaysOutsideExecutableSubset(string vectorPath) {
+        var (outcome, _) = await TryExecuteVector(vectorPath);
+        Assert.True(outcome != Outcome.Terminal,
+            $"Stale pending entry: '{vectorPath}' executes to a terminal state; remove it from PendingCatalog.");
+    }
+
+    private enum Outcome
+    {
+        Terminal,
+        Pending,
+        NonTerminal,
+    }
+
+    private static async Task<(Outcome Outcome, string Reason)> TryExecuteVector(string vectorPath) {
+        ProcessDefinition definition;
+        try {
+            definition = BpmnXmlAdapter.Parse(Vectors.AbsolutePath(vectorPath));
+        } catch (Exception ex) when (ex is NotSupportedException or InvalidDataException or XmlException) {
+            return (Outcome.Pending, PendingReason(ex));
+        }
+
+        try {
+            BpmnValidator.Validate(definition);
+        } catch (FailedPreconditionException ex) {
+            return (Outcome.Pending, PendingReason(ex));
+        }
+
+        try {
+            var snapshot = await ExecuteUntilTerminal(definition);
+            if (snapshot is null) {
+                return (Outcome.Pending, "Process waits for an external trigger not represented by MIWG XML-only execution.");
+            }
+
+            return TerminalStates.Contains(snapshot.Process.State ?? string.Empty)
+                ? (Outcome.Terminal, string.Empty)
+                : (Outcome.NonTerminal, snapshot.Process.State ?? string.Empty);
+        } catch (NotImplementedException ex) when (IsPhaseMarker(ex)) {
+            return (Outcome.Pending, PendingReason(ex));
+        }
+    }
+
+    private static async Task<ProcessSnapshot?> ExecuteUntilTerminal(ProcessDefinition definition) {
         var engine = new BpmnEngine();
         var process = new SchemataProcess {
             Name           = definition.Name,
@@ -75,7 +105,7 @@ public class BpmnConformanceShould
         for (var i = 0; i < 64 && !TerminalStates.Contains(snapshot.Process.State ?? string.Empty); i++) {
             var active = snapshot.Tokens.FirstOrDefault(token => string.Equals(token.State, "Active", StringComparison.OrdinalIgnoreCase));
             if (active is null) {
-                FailUncatalogued("Process waits for an external trigger not represented by MIWG XML-only execution.");
+                return null;
             }
 
             snapshot = await engine.AdvanceAsync(definition, snapshot.Process, snapshot.Tokens, execution, active!.CanonicalName, CancellationToken.None);
@@ -84,19 +114,10 @@ public class BpmnConformanceShould
         return snapshot;
     }
 
-    private static bool IsPendingValidation(Exception ex) {
-        return ex.Message.Contains("unsupported", StringComparison.OrdinalIgnoreCase)
-            || ex.Message.Contains("requires", StringComparison.OrdinalIgnoreCase)
-            || ex.Message.Contains("outgoing", StringComparison.OrdinalIgnoreCase)
-            || ex.Message.Contains("unknown", StringComparison.OrdinalIgnoreCase);
-    }
-
     private static bool IsPhaseMarker(NotImplementedException ex) {
         return ex.Message.Contains("Phase", StringComparison.OrdinalIgnoreCase)
             || ex.Message.Contains("not implemented", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string PendingReason(Exception ex) { return ex.Message.ReplaceLineEndings(" "); }
-
-    private static void FailUncatalogued(string reason) { throw new InvalidOperationException("Pending catalog missing: " + reason); }
 }

@@ -2,16 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace Schemata.Flow.Bpmn.Conformance.Tests;
 
 public static class Vectors
 {
-    private static readonly string[] FastVectorHints = [
-        "Reference",
-        "B.1.0",
-        "A.1.0",
-    ];
+    private static readonly Regex CaseIdPattern = new(@"^[A-C]\.\d+\.\d+(?:\.\d+)?", RegexOptions.Compiled);
 
     public static IEnumerable<object[]> AllVectors() {
         return EnumerateVectors()
@@ -19,18 +16,18 @@ public static class Vectors
               .Select(path => new object[] { path });
     }
 
+    public static IEnumerable<object[]> PendingVectors() {
+        return EnumerateVectors()
+              .Where(path => PendingCatalog.IsPending(path, out _))
+              .Select(path => new object[] { path });
+    }
+
     public static IEnumerable<object[]> FastSubset() {
-        var vectors = EnumerateVectors()
-                     .Where(path => FastVectorHints.Any(hint => path.Contains(hint, StringComparison.OrdinalIgnoreCase)))
-                     .Where(path => !PendingCatalog.IsPending(path, out _))
-                     .Take(50)
-                     .ToList();
-
-        if (vectors.Count == 0) {
-            vectors = EnumerateVectors().Where(path => !PendingCatalog.IsPending(path, out _)).Take(10).ToList();
-        }
-
-        return vectors.Select(path => new object[] { path });
+        return EnumerateVectors()
+              .Where(path => !PendingCatalog.IsPending(path, out _))
+              .GroupBy(CaseGroup)
+              .Select(group => group.FirstOrDefault(IsReferenceVector) ?? group.First())
+              .Select(path => new object[] { path });
     }
 
     internal static string SpecsRoot() {
@@ -54,5 +51,16 @@ public static class Vectors
 
     internal static string Normalize(string path) {
         return path.Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/');
+    }
+
+    // Cross-tool variants of one case id are the same model serialized by different tools; the fast
+    // loop executes one representative per case id while AllVectors keeps every dialect.
+    private static string CaseGroup(string vectorPath) {
+        var match = CaseIdPattern.Match(Path.GetFileNameWithoutExtension(vectorPath));
+        return match.Success ? match.Value : vectorPath;
+    }
+
+    private static bool IsReferenceVector(string vectorPath) {
+        return vectorPath.StartsWith("Reference/", StringComparison.OrdinalIgnoreCase);
     }
 }

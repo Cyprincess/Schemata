@@ -243,10 +243,10 @@ elements are explicitly outside scope in the runtime code:
 ## Compliance
 
 The MIWG conformance suite runs an executable subset of the spec. Vectors are loaded from
-`specs/bpmn-miwg-test-suite`, executed as `Theory` tests by
-`tests/Schemata.Flow.Bpmn.Conformance.Tests/BpmnConformanceShould.cs`, and recorded as passing or
-pending. The exclusion source of truth is `PendingCatalog.cs`; each entry pairs a vector path with
-a reason. Reasons observed across the catalog include:
+`specs/bpmn-miwg-test-suite` and executed as `Theory` tests by
+`tests/Schemata.Flow.Bpmn.Conformance.Tests/BpmnConformanceShould.cs`. Vectors absent from
+`PendingCatalog.cs` must execute to a terminal state; each catalog entry pairs a vector path with
+the reason it stays outside the executable subset. Reasons observed across the catalog include:
 
 - `Initial conformance execution failed; vector outside current executable subset`
 - `Collaboration not supported (multi-participant)`
@@ -254,8 +254,12 @@ a reason. Reasons observed across the catalog include:
 - `Associations are non-executable and outside engine scope`
 - `Text annotations are non-executable and outside engine scope`
 
-A vector that throws during parse, validation, or execution with no cataloged reason surfaces as a
-test failure through `FailUncatalogued`.
+A vector that fails during parse, validation, or execution with no cataloged reason surfaces as a
+test failure. A second theory re-executes every cataloged vector and fails when one reaches a
+terminal state, so a stale catalog entry blocks CI until it is removed. The `Speed=Fast` subset
+selects one vector per MIWG case id: the `Reference` file when it executes, otherwise the first
+tool variant. Cross-tool exports of one case serialize the same model, and the full `Speed=Full`
+set keeps every tool dialect. CI runs `--filter "Speed!=Fast"`.
 
 ## See also
 

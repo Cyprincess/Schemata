@@ -39,10 +39,12 @@ public static class BpmnXmlAdapter
             throw new InvalidDataException($"BPMN file '{filePath}' does not contain a process element.");
         }
 
-        var names = document.Descendants()
-                            .Where(IsBpmn)
-                            .Where(element => element.Attribute("id") is not null)
-                            .ToDictionary(element => Id(element), DisplayName, StringComparer.Ordinal);
+        var names = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var element in document.Descendants().Where(IsBpmn).Where(e => e.Attribute("id") is not null)) {
+            if (!names.TryAdd(Id(element), DisplayName(element))) {
+                throw new InvalidDataException($"BPMN file '{filePath}' contains a duplicate id '{Id(element)}'.");
+            }
+        }
 
         var definition = new ProcessDefinition {
             Name        = Id(process),
