@@ -14,8 +14,8 @@ using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
-using Schemata.Authorization.Skeleton.Managers;
-using Schemata.Authorization.Skeleton.Models;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Advisors;
 using Schemata.Messaging.Skeleton.Runtime;
@@ -36,12 +36,11 @@ public sealed class AuthorizeEndpointContinuityShould
     public async Task Dispatch_Continues_The_Ambient_Context_Into_The_Authorize_Advisor() {
         var marker   = new MarkerPipelineAdvisor();
         var observer = new ObservingAuthorizeAdvisor();
-        var tokens   = new Mock<ITokenManager<SchemataToken>>();
+        var tokens   = new Mock<ITokenStore<SchemataToken>>();
         tokens.Setup(t => t.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync((SchemataToken token, CancellationToken _) => token);
 
         var options = new SchemataAuthorizationOptions();
-        options.AddEphemeralSigningKey();
         options.Issuer         = "https://localhost";
         options.InteractionUri = "https://localhost/consent";
 
@@ -51,19 +50,19 @@ public sealed class AuthorizeEndpointContinuityShould
         services.AddSingleton<IRequestHandler<AuthorizeEndpointRequest, AuthorizationResult>>(
             new EndpointHandler(
                 tokens.Object,
-                new TokenService(Options.Create(options)),
+                TestSecurityKeys.CreateTokenService(options),
                 Options.Create(options),
                 Options.Create(new JsonSerializerOptions())));
         using var provider   = services.BuildServiceProvider();
         var       dispatcher = new InProcessRequestDispatcher(provider);
 
         var result = await dispatcher.SendAsync<AuthorizeEndpointRequest, AuthorizationResult>(
-            new(new AuthorizeRequest {
+            new(new() {
                     ClientId     = "test",
                     ResponseType = "code",
                     RedirectUri  = "https://client.example/callback",
                 },
-                new ClaimsPrincipal(new ClaimsIdentity([new Claim(IdentityClaims.Subject, "user-1")], "test"))),
+                new(new ClaimsIdentity([new(IdentityClaims.Subject, "user-1")], "test"))),
             CancellationToken.None);
 
         Assert.Equal(AuthorizationStatus.Redirect, result.Status);
@@ -73,14 +72,14 @@ public sealed class AuthorizeEndpointContinuityShould
     }
 
     private sealed class EndpointHandler(
-        ITokenManager<SchemataToken>         tokens,
-        TokenService                         issuer,
+        ITokenStore<SchemataToken>           tokens,
+        TokenService                           issuer,
         IOptions<SchemataAuthorizationOptions> options,
-        IOptions<JsonSerializerOptions>      json
+        IOptions<JsonSerializerOptions>        json
     ) : IRequestHandler<AuthorizeEndpointRequest, AuthorizationResult>
     {
         public Task<AuthorizationResult> HandleAsync(AuthorizeEndpointRequest request, CancellationToken ct = default)
-            => new AuthorizeHandler<SchemataApplication, SchemataToken>(tokens, issuer, options, json)
+            => new AuthorizeHandler<SchemataApplication>(tokens, issuer, options, json)
               .AuthorizeAsync(request.Request, request.Principal!, ct);
     }
 

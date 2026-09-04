@@ -13,8 +13,9 @@ using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
-using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
 using static Schemata.Abstractions.SchemataConstants;
@@ -25,7 +26,7 @@ namespace Schemata.Authorization.Foundation.Handlers;
 /// <summary>
 ///     Handles the <c>urn:ietf:params:oauth:grant-type:device_code</c> grant type.
 ///     Validates the device code token, runs the
-///     <see cref="IDeviceCodeExchangeAdvisor{TApp,TToken}" /> pipeline, enforces
+///     <see cref="IDeviceCodeExchangeAdvisor{TApp}" /> pipeline, enforces
 ///     scope constraints, and revokes the device code on success,
 ///     per
 ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html#section-3.4">
@@ -34,13 +35,12 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     </seealso>
 ///     .
 /// </summary>
-public sealed class DeviceCodeHandler<TApp, TToken>(
+public sealed class DeviceCodeHandler<TApp>(
     IClientAuthenticationService<TApp> client,
-    ITokenManager<TToken>              tokens,
+    ITokenStore<SchemataToken>                tokens,
     IOptions<JsonSerializerOptions>    json
 ) : IGrantHandler
     where TApp : SchemataApplication
-    where TToken : SchemataToken
 {
     #region IGrantHandler Members
 
@@ -107,13 +107,13 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
             );
         }
 
-        var exchange = new DeviceCodeExchangeContext<TApp, TToken> {
+        var exchange = new DeviceCodeExchangeContext<TApp> {
             Request     = request,
             Application = application,
             Token       = token,
         };
 
-        switch (await Advisor.For<IDeviceCodeExchangeAdvisor<TApp, TToken>>()
+        switch (await Advisor.For<IDeviceCodeExchangeAdvisor<TApp>>()
                              .RunAsync(ctx, exchange, ct)) {
             case AdviseResult.Continue:
                 break;
@@ -134,7 +134,9 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
             );
         }
 
-        var payload = JsonSerializer.Deserialize<DeviceCodePayload>(token.Payload, json.Value);
+        var clear = token.Payload;
+
+        var payload = JsonSerializer.Deserialize<DeviceCodePayload>(clear, json.Value);
         if (payload is null) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
@@ -159,7 +161,7 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
         await tokens.RevokeAsync(token, ct);
 
         var claims = new List<Claim> {
-            new(IdentityClaims.Subject, token.Subject!),
+            new(IdentityClaims.Subject, token.Parent!),
             new(Claims.ClientId, application.ClientId),
         };
 
@@ -167,6 +169,7 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
         return AuthorizationResult.SignIn(identity, new() {
             [Properties.GrantType]         = GrantTypes.DeviceCode,
             [Properties.Scope]             = scope,
+            [Properties.Resources]         = request.Resource is { Count: > 0 } ? string.Join(" ", request.Resource) : null,
             [Properties.AuthorizationName] = token.Authorization,
             [Properties.SessionId]         = token.SessionId,
         });
