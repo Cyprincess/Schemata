@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Authorization.Foundation.Features;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Core;
 using Schemata.Core.Building;
 using Schemata.Core.Features;
@@ -16,12 +17,10 @@ namespace Schemata.Authorization.Foundation;
 /// <typeparam name="TApp">The application entity type.</typeparam>
 /// <typeparam name="TAuth">The authorization entity type.</typeparam>
 /// <typeparam name="TScope">The scope entity type.</typeparam>
-/// <typeparam name="TToken">The token entity type.</typeparam>
-public sealed class SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> : IResourceBuilder
+public sealed class SchemataAuthorizationBuilder<TApp, TAuth, TScope> : IResourceBuilder
     where TApp : SchemataApplication
     where TAuth : SchemataAuthorization
     where TScope : SchemataScope
-    where TToken : SchemataToken
 {
     public const string AuthenticationSchemeKey = "Authorization:AuthenticationScheme";
 
@@ -73,7 +72,7 @@ public sealed class SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> : 
     /// </summary>
     /// <typeparam name="T">The flow feature type to instantiate and register.</typeparam>
     /// <returns>The current builder.</returns>
-    public SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> AddFlowFeature<T>()
+    public SchemataAuthorizationBuilder<TApp, TAuth, TScope> AddFlowFeature<T>()
         where T : IAuthorizationFlowFeature, new() {
         Configurators.Set<List<IAuthorizationFlowFeature>>(features => { features.Add(new T()); });
 

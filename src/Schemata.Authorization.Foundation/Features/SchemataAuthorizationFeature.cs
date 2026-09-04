@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Transport.Http.Features;
@@ -19,11 +20,10 @@ namespace Schemata.Authorization.Foundation.Features;
 [DependsOn<SchemataAuthenticationFeature>]
 [DependsOn<SchemataTransportHttpFeature>]
 [DependsOn<SchemataWellKnownFeature>]
-public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : FeatureBase
+public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope> : FeatureBase
     where TApp : SchemataApplication
     where TAuth : SchemataAuthorization
     where TScope : SchemataScope
-    where TToken : SchemataToken, new()
 {
     public const int DefaultPriority = Orders.Extension + 60_000_000;
 
@@ -42,7 +42,7 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : 
 
         services.AddSchemataAuthorizationOptions(configure);
         services.AddSchemataAuthorizationFlows(schemata, configurators);
-        services.AddSchemataApplicationPart<SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken>>();
-        services.AddSchemataAuthorization<TApp, TAuth, TScope, TToken>(options);
+        services.AddSchemataApplicationPart<SchemataAuthorizationFeature<TApp, TAuth, TScope>>();
+        services.AddSchemataAuthorization<TApp, TAuth, TScope>(options);
     }
 }

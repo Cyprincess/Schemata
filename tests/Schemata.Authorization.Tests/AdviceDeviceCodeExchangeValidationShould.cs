@@ -6,6 +6,7 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Xunit;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
@@ -50,7 +51,7 @@ public class AdviceDeviceCodeExchangeValidationShould
         Assert.Equal(AdviseResult.Continue, result);
     }
 
-    private static AdviceDeviceCodeExchangeValidation<SchemataApplication, SchemataToken> Advisor() {
+    private static AdviceDeviceCodeExchangeValidation<SchemataApplication> Advisor() {
         var time = new Mock<TimeProvider>();
         time.Setup(value => value.GetUtcNow()).Returns(Now);
         return new(time.Object);
@@ -60,14 +61,14 @@ public class AdviceDeviceCodeExchangeValidationShould
         return new(null!);
     }
 
-    private static DeviceCodeExchangeContext<SchemataApplication, SchemataToken> Context(string status) {
+    private static DeviceCodeExchangeContext<SchemataApplication> Context(string status) {
         return new() {
             Application = new() { Name = "client" },
             Token = new() {
                 Type        = TokenTypes.DeviceCode,
                 Status      = status,
                 Application = "client",
-                Subject     = "user",
+                Parent      = "user",
                 ExpireTime  = Now.AddMinutes(5).UtcDateTime,
             },
             Request = new(),

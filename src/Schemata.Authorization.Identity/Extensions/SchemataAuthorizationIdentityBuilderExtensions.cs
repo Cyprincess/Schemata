@@ -1,6 +1,7 @@
 using Schemata.Authorization.Foundation;
 using Schemata.Authorization.Identity.Features;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Core;
 
 // ReSharper disable once CheckNamespace
@@ -15,13 +16,12 @@ public static class SchemataAuthorizationIdentityBuilderExtensions
     ///     Wires the Identity-backed <see cref="Schemata.Authorization.Skeleton.ISubjectProvider" /> into the
     ///     Authorization pipeline.
     /// </summary>
-    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseIdentity<TApp, TAuth, TScope, TToken>(
-        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope> UseIdentity<TApp, TAuth, TScope>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope> builder
     )
         where TApp : SchemataApplication
         where TAuth : SchemataAuthorization
-        where TScope : SchemataScope
-        where TToken : SchemataToken {
+        where TScope : SchemataScope {
         builder.Schemata.AddFeature<SchemataAuthorizationIdentityFeature>();
         return builder;
     }

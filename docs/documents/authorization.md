@@ -3,7 +3,7 @@
 `Schemata.Authorization.Foundation` is a hand-rolled OAuth 2.0 / OpenID Connect authorization
 server. It builds on `Microsoft.IdentityModel` for key material and JWT handling but pulls in no
 external server framework. The core feature is generic over four entity types — `TApp`, `TAuth`,
-TScope`, `TToken` — and runs at priority 460,000,000. Flows are opt-in: `UseAuthorization()`
+TScope` — and runs at priority 460,000,000. Flows are opt-in: `UseAuthorization()`
 registers the core, and each `Use*Flow` / `Use*` call on the returned builder adds one
 `IAuthorizationFlowFeature`.
 
@@ -39,11 +39,11 @@ builder.UseSchemata(schema => {
 `SchemataAuthorization`, `SchemataScope`, `SchemataToken`, and a generic one for custom subclasses.
 Both take an optional `Action<SchemataAuthorizationOptions>`, store it, map the discovery and JWKS
 endpoints into the well-known pipeline, add `SchemataAuthorizationFeature<...>`, and return a
-`SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken>` for chaining.
+`SchemataAuthorizationBuilder<TApp, TAuth, TScope>` for chaining.
 
 ## Resource management surface
 
-`SchemataAuthorizationBuilder<TApp,TAuth,TScope,TToken>` implements `IResourceBuilder`. Application, Scope, and Token management resources are exposed only after an explicit transport activation:
+`SchemataAuthorizationBuilder<TApp,TAuth,TScope>` implements `IResourceBuilder`. Application, Scope, and Token management resources are exposed only after an explicit transport activation:
 
 ```csharp
 schema.UseSecurity();
@@ -57,7 +57,7 @@ The shared Security extensions configure only this resource management surface. 
 
 ## What the core feature registers
 
-`SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken>` (`Priority = Orders.Extension +
+`SchemataAuthorizationFeature<TApp, TAuth, TScope>` (`Priority = Orders.Extension +
 60_000_000 = 460_000_000`) depends on `SchemataAuthenticationFeature`,
 `SchemataTransportHttpFeature`, and `SchemataWellKnownFeature`. `ConfigureServices`:
 
@@ -69,9 +69,9 @@ The shared Security extensions configure only this resource management surface. 
   the front of the MVC model-binder chain so OAuth form/query parameters bind to the OAuth model
   types instead of the default MVC binders.
 - Registers three scoped managers — `IApplicationManager<TApp>`, `IScopeManager<TScope>`, and
-  `IAuthorizationManager<TAuth>` — plus the unified token stores over `TToken`
-  (`AddTokenStores<TToken>()` registers the repository-backed `ITokenStore<TToken>` and the
-  `nonce`, `jti`, and `rate-slot` keyed slots served by the cache-backed store).
+  `IAuthorizationManager<TAuth>` — and consumes the unified token stores over the concrete
+  `SchemataToken` (`AddTokenStores()` registers the repository-backed `ITokenStore<SchemataToken>`
+  and the `nonce`, `jti`, and `rate-slot` keyed slots served by the cache-backed store).
 - Registers client authentication: `ClientSecretBasicAuthentication<TApp>`,
   `ClientSecretPostAuthentication<TApp>`, `ClientSecretJwtAuthentication<TApp>`, and
   `PrivateKeyJwtAuthentication<TApp>` as `IClientAuthentication<TApp>`, plus
@@ -80,10 +80,10 @@ The shared Security extensions configure only this resource management surface. 
   `IAuthorizationSignInService`, and `ISubjectIdentifierService`. The sign-in service issues either
   a transport-neutral `TokenResponse` or authorization callback parameters.
 - Adds two authentication schemes via `AddAuthentication()`: `BearerScheme`
-  (`SchemataAuthenticationHandler<TApp, TToken>`) and `CodeScheme`
-  (`SchemataAuthorizationCodeHandler<TApp, TToken>`). Connect endpoints render issued responses in
+  (`SchemataAuthenticationHandler<TApp>`) and `CodeScheme`
+  (`SchemataAuthorizationCodeHandler<TApp>`). Connect endpoints render issued responses in
   the controller; the schemes are thin compatibility adapters over the same issuer.
-- Registers `TokenCleanupJob<TToken>` and schedules it through the Scheduling job model — see
+- Registers `TokenCleanupJob` and schedules it through the Scheduling job model — see
   below.
 
 ## Endpoints
@@ -163,7 +163,7 @@ endpoints below are the ones the code implements:
 | `UseDeviceFlow()`            | `urn:ietf:params:oauth:grant-type:device_code`, `/Connect/Device` (RFC 8628 §§3.1, 3.4) | `DeviceFlowFeature` (+ `InteractionFeature`)                            |
 | `UseTokenExchange()`         | `urn:ietf:params:oauth:grant-type:token-exchange` (RFC 8693 §2.1)                       | `TokenExchangeFeature`                                                  |
 | `UseJwtBearerGrant()`        | `urn:ietf:params:oauth:grant-type:jwt-bearer` (RFC 7523 §3.1; needs a trusted issuer)   | `JwtBearerGrantFeature<TApp>`                                           |
-| `UseRichAuthorizationRequests()` | `authorization_details` at `/Connect/Authorize` (RFC 9396 §6; ignored when the feature is absent) | `RichAuthorizationFeature<TApp, TToken>`                              |
+| `UseRichAuthorizationRequests()` | `authorization_details` at `/Connect/Authorize` (RFC 9396 §6; ignored when the feature is absent) | `RichAuthorizationFeature<TApp>`                              |
 | `UseIntrospection()`         | `/Connect/Introspect` (RFC 7662 §§2.1–2.2)                                             | `IntrospectionFeature`                                                  |
 | `UseRevocation()`            | `/Connect/Revoke` (RFC 7009 §§2.1–2.2)                                                 | `RevocationFeature`                                                     |
 | `UseDynamicClientRegistration()` | `/Connect/Register` (OIDC DCR 1.0 §§3.1-3.3; registration gated by a host-supplied `IInitialAccessTokenValidator`; anonymous requests rejected with 401) | `DynamicRegistrationFeature`                                            |
@@ -198,7 +198,7 @@ ordered chains.
 | `IDestinationAdvisor`                                                                                                                                                            | —                  | Route each claim to access token, ID token, and/or UserInfo | `AdviceDestinationSubject`, `Advice{Profile,Email,Phone,Address,Role}ClaimDestination`                                                                                                                                                                                                                           |
 | `ITokenRequestAdvisor<TApp>`                                                                                                                                                     | `TApp`             | Validate the token request                                  | `AdviceRequestEndpointPermission`, `AdviceRequestGrantPermission`, `AdviceRequestScopeValidation`                                                                                                                                                                                                                |
 | `IAuthorizeAdvisor<TApp>`                                                                                                                                                        | `TApp`             | Validate the authorize request                              | `AdviceAuthorizeClientAndRedirect`, `AdviceAuthorizeEndpointPermission`, `AdviceAuthorizeGrantPermission`, `AdviceAuthorizeScopeValidation`, `AdviceAuthorizePkce`, `AdviceAuthorizeNonce`, `AdviceAuthorizePrompt`, `AdviceAuthorizeResponseMode`, `AdviceAuthorizeConsent`, `AdviceAuthorizeAutoApproveSignIn` |
-| `ICodeExchangeAdvisor` / `IRefreshTokenAdvisor` / `IIntrospectionAdvisor` / `IRevocationAdvisor` / `IUserInfoAdvisor` / `IDeviceAuthorizeAdvisor` / `IDeviceCodeExchangeAdvisor` | `TApp`(, `TToken`) | Validate each endpoint's request                            | `AdviceCodeExchange*`, `AdviceRefreshTokenValidation`, `AdviceIntrospection*`, `AdviceRevocation*`, `AdviceUserInfoOpenIdRequirement`, `AdviceDevice*`                                                                                                                                                           |
+| `ICodeExchangeAdvisor` / `IRefreshTokenAdvisor` / `IIntrospectionAdvisor` / `IRevocationAdvisor` / `IUserInfoAdvisor` / `IDeviceAuthorizeAdvisor` / `IDeviceCodeExchangeAdvisor` | `TApp` | Validate each endpoint's request                            | `AdviceCodeExchange*`, `AdviceRefreshTokenValidation`, `AdviceIntrospection*`, `AdviceRevocation*`, `AdviceUserInfoOpenIdRequirement`, `AdviceDevice*`                                                                                                                                                           |
 
 ## Permissions
 
@@ -242,7 +242,7 @@ method. Key lookups:
   `ValidatePostLogoutRedirectUriAsync`, `HasPermissionAsync`, and the `Set*` property helpers.
 - `IScopeManager<TScope>`: `FindByNameAsync`, `ListAsync`.
 - `IAuthorizationManager<TAuth>`: `CreateAsync` and lifecycle queries.
-- `ITokenStore<TToken>`: OAuth row queries and state (`FindByReferenceIdAsync`,
+- `ITokenStore<SchemataToken>`: OAuth row queries and state (`FindByReferenceIdAsync`,
   `FindByNameAsync`, `ListByParentAsync`, `ListBySessionAsync`, `CreateAsync`, `TryRedeemAsync`,
   `RevokeAsync`, `RevokeByAuthorizationAsync`, `RevokeBySessionAsync`, `PruneAsync(ct)`) plus
   key-value slot operations (`GetAsync`, `GetOrCreateAsync`, `SetAsync`, `RemoveAsync`). The
@@ -261,16 +261,16 @@ Rows persist verbatim, in plaintext at rest.
 ## Background jobs
 
 Token cleanup runs through the Scheduling job model. The core feature registers
-`TokenCleanupJob<TToken>` through `services.AddScheduledJob<TokenCleanupJob<TToken>>()` (transient
+`TokenCleanupJob` through `services.AddScheduledJob<TokenCleanupJob>()` (transient
 registration plus a known-only job entry) and adds a `JobRegistration` to
 `SchemataSchedulingOptions.Jobs` with a
 `CronSchedule("0 * * * *")` — hourly at minute 0. That extension is the registration helper for
 feature authors; application code registers jobs through `WithJob<T>()`. The job calls
-`ITokenStore<TToken>.PruneAsync`, and the store owns its clock. This needs `SchemataSchedulingFeature` and the `TToken`
+`ITokenStore<SchemataToken>.PruneAsync`, and the store owns its clock. This needs `SchemataSchedulingFeature` and a registered token
 repository registered.
 
 `UseBackChannelLogout()` registers `BackChannelLogoutFeature`, which wires
-`BackChannelLogoutService<TApp, TToken>` as the `ILogoutNotifier`, an `HttpClient`, and a transient
+`BackChannelLogoutService<TApp>` as the `ILogoutNotifier`, an `HttpClient`, and a transient
 `BackChannelLogoutJob`. The service builds the per-RP logout token, signs it, and triggers the job;
 there is no cron schedule on it.
 
@@ -378,7 +378,7 @@ mechanism; the host configures it).
 - The device flow requires `DeviceVerificationUri`.
 - Pairwise subjects require `UsePairwiseSubjects()` and a `SchemataSubjectMapping` repository so
   `PairwiseSubjectTranslator<TApp>` can retain its canonical-subject-to-pairwise-subject mappings.
-- Token cleanup needs `SchemataSchedulingFeature` and a registered `TToken` repository.
+- Token cleanup needs `SchemataSchedulingFeature` and a registered token repository.
 - DPoP proof replay markers and server-provided nonces live in `ICacheProvider`: proof markers
   under direct cache keys, server nonces through the cache-backed `nonce` token-store slot. A
   multi-instance deployment needs a distributed implementation (Redis, SQL) so the caches are

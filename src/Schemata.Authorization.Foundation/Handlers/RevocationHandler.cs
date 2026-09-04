@@ -7,8 +7,9 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
-using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
@@ -27,12 +28,11 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     </seealso>
 ///     .
 /// </summary>
-public sealed class RevocationHandler<TApp, TToken>(
+public sealed class RevocationHandler<TApp>(
     IClientAuthenticationService<TApp> client,
-    ITokenManager<TToken>              tokens
+    ITokenStore<SchemataToken>                tokens
 ) : RevocationEndpoint
     where TApp : SchemataApplication
-    where TToken : SchemataToken
 {
     public override async Task HandleAsync(
         RevokeRequest                      request,
@@ -72,7 +72,7 @@ public sealed class RevocationHandler<TApp, TToken>(
 
         var ctx = AdviceContext.Require();
 
-        switch (await Advisor.For<IRevocationAdvisor<TApp, TToken>>()
+        switch (await Advisor.For<IRevocationAdvisor<TApp>>()
                              .RunAsync(ctx, application, request, entity, ct)) {
             case AdviseResult.Continue:
                 break;

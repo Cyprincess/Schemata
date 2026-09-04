@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
 using static Schemata.Abstractions.SchemataConstants;
@@ -10,7 +11,7 @@ using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
-/// <summary>Order constants for <see cref="AdviceRevocationEndpointPermission{TApp, TToken}" />.</summary>
+/// <summary>Order constants for <see cref="AdviceRevocationEndpointPermission{TApp}" />.</summary>
 public static class AdviceRevocationEndpointPermission
 {
     /// <summary>The default advisor ordering value.</summary>
@@ -27,13 +28,10 @@ public static class AdviceRevocationEndpointPermission
 ///     .
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
-/// <typeparam name="TToken">The token entity type.</typeparam>
-/// <seealso cref="AdviceRevocationTokenValidation{TApp, TToken}" />
-public sealed class AdviceRevocationEndpointPermission<TApp, TToken>(IApplicationManager<TApp> manager) : IRevocationAdvisor<TApp, TToken>
+public sealed class AdviceRevocationEndpointPermission<TApp>(IApplicationManager<TApp> manager) : IRevocationAdvisor<TApp>
     where TApp : SchemataApplication
-    where TToken : SchemataToken
 {
-    #region IRevocationAdvisor<TApp,TToken> Members
+    #region IRevocationAdvisor<TApp> Members
 
     public int Order => AdviceRevocationEndpointPermission.DefaultOrder;
 
@@ -41,7 +39,7 @@ public sealed class AdviceRevocationEndpointPermission<TApp, TToken>(IApplicatio
         AdviceContext     ctx,
         TApp              application,
         RevokeRequest     request,
-        TToken            token,
+        SchemataToken            token,
         CancellationToken ct = default
     ) {
         await PermissionAdvice.RequireAsync(manager, application, PermissionPrefixes.Endpoint + Endpoints.Revoke, ct, code: 403);

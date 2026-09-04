@@ -1,5 +1,5 @@
 using Schemata.Authorization.Foundation.Services;
-using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Scheduling.Foundation.Runtime;
 using Xunit;
 
@@ -12,9 +12,9 @@ public class ScheduledJobKeyShould
     [Fact]
     public void KeepTheTokenCleanupKeyWithinThePersistedColumn() {
         var registry = new DefaultScheduledJobRegistry();
-        registry.RegisterAll([typeof(TokenCleanupJob<SchemataToken>)]);
+        registry.RegisterAll([typeof(TokenCleanupJob)]);
 
-        var key = registry.ResolveKey(typeof(TokenCleanupJob<SchemataToken>))!;
+        var key = registry.ResolveKey(typeof(TokenCleanupJob))!;
 
         Assert.Equal("schemata.authorization.token.cleanup", key);
         Assert.True(key.Length <= 128, $"Key is {key.Length} characters: {key}");
@@ -24,9 +24,9 @@ public class ScheduledJobKeyShould
     [Fact]
     public void ResolveTheTokenCleanupJobBackFromItsPersistedKey() {
         var registry = new DefaultScheduledJobRegistry();
-        registry.RegisterAll([typeof(TokenCleanupJob<SchemataToken>)]);
+        registry.RegisterAll([typeof(TokenCleanupJob)]);
 
-        Assert.Equal(typeof(TokenCleanupJob<SchemataToken>),
+        Assert.Equal(typeof(TokenCleanupJob),
                      registry.Resolve("schemata.authorization.token.cleanup"));
     }
 

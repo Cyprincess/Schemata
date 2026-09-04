@@ -6,13 +6,14 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
-/// <summary>Order constants for <see cref="AdviceIntrospectionProtectedResource{TApp, TToken}" />.</summary>
+/// <summary>Order constants for <see cref="AdviceIntrospectionProtectedResource{TApp}" />.</summary>
 public static class AdviceIntrospectionProtectedResource
 {
     /// <summary>The default advisor ordering value.</summary>
@@ -29,22 +30,20 @@ public static class AdviceIntrospectionProtectedResource
 ///     .
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
-/// <typeparam name="TToken">The token entity type.</typeparam>
 /// <remarks>
 ///     Public clients are rejected because they cannot be trusted to inspect tokens (RFC 6749: The OAuth 2.0
 ///     Authorization Framework §2.1).
 /// </remarks>
-public sealed class AdviceIntrospectionProtectedResource<TApp, TToken>(IApplicationManager<TApp> manager) : IIntrospectionAdvisor<TApp, TToken>
+public sealed class AdviceIntrospectionProtectedResource<TApp>(IApplicationManager<TApp> manager) : IIntrospectionAdvisor<TApp>
     where TApp : SchemataApplication
-    where TToken : SchemataToken
 {
-    #region IIntrospectionAdvisor<TApp,TToken> Members
+    #region IIntrospectionAdvisor<TApp> Members
 
     public int Order => AdviceIntrospectionProtectedResource.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext                      ctx,
-        IntrospectionContext<TApp, TToken> introspection,
+        IntrospectionContext<TApp> introspection,
         CancellationToken                  ct = default
     ) {
         if (introspection.Application?.ClientType == ClientTypes.Public) {

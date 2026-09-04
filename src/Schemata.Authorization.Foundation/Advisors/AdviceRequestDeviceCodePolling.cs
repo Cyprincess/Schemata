@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
@@ -9,8 +10,9 @@ using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Models;
-using Schemata.Caching.Skeleton;
-using static Schemata.Abstractions.SchemataConstants;
+using Schemata.Security.Skeleton;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
@@ -37,7 +39,10 @@ public static class AdviceRequestDeviceCodePolling
 ///     .
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
-public sealed class AdviceRequestDeviceCodePolling<TApp>(ICacheProvider cache, IOptions<SchemataAuthorizationOptions> options) : ITokenRequestAdvisor<TApp>
+public sealed class AdviceRequestDeviceCodePolling<TApp>(
+    [FromKeyedServices(SecurityConstants.TokenTypes.RateSlot)] ITokenStore<SchemataToken> slots,
+    IOptions<SchemataAuthorizationOptions>                                     options
+) : ITokenRequestAdvisor<TApp>
     where TApp : SchemataApplication
 {
     #region ITokenRequestAdvisor<TApp> Members
@@ -59,17 +64,14 @@ public sealed class AdviceRequestDeviceCodePolling<TApp>(ICacheProvider cache, I
             return AdviseResult.Continue;
         }
 
-        var key      = $"polling\x1e{device}".ToCacheKey(Keys.Authorization);
-        var existing = await cache.GetAsync(key, ct);
+        var existing = await slots.GetAsync(null, "device", $"rate:{device}", ct);
         if (existing is not null) {
             // RFC 8628 §3.5: the client MUST raise its polling interval by 5 seconds on every
             // slow_down. The grown interval is persisted so repeated too-fast polls widen the
             // enforced window for this device code.
-            var current = existing.Length >= sizeof(int) ? BitConverter.ToInt32(existing, 0) : options.Value.DeviceCodeInterval;
+            var current = int.TryParse(existing.Value, out var parsed) ? parsed : options.Value.DeviceCodeInterval;
             var next    = current + 5;
-            await cache.SetAsync(key, BitConverter.GetBytes(next), new() {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(next),
-            }, ct);
+            await slots.SetAsync(null, "device", $"rate:{device}", next.ToString(), TimeSpan.FromSeconds(next), ct);
 
             throw new OAuthException(
                 OAuthErrors.SlowDown,
@@ -77,9 +79,13 @@ public sealed class AdviceRequestDeviceCodePolling<TApp>(ICacheProvider cache, I
             );
         }
 
-        await cache.SetAsync(key, BitConverter.GetBytes(options.Value.DeviceCodeInterval), new() {
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(options.Value.DeviceCodeInterval),
-        }, ct);
+        await slots.GetOrCreateAsync(
+            null,
+            "device",
+            $"rate:{device}",
+            options.Value.DeviceCodeInterval.ToString(),
+            TimeSpan.FromSeconds(options.Value.DeviceCodeInterval),
+            ct);
 
         return AdviseResult.Continue;
     }

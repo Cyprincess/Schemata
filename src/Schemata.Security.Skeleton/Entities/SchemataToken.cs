@@ -4,27 +4,35 @@ using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 
-namespace Schemata.Authorization.Skeleton.Entities;
+namespace Schemata.Security.Skeleton.Entities;
 
 /// <summary>
-///     Represents an OAuth 2.0 token (authorization code, access token, refresh token, or device code).
+///     A unified token row: OAuth 2.0 tokens (authorization code, access token, refresh token, or device
+///     code) and key-value slots (nonce, jti replay marker, rate-limit window), per the ASP.NET Core
+///     Identity <c>AspNetUserTokens</c> analogy.
 /// </summary>
 [Table("SchemataTokens")]
 [CanonicalName("tokens/{token}")]
 [PrimaryKey(nameof(Uid))]
+[Index(nameof(Parent), nameof(Provider), nameof(Name), IsUnique = true)]
+[Index(nameof(Type), nameof(Status))]
+[Index(nameof(ReferenceId), IsUnique = true)]
 public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimestamp, IExpiration
 {
+    /// <summary>Polymorphic owner reference: canonical name of any host resource (users/{x}, applications/{y}, issuer URI).</summary>
+    [ResourceReference]
+    public virtual string? Parent { get; set; }
+
     /// <summary>Canonical name of the application that receives this token.</summary>
-    [ResourceReference(typeof(SchemataApplication))]
+    [ResourceReference]
     public virtual string? Application { get; set; }
 
     /// <summary>Canonical name of the authorization record that grants this token.</summary>
-    [ResourceReference(typeof(SchemataAuthorization))]
+    [ResourceReference]
     public virtual string? Authorization { get; set; }
 
-    /// <summary>Canonical name of the resource owner this token represents.</summary>
-    [ResourceReference]
-    public virtual string? Subject { get; set; }
+    /// <summary>Issuing or managing subsystem (authorization, dpop, device, assertion…); the AspNet <c>LoginProvider</c> analogue.</summary>
+    public virtual string? Provider { get; set; }
 
     /// <summary>
     ///     OP session identifier (<c>sid</c>) linking this token to a login session.
@@ -33,12 +41,12 @@ public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimesta
     public virtual string? SessionId { get; set; }
 
     /// <summary>
-    ///     Token type: <c>"access_token"</c>, <c>"refresh_token"</c>, <c>"authorization_code"</c>, or
-    ///     <c>"device_code"</c>.
+    ///     Token type: <c>"access_token"</c>, <c>"refresh_token"</c>, <c>"authorization_code"</c>,
+    ///     <c>"device_code"</c>, or a slot type (<c>"nonce"</c>, <c>"jti"</c>, <c>"rate-slot"</c>).
     /// </summary>
     public virtual string? Type { get; set; }
 
-    /// <summary>Lifecycle status: <c>"valid"</c>, <c>"redeemed"</c>, or <c>"revoked"</c>.</summary>
+    /// <summary>Lifecycle status: <c>"valid"</c>, <c>"redeemed"</c>, or <c>"revoked"</c>; slot rows carry no status.</summary>
     public virtual string? Status { get; set; }
 
     /// <summary>
@@ -52,12 +60,17 @@ public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimesta
     /// </summary>
     public virtual string? ReferenceId { get; set; }
 
-    /// <summary>Serialized token content (JWT, JSON claims, or encrypted blob depending on <see cref="Format" />).</summary>
+    /// <summary>Serialized token content (JWT or JSON claims depending on <see cref="Format" />).</summary>
     public virtual string? Payload { get; set; }
+
+    /// <summary>Slot payload (nonce value, jti marker, rate-limit count); <see cref="Payload" /> holds OAuth private data.</summary>
+    public virtual string? Value { get; set; }
 
     #region ICanonicalName Members
 
-    public string? Name          { get; set; }
+    /// <summary>Slot name or type refinement (<c>nonce</c>, <c>jti:{id}</c>, <c>rate:{key}</c>); the AspNet <c>Name</c> analogue.</summary>
+    public string? Name { get; set; }
+
     public string? CanonicalName { get; set; }
 
     #endregion
@@ -76,6 +89,7 @@ public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimesta
     #endregion
 
     #region IIdentifier Members
+
     public virtual Guid Uid { get; set; }
 
     #endregion

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Entity.Repository;
+using Schemata.Security.Skeleton.Services;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Managers;
@@ -20,7 +21,6 @@ namespace Schemata.Authorization.Foundation.Managers;
 ///     keyed by canonical subject + canonical application name. Revocation sets the status to
 ///     <see cref="TokenStatuses.Revoked" /> without physically deleting the record.
 /// </remarks>
-/// <seealso cref="SchemataTokenManager{TToken}" />
 public class SchemataAuthorizationManager<TAuthorization> : IAuthorizationManager<TAuthorization>
     where TAuthorization : SchemataAuthorization
 {

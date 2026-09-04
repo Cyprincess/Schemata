@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Authorization.Skeleton.Entities;
-using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 
 namespace Schemata.Authorization.Foundation.Services;
 
@@ -19,13 +19,12 @@ internal static class LogoutSessionHelper
     ///     preferred when available (more targeted); falls back to subject
     ///     lookup when no session tokens are found.
     /// </summary>
-    public static async Task<HashSet<string>> GetSessionClientsAsync<TToken>(
-        ITokenManager<TToken> tokens,
+    public static async Task<HashSet<string>> GetSessionClientsAsync(
+        ITokenStore<SchemataToken>   tokens,
         string?               subject,
         string?               session,
         CancellationToken     ct
-    )
-        where TToken : SchemataToken {
+    ) {
         var clients = new HashSet<string>();
 
         if (!string.IsNullOrWhiteSpace(session)) {
@@ -43,7 +42,7 @@ internal static class LogoutSessionHelper
             return clients;
         }
 
-        await foreach (var token in tokens.ListBySubjectAsync(subject, ct)) {
+        await foreach (var token in tokens.ListByParentAsync(subject, ct: ct)) {
             if (!string.IsNullOrWhiteSpace(token.Application)) {
                 clients.Add(token.Application);
             }

@@ -7,6 +7,7 @@ using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Models;
 using Xunit;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
@@ -19,7 +20,7 @@ public class AdviceCodeExchangePkceShould
     private const string Verifier      = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
     private const string ChallengeS256 = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
 
-    private static AdviceCodeExchangePkce<SchemataApplication, SchemataToken> CreateAdvisor(
+    private static AdviceCodeExchangePkce<SchemataApplication> CreateAdvisor(
         bool requireS256         = true,
         bool downgradeProtection = true
     ) {
@@ -31,7 +32,7 @@ public class AdviceCodeExchangePkceShould
 
     private static AdviceContext CreateContext() { return new(new ServiceCollection().BuildServiceProvider()); }
 
-    private static CodeExchangeContext<SchemataApplication, SchemataToken> Exchange(
+    private static CodeExchangeContext<SchemataApplication> Exchange(
         TokenRequest     request,
         AuthorizeRequest payload
     ) {
