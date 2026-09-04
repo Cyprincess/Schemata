@@ -82,6 +82,7 @@ public sealed class ClientCredentialsHandler<TApp>(IClientAuthenticationService<
         return AuthorizationResult.SignIn(identity, new() {
             [Properties.GrantType] = GrantTypes.ClientCredentials,
             [Properties.Scope]     = request.Scope,
+            [Properties.Resources] = request.Resource is { Count: > 0 } ? string.Join(" ", request.Resource) : null,
         });
     }
 

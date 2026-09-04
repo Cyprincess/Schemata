@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Schemata.Authorization.Skeleton.Models;
 
 /// <summary>
@@ -93,6 +95,16 @@ public class TokenRequest
     public string? DeviceCode { get; set; }
 
     /// <summary>
+    ///     Assertion presented as an authorization grant, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7521.html#section-4.1">
+    ///         RFC 7521: Assertion Framework for OAuth 2.0 Client Authentication
+    ///         and Authorization Grants §4.1: Using Assertions as Authorization Grants
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? Assertion { get; set; }
+
+    /// <summary>
     ///     Security token representing the subject of the exchange.
     ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-2.1">
     ///         RFC 8693: OAuth 2.0 Token Exchange §2.1:
@@ -138,13 +150,19 @@ public class TokenRequest
     public string? RequestedTokenType { get; set; }
 
     /// <summary>
-    ///     Target service or resource where the issued token will be used.
+    ///     Target services or resources where the issued token will be used; the parameter may be repeated,
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8707.html#section-2.2">
+    ///         RFC 8707: Resource Indicators for OAuth 2.0 §2.2: Access Token Request
+    ///     </seealso>
+    ///     and
     ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-2.1">
     ///         RFC 8693: OAuth 2.0 Token Exchange §2.1:
     ///         Request
     ///     </seealso>
+    ///     .
     /// </summary>
-    public string? Resource { get; set; }
+    public ICollection<string>? Resource { get; set; }
 
     /// <summary>
     ///     Logical name of the target service where the issued token will be used.
