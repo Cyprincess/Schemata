@@ -15,8 +15,9 @@ using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
-using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
 using static Schemata.Abstractions.SchemataConstants;
@@ -28,9 +29,9 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     Handles the <c>refresh_token</c> grant type.
 ///     Validates the refresh token via JWT signature verification (skipping
 ///     lifetime checks), runs the <see cref="ITokenRequestAdvisor{TApp}" />
-///     and <see cref="IRefreshTokenAdvisor{TApp, TToken}" /> pipelines,
+///     and <see cref="IRefreshTokenAdvisor{TApp}" /> pipelines,
 ///     validates subject existence, enforces optional refresh token rotation,
-///     and re-issues tokens with the stored scope,
+///     and re-issues tokens with the stored scope, enforcing RFC 8707 §2.2 resource subsetting,
 ///     per
 ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9700.html#section-2.1.3">
 ///         RFC 9700: The OAuth 2.0 Authorization
@@ -38,15 +39,14 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     </seealso>
 ///     .
 /// </summary>
-public sealed class RefreshTokenHandler<TApp, TToken>(
+public sealed class RefreshTokenHandler<TApp>(
     IClientAuthenticationService<TApp> client,
-    ITokenManager<TToken>              tokens,
+    ITokenStore<SchemataToken>                tokens,
     TokenService                       issuer,
     IOptions<RefreshTokenFlowOptions>  options,
     IServiceProvider                   sp
 ) : IGrantHandler
     where TApp : SchemataApplication
-    where TToken : SchemataToken
 {
     #region IGrantHandler Members
 
@@ -124,14 +124,14 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
             );
         }
 
-        var exchange = new RefreshTokenContext<TApp, TToken> {
+        var exchange = new RefreshTokenContext<TApp> {
             Request     = request,
             Application = application,
             Token       = token,
             Principal   = principal,
         };
 
-        switch (await Advisor.For<IRefreshTokenAdvisor<TApp, TToken>>()
+        switch (await Advisor.For<IRefreshTokenAdvisor<TApp>>()
                              .RunAsync(ctx, exchange, ct)) {
             case AdviseResult.Continue:
                 break;
@@ -156,9 +156,30 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(token.Subject)) {
+        // RFC 8707 §2.2: a refresh request may narrow the token to any subset of the resources of
+        // the original grant ("...or a subset thereof"); values outside the original set are
+        // invalid_target, and an omitted parameter adopts the original set. The original set rides
+        // the refresh token's space-joined `resources` claim.
+        var grantedResources = principal.FindFirstValue(Claims.Resources)?
+                                        .Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [];
+        if (request.Resource is { Count: > 0 }) {
+            var requested = new HashSet<string>(request.Resource, StringComparer.Ordinal);
+            if (!requested.IsSubsetOf(grantedResources)) {
+                throw new OAuthException(
+                    OAuthErrors.InvalidTarget,
+                    SchemataResources.GetResourceString(SchemataResources.INVALID_TARGET)
+                );
+            }
+        }
+
+        var resources = request.Resource is { Count: > 0 } ? request.Resource : grantedResources;
+        if (resources.Count > 0) {
+            ctx.Set(new ResourceIndicators([.. resources]));
+        }
+
+        if (!string.IsNullOrWhiteSpace(token.Parent)) {
             var provider = sp.GetService<ISubjectProvider>();
-            if (provider is not null && !await provider.ValidateAsync(token.Subject, ct)) {
+            if (provider is not null && !await provider.ValidateAsync(token.Parent, ct)) {
                 throw new OAuthException(
                     OAuthErrors.InvalidGrant,
                     SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
@@ -174,8 +195,8 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
             new(Claims.ClientId, application.ClientId),
         };
 
-        if (!string.IsNullOrWhiteSpace(token.Subject)) {
-            claims.Add(new(IdentityClaims.Subject, token.Subject));
+        if (!string.IsNullOrWhiteSpace(token.Parent)) {
+            claims.Add(new(IdentityClaims.Subject, token.Parent));
         }
 
         var issuedScope = string.IsNullOrWhiteSpace(request.Scope) ? scope : request.Scope;
@@ -184,6 +205,7 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
         return AuthorizationResult.SignIn(identity, new() {
             [Properties.GrantType]         = GrantTypes.RefreshToken,
             [Properties.Scope]             = issuedScope,
+            [Properties.Resources]         = grantedResources.Length > 0 ? string.Join(" ", grantedResources) : null,
             [Properties.AuthorizationName] = token.Authorization,
             [Properties.SessionId]         = token.SessionId,
         });

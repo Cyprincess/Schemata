@@ -69,6 +69,17 @@ public class OAuthException : SchemataException
     /// </summary>
     public string? ErrorUri { get; set; }
 
+    /// <summary>
+    ///     Additional HTTP response headers rendered with the error response (e.g.
+    ///     <c>DPoP-Nonce</c> alongside a <c>use_dpop_nonce</c> challenge), per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9449.html#section-8">
+    ///         RFC 9449: OAuth 2.0 Demonstrating Proof-of-Possession at the Application Layer
+    ///         (DPoP) §8: Authorization Server-Provided Nonce
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public IDictionary<string, string>? Headers { get; set; }
+
     public override object? CreateErrorResponse(string? requestId = null, string? domain = null, string? locale = null) {
         var status  = Status ?? ErrorCodes.Internal;
         var details = new List<IErrorDetail>();

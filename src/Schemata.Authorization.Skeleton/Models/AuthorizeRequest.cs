@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Schemata.Authorization.Skeleton.Models;
 
 /// <summary>
@@ -52,6 +54,26 @@ public class AuthorizeRequest
     public string? Scope { get; set; }
 
     /// <summary>
+    ///     Target services or resources to which access is requested; the parameter may be repeated,
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8707.html#section-2.1">
+    ///         RFC 8707: Resource Indicators for OAuth 2.0 §2.1: Authorization Request
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public ICollection<string>? Resource { get; set; }
+
+    /// <summary>
+    ///     Raw <c>authorization_details</c> JSON array requesting fine-grained authorization, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9396.html#section-2">
+    ///         RFC 9396: OAuth 2.0 Rich Authorization
+    ///         Requests §2: Request Parameter "authorization_details"
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? AuthorizationDetails { get; set; }
+
+    /// <summary>
     ///     Opaque value for CSRF protection, returned unchanged in the redirect.
     ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.1">
     ///         RFC 6749: The OAuth 2.0 Authorization
@@ -87,6 +109,16 @@ public class AuthorizeRequest
     /// </summary>
     public string? CodeChallengeMethod { get; set; }
 
+    /// <summary>
+    ///     JWK thumbprint committing the authorization code to a DPoP key, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9449.html#section-10">
+    ///         RFC 9449: OAuth 2.0 Demonstrating Proof-of-Possession at the Application Layer
+    ///         (DPoP) §10: Authorization Code Binding to a DPoP Key
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? DpopJkt { get; set; }
+
     /// <summary>Mechanism for returning parameters, e.g. <c>"query"</c>, <c>"fragment"</c>, <c>"form_post"</c>.</summary>
     public string? ResponseMode { get; set; }
 
@@ -107,9 +139,6 @@ public class AuthorizeRequest
 
     /// <summary>Maximum authentication age in seconds; forces re-authentication if exceeded.</summary>
     public string? MaxAge { get; set; }
-
-    /// <summary>Authentication time in epoch seconds recorded for the authorization code.</summary>
-    public string? AuthTime { get; set; }
 
     /// <summary><c>id_token</c> hint for session validation.</summary>
     public string? IdTokenHint { get; set; }

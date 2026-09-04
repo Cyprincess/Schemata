@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,8 +11,9 @@ using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
-using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
 using static Schemata.Abstractions.SchemataConstants;
@@ -31,13 +33,12 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     </seealso>
 ///     .
 /// </summary>
-public sealed class IntrospectionHandler<TApp, TToken>(
+public sealed class IntrospectionHandler<TApp>(
     IClientAuthenticationService<TApp> client,
     TokenService                       issuer,
-    ITokenManager<TToken>              tokens
+    ITokenStore<SchemataToken>                tokens
 ) : IntrospectionEndpoint
     where TApp : SchemataApplication
-    where TToken : SchemataToken
 {
     public override async Task<IntrospectionResponse> HandleAsync(
         IntrospectRequest                  request,
@@ -74,7 +75,11 @@ public sealed class IntrospectionHandler<TApp, TToken>(
 
         var ctx = AdviceContext.Require();
 
-        var introspection = new IntrospectionContext<TApp, TToken> {
+        // RFC 9068 §3: a token minted for several resource indicators carries one aud claim per
+        // value, so introspection echoes all of them.
+        var audiences = principal.FindAll(Claims.Audience).Select(c => c.Value).ToList();
+
+        var introspection = new IntrospectionContext<TApp> {
             Application = application,
             Request     = request,
             Token       = entity,
@@ -84,18 +89,23 @@ public sealed class IntrospectionHandler<TApp, TToken>(
                 Scope     = principal.FindFirstValue(Claims.Scope),
                 ClientId  = principal.FindFirstValue(Claims.ClientId),
                 Username  = principal.FindFirstValue(Claims.Name),
+                // RFC 7662 §2.2 requires token_type; the DPoP flow feature's advisor refines bound tokens.
                 TokenType = Schemes.Bearer,
                 Exp       = GetUnixTimestamp(principal, Claims.Expiration),
                 Iat       = GetUnixTimestamp(principal, Claims.IssuedAt),
                 Nbf       = GetUnixTimestamp(principal, Claims.NotBefore),
                 Sub       = principal.FindFirstValue(IdentityClaims.Subject),
-                Aud       = principal.FindFirstValue(Claims.Audience),
+                Aud       = audiences.Count > 0 ? audiences : null,
                 Iss       = principal.FindFirstValue(Claims.Issuer),
                 Jti       = principal.FindFirstValue(Claims.JwtId),
+
+                // RFC 9470 §6.2: acr and auth_time echo top-level; §6 defines no amr member.
+                Acr      = principal.FindFirstValue(Claims.Acr),
+                AuthTime = GetUnixTimestamp(principal, Claims.AuthTime),
             },
         };
 
-        switch (await Advisor.For<IIntrospectionAdvisor<TApp, TToken>>()
+        switch (await Advisor.For<IIntrospectionAdvisor<TApp>>()
                              .RunAsync(ctx, introspection, ct)) {
             case AdviseResult.Continue:
                 break;
@@ -113,4 +123,5 @@ public sealed class IntrospectionHandler<TApp, TToken>(
         var value = principal.FindFirstValue(type);
         return !string.IsNullOrWhiteSpace(value) && long.TryParse(value, out var result) ? result : null;
     }
+
 }

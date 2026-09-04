@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Text.Json;
@@ -9,12 +10,14 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
-using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
 using static Schemata.Abstractions.SchemataConstants;
@@ -25,8 +28,9 @@ namespace Schemata.Authorization.Foundation.Handlers;
 /// <summary>
 ///     Handles the <c>authorization_code</c> grant type.
 ///     Validates the authorization code token, runs the
-///     <see cref="ITokenRequestAdvisor{TApp}" /> and <see cref="ICodeExchangeAdvisor{TApp, TToken}" />
-///     pipelines, enforces PKCE, enforces scope down-scoping, and marks the code
+///     <see cref="ITokenRequestAdvisor{TApp}" /> and <see cref="ICodeExchangeAdvisor{TApp}" />
+///     pipelines, enforces PKCE, enforces scope down-scoping, enforces RFC 8707 §2.2 resource
+///     consistency, and marks the code
 ///     as single-use when <see cref="CodeFlowOptions.RequireCodeSingleUse" /> is <c>true</c>,
 ///     per
 ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9700.html#section-2.1.2">
@@ -35,14 +39,13 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     </seealso>
 ///     .
 /// </summary>
-public sealed class AuthorizationCodeHandler<TApp, TToken>(
+public sealed class AuthorizationCodeHandler<TApp>(
     IClientAuthenticationService<TApp> client,
-    ITokenManager<TToken>              tokens,
+    ITokenStore<SchemataToken>                tokens,
     IOptions<JsonSerializerOptions>    json,
     IOptions<CodeFlowOptions>          options
 ) : IGrantHandler
     where TApp : SchemataApplication
-    where TToken : SchemataToken
 {
     #region IGrantHandler Members
 
@@ -52,7 +55,7 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
     ///     Exchanges an authorization code for tokens.
     ///     Authenticates the client, validates the stored code token and its payload,
     ///     enforces PKCE and scope constraints, then emits a <see cref="AuthorizationResult.SignIn" />
-    ///     with claims that flow into <see cref="SchemataAuthenticationHandler{TApp, TToken}" />.
+    ///     with claims that flow into <see cref="SchemataAuthenticationHandler{TApp}" />.
     /// </summary>
     /// <param name="request">Token request containing the authorization code.</param>
     /// <param name="headers">HTTP request headers for client authentication.</param>
@@ -97,14 +100,17 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
         }
 
         var token = await tokens.FindByReferenceIdAsync(request.Code, ct);
-        if (string.IsNullOrWhiteSpace(token?.Payload) || string.IsNullOrWhiteSpace(token.Subject)) {
+        if (string.IsNullOrWhiteSpace(token?.Payload) || string.IsNullOrWhiteSpace(token.Parent)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
                 SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
             );
         }
 
-        var payload = JsonSerializer.Deserialize<AuthorizeRequest>(token.Payload, json.Value);
+        var clear = token.Payload;
+
+        var wrapper = JsonSerializer.Deserialize<AuthorizationCodePayload>(clear, json.Value);
+        var payload = wrapper?.Request;
         if (payload is null) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
@@ -112,7 +118,25 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
             );
         }
 
-        var exchange = new CodeExchangeContext<TApp, TToken> {
+        // RFC 8707 §2.2: the resources requested on the code exchange must equal the set granted
+        // at the authorization endpoint (set semantics, order-insensitive); this server applies
+        // the strictest discretionary reading and requires full equality, while an omitted
+        // parameter adopts the granted set. Anything else is invalid_target.
+        var grantedResources   = payload.Resource ?? [];
+        var requestedResources = request.Resource;
+        if (requestedResources is { Count: > 0 } && !ResourcesEqual(requestedResources, grantedResources)) {
+            throw new OAuthException(
+                OAuthErrors.InvalidTarget,
+                SchemataResources.GetResourceString(SchemataResources.INVALID_TARGET)
+            );
+        }
+
+        var resources = requestedResources is { Count: > 0 } ? requestedResources : grantedResources;
+        if (resources.Count > 0) {
+            ctx.Set(new ResourceIndicators([.. resources]));
+        }
+
+        var exchange = new CodeExchangeContext<TApp> {
             Request          = request,
             Application      = application,
             CodeToken        = token,
@@ -120,7 +144,7 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
             RequireSingleUse = options.Value.RequireCodeSingleUse,
         };
 
-        switch (await Advisor.For<ICodeExchangeAdvisor<TApp, TToken>>()
+        switch (await Advisor.For<ICodeExchangeAdvisor<TApp>>()
                              .RunAsync(ctx, exchange, ct)) {
             case AdviseResult.Continue:
                 break;
@@ -147,27 +171,49 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
         }
 
         // Read from the exchange so ICodeExchangeAdvisor can toggle the policy per request.
-        if (exchange.RequireSingleUse) {
-            token.Status = TokenStatuses.Redeemed;
-            await tokens.UpdateAsync(token, ct);
+        if (exchange.RequireSingleUse && !await tokens.TryRedeemAsync(token, ct)) {
+            // A lost redemption means the code was already consumed — a replay: revoke
+            // every token derived from the same authorization grant before rejecting,
+            // per RFC 6749 §4.1.2.
+            if (!string.IsNullOrWhiteSpace(token.Authorization)) {
+                await tokens.RevokeByAuthorizationAsync(token.Authorization, ct);
+            }
+
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
+            );
         }
 
         var claims = new List<Claim> {
-            new(IdentityClaims.Subject, token.Subject),
+            new(IdentityClaims.Subject, token.Parent),
             new(Claims.ClientId, application.ClientId),
         };
+
+        // The context approved with the code rides again: stamped here, the claims advisor
+        // re-tags it for both token destinations at claim assembly.
+        if (wrapper?.Context is { } approved) {
+            claims.Stamp(approved);
+        }
 
         var identity = new ClaimsPrincipal(new ClaimsIdentity(claims, SchemataAuthorizationSchemes.Bearer));
         var props = new Dictionary<string, string?> {
             [Properties.GrantType]         = GrantTypes.AuthorizationCode,
+            [Properties.Resources]         = resources.Count > 0 ? string.Join(" ", resources) : null,
             [Properties.Scope]             = granted,
             [Properties.Nonce]             = payload.Nonce,
             [Properties.SessionId]         = token.SessionId,
             [Properties.AuthorizationName] = token.Authorization,
             [Properties.MaxAge]            = payload.MaxAge,
-            [Properties.AuthTime]          = payload.AuthTime,
         };
+
+        props[Properties.AuthorizationDetails] = payload.AuthorizationDetails;
         return AuthorizationResult.SignIn(identity, props);
+    }
+
+    /// <summary>Set-semantics comparison: same elements, any order.</summary>
+    private static bool ResourcesEqual(ICollection<string> requested, ICollection<string> granted) {
+        return new HashSet<string>(requested, StringComparer.Ordinal).SetEquals(granted);
     }
 
     #endregion

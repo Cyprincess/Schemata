@@ -12,10 +12,13 @@ using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Extensions;
 using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
+using Schemata.Authorization.Skeleton.Services;
 using Schemata.Common;
 using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
@@ -27,25 +30,26 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     An SPA calls GET to render the consent screen and POST to approve or deny.
 ///     Implements <see cref="IInteractionHandler" /> for <see cref="TokenTypeUris.Interaction" />.
 /// </summary>
-public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : IInteractionHandler
+public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope> : IInteractionHandler
     where TApp : SchemataApplication
     where TAuth : SchemataAuthorization, new()
     where TScope : SchemataScope
-    where TToken : SchemataToken
 {
     private readonly IApplicationManager<TApp>              _apps;
     private readonly IAuthorizationManager<TAuth>           _auths;
+    private readonly IAuthenticationContextProvider?        _contexts;
     private readonly IOptions<JsonSerializerOptions>        _json;
     private readonly IOptions<SchemataAuthorizationOptions> _options;
     private readonly IScopeManager<TScope>                  _scopes;
     private readonly TimeProvider                           _time;
-    private readonly ITokenManager<TToken>                  _tokens;
+    private readonly ITokenStore<SchemataToken>                    _tokens;
 
     /// <summary>
     ///     Initializes the handler with the required managers and configuration.
     /// </summary>
     /// <param name="apps">Application registry.</param>
     /// <param name="auths">Authorization storage for consent records.</param>
+    /// <param name="contexts">Authentication context supplier; acr/amr/auth_time stamping is skipped when absent.</param>
     /// <param name="scopes">Scope resolver.</param>
     /// <param name="tokens">Token storage.</param>
     /// <param name="json">JSON serialization options.</param>
@@ -55,18 +59,20 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
         IApplicationManager<TApp>              apps,
         IAuthorizationManager<TAuth>           auths,
         IScopeManager<TScope>                  scopes,
-        ITokenManager<TToken>                  tokens,
+        ITokenStore<SchemataToken>                    tokens,
         IOptions<JsonSerializerOptions>        json,
         IOptions<SchemataAuthorizationOptions> options,
-        TimeProvider?                          time = null
+        IAuthenticationContextProvider?        contexts = null,
+        TimeProvider?                          time     = null
     ) {
-        _apps    = apps;
-        _auths   = auths;
-        _scopes  = scopes;
-        _tokens  = tokens;
-        _json    = json;
-        _options = options;
-        _time    = time ?? TimeProvider.System;
+        _apps     = apps;
+        _auths    = auths;
+        _contexts = contexts;
+        _scopes   = scopes;
+        _tokens   = tokens;
+        _json     = json;
+        _options  = options;
+        _time     = time ?? TimeProvider.System;
     }
 
     #region IInteractionHandler Members
@@ -99,7 +105,9 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
             );
         }
 
-        var authorize = JsonSerializer.Deserialize<AuthorizeRequest>(interaction.Payload, _json.Value);
+        var clear = interaction.Payload;
+
+        var authorize = JsonSerializer.Deserialize<AuthorizeRequest>(clear, _json.Value);
         if (string.IsNullOrWhiteSpace(authorize?.ClientId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
@@ -145,7 +153,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
     ///     Approves the authorization request: revokes the interaction token,
     ///     creates a consent record (<typeparamref name="TAuth" />), and returns
     ///     a <see cref="AuthorizationResult.SignIn" /> carrying all auth properties
-    ///     needed by <see cref="SchemataAuthorizationCodeHandler{TApp, TToken}" />.
+    ///     needed by <see cref="SchemataAuthorizationCodeHandler{TApp}" />.
     /// </summary>
     /// <param name="request">Interaction request containing the reference token code.</param>
     /// <param name="principal">The authenticated resource owner.</param>
@@ -176,7 +184,9 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
             );
         }
 
-        var authorize = JsonSerializer.Deserialize<AuthorizeRequest>(interaction.Payload, _json.Value);
+        var clear = interaction.Payload;
+
+        var authorize = JsonSerializer.Deserialize<AuthorizeRequest>(clear, _json.Value);
         if (string.IsNullOrWhiteSpace(authorize?.ClientId)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
@@ -197,15 +207,22 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
             new(Claims.ClientId, application.ClientId),
         };
 
+        var sid = principal.FindFirstValue(_options.Value.SessionIdClaimType);
+        if (_contexts is not null) {
+            claims.Stamp(await _contexts.GetContextAsync(principal, ct));
+        }
+
         var response = new ClaimsPrincipal(new ClaimsIdentity(claims, SchemataAuthorizationSchemes.Bearer));
         var mode     = ResponseModeService.ResolveMode(authorize.ResponseMode, authorize.ResponseType);
 
-        var sid = principal.FindFirstValue(_options.Value.SessionIdClaimType);
-        var at  = principal.FindFirstValue(Claims.AuthTime);
+        // The grant set was validated at the authorize leg and stamped onto the interaction
+        // payload as normalized JSON; it is null when the feature is absent.
+        var details = string.IsNullOrWhiteSpace(authorize.AuthorizationDetails) ? null : authorize.AuthorizationDetails;
 
         var properties = new Dictionary<string, string?> {
             [Properties.GrantType]           = GrantTypes.AuthorizationCode,
             [Properties.Scope]               = authorize.Scope,
+            [Properties.Resources]           = authorize.Resource is { Count: > 0 } ? string.Join(" ", authorize.Resource) : null,
             [Properties.ResponseType]        = authorize.ResponseType,
             [Properties.Nonce]               = authorize.Nonce,
             [Properties.RedirectUri]         = authorize.RedirectUri,
@@ -213,9 +230,9 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
             [Properties.State]               = authorize.State,
             [Properties.CodeChallenge]       = authorize.CodeChallenge,
             [Properties.CodeChallengeMethod] = authorize.CodeChallengeMethod,
+            [Properties.DpopJkt]             = authorize.DpopJkt,
             [Properties.SessionId]           = sid,
             [Properties.MaxAge]              = authorize.MaxAge,
-            [Properties.AuthTime]            = at,
         };
 
         await _tokens.RevokeAsync(interaction, ct);
@@ -237,9 +254,12 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
             AcrValues           = authorize.AcrValues,
         };
 
+        authorization.AuthorizationDetails = details;
+
         await _auths.CreateAsync(authorization, ct);
 
         properties[Properties.AuthorizationName] = authorization.CanonicalName;
+        properties[Properties.AuthorizationDetails] = details;
 
         return AuthorizationResult.SignIn(response, properties);
     }

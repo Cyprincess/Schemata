@@ -87,6 +87,20 @@ public class OAuthExceptionFilterShould
     }
 
     [Fact]
+    public void Attaches_Exception_Headers_To_Rendered_Response() {
+        var filter    = CreateFilter("https://auth.example.com");
+        var exception = new OAuthException(OAuthErrors.UseDpopNonce, "nonce required") {
+            Headers = new Dictionary<string, string> { [Headers.DpopNonce] = "nonce-1" },
+        };
+        var ctx = CreateContext(exception);
+
+        filter.OnException(ctx);
+
+        Assert.IsType<JsonResult>(ctx.Result);
+        Assert.Equal("nonce-1", ctx.HttpContext.Response.Headers[Headers.DpopNonce].ToString());
+    }
+
+    [Fact]
     public void Ignores_NonOAuthException() {
         var filter = CreateFilter("https://auth.example.com");
         var ctx    = CreateContext(null!);
