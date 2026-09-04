@@ -9,7 +9,9 @@ using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
-using Schemata.Common;
+using Schemata.Security.Skeleton;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using Xunit;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
@@ -22,19 +24,53 @@ public class ClientSecretPostHandlerShould
     };
 
     private static ClientSecretPostAuthentication<SchemataApplication> CreateHandler(
-        Mock<IApplicationManager<SchemataApplication>>? managerMock = null
+        Mock<IApplicationManager<SchemataApplication>>? managerMock = null,
+        Mock<ISecurityStore<SchemataSecurity>>?         securities = null,
+        Mock<ISecretVerifier>?                          verifier   = null
     ) {
-        var mock    = managerMock ?? new Mock<IApplicationManager<SchemataApplication>>();
+        var mock     = managerMock ?? new Mock<IApplicationManager<SchemataApplication>>();
+        securities ??= new();
+        verifier   ??= new();
         var options = new SchemataAuthorizationOptions();
-        return new(mock.Object, Options.Create(options));
+        return new(mock.Object, Options.Create(options), securities.Object, verifier.Object);
     }
 
     private static Mock<IApplicationManager<SchemataApplication>> MockManager() {
         var mock = new Mock<IApplicationManager<SchemataApplication>>();
         mock.Setup(m => m.FindByClientIdAsync("my-client", It.IsAny<CancellationToken>())).ReturnsAsync(TestApp);
-        mock.Setup(m => m.ValidateClientSecretAsync(TestApp, "my-secret", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
         return mock;
+    }
+
+    private static (Mock<ISecurityStore<SchemataSecurity>> Securities, Mock<ISecretVerifier> Verifier) Credentials() {
+        var securities = new Mock<ISecurityStore<SchemataSecurity>>();
+        securities
+            .Setup(s => s.ListByParentAsync(
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Enumerate(new SchemataSecurity {
+                Uid       = Guid.NewGuid(),
+                Parent    = "applications/my-client",
+                Kind      = SecurityConstants.Kinds.Password,
+                Usage     = SecurityConstants.Usages.Authentication,
+                Algorithm = SecurityConstants.Algorithms.Pbkdf2,
+                Status    = SecurityConstants.Statuses.Valid,
+                Value     = "stored-hash",
+            }));
+
+        var verifier = new Mock<ISecretVerifier>();
+        verifier.Setup(v => v.VerifyAsync(It.IsAny<SchemataSecurity>(), "my-secret", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        return (securities, verifier);
+    }
+
+    private static async IAsyncEnumerable<SchemataSecurity> Enumerate(params SchemataSecurity[] rows) {
+        foreach (var row in rows) {
+            yield return row;
+        }
     }
 
     private static Dictionary<string, List<string?>> Form(string clientId, string? secret) {
@@ -48,14 +84,15 @@ public class ClientSecretPostHandlerShould
 
     [Fact]
     public async Task Authenticates_FromPostBody() {
-        var manager = MockManager();
-        var handler = CreateHandler(manager);
+        var manager                = MockManager();
+        var (securities, verifier) = Credentials();
+        var handler                = CreateHandler(manager, securities, verifier);
 
         var result = await handler.AuthenticateAsync(null, Form("my-client", "my-secret"), null,
                                                      CancellationToken.None);
 
         Assert.NotNull(result);
-        Assert.Equal("my-client", result!.ClientId);
+        Assert.Equal("my-client", result.ClientId);
     }
 
     [Fact]

@@ -110,7 +110,7 @@ public class SchemataTenantManagerShould
         var resolved = await manager.FindByHost("example.test", CancellationToken.None);
 
         Assert.NotNull(resolved);
-        Assert.Equal(tenantUid, resolved!.Uid);
+        Assert.Equal(tenantUid, resolved.Uid);
     }
 
     [Fact]

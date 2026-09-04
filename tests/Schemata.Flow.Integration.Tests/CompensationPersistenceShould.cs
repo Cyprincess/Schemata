@@ -67,7 +67,7 @@ public abstract class CompensationPersistenceShould
         var persisted = await repository.FirstOrDefaultAsync(
                             query => query.Where(current => current.CanonicalName == process.CanonicalName));
         Assert.NotNull(persisted);
-        return await runner.CompleteAsync(persisted!, null, null, CancellationToken.None);
+        return await runner.CompleteAsync(persisted, null, null, CancellationToken.None);
     }
 
     private async Task<List<SchemataProcessCompensation>> ReadBindingsAsync(string process) {

@@ -29,11 +29,9 @@ public sealed class OAuthQueryBinder<T> : IModelBinder
         var request = bindingContext.HttpContext.Request;
         var model   = new T();
 
+        OAuthBinderHelpers.ThrowIfDuplicateParameters(request.Query, Map);
         foreach (var (prop, param) in Map) {
-            var value = request.Query[param].ToString();
-            if (!string.IsNullOrWhiteSpace(value)) {
-                prop.SetValue(model, value);
-            }
+            OAuthBinderHelpers.Bind(prop, request.Query[param], model);
         }
 
         bindingContext.Result = ModelBindingResult.Success(model);

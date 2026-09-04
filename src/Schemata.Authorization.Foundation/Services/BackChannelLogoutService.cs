@@ -12,8 +12,9 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Managers;
-using Schemata.Common;
 using Schemata.Scheduling.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
@@ -31,22 +32,20 @@ public static class BackChannelLogoutService
 ///     Performs OIDC Back-Channel Logout per
 ///     <seealso href="https://openid.net/specs/openid-connect-backchannel-1_0.html">OpenID Connect Back-Channel Logout 1.0</seealso>.
 ///     Discovers session clients from stored tokens, resolves per-RP subject
-///     identifiers (including pairwise), builds a logout token JWT, and triggers
+///     identifiers (pairwise when the pairwise flow feature is installed), builds a logout token JWT, and triggers
 ///     one <see cref="BackChannelLogoutJob" /> per relying party through
 ///     <see cref="IScheduler" />. <c>UseScheduling()</c> must be configured at
 ///     host bootstrap; when the scheduler is absent, <c>EnqueueBackChannelAsync</c>
 ///     raises <c>FAILED_PRECONDITION</c> before any notification is attempted.
 /// </summary>
-public sealed class BackChannelLogoutService<TApp, TToken>(
+public sealed class BackChannelLogoutService<TApp>(
     IApplicationManager<TApp>              apps,
-    ITokenManager<TToken>                  tokens,
+    ITokenStore<SchemataToken>                    tokens,
     TokenService                           issuer,
-    PairwiseSubjectTranslator<TApp>        translator,
     IOptions<SchemataAuthorizationOptions> options,
     IServiceProvider                       services
 ) : ILogoutNotifier
     where TApp : SchemataApplication
-    where TToken : SchemataToken
 {
     #region ILogoutNotifier Members
 
@@ -75,9 +74,12 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
                 continue;
             }
 
-            var sub = !string.IsNullOrWhiteSpace(subject)
-                ? await translator.EnsureMappingAsync(app, subject!, ct)
-                : null;
+            // Pairwise projection applies only when the pairwise flow feature installed the
+            // translator; otherwise the logout token carries the canonical subject.
+            var translator = services.GetService<PairwiseSubjectTranslator<TApp>>();
+            var sub = translator is not null && !string.IsNullOrWhiteSpace(subject)
+                ? await translator.EnsureMappingAsync(app, subject, ct)
+                : subject;
 
             var claims = new List<Claim> {
                 new(Claims.JwtId, Guid.NewGuid().ToString("n")),
@@ -101,7 +103,7 @@ public sealed class BackChannelLogoutService<TApp, TToken>(
             }
 
             var uri = app.BackChannelLogoutUri;
-            var jwt = issuer.CreateToken(claims, TimeSpan.FromMinutes(2));
+            var jwt = await issuer.CreateToken(claims, TimeSpan.FromMinutes(2), typ: TokenMediaTypes.Logout);
 
             // One-shot trigger with no persistent SchemataJob entry — the execution row is
             // self-identifying via operations/{uid}, so JobContext.Job stays null and the

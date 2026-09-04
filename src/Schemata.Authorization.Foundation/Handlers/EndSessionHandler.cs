@@ -2,11 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Security.Claims;
+using System.Globalization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
@@ -14,6 +18,7 @@ using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
+using Schemata.Authorization.Skeleton.Services;
 using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
@@ -37,7 +42,9 @@ public sealed class EndSessionHandler<TApp>(
     IApplicationManager<TApp>              apps,
     TokenService                           issuer,
     IOptions<SchemataAuthorizationOptions> config,
-    IServiceProvider                       sp
+    IOpSessionService                      sessions,
+    IServiceProvider                       sp,
+    ILogger<EndSessionHandler<TApp>>       logger
 ) : EndSessionEndpoint
     where TApp : SchemataApplication
 {
@@ -84,6 +91,18 @@ public sealed class EndSessionHandler<TApp>(
             redirect = request.PostLogoutRedirectUri;
         }
 
+        try {
+            await sessions.InvalidateAsync(principal, subject, session, ct);
+        } catch (Exception ex) {
+            // Fail closed: a session we cannot terminate is a logout we cannot honor — RP
+            // notifications and the post-logout redirect are withheld.
+            logger.LogError(ex, "OP session invalidation failed for subject {Subject} session {Session}.",
+                            subject, session);
+            throw new OAuthException(
+                OAuthErrors.ServerError,
+                SchemataResources.GetResourceString(SchemataResources.INTERNAL));
+        }
+
         var uri       = BuildRedirectUri(redirect, request.State);
         var notifiers = sp.GetServices<ILogoutNotifier>();
 
@@ -97,7 +116,7 @@ public sealed class EndSessionHandler<TApp>(
         }
 
         if (uris is { Count: > 0 }) {
-            return AuthorizationResult.Content(BuildLogoutPage(uris, uri));
+            return AuthorizationResult.Content(BuildLogoutPage(uris, uri, CultureInfo.CurrentCulture));
         }
 
         if (string.IsNullOrWhiteSpace(uri)) {
@@ -126,15 +145,24 @@ public sealed class EndSessionHandler<TApp>(
     ///     <paramref name="redirect" /> URI after all iframes finish loading or
     ///     a 5-second timeout elapses.
     /// </summary>
-    public static string BuildLogoutPage(List<string> uris, string? redirect) {
-        var sb = new StringBuilder();
+    public static string BuildLogoutPage(List<string> uris, string? redirect, CultureInfo? culture = null) {
+        var title  = SchemataResources.GetResourceString(SchemataResources.LOGOUT_PAGE_TITLE);
+        var text   = SchemataResources.GetResourceString(SchemataResources.LOGOUT_PAGE_TEXT);
+        var cont   = SchemataResources.GetResourceString(SchemataResources.LOGOUT_PAGE_CONTINUE);
+        var lang   = culture?.Name;
+        var encode = (string? value) => WebUtility.HtmlEncode(value);
 
+        var sb = new StringBuilder();
         sb.AppendLine("<!DOCTYPE html>");
-        sb.Append("<html><head><title>Logging out</title>");
+        sb.Append("<html");
+        if (!string.IsNullOrEmpty(lang)) {
+            sb.Append(" lang=\"").Append(encode(lang)).Append('"');
+        }
+        sb.Append("><head><title>").Append(encode(title)).Append("</title>");
 
         if (!string.IsNullOrWhiteSpace(redirect)) {
             sb.Append("<meta http-equiv=\"refresh\" content=\"5;url=");
-            sb.Append(WebUtility.HtmlEncode(redirect));
+            sb.Append(encode(redirect));
             sb.Append("\">");
         }
 
@@ -142,16 +170,16 @@ public sealed class EndSessionHandler<TApp>(
 
         foreach (var uri in uris) {
             sb.Append("<iframe src=\"");
-            sb.Append(WebUtility.HtmlEncode(uri));
+            sb.Append(encode(uri));
             sb.AppendLine("\" style=\"display:none\"></iframe>");
         }
 
-        sb.AppendLine("<p>Logging out…</p>");
+        sb.Append("<p>").Append(encode(text)).Append("</p>");
 
         if (!string.IsNullOrWhiteSpace(redirect)) {
             sb.Append("<p><a href=\"");
-            sb.Append(WebUtility.HtmlEncode(redirect));
-            sb.AppendLine("\">Continue</a></p>");
+            sb.Append(encode(redirect));
+            sb.Append("\">").Append(encode(cont)).Append("</a></p>");
 
             sb.AppendLine("<script>");
             sb.AppendLine("(function(){");

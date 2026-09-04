@@ -202,7 +202,7 @@ public class TenancyEntryEquivalenceShould
         dispatcher.Setup(value => value.SendAsync<TRequest, TResponse>(
                              It.IsAny<TRequest>(), It.IsAny<CancellationToken>()))
                   .Callback((TRequest request, CancellationToken ct) => {
-                      requests.Add(request!);
+                      requests.Add(request);
                       tokens.Add(ct);
                   })
                   .ReturnsAsync(response);

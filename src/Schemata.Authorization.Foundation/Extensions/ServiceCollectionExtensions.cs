@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions;
 using Schemata.Authorization.Foundation.Advisors;
@@ -18,9 +17,11 @@ using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Services;
 using Schemata.Core;
+using Schemata.Security.Foundation.Extensions;
 using Schemata.Scheduling.Skeleton;
 
 // ReSharper disable once CheckNamespace
@@ -45,21 +46,10 @@ public static class ServiceCollectionExtensions
         services.Configure(configure);
 
         services.PostConfigure<SchemataAuthorizationOptions>(o => {
-            if (o.SigningKey is null) {
-                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_CONFIGURED), nameof(o.SigningKey)));
-            }
-
-            if (string.IsNullOrWhiteSpace(o.SigningAlgorithm)) {
-                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_CONFIGURED), nameof(o.SigningAlgorithm)));
-            }
-
-            if (o.EncryptionKey is not null && string.IsNullOrWhiteSpace(o.EncryptionAlgorithm)) {
-                throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.MISSING_DEPENDENT_SETTING), nameof(o.EncryptionKey), nameof(o.EncryptionAlgorithm)));
-            }
-
             if (string.IsNullOrWhiteSpace(o.Issuer)) {
                 throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_CONFIGURED), nameof(o.Issuer)));
             }
+
         });
 
         return services;
@@ -91,40 +81,55 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    ///     Registers the OAuth model binder, the advisor chains, the managers, the bearer and
-    ///     authorization-code authentication schemes, and the expired-token cleanup job.
+    ///     Registers the DPoP options, the OAuth model binder, the advisor chains, the managers,
+    ///     the bearer and authorization-code authentication schemes, and the expired-token
+    ///     cleanup job.
     /// </summary>
     /// <typeparam name="TApp">Application entity type.</typeparam>
     /// <typeparam name="TAuth">Authorization entity type.</typeparam>
     /// <typeparam name="TScope">Scope entity type.</typeparam>
-    /// <typeparam name="TToken">Token entity type.</typeparam>
     /// <param name="services">The service collection.</param>
     /// <param name="options">Materialized options, read for the authentication scheme names.</param>
     /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddSchemataAuthorization<TApp, TAuth, TScope, TToken>(
+    public static IServiceCollection AddSchemataAuthorization<TApp, TAuth, TScope>(
         this IServiceCollection      services,
         SchemataAuthorizationOptions options
     )
         where TApp : SchemataApplication
         where TAuth : SchemataAuthorization
-        where TScope : SchemataScope
-        where TToken : SchemataToken, new() {
+        where TScope : SchemataScope {
         services.AddMvcCore(mvc => {
                      mvc.ModelBinderProviders.Insert(0, new OAuthRequestBinderProvider());
                  });
 
+        // DPoP consumers — the resource-server-side authentication handler above all — resolve
+        // these with or without the DPoP flow feature installed.
+        services.AddOptions<DPopOptions>();
+
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryBase>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryClientAuthentication>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryAcrValues>());
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IClientAuthentication<TApp>, ClientSecretBasicAuthentication<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IClientAuthentication<TApp>, ClientSecretPostAuthentication<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClientAuthentication<TApp>, ClientSecretJwtAuthentication<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClientAuthentication<TApp>, PrivateKeyJwtAuthentication<TApp>>());
         services.TryAddScoped<IClientAuthenticationService<TApp>, ClientAuthenticationService<TApp>>();
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceRequestEndpointPermission<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceRequestGrantPermission<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceRequestScopeValidation<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceTokenResource<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeResource<TApp>>());
 
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceClaimsAudience<TApp>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceClaimsPairwise<TApp>>());
+        // Advisors consuming ambient feature slots on behalf of the handlers, keeping
+        // optional-feature consumption out of the canonical handler flows.
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeAuthorizationDetailsCommit<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ICodeExchangeAdvisor<TApp>, AdviceCodeExchangeDpop<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IRefreshTokenAdvisor<TApp>, AdviceRefreshTokenDpop<TApp>>());
+
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceClaimsAudience>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceClaimsAuthenticationContext>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationSubject>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationProfile>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationEmail>());
@@ -133,11 +138,12 @@ public static class ServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationRole>());
 
         services.TryAddScoped<DiscoveryHandler<TScope>>();
+        services.TryAddScoped<JwksHandler>();
 
         services.TryAddScoped<TokenService>();
         services.TryAddScoped<
             IAuthorizationSignInService,
-            AuthorizationSignInService<TApp, TToken>>();
+            AuthorizationSignInService<TApp>>();
         services.TryAddScoped<
             IAuthorizationSignInHttpWriter,
             AuthorizationSignInHttpWriter>();
@@ -145,35 +151,32 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<IRequestDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
         services.TryAddScoped<ICommandDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
         services.TryAddScoped<IQueryDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        AddAuthorizationHandlers<TApp, TToken>(services);
+        AddAuthorizationHandlers<TApp>(services);
         services.TryAddScoped<ISubjectIdentifierService, SubjectIdentifierService>();
+        services.TryAddScoped<IOpSessionService, NoOpOpSessionService>();
 
-        // Pairwise (application × canonical-subject) → pairwise-hash mapping lives in
-        // SchemataSubjectMapping. The hosting startup must register a repository for that
-        // entity against its DbContext so AdviceClaimsPairwise (writer) and
-        // IPairwiseSubjectTranslator (reader / reverse-lookup) share the same durable table.
-        services.TryAddScoped<PairwiseSubjectTranslator<TApp>>();
-        services.TryAddScoped<IPairwiseSubjectTranslator>(
-            sp => sp.GetRequiredService<PairwiseSubjectTranslator<TApp>>());
-
-        services.TryAddScoped<IPasswordHasher<TApp>, PasswordHasher<TApp>>();
         services.TryAddScoped<IApplicationManager<TApp>, SchemataApplicationManager<TApp>>();
         services.TryAddScoped<IScopeManager<TScope>, SchemataScopeManager<TScope>>();
         services.TryAddScoped<IAuthorizationManager<TAuth>, SchemataAuthorizationManager<TAuth>>();
-        services.TryAddScoped<ITokenManager<TToken>, SchemataTokenManager<TToken>>();
+        services.TryAddSingleton<ClientAssertionValidator>();
+        services.TryAddSingleton<ClientAssertionChannel>();
+
+        services.AddAuthorization(o => o.AddPolicy(SchemataAuthorizationPolicies.Profile, p => {
+            p.RequireAuthenticatedUser();
+            p.AddAuthenticationSchemes(options.BearerScheme);
+        }));
 
         services.AddAuthentication()
-                .AddScheme<SchemataAuthenticationHandlerOptions, SchemataAuthenticationHandler<TApp, TToken>>(options.BearerScheme, null)
-                .AddScheme<SchemataAuthenticationHandlerOptions, SchemataAuthorizationCodeHandler<TApp, TToken>>(options.CodeScheme, null);
+                .AddScheme<SchemataAuthenticationHandlerOptions, SchemataAuthenticationHandler<TApp>>(options.BearerScheme, null)
+                .AddScheme<SchemataAuthenticationHandlerOptions, SchemataAuthorizationCodeHandler<TApp>>(options.CodeScheme, null);
 
-        services.Configure<SchemataSchedulingOptions>(o => o.Jobs.Add(new(typeof(TokenCleanupJob<TToken>), new CronSchedule("0 * * * *"))));
-        services.AddScheduledJob<TokenCleanupJob<TToken>>();
+        services.Configure<SchemataSchedulingOptions>(o => o.Jobs.Add(new(typeof(TokenCleanupJob), new CronSchedule("0 * * * *"))));
+        services.AddScheduledJob<TokenCleanupJob>();
 
         return services;
     }
-    private static void AddAuthorizationHandlers<TApp, TToken>(IServiceCollection services)
+    private static void AddAuthorizationHandlers<TApp>(IServiceCollection services)
         where TApp : SchemataApplication
-        where TToken : SchemataToken, new()
     {
         services.TryAddScoped<
             IRequestHandler<AuthorizeEndpointRequest, AuthorizationResult>,
@@ -205,6 +208,13 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<
             IRequestHandler<InteractionDetailsQuery, AuthorizationResult>,
             InteractionDetailsHandler>();
+        services.TryAddScoped<
+            IRequestHandler<RegisterEndpointQuery, RegistrationResponse>,
+            RegisterEndpointHandler>();
+        services.TryAddScoped<
+            IRequestHandler<RegisterReadQuery, RegistrationResponse?>,
+            RegistrationReadHandler<TApp>>();
+        services.AddHttpClient(nameof(RegistrationMetadataMapper));
     }
 
 }

@@ -36,7 +36,7 @@ public sealed class SchemataReportGrpcFeature<TReport, TSnapshot, TChunk> : Feat
         IWebHostEnvironment environment
     ) {
         var resources = new SchemataResourceBuilder(schemata, services) {
-            AuthenticationScheme = schemata.Get<string>(Foundation.SchemataReportBuilder<TReport, TSnapshot, TChunk>.AuthenticationSchemeKey),
+            AuthenticationScheme = schemata.Get<string>(SchemataReportBuilder<TReport, TSnapshot, TChunk>.AuthenticationSchemeKey),
         };
         resources.Use<TReport, TReport, TReport, TReport>(
             [GrpcResourceAttribute.Name],

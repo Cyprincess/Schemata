@@ -10,10 +10,10 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Skeleton.Entities;
-using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
-using Schemata.Common;
 using Xunit;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
@@ -21,9 +21,9 @@ namespace Schemata.Authorization.Tests;
 
 public class DeviceCodeHandlerShould
 {
+    private static readonly DateTimeOffset Now = new(2026, 8, 26, 0, 0, 0, TimeSpan.Zero);
     private static Fixture CreateFixture(string? approvedScope = "openid profile email") {
         var jsonOpts = Options.Create(new JsonSerializerOptions());
-
         var app        = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test-client" };
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
         clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
@@ -41,19 +41,19 @@ public class DeviceCodeHandlerShould
             Type          = TokenTypes.DeviceCode,
             Status        = TokenStatuses.Authorized,
             Application   = app.Name,
-            Subject       = "user-1",
+            Parent        = "user-1",
             ReferenceId   = "dev-ref",
             Payload       = payload,
             Authorization = "auth-approved",
             SessionId     = "sess-approved",
-            ExpireTime    = DateTime.UtcNow.AddMinutes(10),
+            ExpireTime    = Now.AddMinutes(10).UtcDateTime,
         };
 
-        var tokens = new Mock<ITokenManager<SchemataToken>>();
+        var tokens = new Mock<ITokenStore<SchemataToken>>();
         tokens.Setup(t => t.FindByReferenceIdAsync("dev-ref", It.IsAny<CancellationToken>())).ReturnsAsync(device);
 
         var sp = new ServiceCollection().BuildServiceProvider();
-        var handler = new DeviceCodeHandler<SchemataApplication, SchemataToken>(
+        var handler = new DeviceCodeHandler<SchemataApplication>(
             clientAuth.Object, tokens.Object, jsonOpts);
 
         return new(handler, tokens, device, app, sp);
@@ -70,9 +70,9 @@ public class DeviceCodeHandlerShould
 
     [Fact]
     public async Task ThrowsInvalidGrant_WhenDeviceCodeEmpty() {
-        var f       = CreateFixture();
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
-        var request = CreateRequest(deviceCode: string.Empty);
+        var       f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new(f.Sp));
+        var       request = CreateRequest(deviceCode: string.Empty);
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
                                                               request, null, CancellationToken.None));
@@ -82,9 +82,9 @@ public class DeviceCodeHandlerShould
 
     [Fact]
     public async Task ThrowsInvalidGrant_WhenDeviceCodeNotFound() {
-        var f       = CreateFixture();
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
-        var request = CreateRequest(deviceCode: "missing");
+        var       f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new(f.Sp));
+        var       request = CreateRequest(deviceCode: "missing");
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
                                                               request, null, CancellationToken.None));
@@ -94,9 +94,9 @@ public class DeviceCodeHandlerShould
 
     [Fact]
     public async Task UsesApprovedScope_WhenRequestScopeOmitted() {
-        var f       = CreateFixture();
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
-        var request = CreateRequest();
+        var       f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new(f.Sp));
+        var       request = CreateRequest();
 
         var result = await f.Handler.HandleAsync(request, null, CancellationToken.None);
 
@@ -106,9 +106,9 @@ public class DeviceCodeHandlerShould
 
     [Fact]
     public async Task UsesRequestScope_WhenNarrowerThanApproved() {
-        var f       = CreateFixture();
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
-        var request = CreateRequest("profile");
+        var       f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new(f.Sp));
+        var       request = CreateRequest("profile");
 
         var result = await f.Handler.HandleAsync(request, null, CancellationToken.None);
 
@@ -117,9 +117,9 @@ public class DeviceCodeHandlerShould
 
     [Fact]
     public async Task UsesRequestScope_WhenEqualToApproved() {
-        var f       = CreateFixture("openid profile");
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
-        var request = CreateRequest("openid profile");
+        var       f       = CreateFixture("openid profile");
+        using var ambient = AdviceContext.Establish(new(f.Sp));
+        var       request = CreateRequest("openid profile");
 
         var result = await f.Handler.HandleAsync(request, null, CancellationToken.None);
 
@@ -128,9 +128,9 @@ public class DeviceCodeHandlerShould
 
     [Fact]
     public async Task ThrowsInvalidScope_WhenRequestScopeIntroducesNewScope() {
-        var f       = CreateFixture("openid profile");
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
-        var request = CreateRequest("openid profile email");
+        var       f       = CreateFixture("openid profile");
+        using var ambient = AdviceContext.Establish(new(f.Sp));
+        var       request = CreateRequest("openid profile email");
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
                                                               request, null, CancellationToken.None));
@@ -140,9 +140,9 @@ public class DeviceCodeHandlerShould
 
     [Fact]
     public async Task ThrowsInvalidScope_WhenNoScopeApprovedButClientRequestsOne() {
-        var f       = CreateFixture(null);
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
-        var request = CreateRequest("openid");
+        var       f       = CreateFixture(null);
+        using var ambient = AdviceContext.Establish(new(f.Sp));
+        var       request = CreateRequest("openid");
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
                                                               request, null, CancellationToken.None));
@@ -152,9 +152,9 @@ public class DeviceCodeHandlerShould
 
     [Fact]
     public async Task PropagatesAuthorizationNameAndSessionId_OnSuccessfulExchange() {
-        var f       = CreateFixture();
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
-        var request = CreateRequest();
+        var       f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new(f.Sp));
+        var       request = CreateRequest();
 
         var result = await f.Handler.HandleAsync(request, null, CancellationToken.None);
 
@@ -166,7 +166,7 @@ public class DeviceCodeHandlerShould
     [Fact]
     public async Task ThrowsInvalidGrant_WhenPayloadMissing() {
         var f = CreateFixture();
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
+        using var ambient = AdviceContext.Establish(new(f.Sp));
         f.Device.Payload = null;
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
@@ -178,8 +178,8 @@ public class DeviceCodeHandlerShould
     #region Nested type: Fixture
 
     private record Fixture(
-        DeviceCodeHandler<SchemataApplication, SchemataToken> Handler,
-        Mock<ITokenManager<SchemataToken>>                    Tokens,
+        DeviceCodeHandler<SchemataApplication> Handler,
+        Mock<ITokenStore<SchemataToken>>                    Tokens,
         SchemataToken                                         Device,
         SchemataApplication                                   App,
         IServiceProvider                                      Sp

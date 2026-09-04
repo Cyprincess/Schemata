@@ -1,14 +1,23 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Schemata.Abstractions;
 using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Caching.Skeleton;
+using Schemata.Security.Foundation;
+using Schemata.Security.Foundation.Services;
+using Schemata.Security.Skeleton;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Services;
@@ -16,44 +25,111 @@ namespace Schemata.Authorization.Foundation.Services;
 /// <summary>
 ///     Core token creation and validation service.
 ///     Creates signed JWTs, encrypted JWEs, opaque reference tokens, and OIDC
-///     ID tokens.  Validates tokens against the configured signing key and issuer.
-///     All token claims include <c>iss</c>, <c>iat</c>, <c>exp</c>, and <c>jti</c>.
+///     ID tokens.  Signing and encryption keys come from security rows stored under the
+///     configured issuer; credentials are resolved per call so rotation takes effect
+///     without restart.  All token claims include <c>iss</c>, <c>iat</c>, <c>exp</c>, and <c>jti</c>.
 /// </summary>
-public class TokenService
+public class TokenService(
+    ISecurityStore<SchemataSecurity>       securities,
+    IHttpClientFactory                     http,
+    ICacheProvider                         cache,
+    IOptions<SchemataSecurityOptions>      securityOptions,
+    IOptions<SchemataAuthorizationOptions> options,
+    TimeProvider?                          time = null
+)
 {
-    private readonly string                       _algorithm;
-    private readonly EncryptingCredentials?       _encrypting;
     private readonly JsonWebTokenHandler          _handler = new() { SetDefaultTimesOnTokenCreation = false };
-    private readonly SchemataAuthorizationOptions _options;
-    private readonly SigningCredentials           _signing;
-    private readonly TimeProvider                 _time;
-    private readonly TokenValidationParameters    _validation;
+    private readonly SchemataAuthorizationOptions _options = options.Value;
+    private readonly TimeProvider                 _time    = time ?? TimeProvider.System;
 
-    /// <summary>
-    ///     Initializes the token service from <see cref="SchemataAuthorizationOptions" />.
-    ///     Configures signing credentials, optional encryption credentials, and
-    ///     validation parameters.
-    /// </summary>
-    /// <param name="options">Server authorization options.</param>
-    /// <param name="time">Clock for token <c>iat</c>/<c>exp</c>; defaults to the system clock.</param>
-    public TokenService(IOptions<SchemataAuthorizationOptions> options, TimeProvider? time = null) {
-        _options   = options.Value;
-        _time      = time ?? TimeProvider.System;
-        _algorithm = _options.SigningAlgorithm!;
+    /// <summary>Builds the credential set from the issuer's security rows: the newest valid
+    /// signing row is primary, valid and retired rows verify, and the newest valid
+    /// encryption row (when present) encrypts.</summary>
+    /// <exception cref="InvalidOperationException">No valid signing row exists, the primary
+    /// row carries no key material or algorithm, or a multi-row verification set carries a
+    /// blank key id.</exception>
+    /// <exception cref="NotSupportedException">A private-key row fails its algorithm-driven
+    /// key import; see <see cref="SecurityKeyMaterialExtensions.ToKeyMaterialAsync" />.</exception>
+    private async Task<(SigningCredentials Signing, EncryptingCredentials? Encrypting, TokenValidationParameters Validation)>
+        ResolveCredentials(CancellationToken ct) {
+        var signingRows = await ListRowsAsync(SecurityConstants.Usages.Signing, ct);
+        var primary = signingRows.FirstOrDefault(
+                          row => row.Status == SecurityConstants.Statuses.Valid)
+                      ?? throw new InvalidOperationException(
+                          string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_CONFIGURED), "Signing key"));
 
-        _signing = new(_options.SigningKey!, _algorithm);
-
-        if (_options.EncryptionKey is not null) {
-            _encrypting = new(_options.EncryptionKey, _options.EncryptionAlgorithm!, _options.ContentEncryptionAlgorithm);
+        // With multiple verification keys the kid header is the only way to route a
+        // signature to its key, so every key in a set must carry a key id. A single
+        // bare key remains valid: RFC 7517 §4.5 makes kid a SHOULD, not a MUST.
+        var trusted = signingRows
+            .Where(row => row.Status is SecurityConstants.Statuses.Valid or SecurityConstants.Statuses.Retired)
+            .ToList();
+        if (trusted.Count > 1 && trusted.Any(row => string.IsNullOrEmpty(row.Kid))) {
+            throw new InvalidOperationException(
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), "Key id"));
         }
 
-        _validation = new() {
+        var keyAlgorithm = primary.Algorithm ?? throw new InvalidOperationException(
+            string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_CONFIGURED), "Signing algorithm"));
+        var algorithm = SecurityKeyAdapter.ToSigningAlgorithm(keyAlgorithm);
+
+        var primaryKey = await ToKeyAsync(primary, ct) ?? throw new InvalidOperationException(
+            string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_CONFIGURED), "Signing key"));
+
+        var keys = new List<SecurityKey>();
+        foreach (var row in trusted) {
+            if (await ToKeyAsync(row, ct) is { } key) {
+                keys.Add(key);
+            }
+        }
+
+        var encryptionRow = (await ListRowsAsync(SecurityConstants.Usages.Encryption, ct)).FirstOrDefault(
+            row => row.Status == SecurityConstants.Statuses.Valid);
+
+        EncryptingCredentials? encrypting = null;
+        SecurityKey?           decryption = null;
+        if (encryptionRow is not null) {
+            var encryptionKeyAlgorithm = encryptionRow.Algorithm ?? throw new InvalidOperationException(
+                string.Format(
+                    SchemataResources.GetResourceString(SchemataResources.MISSING_DEPENDENT_SETTING),
+                    "Encryption key", "Encryption algorithm"));
+            var encryptionAlgorithm = SecurityKeyAdapter.ToEncryptionAlgorithm(encryptionKeyAlgorithm);
+
+            if (await ToKeyAsync(encryptionRow, ct) is { } encryptionKey) {
+                encrypting = new(encryptionKey, encryptionAlgorithm, _options.ContentEncryptionAlgorithm);
+                decryption = encryptionKey;
+            }
+        }
+
+        var validation = new TokenValidationParameters {
             ValidIssuer        = _options.Issuer,
             ValidateAudience   = false,
-            IssuerSigningKey   = _signing.Key,
-            TokenDecryptionKey = _options.EncryptionKey,
+            IssuerSigningKeys  = keys,
+            TokenDecryptionKey = decryption,
             ClockSkew          = TimeSpan.FromMinutes(1),
         };
+
+        return (new(primaryKey, algorithm), encrypting, validation);
+    }
+
+    private async Task<List<SchemataSecurity>> ListRowsAsync(string usage, CancellationToken ct) {
+        var rows = new List<SchemataSecurity>();
+        await foreach (var row in securities.ListByParentAsync(
+                           SecurityParents.Issuer(_options.Issuer!), null, usage, null, ct)) {
+            rows.Add(row);
+        }
+
+        return rows;
+    }
+
+    private async Task<SecurityKey?> ToKeyAsync(SchemataSecurity row, CancellationToken ct) {
+        var material = await row.ToKeyMaterialAsync(
+            http.CreateClient(SecurityKeyMaterialExtensions.HttpClientName),
+            cache,
+            securityOptions.Value.KeyCacheLifetime,
+            ct);
+
+        return material is null ? null : SecurityKeyAdapter.ToSecurityKey(material);
     }
 
     /// <summary>
@@ -63,21 +139,32 @@ public class TokenService
     /// <param name="claims">Claims to embed in the token.</param>
     /// <param name="lifetime">Token validity duration.</param>
     /// <param name="encrypt">When <c>true</c>, wraps the JWT as a JWE.</param>
-    public string CreateToken(IEnumerable<Claim> claims, TimeSpan lifetime, bool encrypt = false) {
-        if (encrypt && _encrypting is null) {
+    /// <param name="typ">
+    ///     Media type stamped into the <c>typ</c> header; for a nested JWT the library stamps the
+    ///     outer <c>cty</c> as <c>JWT</c>, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7519.html#section-5.2">
+    ///         RFC 7519: JSON Web Token (JWT) §5.2: "cty" (Content Type) Header Parameter
+    ///     </seealso>
+    ///     .
+    /// </param>
+    public async Task<string> CreateToken(IEnumerable<Claim> claims, TimeSpan lifetime, bool encrypt = false, string? typ = null) {
+        var (signing, encrypting, _) = await ResolveCredentials(CancellationToken.None);
+
+        if (encrypt && encrypting is null) {
             throw new InvalidOperationException(
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_CONFIGURED), "Encryption key")
-            );
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_CONFIGURED), "Encryption key"));
         }
 
         var now = _time.GetUtcNow().UtcDateTime;
         var descriptor = new SecurityTokenDescriptor {
-            Subject               = new(claims),
-            Expires               = now + lifetime,
-            IssuedAt              = now,
-            Issuer                = _options.Issuer,
-            SigningCredentials    = _signing,
-            EncryptingCredentials = encrypt ? _encrypting : null,
+            Subject                = new(claims),
+            Expires                = now + lifetime,
+            IssuedAt               = now,
+            Issuer                 = _options.Issuer,
+            TokenType              = typ,
+            AdditionalHeaderClaims = encrypt ? new Dictionary<string, object> { ["cty"] = TokenMediaTypes.NestedJwt } : null,
+            SigningCredentials     = signing,
+            EncryptingCredentials  = encrypt ? encrypting : null,
         };
         return _handler.CreateToken(descriptor);
     }
@@ -105,13 +192,15 @@ public class TokenService
     /// <param name="at">Access token value for <c>at_hash</c>.</param>
     /// <param name="code">Authorization code for <c>c_hash</c>.</param>
     /// <param name="nonce">Opaque nonce from the authorization request.</param>
-    public string CreateIdToken(
+    public async Task<string> CreateIdToken(
         List<Claim> claims,
         TimeSpan    lifetime,
         string?     at    = null,
         string?     code  = null,
         string?     nonce = null
     ) {
+        var (signing, _, _) = await ResolveCredentials(CancellationToken.None);
+
         claims.Add(new(Claims.TokenUse, "id_token"));
 
         if (!string.IsNullOrWhiteSpace(nonce)) {
@@ -119,19 +208,19 @@ public class TokenService
         }
 
         if (!string.IsNullOrWhiteSpace(at)) {
-            claims.Add(new(Claims.AtHash, ComputeHash(at, _algorithm)));
+            claims.Add(new(Claims.AtHash, ComputeHash(at, signing.Algorithm)));
         }
 
         if (!string.IsNullOrWhiteSpace(code)) {
-            claims.Add(new(Claims.CHash, ComputeHash(code, _algorithm)));
+            claims.Add(new(Claims.CHash, ComputeHash(code, signing.Algorithm)));
         }
 
-        return CreateToken(claims, lifetime);
+        return await CreateToken(claims, lifetime);
     }
 
     /// <summary>
     ///     Validates a JWT or JWE token string against the configured issuer
-    ///     and signing key. When <paramref name="audience" /> is provided,
+    ///     and the issuer's signing rows. When <paramref name="audience" /> is provided,
     ///     audience validation is enforced.
     /// </summary>
     /// <param name="token">The JWT/JWE token string, or stored payload for reference tokens.</param>
@@ -142,7 +231,8 @@ public class TokenService
             return null;
         }
 
-        var parameters = _validation.Clone();
+        var (_, _, template) = await ResolveCredentials(CancellationToken.None);
+        var parameters = template.Clone();
 
         parameters.ValidateLifetime = lifetime;
 

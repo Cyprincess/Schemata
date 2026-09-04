@@ -21,7 +21,7 @@ public class ResourceNameStructuralIdentityShould
 
         var parsed = descriptor.ParseCanonicalName("operations/x1");
         Assert.NotNull(parsed);
-        Assert.Equal("x1", parsed!.Value.LeafName);
+        Assert.Equal("x1", parsed.Value.LeafName);
         Assert.Empty(parsed.Value.ParentValues);
     }
 

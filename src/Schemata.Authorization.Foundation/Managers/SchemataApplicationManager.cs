@@ -3,34 +3,30 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Identity;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Entity.Repository;
+using Schemata.Security.Skeleton.Services;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Managers;
 
 /// <summary>
 ///     Default implementation of <see cref="IApplicationManager{TApplication}" /> backed by an
-///     <see cref="IRepository{TEntity}" /> and an <see cref="IPasswordHasher{TUser}" /> for client secret hashing.
+///     <see cref="IRepository{TEntity}" />.
 /// </summary>
 /// <typeparam name="TApplication">The application entity type, must derive from <see cref="SchemataApplication" />.</typeparam>
 /// <remarks>
-///     Client secrets are hashed using <see cref="IPasswordHasher{TApplication}" /> before storage. Redirect URI
-///     and permission checks use exact-match comparison against the application's configured lists.
+///     Redirect URI and permission checks use exact-match comparison against the application's configured lists.
 /// </remarks>
 /// <seealso cref="SchemataScopeManager{TScope}" />
-/// <seealso cref="SchemataTokenManager{TToken}" />
 public class SchemataApplicationManager<TApplication> : IApplicationManager<TApplication>
     where TApplication : SchemataApplication
 {
     private readonly IRepository<TApplication>     _applications;
-    private readonly IPasswordHasher<TApplication> _hasher;
 
-    public SchemataApplicationManager(IRepository<TApplication> applications, IPasswordHasher<TApplication> hasher) {
+    public SchemataApplicationManager(IRepository<TApplication> applications) {
         _applications = applications;
-        _hasher       = hasher;
     }
 
     #region IApplicationManager<TApplication> Members
@@ -52,27 +48,6 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return await _applications.SingleOrDefaultAsync(q => q.Where(a => a.ClientId == clientId), ct);
     }
 
-    public Task<bool> ValidateClientSecretAsync(
-        TApplication?     application,
-        string?           secret,
-        CancellationToken ct = default
-    ) {
-        ct.ThrowIfCancellationRequested();
-
-        if (string.IsNullOrWhiteSpace(application?.ClientSecret)) {
-            return Task.FromResult(false);
-        }
-
-        if (string.IsNullOrWhiteSpace(secret)) {
-            return Task.FromResult(false);
-        }
-
-        var result = _hasher.VerifyHashedPassword(application, application.ClientSecret, secret);
-
-        return Task.FromResult(result is PasswordVerificationResult.Success
-                                      or PasswordVerificationResult.SuccessRehashNeeded);
-    }
-
     public Task<bool> ValidateRedirectUriAsync(TApplication? application, string? uri, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
@@ -84,7 +59,7 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
             return Task.FromResult(false);
         }
 
-        var found = application.RedirectUris?.Any(r => r == uri);
+        var found = application.RedirectUris?.Any(r => RedirectUriMatcher.Matches(r, uri));
 
         return Task.FromResult(found == true);
     }
@@ -129,20 +104,10 @@ public class SchemataApplicationManager<TApplication> : IApplicationManager<TApp
         return Task.FromResult(found == true);
     }
 
-    public Task SetClientSecretAsync(TApplication? application, string? secret, CancellationToken ct = default) {
+    public Task SetClientNameAsync(TApplication? application, string? name, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
-        application?.ClientSecret = !string.IsNullOrWhiteSpace(secret)
-            ? _hasher.HashPassword(application, secret)
-            : null;
-
-        return Task.CompletedTask;
-    }
-
-    public Task SetDisplayNameAsync(TApplication? application, string? name, CancellationToken ct = default) {
-        ct.ThrowIfCancellationRequested();
-
-        application?.DisplayName = name;
+        application?.ClientName = name;
 
         return Task.CompletedTask;
     }

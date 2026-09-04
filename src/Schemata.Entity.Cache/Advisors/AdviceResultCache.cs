@@ -82,7 +82,7 @@ public class AdviceResultCache<TEntity, TResult, T> : IRepositoryResultAdvisor<T
 
         var ttl   = _options.Value.Ttl;
         var bytes = JsonSerializer.SerializeToUtf8Bytes(context.Result);
-        await _cache.SetAsync(key!, bytes, new() {
+        await _cache.SetAsync(key, bytes, new() {
             SlidingExpiration = ttl,
         }, ct);
 
@@ -92,7 +92,7 @@ public class AdviceResultCache<TEntity, TResult, T> : IRepositoryResultAdvisor<T
 
         var index = ReverseIndex.BuildKey(typeof(TEntity), entity);
         if (index is not null) {
-            await _cache.CollectionAddAsync(index, key!, new() {
+            await _cache.CollectionAddAsync(index, key, new() {
                 SlidingExpiration = ttl,
             }, ct);
         }

@@ -11,7 +11,9 @@ registers the core, and each `Use*Flow` / `Use*` call on the returned builder ad
 
 | Package                             | Key files                                                                                                                                                                                                                                                                        |
 | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Schemata.Authorization.Skeleton`   | `Entities/{SchemataApplication,SchemataAuthorization,SchemataScope,SchemataToken}.cs`, `Advisors/`, `Contexts/`, `Handlers/`, `Managers/`, `Services/IClientAuthentication.cs`, `ISubjectProvider.cs`                                                                            |
+| `Schemata.Authorization.Skeleton`   | `Entities/{SchemataApplication,SchemataAuthorization,SchemataScope}.cs`, `Advisors/`, `Contexts/`, `Handlers/`, `Managers/`, `Services/IClientAuthentication.cs`, `ISubjectProvider.cs`                                                                                            |
+| `Schemata.Security.Skeleton`        | `Entities/{SchemataToken,SchemataSecurity}.cs`, `Services/{ITokenStore,ISecurityStore,ISecretVerifier,SchemataKeyMaterial}.cs`                                                                                                                                                     |
+| `Schemata.Security.Foundation`      | `Stores/{RepositoryTokenStore,CacheTokenStore,SecurityStore}.cs`, `Services/{SecretVerifier,SecurityKeyMaterialExtensions}.cs`                                                                                                                                                     |
 | `Schemata.Authorization.Foundation` | `Extensions/SchemataBuilderExtensions.cs` (`UseAuthorization`), `Extensions/SchemataAuthorizationBuilderExtensions.cs` (flow methods), `Features/`, `Controllers/ConnectController*.cs`, `Authentication/SchemataAuthorizationOptions.cs`, `Managers/`, `Services/`, `Advisors/` |
 | `Schemata.Authorization.Identity`   | `Features/SchemataAuthorizationIdentityFeature.cs`, `IdentitySubjectProvider.cs`, `Advisors/AdviceClaimsSubject.cs`, the `UseIdentity()` builder extension                                                                                                                       |
 
@@ -21,9 +23,10 @@ registers the core, and each `Use*Flow` / `Use*` call on the returned builder ad
 builder.UseSchemata(schema => {
     schema.UseIdentity();
 
+    schema.UseSecurity();                   // security rows, secret verification, token stores
+
     schema.UseAuthorization(o => {
               o.Issuer = "https://auth.example.com";
-              o.AddEphemeralSigningKey();        // dev only; load a persisted key in production
           })
           .UseIdentity()                          // bridge in the Identity subject provider
           .UseCodeFlow()
@@ -58,18 +61,20 @@ The shared Security extensions configure only this resource management surface. 
 60_000_000 = 460_000_000`) depends on `SchemataAuthenticationFeature`,
 `SchemataTransportHttpFeature`, and `SchemataWellKnownFeature`. `ConfigureServices`:
 
-- Validates `SchemataAuthorizationOptions` in `PostConfigure`: `SigningKey`, `SigningAlgorithm`,
-  and `Issuer` are required, and `EncryptionAlgorithm` is required when `EncryptionKey` is set.
-  Any missing value throws `InvalidOperationException`.
+- Validates `SchemataAuthorizationOptions` in `PostConfigure`: the `Issuer` is required, and a
+  blank value throws `InvalidOperationException`.
 - Collects the registered `IAuthorizationFlowFeature` instances, sorts them by `Order`, and calls
   `ConfigureServices` on each — this is how flow methods contribute their handlers and advisors.
 - Adds the controller as a `SchemataApplicationPart` and inserts `OAuthRequestBinderProvider` at
   the front of the MVC model-binder chain so OAuth form/query parameters bind to the OAuth model
   types instead of the default MVC binders.
 - Registers three scoped managers — `IApplicationManager<TApp>`, `IScopeManager<TScope>`, and
-  `IAuthorizationManager<TAuth>` — plus the transient `ITokenManager<TToken>`.
-- Registers client authentication: `ClientSecretBasicAuthentication<TApp>` and
-  `ClientSecretPostAuthentication<TApp>` as `IClientAuthentication<TApp>`, plus
+  `IAuthorizationManager<TAuth>` — plus the unified token stores over `TToken`
+  (`AddTokenStores<TToken>()` registers the repository-backed `ITokenStore<TToken>` and the
+  `nonce`, `jti`, and `rate-slot` keyed slots served by the cache-backed store).
+- Registers client authentication: `ClientSecretBasicAuthentication<TApp>`,
+  `ClientSecretPostAuthentication<TApp>`, `ClientSecretJwtAuthentication<TApp>`, and
+  `PrivateKeyJwtAuthentication<TApp>` as `IClientAuthentication<TApp>`, plus
   `IClientAuthenticationService<TApp>`.
 - Registers the advisor families (see below), `DiscoveryHandler<TScope>`, `TokenService`,
   `IAuthorizationSignInService`, and `ISubjectIdentifierService`. The sign-in service issues either
@@ -95,6 +100,7 @@ which flow methods are enabled, but the routes are fixed:
 | `POST`                    | `/Connect/Introspect` | `Introspect`                                          | RFC 7662 §§2.1–2.2, Introspection Request and Response        |
 | `POST`                    | `/Connect/Revoke`     | `Revoke`                                              | RFC 7009 §§2.1–2.2, Revocation Request and Response            |
 | `GET` / `POST`            | `/Connect/Profile`    | `Profile` (bearer-authorized)                         | OpenID Connect Core 1.0 §5.3, UserInfo Endpoint               |
+| `POST` / `GET` | `/Connect/Register` | `Register` / `RegisterRead` | OIDC Dynamic Client Registration 1.0 §§3.1-3.3               |
 | `GET` / `POST`            | `/Connect/EndSession` | `EndSessionGet` / `EndSessionPost`                    | OpenID Connect RP-Initiated Logout 1.0 §2, RP-Initiated Logout |
 
 `IAuthorizationSignInService` owns transport-neutral protocol issuance. `ConnectController` renders
@@ -123,6 +129,13 @@ values that fail `Uri.TryCreate(..., UriKind.Absolute, ...)` both throw `Invalid
 so `AuthorizeHandler` builds the redirect without re-checking it. `UseDeviceFlow()` validates
 `DeviceVerificationUri` the same way.
 
+`GET /Connect/Interact` returns the original request beside the client and scope metadata, so the
+page can relay request parameters into the sign-in itself: `request.acr_values` carries the
+requested Authentication Context Classes (Core §3.1.2.1), and the identity login accepts them on
+the login body, stamping the satisfied class as the `acr` claim — the performed level when the
+request cannot be satisfied (§5.5.1.1). Token issuance re-tags that claim onto the ID token and
+access token.
+
 Two exceptions stay outside the redirect: `prompt=none` without a session raises `login_required`
 per OpenID Connect Core §3.1.2.1, and `POST /Connect/Interact` from an unauthenticated caller answers
 `401` rather than a redirect the XHR caller cannot follow.
@@ -149,12 +162,16 @@ endpoints below are the ones the code implements:
 | `UseRefreshTokenFlow()`      | `refresh_token`                                                   | `RefreshTokenFlowFeature`                                               |
 | `UseDeviceFlow()`            | `urn:ietf:params:oauth:grant-type:device_code`, `/Connect/Device` (RFC 8628 §§3.1, 3.4) | `DeviceFlowFeature` (+ `InteractionFeature`)                            |
 | `UseTokenExchange()`         | `urn:ietf:params:oauth:grant-type:token-exchange` (RFC 8693 §2.1)                       | `TokenExchangeFeature`                                                  |
+| `UseJwtBearerGrant()`        | `urn:ietf:params:oauth:grant-type:jwt-bearer` (RFC 7523 §3.1; needs a trusted issuer)   | `JwtBearerGrantFeature<TApp>`                                           |
+| `UseRichAuthorizationRequests()` | `authorization_details` at `/Connect/Authorize` (RFC 9396 §6; ignored when the feature is absent) | `RichAuthorizationFeature<TApp, TToken>`                              |
 | `UseIntrospection()`         | `/Connect/Introspect` (RFC 7662 §§2.1–2.2)                                             | `IntrospectionFeature`                                                  |
 | `UseRevocation()`            | `/Connect/Revoke` (RFC 7009 §§2.1–2.2)                                                 | `RevocationFeature`                                                     |
+| `UseDynamicClientRegistration()` | `/Connect/Register` (OIDC DCR 1.0 §§3.1-3.3; registration gated by a host-supplied `IInitialAccessTokenValidator`; anonymous requests rejected with 401) | `DynamicRegistrationFeature`                                            |
 | `UseUserInfo()`              | `/Connect/Profile` (OpenID Connect Core 1.0 §5.3)                                     | `UserInfoFeature`                                                       |
 | `UseEndSession()`            | `/Connect/EndSession` (OpenID Connect RP-Initiated Logout 1.0 §2)                     | `EndSessionFeature`                                                     |
 | `UseFrontChannelLogout()`    | front-channel logout metadata                                     | `FrontChannelLogoutFeature`                                             |
 | `UseBackChannelLogout()`     | back-channel logout queue + notifier                              | `BackChannelLogoutFeature`                                              |
+| `UsePairwiseSubjects()`      | pairwise `sub` projection + discovery advertisement (OIDC Core 1.0 §8)  | `PairwiseFeature<TApp>`                                                 |
 
 `UseCodeFlow` and `UseRefreshTokenFlow` accept optional `Action<CodeFlowOptions>` /
 `Action<RefreshTokenFlowOptions>` configurators. `TokenFeature` is shared: any grant that lands on
@@ -176,8 +193,8 @@ ordered chains.
 
 | Interface                                                                                                                                                                        | Generic params     | Role                                                        | Built-ins                                                                                                                                                                                                                                                                                                        |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `IDiscoveryAdvisor`                                                                                                                                                              | —                  | Populate the discovery document                             | `AdviceDiscoveryBase` plus one per flow (`AdviceDiscoveryCodeFlow`, `AdviceDiscoveryRefreshToken`, `AdviceDiscoveryDeviceFlow`, `AdviceDiscoveryIntrospection`, `AdviceDiscoveryRevocation`, `AdviceDiscoveryUserInfo`, `AdviceDiscoveryEndSession`, …)                                                          |
-| `IClaimsAdvisor`                                                                                                                                                                 | —                  | Enrich the principal before token issuance                  | `AdviceClaimsAudience<TApp>`, `AdviceClaimsPairwise<TApp>`, and `AdviceClaimsSubject` (Identity bridge)                                                                                                                                                                                                         |
+| `IDiscoveryAdvisor`                                                                                                                                                              | —                  | Populate the discovery document                             | `AdviceDiscoveryBase`, `AdviceDiscoveryClientAuthentication`, and `AdviceDiscoveryAcrValues` plus one per flow (`AdviceDiscoveryCodeFlow`, `AdviceDiscoveryRefreshToken`, `AdviceDiscoveryDeviceFlow`, `AdviceDiscoveryIntrospection`, `AdviceDiscoveryRevocation`, `AdviceDiscoveryUserInfo`, `AdviceDiscoveryEndSession`, …) |
+| `IClaimsAdvisor`                                                                                                                                                                 | —                  | Enrich the principal before token issuance                  | `AdviceClaimsAudience`, `AdviceClaimsAuthenticationContext`, `AdviceClaimsPairwise<TApp>` (pairwise flow feature), and `AdviceClaimsSubject` (Identity bridge)                                                                                                                                                         |
 | `IDestinationAdvisor`                                                                                                                                                            | —                  | Route each claim to access token, ID token, and/or UserInfo | `AdviceDestinationSubject`, `Advice{Profile,Email,Phone,Address,Role}ClaimDestination`                                                                                                                                                                                                                           |
 | `ITokenRequestAdvisor<TApp>`                                                                                                                                                     | `TApp`             | Validate the token request                                  | `AdviceRequestEndpointPermission`, `AdviceRequestGrantPermission`, `AdviceRequestScopeValidation`                                                                                                                                                                                                                |
 | `IAuthorizeAdvisor<TApp>`                                                                                                                                                        | `TApp`             | Validate the authorize request                              | `AdviceAuthorizeClientAndRedirect`, `AdviceAuthorizeEndpointPermission`, `AdviceAuthorizeGrantPermission`, `AdviceAuthorizeScopeValidation`, `AdviceAuthorizePkce`, `AdviceAuthorizeNonce`, `AdviceAuthorizePrompt`, `AdviceAuthorizeResponseMode`, `AdviceAuthorizeConsent`, `AdviceAuthorizeAutoApproveSignIn` |
@@ -200,10 +217,12 @@ advisors use.
 ## Audience and application bindings
 
 `SchemataApplication.Name` aliases the OAuth `ClientId`; its canonical name is a distinct AIP-122
-reference such as `applications/test-client`. `AdviceClaimsAudience<TApp>` preserves an explicit
-`aud` claim. Otherwise, it resolves the `client_id` through `IApplicationManager<TApp>` and adds the
-application's canonical name as `aud`. A missing application or blank canonical name leaves the
-claim set unchanged.
+reference such as `applications/test-client`. `AdviceClaimsAudience` preserves an explicit
+`aud` claim set. Otherwise, it mints two claims, each pre-tagged with a single destination so the
+destination split routes them without further handling: the access token carries
+`aud = DefaultResource ?? Issuer` (RFC 8707 §2 default resource; RFC 9068 §2.2), and the ID token
+carries `aud = client_id` (OIDC Core §2), skipped when the claim set holds no client. A blank
+`DefaultResource` and `Issuer` leave the access-token audience unset.
 
 `SchemataToken.Application` and `SchemataAuthorization.Application` persist the canonical
 application reference. Authorization-code and refresh-token exchange compare that value with the
@@ -219,13 +238,25 @@ reference.
 The managers are open-generic over their entity type and take a `CancellationToken` on every
 method. Key lookups:
 
-- `IApplicationManager<TApp>`: `FindByClientIdAsync`, `ValidateClientSecretAsync`,
-  `HasPermissionAsync`.
+- `IApplicationManager<TApp>`: `FindByClientIdAsync`, `ValidateRedirectUriAsync`,
+  `ValidatePostLogoutRedirectUriAsync`, `HasPermissionAsync`, and the `Set*` property helpers.
 - `IScopeManager<TScope>`: `FindByNameAsync`, `ListAsync`.
 - `IAuthorizationManager<TAuth>`: `CreateAsync` and lifecycle queries.
-- `ITokenManager<TToken>`: `FindByReferenceIdAsync`, `FindByNameAsync`, `ListBySubjectAsync`,
-  `ListBySessionAsync`, `CreateAsync`, `RevokeByAuthorizationAsync`, and `PruneAsync(threshold,
-ct)` for cleanup.
+- `ITokenStore<TToken>`: OAuth row queries and state (`FindByReferenceIdAsync`,
+  `FindByNameAsync`, `ListByParentAsync`, `ListBySessionAsync`, `CreateAsync`, `TryRedeemAsync`,
+  `RevokeAsync`, `RevokeByAuthorizationAsync`, `RevokeBySessionAsync`, `PruneAsync(ct)`) plus
+  key-value slot operations (`GetAsync`, `GetOrCreateAsync`, `SetAsync`, `RemoveAsync`). The
+  plain slot resolves to the repository-backed store; the `nonce`, `jti`, and `rate-slot` keyed
+  slots resolve to the cache-backed store.
+
+Client credentials and assertion keys live in security rows addressed through `SecurityParents`
+(`Application(app)` builds `applications/{ClientId}`, `Issuer(issuer)` returns the issuer URI)
+and read through `ISecurityStore<TSecurity>`, which `UseSecurity()` registers. The shared
+`ClientSecretValidator` verifies the presented secret against the client's newest valid
+`password` row (`usage=authentication`) with `ISecretVerifier`; `client_secret_jwt` reads
+`secret` rows; `private_key_jwt` loads JOSE material from `jwk`, `jwks`, and `jwks-uri` rows
+through `ToKeyMaterialAsync`, adapted by `SecurityKeyAdapter`.
+Rows persist verbatim, in plaintext at rest.
 
 ## Background jobs
 
@@ -235,7 +266,7 @@ registration plus a known-only job entry) and adds a `JobRegistration` to
 `SchemataSchedulingOptions.Jobs` with a
 `CronSchedule("0 * * * *")` — hourly at minute 0. That extension is the registration helper for
 feature authors; application code registers jobs through `WithJob<T>()`. The job calls
-`ITokenManager<TToken>.PruneAsync`. This needs `SchemataSchedulingFeature` and the `TToken`
+`ITokenStore<TToken>.PruneAsync`, and the store owns its clock. This needs `SchemataSchedulingFeature` and the `TToken`
 repository registered.
 
 `UseBackChannelLogout()` registers `BackChannelLogoutFeature`, which wires
@@ -260,36 +291,41 @@ and adds `AdviceClaimsSubject` to the `IClaimsAdvisor` chain. `IdentitySubjectPr
 
 ## Entity types
 
-All five entities use `Guid Uid` as the primary key and carry `[PrimaryKey(nameof(Uid))]`:
+All entities use `Guid Uid` as the primary key and carry `[PrimaryKey(nameof(Uid))]`:
 
 | Entity                  | Table                    | Canonical name                   | Notable properties                                                                                                                                      |
 | ----------------------- | ------------------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SchemataApplication`   | `SchemataApplications`   | `applications/{application}`     | `ClientId` (`Name` alias), `ClientSecret`, `ClientType`, `ConsentType`, `RequirePkce`, `RedirectUris`, `PostLogoutRedirectUris`, `Permissions`, `BackChannelLogoutUri` |
+| `SchemataApplication`   | `SchemataApplications`   | `applications/{application}`     | `ClientId` (`Name` alias), `ClientType`, `ConsentType`, `RequirePkce`, `RedirectUris`, `PostLogoutRedirectUris`, `Permissions`, `BackChannelLogoutUri` |
 | `SchemataAuthorization` | `SchemataAuthorizations` | `authorizations/{authorization}` | `Application` (canonical reference), `Subject`, `Type`, `Status`, `Scopes`, `CodeChallengeMethod`                                                        |
 | `SchemataScope`         | `SchemataScopes`         | `scopes/{scope}`                 | `Name`, `Resources`                                                                                                                                     |
-| `SchemataToken`         | `SchemataTokens`         | `tokens/{token}`                 | `Application` and `Authorization` (canonical references), `Subject`, `SessionId`, `Type`, `Status`, `Format`, `ReferenceId`, `Payload`, `ExpireTime` |
+| `SchemataToken`         | `SchemataTokens`         | `tokens/{token}`                 | `Parent` (subject reference), `Application` and `Authorization` (canonical references), `Provider`, `SessionId`, `Type`, `Status`, `Format`, `ReferenceId`, `Payload`, `Value` (slot payload), `ExpireTime`; defined in `Schemata.Security.Skeleton` |
 | `SchemataSubjectMapping` | `SchemataSubjectMappings` | `subjectMappings/{subjectMapping}` | `Application` (canonical reference), `CanonicalSubject`, `PairwiseSubject`, `SectorHost` |
+| `SchemataSecurity`      | `SchemataSecurities`     | `securities/{security}`          | `Parent` (host-resource canonical name or issuer URI), `Kind`, `Algorithm`, `Usage`, `Kid`, `Value` (plaintext material), `Status`; defined in `Schemata.Security.Skeleton` |
 
 ## SchemataAuthorizationOptions
 
-Key material is required; lifetimes and formats have defaults:
+Signing and encryption key material is served from security rows under the issuer, and client
+secrets live in rows under each application (see Managers). Lifetimes and formats have defaults:
 
 | Property                                    | Default          | Notes                                                       |
 | ------------------------------------------- | ---------------- | ----------------------------------------------------------- |
 | `Issuer`                                    | —                | Required (`iss` claim, discovery base URL)                  |
-| `SigningKey` / `SigningAlgorithm`           | —                | Required; `AddEphemeralSigningKey(alg)` generates a dev key |
-| `EncryptionKey` / `EncryptionAlgorithm`     | `null`           | Optional JWE; `AddEphemeralEncryptionKey(alg)` available    |
+| Issuer signing rows                         | —                | `SchemataSecurity` rows under `SecurityParents.Issuer(Issuer)` with `usage=signing`; the newest `valid` row signs, `valid` and `retired` rows verify |
+| Issuer encryption rows                      | none             | `usage=encryption` rows; the newest `valid` row encrypts JWE output, with the row `Algorithm` as the JWE `alg` |
+| `ContentEncryptionAlgorithm`                | `A256CBC-HS512`  | JWE `enc` for encrypted tokens |
 | `AccessTokenFormat`                         | `Jwe`            | `Jwt`, `Jwe`, or `Reference`                                |
 | `RefreshTokenFormat`                        | `Reference`      |                                                             |
 | `AccessTokenLifetime` / `IdTokenLifetime`   | 1 hour           |                                                             |
 | `RefreshTokenLifetime`                      | 14 days          |                                                             |
 | `AuthorizationCodeLifetime`                 | 10 minutes       |                                                             |
 | `DeviceCodeLifetime` / `DeviceCodeInterval` | 15 minutes / 5 s |                                                             |
-| `SubjectType`                               | `Public`         | `Public` or `Pairwise`; pairwise subjects derive from the application's `SectorIdentifierUri` (or first redirect URI host) and the global `PairwiseSalt`. `PairwiseSubjectTranslator<TApp>` persists canonical-subject-to-pairwise-subject mappings in `SchemataSubjectMapping`. |
+| `SubjectType`                               | `Public`         | `Public` or `Pairwise`; pairwise projection requires `UsePairwiseSubjects()` and derives from the application's `SectorIdentifierUri` (or first redirect URI host) and the global `PairwiseSalt`. `PairwiseSubjectTranslator<TApp>` persists canonical-subject-to-pairwise-subject mappings in `SchemataSubjectMapping`. |
 | `DeviceVerificationUri`                     | `null`           | Required by the device flow                                 |
 | `BearerScheme` / `CodeScheme`               | scheme constants | Authentication scheme names                                 |
+| `AcrValuesSupported`                        | empty            | Authentication Context Classes the deployment supports; advertised as the discovery `acr_values_supported` array and omitted while empty |
+| `JwtBearerTrustedIssuers`                  | empty            | `jwt-bearer` grant trust anchors (RFC 7523); register each external issuer's public key through `AddJwtBearerTrustedIssuer(issuer, key)` |
 
-`PermitResponseType(...)` and `AddEphemeral*Key(...)` are fluent helpers on the options object.
+`PermitResponseType(...)` and `AddJwtBearerTrustedIssuer(...)` are fluent helpers on the options object. DPoP proof configuration lives on `DPopOptions` (`SigningAlgorithms` / `ProofTimeWindow` / `NonceLifetime` defaulting to the nine RFC 7518 algorithms / 30 s / 5 min, plus `RequireAllClients`); `AddSchemataAuthorization()` registers it, and `UseDemonstratingProofOfPossession()` customizes it.
 
 ## Extension points
 
@@ -302,16 +338,51 @@ Key material is required; lifetimes and formats have defaults:
 | `IClientAuthentication<TApp>`            | Add a client authentication method.                            |
 | `ISubjectProvider`                       | Provide the subject identifier (wired by the Identity bridge). |
 
+## Standards compliance
+
+Every row is judged by the full path — binding, advisor, issuance, storage, wire — never by a
+CLR type or field name alone. Grades: **Enforced** (verified end to end), **Partial** (core
+behavior present, remainder planned), **Application responsibility** (the framework provides the
+mechanism; the host configures it).
+
+| Spec | Area | Grade |
+|---|---|---|
+| RFC 6749 §3.1/§3.2 | Duplicate-parameter rejection at binding | Enforced |
+| RFC 6749 §4.1.2/§10.5 | Authorization-code single use; replay cascades revocation of derived tokens | Enforced |
+| RFC 6749 §5.2, OIDC Core §3.1.2.6 | Token-endpoint error-code families | Enforced |
+| RFC 8252 §7.3/§8.3 | Loopback redirect URI port variance (`localhost` excluded by §8.3) | Enforced |
+| RFC 9068 §2.1/§2.2, RFC 8707 §2 | Access token `typ: at+jwt`; `aud` = `DefaultResource ?? Issuer` when no resource parameter is sent | Enforced |
+| OIDC Core §2 | ID token `aud` = `client_id` | Enforced |
+| RFC 7517 §4.5 | JWKS publishes every valid and retired issuer signing row with its `kid`; multi-key sets require `kid` on each row | Enforced |
+| RFC 9700 §4.16 | Rendered pages carry `X-Frame-Options: DENY` and `CSP: frame-ancestors 'self'` | Enforced |
+| RFC 9700 §2.6, RFC 10017 §6.3.3.4 | CORS on public token endpoints | Application responsibility — `SchemataCorsFeature` wires app-level CORS; the host decides origins and reachable endpoints |
+| Front-Channel Logout §2 | `iss` and `sid` appended to `frontchannel_logout_uri` as a pair | Enforced |
+| Back-Channel Logout §2.4 | Logout token `typ: logout+jwt` | Enforced |
+| RP-Initiated Logout §2 | OP session invalidation before RP notifications; failure closes the logout | Enforced |
+| OIDC DCR §2-§3 | Dynamic registration: full metadata validation, 201 creation with paired registration access token + `registration_client_uri`, Bearer read-back; registration requests pass an initial access token gate satisfied by a host-supplied `IInitialAccessTokenValidator` (anonymous requests rejected with 401); software statements are unapproved unless the host supplies a trusting validator | Enforced (registration surface) |
+| RFC 8707 §3 | `resource` at the authorize and token endpoints: §2 syntax validation (`invalid_target`), code-payload and refresh-subset grant consistency, access-token `aud` restriction, introspection echo | Enforced |
+| OIDC Core §5.3/§5.5 | UserInfo endpoint over bearer with the `openid` scope; `acr_values` voluntary satisfiability per §5.5.1.1 — the satisfied requested class is stamped as `acr` (level walk, stronger performed authentication covers a weaker request), an unsatisfiable request keeps the performed level, discovery `acr_values_supported` | Enforced (endpoint, `acr` semantics) / Not implemented (`claims` request parameter, signed UserInfo responses) |
+| RFC 9396 | `authorization_details` validated against registered type descriptors and the client's `authorization_details_types` subset (§10), persisted onto grants, echoed at code exchange, discovery `authorization_details_types_supported`; without the feature the parameter is ignored and reaches no grant | Enforced (behind `UseRichAuthorizationRequests()`) |
+| RFC 7523 | Assertion client authentication (`client_secret_jwt`, `private_key_jwt`); §3.1 `jwt-bearer` grant anchored on the `JwtBearerTrustedIssuers` table — an assertion issuer without an entry is rejected, and an empty table leaves the grant unusable | Enforced |
+| RFC 9449 | DPoP proof validation, key-bound tokens, server nonces, discovery metadata, `dpop_jkt` authorize binding | Enforced (behind `UseDemonstratingProofOfPossession()`) |
+
 ## Caveats
 
-- The options validation runs in `PostConfigure`, so a missing `SigningKey`, `SigningAlgorithm`, or
-  `Issuer` surfaces as an `InvalidOperationException` when the options are first resolved.
+- `Issuer` validation runs in `PostConfigure`, so a missing value surfaces as an
+  `InvalidOperationException` when the options are first resolved. Token issuance resolves the
+  signing rows under the issuer and throws the same exception when no valid signing row exists,
+  when that row carries no algorithm or loadable material, or when a multi-key set carries a
+  blank key id.
 - The bridge is opt-in. Without `.UseIdentity()` on the authorization builder, tokens carry only
   the base claims; user claims do not appear.
 - The device flow requires `DeviceVerificationUri`.
-- Pairwise subjects require a `SchemataSubjectMapping` repository so `PairwiseSubjectTranslator<TApp>`
-  can retain its canonical-subject-to-pairwise-subject mappings.
+- Pairwise subjects require `UsePairwiseSubjects()` and a `SchemataSubjectMapping` repository so
+  `PairwiseSubjectTranslator<TApp>` can retain its canonical-subject-to-pairwise-subject mappings.
 - Token cleanup needs `SchemataSchedulingFeature` and a registered `TToken` repository.
+- DPoP proof replay markers and server-provided nonces live in `ICacheProvider`: proof markers
+  under direct cache keys, server nonces through the cache-backed `nonce` token-store slot. A
+  multi-instance deployment needs a distributed implementation (Redis, SQL) so the caches are
+  shared across nodes.
 
 ## See also
 

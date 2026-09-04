@@ -17,21 +17,23 @@ then drive the authorization-code + PKCE flow with `curl`.
   Core.
 - `Schemata.Authorization.Foundation` and `Schemata.Identity.Foundation` added. The server needs
   Identity to authenticate the resource owner.
-- A signing key. The example generates an ephemeral one; production should load a persisted key.
+- A signing key. The example seeds an RSA key as a security row under the issuer; production
+  deployments rotate rows instead of replacing files.
 
 ```shell
 dotnet add package --prerelease Schemata.Authorization.Foundation
 dotnet add package --prerelease Schemata.Identity.Foundation
 ```
 
-## Step 1 — Add the authorization tables
+## Step 1 — Add the authorization and security tables
 
-Add the four entities to your `DbContext` (here on top of `IdentityDbContext`, since you need
-Identity):
+Add the authorization and security entities to your `DbContext` (here on top of
+`IdentityDbContext`, since you need Identity):
 
 ```csharp
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 
 public class AppDbContext(DbContextOptions<AppDbContext> options)
     : IdentityDbContext<SchemataUser, SchemataRole, Guid, ...>(options)
@@ -39,20 +41,22 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<SchemataApplication>   Applications   => Set<SchemataApplication>();
     public DbSet<SchemataAuthorization> Authorizations => Set<SchemataAuthorization>();
     public DbSet<SchemataScope>         Scopes         => Set<SchemataScope>();
+    public DbSet<SchemataSecurity>      Securities     => Set<SchemataSecurity>();
     public DbSet<SchemataToken>         Tokens         => Set<SchemataToken>();
 }
 ```
 
 Each entity carries `[PrimaryKey(nameof(Uid))]` and its own `[Table]`; the tables are
-`SchemataApplications`, `SchemataAuthorizations`, `SchemataScopes`, `SchemataTokens`.
+`SchemataApplications`, `SchemataAuthorizations`, `SchemataScopes`, `SchemataSecurities`, `SchemataTokens`.
 
-**Verify:** `dotnet ef migrations add AddAuthorization` produces a migration creating all four
+**Verify:** `dotnet ef migrations add AddAuthorization` produces a migration creating all five
 tables.
 
 ## Step 2 — Register the server
 
 ```csharp
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository.Advisors;
 
@@ -66,10 +70,11 @@ var builder = WebApplication.CreateBuilder(args)
         // Identity authenticates the resource owner; register it before Authorization.
         schema.UseIdentity<SchemataUser, SchemataRole, SchemataUserStore<SchemataUser>, SchemataRoleStore<SchemataRole>>();
 
+        schema.UseSecurity();
+
         schema.UseAuthorization(o => {
                   o.Issuer         = "https://localhost:5001";
                   o.InteractionUri = "https://localhost:5001/consent"; // your consent SPA
-                  o.AddEphemeralSigningKey();
                   o.PermitResponseType("code");
               })
               .UseIdentity()           // bridge Identity claims into tokens
@@ -81,6 +86,7 @@ var builder = WebApplication.CreateBuilder(args)
             services.AddRepository<SchemataApplication, EfCoreRepository<AppDbContext, SchemataApplication>>();
             services.AddRepository<SchemataAuthorization, EfCoreRepository<AppDbContext, SchemataAuthorization>>();
             services.AddRepository<SchemataScope, EfCoreRepository<AppDbContext, SchemataScope>>();
+            services.AddRepository<SchemataSecurity, EfCoreRepository<AppDbContext, SchemataSecurity>>();
             services.AddRepository<SchemataToken, EfCoreRepository<AppDbContext, SchemataToken>>()
                 .UseEntityFrameworkCore<AppDbContext>(
                     (_, opts) => opts.UseSqlite("Data Source=app.db"));
@@ -95,9 +101,10 @@ consent, and interaction advisors; `UseRefreshTokenFlow()` adds the refresh gran
 adds `/Connect/Profile`. The `.UseIdentity()` on the authorization builder wires user claims into
 issued tokens.
 
-`Issuer`, a signing key, and a signing algorithm are required. The validation runs in
-`PostConfigure`, so a missing value surfaces as `InvalidOperationException` when the options first
-resolve.
+`Issuer` is required. The validation runs in `PostConfigure`, so a missing value surfaces as
+`InvalidOperationException` when the options first resolve. The signing key itself is a
+`SchemataSecurity` row under the issuer, seeded in Step 3; token issuance throws
+`InvalidOperationException` when no valid signing row exists.
 
 **Verify:** `dotnet run` starts, and `curl https://localhost:5001/.well-known/openid-configuration`
 returns JSON with `issuer`, `authorization_endpoint`, and `token_endpoint`.
@@ -130,7 +137,7 @@ if (await apps.FindByClientIdAsync("my-spa", default) is null)
     await apps.CreateAsync(new SchemataApplication {
         ClientId     = "my-spa",
         ClientType   = "public",                 // ClientTypes.Public — no client secret
-        DisplayName  = "My SPA",
+        ClientName   = "My SPA",
         RedirectUris = { "https://app.example.com/callback" },
         Permissions  = {
             "e:/Connect/Authorize",
@@ -141,6 +148,40 @@ if (await apps.FindByClientIdAsync("my-spa", default) is null)
             "s:profile",
             "s:api",
         },
+    }, default);
+}
+```
+
+The server signs every token with its newest valid signing row under the issuer, so seed one at
+startup:
+
+```csharp
+using System.Security.Cryptography;
+using Schemata.Security.Skeleton;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
+
+var securities = sp.GetRequiredService<ISecurityStore<SchemataSecurity>>();
+
+var hasSigningKey = false;
+await foreach (var _ in securities.ListByParentAsync(
+                   "https://localhost:5001", SecurityConstants.Kinds.PrivateKey,
+                   SecurityConstants.Usages.Signing, SecurityConstants.Statuses.Valid)) {
+    hasSigningKey = true;
+    break;
+}
+
+if (!hasSigningKey) {
+    using var rsa = RSA.Create(2048);
+    await securities.CreateAsync(new SchemataSecurity {
+        Parent    = "https://localhost:5001",   // the issuer URI itself
+        Name      = "issuer-signing",
+        Kind      = SecurityConstants.Kinds.PrivateKey,
+        Usage     = SecurityConstants.Usages.Signing,
+        Algorithm = "RS256",
+        Kid       = "signing-1",
+        Value     = rsa.ExportPkcs8PrivateKeyPem(),
+        Status    = SecurityConstants.Statuses.Valid,
     }, default);
 }
 ```
@@ -223,8 +264,10 @@ Constraints: `TApp : SchemataApplication`, `TAuth : SchemataAuthorization, new()
 
 ## Common pitfalls
 
-**`InvalidOperationException` for `SigningKey` / `SigningAlgorithm` / `Issuer`** — all three are
-required and validated in `PostConfigure`. Set them in the `UseAuthorization` delegate.
+**`InvalidOperationException` for `Issuer`** — validated in `PostConfigure`; set it in the
+`UseAuthorization` delegate. Token issuance also throws when the issuer has no valid signing
+row, when that row carries no `Algorithm` or loadable material, or when a multi-key set carries
+a blank `Kid`. Seed the signing row (Step 3) before issuing tokens.
 
 **`UseCodeFlow()` requires an absolute `InteractionUri`** — `AuthorizationCodeFlowFeature` checks it
 once at startup and throws `InvalidOperationException` for a blank value or one that is relative.
@@ -246,7 +289,8 @@ base claims; `sub`, `email`, and `role` come from the bridge.
 
 **Token cleanup** — the core feature schedules `TokenCleanupJob<TToken>` hourly through the
 Scheduling job model (`CronSchedule("0 * * * *")`). It needs `SchemataSchedulingFeature` and a
-registered `TToken` repository, and calls `ITokenManager.PruneAsync`.
+registered `TToken` repository, and calls `ITokenStore<TToken>.PruneAsync`; the store owns its
+clock.
 
 ## See also
 

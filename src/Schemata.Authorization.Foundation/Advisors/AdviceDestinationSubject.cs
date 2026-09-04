@@ -26,8 +26,10 @@ namespace Schemata.Authorization.Foundation.Advisors;
 /// <remarks>
 ///     <c>sub</c> always goes to all three destinations (access token, id token, userinfo).
 ///     <c>client_id</c> goes to access tokens only.
-///     <c>aud</c> goes to access and identity tokens.
+///     A claim already carrying a destination property owns its routing and is left untouched;
+///     this advisor only assigns destinations to untagged claims.
 /// </remarks>
+/// <seealso cref="AdviceClaimsAudience" />
 /// <seealso cref="AdviceDestinationProfile" />
 public sealed class AdviceDestinationSubject : IDestinationAdvisor
 {
@@ -45,6 +47,12 @@ public sealed class AdviceDestinationSubject : IDestinationAdvisor
         ClaimsPrincipal   principal,
         CancellationToken ct = default
     ) {
+        if (claim.Properties.ContainsKey(ClaimDestinations.AccessToken)
+         || claim.Properties.ContainsKey(ClaimDestinations.IdentityToken)
+         || claim.Properties.ContainsKey(ClaimDestinations.UserInfo)) {
+            return Task.FromResult(AdviseResult.Continue);
+        }
+
         switch (claim.Type) {
             case IdentityClaims.Subject:
                 destinations.Add(ClaimDestinations.AccessToken);
@@ -67,6 +75,10 @@ public sealed class AdviceDestinationSubject : IDestinationAdvisor
                 destinations.Add(ClaimDestinations.AccessToken);
 
                 destinations.Add(ClaimDestinations.IdentityToken);
+
+                return Task.FromResult(AdviseResult.Handle);
+            case Claims.Resources:
+                destinations.Add(ClaimDestinations.AccessToken);
 
                 return Task.FromResult(AdviseResult.Handle);
             default:

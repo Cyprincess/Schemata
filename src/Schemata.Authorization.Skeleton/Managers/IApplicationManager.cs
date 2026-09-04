@@ -24,15 +24,6 @@ public interface IApplicationManager<TApplication>
     Task<TApplication?> FindByClientIdAsync(string? clientId, CancellationToken ct = default);
 
     /// <summary>
-    ///     Validates a client secret against the stored hash.
-    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-2.3.1">
-    ///         RFC 6749: The OAuth 2.0 Authorization
-    ///         Framework §2.3.1: Client Password
-    ///     </seealso>
-    /// </summary>
-    Task<bool> ValidateClientSecretAsync(TApplication? application, string? secret, CancellationToken ct = default);
-
-    /// <summary>
     ///     Validates that a redirect URI is registered for the application.
     ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-3.1.2">
     ///         RFC 6749: The OAuth 2.0 Authorization
@@ -51,11 +42,8 @@ public interface IApplicationManager<TApplication>
     /// <summary>Checks whether the application has a specific permission.</summary>
     Task<bool> HasPermissionAsync(TApplication? application, string? permission, CancellationToken ct = default);
 
-    /// <summary>Stores a hashed client secret for the application.</summary>
-    Task SetClientSecretAsync(TApplication? application, string? secret, CancellationToken ct = default);
-
-    /// <summary>Sets the display name for the application.</summary>
-    Task SetDisplayNameAsync(TApplication? application, string? name, CancellationToken ct = default);
+    /// <summary>Sets the <c>client_name</c> for the application.</summary>
+    Task SetClientNameAsync(TApplication? application, string? name, CancellationToken ct = default);
 
     /// <summary>Sets localized display names for the application.</summary>
     Task SetDisplayNamesAsync(

@@ -8,18 +8,18 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
-using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
-using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Models;
-using Schemata.Common;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
@@ -36,15 +36,14 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     </seealso>
 ///     .
 /// </summary>
-public sealed class AuthorizeHandler<TApp, TToken>(
-    ITokenManager<TToken>                  tokens,
+public sealed class AuthorizeHandler<TApp>(
+    ITokenStore<SchemataToken>                    tokens,
     TokenService                           issuer,
     IOptions<SchemataAuthorizationOptions> options,
     IOptions<JsonSerializerOptions>        json,
     TimeProvider?                          time = null
 ) : AuthorizeEndpoint
     where TApp : SchemataApplication
-    where TToken : SchemataToken, new()
 {
     private readonly TimeProvider _time = time ?? TimeProvider.System;
 
@@ -90,7 +89,7 @@ public sealed class AuthorizeHandler<TApp, TToken>(
         var reference = issuer.CreateReference();
         var payload   = JsonSerializer.Serialize(authz.Request, json.Value);
 
-        var interaction = new TToken {
+        var interaction = new SchemataToken {
             Name        = Guid.NewGuid().ToString("n"),
             Application = authz.Application.CanonicalName,
             Type        = TokenTypes.Interaction,

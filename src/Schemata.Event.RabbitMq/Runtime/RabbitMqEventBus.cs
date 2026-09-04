@@ -68,7 +68,7 @@ public sealed class RabbitMqEventBus : IEventBus
         where TEvent : IEvent {
         // Resolve by the runtime type so a derived event published through a base/interface
         // static type keeps its registered name and serialized derived members.
-        var type       = @event!.GetType();
+        var type       = @event.GetType();
         var routingKey = _registry.RequireName(type);
 
         using var scope = _services.CreateScope();

@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Authorization.Foundation.Authentication;
@@ -20,7 +21,6 @@ public class EndSessionHandlerShould
 {
     private static EndSessionHandler<SchemataApplication> CreateHandler(ILogoutNotifier? notifier = null) {
         var opts = new SchemataAuthorizationOptions();
-        opts.AddEphemeralSigningKey();
         opts.Issuer = "https://localhost";
 
         var apps = new Mock<IApplicationManager<SchemataApplication>>();
@@ -28,7 +28,7 @@ public class EndSessionHandlerShould
                                                              It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        var tokenService = new TokenService(Options.Create(opts));
+        var tokenService = TestSecurityKeys.CreateTokenService(opts);
 
         var services = new ServiceCollection();
         if (notifier is not null) {
@@ -37,7 +37,8 @@ public class EndSessionHandlerShould
 
         var sp = services.BuildServiceProvider();
 
-        return new(apps.Object, tokenService, Options.Create(opts), sp);
+        return new(apps.Object, tokenService, Options.Create(opts), new NoOpOpSessionService(), sp,
+                    NullLogger<EndSessionHandler<SchemataApplication>>.Instance);
     }
 
     private static ClaimsPrincipal AnonymousUser() { return new(new ClaimsIdentity()); }

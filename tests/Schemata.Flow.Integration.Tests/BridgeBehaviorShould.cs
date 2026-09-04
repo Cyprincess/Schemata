@@ -92,6 +92,6 @@ public sealed class BridgeBehaviorShould : IClassFixture<EfCoreFlowFixture>
         var       repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataProcessToken>>();
         var token = await repository.FirstOrDefaultAsync(query => query.Where(current => current.Process == process));
         Assert.NotNull(token);
-        return token!;
+        return token;
     }
 }

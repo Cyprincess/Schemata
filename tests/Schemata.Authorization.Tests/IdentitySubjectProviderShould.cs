@@ -9,7 +9,6 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Authorization.Identity;
 using Schemata.Authorization.Skeleton;
-using Schemata.Common;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Managers;
 using Schemata.Identity.Skeleton.Stores;

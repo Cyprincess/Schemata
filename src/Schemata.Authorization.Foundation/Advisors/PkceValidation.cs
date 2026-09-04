@@ -2,7 +2,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 
 /// <summary>
 ///     Shared RFC 7636 shape validation for <c>code_verifier</c> and <c>code_challenge</c>, used by
-///     <see cref="AdviceAuthorizePkce{TApp}" /> and <see cref="AdviceCodeExchangePkce{TApp, TToken}" />.
+///     <see cref="AdviceAuthorizePkce{TApp}" /> and <see cref="AdviceCodeExchangePkce{TApp}" />.
 /// </summary>
 internal static class PkceValidation
 {

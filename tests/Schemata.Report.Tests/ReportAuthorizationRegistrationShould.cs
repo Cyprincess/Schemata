@@ -25,7 +25,7 @@ public sealed class ReportAuthorizationRegistrationShould
     [Fact]
     public void Activation_Registers_Only_Its_Security_Stage() {
         var services = new ServiceCollection();
-        var builder  = new Foundation.SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services);
+        var builder  = new SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services);
 
         builder.WithAuthorization();
 
@@ -40,7 +40,7 @@ public sealed class ReportAuthorizationRegistrationShould
     [Fact]
     public void Combined_Activation_Registers_Both_Security_Stages() {
         var services = new ServiceCollection();
-        var builder  = new Foundation.SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services);
+        var builder  = new SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services);
 
         builder.WithAuthentication().WithAuthorization();
 
@@ -55,7 +55,7 @@ public sealed class ReportAuthorizationRegistrationShould
     [Fact]
     public void Authorization_Resolves_Run_Closure_To_Report_Operation_And_Entity() {
         var services = new ServiceCollection();
-        new Foundation.SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services).WithAuthorization();
+        new SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services).WithAuthorization();
         var envelope = typeof(ResourceMethodRequest<SchemataReport, RunReportRequest, ReportResult>);
         var service  = typeof(IRequestPipelineAdvisor<,>).MakeGenericType(envelope, typeof(ReportResult));
 
@@ -76,7 +76,7 @@ public sealed class ReportAuthorizationRegistrationShould
     [Fact]
     public void Authorization_Resolves_Generate_Closure_To_Report_Operation_And_Entity() {
         var services = new ServiceCollection();
-        new Foundation.SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services).WithAuthorization();
+        new SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services).WithAuthorization();
         var envelope = typeof(ResourceMethodRequest<SchemataReport, GenerateReportRequest, Operation>);
         var service  = typeof(IRequestPipelineAdvisor<,>).MakeGenericType(envelope, typeof(Operation));
 
@@ -97,7 +97,7 @@ public sealed class ReportAuthorizationRegistrationShould
     [Fact]
     public void Authorization_Resolves_Read_Closure_To_Read_Operation_And_Snapshot_Entity() {
         var services = new ServiceCollection();
-        new Foundation.SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services).WithAuthorization();
+        new SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services).WithAuthorization();
         var service = typeof(IRequestPipelineAdvisor<,>).MakeGenericType(typeof(ReadSnapshotRequest), typeof(ReadSnapshotResponse));
 
         Assert.Contains(services, descriptor => descriptor.ServiceType == service

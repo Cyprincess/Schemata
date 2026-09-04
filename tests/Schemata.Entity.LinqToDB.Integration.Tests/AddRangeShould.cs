@@ -36,7 +36,7 @@ public class AddRangeShould : IAsyncLifetime
                 foreach (var student in batch) {
                     var found = await verifier.FirstOrDefaultAsync<Student>(q => q.Where(s => s.Uid == student.Uid));
                     Assert.NotNull(found);
-                    Assert.Equal(student.Name, found!.Name);
+                    Assert.Equal(student.Name, found.Name);
                 }
             }
         }

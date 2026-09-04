@@ -6,12 +6,14 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Foundation.Commands;
+using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
-using Schemata.Common;
+using Schemata.Authorization.Skeleton.Services;
 using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
@@ -36,7 +38,8 @@ public static class AdviceAuthorizeAutoApproveSignIn
 /// <seealso cref="AdviceAuthorizeConsent" />
 public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
     IOptions<SchemataAuthorizationOptions> authOptions,
-    IAuthorizationManager<TAuth>           authorizations
+    IAuthorizationManager<TAuth>           authorizations,
+    IAuthenticationContextProvider? contexts = null
 ) : IAuthorizeAdvisor<TApp>
     where TApp : SchemataApplication
     where TAuth : SchemataAuthorization, new()
@@ -75,14 +78,19 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
             new(Claims.ClientId, authz.Application.ClientId),
         };
 
+        var sid = authz.Principal?.FindFirstValue(authOptions.Value.SessionIdClaimType);
+        if (contexts is not null) {
+            claims.Stamp(await contexts.GetContextAsync(authz.Principal, ct));
+        }
+
         var response = new ClaimsPrincipal(new ClaimsIdentity(claims, SchemataAuthorizationSchemes.Bearer));
 
-        var sid = authz.Principal?.FindFirstValue(authOptions.Value.SessionIdClaimType);
-        var at  = authz.Principal?.FindFirstValue(Claims.AuthTime);
-
+        // The validating advisor owns the parameter: without its accepted grant set on the
+        // context, the request carries no authorization details.
+        var json = ctx.TryGet<AuthorizationDetailsGrant>(out var details) ? details?.Json : null;
         var authorization = new TAuth {
             Name                = Guid.NewGuid().ToString("n"),
-            Application         = authz.Application.CanonicalName,
+            Application         = authz.Application!.CanonicalName,
             Subject             = subject,
             Type                = AuthorizationTypes.AdHoc,
             Status              = TokenStatuses.Valid,
@@ -93,11 +101,14 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
             AcrValues           = authz.Request?.AcrValues,
         };
 
+        authorization.AuthorizationDetails = json;
+
         await authorizations.CreateAsync(authorization, ct);
 
         var properties = new Dictionary<string, string?> {
             [Properties.GrantType]           = GrantTypes.AuthorizationCode,
             [Properties.Scope]               = authz.Request?.Scope,
+            [Properties.Resources]           = authz.Request?.Resource is { Count: > 0 } ? string.Join(" ", authz.Request.Resource) : null,
             [Properties.ResponseType]        = authz.Request?.ResponseType,
             [Properties.Nonce]               = authz.Request?.Nonce,
             [Properties.RedirectUri]         = authz.Request?.RedirectUri,
@@ -105,11 +116,13 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
             [Properties.State]               = authz.Request?.State,
             [Properties.CodeChallenge]       = authz.Request?.CodeChallenge,
             [Properties.CodeChallengeMethod] = authz.Request?.CodeChallengeMethod,
+            [Properties.DpopJkt]             = authz.Request?.DpopJkt,
             [Properties.AuthorizationName]   = authorization.CanonicalName,
             [Properties.SessionId]           = sid,
             [Properties.MaxAge]              = authz.Request?.MaxAge,
-            [Properties.AuthTime]            = at,
         };
+
+        properties[Properties.AuthorizationDetails] = json;
 
         ctx.Set(AuthorizationResult.SignIn(response, properties));
 

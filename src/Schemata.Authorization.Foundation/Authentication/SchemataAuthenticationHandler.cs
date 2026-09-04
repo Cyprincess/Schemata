@@ -2,39 +2,57 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
+using System.Text;
 using System.Text.Encodings.Web;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Primitives;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Exceptions;
+using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
-using Schemata.Authorization.Skeleton.Managers;
-using Schemata.Common;
+using Schemata.Security.Skeleton;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Authentication;
 
 /// <summary>
-///     ASP.NET Core authentication handler for the Schemata Bearer token scheme. Bearer
-///     authentication validates stored access tokens. Direct compatibility sign-in calls delegate
+///     ASP.NET Core authentication handler serving both Schemata access-token schemes.
+///     It dispatches on the wire scheme of the Authorization header per RFC 9449 §7.1:
+///     "DPoP" requests validate a DPoP proof bound to the token, while "Bearer" requests
+///     reject DPoP-bound tokens per §7.2. Direct compatibility sign-in calls delegate
 ///     issuance to <see cref="IAuthorizationSignInService" /> and HTTP writing to
 ///     <see cref="IAuthorizationSignInHttpWriter" />.
 /// </summary>
-public class SchemataAuthenticationHandler<TApp, TToken>(
+/// <remarks>
+///     The DPoP scheme and its services are registered only by
+///     <see cref="Features.DPopFlowFeature{TApp}" />; the nullable proof validator and
+///     nonce store keep the handler constructible for hosts without that feature, whose
+///     DPoP flavor instance then never exists.
+/// </remarks>
+public class SchemataAuthenticationHandler<TApp>(
     IOptionsMonitor<SchemataAuthenticationHandlerOptions> options,
     ILoggerFactory                                        logger,
     UrlEncoder                                            encoder,
     TokenService                                          issuer,
-    ITokenManager<TToken>                                 tokens,
+    ITokenStore<SchemataToken>                                   tokens,
     IAuthorizationSignInService                           signIns,
-    IAuthorizationSignInHttpWriter                        writer
+    IAuthorizationSignInHttpWriter                        writer,
+    IOptions<DPopOptions>                                 dpop,
+    DPopProofValidator?                                   proofs = null,
+    [FromKeyedServices(SecurityConstants.TokenTypes.Nonce)] ITokenStore<SchemataToken>? nonces = null
 ) : SignInAuthenticationHandler<SchemataAuthenticationHandlerOptions>(options, logger, encoder)
     where TApp : SchemataApplication
-    where TToken : SchemataToken, new()
 {
     /// <summary>
     ///     Returns <c>true</c> when the grant type indicates a user-present flow
@@ -48,8 +66,10 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
     /// <summary>
     ///     Determines whether a refresh token should be issued.
     ///     Returns <c>true</c> for the <c>refresh_token</c> grant (rotation),
-    ///     <c>false</c> for <c>client_credentials</c>, and otherwise follows
-    ///     the presence of the <c>offline_access</c> scope.
+    ///     <c>false</c> for <c>client_credentials</c> and the <c>jwt-bearer</c> assertion grant
+    ///     (RFC 7521 §4.1: assertion grants yield short-lived access tokens; clients re-assert
+    ///     instead of refreshing), and otherwise follows the presence of the
+    ///     <c>offline_access</c> scope.
     /// </summary>
     public static bool ShouldIssueRefreshToken(IDictionary<string, string?> items) {
         if (!items.TryGetValue(Properties.GrantType, out var grant) || string.IsNullOrWhiteSpace(grant)) {
@@ -60,6 +80,7 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
             case GrantTypes.RefreshToken:
                 return true;
             case GrantTypes.ClientCredentials:
+            case GrantTypes.JwtBearer:
                 return false;
             default:
                 items.TryGetValue(Properties.Scope, out var scope);
@@ -69,9 +90,10 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
 
     /// <summary>
     ///     Creates a signed OIDC ID token (JWT) with optional <c>at_hash</c>,
-    ///     <c>c_hash</c>, and <c>nonce</c> claims.  When <c>max_age</c> and
-    ///     <c>auth_time</c> are present, the <c>auth_time</c> claim is included
-    ///     in the token.
+    ///     <c>c_hash</c>, and <c>nonce</c> claims. The <c>auth_time</c> claim, REQUIRED when
+    ///     <c>max_age</c> was used (OpenID Connect Core 1.0 §2), is minted by
+    ///     <see cref="AdviceClaimsAuthenticationContext" /> whenever the authentication context
+    ///     asserts it.
     /// </summary>
     /// <param name="token">The <see cref="TokenService" /> used for signing.</param>
     /// <param name="items">Authentication properties dictionary.</param>
@@ -79,7 +101,7 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
     /// <param name="lifetime">ID token validity duration.</param>
     /// <param name="at">Access token value for <c>at_hash</c> computation.</param>
     /// <param name="code">Authorization code value for <c>c_hash</c> computation.</param>
-    public static string CreateIdToken(
+    public static Task<string> CreateIdToken(
         TokenService                 token,
         IDictionary<string, string?> items,
         List<Claim>                  claims,
@@ -88,16 +110,6 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         string?                      code
     ) {
         items.TryGetValue(Properties.Nonce, out var nonce);
-        items.TryGetValue(Properties.MaxAge, out var maxAge);
-
-        if (string.IsNullOrWhiteSpace(maxAge)) {
-            return token.CreateIdToken(claims, lifetime, at, code, nonce);
-        }
-
-        items.TryGetValue(Properties.AuthTime, out var authTime);
-        if (!string.IsNullOrWhiteSpace(authTime)) {
-            claims.Add(new(Claims.AuthTime, authTime));
-        }
 
         return token.CreateIdToken(claims, lifetime, at, code, nonce);
     }
@@ -122,7 +134,7 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
     /// <param name="time">Clock for the token's create and expiry timestamps.</param>
     /// <param name="ct">A cancellation token.</param>
     public static async Task<string> CreateTokenAsync(
-        ITokenManager<TToken> tokens,
+        ITokenStore<SchemataToken>   tokens,
         TokenService          token,
         List<Claim>           claims,
         string?               format,
@@ -137,18 +149,19 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
     ) {
         var jti         = Guid.NewGuid().ToString("n");
         var tokenClaims = new List<Claim>(claims) { new(Claims.JwtId, jti) };
+        var typ         = type == TokenTypes.AccessToken ? TokenMediaTypes.AccessToken : null;
 
         string value;
         string reference;
 
         switch (format) {
             case TokenFormats.Jwt:
-                value     = token.CreateToken(tokenClaims, lifetime);
+                value     = await token.CreateToken(tokenClaims, lifetime, typ: typ);
                 reference = value;
                 break;
 
             case TokenFormats.Jwe:
-                value     = token.CreateToken(tokenClaims, lifetime, true);
+                value     = await token.CreateToken(tokenClaims, lifetime, true, typ);
                 reference = value;
                 break;
 
@@ -159,17 +172,17 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
                 break;
         }
 
-        var payload = format == TokenFormats.Reference ? token.CreateToken(tokenClaims, lifetime) : value;
+        var payload = format == TokenFormats.Reference ? await token.CreateToken(tokenClaims, lifetime) : value;
 
         var now = time.GetUtcNow().UtcDateTime;
-        var entity = new TToken {
+        var entity = new SchemataToken {
             Name              = jti,
             Type              = type,
             Format            = format,
             Status            = TokenStatuses.Valid,
             ReferenceId       = reference,
             Payload           = payload,
-            Subject           = subject,
+            Parent            = subject,
             ExpireTime        = now + lifetime,
             Application       = application,
             Authorization     = authorization,
@@ -180,29 +193,43 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         return value;
     }
 
+    private const string ChallengeErrorItem       = "Schemata.Authorization.DpopChallengeError";
+    private const string ChallengeNonceItem       = "Schemata.Authorization.DpopChallengeNonce";
+    private const string BearerChallengeErrorItem = "Schemata.Authorization.BearerChallengeError";
+    private const string NonceProvider            = "dpop-rs";
+
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync() {
         var ct = Context.RequestAborted;
 
+        // RFC 9449 §7.1: with both schemes supported the token is interpreted per the scheme
+        // presented on the wire; each registration serves its own scheme's requests.
+        var flavor = Scheme.Name.Equals(Schemes.Dpop, StringComparison.Ordinal) ? Schemes.Dpop : Schemes.Bearer;
+
         var header = Request.Headers.Authorization.ToString();
-        if (string.IsNullOrWhiteSpace(header)
-         || !header.StartsWith(Schemes.Bearer + " ", StringComparison.OrdinalIgnoreCase)) {
+        var space  = header.IndexOf(' ');
+        if (space <= 0 || !header[..space].Equals(flavor, StringComparison.OrdinalIgnoreCase)) {
             return AuthenticateResult.NoResult();
         }
 
-        var token = header[(Schemes.Bearer + " ").Length..].Trim();
+        var token = header[(space + 1)..].Trim();
         if (string.IsNullOrWhiteSpace(token)) {
-            return AuthenticateResult.NoResult();
+            // §7.1 Figure 15: a challenge for a request without credentials carries no error.
+            return flavor == Schemes.Dpop ? StageDpopChallenge(string.Empty) : AuthenticateResult.NoResult();
         }
 
         var entity = await tokens.FindByReferenceIdAsync(token, ct);
         if (string.IsNullOrWhiteSpace(entity?.Application)
          || entity.Type != TokenTypes.AccessToken
          || entity.Status != TokenStatuses.Valid) {
+            if (flavor == Schemes.Dpop) {
+                StageDpopChallenge(OAuthErrors.InvalidToken);
+            }
+
             return AuthenticateResult.NoResult();
         }
 
         var principal = entity.Format switch {
-            TokenFormats.Reference when !string.IsNullOrWhiteSpace(entity.Payload) => await issuer.Validate(entity.Payload, entity.Application),
+            TokenFormats.Reference when !string.IsNullOrWhiteSpace(entity.Payload) => await ValidateReferencePayload(entity.Payload, entity.Application),
             TokenFormats.Jwt or TokenFormats.Jwe => await issuer.Validate(token, entity.Application),
             var _                                => null,
         };
@@ -216,12 +243,148 @@ public class SchemataAuthenticationHandler<TApp, TToken>(
         }
 
         var claims = id.Claims.Where(c => c.Type != IdentityClaims.Subject)
-                       .Append(new(IdentityClaims.Subject, entity.Subject ?? string.Empty))
+                       .Append(new(IdentityClaims.Subject, entity.Parent ?? string.Empty))
                        .ToList();
-        principal = new(new ClaimsIdentity(claims, id.AuthenticationType, IdentityClaims.Subject, IdentityClaims.Role));
+        principal = new(new ClaimsIdentity(claims, Scheme.Name, IdentityClaims.Subject, IdentityClaims.Role));
 
+        var jkt = DPopProofValidator.ReadBoundThumbprint(principal);
+
+        // §7.2 Figure 18: a DPoP-bound token received via Bearer MUST be rejected, with the
+        // error on the Bearer challenge — the scheme the client actually used.
+        if (flavor == Schemes.Bearer) {
+            if (jkt is not null) {
+                StageBearerChallenge(OAuthErrors.InvalidToken);
+                return AuthenticateResult.NoResult();
+            }
+
+            return AuthenticateResult.Success(new(principal, Scheme.Name));
+        }
+
+        // Unreachable without the DPoP scheme; the guard keeps the DPoP branch honest when the
+        // feature's services were not registered.
+        if (proofs is null || nonces is null) {
+            return AuthenticateResult.NoResult();
+        }
+
+        var proof = Request.Headers[Headers.Dpop]
+                       .Where(v => !string.IsNullOrWhiteSpace(v))
+                       .FirstOrDefault();
+        if (proof is null) {
+            StageDpopChallenge(OAuthErrors.InvalidDpopProof);
+            return AuthenticateResult.NoResult();
+        }
+
+        var htu      = new Uri($"{Request.Scheme}://{Request.Host}{Request.Path}{Request.QueryString}");
+        var nonceKey = NonceProvider;
+
+        string thumbprint;
+        try {
+            thumbprint = await proofs.ValidateAsync(proof, Request.Method, htu, token, nonceKey, entity.Application, ct);
+        } catch (OAuthException ex) when (ex.Status == OAuthErrors.UseDpopNonce) {
+            // §9: 401 use_dpop_nonce with the current value in a DPoP-Nonce response header;
+            // the client retries with it in the proof's nonce claim.
+            StageDpopChallenge(
+                OAuthErrors.UseDpopNonce,
+                (await nonces.GetOrCreateAsync(
+                    null, nonceKey, entity.Application, null, dpop.Value.NonceLifetime, ct)).Value);
+            return AuthenticateResult.NoResult();
+        } catch (OAuthException) {
+            StageDpopChallenge(OAuthErrors.InvalidDpopProof);
+            return AuthenticateResult.NoResult();
+        }
+
+        if (jkt is not null && !string.Equals(jkt, thumbprint, StringComparison.Ordinal)) {
+            StageDpopChallenge(OAuthErrors.InvalidToken);
+            return AuthenticateResult.NoResult();
+        }
+
+        // Tokens issued without cnf stay presentable via the DPoP scheme during the BCP
+        // transition; the proof is still enforced, only cnf-bound tokens are compared.
         return AuthenticateResult.Success(new(principal, Scheme.Name));
     }
+
+    /// <summary>Validates a Reference-format stored payload; an invalid payload
+    ///     yields no principal.</summary>
+    /// <param name="payload">Stored payload of the token row.</param>
+    /// <param name="application">Application canonical name used as the validation audience.</param>
+    private async Task<ClaimsPrincipal?> ValidateReferencePayload(string payload, string? application) {
+        return await issuer.Validate(payload, application);
+    }
+
+    private AuthenticateResult StageDpopChallenge(string error, string? nonce = null) {
+        Context.Items[ChallengeErrorItem] = error;
+
+        if (nonce is not null) {
+            Context.Items[ChallengeNonceItem] = nonce;
+        }
+
+        return AuthenticateResult.NoResult();
+    }
+
+    private AuthenticateResult StageBearerChallenge(string error) {
+        Context.Items[BearerChallengeErrorItem] = error;
+
+        return AuthenticateResult.NoResult();
+    }
+
+    protected override Task HandleChallengeAsync(AuthenticationProperties properties) {
+        // §7.2 Figures 17/18: each scheme of this handler advertises its own challenge; the
+        // error rides the challenge corresponding to the mechanism that failed. Instances
+        // share the request item store, so each flavor consumes only its own staged state.
+        var isDpop = Scheme.Name.Equals(Schemes.Dpop, StringComparison.Ordinal);
+
+        if (!isDpop && Context.Items[BearerChallengeErrorItem] is string bearerError) {
+            WriteChallenge(BuildBearerChallenge(bearerError));
+        } else if (isDpop && Context.Items[ChallengeErrorItem] is string error) {
+            WriteChallenge(BuildChallenge(error, dpop.Value.SigningAlgorithms));
+
+            if (Context.Items[ChallengeNonceItem] is string nonce) {
+                Response.Headers[Headers.DpopNonce] = nonce;
+            }
+        } else {
+            WriteChallenge(isDpop
+                ? BuildChallenge(string.Empty, dpop.Value.SigningAlgorithms)
+                : Schemes.Bearer);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void WriteChallenge(string value) {
+        Response.StatusCode = StatusCodes.Status401Unauthorized;
+        Response.Headers.WWWAuthenticate = StringValues.Concat(Response.Headers.WWWAuthenticate, value);
+    }
+
+    /// <summary>
+    ///     Shapes a DPoP WWW-Authenticate value per RFC 9449 §7.1: the scheme name, an
+    ///     error parameter when a presented token failed authentication, and the
+    ///     space-delimited <c>algs</c> list of acceptable proof algorithms.
+    /// </summary>
+    internal static string BuildChallenge(string? error, IEnumerable<string> algorithms) {
+        var builder = new StringBuilder(Schemes.Dpop);
+        var first   = true;
+
+        if (!string.IsNullOrWhiteSpace(error)) {
+            builder.Append(" error=\"").Append(error).Append('"');
+            first = false;
+        }
+
+        var algs = string.Join(' ', algorithms.OrderBy(a => a, StringComparer.Ordinal));
+        if (algs.Length > 0) {
+            builder.Append(first ? " algs=\"" : ", algs=\"").Append(algs).Append('"');
+        }
+
+        return builder.ToString();
+    }
+
+    /// <summary>
+    ///     Shapes the Bearer companion challenge per RFC 9449 §7.2 Figure 18: the error
+    ///     travels on the scheme the client used, without DPoP-specific parameters.
+    /// </summary>
+    internal static string BuildBearerChallenge(string error) {
+        return $"{Schemes.Bearer} error=\"{error}\", error_description=\"{SchemataResources.GetResourceString(SchemataResources.INVALID_TOKEN)}\"";
+    }
+
 
     protected override Task HandleSignOutAsync(AuthenticationProperties? properties) { return Task.CompletedTask; }
 

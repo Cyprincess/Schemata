@@ -102,7 +102,7 @@ public sealed class DefaultResourceTypeResolver : IResourceTypeResolver
                 continue;
             }
 
-            var segments = pattern!.Split(Separator);
+            var segments = pattern.Split(Separator);
             // Only patterns whose leaf is a placeholder participate, matching
             // ResourceNameDescriptor.ParseCanonicalName's contract: a bare collection name
             // is served by ResolveCollection rather than full-pattern matching.

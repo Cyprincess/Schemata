@@ -31,6 +31,6 @@ public class InsightSourceNamingShould
         var parsed = descriptor.ParseCanonicalName("insightSources/orders");
 
         Assert.NotNull(parsed);
-        Assert.Equal("orders", parsed!.Value.LeafName);
+        Assert.Equal("orders", parsed.Value.LeafName);
     }
 }

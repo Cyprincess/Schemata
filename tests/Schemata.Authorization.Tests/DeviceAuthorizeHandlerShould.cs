@@ -11,10 +11,10 @@ using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
-using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
-using Schemata.Common;
 using Xunit;
 
 namespace Schemata.Authorization.Tests;
@@ -23,17 +23,16 @@ public class DeviceAuthorizeHandlerShould
 {
     private const string UserCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-    private static (DeviceAuthorizeHandler<SchemataApplication, SchemataToken> handler,
-        Mock<ITokenManager<SchemataToken>> tokens,
-        System.IServiceProvider sp) CreateHandler(SchemataApplication? application = null) {
+    private static (DeviceAuthorizeHandler<SchemataApplication> handler,
+        Mock<ITokenStore<SchemataToken>> tokens,
+        IServiceProvider sp) CreateHandler(SchemataApplication? application = null) {
         var opts = new SchemataAuthorizationOptions();
-        opts.AddEphemeralSigningKey();
         opts.Issuer                = "https://localhost";
         opts.DeviceVerificationUri = "https://localhost/device";
         opts.DeviceCodeLifetime    = TimeSpan.FromMinutes(15);
         opts.DeviceCodeInterval    = 5;
 
-        var tokens = new Mock<ITokenManager<SchemataToken>>();
+        var tokens = new Mock<ITokenStore<SchemataToken>>();
         tokens.Setup(t => t.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync((SchemataToken t, CancellationToken _) => t);
 
@@ -52,7 +51,7 @@ public class DeviceAuthorizeHandlerShould
         }
 
         var sp = services.BuildServiceProvider();
-        var handler = new DeviceAuthorizeHandler<SchemataApplication, SchemataToken>(
+        var handler = new DeviceAuthorizeHandler<SchemataApplication>(
             clientAuth.Object, tokens.Object, Options.Create(opts), jsonOpts);
         return (handler, tokens, sp);
     }
@@ -65,7 +64,7 @@ public class DeviceAuthorizeHandlerShould
     public async Task DeviceAuthorizeAsync_WithOpenIdScope_ReturnsResponseWithDeviceCodeUserCodeVerificationUriLifetimeAndInterval() {
         var app = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test-client" };
         var (handler, _, sp) = CreateHandler(app);
-        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
+        using var ambient = AdviceContext.Establish(new(sp));
 
         var result = await handler.DeviceAuthorizeAsync(CreateRequest("openid"), null, CancellationToken.None);
 
@@ -84,7 +83,7 @@ public class DeviceAuthorizeHandlerShould
     public async Task DeviceUserCode_FollowsCrockfordAlphabetWithHyphenAtIndexFour() {
         var app = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test-client" };
         var (handler, _, sp) = CreateHandler(app);
-        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
+        using var ambient = AdviceContext.Establish(new(sp));
 
         var result = await handler.DeviceAuthorizeAsync(CreateRequest(), null, CancellationToken.None);
 
@@ -104,7 +103,7 @@ public class DeviceAuthorizeHandlerShould
     public async Task Creates_DeviceCodeAndUserCodeTokens() {
         var app = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test-client" };
         var (handler, tokens, sp) = CreateHandler(app);
-        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
+        using var ambient = AdviceContext.Establish(new(sp));
 
         await handler.DeviceAuthorizeAsync(CreateRequest("openid"), null, CancellationToken.None);
 

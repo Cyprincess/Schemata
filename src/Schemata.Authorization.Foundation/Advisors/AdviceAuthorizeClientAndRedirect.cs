@@ -83,7 +83,7 @@ public sealed class AdviceAuthorizeClientAndRedirect<TApp>(
 
         if (!await apps.ValidateRedirectUriAsync(authz.Application, authz.Request.RedirectUri, ct)) {
             throw new OAuthException(
-                OAuthErrors.InvalidRedirectUri,
+                OAuthErrors.InvalidRequest,
                 SchemataResources.GetResourceString(SchemataResources.INVALID_REDIRECT_URI)
             );
         }

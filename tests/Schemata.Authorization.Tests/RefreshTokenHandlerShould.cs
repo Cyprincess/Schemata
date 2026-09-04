@@ -10,12 +10,11 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Handlers;
-using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Entities;
-using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
-using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
@@ -24,19 +23,18 @@ namespace Schemata.Authorization.Tests;
 
 public class RefreshTokenHandlerShould
 {
-    private static Fixture CreateFixture(
+    private static async Task<Fixture> CreateFixture(
         string? approvedScope = "openid profile",
         string? authName      = "auth-1",
         string? sessionId     = "sid-1"
     ) {
-        var authOpts = new SchemataAuthorizationOptions { Issuer = "https://auth.example.com" };
-        authOpts.AddEphemeralSigningKey();
+        var authOpts     = new SchemataAuthorizationOptions { Issuer = "https://auth.example.com" };
         var opts         = Options.Create(authOpts);
         var refreshOpts  = Options.Create(new RefreshTokenFlowOptions());
-        var tokenService = new TokenService(opts);
+        var tokenService = TestSecurityKeys.CreateTokenService(authOpts);
 
         var claims = new List<Claim> { new(IdentityClaims.Subject, "user-1"), new(Claims.Scope, approvedScope ?? "") };
-        var jwt    = tokenService.CreateToken(claims, TimeSpan.FromHours(1));
+        var jwt    = await tokenService.CreateToken(claims, TimeSpan.FromHours(1));
 
         var refreshToken = new SchemataToken {
             Uid           = Guid.NewGuid(),
@@ -44,12 +42,12 @@ public class RefreshTokenHandlerShould
             Status        = TokenStatuses.Valid,
             ReferenceId   = "rt-ref",
             Payload       = jwt,
-            Subject       = "user-1",
+            Parent        = "user-1",
             Authorization = authName,
             SessionId     = sessionId,
         };
 
-        var tokens = new Mock<ITokenManager<SchemataToken>>();
+        var tokens = new Mock<ITokenStore<SchemataToken>>();
         tokens.Setup(t => t.FindByReferenceIdAsync("rt-ref", It.IsAny<CancellationToken>())).ReturnsAsync(refreshToken);
 
         var app        = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test" };
@@ -61,7 +59,7 @@ public class RefreshTokenHandlerShould
                   .ReturnsAsync(app);
 
         var sp = new ServiceCollection().BuildServiceProvider();
-        var handler = new RefreshTokenHandler<SchemataApplication, SchemataToken>(
+        var handler = new RefreshTokenHandler<SchemataApplication>(
             clientAuth.Object, tokens.Object, tokenService, refreshOpts, sp);
 
         return new(handler, tokens, refreshToken, sp);
@@ -81,8 +79,8 @@ public class RefreshTokenHandlerShould
     [InlineData("")]
     [InlineData("  ")]
     public async Task ThrowsInvalidGrant_WhenRefreshTokenEmpty(string? refreshToken) {
-        var f = CreateFixture();
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
+        var f = await CreateFixture();
+        using var ambient = AdviceContext.Establish(new(f.Sp));
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
                                                               CreateRequest(refresh: refreshToken), null,
@@ -93,8 +91,8 @@ public class RefreshTokenHandlerShould
 
     [Fact]
     public async Task PropagatesAuthorizationNameAndSessionId_OnRotation() {
-        var f = CreateFixture(authName: "auth-42", sessionId: "session-xyz");
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
+        var f = await CreateFixture(authName: "auth-42", sessionId: "session-xyz");
+        using var ambient = AdviceContext.Establish(new(f.Sp));
 
         var result = await f.Handler.HandleAsync(CreateRequest(), null, CancellationToken.None);
 
@@ -106,8 +104,8 @@ public class RefreshTokenHandlerShould
 
     [Fact]
     public async Task OmitsAuthorizationNameAndSessionId_WhenOriginalTokenHasNone() {
-        var f = CreateFixture(authName: null, sessionId: null);
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
+        var f = await CreateFixture(authName: null, sessionId: null);
+        using var ambient = AdviceContext.Establish(new(f.Sp));
 
         var result = await f.Handler.HandleAsync(CreateRequest(), null, CancellationToken.None);
 
@@ -119,8 +117,8 @@ public class RefreshTokenHandlerShould
     #region Nested type: Fixture
 
     private record Fixture(
-        RefreshTokenHandler<SchemataApplication, SchemataToken> Handler,
-        Mock<ITokenManager<SchemataToken>>                      Tokens,
+        RefreshTokenHandler<SchemataApplication> Handler,
+        Mock<ITokenStore<SchemataToken>>                      Tokens,
         SchemataToken                                           RefreshToken,
         IServiceProvider                                        Sp
     );

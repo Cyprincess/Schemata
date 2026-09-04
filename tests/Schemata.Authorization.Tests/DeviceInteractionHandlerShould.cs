@@ -10,9 +10,10 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Models;
-using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
@@ -34,7 +35,7 @@ public class DeviceInteractionHandlerShould
             ClientId      = "device-client",
             Name          = "device-client",
             CanonicalName = "applications/device-client",
-            DisplayName   = "Device Client",
+            ClientName    = "Device Client",
             DisplayNames  = new() { ["zh-Hans"] = "设备客户端" },
             Description   = "Signs in on a TV.",
             Descriptions  = new() { ["zh-Hans"] = "在电视上登录。" },
@@ -70,7 +71,7 @@ public class DeviceInteractionHandlerShould
             ExpireTime  = Anchor.AddMinutes(10),
         };
 
-        var tokens = new Mock<ITokenManager<SchemataToken>>();
+        var tokens = new Mock<ITokenStore<SchemataToken>>();
         tokens.Setup(t => t.FindByReferenceIdAsync("user-ref", It.IsAny<CancellationToken>())).ReturnsAsync(userCode);
         tokens.Setup(t => t.FindByNameAsync(device.Name!, It.IsAny<CancellationToken>())).ReturnsAsync(device);
 
@@ -95,7 +96,7 @@ public class DeviceInteractionHandlerShould
                  });
 
         var handler
-            = new DeviceInteractionHandler<SchemataApplication, SchemataAuthorization, SchemataScope, SchemataToken>(
+            = new DeviceInteractionHandler<SchemataApplication, SchemataAuthorization, SchemataScope>(
                 apps.Object, tokens.Object, scopes.Object, authzMgr.Object, authOpts, jsonOpts, Clock);
 
         return new(handler, tokens, authzMgr, device, userCode);
@@ -131,7 +132,7 @@ public class DeviceInteractionHandlerShould
 
         Assert.Equal("authorizations/auth-generated", f.Device.Authorization);
         Assert.Equal("sess-xyz", f.Device.SessionId);
-        Assert.Equal("users/u-42", f.Device.Subject);
+        Assert.Equal("users/u-42", f.Device.Parent);
         Assert.Equal(TokenStatuses.Authorized, f.Device.Status);
     }
 
@@ -150,7 +151,7 @@ public class DeviceInteractionHandlerShould
         Assert.Equal("Signs in on a TV.", client.Description);
         Assert.Equal("在电视上登录。", client.Descriptions!["zh-Hans"]);
 
-        var scope = Assert.Single(response.Scopes!);
+        var scope = Assert.Single(response.Scopes);
         Assert.Equal("openid", scope.Name);
         Assert.Equal("Sign you in", scope.DisplayName);
         Assert.Equal("登录", scope.DisplayNames!["zh-Hans"]);
@@ -174,8 +175,8 @@ public class DeviceInteractionHandlerShould
     #region Nested type: Fixture
 
     private record Fixture(
-        DeviceInteractionHandler<SchemataApplication, SchemataAuthorization, SchemataScope, SchemataToken> Handler,
-        Mock<ITokenManager<SchemataToken>>                                                                 Tokens,
+        DeviceInteractionHandler<SchemataApplication, SchemataAuthorization, SchemataScope> Handler,
+        Mock<ITokenStore<SchemataToken>>                                                                 Tokens,
         Mock<IAuthorizationManager<SchemataAuthorization>>                                                 AuthzMgr,
         SchemataToken                                                                                      Device,
         SchemataToken                                                                                      UserCode

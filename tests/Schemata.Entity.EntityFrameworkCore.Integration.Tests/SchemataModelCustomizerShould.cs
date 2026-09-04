@@ -74,7 +74,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
             var       found = await db.Books.FindAsync(bookUid);
             Assert.NotNull(found);
-            Assert.NotNull(found!.Metadata);
+            Assert.NotNull(found.Metadata);
             Assert.Equal("Hugo", found.Metadata!["author"]);
             Assert.Equal("1862", found.Metadata["edition"]);
         }
@@ -106,7 +106,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
             var       found = await db.Books.FindAsync(bookUid);
             Assert.NotNull(found);
-            Assert.NotNull(found!.Annotations);
+            Assert.NotNull(found.Annotations);
             Assert.Equal("fr", found.Annotations!["language"]);
             Assert.Null(found.Annotations["origin"]);
         }
@@ -135,7 +135,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
             var       found = await db.Books.FindAsync(bookUid);
             Assert.NotNull(found);
-            Assert.NotNull(found!.Tags);
+            Assert.NotNull(found.Tags);
             Assert.Equal(3, found.Tags!.Count);
             Assert.Contains("french", found.Tags);
         }
@@ -164,7 +164,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
             var       found = await db.Books.FindAsync(bookUid);
             Assert.NotNull(found);
-            Assert.NotNull(found!.Aliases);
+            Assert.NotNull(found.Aliases);
             Assert.Equal(["les-mis", "the-miserables"], found.Aliases!);
         }
     }
@@ -195,7 +195,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
             var       found = await db.Books.FindAsync(bookUid);
             Assert.NotNull(found);
-            Assert.NotNull(found!.Counters);
+            Assert.NotNull(found.Counters);
             Assert.Equal(3, found.Counters!["views"]);
             Assert.Equal(5, found.Counters["likes"]);
         }
@@ -224,7 +224,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
             var       found = await db.Books.FindAsync(bookUid);
             Assert.NotNull(found);
-            Assert.NotNull(found!.Ratings);
+            Assert.NotNull(found.Ratings);
             Assert.Equal([1, 2, 3], found.Ratings!);
         }
     }
@@ -254,7 +254,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
             var       found = await db.Books.FindAsync(bookUid);
             Assert.NotNull(found);
-            Assert.NotNull(found!.Counters);
+            Assert.NotNull(found.Counters);
 
             found.Counters!["views"] = 2;
             await db.SaveChangesAsync();
@@ -265,7 +265,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
             var       found = await db.Books.FindAsync(bookUid);
             Assert.NotNull(found);
-            Assert.Equal(2, found!.Counters!["views"]);
+            Assert.Equal(2, found.Counters!["views"]);
         }
     }
 
@@ -293,7 +293,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
             var       found = await db.Books.FindAsync(bookUid);
             Assert.NotNull(found);
-            Assert.Equal([Book.Shelf.Fiction, Book.Shelf.Science], found!.Genres!);
+            Assert.Equal([Book.Shelf.Fiction, Book.Shelf.Science], found.Genres!);
             Assert.Equal(Book.Shelf.History, found.ShelfByName!["primary"]);
         }
     }
@@ -305,7 +305,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
 
         var property = db.Model.FindEntityType(typeof(Book))!.FindProperty(nameof(Book.Payload));
         Assert.NotNull(property);
-        Assert.Null(property!.GetValueConverter());
+        Assert.Null(property.GetValueConverter());
     }
 
     #region Nested type: Book

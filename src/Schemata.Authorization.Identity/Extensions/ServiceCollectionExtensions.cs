@@ -5,6 +5,7 @@ using Schemata.Authorization.Identity;
 using Schemata.Authorization.Identity.Advisors;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
+using Schemata.Authorization.Skeleton.Services;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -15,10 +16,10 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    ///     Registers <see cref="IdentitySubjectProvider{TUser}" /> closed over the user type Identity was
-    ///     configured with, along with the subject-claims advisor. The user type is discovered from the
-    ///     <see cref="IUserValidator{TUser}" /> registration Identity leaves behind, so calling this
-    ///     before Identity is added registers nothing.
+    ///     Registers <see cref="IdentitySubjectProvider{TUser}" /> closed over the user type
+    ///     Identity was configured with, along with the subject-claims advisor. The user type is
+    ///     discovered from the <see cref="IUserValidator{TUser}" /> registration Identity leaves
+    ///     behind, so calling this before Identity is added registers nothing.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
@@ -34,6 +35,10 @@ public static class ServiceCollectionExtensions
         var provider = typeof(IdentitySubjectProvider<>).MakeGenericType(user);
 
         services.TryAddScoped(typeof(ISubjectProvider), provider);
+        services.AddHttpContextAccessor();
+        // Replace, not TryAdd: the Foundation default (NoOp session service) must lose to this
+        // host integration regardless of registration order.
+        services.Replace(ServiceDescriptor.Scoped<IOpSessionService, OpSessionService>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceClaimsSubject>());
 
         return services;

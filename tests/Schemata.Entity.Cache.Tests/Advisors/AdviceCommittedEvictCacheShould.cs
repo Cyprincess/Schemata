@@ -36,7 +36,7 @@ public class AdviceCommittedEvictCacheShould
         Assert.NotNull(indexKey);
 
         var mock = new Mock<ICacheProvider>();
-        mock.Setup(x => x.CollectionMembersAsync(indexKey!, It.IsAny<CancellationToken>()))
+        mock.Setup(x => x.CollectionMembersAsync(indexKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync([cacheKey1, cacheKey2]);
 
         var advisor = new AdviceCommittedEvictCache<Student>(mock.Object, DefaultOptions());
@@ -49,7 +49,7 @@ public class AdviceCommittedEvictCacheShould
         Assert.Equal(AdviseResult.Continue, result);
         mock.Verify(x => x.RemoveAsync(cacheKey1, It.IsAny<CancellationToken>()), Times.Once);
         mock.Verify(x => x.RemoveAsync(cacheKey2, It.IsAny<CancellationToken>()), Times.Once);
-        mock.Verify(x => x.CollectionClearAsync(indexKey!, It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(x => x.CollectionClearAsync(indexKey, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public class AdviceCommittedEvictCacheShould
         Assert.NotNull(indexKey);
 
         var mock = new Mock<ICacheProvider>();
-        mock.Setup(x => x.CollectionMembersAsync(indexKey!, It.IsAny<CancellationToken>())).ReturnsAsync([cacheKey]);
+        mock.Setup(x => x.CollectionMembersAsync(indexKey, It.IsAny<CancellationToken>())).ReturnsAsync([cacheKey]);
 
         var advisor = new AdviceCommittedEvictCache<Student>(mock.Object, DefaultOptions());
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
@@ -71,7 +71,7 @@ public class AdviceCommittedEvictCacheShould
 
         Assert.Equal(AdviseResult.Continue, result);
         mock.Verify(x => x.RemoveAsync(cacheKey, It.IsAny<CancellationToken>()), Times.Once);
-        mock.Verify(x => x.CollectionClearAsync(indexKey!, It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(x => x.CollectionClearAsync(indexKey, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -156,7 +156,7 @@ public class AdviceCommittedEvictCacheShould
         Assert.NotNull(targetIndex);
 
         var mock = new Mock<ICacheProvider>();
-        mock.Setup(x => x.CollectionMembersAsync(targetIndex!, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        mock.Setup(x => x.CollectionMembersAsync(targetIndex, It.IsAny<CancellationToken>())).ReturnsAsync([]);
 
         var advisor = new AdviceCommittedEvictCache<Student>(mock.Object, DefaultOptions());
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
@@ -166,8 +166,8 @@ public class AdviceCommittedEvictCacheShould
         var result = await advisor.AdviseAsync(ctx, repo, changes, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
-        mock.Verify(x => x.CollectionMembersAsync(otherIndex!, It.IsAny<CancellationToken>()), Times.Never);
-        mock.Verify(x => x.RemoveAsync(otherIndex!, It.IsAny<CancellationToken>()), Times.Never);
+        mock.Verify(x => x.CollectionMembersAsync(otherIndex, It.IsAny<CancellationToken>()), Times.Never);
+        mock.Verify(x => x.RemoveAsync(otherIndex, It.IsAny<CancellationToken>()), Times.Never);
     }
 
 }

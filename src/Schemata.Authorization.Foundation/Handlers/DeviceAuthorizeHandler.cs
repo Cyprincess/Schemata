@@ -15,11 +15,11 @@ using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
-using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
-using Schemata.Common;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
@@ -36,15 +36,14 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     User codes use an 8-character human-readable alphabet with a dash separator
 ///     (formatted as XXXX-XXXX) excluding visually ambiguous characters.
 /// </summary>
-public sealed class DeviceAuthorizeHandler<TApp, TToken>(
+public sealed class DeviceAuthorizeHandler<TApp>(
     IClientAuthenticationService<TApp>     client,
-    ITokenManager<TToken>                  tokens,
+    ITokenStore<SchemataToken>                    tokens,
     IOptions<SchemataAuthorizationOptions> options,
     IOptions<JsonSerializerOptions>        json,
     TimeProvider?                          time = null
 ) : DeviceAuthorizeEndpoint
     where TApp : SchemataApplication
-    where TToken : SchemataToken, new()
 {
     private const    string       UserCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private readonly TimeProvider _time            = time ?? TimeProvider.System;
@@ -84,7 +83,7 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
         var now    = _time.GetUtcNow().UtcDateTime;
         var expiry = now + options.Value.DeviceCodeLifetime;
 
-        var dc = new TToken {
+        var dc = new SchemataToken {
             Name        = Guid.NewGuid().ToString("n"),
             Application = application.CanonicalName,
             Type            = TokenTypes.DeviceCode,
@@ -99,7 +98,7 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
 
         await tokens.CreateAsync(dc, ct);
 
-        var uc = new TToken {
+        var uc = new SchemataToken {
             Name        = Guid.NewGuid().ToString("n"),
             Application = application.CanonicalName,
             Type            = TokenTypes.UserCode,

@@ -42,7 +42,7 @@ public sealed class BackChannelLogoutJob(
         }
 
         try {
-            var client = factory.CreateClient(nameof(BackChannelLogoutService<,>));
+            var client = factory.CreateClient(nameof(BackChannelLogoutService<>));
             client.Timeout = BackChannelLogoutService.Timeout;
             var content  = new FormUrlEncodedContent([new(Parameters.LogoutToken, jwt)]);
             var response = await client.PostAsync(uri, content, ct);

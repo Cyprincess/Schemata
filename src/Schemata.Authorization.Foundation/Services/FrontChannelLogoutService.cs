@@ -7,6 +7,8 @@ using Microsoft.Extensions.Options;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Managers;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
@@ -23,13 +25,12 @@ namespace Schemata.Authorization.Foundation.Services;
 ///     <c>frontchannel_logout_uri</c> values with appended <c>iss</c>
 ///     and <c>sid</c> parameters.  The caller renders these as iframes.
 /// </summary>
-public sealed class FrontChannelLogoutService<TApp, TToken>(
+public sealed class FrontChannelLogoutService<TApp>(
     IApplicationManager<TApp>              apps,
-    ITokenManager<TToken>                  tokens,
+    ITokenStore<SchemataToken>                    tokens,
     IOptions<SchemataAuthorizationOptions> options
 ) : ILogoutNotifier
     where TApp : SchemataApplication
-    where TToken : SchemataToken
 {
     #region ILogoutNotifier Members
 
@@ -55,19 +56,12 @@ public sealed class FrontChannelLogoutService<TApp, TToken>(
                 continue;
             }
 
-            var separator  = uri.Contains('?') ? '&' : '?';
-            var parameters = new List<string>();
-
-            if (!string.IsNullOrWhiteSpace(options.Value.Issuer)) {
-                parameters.Add($"{Claims.Issuer}={Uri.EscapeDataString(options.Value.Issuer)}");
-            }
-
-            if (app.FrontChannelLogoutSessionRequired && !string.IsNullOrWhiteSpace(session)) {
-                parameters.Add($"{Claims.SessionId}={Uri.EscapeDataString(session)}");
-            }
-
-            if (parameters.Count > 0) {
-                uri = $"{uri}{separator}{string.Join('&', parameters)}";
+            // OpenID Connect Front-Channel Logout 1.0 §2: iss and sid are appended as a pair —
+            // both are included, or neither.
+            if (!string.IsNullOrWhiteSpace(session)) {
+                var separator = uri.Contains('?') ? '&' : '?';
+                uri = $"{uri}{separator}{Claims.Issuer}={Uri.EscapeDataString(options.Value.Issuer!)}"
+                    + $"&{Claims.SessionId}={Uri.EscapeDataString(session)}";
             }
 
             uris.Add(uri);

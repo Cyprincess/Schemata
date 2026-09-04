@@ -61,7 +61,7 @@ public class BpmnEngineParallelShould
 
         var output = snapshot.Tokens.FirstOrDefault(t => t.StateName == "after-join");
         Assert.NotNull(output);
-        Assert.Equal("Active", output!.State);
+        Assert.Equal("Active", output.State);
 
         snapshot = await engine.AdvanceAsync(definition, snapshot.Process, snapshot.Tokens, output.CanonicalName, CancellationToken.None);
         Assert.Equal("Completed", snapshot.Process.State);

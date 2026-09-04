@@ -27,9 +27,9 @@ public class ConnectControllerRenderingShould
         var token     = new TokenResponse { AccessToken = "access", TokenType = Schemes.Bearer };
         var dispatcher = new Mock<IRequestDispatcher>();
         dispatcher.Setup(value => value.SendAsync<
-                             Schemata.Authorization.Foundation.Commands.TokenEndpointRequest,
+                             Foundation.Commands.TokenEndpointRequest,
                              AuthorizationResult>(
-                             It.IsAny<Schemata.Authorization.Foundation.Commands.TokenEndpointRequest>(),
+                             It.IsAny<Foundation.Commands.TokenEndpointRequest>(),
                              It.IsAny<CancellationToken>()))
                   .ReturnsAsync(signIn);
         var issuer = new Mock<IAuthorizationSignInService>();
@@ -41,7 +41,7 @@ public class ConnectControllerRenderingShould
               .ReturnsAsync(new AuthorizationSignInResponse(token, null));
         var controller = Controller(dispatcher.Object, issuer.Object);
 
-        var result = await controller.Token(new TokenRequest(), CancellationToken.None);
+        var result = await controller.Token(new(), CancellationToken.None);
 
         Assert.Same(token, Assert.IsType<JsonResult>(result).Value);
         dispatcher.VerifyAll();
@@ -59,9 +59,9 @@ public class ConnectControllerRenderingShould
         var signIn = AuthorizationResult.SignIn(principal, properties);
         var dispatcher = new Mock<IRequestDispatcher>();
         dispatcher.Setup(value => value.SendAsync<
-                             Schemata.Authorization.Foundation.Commands.AuthorizeEndpointRequest,
+                             Foundation.Commands.AuthorizeEndpointRequest,
                              AuthorizationResult>(
-                             It.IsAny<Schemata.Authorization.Foundation.Commands.AuthorizeEndpointRequest>(),
+                             It.IsAny<Foundation.Commands.AuthorizeEndpointRequest>(),
                              It.IsAny<CancellationToken>()))
                   .ReturnsAsync(signIn);
         var issuer = new Mock<IAuthorizationSignInService>();
@@ -76,7 +76,7 @@ public class ConnectControllerRenderingShould
                   ResponseModes.Query)));
         var controller = Controller(dispatcher.Object, issuer.Object);
 
-        var result = await controller.AuthorizeGet(new AuthorizeRequest(), CancellationToken.None);
+        var result = await controller.AuthorizeGet(new(), CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Contains("code=code-1", redirect.Url);
@@ -95,7 +95,7 @@ public class ConnectControllerRenderingShould
             dispatcher) {
             ControllerContext = new() {
                 HttpContext = new DefaultHttpContext {
-                    User = new ClaimsPrincipal(new ClaimsIdentity("caller")),
+                    User = new(new ClaimsIdentity("caller")),
                 },
             },
         };

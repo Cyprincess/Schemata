@@ -1,13 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
@@ -17,10 +15,10 @@ using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
-using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
-using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
@@ -31,16 +29,13 @@ public class RevocationHandlerShould
 {
     private const string Issuer = "https://auth.example.com";
 
-    private static readonly RSA            Rsa        = RSA.Create(2048);
-    private static readonly RsaSecurityKey SigningKey = new(Rsa);
+    private static readonly DateTimeOffset Now = new(2026, 8, 26, 0, 0, 0, TimeSpan.Zero);
 
     private static Fixture CreateFixture() {
-        var opts = Options.Create(new SchemataAuthorizationOptions {
-            Issuer = Issuer, SigningKey = SigningKey, SigningAlgorithm = SigningAlgorithms.RsaSha256,
-        });
+        var opts = Options.Create(new SchemataAuthorizationOptions { Issuer = Issuer });
 
-        var tokensMock   = new Mock<ITokenManager<SchemataToken>>(MockBehavior.Loose);
-        var tokenService = new TokenService(opts);
+        var tokensMock   = new Mock<ITokenStore<SchemataToken>>(MockBehavior.Loose);
+        var tokenService = TestSecurityKeys.CreateTokenService(opts.Value);
 
         var app = new SchemataApplication {
             Uid           = Guid.NewGuid(),
@@ -57,11 +52,11 @@ public class RevocationHandlerShould
 
         var services = new ServiceCollection();
         services.TryAddEnumerable(ServiceDescriptor
-                                     .Scoped<IRevocationAdvisor<SchemataApplication, SchemataToken>,
-                                          AdviceRevocationTokenValidation<SchemataApplication, SchemataToken>>());
+                                     .Scoped<IRevocationAdvisor<SchemataApplication>,
+                                          AdviceRevocationTokenValidation<SchemataApplication>>());
         var sp = services.BuildServiceProvider();
 
-        var handler = new RevocationHandler<SchemataApplication, SchemataToken>(
+        var handler = new RevocationHandler<SchemataApplication>(
             clientAuth.Object, tokensMock.Object);
         return new(handler, tokensMock, tokenService, sp);
     }
@@ -82,15 +77,15 @@ public class RevocationHandlerShould
             Format      = format,
             Status      = status,
             Payload     = payload,
-            ExpireTime  = DateTime.UtcNow.AddHours(1),
+            ExpireTime  = Now.AddHours(1).UtcDateTime,
         };
     }
 
     [Fact]
     public async Task ThrowsInvalidRequest_WhenTokenEmpty() {
-        var f       = CreateFixture();
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
-        var request = new RevokeRequest { Token = "" };
+        var       f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new(f.Sp));
+        var       request = new RevokeRequest { Token = "" };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
                                                               request, null, CancellationToken.None));
@@ -100,9 +95,9 @@ public class RevocationHandlerShould
 
     [Fact]
     public async Task ThrowsInvalidRequest_WhenTokenWhitespace() {
-        var f       = CreateFixture();
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
-        var request = new RevokeRequest { Token = "   " };
+        var       f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new(f.Sp));
+        var       request = new RevokeRequest { Token = "   " };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
                                                               request, null, CancellationToken.None));
@@ -113,7 +108,7 @@ public class RevocationHandlerShould
     [Fact]
     public async Task DoesNotThrow_WhenTokenNotFound() {
         var f = CreateFixture();
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
+        using var ambient = AdviceContext.Establish(new(f.Sp));
 
         f.Tokens.Setup(m => m.FindByReferenceIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
          .ReturnsAsync((SchemataToken?)null);
@@ -128,7 +123,7 @@ public class RevocationHandlerShould
     [Fact]
     public async Task RevokesToken_WhenJwtTokenResolved() {
         var f = CreateFixture();
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
+        using var ambient = AdviceContext.Establish(new(f.Sp));
 
         var claims = new List<Claim> {
             new(Claims.JwtId, Guid.NewGuid().ToString()),
@@ -136,7 +131,7 @@ public class RevocationHandlerShould
             new(Claims.Audience, "api"),
         };
 
-        var jwt    = f.TokenService.CreateToken(claims, TimeSpan.FromHours(1));
+        var jwt    = await f.TokenService.CreateToken(claims, TimeSpan.FromHours(1));
         var entity = CreateTokenEntity(jwt);
 
         f.Tokens.Setup(m => m.FindByReferenceIdAsync(jwt, It.IsAny<CancellationToken>())).ReturnsAsync(entity);
@@ -150,10 +145,10 @@ public class RevocationHandlerShould
 
     [Fact]
     public async Task FallsBackToReferenceIdLookup_WhenResolverReturnsNull() {
-        var f      = CreateFixture();
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
-        var refId  = "opaque-ref-123";
-        var entity = CreateTokenEntity(refId, "reference");
+        var       f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new(f.Sp));
+        var       refId   = "opaque-ref-123";
+        var       entity  = CreateTokenEntity(refId, "reference");
 
         f.Tokens.Setup(m => m.FindByReferenceIdAsync(refId, It.IsAny<CancellationToken>())).ReturnsAsync(entity);
 
@@ -167,7 +162,7 @@ public class RevocationHandlerShould
     [Fact]
     public async Task DoesNotRevoke_WhenEntityStatusRevoked() {
         var f = CreateFixture();
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
+        using var ambient = AdviceContext.Establish(new(f.Sp));
 
         var claims = new List<Claim> {
             new(Claims.JwtId, Guid.NewGuid().ToString()),
@@ -175,7 +170,7 @@ public class RevocationHandlerShould
             new(Claims.Audience, "api"),
         };
 
-        var jwt    = f.TokenService.CreateToken(claims, TimeSpan.FromHours(1));
+        var jwt    = await f.TokenService.CreateToken(claims, TimeSpan.FromHours(1));
         var entity = CreateTokenEntity(jwt, "jwt", "revoked");
 
         f.Tokens.Setup(m => m.FindByReferenceIdAsync(jwt, It.IsAny<CancellationToken>())).ReturnsAsync(entity);
@@ -190,8 +185,8 @@ public class RevocationHandlerShould
     #region Nested type: Fixture
 
     private record Fixture(
-        RevocationHandler<SchemataApplication, SchemataToken> Handler,
-        Mock<ITokenManager<SchemataToken>>                    Tokens,
+        RevocationHandler<SchemataApplication> Handler,
+        Mock<ITokenStore<SchemataToken>>                    Tokens,
         TokenService                                          TokenService,
         IServiceProvider                                      Sp
     );

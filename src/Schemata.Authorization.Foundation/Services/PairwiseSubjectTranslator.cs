@@ -64,11 +64,6 @@ public sealed class PairwiseSubjectTranslator<TApp> : IPairwiseSubjectTranslator
             return subject;
         }
 
-        // Canonical names always contain a '/'; pairwise hashes are Base64Url and never do.
-        if (subject!.Contains('/')) {
-            return subject;
-        }
-
         var application = await ResolveCallerApplicationAsync(caller, ct);
         if (application is null) {
             return subject;
@@ -83,76 +78,78 @@ public sealed class PairwiseSubjectTranslator<TApp> : IPairwiseSubjectTranslator
         var mapping = await _mappings.FirstOrDefaultAsync(
                           q => q.Where(m => m.Application == key && m.PairwiseSubject == subject),
                           ct);
-        return mapping?.CanonicalSubject;
+        return mapping?.Subject;
     }
 
     public async Task<string?> ToPairwiseAsync(
-        string?           canonicalSubject,
+        string?           subject,
         ClaimsPrincipal?  caller,
         CancellationToken ct = default) {
-        if (string.IsNullOrWhiteSpace(canonicalSubject)) {
-            return canonicalSubject;
+        if (string.IsNullOrWhiteSpace(subject)) {
+            return subject;
         }
 
         var application = await ResolveCallerApplicationAsync(caller, ct);
         if (application is null) {
-            return canonicalSubject;
+            return subject;
         }
 
         var subjectType = application.SubjectType ?? SubjectTypes.Public;
         if (subjectType != SubjectTypes.Pairwise) {
-            return canonicalSubject;
+            return subject;
         }
 
-        return await EnsureMappingAsync(application, canonicalSubject!, ct);
+        return await EnsureMappingAsync(application, subject, ct);
     }
 
     #endregion
 
     /// <summary>
-    ///     Returns the stored pairwise subject for <paramref name="canonicalSubject" /> under
+    ///     Returns the stored pairwise subject for <paramref name="subject" /> under
     ///     <paramref name="application" />, inserting a new row when one does not yet exist.
     ///     Called from <c>AdviceClaimsPairwise</c> during claim assembly so OAuth wire
     ///     endpoints (id_token, access_token, userinfo, introspection, back-channel logout)
     ///     implicitly seed the reverse-lookup table without extra plumbing.
     /// </summary>
     /// <param name="application">The OAuth application the pairwise hash is bound to.</param>
-    /// <param name="canonicalSubject">The canonical subject the hash projects from.</param>
+    /// <param name="subject">The canonical subject the hash projects from.</param>
     /// <param name="ct">Cancellation token.</param>
     public async Task<string> EnsureMappingAsync(
         SchemataApplication application,
-        string              canonicalSubject,
+        string              subject,
         CancellationToken   ct = default) {
         var subjectType = application.SubjectType ?? SubjectTypes.Public;
         if (subjectType != SubjectTypes.Pairwise) {
-            return canonicalSubject;
+            return subject;
         }
 
         if (string.IsNullOrWhiteSpace(application.CanonicalName)) {
             throw new InvalidOperationException(
-                $"SchemataApplication '{application.Name ?? application.ClientId}' has no canonical name; "
-              + "pairwise subject mapping requires a fully resolved AIP-122 name.");
+                $"Application '{application.Name ?? application.ClientId}' has no canonical name; "
+              + "pairwise subject mapping requires a fully resolved resource name.");
         }
 
         var key = application.CanonicalName;
 
         var existing = await _mappings.FirstOrDefaultAsync(
-                           q => q.Where(m => m.Application == key && m.CanonicalSubject == canonicalSubject),
+                           q => q.Where(m => m.Application == key && m.Subject == subject),
                            ct);
         if (existing is { PairwiseSubject: { Length: > 0 } stored }) {
             return stored;
         }
 
-        var pairwise = _subjects.Resolve(canonicalSubject, application);
-        if (existing is null) {
-            await _mappings.AddAsync(new() {
-                Application      = key,
-                CanonicalSubject = canonicalSubject,
-                PairwiseSubject  = pairwise,
-                SectorHost       = TryGetSector(application),
-            }, ct);
-            await _mappings.CommitAsync(ct);
+        var pairwise = _subjects.Resolve(subject, application);
+        if (existing is not null) {
+            return pairwise;
         }
+
+        await _mappings.AddAsync(new() {
+            Application     = key,
+            Subject         = subject,
+            PairwiseSubject = pairwise,
+            SectorHost      = TryGetSector(application),
+        }, ct);
+        await _mappings.CommitAsync(ct);
 
         return pairwise;
     }

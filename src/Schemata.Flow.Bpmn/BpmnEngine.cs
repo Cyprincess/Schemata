@@ -1950,7 +1950,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         }
 
         foreach (var token in liveTokens) {
-            if (CanReach(definition, token.StateName!, gateway)) {
+            if (CanReach(definition, token.StateName, gateway)) {
                 return true;
             }
         }

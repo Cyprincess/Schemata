@@ -65,7 +65,7 @@ public sealed class AdviceQueryCache<TEntity, TResult, T> : IRepositoryQueryAdvi
             return AdviseResult.Continue;
         }
 
-        var bytes = await _cache.GetAsync(key!, ct);
+        var bytes = await _cache.GetAsync(key, ct);
         if (bytes is null) {
             return AdviseResult.Continue;
         }

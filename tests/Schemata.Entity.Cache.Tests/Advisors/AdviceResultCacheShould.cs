@@ -41,7 +41,7 @@ public class AdviceResultCacheShould
         var key = context.ToCacheKey();
         Assert.NotNull(key);
         mock.Verify(
-            x => x.SetAsync(key!, It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(), It.IsAny<CancellationToken>()),
+            x => x.SetAsync(key, It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -107,7 +107,7 @@ public class AdviceResultCacheShould
         var indexKey = ReverseIndex.BuildKey(typeof(Student), entity);
         Assert.NotNull(indexKey);
         mock.Verify(
-            x => x.CollectionAddAsync(indexKey!, cacheKey, It.IsAny<CacheEntryOptions>(),
+            x => x.CollectionAddAsync(indexKey, cacheKey, It.IsAny<CacheEntryOptions>(),
                                       It.IsAny<CancellationToken>()), Times.Once);
     }
 

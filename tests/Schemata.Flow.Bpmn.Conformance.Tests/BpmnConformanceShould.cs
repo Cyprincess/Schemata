@@ -108,7 +108,7 @@ public class BpmnConformanceShould
                 return null;
             }
 
-            snapshot = await engine.AdvanceAsync(definition, snapshot.Process, snapshot.Tokens, execution, active!.CanonicalName, CancellationToken.None);
+            snapshot = await engine.AdvanceAsync(definition, snapshot.Process, snapshot.Tokens, execution, active.CanonicalName, CancellationToken.None);
         }
 
         return snapshot;

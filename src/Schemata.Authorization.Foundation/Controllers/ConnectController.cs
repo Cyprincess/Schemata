@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Filters;
+using Schemata.Core.Filters;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;

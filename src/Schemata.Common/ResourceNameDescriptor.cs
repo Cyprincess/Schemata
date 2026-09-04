@@ -240,7 +240,7 @@ public sealed class ResourceNameDescriptor
             return null;
         }
 
-        return MatchSegments(_parentSegments, parent!.Split('/'));
+        return MatchSegments(_parentSegments, parent.Split('/'));
     }
 
     /// <summary>

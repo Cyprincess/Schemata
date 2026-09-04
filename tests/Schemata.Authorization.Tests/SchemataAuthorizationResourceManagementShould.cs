@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Resource;
 using Schemata.Authorization.Skeleton.Entities;
-using Schemata.Resource.Foundation;
+using Schemata.Security.Skeleton.Entities;
 using Xunit;
 
 namespace Schemata.Authorization.Tests;
@@ -42,8 +42,7 @@ public class SchemataAuthorizationResourceManagementShould
             registry.GetResource(typeof(SchemataToken))!.Endpoints!.OrderBy(endpoint => endpoint, System.StringComparer.Ordinal));
     }
 
-    private static void Configure(Schemata.Authorization.Foundation.Authentication.SchemataAuthorizationOptions options) {
+    private static void Configure(Foundation.Authentication.SchemataAuthorizationOptions options) {
         options.Issuer = "https://issuer.example";
-        options.SigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(new byte[32]);
     }
 }

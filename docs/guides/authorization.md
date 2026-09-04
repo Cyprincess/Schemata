@@ -17,15 +17,16 @@ When composing manually, also add `Schemata.Authorization.Foundation` itself.
 
 ## Enable the server
 
-Add `UseAuthorization()` inside the `UseSchemata` block and chain the flows you need. Set a key and
-an issuer; `AddEphemeralSigningKey()` generates an in-process RSA key for development.
+Add `UseSecurity()` and `UseAuthorization()` inside the `UseSchemata` block and chain the flows
+you need. The issuer identifies the server; its signing keys are security rows seeded below.
 
 ```csharp
 schema.UseIdentity();
 
+schema.UseSecurity();           // security rows, secret verification, token stores
+
 schema.UseAuthorization(o => {
           o.Issuer = "https://auth.example.com";
-          o.AddEphemeralSigningKey();
       })
       .UseIdentity()                  // bridge Identity user claims into tokens
       .UseClientCredentialsFlow()
@@ -45,17 +46,20 @@ schema.UseAuthorization(o => {
 | `UseRevocation()`            | `/Connect/Revoke`                                                        |
 | `UseUserInfo()`              | `/Connect/Profile`                                                       |
 | `UseEndSession()`            | `/Connect/EndSession`                                                    |
+| `UsePairwiseSubjects()`      | pairwise subject identifiers — OIDC Core §8                              |
 
-`Issuer`, a signing key, and a signing algorithm are required; the host throws
-`InvalidOperationException` if any is missing. The `.UseIdentity()` call on the authorization builder
+`Issuer` is required; the host throws `InvalidOperationException` when it is missing. Token
+issuance loads the signing rows under the issuer and throws `InvalidOperationException` when
+none is valid, so seed one below. The `.UseIdentity()` call on the authorization builder
 is what wires user claims (`sub`, `email`, `role`, …) into issued tokens.
 
 ## Update the DbContext
 
-Add the authorization tables alongside the Identity tables:
+Add the authorization and security tables alongside the Identity tables:
 
 ```csharp
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 
 public class AppDbContext(DbContextOptions<AppDbContext> options)
     : IdentityDbContext<SchemataUser, SchemataRole, Guid, ...>(options)
@@ -64,12 +68,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<SchemataApplication>   Applications   => Set<SchemataApplication>();
     public DbSet<SchemataAuthorization> Authorizations => Set<SchemataAuthorization>();
     public DbSet<SchemataScope>         Scopes         => Set<SchemataScope>();
+    public DbSet<SchemataSecurity>      Securities     => Set<SchemataSecurity>();
     public DbSet<SchemataToken>         Tokens         => Set<SchemataToken>();
-}
 ```
 
 Each entity carries `[PrimaryKey(nameof(Uid))]` and its own `[Table]`, so no extra mapping is
 needed.
+
+When you register repositories manually, register one for `SchemataSecurity` too;
+`SecurityStore<TSecurity>` reads through `IRepository<TSecurity>`.
 
 ## Register a client
 
@@ -77,16 +84,49 @@ Seed a confidential client at startup through `IApplicationManager<SchemataAppli
 `Permissions` collection uses the `e:` (endpoint), `g:` (grant type), and `s:` (scope) prefixes:
 
 ```csharp
+using System.Security.Cryptography;
+using Schemata.Authorization.Foundation.Services;   // SecurityParents
+using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
+
 var manager = scope.ServiceProvider
     .GetRequiredService<IApplicationManager<SchemataApplication>>();
+var securities = scope.ServiceProvider
+    .GetRequiredService<ISecurityStore<SchemataSecurity>>();
+var verifier = scope.ServiceProvider
+    .GetRequiredService<ISecretVerifier>();
+
+// The server signs every token with its newest valid signing row under the issuer.
+var hasSigningKey = false;
+await foreach (var _ in securities.ListByParentAsync(
+                   "https://auth.example.com", SecurityConstants.Kinds.PrivateKey,
+                   SecurityConstants.Usages.Signing, SecurityConstants.Statuses.Valid)) {
+    hasSigningKey = true;
+    break;
+}
+
+if (!hasSigningKey) {
+    using var rsa = RSA.Create(2048);
+    await securities.CreateAsync(new SchemataSecurity {
+        Parent    = "https://auth.example.com",   // SecurityParents.Issuer(o.Issuer)
+        Name      = "issuer-signing",
+        Kind      = SecurityConstants.Kinds.PrivateKey,
+        Usage     = SecurityConstants.Usages.Signing,
+        Algorithm = "RS256",                      // SigningAlgorithms.RsaSha256
+        Kid       = "student-signing-1",
+        Value     = rsa.ExportPkcs8PrivateKeyPem(),
+        Status    = SecurityConstants.Statuses.Valid,
+    }, default);
+}
 
 if (await manager.FindByClientIdAsync("student-app", default) is null)
 {
-    await manager.CreateAsync(new SchemataApplication {
+    var app = new SchemataApplication {
         ClientId     = "student-app",
-        ClientSecret = "secret",
         ClientType   = "confidential",
-        DisplayName  = "Student App",
+        ClientName   = "Student App",
         Permissions  = {
             "e:/Connect/Token",
             "g:client_credentials",
@@ -96,6 +136,18 @@ if (await manager.FindByClientIdAsync("student-app", default) is null)
             "s:profile",
         },
         RedirectUris = { "http://localhost:5001/callback" },
+    };
+    await manager.CreateAsync(app, default);
+
+    // The client authenticates with its newest valid password row; only the PBKDF2 hash is stored.
+    await securities.CreateAsync(new SchemataSecurity {
+        Parent    = SecurityParents.Application(app),
+        Name      = app.ClientId,
+        Kind      = SecurityConstants.Kinds.Password,
+        Usage     = SecurityConstants.Usages.Authentication,
+        Algorithm = SecurityConstants.Algorithms.Pbkdf2,
+        Value     = await verifier.HashAsync("secret"),
+        Status    = SecurityConstants.Statuses.Valid,
     }, default);
 }
 ```
