@@ -8,7 +8,6 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
 using Schemata.Resource.Foundation;
-using Schemata.Resource.Foundation.Commands;
 using Schemata.Resource.Tests.Fixtures;
 using Xunit;
 
@@ -48,7 +47,7 @@ public class UndeleteHandlerShould
         var handler = new UndeleteHandler<TrashStudent, TrashStudent>(repository.Object, mapper.Object);
 
         var detail = await handler.HandleAsync(
-            new UndeleteResourceRequest<TrashStudent, TrashStudent> { CanonicalName = entity.CanonicalName },
+            new() { CanonicalName = entity.CanonicalName },
             CancellationToken.None);
 
         Assert.Same(entity, detail);
@@ -73,7 +72,7 @@ public class UndeleteHandlerShould
         var handler = new UndeleteHandler<TrashStudent, TrashStudent>(repository.Object, mapper.Object);
 
         var ex = await Assert.ThrowsAsync<AlreadyExistsException>(() => handler.HandleAsync(
-            new UndeleteResourceRequest<TrashStudent, TrashStudent> { CanonicalName = entity.CanonicalName },
+            new() { CanonicalName = entity.CanonicalName },
             CancellationToken.None));
 
         var resource = Assert.Single(ex.Details!.OfType<ResourceInfoDetail>());

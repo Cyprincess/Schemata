@@ -31,7 +31,7 @@ internal sealed class IdentityHandlerTestHost : IDisposable
         var options = new IdentityOptions();
         _managerServices = new ServiceCollection().BuildServiceProvider();
         var store = new Mock<IUserStore<SchemataUser>>();
-        Users = new Mock<SchemataUserManager<SchemataUser>>(
+        Users = new(
             MockBehavior.Loose,
             _managerServices,
             store.Object,
@@ -42,7 +42,7 @@ internal sealed class IdentityHandlerTestHost : IDisposable
             new UpperInvariantLookupNormalizer(),
             new IdentityErrorDescriber(),
             NullLogger<SchemataUserManager<SchemataUser>>.Instance);
-        SignIn = new Mock<SignInManager<SchemataUser>>(
+        SignIn = new(
             MockBehavior.Loose,
             Users.Object,
             Mock.Of<IHttpContextAccessor>(),
@@ -51,8 +51,8 @@ internal sealed class IdentityHandlerTestHost : IDisposable
             NullLogger<SignInManager<SchemataUser>>.Instance,
             Mock.Of<IAuthenticationSchemeProvider>(),
             Mock.Of<IUserConfirmation<SchemataUser>>());
-        Mail    = new Mock<IMailSender<SchemataUser>>(MockBehavior.Strict);
-        Message = new Mock<IMessageSender<SchemataUser>>(MockBehavior.Strict);
+        Mail    = new(MockBehavior.Strict);
+        Message = new(MockBehavior.Strict);
 
         var services = new ServiceCollection();
         services.AddSingleton(Users.Object);

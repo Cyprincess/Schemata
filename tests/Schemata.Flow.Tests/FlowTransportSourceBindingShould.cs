@@ -327,7 +327,7 @@ public class FlowTransportSourceBindingShould
                        WaitingAtName = "review",
                        State         = "Waiting",
                    };
-                   return new ValueTask<ProcessSnapshot>(new ProcessSnapshot { Process = process, Tokens = [token], Transitions = [] });
+                   return new(new ProcessSnapshot { Process = process, Tokens = [token], Transitions = [] });
                });
         return runtime.Object;
     }
@@ -351,7 +351,7 @@ public class FlowTransportSourceBindingShould
                        StateName     = "review",
                        State         = "Active",
                    };
-                   return new ValueTask<ProcessSnapshot>(new ProcessSnapshot {
+                   return new(new ProcessSnapshot {
                        Process = process,
                        Tokens = [token],
                        Transitions = [

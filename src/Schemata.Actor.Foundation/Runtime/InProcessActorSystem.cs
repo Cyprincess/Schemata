@@ -107,7 +107,7 @@ public sealed class InProcessActorSystem : IActorSystem
     ///     equality) match.
     /// </remarks>
     internal void Remove(ActorId id, Lazy<ActorInstance> cell) {
-        _instances.TryRemove(new KeyValuePair<ActorId, Lazy<ActorInstance>>(id, cell));
+        _instances.TryRemove(new(id, cell));
     }
 
     /// <summary>
@@ -120,7 +120,7 @@ public sealed class InProcessActorSystem : IActorSystem
     /// </summary>
     private ActorInstance GetOrCreate(ActorId id, Props props) {
         Lazy<ActorInstance>? cell = null;
-        cell = new Lazy<ActorInstance>(() => CreateInstance(id, props, cell!));
+        cell = new(() => CreateInstance(id, props, cell!));
         var lazy = _instances.GetOrAdd(id, cell);
         return Resolve(id, lazy);
     }
@@ -136,7 +136,7 @@ public sealed class InProcessActorSystem : IActorSystem
         try {
             return lazy.Value;
         } catch {
-            _instances.TryRemove(new KeyValuePair<ActorId, Lazy<ActorInstance>>(id, lazy));
+            _instances.TryRemove(new(id, lazy));
             throw;
         }
     }

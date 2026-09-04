@@ -2,7 +2,6 @@ using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
-using Schemata.Core;
 using Schemata.Entity.Repository;
 using Schemata.Tenancy.Foundation.Features;
 using Schemata.Tenancy.Foundation.Services;
@@ -38,8 +37,8 @@ internal static class TenancyTestHost
         new SchemataTenancyFeature<SchemataTenantManager<SchemataTenant>, SchemataTenant>()
             .ConfigureServices(
                 services,
-                new SchemataOptions(),
-                new Configurators(),
+                new(),
+                new(),
                 new ConfigurationBuilder().Build(),
                 environment: null!);
         configure?.Invoke(services);

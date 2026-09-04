@@ -40,7 +40,7 @@ public sealed class ReadSnapshotHandler<TSnapshot>(
         var header = await snapshots.GetAsync(snapshotName, ct)
                      ?? throw new InvalidArgumentException(message: "Report snapshot was not found.");
         var token = string.IsNullOrWhiteSpace(request.PageToken)
-            ? new ReportReadPageToken(0, 0)
+            ? new(0, 0)
             : ReportReadPageToken.Decode(request.PageToken);
         var response   = new ReadSnapshotResponse();
         var chunkIndex = token.ChunkIndex;

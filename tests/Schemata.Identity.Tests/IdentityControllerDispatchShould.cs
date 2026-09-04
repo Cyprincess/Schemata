@@ -65,7 +65,7 @@ public class IdentityControllerDispatchShould
         var results = new[] {
             await controller.Register(register, CancellationToken.None),
             await controller.Login(login, CancellationToken.None),
-            await controller.Refresh(new RefreshRequest { RefreshToken = "refresh-token" }, CancellationToken.None),
+            await controller.Refresh(new() { RefreshToken = "refresh-token" }, CancellationToken.None),
             await controller.Profile(CancellationToken.None),
             await controller.Email(profile, CancellationToken.None),
             await controller.Phone(profile, CancellationToken.None),
@@ -105,7 +105,7 @@ public class IdentityControllerDispatchShould
     ) where TRequest : IRequest<IdentityResult<TPayload>> {
         dispatcher.Setup(value => value.SendAsync<TRequest, IdentityResult<TPayload>>(
                              It.IsAny<TRequest>(), It.IsAny<CancellationToken>()))
-                  .Callback((TRequest request, CancellationToken _) => requests.Add(request!))
+                  .Callback((TRequest request, CancellationToken _) => requests.Add(request))
                   .ReturnsAsync(IdentityResult<TPayload>.Challenge());
     }
 }

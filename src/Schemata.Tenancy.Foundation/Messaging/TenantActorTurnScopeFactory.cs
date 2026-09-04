@@ -71,7 +71,7 @@ public sealed class TenantActorTurnScopeFactory<TTenant>(IServiceScopeFactory sc
                     await propagator.RestoreAsync(items, final.ServiceProvider, ct);
                 }
 
-                return new AsyncServiceScope(new TwoPhaseScope(final, bootstrap));
+                return new(new TwoPhaseScope(final, bootstrap));
             } catch {
                 // The final scope was already allocated; release it before the bootstrap scope so
                 // its ITenantProviderLease is returned before the identity that created it goes away.

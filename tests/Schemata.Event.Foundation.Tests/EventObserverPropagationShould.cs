@@ -50,7 +50,7 @@ public class EventObserverPropagationShould
         var publisher = new InProcessEventOutboxPublisher(services, Options.Create(new JsonSerializerOptions()));
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => publisher.PublishAsync(new EventOutboxMessage(EventName, "{}", "corr-1")));
+            () => publisher.PublishAsync(new(EventName, "{}", "corr-1")));
 
         Assert.Equal("consume observer failed", ex.Message);
         Assert.Equal(EventState.Failed, record.State);
@@ -89,7 +89,7 @@ public class EventObserverPropagationShould
         var publisher = new InProcessEventOutboxPublisher(services, Options.Create(new JsonSerializerOptions()));
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => publisher.PublishAsync(new EventOutboxMessage(EventName, "{}", "corr-2")));
+            () => publisher.PublishAsync(new(EventName, "{}", "corr-2")));
 
         Assert.Equal("delivered observer failed", ex.Message);
         handler.Verify(h => h.HandleAsync(It.IsAny<SampleEvent>(), It.IsAny<CancellationToken>()), Times.Never);

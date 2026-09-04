@@ -4,7 +4,6 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using Schemata.Actor.Foundation.Runtime;
 using Schemata.Actor.Foundation.Tests.Fixtures;
-using Schemata.Actor.Skeleton;
 using Xunit;
 
 namespace Schemata.Actor.Foundation.Tests;
@@ -24,12 +23,12 @@ public class MailboxLoopShould
         var loop = new MailboxLoop(channel.Reader, async item => {
             processed.Add(((Ping)item.Envelope.Payload).Text);
             if (processed.Count == 1) {
-                await channel.Writer.WriteAsync(new MailboxItem(new Envelope(new Ping("second"))));
+                await channel.Writer.WriteAsync(new(new(new Ping("second"))));
                 channel.Writer.Complete();
             }
         });
 
-        await channel.Writer.WriteAsync(new MailboxItem(new Envelope(new Ping("first"))));
+        await channel.Writer.WriteAsync(new(new(new Ping("first"))));
 
         await loop.RunAsync().WaitAsync(TimeSpan.FromSeconds(5));
 
@@ -41,11 +40,11 @@ public class MailboxLoopShould
         var channel = Channel.CreateBounded<MailboxItem>(new BoundedChannelOptions(4) { SingleReader = true });
         var invoked = new List<string>();
 
-        var canceled = new MailboxItem(new Envelope(new Ping("canceled")));
+        var canceled = new MailboxItem(new(new Ping("canceled")));
         Assert.True(canceled.TryCancel());
 
         await channel.Writer.WriteAsync(canceled);
-        await channel.Writer.WriteAsync(new MailboxItem(new Envelope(new Ping("kept"))));
+        await channel.Writer.WriteAsync(new(new(new Ping("kept"))));
         channel.Writer.Complete();
 
         var loop = new MailboxLoop(channel.Reader, item => {

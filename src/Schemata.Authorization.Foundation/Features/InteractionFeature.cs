@@ -12,15 +12,17 @@ namespace Schemata.Authorization.Foundation.Features;
 /// </summary>
 /// <remarks>
 ///     Installed automatically by flow features that require interaction (
-///     <see cref="AuthorizationCodeFlowFeature{TApp, TAuth, TScope, TToken}" />
-///     and <see cref="DeviceFlowFeature{TApp, TAuth, TScope, TToken}" />).
+///     and <see cref="DeviceFlowFeature{TApp, TAuth, TScope}" />).
 /// </remarks>
 /// <seealso cref="IAuthorizationFlowFeature" />
 public sealed class InteractionFeature : IAuthorizationFlowFeature
 {
     #region IAuthorizationFlowFeature Members
 
-    public int Order => 2_000;
+    /// <summary>The default feature ordering value (chained after its predecessor).</summary>
+    public const int DefaultOrder = TokenFeature.DefaultOrder + 100;
+
+    public int Order => DefaultOrder;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddScoped<InteractionEndpoint, InteractionHandler>();

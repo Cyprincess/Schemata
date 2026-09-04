@@ -145,7 +145,7 @@ public class FlowRunnerTerminationShould
             Name          = "termination-process",
             Engine        = FlowConstants.Engines.StateMachine,
             Definition    = new TerminationProcess(),
-            Configuration = new ProcessConfiguration(),
+            Configuration = new(),
         };
 
         var harness = new Harness { Tokens = tokens };
@@ -202,10 +202,10 @@ public class FlowRunnerTerminationShould
                                Async(predicate(data.AsQueryable()).ToList()));
         repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) =>
-                               new ValueTask<T?>(predicate(data.AsQueryable()).SingleOrDefault()));
+                               new(predicate(data.AsQueryable()).SingleOrDefault()));
         repository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) =>
-                               new ValueTask<T?>(predicate(data.AsQueryable()).FirstOrDefault()));
+                               new(predicate(data.AsQueryable()).FirstOrDefault()));
         return repository;
     }
 

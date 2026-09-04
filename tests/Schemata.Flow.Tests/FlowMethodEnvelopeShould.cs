@@ -114,7 +114,7 @@ public sealed class FlowMethodEnvelopeShould
         var facade = harness.Services.GetRequiredService<FlowRunner>();
 
         await facade.CompleteAsync(
-            new SchemataProcess { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "envelope-process" },
+            new() { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "envelope-process" },
             null, null, CancellationToken.None);
 
         var observed = Assert.Single(wrap.Observed);
@@ -145,7 +145,7 @@ public sealed class FlowMethodEnvelopeShould
             services.AddFlowAuthorization();
         });
         var allowedDispatcher = allowed.Services.GetRequiredService<IRequestDispatcher>();
-        var allowedPrincipal = new ClaimsPrincipal(new ClaimsIdentity([new Claim("role", "schemata-process.start")], "test"));
+        var allowedPrincipal = new ClaimsPrincipal(new ClaimsIdentity([new("role", "schemata-process.start")], "test"));
 
         var result = await allowedDispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>, SchemataProcess>(
             new(FlowOperations.Start, null, new("envelope-process", null, null, null, null, allowedPrincipal), allowedPrincipal), CancellationToken.None);
@@ -172,7 +172,7 @@ public sealed class FlowMethodEnvelopeShould
             Name          = "envelope-process",
             Engine        = FlowConstants.Engines.StateMachine,
             Definition    = new EnvelopeProcess(),
-            Configuration = new ProcessConfiguration(),
+            Configuration = new(),
         };
 
         var harness = new Harness();
@@ -182,14 +182,14 @@ public sealed class FlowMethodEnvelopeShould
                   It.IsAny<CancellationToken>()))
               .Returns((ProcessDefinition _, SchemataProcess process, FlowExecutionContext _, CancellationToken _) => {
                   harness.EngineStarts++;
-                  return new ValueTask<ProcessSnapshot>(new ProcessSnapshot { Process = process, Tokens = [], Transitions = [] });
+                  return new(new ProcessSnapshot { Process = process, Tokens = [], Transitions = [] });
               });
         engine.Setup(e => e.AdvanceAsync(
                   It.IsAny<ProcessDefinition>(), It.IsAny<SchemataProcess>(), It.IsAny<IReadOnlyList<SchemataProcessToken>>(),
                   It.IsAny<FlowExecutionContext>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
               .Returns((ProcessDefinition _, SchemataProcess process, IReadOnlyList<SchemataProcessToken> tokens,
                         FlowExecutionContext _, string? _, CancellationToken _) =>
-                            new ValueTask<ProcessSnapshot>(new ProcessSnapshot { Process = process, Tokens = tokens, Transitions = [] }));
+                            new(new ProcessSnapshot { Process = process, Tokens = tokens, Transitions = [] }));
 
         var registry = new Mock<IProcessRegistry>();
         registry.Setup(r => r.GetRegistration("envelope-process")).Returns(registration);
@@ -229,9 +229,9 @@ public sealed class FlowMethodEnvelopeShould
         repository.Setup(r => r.ListAsync<T>(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => Async(predicate(data.AsQueryable()).ToList()));
         repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new ValueTask<T?>(predicate(data.AsQueryable()).SingleOrDefault()));
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new(predicate(data.AsQueryable()).SingleOrDefault()));
         repository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new ValueTask<T?>(predicate(data.AsQueryable()).FirstOrDefault()));
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new(predicate(data.AsQueryable()).FirstOrDefault()));
         return repository;
     }
 

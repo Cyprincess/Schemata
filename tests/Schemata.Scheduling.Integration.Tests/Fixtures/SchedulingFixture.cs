@@ -21,7 +21,7 @@ public sealed class SchedulingFixture : IAsyncLifetime
     private SqliteConnection? _connection;
     private ServiceProvider?   _root;
 
-    public MutableClock Clock { get; } = new(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+    public MutableClock Clock { get; } = new(new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
 
     public BlockingJob BlockingJob { get; } = new();
 

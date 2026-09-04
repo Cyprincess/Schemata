@@ -7,6 +7,7 @@ using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Core;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
@@ -31,21 +32,18 @@ namespace Schemata.Authorization.Foundation.Features;
 /// <typeparam name="TApp">The application entity type.</typeparam>
 /// <typeparam name="TAuth">The authorization entity type.</typeparam>
 /// <typeparam name="TScope">The scope entity type.</typeparam>
-/// <typeparam name="TToken">The token entity type.</typeparam>
 /// <remarks>
-///     Installed via <c>UseCodeFlow()</c> on <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope, TToken}" />.
+///     Installed via <c>UseCodeFlow()</c> on <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope}" />.
 /// </remarks>
 /// <seealso cref="IAuthorizationFlowFeature" />
-/// <seealso cref="RefreshTokenFlowFeature{TApp, TToken}" />
-public sealed class AuthorizationCodeFlowFeature<TApp, TAuth, TScope, TToken> : IAuthorizationFlowFeature
+public sealed class AuthorizationCodeFlowFeature<TApp, TAuth, TScope> : IAuthorizationFlowFeature
     where TApp : SchemataApplication
     where TAuth : SchemataAuthorization, new()
     where TScope : SchemataScope
-    where TToken : SchemataToken, new()
 {
     #region IAuthorizationFlowFeature Members
 
-    public int Order => 10_100;
+    public int Order => AuthorizationCodeFlowFeature.DefaultOrder;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.Configure<SchemataAuthorizationOptions>(o => {
@@ -63,10 +61,10 @@ public sealed class AuthorizationCodeFlowFeature<TApp, TAuth, TScope, TToken> : 
             }
         });
 
-        services.TryAddScoped<AuthorizeEndpoint, AuthorizeHandler<TApp, TToken>>();
+        services.TryAddScoped<AuthorizeEndpoint, AuthorizeHandler<TApp>>();
 
-        services.TryAddKeyedScoped<IGrantHandler, AuthorizationCodeHandler<TApp, TToken>>(GrantTypes.AuthorizationCode);
-        services.TryAddKeyedScoped<IInteractionHandler, AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken>>(TokenTypeUris.Interaction);
+        services.TryAddKeyedScoped<IGrantHandler, AuthorizationCodeHandler<TApp>>(GrantTypes.AuthorizationCode);
+        services.TryAddKeyedScoped<IInteractionHandler, AuthorizeInteractionHandler<TApp, TAuth, TScope>>(TokenTypeUris.Interaction);
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryCodeFlow>());
 
@@ -81,9 +79,20 @@ public sealed class AuthorizationCodeFlowFeature<TApp, TAuth, TScope, TToken> : 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeConsent<TApp, TAuth>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>>());
 
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<ICodeExchangeAdvisor<TApp, TToken>, AdviceCodeExchangeValidation<TApp, TToken>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<ICodeExchangeAdvisor<TApp, TToken>, AdviceCodeExchangePkce<TApp, TToken>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ICodeExchangeAdvisor<TApp>, AdviceCodeExchangeValidation<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ICodeExchangeAdvisor<TApp>, AdviceCodeExchangePkce<TApp>>());
     }
 
     #endregion
+}
+
+
+/// <summary>
+///     Ordering anchor for <see cref="AuthorizationCodeFlowFeature{TApp, TAuth, TScope}" /> so successor features can chain
+///     off its <c>DefaultOrder</c> without naming type arguments.
+/// </summary>
+internal static class AuthorizationCodeFlowFeature
+{
+    /// <summary>The default feature ordering value (chained after its predecessor).</summary>
+    public const int DefaultOrder = RevocationFeature.DefaultOrder + 100;
 }

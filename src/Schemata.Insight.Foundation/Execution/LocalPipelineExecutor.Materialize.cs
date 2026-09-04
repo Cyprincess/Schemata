@@ -4,6 +4,8 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Errors;
 using Schemata.Expressions.Skeleton;
 using Schemata.Insight.Foundation.Materialization;
 using Schemata.Insight.Foundation.Planning;
@@ -24,7 +26,7 @@ public sealed partial class LocalPipelineExecutor
                                                                     Compiler(item.Expression!.Language)
                                                                        .Compile<IReadOnlyDictionary<string, object?>, object>(
                                                                             item.Expression!.Tree))))
-                                               .ToArray<(string Alias, Func<IReadOnlyDictionary<string, object>, object> Value)>();
+                                               .ToArray<(string Alias, Func<IReadOnlyDictionary<string, object?>, object> Value)>();
 
         await foreach (var row in rows.WithCancellation(ct)) {
             if (selection.Items.IsDefaultOrEmpty) {
@@ -81,7 +83,7 @@ public sealed partial class LocalPipelineExecutor
                 GroupNode group         => group.Input,
                 SelectionNode selection => selection.Input,
                 var _ => throw new InsightValidationException(InsightReasons.Unimplemented,
-                                                             $"Plan node '{node.GetType().Name}' is not a nested stage."),
+                                                             LocalizedMessageFormatter.FormatInvariant(SchemataResources.INSIGHT_NESTED_STAGE_REQUIRED, new Dictionary<string, string?> { ["node"] = node.GetType().Name })!),
             };
         }
 
@@ -106,7 +108,13 @@ public sealed partial class LocalPipelineExecutor
         }
 
         throw new InsightValidationException(InsightReasons.Unimplemented,
-                                             $"Driver '{driverName}' returned no child collection for nested selection '{item.Alias}' (path '{item.FieldPath}'); declare Nested or include the child collection in raw rows.");
+                                             LocalizedMessageFormatter.FormatInvariant(
+                                                 SchemataResources.INSIGHT_NESTED_COLLECTION_MISSING,
+                                                 new Dictionary<string, string?> {
+                                                     ["driver"] = driverName,
+                                                     ["alias"]  = item.Alias,
+                                                     ["field"]  = item.FieldPath,
+                                                 })!);
     }
 
     private static (IReadOnlyDictionary<string, object?> Source, string? Path) AnchorSource(
@@ -137,7 +145,12 @@ public sealed partial class LocalPipelineExecutor
         }
 
         throw new InsightValidationException(InsightReasons.InvalidArgument,
-                                             $"Nested selection '{item.Alias}' (path '{item.FieldPath}') cannot be anchored to a single source.");
+                                             LocalizedMessageFormatter.FormatInvariant(
+                                                 SchemataResources.INSIGHT_NESTED_ANCHOR_INVALID,
+                                                 new Dictionary<string, string?> {
+                                                     ["alias"]  = item.Alias,
+                                                     ["field"]  = item.FieldPath,
+                                                 })!);
     }
 
     private static IReadOnlyList<IReadOnlyDictionary<string, object?>> ToChildRows(object? value, SelectionItem item) {
@@ -153,7 +166,12 @@ public sealed partial class LocalPipelineExecutor
 
     private static InsightValidationException NonCollection(SelectionItem item) {
         return new(InsightReasons.InvalidArgument,
-                   $"Nested selection '{item.Alias}' (path '{item.FieldPath}') targets a non-collection value.");
+                   LocalizedMessageFormatter.FormatInvariant(
+                       SchemataResources.INSIGHT_NESTED_NOT_COLLECTION,
+                       new Dictionary<string, string?> {
+                           ["alias"]  = item.Alias,
+                           ["field"]  = item.FieldPath,
+                       })!);
     }
 
     private static async IAsyncEnumerable<IReadOnlyDictionary<string, object?>> ToAsync(

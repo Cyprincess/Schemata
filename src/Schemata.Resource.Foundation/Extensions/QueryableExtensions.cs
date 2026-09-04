@@ -54,7 +54,7 @@ public static class QueryableExtensions
         var description = string.Format(SchemataResources.GetResourceString(SchemataResources.INVALID_EXPRESSION), "filter");
         var exception   = new InvalidArgumentException(message: description, reason: SchemataResources.INVALID_FILTER);
         exception.Details!.Add(new BadRequestDetail {
-            FieldViolations = [new ErrorFieldViolation {
+            FieldViolations = [new() {
                 Field       = nameof(IFilterRequest.Filter).Underscore(),
                 Description = description,
                 Reason      = SchemataResources.INVALID_FILTER,

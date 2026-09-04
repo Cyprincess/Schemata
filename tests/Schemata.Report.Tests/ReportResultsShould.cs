@@ -44,14 +44,14 @@ public class ReportResultsShould
 
     [Fact]
     public void Pending_Operation_Throws() {
-        var exception = Assert.Throws<ReportException>(() => ReportResults.FromOperation(new Operation()));
+        var exception = Assert.Throws<ReportException>(() => ReportResults.FromOperation(new()));
 
         Assert.Equal(ReportReasons.OperationNotComplete, exception.Reason);
     }
 
     [Fact]
     public void Failed_Operation_Surfaces_Error() {
-        var exception = Assert.Throws<ReportException>(() => ReportResults.FromOperation(new Operation {
+        var exception = Assert.Throws<ReportException>(() => ReportResults.FromOperation(new() {
             Done  = true,
             Error = new() {
                 Code    = 13,

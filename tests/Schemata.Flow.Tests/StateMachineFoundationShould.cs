@@ -11,7 +11,6 @@ using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Builders;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
-using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Flow.StateMachine;
 using Xunit;
 
@@ -32,7 +31,7 @@ public class StateMachineFoundationShould
         var engine = new StateMachineEngine();
         var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1" };
 
-        var snapshot = await engine.StartAsync(definition, process, new FlowExecutionContext(uow, services));
+        var snapshot = await engine.StartAsync(definition, process, new(uow, services));
 
         Assert.Equal(definition.Reserve.Name, snapshot.Tokens[0].StateName);
         transactions.Verify(r => r.Join(uow), Times.Once);
@@ -83,9 +82,9 @@ public class StateMachineFoundationShould
         repository.Setup(r => r.ListAsync<T>(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => Async(predicate(data.AsQueryable()).ToList()));
         repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new ValueTask<T?>(predicate(data.AsQueryable()).SingleOrDefault()));
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new(predicate(data.AsQueryable()).SingleOrDefault()));
         repository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new ValueTask<T?>(predicate(data.AsQueryable()).FirstOrDefault()));
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new(predicate(data.AsQueryable()).FirstOrDefault()));
         return repository;
     }
 
@@ -105,7 +104,7 @@ public class StateMachineFoundationShould
                 var transactions = ctx.Repository<Transaction>();
                 var stocks = ctx.Repository<Stock>();
                 var stock = await stocks.SingleOrDefaultAsync(q => q.Where(s => s.CanonicalName == "stocks/stock1"));
-                await transactions.AddAsync(new Transaction { Name = "tx1", CanonicalName = "transactions/tx1" });
+                await transactions.AddAsync(new() { Name = "tx1", CanonicalName = "transactions/tx1" });
                 stock!.Quantity--;
                 await stocks.UpdateAsync(stock);
             }).Go(Done);

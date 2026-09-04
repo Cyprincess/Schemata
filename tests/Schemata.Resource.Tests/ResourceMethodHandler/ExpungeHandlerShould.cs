@@ -7,7 +7,6 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Resource.Foundation.Handlers;
 using Schemata.Resource.Tests.Fixtures;
-using Schemata.Resource.Foundation.Commands;
 using Xunit;
 
 namespace Schemata.Resource.Tests.ResourceMethodHandler;
@@ -39,7 +38,7 @@ public class ExpungeHandlerShould
 
         var handler = new ExpungeHandler<TrashStudent>(repository.Object);
         var response = await handler.HandleAsync(
-            new ExpungeResourceRequest<TrashStudent> { CanonicalName = entity.CanonicalName },
+            new() { CanonicalName = entity.CanonicalName },
             CancellationToken.None);
 
         // AIP-164 expunge returns an empty body.
@@ -63,7 +62,7 @@ public class ExpungeHandlerShould
         var handler = new ExpungeHandler<TrashStudent>(repository.Object);
 
         await Assert.ThrowsAsync<FailedPreconditionException>(() => handler.HandleAsync(
-            new ExpungeResourceRequest<TrashStudent> { CanonicalName = entity.CanonicalName },
+            new() { CanonicalName = entity.CanonicalName },
             CancellationToken.None));
 
         repository.Verify(r => r.SuppressSoftDelete(), Times.Never);

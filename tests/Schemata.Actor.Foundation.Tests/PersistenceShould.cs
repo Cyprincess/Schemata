@@ -8,7 +8,6 @@ using Moq;
 using Schemata.Actor.Foundation.Tests.Fixtures;
 using Schemata.Actor.Skeleton;
 using Schemata.Actor.Skeleton.Entities;
-using Schemata.Core;
 using Schemata.Entity.Repository;
 using Xunit;
 
@@ -25,14 +24,14 @@ public class PersistenceShould
         var id          = new ActorId("counter", "a");
 
         var actor = await system.GetAsync(id);
-        await actor.AskAsync<Increment, int>(new Increment());
-        await actor.AskAsync<Increment, int>(new Increment());
-        await actor.AskAsync<Increment, int>(new Increment());
+        await actor.AskAsync<Increment, int>(new());
+        await actor.AskAsync<Increment, int>(new());
+        await actor.AskAsync<Increment, int>(new());
 
         await system.StopAsync(id);
 
         var respawned = await system.GetAsync(id);
-        var loaded     = await respawned.AskAsync<GetCount, int>(new GetCount());
+        var loaded     = await respawned.AskAsync<GetCount, int>(new());
 
         Assert.Equal(3, loaded);
         var row = Assert.Single(rows);
@@ -49,14 +48,14 @@ public class PersistenceShould
         var id          = new ActorId("counter", "a");
 
         var actor = await system.GetAsync(id);
-        await actor.AskAsync<Increment, int>(new Increment());
-        await actor.AskAsync<Increment, int>(new Increment());
-        await actor.AskAsync<Increment, int>(new Increment());
+        await actor.AskAsync<Increment, int>(new());
+        await actor.AskAsync<Increment, int>(new());
+        await actor.AskAsync<Increment, int>(new());
 
         await system.StopAsync(id);
 
         var respawned = await system.GetAsync(id);
-        var loaded     = await respawned.AskAsync<GetCount, int>(new GetCount());
+        var loaded     = await respawned.AskAsync<GetCount, int>(new());
 
         Assert.Equal(0, loaded);
         Assert.Empty(rows); // Opt-in never enabled: the repository is never touched.
@@ -71,14 +70,14 @@ public class PersistenceShould
         var actor = await system.GetAsync(id);
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => actor.AskAsync<Increment, int>(new Increment()).AsTask());
+            () => actor.AskAsync<Increment, int>(new()).AsTask());
 
         Assert.Contains("ActorStateStore", ex.Message);
     }
 
     private static IServiceProvider BuildContainer(Mock<IRepository<SchemataActor>>? repository, bool usePersistence) {
         var services = new ServiceCollection();
-        var builder  = new SchemataActorBuilder(new SchemataOptions(), services);
+        var builder  = new SchemataActorBuilder(new(), services);
         builder.Register<CounterPersistentActor>("counter");
 
         if (usePersistence) {

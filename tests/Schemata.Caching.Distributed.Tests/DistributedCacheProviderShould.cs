@@ -143,11 +143,11 @@ public class DistributedCacheProviderShould
                   values.TryRemove(key, out _);
                   return Task.CompletedTask;
               });
-        return new DistributedCacheProvider(cache.Object);
+        return new(cache.Object);
     }
 
     private static CacheEntryOptions NewOptions() {
-        return new CacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) };
+        return new() { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) };
     }
 
     private static byte[] Bytes(string value) { return Encoding.UTF8.GetBytes(value); }

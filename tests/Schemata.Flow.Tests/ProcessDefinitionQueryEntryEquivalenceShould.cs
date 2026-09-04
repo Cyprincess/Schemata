@@ -48,11 +48,11 @@ public sealed class ProcessDefinitionQueryEntryEquivalenceShould
         var dispatcher = scope.ServiceProvider.GetRequiredService<IQueryDispatcher>();
 
         var direct = await dispatcher.SendAsync<ListProcessDefinitionsQuery, IReadOnlyList<ProcessDefinitionInfo>>(
-            new ListProcessDefinitionsQuery(), CancellationToken.None);
+            new(), CancellationToken.None);
         Assert.Equal(1, advisor.Count);
 
         var controller = new ProcessDefinitionsController(dispatcher, Options.Create(new JsonSerializerOptions())) {
-            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
+            ControllerContext = new() { HttpContext = new DefaultHttpContext() },
         };
         var action = await controller.ListProcessDefinitions();
         var json   = Assert.IsType<JsonResult>(action);
@@ -60,7 +60,7 @@ public sealed class ProcessDefinitionQueryEntryEquivalenceShould
         Assert.Equal(2, advisor.Count);
 
         var service = new ProcessDefinitionService(dispatcher);
-        var grpc    = (await service.ListProcessDefinitionsAsync(new ListRequest())).Entities;
+        var grpc    = (await service.ListProcessDefinitionsAsync(new())).Entities;
         Assert.Equal(3, advisor.Count);
 
         var info = Assert.Single(direct);
@@ -150,7 +150,7 @@ public sealed class ProcessDefinitionQueryEntryEquivalenceShould
         ]);
         definition.Messages.Add(message);
 
-        return new ProcessRegistration {
+        return new() {
             Name          = "orders",
             Engine        = "StateMachine",
             Definition    = definition,

@@ -147,7 +147,7 @@ internal static class ReportTestHost
                  report is not null && string.Equals(report.Name, name, StringComparison.Ordinal)
                      ? ((SchemataReport Report, QueryInsightRequest Query)?)(
                          report,
-                         new QueryInsightRequest { Sources = [new("r", "rows")] })
+                         new() { Sources = [new("r", "rows")] })
                      : null));
         store.Setup(value => value.ListPeriodicAsync(It.IsAny<CancellationToken>()))
              .Returns((CancellationToken _) => ReportTestRows.ToAsync(

@@ -51,7 +51,7 @@ public class ReportActorConcurrencyShould
 
         var dispatcher = scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
         var request    = new RunReportRequest(
-            new ReportRequest {
+            new() {
                 Persist = false,
                 Query   = new() { Sources = { new("record", "source-records") } },
             },

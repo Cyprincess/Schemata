@@ -38,7 +38,7 @@ public class PushEntryEquivalenceShould
         using var provider = services.BuildServiceProvider();
 
         var results = await CollectAsync(provider.GetRequiredService<IPushService>()
-                                              .SendAsync(new PushContext("message", new RecipientTarget("users/one"))));
+                                              .SendAsync(new("message", new RecipientTarget("users/one"))));
 
         var context = await captured.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal("message", context.Message);
@@ -61,7 +61,7 @@ public class PushEntryEquivalenceShould
         services.AddSchemataPush();
         using var provider = services.BuildServiceProvider();
         await using var enumerator = provider.GetRequiredService<IPushService>()
-                                             .SendAsync(new PushContext("message", new BroadcastTarget()))
+                                             .SendAsync(new("message", new BroadcastTarget()))
                                              .GetAsyncEnumerator();
 
         var firstMove = enumerator.MoveNextAsync().AsTask();
@@ -116,13 +116,13 @@ public class PushEntryEquivalenceShould
         AssertHandler<SchedulePushRequest, Abstractions.Resource.Operation, SchedulePushHandler>(provider);
 
         var send = RoundTrip(new SendPushRequest(
-            new PushContext("send-message", new BroadcastTarget())));
+            new("send-message", new BroadcastTarget())));
         Assert.Equal("send-message", Assert.IsType<JsonElement>(send.Context.Message).GetString());
         Assert.IsType<BroadcastTarget>(send.Context.Target);
 
         var at = new DateTimeOffset(2025, 1, 2, 3, 4, 5, TimeSpan.Zero);
         var schedule = RoundTrip(new SchedulePushRequest(
-            new PushContext("scheduled-message", new TopicTarget("alerts")), at));
+            new("scheduled-message", new TopicTarget("alerts")), at));
         Assert.Equal("scheduled-message", Assert.IsType<JsonElement>(schedule.Context.Message).GetString());
         Assert.Equal("alerts", Assert.IsType<TopicTarget>(schedule.Context.Target).Topic);
         Assert.Equal(at, schedule.At);

@@ -104,7 +104,7 @@ public class ReportMethodEnvelopeShould
         var principal  = new ClaimsPrincipal(new ClaimsIdentity("test"));
 
         await dispatcher.SendAsync<ResourceMethodRequest<SchemataReport, GenerateReportRequest, Operation>, Operation>(
-            new(ReportOperations.Generate, null, new GenerateReportRequest { Query = ReportTestHost.InlineRequest().Query, Sync = true }, principal),
+            new(ReportOperations.Generate, null, new() { Query = ReportTestHost.InlineRequest().Query, Sync = true }, principal),
             CancellationToken.None);
 
         var observed = Assert.Single(wrap.Observed);
@@ -127,7 +127,7 @@ public class ReportMethodEnvelopeShould
         await Assert.ThrowsAsync<PermissionDeniedException>(() => denied.GetRequiredService<IRequestDispatcher>()
             .SendAsync<ResourceMethodRequest<SchemataReport, RunReportRequest, ReportResult>, ReportResult>(deniedRequest));
 
-        var principal = new ClaimsPrincipal(new ClaimsIdentity([new Claim("role", "schemata-report.run")], "test"));
+        var principal = new ClaimsPrincipal(new ClaimsIdentity([new("role", "schemata-report.run")], "test"));
         using var allowed = ReportTestHost.Create(ReportTestHost.CreateDriver(ReportTestRows.Create(1)), configure: services => {
             services.Configure<SchemataSecurityOptions>(_ => { });
             services.AddScoped<IPermissionResolver, DefaultPermissionResolver>();

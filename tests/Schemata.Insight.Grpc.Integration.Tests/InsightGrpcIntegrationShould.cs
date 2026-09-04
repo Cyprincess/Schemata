@@ -46,7 +46,7 @@ public class InsightGrpcIntegrationShould : IClassFixture<WebAppFactory>
         using var call = invoker.AsyncUnaryCall(
             InsightGrpcMethods.Query,
             null,
-            new CallOptions(headers: new() { { "authorization", TestAuthenticationHandler.TestScheme } }),
+            new(headers: new() { { "authorization", TestAuthenticationHandler.TestScheme } }),
             new() { Sources = { new() { Alias = "b", Name = "buyers" } } });
 
         var response = await call.ResponseAsync;

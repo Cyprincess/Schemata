@@ -1,15 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Authorization.Skeleton.Services;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
@@ -18,7 +19,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 public static class AdviceAuthorizePrompt
 {
     /// <summary>The default advisor ordering value.</summary>
-    public const int DefaultOrder = AdviceAuthorizeNonce.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = AdviceAuthorizeDpopJkt.DefaultOrder + 10_000_000;
 
     /// <summary>The known prompt values defined by OpenID Connect Core 1.0 §3.1.2.1.</summary>
     public static readonly List<string> KnownValues = [
@@ -40,19 +41,35 @@ public static class AdviceAuthorizePrompt
 ///     existing authenticated session. If <c>login</c> or <c>select_account</c> is present,
 ///     <see cref="AuthorizeContext{TApp}.RequireReauthentication" /> is set. The <c>max_age</c>
 ///     parameter (OpenID Connect Core 1.0 §2) triggers reauthentication when the last auth_time
-///     exceeds the specified age.
+///     exceeds the specified age; the read comes from the
+///     <see cref="IAuthenticationContextProvider" />-resolved context. Without a host-supplied
+///     provider no auth_time evidence exists and every <c>max_age</c> request reauthenticates.
+///     <para>
+///         <c>acr_values</c> passes through validation untouched: the parameter requests the
+///         <c>acr</c> claim as a Voluntary Claim (§3.1.2.1), and §5.5.1.1 directs an OP that
+///         cannot provide a requested value to return the session's current <c>acr</c> — an
+///         unsatisfiable request is never an error. Only the essential
+///         <c>claims</c>-parameter form of the request carries MUST-reject semantics, and that
+///         form is not implemented. Satisfying the request happens where the authentication is
+///         performed: the login pipeline resolves the requested values against the class it
+///         achieved and stamps the <c>acr</c> claim accordingly.
+///     </para>
 /// </remarks>
 /// <seealso cref="AdviceAuthorizeConsent{TApp, TAuth}" />
-public sealed class AdviceAuthorizePrompt<TApp>(TimeProvider? time = null) : IAuthorizeAdvisor<TApp>
+public sealed class AdviceAuthorizePrompt<TApp>(
+    IAuthenticationContextProvider? contexts = null,
+    TimeProvider?                   time     = null
+) : IAuthorizeAdvisor<TApp>
     where TApp : SchemataApplication
 {
-    private readonly TimeProvider _time = time ?? TimeProvider.System;
+    private readonly IAuthenticationContextProvider? _contexts = contexts;
+    private readonly TimeProvider                   _time     = time ?? TimeProvider.System;
 
     #region IAuthorizeAdvisor<TApp> Members
 
     public int Order => AdviceAuthorizePrompt.DefaultOrder;
 
-    public Task<AdviseResult> AdviseAsync(
+    public async Task<AdviseResult> AdviseAsync(
         AdviceContext          ctx,
         AuthorizeContext<TApp> authz,
         CancellationToken      ct = default
@@ -94,7 +111,7 @@ public sealed class AdviceAuthorizePrompt<TApp>(TimeProvider? time = null) : IAu
         }
 
         if (string.IsNullOrWhiteSpace(authz.Request?.MaxAge)) {
-            return Task.FromResult(AdviseResult.Continue);
+            return AdviseResult.Continue;
         }
 
         if (!int.TryParse(authz.Request.MaxAge, out var age) || age < 0) {
@@ -104,11 +121,11 @@ public sealed class AdviceAuthorizePrompt<TApp>(TimeProvider? time = null) : IAu
             );
         }
 
-        var at = authz.Principal?.FindFirstValue(Claims.AuthTime);
-        if (!string.IsNullOrWhiteSpace(at) && long.TryParse(at, out var epoch)) {
+        var context = _contexts is null ? null : await _contexts.GetContextAsync(authz.Principal, ct);
+        if (context?.AuthTime is { } epoch) {
             var time = DateTimeOffset.FromUnixTimeSeconds(epoch);
             if (_time.GetUtcNow() - time <= TimeSpan.FromSeconds(age)) {
-                return Task.FromResult(AdviseResult.Continue);
+                return AdviseResult.Continue;
             }
         }
 
@@ -121,7 +138,7 @@ public sealed class AdviceAuthorizePrompt<TApp>(TimeProvider? time = null) : IAu
 
         authz.RequireReauthentication = true;
 
-        return Task.FromResult(AdviseResult.Continue);
+        return AdviseResult.Continue;
     }
 
     #endregion

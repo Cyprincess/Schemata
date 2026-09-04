@@ -34,7 +34,7 @@ public class IdentityAccessHandlerShould
             Password     = "secret",
         };
 
-        var result = await host.Handler.RegisterAsync(request, new ClaimsPrincipal(), CancellationToken.None);
+        var result = await host.Handler.RegisterAsync(request, new(), CancellationToken.None);
 
         Assert.Equal(IdentityStatus.Success, result.Status);
         Assert.Same(Principal, result.Data);
@@ -55,7 +55,7 @@ public class IdentityAccessHandlerShould
 
         var result = await host.Handler.LoginAsync(
             new() { Username = "alice", Password = "secret" },
-            new ClaimsPrincipal(),
+            new(),
             CancellationToken.None);
 
         Assert.Equal(IdentityStatus.Success, result.Status);
@@ -71,7 +71,7 @@ public class IdentityAccessHandlerShould
 
         var result = await host.Handler.LoginAsync(
             new() { Username = "alice", Password = "secret" },
-            new ClaimsPrincipal(),
+            new(),
             CancellationToken.None);
 
         Assert.Equal(IdentityStatus.Challenge, result.Status);
@@ -87,7 +87,7 @@ public class IdentityAccessHandlerShould
         host.SignIn.Setup(value => value.ValidateSecurityStampAsync(ticketPrincipal)).ReturnsAsync(User);
         host.SignIn.Setup(value => value.CreateUserPrincipalAsync(User)).ReturnsAsync(Principal);
 
-        var result = await host.Handler.RefreshAsync(ticket, new ClaimsPrincipal(), CancellationToken.None);
+        var result = await host.Handler.RefreshAsync(ticket, new(), CancellationToken.None);
 
         Assert.Equal(IdentityStatus.Success, result.Status);
         Assert.Same(Principal, result.Data);
@@ -97,7 +97,7 @@ public class IdentityAccessHandlerShould
     public async Task Refresh_Without_Ticket_Returns_Challenge() {
         using var host = new IdentityHandlerTestHost();
 
-        var result = await host.Handler.RefreshAsync(null, new ClaimsPrincipal(), CancellationToken.None);
+        var result = await host.Handler.RefreshAsync(null, new(), CancellationToken.None);
 
         Assert.Equal(IdentityStatus.Challenge, result.Status);
         Assert.Null(result.Data);

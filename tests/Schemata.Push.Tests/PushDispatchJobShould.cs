@@ -34,7 +34,7 @@ public class PushDispatchJobShould
         using var provider = Provider(dispatcher.Object);
         var context = new JobContext {
             ArgsJson  = JsonSerializer.Serialize(expected, SchemataJson.Default),
-            Execution = new SchemataJobExecution(),
+            Execution = new(),
         };
 
         await new PushDispatchJob(provider).ExecuteAsync(context, CancellationToken.None);
@@ -55,7 +55,7 @@ public class PushDispatchJobShould
                              It.IsAny<SendPushRequest>(), cts.Token))
                   .ReturnsAsync(ImmutableArray<TransportResult>.Empty);
         using var provider = Provider(dispatcher.Object);
-        var context = Context(new PushContext("ping", new RecipientTarget("user-2")));
+        var context = Context(new("ping", new RecipientTarget("user-2")));
 
         await new PushDispatchJob(provider).ExecuteAsync(context, cts.Token);
 
@@ -74,7 +74,7 @@ public class PushDispatchJobShould
                   .ReturnsAsync(expected);
         using var provider = Provider(dispatcher.Object);
         var execution = new SchemataJobExecution();
-        var context = Context(new PushContext("ordered", new RecipientTarget("user-3")), execution);
+        var context = Context(new("ordered", new RecipientTarget("user-3")), execution);
 
         await new PushDispatchJob(provider).ExecuteAsync(context, CancellationToken.None);
 
@@ -89,7 +89,7 @@ public class PushDispatchJobShould
         using var provider = Provider(dispatcher.Object);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new PushDispatchJob(provider).ExecuteAsync(new JobContext(), CancellationToken.None));
+            new PushDispatchJob(provider).ExecuteAsync(new(), CancellationToken.None));
 
         Assert.Contains("missing its dispatch context", exception.Message);
         dispatcher.VerifyNoOtherCalls();
@@ -102,7 +102,7 @@ public class PushDispatchJobShould
 
         await Assert.ThrowsAsync<JsonException>(() =>
             new PushDispatchJob(provider).ExecuteAsync(
-                new JobContext { ArgsJson = string.Empty }, CancellationToken.None));
+                new() { ArgsJson = string.Empty }, CancellationToken.None));
 
         dispatcher.VerifyNoOtherCalls();
     }

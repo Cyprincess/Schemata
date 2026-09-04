@@ -110,7 +110,7 @@ public class MissedFirePolicyShould
         var scheduler  = services.GetRequiredService<DefaultScheduler>();
         var dispatcher = new JobExecutionDispatcher(services, time: clock);
 
-        return new SchedulerFixture(services, scheduler, dispatcher, job);
+        return new(services, scheduler, dispatcher, job);
     }
 
     private static SchemataJob CreateCronJob(DateTime nextRunTime) {

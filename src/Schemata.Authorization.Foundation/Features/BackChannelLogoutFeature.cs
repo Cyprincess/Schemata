@@ -5,6 +5,7 @@ using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Core;
 
 namespace Schemata.Authorization.Foundation.Features;
@@ -16,27 +17,35 @@ namespace Schemata.Authorization.Foundation.Features;
 ///     logout queue, HTTP-backed notifier, and discovery metadata.
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
-/// <typeparam name="TToken">The token entity type.</typeparam>
 /// <remarks>
 ///     Installed via <c>UseBackChannelLogout()</c> on
-///     <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope, TToken}" />.
+///     <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope}" />.
 /// </remarks>
-/// <seealso cref="FrontChannelLogoutFeature{TApp, TToken}" />
-public sealed class BackChannelLogoutFeature<TApp, TToken> : IAuthorizationFlowFeature
+public sealed class BackChannelLogoutFeature<TApp> : IAuthorizationFlowFeature
     where TApp : SchemataApplication
-    where TToken : SchemataToken
 {
     #region IAuthorizationFlowFeature Members
 
-    public int Order => 60_200;
+    public int Order => BackChannelLogoutFeature.DefaultOrder;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
-        services.AddHttpClient(nameof(BackChannelLogoutService<,>));
-        services.TryAddScoped<BackChannelLogoutService<TApp, TToken>>();
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<ILogoutNotifier, BackChannelLogoutService<TApp, TToken>>());
+        services.AddHttpClient(nameof(BackChannelLogoutService<>));
+        services.TryAddScoped<BackChannelLogoutService<TApp>>();
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ILogoutNotifier, BackChannelLogoutService<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryBackChannelLogout>());
         services.AddScheduledJob<BackChannelLogoutJob>();
     }
 
     #endregion
+}
+
+
+/// <summary>
+///     Ordering anchor for <see cref="BackChannelLogoutFeature{TApp}" /> so successor features can chain
+///     off its <c>DefaultOrder</c> without naming type arguments.
+/// </summary>
+internal static class BackChannelLogoutFeature
+{
+    /// <summary>The default feature ordering value (chained after its predecessor).</summary>
+    public const int DefaultOrder = FrontChannelLogoutFeature.DefaultOrder + 100;
 }

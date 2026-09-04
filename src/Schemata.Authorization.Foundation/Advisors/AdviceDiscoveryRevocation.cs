@@ -20,7 +20,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 public sealed class AdviceDiscoveryRevocation : IDiscoveryAdvisor
 {
     /// <summary>The default advisor ordering value.</summary>
-    public const int DefaultOrder = AdviceDiscoveryIntrospection.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = AdviceDiscoveryRegistration.DefaultOrder + 10_000_000;
 
     #region IDiscoveryAdvisor Members
 

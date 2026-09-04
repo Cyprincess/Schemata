@@ -32,7 +32,7 @@ public class DefaultSchedulerTriggerShould
 
         // The scheduler begins stopped; a fire accepted here would never be drained.
         await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await harness.Scheduler.TriggerAsync<SampleJob>(new JobContext(), CancellationToken.None));
+            async () => await harness.Scheduler.TriggerAsync<SampleJob>(new(), CancellationToken.None));
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public class DefaultSchedulerTriggerShould
         var harness = await StartedHarness();
 
         var execution = await harness.Scheduler.TriggerAsync<SampleJob>(
-            new JobContext { Job = "jobs/sample" }, CancellationToken.None);
+            new() { Job = "jobs/sample" }, CancellationToken.None);
 
         Assert.Equal(ExecutionState.Pending, execution.State);
         Assert.Same(execution, Assert.Single(harness.Persisted));
@@ -51,7 +51,7 @@ public class DefaultSchedulerTriggerShould
         var harness = await StartedHarness();
 
         var execution = await harness.Scheduler.TriggerAsync<SampleJob>(
-            new JobContext { Job = "jobs/sample" }, CancellationToken.None);
+            new() { Job = "jobs/sample" }, CancellationToken.None);
 
         Assert.Equal($"operations/{execution.Name}", execution.CanonicalName);
         Assert.Equal("jobs/sample", execution.Job);
@@ -76,7 +76,7 @@ public class DefaultSchedulerTriggerShould
         var uid     = Guid.NewGuid();
 
         var execution = await harness.Scheduler.TriggerAsync<SampleJob>(
-            new JobContext { Job = "jobs/sample", ExecutionUid = uid }, CancellationToken.None);
+            new() { Job = "jobs/sample", ExecutionUid = uid }, CancellationToken.None);
 
         // The caller owns the operation name when it supplies one, so a client that pre-computed
         // operations/{uid} can address the row it is about to create.
@@ -89,7 +89,7 @@ public class DefaultSchedulerTriggerShould
         var harness = await StartedHarness();
 
         var execution = await harness.Scheduler.TriggerAsync<SampleJob>(
-            new JobContext { Job = "jobs/sample" }, CancellationToken.None);
+            new() { Job = "jobs/sample" }, CancellationToken.None);
 
         Assert.Equal("sample-key", execution.JobKey);
     }

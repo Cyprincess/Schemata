@@ -85,7 +85,7 @@ public class ResourceDetailResponsePipelineAdvisorShould
         var detail = MappedDetail();
 
         using var services = BuildServices<Detail>(CreateRepository(), CreateMapper(detail),
-            options: new SchemataResourceOptions { SuppressFreshness = true });
+            options: new() { SuppressFreshness = true });
         var result = await DispatchGetAsync<Detail>(services);
 
         Assert.Equal("tenants/t1", result.Detail!.Parent);
@@ -124,7 +124,7 @@ public class ResourceDetailResponsePipelineAdvisorShould
         var calls    = 0;
 
         var result = await advisor.AdviseAsync(
-            ctx, new(new GetRequest(), null), _ => {
+            ctx, new(new(), null), _ => {
                 calls++;
                 return Task.FromResult(response);
             }, CancellationToken.None);
@@ -148,7 +148,7 @@ public class ResourceDetailResponsePipelineAdvisorShould
         var ctx      = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var response = new GetResultBase<Detail> { Detail = detail };
 
-        await advisor.AdviseAsync(ctx, new(new GetRequest(), null), _ => Task.FromResult(response), CancellationToken.None);
+        await advisor.AdviseAsync(ctx, new(new(), null), _ => Task.FromResult(response), CancellationToken.None);
 
         Assert.Equal(expected, detail.Parent);
     }
@@ -214,24 +214,24 @@ public class ResourceDetailResponsePipelineAdvisorShould
     private static Task<CreateResultBase<Detail>> DispatchCreateAsync(ServiceProvider services) {
         var dispatcher = new InProcessRequestDispatcher(services);
         return dispatcher.SendAsync<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>(
-            new(new Request(), null), CancellationToken.None);
+            new(new(), null), CancellationToken.None);
     }
 
     private static Task<GetResultBase<TGetDetail>> DispatchGetAsync<TGetDetail>(ServiceProvider services)
         where TGetDetail : class, ICanonicalName {
         var dispatcher = new InProcessRequestDispatcher(services);
         return dispatcher.SendAsync<GetResourceQueryRequest<Entity, TGetDetail>, GetResultBase<TGetDetail>>(
-            new(new GetRequest { CanonicalName = "entities/e1" }, null), CancellationToken.None);
+            new(new() { CanonicalName = "entities/e1" }, null), CancellationToken.None);
     }
 
     private static Task<UpdateResultBase<Detail>> DispatchUpdateAsync(ServiceProvider services) {
         var dispatcher = new InProcessRequestDispatcher(services);
         return dispatcher.SendAsync<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>(
-            new("entities/e1", new Request(), null), CancellationToken.None);
+            new("entities/e1", new(), null), CancellationToken.None);
     }
 
     private static Detail MappedDetail() {
-        return new Detail {
+        return new() {
             CanonicalName = "tenants/t1/hosts/h1",
             Timestamp     = Timestamp,
         };

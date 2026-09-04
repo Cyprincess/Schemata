@@ -55,7 +55,7 @@ public class AuthenticationPipelineAdvisorShould
         }
 
         var exception = await Assert.ThrowsAsync<UnauthenticatedException>(() =>
-            advisor.AdviseAsync(Context(), new TestRequest(null), Next, CancellationToken.None));
+            advisor.AdviseAsync(Context(), new(null), Next, CancellationToken.None));
 
         Assert.Equal(401, exception.Code);
         Assert.Equal("UNAUTHENTICATED", exception.Status);
@@ -72,7 +72,7 @@ public class AuthenticationPipelineAdvisorShould
             return Task.FromResult("completed");
         }
 
-        var result = await advisor.AdviseAsync(Context(), new TestRequest(null), Next, CancellationToken.None);
+        var result = await advisor.AdviseAsync(Context(), new(null), Next, CancellationToken.None);
 
         Assert.Equal("completed", result);
         Assert.Equal(1, calls);
@@ -101,7 +101,7 @@ public class AuthenticationPipelineAdvisorShould
     public async Task Bypass_Authentication_When_The_Resolver_Has_No_Entity() {
         var advisor = new AuthenticationPipelineAdvisor<TestRequest, string>(_ => ("Lookup", null));
 
-        var result = await advisor.AdviseAsync(Context(), new TestRequest(null), _ => Task.FromResult("completed"), CancellationToken.None);
+        var result = await advisor.AdviseAsync(Context(), new(null), _ => Task.FromResult("completed"), CancellationToken.None);
 
         Assert.Equal("completed", result);
     }

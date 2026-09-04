@@ -29,7 +29,6 @@ using Schemata.Insight.Skeleton.Queries;
 using Schemata.Report.Foundation.Commands;
 using Schemata.Report.Foundation.Handlers;
 using Schemata.Report.Foundation.Jobs;
-using Schemata.Report.Foundation.Queries;
 using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Tests;
@@ -127,10 +126,10 @@ public class ReportMethodHandlerShould
         var handler = new ReadSnapshotHandler<SchemataReportSnapshot>(store.Object, options);
 
         var first = await handler.HandleAsync(
-            new ReadSnapshotRequest { CanonicalName = snapshot.CanonicalName, PageSize = 1_500 },
+            new() { CanonicalName = snapshot.CanonicalName, PageSize = 1_500 },
             default);
         var second = await handler.HandleAsync(
-            new ReadSnapshotRequest {
+            new() {
                 CanonicalName = snapshot.CanonicalName,
                 PageSize      = 1_500,
                 PageToken     = first.NextPageToken,
@@ -154,7 +153,7 @@ public class ReportMethodHandlerShould
 
         var error = await Assert.ThrowsAsync<InvalidArgumentException>(async () => {
             await handler.HandleAsync(
-                new ReadSnapshotRequest {
+                new() {
                     CanonicalName = snapshot.CanonicalName,
                     PageToken     = "not-a-report-token",
                 },
@@ -176,7 +175,7 @@ public class ReportMethodHandlerShould
         var handler = new ReadSnapshotHandler<SchemataReportSnapshot>(store.Object, options);
 
         var page = await handler.HandleAsync(
-            new ReadSnapshotRequest {
+            new() {
                 CanonicalName = snapshot.CanonicalName,
                 PageSize      = 5_000,
             },

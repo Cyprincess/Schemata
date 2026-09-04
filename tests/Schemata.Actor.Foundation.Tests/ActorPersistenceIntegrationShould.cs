@@ -9,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Actor.Foundation.Tests.Fixtures;
 using Schemata.Actor.Skeleton;
 using Schemata.Actor.Skeleton.Entities;
-using Schemata.Core;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
 using Xunit;
@@ -35,7 +34,7 @@ public sealed class ActorPersistenceIntegrationShould
                      .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
         services.AddRepository<SchemataActor, EfCoreRepository<TestDbContext, SchemataActor>>();
 
-        var builder = new SchemataActorBuilder(new SchemataOptions(), services);
+        var builder = new SchemataActorBuilder(new(), services);
         builder.Register<CounterPersistentActor>("counter");
         builder.UsePersistence();
         services.AddSchemataActor();
@@ -57,15 +56,15 @@ public sealed class ActorPersistenceIntegrationShould
         await actor.TellAsync(new Increment());
 
         // Ask: request/response, twice more.
-        await actor.AskAsync<Increment, int>(new Increment());
-        var afterThree = await actor.AskAsync<Increment, int>(new Increment());
+        await actor.AskAsync<Increment, int>(new());
+        var afterThree = await actor.AskAsync<Increment, int>(new());
         Assert.Equal(3, afterThree);
 
         await system.StopAsync(id);
 
         // Persistence: a freshly (re)spawned instance loads the state a real repository wrote.
         var respawned = await system.GetAsync(id);
-        var loaded     = await respawned.AskAsync<GetCount, int>(new GetCount());
+        var loaded     = await respawned.AskAsync<GetCount, int>(new());
         Assert.Equal(3, loaded);
 
         await using var verifyScope = root.CreateAsyncScope();
@@ -74,6 +73,6 @@ public sealed class ActorPersistenceIntegrationShould
             q => q.Where(a => a.Name == id.ToString()), CancellationToken.None);
 
         Assert.NotNull(row);
-        Assert.Equal(3, BitConverter.ToInt32(row!.State!, 0));
+        Assert.Equal(3, BitConverter.ToInt32(row.State!, 0));
     }
 }

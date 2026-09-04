@@ -67,13 +67,13 @@ public sealed class InsightEntryEquivalenceShould
     public async Task Query_Throw_The_Same_Exception_Payload_Through_Both_Entries_For_A_Sourceless_Request() {
         await using var facadeProvider = CreateProvider(CreateDriver(ValueRows(0)).Object, advisor: null);
         var insight = facadeProvider.GetRequiredService<IInsightService>();
-        var facadeException = await Record.ExceptionAsync(() => insight.QueryAsync(new QueryInsightRequest(), null).AsTask());
+        var facadeException = await Record.ExceptionAsync(() => insight.QueryAsync(new(), null).AsTask());
 
         await using var dispatcherProvider = CreateProvider(CreateDriver(ValueRows(0)).Object, advisor: null);
         using var dispatcherScope = dispatcherProvider.CreateScope();
         var dispatcher = dispatcherScope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
         var dispatcherException = await Record.ExceptionAsync(() => dispatcher.SendAsync<QueryInsightRequest, QueryInsightResponse>(
-            new QueryInsightRequest(), CancellationToken.None));
+            new(), CancellationToken.None));
 
         var facadeValidation     = Assert.IsType<InsightValidationException>(facadeException);
         var dispatcherValidation = Assert.IsType<InsightValidationException>(dispatcherException);

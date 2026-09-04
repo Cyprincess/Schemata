@@ -21,7 +21,7 @@ public sealed partial class LocalPipelineExecutor
                                                                                    Compiler(field.Expression.Language)
                                                                                       .Compile<IReadOnlyDictionary<string, object?>, object>(
                                                                                            field.Expression.Tree))))
-                                             .ToArray<(string Alias, Func<IReadOnlyDictionary<string, object>, object> Value)>();
+                                             .ToArray<(string Alias, Func<IReadOnlyDictionary<string, object?>, object> Value)>();
 
         await foreach (var row in rows.WithCancellation(ct)) {
             var next = new Dictionary<string, object?>(row, StringComparer.Ordinal);

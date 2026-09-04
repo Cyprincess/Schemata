@@ -31,7 +31,7 @@ public class DefaultOperationServiceShould
                             CancellationToken _) => {
                       var source = Volatile.Read(ref completed) == 0
                           ? row
-                          : new SchemataJobExecution {
+                          : new() {
                               Uid           = row.Uid,
                               Name          = row.Name,
                               CanonicalName = row.CanonicalName,
@@ -44,7 +44,7 @@ public class DefaultOperationServiceShould
                       var snapshot = predicate!(new[] { source }.AsQueryable()).SingleOrDefault();
                       firstRead.TrySetResult();
 
-                      return new ValueTask<SchemataJobExecution?>(snapshot);
+                      return new(snapshot);
                   });
         var service = CreateService(executions, pollInterval: TimeSpan.FromMilliseconds(5));
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -147,7 +147,7 @@ public class DefaultOperationServiceShould
                   .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>? predicate,
                             CancellationToken _) => {
                       firstRead.TrySetResult();
-                      return new ValueTask<SchemataJobExecution?>(
+                      return new(
                           predicate!(new[] { row }.AsQueryable()).SingleOrDefault());
                   });
         var service = CreateService(executions, pollInterval: TimeSpan.FromMilliseconds(5));
@@ -175,7 +175,7 @@ public class DefaultOperationServiceShould
                              It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>? predicate,
                             CancellationToken _) =>
-                      new ValueTask<SchemataJobExecution?>(predicate!(rows.AsQueryable()).SingleOrDefault()));
+                      new(predicate!(rows.AsQueryable()).SingleOrDefault()));
         var service = CreateService(executions);
         var uid = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
@@ -201,7 +201,7 @@ public class DefaultOperationServiceShould
                              It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>? predicate,
                             CancellationToken _) =>
-                      new ValueTask<SchemataJobExecution?>(predicate!(new[] { row }.AsQueryable()).SingleOrDefault()));
+                      new(predicate!(new[] { row }.AsQueryable()).SingleOrDefault()));
         return executions;
     }
 

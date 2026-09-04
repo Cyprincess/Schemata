@@ -22,7 +22,7 @@ public class RequestPipelineAdvisorShould
 
         var ctx = new AdviceContext(new EmptyServiceProvider());
 
-        var result = await advisor.AdviseAsync(ctx, new RenameWidget("hub"), Continuation, CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, new("hub"), Continuation, CancellationToken.None);
 
         Assert.Equal(["before", "handler", "after"], trail);
         Assert.Equal("handler-result::after", result);
@@ -41,7 +41,7 @@ public class RequestPipelineAdvisorShould
 
         var ctx = new AdviceContext(new EmptyServiceProvider());
 
-        var result = await advisor.AdviseAsync(ctx, new RenameWidget("hub"), Continuation, CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, new("hub"), Continuation, CancellationToken.None);
 
         Assert.Equal("short", result);
         Assert.Empty(trail);

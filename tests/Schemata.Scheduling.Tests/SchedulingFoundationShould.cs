@@ -35,7 +35,7 @@ public class SchedulingFoundationShould
         var scheduler = services.GetRequiredService<IScheduler>();
         await scheduler.StartAsync(CancellationToken.None);
 
-        var execution = await scheduler.TriggerAsync<SampleJob>(new JobContext {
+        var execution = await scheduler.TriggerAsync<SampleJob>(new() {
             Job       = "jobs/sample",
             StartTime = DateTime.UtcNow.AddHours(1),
         }, CancellationToken.None);

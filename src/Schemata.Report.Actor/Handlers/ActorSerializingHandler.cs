@@ -38,7 +38,7 @@ internal sealed class ActorSerializingHandler<TRequest, TResult>(
         }
 
         var context = MessageContexts.Capture(caller);
-        var actor   = await actors.GetAsync(new ActorId("report", key));
+        var actor   = await actors.GetAsync(new("report", key));
         return await actor.AskAsync<TRequest, TResult>(request, context, ct: ct);
     }
 }

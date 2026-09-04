@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -65,7 +64,7 @@ internal sealed class DefaultTriggerJobHandler(SchedulingHandlerSupport support)
             Method        = context.Method,
             JobKey        = context.JobKey ?? job.JobKey,
             ArgsJson      = context.ArgsJson ?? job.ArgsJson,
-            Variables     = new Dictionary<string, string?>(context.Variables),
+            Variables     = new(context.Variables),
             State         = ExecutionState.Pending,
             StartTime     = context.StartTime.GetValueOrDefault(),
         };

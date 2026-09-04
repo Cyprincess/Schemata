@@ -6,8 +6,6 @@ using Schemata.Report.Foundation;
 using Schemata.Report.Foundation.Definitions;
 using Schemata.Report.Skeleton;
 using Xunit;
-
-using Schemata.Report.Skeleton.Models;
 using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Tests;
@@ -22,7 +20,7 @@ public class ReportRepositoryDependencyShould
 
         var result = await service.RunAsync(ReportTestHost.InlineRequest());
 
-        Assert.Equal(2, result.Response!.Rows.Count);
+        Assert.Equal(2, result.Response.Rows.Count);
     }
 
     [Fact]
@@ -41,9 +39,9 @@ public class ReportRepositoryDependencyShould
             });
         var service = provider.GetRequiredService<IReportService>();
 
-        var result = await service.RunAsync(new ReportRequest { Name = "daily" });
+        var result = await service.RunAsync(new() { Name = "daily" });
 
-        Assert.Single(result.Response!.Rows);
+        Assert.Single(result.Response.Rows);
     }
 
     [Fact]
@@ -59,7 +57,7 @@ public class ReportRepositoryDependencyShould
         var service = provider.GetRequiredService<IReportService>();
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await service.RunAsync(new ReportRequest { Name = "missing" }));
+            async () => await service.RunAsync(new() { Name = "missing" }));
 
         Assert.Contains("IRepository", exception.Message);
     }

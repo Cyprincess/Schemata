@@ -5,6 +5,7 @@ using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Core;
 
 namespace Schemata.Authorization.Foundation.Features;
@@ -18,24 +19,32 @@ namespace Schemata.Authorization.Foundation.Features;
 ///     and discovery metadata.
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
-/// <typeparam name="TToken">The token entity type.</typeparam>
 /// <remarks>
 ///     Installed via <c>UseFrontChannelLogout()</c> on
-///     <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope, TToken}" />.
+///     <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope}" />.
 /// </remarks>
-/// <seealso cref="BackChannelLogoutFeature{TApp, TToken}" />
-public sealed class FrontChannelLogoutFeature<TApp, TToken> : IAuthorizationFlowFeature
+public sealed class FrontChannelLogoutFeature<TApp> : IAuthorizationFlowFeature
     where TApp : SchemataApplication
-    where TToken : SchemataToken
 {
     #region IAuthorizationFlowFeature Members
 
-    public int Order => 60_100;
+    public int Order => FrontChannelLogoutFeature.DefaultOrder;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<ILogoutNotifier, FrontChannelLogoutService<TApp, TToken>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ILogoutNotifier, FrontChannelLogoutService<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryFrontChannelLogout>());
     }
 
     #endregion
+}
+
+
+/// <summary>
+///     Ordering anchor for <see cref="FrontChannelLogoutFeature{TApp}" /> so successor features can chain
+///     off its <c>DefaultOrder</c> without naming type arguments.
+/// </summary>
+internal static class FrontChannelLogoutFeature
+{
+    /// <summary>The default feature ordering value (chained after its predecessor).</summary>
+    public const int DefaultOrder = EndSessionFeature.DefaultOrder + 100;
 }

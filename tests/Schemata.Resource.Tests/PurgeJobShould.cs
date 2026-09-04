@@ -11,7 +11,6 @@ using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Resource.Foundation;
-using Schemata.Resource.Foundation.Commands;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;
@@ -42,7 +41,7 @@ public class PurgeJobShould
         var handler = new PurgeHandler<ParentTrashStudent>(services);
 
         var operation = await handler.HandleAsync(
-            new PurgeResourceRequest<ParentTrashStudent> {
+            new() {
                 Filter   = "*",
                 Language = "aip",
                 Parent   = "schools/one",
@@ -75,7 +74,7 @@ public class PurgeJobShould
                               It.IsAny<Func<IQueryable<ParentTrashStudent>, IQueryable<ParentTrashStudent>>>(),
                               It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<ParentTrashStudent>, IQueryable<ParentTrashStudent>> query, CancellationToken _) =>
-                      new ValueTask<long>(query(rows.AsQueryable()).LongCount()));
+                      new(query(rows.AsQueryable()).LongCount()));
         repository.Setup(r => r.ListAsync(
                               It.IsAny<Func<IQueryable<ParentTrashStudent>, IQueryable<ParentTrashStudent>>>(),
                               It.IsAny<CancellationToken>()))
@@ -88,7 +87,7 @@ public class PurgeJobShould
         var job = new PurgeJob<ParentTrashStudent>(repository.Object, services);
         var execution = new SchemataJobExecution();
 
-        await job.ExecuteAsync(new JobContext {
+        await job.ExecuteAsync(new() {
             ArgsJson = "{\"filter\":\"*\",\"parent\":\"schools/one\",\"force\":false}",
             Execution = execution,
         }, CancellationToken.None);
@@ -113,7 +112,7 @@ public class PurgeJobShould
                               It.IsAny<Func<IQueryable<ParentTrashStudent>, IQueryable<ParentTrashStudent>>>(),
                               It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<ParentTrashStudent>, IQueryable<ParentTrashStudent>> query, CancellationToken _) =>
-                      new ValueTask<long>(query(rows.AsQueryable()).LongCount()));
+                      new(query(rows.AsQueryable()).LongCount()));
         repository.Setup(r => r.ListAsync(
                               It.IsAny<Func<IQueryable<ParentTrashStudent>, IQueryable<ParentTrashStudent>>>(),
                               It.IsAny<CancellationToken>()))
@@ -129,7 +128,7 @@ public class PurgeJobShould
         var job       = new PurgeJob<ParentTrashStudent>(repository.Object, services);
         var execution = new SchemataJobExecution();
 
-        await job.ExecuteAsync(new JobContext {
+        await job.ExecuteAsync(new() {
             ArgsJson  = "{\"filter\":\"*\",\"parent\":\"schools/one\",\"force\":true}",
             Execution = execution,
         }, CancellationToken.None);

@@ -77,7 +77,7 @@ public class ReportGenerationJobShould
         var job = CreateJob(provider);
         var request = ReportTestHost.InlineRequest(persist: true);
 
-        await job.ExecuteAsync(new JobContext {
+        await job.ExecuteAsync(new() {
             ArgsJson = JsonSerializer.Serialize(request, SchemataJson.Default),
         }, CancellationToken.None);
 
@@ -97,7 +97,7 @@ public class ReportGenerationJobShould
         var job = CreateJob(provider);
         var execution = new SchemataJobExecution { Uid = Guid.NewGuid() };
 
-        await job.ExecuteAsync(new JobContext {
+        await job.ExecuteAsync(new() {
             ArgsJson  = JsonSerializer.Serialize(ReportTestHost.InlineRequest(persist: true), SchemataJson.Default),
             Execution = execution,
         }, CancellationToken.None);
@@ -124,7 +124,7 @@ public class ReportGenerationJobShould
         var job = CreateJob(provider);
 
         var exception = await Assert.ThrowsAsync<ReportException>(async () => {
-            await job.ExecuteAsync(new JobContext {
+            await job.ExecuteAsync(new() {
                 ArgsJson  = JsonSerializer.Serialize(ReportTestHost.InlineRequest(), SchemataJson.Default),
                 Execution = new(),
             }, CancellationToken.None);
@@ -150,7 +150,7 @@ public class ReportGenerationJobShould
             configure: services => services.AddScoped<IRepository<SchemataJobExecution>>(_ => state.CreateExecutionRepository()));
         var job = CreateJob(provider);
 
-        await job.ExecuteAsync(new JobContext {
+        await job.ExecuteAsync(new() {
             ExecutionUid = uid,
             ArgsJson     = JsonSerializer.Serialize(ReportTestHost.InlineRequest(persist: true), SchemataJson.Default),
             Execution    = state.Execution,
@@ -203,7 +203,7 @@ public class ReportGenerationJobShould
         };
 
         await Assert.ThrowsAsync<JsonException>(async () => {
-            await job.ExecuteAsync(new JobContext {
+            await job.ExecuteAsync(new() {
                 ArgsJson  = "{bad",
                 Execution = execution,
             }, CancellationToken.None);
@@ -219,7 +219,7 @@ public class ReportGenerationJobShould
         using var provider = ReportTestHost.Create(ReportTestHost.CreateDriver(ReportTestRows.Create(1)), state);
         var job = CreateJob(provider);
 
-        await job.ExecuteAsync(new JobContext {
+        await job.ExecuteAsync(new() {
             ArgsJson  = JsonSerializer.Serialize(ReportTestHost.InlineRequest(persist: true), SchemataJson.Default),
             Execution = new(),
         }, CancellationToken.None);
@@ -234,7 +234,7 @@ public class ReportGenerationJobShould
         using var provider = ReportTestHost.Create(ReportTestHost.CreateDriver(ReportTestRows.Create(1)), state, report: report);
         var job = CreateJob(provider);
 
-        await job.ExecuteAsync(new JobContext {
+        await job.ExecuteAsync(new() {
             Variables = new Dictionary<string, string?> { ["report"] = "daily" },
             Execution = new(),
         }, CancellationToken.None);

@@ -25,8 +25,8 @@ public class UserInfoHandlerShould
                                 It.IsAny<List<Claim>>(),
                                 It.IsAny<CancellationToken>()))
                      .Callback((AdviceContext _, List<Claim> claims, CancellationToken _) => {
-                         claims.Add(new Claim(IdentityClaims.Email, "alice@example.com"));
-                         claims.Add(new Claim("internal", "secret"));
+                         claims.Add(new(IdentityClaims.Email, "alice@example.com"));
+                         claims.Add(new("internal", "secret"));
                      })
                      .ReturnsAsync(AdviseResult.Continue);
         var destinationAdvisor = new Mock<IDestinationAdvisor>();
@@ -48,12 +48,12 @@ public class UserInfoHandlerShould
         services.AddSingleton(claimsAdvisor.Object);
         services.AddSingleton(destinationAdvisor.Object);
         using var provider = services.BuildServiceProvider();
-        using var ambient  = AdviceContext.Establish(new AdviceContext(provider));
-        var handler = new UserInfoHandler();
+        using var ambient  = AdviceContext.Establish(new(provider));
+        var       handler  = new UserInfoHandler();
         var principal = new ClaimsPrincipal(new ClaimsIdentity([
-            new Claim(IdentityClaims.Subject, "user-1"),
-            new Claim(Claims.ClientId, "client-1"),
-            new Claim(Claims.Scope, "openid profile email"),
+            new(IdentityClaims.Subject, "user-1"),
+            new(Claims.ClientId, "client-1"),
+            new(Claims.Scope, "openid profile email"),
         ], "bearer"));
 
         var result = await handler.HandleAsync(principal, CancellationToken.None);

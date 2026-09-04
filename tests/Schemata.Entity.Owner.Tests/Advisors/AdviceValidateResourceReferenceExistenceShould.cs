@@ -89,7 +89,7 @@ public class AdviceValidateResourceReferenceExistenceShould
                 It.IsAny<CancellationToken>()))
             .Returns((Func<IQueryable<Book>, IQueryable<Book>> _, CancellationToken _) => {
                 suppressionObserved = bookContext.Has<QueryOwnerSuppressed>();
-                return new ValueTask<bool>(true);
+                return new(true);
             });
 
         var entity = new ReferencingEntity { BookCanonicalName = "books/x" };
@@ -201,7 +201,7 @@ public class AdviceValidateResourceReferenceExistenceShould
         IReadOnlyList<User>   users) {
         var bookContext    = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var bookRepository = QueryableRepository(books, bookContext);
-        var userRepository = QueryableRepository(users, new AdviceContext(new ServiceCollection().BuildServiceProvider()));
+        var userRepository = QueryableRepository(users, new(new ServiceCollection().BuildServiceProvider()));
 
         var services = new ServiceCollection();
         services.AddSingleton(resolver);
@@ -209,8 +209,8 @@ public class AdviceValidateResourceReferenceExistenceShould
         services.AddSingleton(userRepository.Object);
 
         return (
-            new AdviceValidateResourceReferenceExistence<ReferencingEntity>(),
-            new AdviceContext(services.BuildServiceProvider()),
+            new(),
+            new(services.BuildServiceProvider()),
             bookRepository,
             bookContext);
     }
@@ -223,7 +223,7 @@ public class AdviceValidateResourceReferenceExistenceShould
                 It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(),
                 It.IsAny<CancellationToken>()))
             .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) =>
-                new ValueTask<bool>(predicate(rows.AsQueryable()).Any()));
+                new(predicate(rows.AsQueryable()).Any()));
         return repository;
     }
 

@@ -118,7 +118,7 @@ public class DefaultPushSubscriptionManagerShould
                              It.IsAny<Func<IQueryable<SchemataPushSubscription>, IQueryable<SchemataPushSubscription>>>(),
                              It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<SchemataPushSubscription>, IQueryable<SchemataPushSubscription>> query,
-                            CancellationToken _) => new ValueTask<bool>(query(rows.AsQueryable()).Any()));
+                            CancellationToken _) => new(query(rows.AsQueryable()).Any()));
         using var services = BuildServices(repository.Object);
         var manager = services.GetRequiredService<IPushSubscriptionManager>();
 

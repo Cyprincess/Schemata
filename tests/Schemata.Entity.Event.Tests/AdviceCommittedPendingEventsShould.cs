@@ -57,7 +57,7 @@ public class AdviceCommittedPendingEventsShould
     public async Task Publish_Nothing_WhenTheEntityBufferedNoEvents() {
         var bus = new Mock<IEventBus>();
 
-        await Advise(bus, added: [new Widget()]);
+        await Advise(bus, added: [new()]);
 
         bus.Verify(b => b.PublishAsync(It.IsAny<IEvent>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -66,7 +66,7 @@ public class AdviceCommittedPendingEventsShould
     public async Task Publish_Nothing_ForAnEntityThatDoesNotBufferEvents() {
         var bus     = new Mock<IEventBus>();
         var advisor = new AdviceCommittedPendingEvents<Plain>(bus.Object);
-        var changes = new CommitChanges<Plain> { Added = [new Plain()], Updated = [], Removed = [] };
+        var changes = new CommitChanges<Plain> { Added = [new()], Updated = [], Removed = [] };
 
         await advisor.AdviseAsync(new(Mock.Of<IServiceProvider>()), Mock.Of<IRepository<Plain>>(), changes);
 
@@ -89,7 +89,7 @@ public class AdviceCommittedPendingEventsShould
     public async Task Continue_TheAdvisorChain() {
         var bus = new Mock<IEventBus>();
 
-        var result = await Advise(bus, added: [new Widget()]);
+        var result = await Advise(bus, added: [new()]);
 
         Assert.Equal(AdviseResult.Continue, result);
     }

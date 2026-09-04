@@ -355,7 +355,7 @@ public sealed class ResourceAuthorizationRegistrationShould
                     Assert.Equal(AdviseResult.Continue, advice);
                 }
 
-                return new ListResultBase<Summary>();
+                return new();
             }, ct), CancellationToken.None);
         var names = container.Query(new[] { new AnonymousEntity { Name = "allowed" }, new AnonymousEntity { Name = "denied" } }.AsQueryable()).Select(entity => entity.Name).ToArray();
 

@@ -20,7 +20,7 @@ public class SchedulePersistenceOrderingShould
 {
     [Fact]
     public async Task RepositoryWriteFailure_LeavesNoEntryOrFire() {
-        var clock = new MutableClock(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var clock = new MutableClock(new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         clock.Advance(TimeSpan.FromMinutes(1));
         var recording = new RecordingJob();
         var registry  = new DefaultScheduledJobRegistry();

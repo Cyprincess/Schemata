@@ -235,7 +235,7 @@ internal sealed class FlowHandlerSupport(
         }
 
         var (name, type, canonical, stamp) = StartSource(registration, source, sourceType, sourceName);
-        await scope.Sources.AddAsync(new SchemataProcessSource {
+        await scope.Sources.AddAsync(new() {
             Process         = process.CanonicalName!,
             Token           = null,
             Name            = name,

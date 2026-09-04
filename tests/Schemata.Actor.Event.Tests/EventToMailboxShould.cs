@@ -64,12 +64,12 @@ public class EventToMailboxShould
             }
 
             var system = root.GetRequiredService<IActorSystem>();
-            var actor  = await system.GetAsync(new ActorId("recorder", "order-1"));
+            var actor  = await system.GetAsync(new("recorder", "order-1"));
 
             IMessage? received = null;
             var deadline = DateTime.UtcNow.AddSeconds(5);
             while (received is null && DateTime.UtcNow < deadline) {
-                received = await actor.AskAsync<GetReceived, IMessage?>(new GetReceived());
+                received = await actor.AskAsync<GetReceived, IMessage?>(new());
                 if (received is null) {
                     await Task.Delay(TimeSpan.FromMilliseconds(50));
                 }
@@ -86,7 +86,7 @@ public class EventToMailboxShould
         var services = new ServiceCollection();
         services.AddSchemataActor();
 
-        var actorBuilder = new SchemataActorBuilder(new SchemataOptions(), services);
+        var actorBuilder = new SchemataActorBuilder(new(), services);
         actorBuilder.Register<RecordingActor>("recorder");
         // Only OrderPlaced is routed; OrderCancelled is never registered through RouteEvent.
         actorBuilder.UseEvent().RouteEvent<OrderPlaced, OrderPlacedRoute>();

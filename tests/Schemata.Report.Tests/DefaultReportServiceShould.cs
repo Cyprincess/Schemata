@@ -167,7 +167,7 @@ public class DefaultReportServiceShould
                 ServiceDescriptor.Singleton<IReportGenerateAdvisor>(advisor.Object)));
         var service = provider.GetRequiredService<IReportService>();
 
-        await service.RunAsync(ReportTestHost.InlineRequest(), new ClaimsPrincipal(new ClaimsIdentity("caller")));
+        await service.RunAsync(ReportTestHost.InlineRequest(), new(new ClaimsIdentity("caller")));
 
         driver.Verify(value => value.ExecuteAsync(
                           It.IsAny<SubPlan>(),
@@ -214,9 +214,9 @@ public class DefaultReportServiceShould
         result.SetupGet(value => value.Rows).Returns(ReportTestRows.Create(1));
         result.SetupGet(value => value.Schema).Returns([]);
         result.Setup(value => value.DisposeAsync()).Returns(ValueTask.CompletedTask);
-        var driver = ReportTestHost.CreateDriver(result.Object);
-        using var provider = ReportTestHost.Create(driver, new ReportPersistenceState());
-        var service = provider.GetRequiredService<IReportService>();
+        var       driver   = ReportTestHost.CreateDriver(result.Object);
+        using var provider = ReportTestHost.Create(driver, new());
+        var       service  = provider.GetRequiredService<IReportService>();
 
         await service.RunAsync(ReportTestHost.InlineRequest(persist: true));
 

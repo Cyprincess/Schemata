@@ -77,7 +77,7 @@ internal sealed class ReportPersistenceState
     }
 
     private void CaptureChunkAdd(SchemataReportSnapshotChunk chunk) {
-        ChunkAddSequence.Add(new ReportChunkMetadata(
+        ChunkAddSequence.Add(new(
                                  chunk.Name ?? string.Empty,
                                  chunk.Index,
                                  chunk.CanonicalName ?? string.Empty,

@@ -64,7 +64,7 @@ public class AuthorizationPipelineAdvisorShould
         }
 
         var exception = await Assert.ThrowsAsync<PermissionDeniedException>(() =>
-                                                                                advisor.AdviseAsync(Context(), new TestRequest(principal), Next, CancellationToken.None));
+                                                                                advisor.AdviseAsync(Context(), new(principal), Next, CancellationToken.None));
 
         Assert.Equal(403, exception.Code);
         Assert.Equal("PERMISSION_DENIED", exception.Status);
@@ -82,7 +82,7 @@ public class AuthorizationPipelineAdvisorShould
         var advisor = CreateAdvisor(_ => (nameof(Operations.Delete), typeof(Product)));
 
         var exception = await Assert.ThrowsAsync<PermissionDeniedException>(() =>
-                                                                                advisor.AdviseAsync(Context(), new TestRequest(principal), _ => Task.FromResult("completed"), CancellationToken.None));
+                                                                                advisor.AdviseAsync(Context(), new(principal), _ => Task.FromResult("completed"), CancellationToken.None));
 
         Assert.Equal(403, exception.Code);
         _resolver.Verify(value => value.Resolve(nameof(Operations.Get), typeof(Product)), Times.Once);
@@ -96,7 +96,7 @@ public class AuthorizationPipelineAdvisorShould
         var advisor = CreateAdvisor(_ => (nameof(Operations.Get), typeof(Product)));
 
         var exception = await Assert.ThrowsAsync<NotFoundException>(() =>
-                                                                        advisor.AdviseAsync(Context(), new TestRequest(principal), _ => Task.FromResult("completed"), CancellationToken.None));
+                                                                        advisor.AdviseAsync(Context(), new(principal), _ => Task.FromResult("completed"), CancellationToken.None));
 
         Assert.Equal(404, exception.Code);
         Assert.Equal("NOT_FOUND", exception.Status);
@@ -113,7 +113,7 @@ public class AuthorizationPipelineAdvisorShould
         var advisor = CreateAdvisor(_ => (nameof(Operations.Update), typeof(Product)));
 
         var exception = await Assert.ThrowsAsync<PermissionDeniedException>(() =>
-                                                                                advisor.AdviseAsync(Context(), new TestRequest(principal), _ => Task.FromResult("completed"), CancellationToken.None));
+                                                                                advisor.AdviseAsync(Context(), new(principal), _ => Task.FromResult("completed"), CancellationToken.None));
 
         Assert.Equal(403, exception.Code);
         _resolver.Verify(value => value.Resolve(nameof(Operations.Get), typeof(Product)), Times.Once);
@@ -130,7 +130,7 @@ public class AuthorizationPipelineAdvisorShould
         var advisor = CreateAdvisor(_ => (nameof(Operations.Update), typeof(Product)));
 
         var exception = await Assert.ThrowsAsync<NotFoundException>(() =>
-                                                                        advisor.AdviseAsync(Context(), new TestRequest(principal), _ => Task.FromResult("completed"), CancellationToken.None));
+                                                                        advisor.AdviseAsync(Context(), new(principal), _ => Task.FromResult("completed"), CancellationToken.None));
 
         Assert.Equal(404, exception.Code);
         _resolver.Verify(value => value.Resolve(nameof(Operations.Get), typeof(Product)), Times.Once);
@@ -153,7 +153,7 @@ public class AuthorizationPipelineAdvisorShould
             return Task.FromResult("completed");
         }
 
-        var result = await advisor.AdviseAsync(Context(), new TestRequest(principal), Next, cancellation.Token);
+        var result = await advisor.AdviseAsync(Context(), new(principal), Next, cancellation.Token);
 
         Assert.Equal("completed", result);
         Assert.Equal(1, calls);
@@ -164,7 +164,7 @@ public class AuthorizationPipelineAdvisorShould
     public async Task Bypass_Authorization_For_An_Anonymous_Entity_Operation() {
         var advisor = CreateAdvisor(_ => (nameof(Operations.Create), typeof(PublicProduct)));
 
-        var result = await advisor.AdviseAsync(Context(), new TestRequest(null), _ => Task.FromResult("completed"), CancellationToken.None);
+        var result = await advisor.AdviseAsync(Context(), new(null), _ => Task.FromResult("completed"), CancellationToken.None);
 
         Assert.Equal("completed", result);
         _resolver.Verify(value => value.Resolve(It.IsAny<string>(), It.IsAny<Type>()), Times.Never);
@@ -175,7 +175,7 @@ public class AuthorizationPipelineAdvisorShould
     public async Task Bypass_Authorization_When_The_Resolver_Has_No_Entity() {
         var advisor = CreateAdvisor(_ => ("Lookup", null));
 
-        var result = await advisor.AdviseAsync(Context(), new TestRequest(null), _ => Task.FromResult("completed"), CancellationToken.None);
+        var result = await advisor.AdviseAsync(Context(), new(null), _ => Task.FromResult("completed"), CancellationToken.None);
 
         Assert.Equal("completed", result);
         _resolver.Verify(value => value.Resolve(It.IsAny<string>(), It.IsAny<Type>()), Times.Never);
@@ -193,7 +193,7 @@ public class AuthorizationPipelineAdvisorShould
         }
 
         var exception = await Assert.ThrowsAsync<PermissionDeniedException>(() =>
-                                                                                advisor.AdviseAsync(Context(), new TestRequest(null), Next, CancellationToken.None));
+                                                                                advisor.AdviseAsync(Context(), new(null), Next, CancellationToken.None));
 
         Assert.Equal(403, exception.Code);
         Assert.Equal(0, calls);

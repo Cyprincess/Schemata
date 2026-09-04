@@ -16,6 +16,17 @@ namespace Schemata.Authorization.Skeleton.Services;
 /// </remarks>
 public interface IClientAuthentication<TApplication>
 {
+    /// <summary>
+    ///     Gets the OAuth 2.0 client authentication method identifier served by this
+    ///     authenticator (e.g. <c>client_secret_basic</c>), per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-2.3">
+    ///         RFC 6749: The OAuth 2.0 Authorization
+    ///         Framework §2.3: Client Authentication
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    string Method { get; }
+
     /// <summary>Attempts to authenticate a client from the given request parameters.</summary>
     Task<TApplication?> AuthenticateAsync(
         Dictionary<string, List<string?>>? query,

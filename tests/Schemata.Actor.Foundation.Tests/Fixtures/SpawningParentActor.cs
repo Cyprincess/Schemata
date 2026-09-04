@@ -11,7 +11,7 @@ public sealed class SpawningParentActor : IActor
 
     public async ValueTask OnReceiveAsync(IActorContext ctx, Envelope envelope) {
         if (envelope.Payload is SpawnFailingChild) {
-            var child = await ctx.SpawnAsync(new Props(typeof(ImmediatelyFailingChildActor)));
+            var child = await ctx.SpawnAsync(new(typeof(ImmediatelyFailingChildActor)));
             await ctx.ReplyAsync(child);
         }
     }

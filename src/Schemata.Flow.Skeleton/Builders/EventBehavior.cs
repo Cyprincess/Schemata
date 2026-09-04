@@ -43,7 +43,7 @@ public sealed class EventBehavior
     /// <summary>Splices a procedure task running <paramref name="body" /> in front of the event.</summary>
     /// <param name="body">The delegate executed by the inserted procedure task.</param>
     public EventBehavior OnEnter(Func<FlowTaskContext, ValueTask> body) {
-        _definition.InsertEnterTask(_event, new ProcedureTask { Name = $"Enter_{_event.Name}", Body = body });
+        _definition.InsertEnterTask(_event, new() { Name = $"Enter_{_event.Name}", Body = body });
         return this;
     }
 

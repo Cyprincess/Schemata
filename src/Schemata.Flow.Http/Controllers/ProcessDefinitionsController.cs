@@ -23,7 +23,7 @@ public sealed class ProcessDefinitionsController(
     [HttpGet]
     public async Task<IActionResult> ListProcessDefinitions() {
         var results = await dispatcher.SendAsync<ListProcessDefinitionsQuery, IReadOnlyList<ProcessDefinitionInfo>>(
-            new ListProcessDefinitionsQuery(), HttpContext.RequestAborted);
+            new(), HttpContext.RequestAborted);
         return new JsonResult(new ListResultBase<ProcessDefinitionInfo> { Entities = results.ToList() }, json.Value);
     }
 }

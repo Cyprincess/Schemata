@@ -106,7 +106,7 @@ public sealed class FlowEntryEquivalenceShould
             Name          = "equivalence-process",
             Engine        = FlowConstants.Engines.StateMachine,
             Definition    = new EquivalenceProcess(),
-            Configuration = new ProcessConfiguration(),
+            Configuration = new(),
         };
 
         var harness = new Harness();
@@ -117,7 +117,7 @@ public sealed class FlowEntryEquivalenceShould
                   It.IsAny<FlowExecutionContext>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
               .Returns((ProcessDefinition _, SchemataProcess process, IReadOnlyList<SchemataProcessToken> _,
                         FlowExecutionContext _, string? _, CancellationToken _) =>
-                            new ValueTask<ProcessSnapshot>(Snapshot(process)));
+                            new(Snapshot(process)));
 
         var registry = new Mock<IProcessRegistry>();
         registry.Setup(r => r.GetRegistration("equivalence-process")).Returns(registration);
@@ -151,7 +151,7 @@ public sealed class FlowEntryEquivalenceShould
 
         harness.Services = services;
         harness.Runner   = services.GetRequiredService<FlowRunner>();
-        harness.Process = new SchemataProcess {
+        harness.Process = new() {
             Name           = "p1",
             CanonicalName  = "processes/p1",
             DefinitionName = "equivalence-process",
@@ -189,9 +189,9 @@ public sealed class FlowEntryEquivalenceShould
         repository.Setup(r => r.ListAsync<T>(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => Async(predicate(data.AsQueryable()).ToList()));
         repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new ValueTask<T?>(predicate(data.AsQueryable()).SingleOrDefault()));
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new(predicate(data.AsQueryable()).SingleOrDefault()));
         repository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new ValueTask<T?>(predicate(data.AsQueryable()).FirstOrDefault()));
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new(predicate(data.AsQueryable()).FirstOrDefault()));
         return repository;
     }
 

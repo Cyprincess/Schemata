@@ -68,7 +68,7 @@ public class ResourceMethodEnvelopeShould
             services.AddSingleton<IRequestPipelineAdvisor<ResourceMethodRequest<MethodEntity, MethodRequest, MethodResponse>, MethodResponse>>(wrap);
         });
 
-        await DispatchAsync(services, "archive", "entities/e1", new MethodRequest { CanonicalName = "entities/payload" }, null);
+        await DispatchAsync(services, "archive", "entities/e1", new() { CanonicalName = "entities/payload" }, null);
 
         var observed = Assert.Single(wrap.Observed);
         Assert.Equal("archive", observed.Verb);
@@ -92,7 +92,7 @@ public class ResourceMethodEnvelopeShould
             services.AddSingleton<IResourceMethodAdvisor<MethodEntity, MethodRequest, MethodResponse>>(entityAdvisor);
         });
 
-        var response = await DispatchAsync(services, "archive", "entities/e1", new MethodRequest(), null);
+        var response = await DispatchAsync(services, "archive", "entities/e1", new(), null);
 
         Assert.Same(handler.Response, response);
         Assert.Same(entity, entityAdvisor.Entity);
@@ -102,7 +102,7 @@ public class ResourceMethodEnvelopeShould
     [Fact]
     public async Task Method_Response_Wrap_Derives_Parent_And_Sets_Weak_ETag() {
         var handler = new MethodHandler {
-            Response = new MethodResponse { CanonicalName = "tenants/t1/hosts/h1", Timestamp = Timestamp },
+            Response = new() { CanonicalName = "tenants/t1/hosts/h1", Timestamp = Timestamp },
         };
         using var services = BuildServices(handler: handler, configure: services => {
             services.AddSingleton<IEntityTagProvider, DefaultEntityTagProvider>();
@@ -111,7 +111,7 @@ public class ResourceMethodEnvelopeShould
                 ResourceMethodResponsePipelineAdvisor<MethodEntity, MethodRequest, MethodResponse>>();
         });
 
-        var response = await DispatchAsync(services, "archive", null, new MethodRequest(), null);
+        var response = await DispatchAsync(services, "archive", null, new(), null);
 
         Assert.Equal("tenants/t1", response.Parent);
         Assert.Equal(WeakTag(Timestamp), response.EntityTag);
@@ -145,7 +145,7 @@ public class ResourceMethodEnvelopeShould
     public async Task Method_Idempotency_Reserves_With_Verb_And_Target_Then_Commits_The_Produced_Response() {
         var request = new MethodRequest { RequestId = "req-1" };
         var handler = new MethodHandler {
-            Response = new MethodResponse { CanonicalName = "tenants/t1/hosts/h1", Timestamp = Timestamp },
+            Response = new() { CanonicalName = "tenants/t1/hosts/h1", Timestamp = Timestamp },
         };
         var store    = new Dictionary<string, byte[]>();
         var reserved = new List<byte[]>();

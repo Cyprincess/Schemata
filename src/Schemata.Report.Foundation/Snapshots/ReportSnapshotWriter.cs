@@ -112,7 +112,7 @@ public sealed class ReportSnapshotWriter<TReport, TSnapshot, TChunk>
             response.TotalSize = rowCount;
             await Advisor.For<IReportSnapshotAdvisor>().RunAsync(
                 AdviceContext.Require(),
-                new ReportSnapshotContext(header, response),
+                new(header, response),
                 ct);
 
             header.State      = SnapshotState.Succeeded;

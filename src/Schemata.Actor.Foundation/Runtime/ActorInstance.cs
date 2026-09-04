@@ -64,7 +64,7 @@ internal sealed class ActorInstance : IActorRef
             FullMode     = BoundedChannelFullMode.Wait,
         });
         _writer = channel.Writer;
-        _loop   = new MailboxLoop(channel.Reader, ProcessItemAsync);
+        _loop   = new(channel.Reader, ProcessItemAsync);
 
         _actor    = CreateActor(props);
         _loopTask = Task.Run(RunAsync);
@@ -79,7 +79,7 @@ internal sealed class ActorInstance : IActorRef
 
     public async ValueTask TellAsync<T>(T message, MessageContext? context = null, CancellationToken ct = default)
         where T : IMessage {
-        var item = new MailboxItem(new Envelope(Payload: message, Context: context));
+        var item = new MailboxItem(new(Payload: message, Context: context));
         try {
             await _writer.WriteAsync(item, ct);
         } catch (ChannelClosedException) {
@@ -94,9 +94,9 @@ internal sealed class ActorInstance : IActorRef
         TimeSpan? timeout = null, CancellationToken ct = default
     ) where TRequest : IRequest<TResponse> {
         var correlationId = Guid.NewGuid();
-        var item           = new MailboxItem(new Envelope(Payload: request, Context: context, CorrelationId: correlationId));
-        var completion     = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _pending[correlationId] = new PendingAsk(completion, item);
+        var item          = new MailboxItem(new(Payload: request, Context: context, CorrelationId: correlationId));
+        var completion    = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _pending[correlationId] = new(completion, item);
 
         try {
             await _writer.WriteAsync(item, ct);

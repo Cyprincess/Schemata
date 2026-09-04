@@ -4,7 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Core;
 using Schemata.Messaging.Skeleton;
 using Schemata.Tenancy.Foundation.Features;
 using Schemata.Tenancy.Foundation.Messaging;
@@ -25,7 +24,7 @@ public class SchemataTenancyFeatureShould
         // equals its service type (IMessageContextPropagator); this call is where that check runs,
         // synchronously, at registration time - before a provider is ever built.
         var exception = Record.Exception(() =>
-            feature.ConfigureServices(services, new SchemataOptions(), new Configurators(), new ConfigurationBuilder().Build(), environment: null!));
+            feature.ConfigureServices(services, new(), new(), new ConfigurationBuilder().Build(), environment: null!));
 
         Assert.Null(exception);
     }
@@ -34,7 +33,7 @@ public class SchemataTenancyFeatureShould
     public void ConfigureServices_MakesThePropagator_ResolvableBothAsTheInterfaceCollectionAndTheConcreteType() {
         var services = new ServiceCollection();
         var feature  = new SchemataTenancyFeature<NoOpTenantManager, SchemataTenant>();
-        feature.ConfigureServices(services, new SchemataOptions(), new Configurators(), new ConfigurationBuilder().Build(), environment: null!);
+        feature.ConfigureServices(services, new(), new(), new ConfigurationBuilder().Build(), environment: null!);
 
         using var provider = services.BuildServiceProvider();
         using var scope     = provider.CreateScope();

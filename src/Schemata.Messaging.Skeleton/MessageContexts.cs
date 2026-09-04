@@ -23,6 +23,6 @@ public static class MessageContexts
             propagator.Capture(items, source);
         }
 
-        return new MessageContext(items);
+        return new(items);
     }
 }

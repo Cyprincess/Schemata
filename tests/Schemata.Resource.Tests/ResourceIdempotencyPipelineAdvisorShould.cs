@@ -51,11 +51,11 @@ public class ResourceIdempotencyPipelineAdvisorShould
     }
 
     private static Request CreateRequest() {
-        return new Request { DisplayName = "primary", RequestId = "req-1" };
+        return new() { DisplayName = "primary", RequestId = "req-1" };
     }
 
     private static Detail MappedDetail() {
-        return new Detail {
+        return new() {
             CanonicalName = "tenants/t1/hosts/h1",
             Timestamp     = Timestamp,
         };
@@ -144,7 +144,7 @@ public class ResourceIdempotencyPipelineAdvisorShould
         var (repository, mapper) = CreateDoubles(MappedDetail());
         using var services = BuildCreateServices(cache, repository, mapper,
             detailWrap: false,
-            options: new SchemataResourceOptions { IdempotencyPendingWait = TimeSpan.Zero });
+            options: new() { IdempotencyPendingWait = TimeSpan.Zero });
 
         await Assert.ThrowsAsync<AbortedException>(() => DispatchCreateAsync(services, request));
 
@@ -272,7 +272,7 @@ public class ResourceIdempotencyPipelineAdvisorShould
         using var services = BuildCreateServices(cache, repository, mapper,
             detailWrap: false);
 
-        var result = await DispatchCreateAsync(services, new Request { DisplayName = "anonymous" });
+        var result = await DispatchCreateAsync(services, new() { DisplayName = "anonymous" });
 
         Assert.Equal("tenants/t1/hosts/h1", result.Detail!.CanonicalName);
         repository.Verify(r => r.AddAsync(It.IsAny<Entity>(), It.IsAny<CancellationToken>()), Times.Once);
@@ -291,7 +291,7 @@ public class ResourceIdempotencyPipelineAdvisorShould
         var calls = 0;
 
         var result = await advisor.AdviseAsync(
-            ctx, new CreateResourceRequest<Entity, Request, Detail>(CreateRequest(), null), _ => {
+            ctx, new(CreateRequest(), null), _ => {
                 calls++;
                 return Task.FromResult(new CreateResultBase<Detail>());
             }, CancellationToken.None);
@@ -368,7 +368,7 @@ public class ResourceIdempotencyPipelineAdvisorShould
         var (repository, mapper) = CreateDoubles(MappedDetail());
         using var services = BuildCreateServices(cache, repository, mapper,
             detailWrap: false,
-            options: new SchemataResourceOptions { IdempotencyRetention = retention });
+            options: new() { IdempotencyRetention = retention });
 
         await DispatchCreateAsync(services, request);
 
@@ -462,7 +462,7 @@ public class ResourceIdempotencyPipelineAdvisorShould
             static envelope => envelope.Request,
             static envelope => envelope.Request.CanonicalName ?? envelope.Request.Name ?? string.Empty,
             static ctx => ctx.Has<CreateIdempotencySuppressed>(),
-            static detail => new CreateResultBase<Detail> { Detail = detail },
+            static detail => new() { Detail = detail },
             static response => response.Detail);
     }
     private static ResourceIdempotencyPipelineAdvisor<Entity, Request, UpdateResourceRequest<Entity, Request, Detail>, Detail, UpdateResultBase<Detail>>
@@ -473,7 +473,7 @@ public class ResourceIdempotencyPipelineAdvisorShould
             static envelope => envelope.Request,
             static envelope => envelope.Request.CanonicalName ?? envelope.Request.Name ?? string.Empty,
             static ctx => ctx.Has<UpdateIdempotencySuppressed>(),
-            static detail => new UpdateResultBase<Detail> { Detail = detail },
+            static detail => new() { Detail = detail },
             static response => response.Detail);
     }
 

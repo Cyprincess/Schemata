@@ -154,7 +154,7 @@ public class ResourceMethodControllerConventionShould
     public void RequireResourceDeclaredScheme_OverGlobalDefault() {
         var registry = new ResourceRegistry();
         registry.Add(new(typeof(EntityB)) { AuthenticationScheme = "ResourceScheme" },
-                     [new ResourceMethodAttribute("run", typeof(HandlerB))]);
+                     [new("run", typeof(HandlerB))]);
         var convention = new ResourceMethodControllerConvention(registry, "GlobalScheme");
 
         var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB>).GetTypeInfo();

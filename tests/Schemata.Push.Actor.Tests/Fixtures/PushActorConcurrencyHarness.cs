@@ -7,7 +7,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Actor.Foundation.Features;
-using Schemata.Core;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
@@ -40,14 +39,14 @@ public sealed class PushActorConcurrencyHarness : IAsyncDisposable
         if (withActor) {
             new SchemataActorFeature().ConfigureServices(
                 services,
-                new SchemataOptions(),
-                new Configurators(),
+                new(),
+                new(),
                 new ConfigurationBuilder().Build(),
                 environment: null!);
             new SchemataPushActorFeature().ConfigureServices(
                 services,
-                new SchemataOptions(),
-                new Configurators(),
+                new(),
+                new(),
                 new ConfigurationBuilder().Build(),
                 environment: null!);
         }

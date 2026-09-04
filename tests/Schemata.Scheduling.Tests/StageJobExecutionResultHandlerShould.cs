@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,7 +27,7 @@ public sealed class StageJobExecutionResultHandlerShould
             ScheduleType   = ScheduleType.Cron,
             CronExpression = "0 * * * *",
             ArgsJson       = """{"count":3}""",
-            Variables      = new Dictionary<string, string?> { ["tier"] = "gold" },
+            Variables      = new() { ["tier"] = "gold" },
             Replay         = true,
             State          = JobState.Active,
             RecentRunTime  = new DateTime(2026, 8, 25, 11, 0, 0, DateTimeKind.Utc),

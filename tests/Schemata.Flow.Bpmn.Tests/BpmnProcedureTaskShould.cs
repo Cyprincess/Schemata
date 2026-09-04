@@ -18,7 +18,7 @@ public class BpmnProcedureTaskShould
     [Fact]
     public async Task Start_Procedure_Task_Executes_Body_And_Follows_Auto_Flow() {
         var executed = false;
-        var definition = Definition(new ProcedureTask {
+        var definition = Definition(new() {
             Name = "procedure",
             Body = _ => {
                 executed = true;
@@ -126,7 +126,7 @@ public class BpmnProcedureTaskShould
             definition,
             process,
             started.Tokens,
-            new FlowExecutionContext(Mock.Of<IUnitOfWork>(), services),
+            new(Mock.Of<IUnitOfWork>(), services),
             message,
             42,
             token.CanonicalName,
@@ -166,7 +166,7 @@ public class BpmnProcedureTaskShould
                       It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(),
                       It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<T>, IQueryable<T>> query, CancellationToken _) =>
-                      new ValueTask<T?>(query(data.AsQueryable()).SingleOrDefault()));
+                      new(query(data.AsQueryable()).SingleOrDefault()));
         return repository;
     }
 

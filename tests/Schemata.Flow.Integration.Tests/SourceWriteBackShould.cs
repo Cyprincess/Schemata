@@ -123,7 +123,7 @@ public abstract class SourceWriteBackShould
         var       repository = scope.ServiceProvider.GetRequiredService<IRepository<Order>>();
         var order = await repository.FindAsync([uid]);
         Assert.NotNull(order);
-        return order!;
+        return order;
     }
 
     private async Task<List<SchemataProcessSource>> ReadBindingsAsync(string process) {
@@ -168,7 +168,7 @@ public abstract class SourceWriteBackShould
             UnitOfWork = uow,
         };
 
-        var result = await advisor.AdviseAsync(new AdviceContext(scope.ServiceProvider), context, order, CancellationToken.None);
+        var result = await advisor.AdviseAsync(new(scope.ServiceProvider), context, order, CancellationToken.None);
         Assert.Equal(AdviseResult.Continue, result);
         await uow.CommitAsync();
     }

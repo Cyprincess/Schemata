@@ -30,7 +30,7 @@ public class RequestDispatcherShould
         });
 
         var result = await scope.ServiceProvider.GetRequiredService<ICommandDispatcher>()
-                                 .SendAsync<RenameWidget, string>(new RenameWidget("hub"));
+                                 .SendAsync<RenameWidget, string>(new("hub"));
 
         Assert.Equal("hub", result);
         Assert.Equal(["advisor:before", "advisor:after"], trail);
@@ -51,7 +51,7 @@ public class RequestDispatcherShould
         });
 
         var result = await scope.ServiceProvider.GetRequiredService<IQueryDispatcher>()
-                                 .SendAsync<CountWidgets, int>(new CountWidgets());
+                                 .SendAsync<CountWidgets, int>(new());
 
         Assert.Equal(7, result);
         Assert.Equal(["query-advisor"], trail);
@@ -71,7 +71,7 @@ public class RequestDispatcherShould
         });
 
         var result = await scope.ServiceProvider.GetRequiredService<IRequestDispatcher>()
-                                 .SendAsync<PlainRequest, string>(new PlainRequest("echo"));
+                                 .SendAsync<PlainRequest, string>(new("echo"));
 
         Assert.Equal("echo", result);
         Assert.False(advisor.Ran);
@@ -89,7 +89,7 @@ public class RequestDispatcherShould
         });
 
         var result = await scope.ServiceProvider.GetRequiredService<ICommandDispatcher>()
-                                 .SendAsync<RenameWidget, string>(new RenameWidget("hub"));
+                                 .SendAsync<RenameWidget, string>(new("hub"));
 
         Assert.Equal("short:short", result);
         handler.Verify(h => h.HandleAsync(It.IsAny<RenameWidget>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -103,7 +103,7 @@ public class RequestDispatcherShould
             services.AddSingleton<IRequestPipelineAdvisor<RenameWidget, string>>(advisor));
 
         var result = await scope.ServiceProvider.GetRequiredService<ICommandDispatcher>()
-                                 .SendAsync<RenameWidget, string>(new RenameWidget("hub"));
+                                 .SendAsync<RenameWidget, string>(new("hub"));
 
         Assert.Equal("short:short", result);
     }
@@ -120,7 +120,7 @@ public class RequestDispatcherShould
 
         var error = await Assert.ThrowsAsync<NotSupportedException>(
             () => scope.ServiceProvider.GetRequiredService<ICommandDispatcher>()
-                       .SendAsync<RenameWidget, string>(new RenameWidget("hub")));
+                       .SendAsync<RenameWidget, string>(new("hub")));
 
         Assert.Equal("advisor-defined", error.Message);
         handler.Verify(h => h.HandleAsync(It.IsAny<RenameWidget>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -132,7 +132,7 @@ public class RequestDispatcherShould
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(
             () => scope.ServiceProvider.GetRequiredService<ICommandDispatcher>()
-                       .SendAsync<RenameWidget, string>(new RenameWidget("hub")));
+                       .SendAsync<RenameWidget, string>(new("hub")));
 
         Assert.Contains(typeof(RenameWidget).FullName!, error.Message);
     }
@@ -146,7 +146,7 @@ public class RequestDispatcherShould
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(
             () => scope.ServiceProvider.GetRequiredService<ICommandDispatcher>()
-                       .SendAsync<RenameWidget, string>(new RenameWidget("hub")));
+                       .SendAsync<RenameWidget, string>(new("hub")));
 
         Assert.Contains(typeof(RenameWidget).FullName!, error.Message);
     }
@@ -198,7 +198,7 @@ public class RequestDispatcherShould
         Assert.Null(AdviceContext.Current);
 
         await scope.ServiceProvider.GetRequiredService<ICommandDispatcher>()
-                   .SendAsync<RenameWidget, string>(new RenameWidget("hub"));
+                   .SendAsync<RenameWidget, string>(new("hub"));
 
         Assert.NotNull(seenInHandler);
         Assert.Same(advisor.ObservedContext, seenInHandler);
@@ -222,7 +222,7 @@ public class RequestDispatcherShould
         });
 
         var result = await scope.ServiceProvider.GetRequiredService<ICommandDispatcher>()
-                                 .SendAsync<RenameWidget, string>(new RenameWidget("hub"));
+                                 .SendAsync<RenameWidget, string>(new("hub"));
 
         Assert.Equal("second:short", result);
         Assert.Equal(["first:before", "second:before", "first:after"], trail);

@@ -8,7 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using Schemata.Abstractions.Advisors;
-using Schemata.Core;
 using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Report.Foundation;
@@ -49,8 +48,8 @@ public class ReportSchedulingShould
         var records = new List<SchemataReport> { PeriodicReport("database", "0 * * * *") };
         var persistence = new ReportPersistenceState();
         var services = new ServiceCollection();
-        var reports = new Foundation.SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
-            new SchemataOptions(),
+        var reports = new SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
+            new(),
             services);
         reports.Define("dsl", definition => definition.Periodic(cron: "0 0 * * *"));
         services.AddScoped<IRepository<SchemataReport>>(_ => persistence.CreateRepository(records));
@@ -150,7 +149,7 @@ public class ReportSchedulingShould
             provider.GetRequiredService<IServiceScopeFactory>(),
             provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<SchemataReportOptions>>());
 
-        await job.ExecuteAsync(new JobContext {
+        await job.ExecuteAsync(new() {
             Variables = new Dictionary<string, string?> { ["report"] = "daily" },
         }, CancellationToken.None);
 

@@ -18,14 +18,16 @@ namespace Schemata.Authorization.Foundation.Features;
 ///     handler, <c>openid</c> scope requirement advisor, and discovery metadata.
 /// </summary>
 /// <remarks>
-///     Installed via <c>UseUserInfo()</c> on <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope, TToken}" />.
+///     Installed via <c>UseUserInfo()</c> on <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope}" />.
 /// </remarks>
-/// <seealso cref="IntrospectionFeature{TApp, TToken}" />
 public sealed class UserInfoFeature : IAuthorizationFlowFeature
 {
     #region IAuthorizationFlowFeature Members
 
-    public int Order => 3_000;
+    /// <summary>The default feature ordering value (chained after its predecessor).</summary>
+    public const int DefaultOrder = InteractionFeature.DefaultOrder + 100;
+
+    public int Order => DefaultOrder;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddScoped<UserInfoEndpoint, UserInfoHandler>();

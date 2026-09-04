@@ -44,9 +44,9 @@ public class ResourceAdviceContextShould
         var facadeHandler = new ResourceOperationHandler<Entity, Request, Detail, Summary>(
             facadeServices, facadeRepository.Object, facadeMapper.Object);
 
-        using (AdviceContext.Establish(new AdviceContext(facadeServices))) {
+        using (AdviceContext.Establish(new(facadeServices))) {
             AdviceContext.Current!.Set(new TestMarker());
-            await facadeHandler.CreateAsync(new Request(), null, CancellationToken.None);
+            await facadeHandler.CreateAsync(new(), null, CancellationToken.None);
         }
 
         Assert.True(facadeSpy.SawMarker);
@@ -60,7 +60,7 @@ public class ResourceAdviceContextShould
         var dispatcher = new InProcessRequestDispatcher(dispatcherServices);
 
         await dispatcher.SendAsync<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>(
-            new(new Request(), null), CancellationToken.None);
+            new(new(), null), CancellationToken.None);
 
         Assert.True(dispatcherSpy.SawMarker);
     }
@@ -77,8 +77,8 @@ public class ResourceAdviceContextShould
         var facadeHandler = new ResourceOperationHandler<Entity, Request, Detail, Summary>(
             facadeServices, facadeRepository.Object, facadeMapper.Object);
 
-        using (AdviceContext.Establish(new AdviceContext(facadeServices))) {
-            await facadeHandler.CreateAsync(new Request(), null, CancellationToken.None);
+        using (AdviceContext.Establish(new(facadeServices))) {
+            await facadeHandler.CreateAsync(new(), null, CancellationToken.None);
         }
 
         Assert.True(facadeSpy.SawSuppression);
@@ -91,7 +91,7 @@ public class ResourceAdviceContextShould
         var dispatcher = new InProcessRequestDispatcher(dispatcherServices);
 
         await dispatcher.SendAsync<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>(
-            new(new Request(), null), CancellationToken.None);
+            new(new(), null), CancellationToken.None);
 
         Assert.True(dispatcherSpy.SawSuppression);
     }

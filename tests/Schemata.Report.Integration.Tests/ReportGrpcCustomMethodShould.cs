@@ -8,7 +8,6 @@ using Schemata.Common;
 using Schemata.Report.Foundation.Commands;
 using Schemata.Report.Foundation.Queries;
 using Schemata.Report.Skeleton.Models;
-using Schemata.Insight.Skeleton.Queries;
 using Schemata.Report.Integration.Tests.Fixtures;
 using Schemata.Report.Skeleton.Entities;
 using Schemata.Resource.Grpc.Runtime;
@@ -56,7 +55,7 @@ public class ReportGrpcCustomMethodShould : IClassFixture<WebAppFactory>
     public async Task Generate_With_Name_And_Query_Returns_InvalidArgument() {
         var error = await Assert.ThrowsAsync<RpcException>(() =>
             Call<SchemataReport, GenerateReportRequest, Operation>(
-                "generate", new() { Name = "dsl-records", Query = new QueryInsightRequest(), Sync = true }));
+                "generate", new() { Name = "dsl-records", Query = new(), Sync = true }));
 
         Assert.Equal(StatusCode.InvalidArgument, error.StatusCode);
     }

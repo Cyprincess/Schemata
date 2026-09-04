@@ -109,7 +109,7 @@ public class ResourceRequestPipelineAdvisorShould
                     new ResourceCreateValidationPipelineAdvisor<Entity, Request, Detail>());
                 services.AddSingleton<IValidationAdvisor<Request>>(validator);
             },
-            new SchemataResourceOptions { SuppressCreateValidation = true });
+            new() { SuppressCreateValidation = true });
         var dispatcher = new InProcessRequestDispatcher(services);
 
         var result = await dispatcher.SendAsync<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>(
@@ -195,7 +195,7 @@ public class ResourceRequestPipelineAdvisorShould
                     new ResourceUpdateValidationPipelineAdvisor<Entity, Request, Detail>());
                 services.AddSingleton<IValidationAdvisor<Request>>(validator);
             },
-            new SchemataResourceOptions { SuppressUpdateValidation = true });
+            new() { SuppressUpdateValidation = true });
         var dispatcher = new InProcessRequestDispatcher(services);
 
         var result = await dispatcher.SendAsync<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>(
@@ -321,7 +321,7 @@ public class ResourceRequestPipelineAdvisorShould
         ) {
             Invoked        = true;
             SeenCreateTime = request.CreateTime;
-            errors.Add(new ErrorFieldViolation {
+            errors.Add(new() {
                 Field       = nameof(Request.DisplayName),
                 Description = "Display name is required.",
             });

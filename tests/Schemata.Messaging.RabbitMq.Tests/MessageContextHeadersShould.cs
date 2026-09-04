@@ -48,7 +48,7 @@ public class MessageContextHeadersShould
     [Fact]
     public void Write_NoHeadersAtAll_ForAnEmptyContext() {
         // An application with no propagator registered must pay nothing on the wire.
-        Assert.Null(MessageContextHeaders.Write(new MessageContext(new Dictionary<string, string?>())));
+        Assert.Null(MessageContextHeaders.Write(new(new Dictionary<string, string?>())));
     }
 
     [Fact]

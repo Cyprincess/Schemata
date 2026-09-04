@@ -55,7 +55,7 @@ public sealed class ExceptionMappingInterceptorShould
             "method",
             "host",
             DateTime.MaxValue,
-            new Metadata(),
+            new(),
             CancellationToken.None,
             "peer",
             null,

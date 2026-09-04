@@ -33,13 +33,13 @@ public sealed class SchedulingEntryEquivalenceShould
         var facadeSpy     = new RecordingCommandAdvisor();
         var facadeHarness = await CreateStartedHarnessAsync(facadeSpy);
         var facadeExecution = await facadeHarness.Scheduler.TriggerAsync<SampleJob>(
-            new JobContext { Job = "sample" }, CancellationToken.None);
+            new() { Job = "sample" }, CancellationToken.None);
 
         var dispatcherSpy     = new RecordingCommandAdvisor();
         var dispatcherHarness = await CreateStartedHarnessAsync(dispatcherSpy);
         var dispatcher         = dispatcherHarness.Services.GetRequiredService<IRequestDispatcher>();
         var dispatcherExecution = await dispatcher.SendAsync<TriggerJobRequest, SchemataJobExecution>(
-            new("sample", typeof(SampleJob), new JobContext { Job = "sample" }), CancellationToken.None);
+            new("sample", typeof(SampleJob), new() { Job = "sample" }), CancellationToken.None);
 
         Assert.Equal(facadeExecution.JobKey, dispatcherExecution.JobKey);
         Assert.Equal(facadeExecution.Job, dispatcherExecution.Job);
@@ -55,12 +55,12 @@ public sealed class SchedulingEntryEquivalenceShould
     public async Task Trigger_Throw_The_Same_Exception_Type_Through_Both_Entries_When_The_Scheduler_Is_Stopped() {
         var facadeHarness = CreateHarness(null);
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            facadeHarness.Scheduler.TriggerAsync<SampleJob>(new JobContext { Job = "sample" }, CancellationToken.None));
+            facadeHarness.Scheduler.TriggerAsync<SampleJob>(new() { Job = "sample" }, CancellationToken.None));
 
         var dispatcherHarness = CreateHarness(null);
         var dispatcher         = dispatcherHarness.Services.GetRequiredService<IRequestDispatcher>();
         await Assert.ThrowsAsync<InvalidOperationException>(() => dispatcher.SendAsync<TriggerJobRequest, SchemataJobExecution>(
-            new("sample", typeof(SampleJob), new JobContext { Job = "sample" }), CancellationToken.None));
+            new("sample", typeof(SampleJob), new() { Job = "sample" }), CancellationToken.None));
     }
 
     private static async Task<Harness> CreateStartedHarnessAsync(IRequestPipelineAdvisor<TriggerJobRequest, SchemataJobExecution>? advisor) {

@@ -51,7 +51,7 @@ public class ResourceListResponsePipelineAdvisorShould
         var dispatcher = new InProcessRequestDispatcher(services);
 
         var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Summary>>(
-            new(new ListRequest(), null), CancellationToken.None);
+            new(new(), null), CancellationToken.None);
 
         Assert.NotNull(result.Entities);
         Assert.Equal(3, result.Entities!.Count);
@@ -75,7 +75,7 @@ public class ResourceListResponsePipelineAdvisorShould
         var dispatcher = new InProcessRequestDispatcher(services);
 
         var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Summary>>(
-            new(new ListRequest(), null), CancellationToken.None);
+            new(new(), null), CancellationToken.None);
 
         Assert.NotNull(result.Entities);
         Assert.Empty(result.Entities!);
@@ -102,7 +102,7 @@ public class ResourceListResponsePipelineAdvisorShould
         var dispatcher = new InProcessRequestDispatcher(services);
 
         var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, PlainSummary>, ListResultBase<PlainSummary>>(
-            new(new ListRequest(), null), CancellationToken.None);
+            new(new(), null), CancellationToken.None);
 
         Assert.NotNull(result.Entities);
         Assert.Equal(mapped, result.Entities!);
@@ -112,7 +112,7 @@ public class ResourceListResponsePipelineAdvisorShould
     public async Task NullEntities_ReturnsContinuationResponse() {
         var advisor  = new ResourceListResponsePipelineAdvisor<Entity, Summary>();
         var ctx      = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var envelope = new ListResourceQueryRequest<Entity, Summary>(new ListRequest(), null);
+        var envelope = new ListResourceQueryRequest<Entity, Summary>(new(), null);
         var response = new ListResultBase<Summary> { Entities = null, TotalSize = 5 };
         var calls    = 0;
 
@@ -156,9 +156,9 @@ public class ResourceListResponsePipelineAdvisorShould
                               It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
                               It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<Entity>, IQueryable<Entity>> query, CancellationToken _) =>
-                      new ValueTask<int>(query(rows.AsQueryable()).Count()));
+                      new(query(rows.AsQueryable()).Count()));
 
-        return (repository, new Mock<ISimpleMapper>());
+        return (repository, new());
     }
 
     private static ServiceProvider BuildServices<TSummary>(

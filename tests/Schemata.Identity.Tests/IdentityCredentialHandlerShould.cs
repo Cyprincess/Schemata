@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Moq;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Entities;
-using Schemata.Identity.Skeleton.Models;
 using Xunit;
 using AspNetIdentityResult = Microsoft.AspNetCore.Identity.IdentityResult;
 
@@ -62,7 +61,7 @@ public class IdentityCredentialHandlerShould
         host.Users.Setup(value => value.ChangePasswordAsync(User, "old-secret", "new-secret"))
                   .ReturnsAsync(AspNetIdentityResult.Success);
 
-        var result = await host.Handler.ChangePasswordAsync(new ProfileRequest {
+        var result = await host.Handler.ChangePasswordAsync(new() {
             OldPassword = "old-secret",
             NewPassword = "new-secret",
         }, Principal, CancellationToken.None);
@@ -96,7 +95,7 @@ public class IdentityCredentialHandlerShould
                   .ReturnsAsync(AspNetIdentityResult.Success);
 
         var result = await host.Handler.EnrollAsync(
-            new AuthenticatorRequest(), Principal, CancellationToken.None);
+            new(), Principal, CancellationToken.None);
 
         Assert.Equal(IdentityStatus.Success, result.Status);
         host.Users.Verify(value => value.SetTwoFactorEnabledAsync(User, true), Times.Once);

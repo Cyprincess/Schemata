@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Routing;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Identity.Foundation.Controllers;
@@ -61,7 +60,7 @@ public class AuthenticateContinueShould
     }
 
     private static IActionResult Continue(HttpContext context, string? token) {
-        var action     = new ActionContext(context, new RouteData(), new ControllerActionDescriptor());
+        var action     = new ActionContext(context, new(), new ControllerActionDescriptor());
         var controller = new AuthenticateController<SchemataUser>(null!, null!) {
             ControllerContext = new(action),
             Url               = new UrlHelper(action),

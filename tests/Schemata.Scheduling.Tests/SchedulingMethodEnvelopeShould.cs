@@ -40,7 +40,7 @@ public sealed class SchedulingMethodEnvelopeShould
         });
 
         await harness.Scheduler.TriggerAsync<SampleJob>(
-            new JobContext { Job = "sample" }, CancellationToken.None);
+            new() { Job = "sample" }, CancellationToken.None);
 
         var observed = Assert.Single(wrap.Observed);
         Assert.Equal(SchedulingOperations.Trigger, observed.Verb);
@@ -60,7 +60,7 @@ public sealed class SchedulingMethodEnvelopeShould
         var dispatcher = harness.Services.GetRequiredService<IRequestDispatcher>();
 
         var execution = await dispatcher.SendAsync<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>(
-            new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new JobContext { Job = "sample" }), null),
+            new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new() { Job = "sample" }), null),
             CancellationToken.None);
 
         var observed = Assert.Single(wrap.Observed);
@@ -83,7 +83,7 @@ public sealed class SchedulingMethodEnvelopeShould
         var principal = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity("test"));
 
         await Assert.ThrowsAsync<PermissionDeniedException>(() => deniedDispatcher.SendAsync<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>(
-            new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new JobContext { Job = "sample" }), principal), CancellationToken.None));
+            new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new() { Job = "sample" }), principal), CancellationToken.None));
 
         var allowed = await CreateStartedHarnessAsync(services => {
             services.Configure<SchemataSecurityOptions>(_ => { });
@@ -91,10 +91,10 @@ public sealed class SchedulingMethodEnvelopeShould
             services.AddScoped<IPermissionMatcher, DefaultPermissionMatcher>();
             services.AddSchedulingAuthorization();
         });
-        var allowedPrincipal = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity([new System.Security.Claims.Claim("role", "schemata-job.trigger")], "test"));
+        var allowedPrincipal = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity([new("role", "schemata-job.trigger")], "test"));
 
         var execution = await allowed.Services.GetRequiredService<IRequestDispatcher>().SendAsync<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>(
-            new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new JobContext { Job = "sample" }), allowedPrincipal), CancellationToken.None);
+            new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new() { Job = "sample" }), allowedPrincipal), CancellationToken.None);
 
         Assert.Equal("sample", execution.Job);
     }
@@ -111,7 +111,7 @@ public sealed class SchedulingMethodEnvelopeShould
 
         await Assert.ThrowsAsync<UnauthenticatedException>(() => harness.Services.GetRequiredService<IRequestDispatcher>()
             .SendAsync<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>(
-                new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new JobContext { Job = "sample" }), null), CancellationToken.None));
+                new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new() { Job = "sample" }), null), CancellationToken.None));
     }
 
     private static async Task<Harness> CreateStartedHarnessAsync(Action<IServiceCollection>? advisors = null) {

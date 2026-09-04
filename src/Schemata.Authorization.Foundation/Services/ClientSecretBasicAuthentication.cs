@@ -12,6 +12,8 @@ using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Services;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Services;
@@ -29,11 +31,15 @@ namespace Schemata.Authorization.Foundation.Services;
 /// </summary>
 public sealed class ClientSecretBasicAuthentication<TApp>(
     IApplicationManager<TApp>              apps,
-    IOptions<SchemataAuthorizationOptions> options
+    IOptions<SchemataAuthorizationOptions> options,
+    ISecurityStore<SchemataSecurity>       securities,
+    ISecretVerifier                        verifier
 ) : IClientAuthentication<TApp>
     where TApp : SchemataApplication
 {
     #region IClientAuthentication<TApp> Members
+
+    public string Method => ClientAuthMethods.ClientSecretBasic;
 
     public async Task<TApp?> AuthenticateAsync(
         Dictionary<string, List<string?>>? query,
@@ -90,21 +96,7 @@ public sealed class ClientSecretBasicAuthentication<TApp>(
             );
         }
 
-        // Confidential clients MUST present a valid secret (RFC 6749 §2.3.1);
-        // public clients may authenticate without one.
-        if (!string.IsNullOrWhiteSpace(secret)) {
-            if (!await apps.ValidateClientSecretAsync(app, secret, ct)) {
-                throw new OAuthException(
-                    OAuthErrors.InvalidClient,
-                    SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-                );
-            }
-        } else if (app.ClientType == ClientTypes.Confidential) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.CLIENT_SECRET_REQUIRED)
-            );
-        }
+        await ClientSecretValidator.ValidateAsync(securities, verifier, app, secret, ct);
 
         return app;
     }

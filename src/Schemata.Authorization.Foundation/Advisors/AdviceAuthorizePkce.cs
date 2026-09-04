@@ -16,7 +16,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 public static class AdviceAuthorizePkce
 {
     /// <summary>The default advisor ordering value.</summary>
-    public const int DefaultOrder = AdviceAuthorizeScopeValidation.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = AdviceAuthorizeResource.DefaultOrder + 10_000_000;
 }
 
 /// <summary>
@@ -42,7 +42,6 @@ public static class AdviceAuthorizePkce
 ///     When <see cref="CodeFlowOptions.RequirePkceS256" /> is true, only <c>S256</c> is accepted.
 /// </remarks>
 /// <seealso cref="CodeFlowOptions" />
-/// <seealso cref="AdviceCodeExchangePkce{TApp, TToken}" />
 public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options) : IAuthorizeAdvisor<TApp>
     where TApp : SchemataApplication
 {

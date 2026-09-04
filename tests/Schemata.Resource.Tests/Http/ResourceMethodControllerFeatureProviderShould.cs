@@ -80,7 +80,7 @@ public class ResourceMethodControllerFeatureProviderShould
     [Fact]
     public void SkipMethods_WhenResourceIsNotRegistered() {
         var provider = new ResourceMethodControllerFeatureProvider {
-            Registry = new ResourceRegistry(),
+            Registry = new(),
         };
         var feature = new ControllerFeature();
 

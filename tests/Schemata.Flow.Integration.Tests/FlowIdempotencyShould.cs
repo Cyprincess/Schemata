@@ -43,7 +43,7 @@ public abstract class FlowIdempotencyShould
             var processes = scope.ServiceProvider.GetRequiredService<IRepository<SchemataProcess>>();
             var persisted = await processes.FindAsync([process.Uid]);
             Assert.NotNull(persisted);
-            Assert.Null(persisted!.IdempotencyKey);
+            Assert.Null(persisted.IdempotencyKey);
             Assert.Equal(key, persisted.Annotations["schemata/flow/idempotency-key"]);
         }
 
@@ -57,7 +57,7 @@ public abstract class FlowIdempotencyShould
             var       runner = scope.ServiceProvider.GetRequiredService<FlowRunner>();
             var process = await runner.StartAsync(
                 nameof(IdempotencyProcess),
-                new StartProcessOptions { IdempotencyKey = key },
+                new() { IdempotencyKey = key },
                 CancellationToken.None);
             return new(process, null);
         } catch (Exception ex) {

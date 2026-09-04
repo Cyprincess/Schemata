@@ -12,7 +12,6 @@ using Schemata.Actor.Foundation;
 using Schemata.Actor.Scheduling.Features;
 using Schemata.Actor.Scheduling.Tests.Fixtures;
 using Schemata.Actor.Skeleton;
-using Schemata.Core;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Skeleton;
@@ -41,12 +40,12 @@ public sealed class ReminderShould
         services.AddRepository<SchemataJobExecution, EfCoreRepository<TestDbContext, SchemataJobExecution>>();
         services.AddSchemataScheduling();
 
-        var actorBuilder = new SchemataActorBuilder(new SchemataOptions(), services);
+        var actorBuilder = new SchemataActorBuilder(new(), services);
         actorBuilder.Register<RecordingActor>("recorder");
         services.AddSchemataActor();
 
         new SchemataActorSchedulingFeature().ConfigureServices(
-            services, new SchemataOptions(), new Configurators(), new ConfigurationBuilder().Build(), null!);
+            services, new(), new(), new ConfigurationBuilder().Build(), null!);
 
         await using var root = services.BuildServiceProvider();
 
@@ -79,7 +78,7 @@ public sealed class ReminderShould
             ReminderPayload? received = null;
             var deadline = DateTime.UtcNow.AddSeconds(5);
             while (received is null && DateTime.UtcNow < deadline) {
-                received = await actor.AskAsync<GetReceived, ReminderPayload?>(new GetReceived());
+                received = await actor.AskAsync<GetReceived, ReminderPayload?>(new());
                 if (received is null) {
                     await Task.Delay(TimeSpan.FromMilliseconds(50));
                 }

@@ -15,14 +15,14 @@ public class ActorLifecycleSerializationShould
         var gate      = new ManualGate();
         var (system, _, _) = ActorSystemFactory.Create();
         var id              = new ActorId("lifecycle", "a");
-        var actor           = await system.SpawnAsync(id, new Props(typeof(LifecycleRecordingActor), [recorder, gate]));
+        var actor           = await system.SpawnAsync(id, new(typeof(LifecycleRecordingActor), [recorder, gate]));
 
         // Get a turn genuinely in flight - OnReceiveAsync has begun and is blocked - before an
         // external StopAsync races in. Under the old design StopAsync's own MarkStoppedAsync
         // called OnStoppedAsync directly from the caller's task while this turn was still
         // executing; the fix makes StopAsync only signal intent and waits for the mailbox loop's
         // own task to notify OnStoppedAsync once the turn has actually finished.
-        var executing = actor.AskAsync<GateAndWait, string>(new GateAndWait()).AsTask();
+        var executing = actor.AskAsync<GateAndWait, string>(new()).AsTask();
         await gate.Started.WaitAsync(TimeSpan.FromSeconds(5));
 
         var stopping = system.StopAsync(id);
@@ -44,10 +44,10 @@ public class ActorLifecycleSerializationShould
         var constructionCount  = new SharedCounter();
         var (system, _, _)     = ActorSystemFactory.Create();
         var id                  = new ActorId("stop-during-fail", "a");
-        var actor               = await system.SpawnAsync(id, new Props(typeof(StopDuringFailureActor), [gate, constructionCount]));
+        var actor               = await system.SpawnAsync(id, new(typeof(StopDuringFailureActor), [gate, constructionCount]));
 
         // The failing turn begins and blocks before it ever throws.
-        var failing = actor.AskAsync<Fail, string>(new Fail("boom")).AsTask();
+        var failing = actor.AskAsync<Fail, string>(new("boom")).AsTask();
         await gate.Started.WaitAsync(TimeSpan.FromSeconds(5));
 
         // A stop is requested while that turn is still in flight, before it throws.

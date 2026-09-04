@@ -19,7 +19,7 @@ public class ReloadPersistedJobsShould
 {
     [Fact]
     public async Task PausedPersistedJob_IsNotRearmedOrMaterialized() {
-        var clock = new MutableClock(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var clock = new MutableClock(new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         var job = new SchemataJob {
             Name          = "durable",
             CanonicalName = "jobs/durable",

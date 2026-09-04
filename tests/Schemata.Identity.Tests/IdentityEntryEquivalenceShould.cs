@@ -77,7 +77,7 @@ public class IdentityEntryEquivalenceShould
     [Fact]
     public async Task Facade_And_Bare_Dispatcher_Share_Command_Query_And_Identity_Advice_Context() {
         var principal = new ClaimsPrincipal(
-            new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, "alice")], "test"));
+            new ClaimsIdentity([new(ClaimTypes.NameIdentifier, "alice")], "test"));
         var returnedPrincipal = new ClaimsPrincipal(new ClaimsIdentity("returned"));
         var commandAdvisor = CommandAdvisor();
         var queryAdvisor   = QueryAdvisor();
@@ -135,7 +135,7 @@ public class IdentityEntryEquivalenceShould
         using var host = new IdentityHandlerTestHost();
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            host.Operations.RegisterAsync(new(), new ClaimsPrincipal()));
+            host.Operations.RegisterAsync(new(), new()));
 
         Assert.Contains("ambient AdviceContext is required", exception.Message, StringComparison.Ordinal);
     }

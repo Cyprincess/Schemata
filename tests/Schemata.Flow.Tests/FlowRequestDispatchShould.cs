@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
-using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Entity.Repository;
 using Schemata.Event.Skeleton;
@@ -83,8 +82,8 @@ public sealed class FlowRequestDispatchShould
     private static void Configure(FeatureBase feature, IServiceCollection services) {
         feature.ConfigureServices(
             services,
-            new SchemataOptions(),
-            new Configurators(),
+            new(),
+            new(),
             new ConfigurationBuilder().Build(),
             Mock.Of<IWebHostEnvironment>()
         );
@@ -112,12 +111,12 @@ public sealed class FlowRequestDispatchShould
                              It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
                              It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>> query, CancellationToken _) =>
-                               new ValueTask<TEntity?>(query(data.AsQueryable()).SingleOrDefault()));
+                               new(query(data.AsQueryable()).SingleOrDefault()));
         repository.Setup(current => current.FirstOrDefaultAsync(
                              It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
                              It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>> query, CancellationToken _) =>
-                               new ValueTask<TEntity?>(query(data.AsQueryable()).FirstOrDefault()));
+                               new(query(data.AsQueryable()).FirstOrDefault()));
         return repository;
     }
 

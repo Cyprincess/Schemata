@@ -66,6 +66,22 @@ public sealed class DiscoveryDocument
     /// </summary>
     public string? RevocationEndpoint { get; set; }
 
+    /// <summary>
+    ///     URL of the dynamic client registration endpoint, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-discovery-1_0.html">
+    ///         OpenID Connect Discovery 1.0 §3: Provider Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? RegistrationEndpoint { get; set; }
+
+    /// <summary>
+    ///     Authorization detail types supported for rich authorization requests, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9396.html#section-10">RFC 9396 §10: Metadata</seealso>
+    ///     .
+    /// </summary>
+    public List<string>? AuthorizationDetailsTypesSupported { get; set; }
+
     /// <summary>Scope values the server supports.</summary>
     public List<string>? ScopesSupported { get; set; }
 
@@ -78,6 +94,16 @@ public sealed class DiscoveryDocument
     /// <summary>OAuth 2.0 <c>grant_type</c> values the server supports.</summary>
     public List<string>? GrantTypesSupported { get; set; } = [];
 
+    /// <summary>
+    ///     Authentication Context Class References the OP supports, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata">
+    ///         OpenID Connect Discovery 1.0
+    ///         §3: OpenID Provider Metadata
+    ///     </seealso>
+    ///     . Omitted when the deployment declares none.
+    /// </summary>
+    public List<string>? AcrValuesSupported { get; set; }
+
     /// <summary>Subject identifier types the server supports, e.g. <c>"public"</c> or <c>"pairwise"</c>.</summary>
     public List<string>? SubjectTypesSupported { get; set; }
 
@@ -89,6 +115,28 @@ public sealed class DiscoveryDocument
 
     /// <summary>Client authentication methods supported at the token endpoint.</summary>
     public List<string>? TokenEndpointAuthMethodsSupported { get; set; }
+
+    /// <summary>
+    ///     JWS <c>alg</c> values the token endpoint verifies on client assertion JWTs for the
+    ///     <c>private_key_jwt</c> and <c>client_secret_jwt</c> authentication methods, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata">
+    ///         OpenID Connect Discovery 1.0
+    ///         §3: OpenID Provider Metadata
+    ///     </seealso>
+    ///     .  The value <c>none</c> MUST NOT be used.  Omitted when no assertion method is enabled.
+    /// </summary>
+    public List<string>? TokenEndpointAuthSigningAlgValuesSupported { get; set; }
+
+    /// <summary>
+    ///     JWS <c>alg</c> values the authorization server supports for DPoP proof JWTs, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9449.html#section-5.1">
+    ///         RFC 9449: OAuth 2.0 Demonstrating Proof
+    ///         of Possession (DPoP) §5.1: Authorization Server
+    ///         Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public List<string>? DpopSigningAlgValuesSupported { get; set; }
 
     /// <summary>
     ///     PKCE code challenge methods the server supports.

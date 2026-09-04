@@ -17,7 +17,7 @@ namespace Schemata.Authorization.Foundation.Features;
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
 /// <remarks>
-///     Installed via <c>UseTokenExchange()</c> on <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope, TToken}" />
+///     Installed via <c>UseTokenExchange()</c> on <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope}" />
 ///     .
 /// </remarks>
 /// <seealso cref="ClientCredentialsFlowFeature{TApp}" />
@@ -26,7 +26,7 @@ public sealed class TokenExchangeFeature<TApp> : IAuthorizationFlowFeature
 {
     #region IAuthorizationFlowFeature Members
 
-    public int Order => 10_500;
+    public int Order => TokenExchangeFeature.DefaultOrder;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddKeyedScoped<IGrantHandler, TokenExchangeHandler<TApp>>(GrantTypes.TokenExchange);
@@ -34,4 +34,15 @@ public sealed class TokenExchangeFeature<TApp> : IAuthorizationFlowFeature
     }
 
     #endregion
+}
+
+
+/// <summary>
+///     Ordering anchor for <see cref="TokenExchangeFeature{TApp}" /> so successor features can chain
+///     off its <c>DefaultOrder</c> without naming type arguments.
+/// </summary>
+internal static class TokenExchangeFeature
+{
+    /// <summary>The default feature ordering value (chained after its predecessor).</summary>
+    public const int DefaultOrder = DeviceFlowFeature.DefaultOrder + 100;
 }
