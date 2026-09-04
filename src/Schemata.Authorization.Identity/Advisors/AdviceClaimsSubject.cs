@@ -17,7 +17,7 @@ namespace Schemata.Authorization.Identity.Advisors;
 public sealed class AdviceClaimsSubject(ISubjectProvider subjects) : IClaimsAdvisor
 {
     /// <summary>Default advisor order for Identity subject claim enrichment.</summary>
-    public const int DefaultOrder = AdviceClaimsAudience.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = AdviceClaimsAuthenticationContext.DefaultOrder + 10_000_000;
 
     #region IClaimsAdvisor Members
 
