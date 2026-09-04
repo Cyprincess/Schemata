@@ -7,12 +7,12 @@
     <body>
       <trans-unit id="DEPENDENCY_AUTO_REGISTERED">
         <source>{0} depends on {1}, it will be added automatically.</source>
-        <target state="translated">{0} dépend de {1}, il sera ajouté automatiquement.</target>
+        <target state="translated">{0} dépend de {1} ; il sera ajouté automatiquement.</target>
         <note />
       </trans-unit>
       <trans-unit id="DEPENDENCY_REQUIRED">
         <source>{0} requires {1}, you should add it manually.</source>
-        <target state="translated">{0} nécessite {1}, ajoutez-le manuellement.</target>
+        <target state="translated">{0} requiert {1} ; vous devez l'ajouter manuellement.</target>
         <note />
       </trans-unit>
       <trans-unit id="DEPENDENCY_SUGGESTED">
@@ -27,7 +27,7 @@
       </trans-unit>
       <trans-unit id="TENANT_RESOLUTION_FAILED">
         <source>Unable to resolve tenant for the current request.</source>
-        <target state="translated">Impossible de résoudre le tenant pour la requête actuelle.</target>
+        <target state="translated">Impossible de résoudre le locataire pour la requête actuelle.</target>
         <note />
       </trans-unit>
       <trans-unit id="FAILED_PRECONDITION">
@@ -37,12 +37,12 @@
       </trans-unit>
       <trans-unit id="UNAUTHENTICATED">
         <source>The request does not have valid authentication credentials.</source>
-        <target state="translated">La requête ne possède pas d'identifiants d'authentification valides.</target>
+        <target state="translated">La requête ne dispose pas d'informations d'identification d'authentification valides.</target>
         <note />
       </trans-unit>
       <trans-unit id="PERMISSION_DENIED">
         <source>You do not have permission to perform this action.</source>
-        <target state="translated">Vous n'avez pas la permission d'effectuer cette action.</target>
+        <target state="translated">Vous n'êtes pas autorisé à effectuer cette action.</target>
         <note />
       </trans-unit>
       <trans-unit id="NOT_FOUND">
@@ -57,7 +57,7 @@
       </trans-unit>
       <trans-unit id="CONCURRENCY_MISMATCH">
         <source>A concurrency conflict occurred while saving to the database.</source>
-        <target state="translated">Un conflit de concurrence est survenu lors de la sauvegarde dans la base de données.</target>
+        <target state="translated">Un conflit d'accès concurrentiel s'est produit lors de l'enregistrement dans la base de données.</target>
         <note />
       </trans-unit>
       <trans-unit id="VALIDATION_ERROR">
@@ -67,7 +67,7 @@
       </trans-unit>
       <trans-unit id="RESOURCE_EXHAUSTED">
         <source>Rate limit exceeded.</source>
-        <target state="translated">Limite de taux dépassée.</target>
+        <target state="translated">Limite de débit dépassée.</target>
         <note />
       </trans-unit>
       <trans-unit id="NAMED_NOT_FOUND">
@@ -77,7 +77,7 @@
       </trans-unit>
       <trans-unit id="GENERIC_ERROR">
         <source>An error occurred.</source>
-        <target state="translated">Une erreur est survenue.</target>
+        <target state="translated">Une erreur s'est produite.</target>
         <note />
       </trans-unit>
       <trans-unit id="NOT_EMPTY">
@@ -95,6 +95,11 @@
         <target state="translated">'{0}' n'est pas pris en charge.</target>
         <note />
       </trans-unit>
+      <trans-unit id="NOT_SINGLE">
+        <source>The parameter '{0}' MUST NOT be included more than once.</source>
+        <target state="translated">Le paramètre '{0}' NE DOIT PAS être inclus plus d'une fois.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="NOT_CONFIGURED">
         <source>'{0}' is not configured.</source>
         <target state="translated">'{0}' n'est pas configuré.</target>
@@ -102,7 +107,7 @@
       </trans-unit>
       <trans-unit id="SECTOR_IDENTIFIER_URI_REQUIRED">
         <source>Application has no sector identifier URI and no redirect URIs.</source>
-        <target state="translated">L'application n'a pas de Sector Identifier URI ni d'URI de redirection.</target>
+        <target state="translated">L'application n'a ni URI d'identificateur de secteur ni URI de redirection.</target>
         <note />
       </trans-unit>
       <trans-unit id="PATTERN_REQUIRED">
@@ -112,7 +117,7 @@
       </trans-unit>
       <trans-unit id="INVALID_TABLE_NAME">
         <source>Invalid table name '{0}' of type '{1}'.</source>
-        <target state="translated">Nom de table '{0}' non valide du type '{1}'.</target>
+        <target state="translated">Nom de table '{0}' non valide pour le type '{1}'.</target>
         <note />
       </trans-unit>
       <trans-unit id="TABLE_KEY_REQUIRED">
@@ -127,7 +132,7 @@
       </trans-unit>
       <trans-unit id="PARAMETER_NOT_RESOLVED">
         <source>Cannot resolve parameter '{0}' of type '{1}'.</source>
-        <target state="translated">Impossible de résoudre le paramètre '{0}' du type '{1}'.</target>
+        <target state="translated">Impossible de résoudre le paramètre '{0}' de type '{1}'.</target>
         <note />
       </trans-unit>
       <trans-unit id="METHOD_PARAMETER_NOT_RESOLVED">
@@ -147,7 +152,7 @@
       </trans-unit>
       <trans-unit id="TENANT_NOT_INITIALIZED">
         <source>Tenant is not initialized successfully.</source>
-        <target state="translated">Le tenant n'a pas été initialisé avec succès.</target>
+        <target state="translated">Le locataire n'a pas été initialisé correctement.</target>
         <note />
       </trans-unit>
       <trans-unit id="ENTRY_ASSEMBLY_REQUIRED">
@@ -162,17 +167,17 @@
       </trans-unit>
       <trans-unit id="INVALID_PAYLOAD">
         <source>Invalid request payload.</source>
-        <target state="translated">Charge utile de la requête non valide.</target>
+        <target state="translated">Charge utile de requête non valide.</target>
         <note />
       </trans-unit>
       <trans-unit id="CROSS_PARENT_UNSUPPORTED">
         <source>Cross-parent operation is not supported for '{parent}'.</source>
-        <target state="translated">L'opération inter-parents n'est pas prise en charge pour '{parent}'.</target>
+        <target state="translated">Les opérations multi-parents ne sont pas prises en charge pour '{parent}'.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_PAGE_TOKEN">
         <source>The page token is invalid or has expired.</source>
-        <target state="translated">Le jeton de page est non valide ou a expiré.</target>
+        <target state="translated">Le jeton de page n'est pas valide ou a expiré.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_EXPRESSION">
@@ -187,17 +192,17 @@
       </trans-unit>
       <trans-unit id="INVALID_FIELD_NAME">
         <source>Invalid field name '{0}'.</source>
-        <target state="translated">Nom de champ non valide '{0}'.</target>
+        <target state="translated">Nom de champ '{0}' non valide.</target>
         <note />
       </trans-unit>
       <trans-unit id="FUNCTION_NOT_REGISTERED">
         <source>Function '{0}' not registered.</source>
-        <target state="translated">La fonction '{0}' n'est pas enregistrée.</target>
+        <target state="translated">La fonction '{0}' n'est pas inscrite.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_PAGE_SIZE">
         <source>The page_size must not be negative.</source>
-        <target state="translated">page_size ne doit pas être négatif.</target>
+        <target state="translated">Le paramètre page_size ne doit pas être négatif.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_PARENT">
@@ -212,37 +217,202 @@
       </trans-unit>
       <trans-unit id="INVALID_CLIENT_CREDENTIALS">
         <source>The client credentials are missing or invalid.</source>
-        <target state="translated">Les identifiants client sont manquants ou non valides.</target>
+        <target state="translated">Les informations d'identification du client sont manquantes ou non valides.</target>
         <note />
       </trans-unit>
       <trans-unit id="CLIENT_SECRET_REQUIRED">
         <source>Client secret is required for confidential clients.</source>
-        <target state="translated">Un secret client est requis pour les clients confidentiels.</target>
+        <target state="translated">Une clé secrète client est requise pour les clients confidentiels.</target>
         <note />
       </trans-unit>
       <trans-unit id="MULTIPLE_CLIENT_AUTH_METHODS">
         <source>The request uses more than one client authentication method.</source>
-        <target state="translated">La requête utilise plusieurs méthodes d'authentification client.</target>
+        <target state="translated">La requête utilise plusieurs méthodes d'authentification du client.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNAUTHORIZED_CLIENT_AUTH_METHOD">
+        <source>The client is registered for a different client authentication method.</source>
+        <target state="translated">Le client est inscrit pour une autre méthode d'authentification du client.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_CLIENT_ASSERTION">
+        <source>The client assertion is not a well-formed JWT.</source>
+        <target state="translated">L'assertion client n'est pas un JWT bien formé.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_ISSUER_MISMATCH">
+        <source>The client assertion issuer does not match the expected issuer.</source>
+        <target state="translated">L'émetteur de l'assertion client ne correspond pas à l'émetteur attendu.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_SUBJECT_MISMATCH">
+        <source>The client assertion subject must be the client identifier.</source>
+        <target state="translated">L'objet de l'assertion client doit être l'identificateur du client.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_AUDIENCE_MISMATCH">
+        <source>The client assertion audience does not identify the authorization server.</source>
+        <target state="translated">L'audience de l'assertion client n'identifie pas le serveur d'autorisation.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_EXPIRED">
+        <source>The client assertion is expired or has no expiration time.</source>
+        <target state="translated">L'assertion client a expiré ou n'a pas d'heure d'expiration.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_NOT_YET_VALID">
+        <source>The client assertion is not yet valid.</source>
+        <target state="translated">L'assertion client n'est pas encore valide.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_JTI_REQUIRED">
+        <source>The client assertion must contain a non-empty jti claim.</source>
+        <target state="translated">L'assertion client doit contenir une revendication jti non vide.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_REPLAYED">
+        <source>The client assertion has already been used.</source>
+        <target state="translated">L'assertion client a déjà été utilisée.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_ALGORITHM_REJECTED">
+        <source>The client assertion algorithm is missing, unsecured, or not allowed.</source>
+        <target state="translated">L'algorithme de l'assertion client est manquant, non sécurisé ou non autorisé.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_CLIENT_ID_REQUIRED">
+        <source>The client identity must be provided by the client_id parameter or the client assertion subject.</source>
+        <target state="translated">L'identité du client doit être fournie par le paramètre client_id ou l'objet de l'assertion client.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_KEY_NOT_FOUND">
+        <source>No signing key registered for the client can verify the client assertion.</source>
+        <target state="translated">Aucune clé de signature inscrite pour le client ne peut vérifier l'assertion client.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_ISSUER_UNTRUSTED">
+        <source>The assertion issuer is not a trusted jwt-bearer issuer.</source>
+        <target state="translated">L'émetteur de l'assertion n'est pas un émetteur jwt-bearer approuvé.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_SIGNATURE_INVALID">
+        <source>The assertion signature could not be verified.</source>
+        <target state="translated">La signature de l'assertion n'a pas pu être vérifiée.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_MALFORMED">
+        <source>The DPoP proof is not a single well-formed JWT.</source>
+        <target state="translated">La preuve DPoP n'est pas un JWT bien formé unique.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_CLAIMS_REQUIRED">
+        <source>The DPoP proof must contain the jti, htm, htu, and iat claims.</source>
+        <target state="translated">La preuve DPoP doit contenir les revendications jti, htm, htu et iat.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_TYPE_MISMATCH">
+        <source>The DPoP proof typ header must be dpop+jwt.</source>
+        <target state="translated">L'en-tête typ de la preuve DPoP doit être dpop+jwt.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_ALGORITHM_REJECTED">
+        <source>The DPoP proof algorithm is missing, unsecured, or not allowed.</source>
+        <target state="translated">L'algorithme de la preuve DPoP est manquant, non sécurisé ou non autorisé.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_JWK_REQUIRED">
+        <source>The DPoP proof must contain a jwk header parameter with the signing public key.</source>
+        <target state="translated">La preuve DPoP doit contenir un paramètre d'en-tête jwk avec la clé publique de signature.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_PRIVATE_KEY">
+        <source>The DPoP proof jwk header parameter must not contain private key material.</source>
+        <target state="translated">Le paramètre d'en-tête jwk de la preuve DPoP ne doit pas contenir de matériel de clé privée.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_SIGNATURE_INVALID">
+        <source>The DPoP proof signature does not verify with the public key in the jwk header parameter.</source>
+        <target state="translated">La signature de la preuve DPoP ne peut pas être vérifiée avec la clé publique du paramètre d'en-tête jwk.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_HTM_MISMATCH">
+        <source>The DPoP proof htm claim does not match the HTTP request method.</source>
+        <target state="translated">La revendication htm de la preuve DPoP ne correspond pas à la méthode de requête HTTP.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_HTU_MISMATCH">
+        <source>The DPoP proof htu claim does not match the HTTP request URI.</source>
+        <target state="translated">La revendication htu de la preuve DPoP ne correspond pas à l'URI de la requête HTTP.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_NONCE_MISMATCH">
+        <source>The DPoP proof must carry the current server-provided nonce.</source>
+        <target state="translated">La preuve DPoP doit contenir le nonce actuel fourni par le serveur.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_TIME_WINDOW">
+        <source>The DPoP proof creation time is outside the acceptable window.</source>
+        <target state="translated">L'heure de création de la preuve DPoP est en dehors de la fenêtre acceptable.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_REQUIRED">
+        <source>The client is registered to always use DPoP and must send a DPoP proof header.</source>
+        <target state="translated">Le client est inscrit pour toujours utiliser DPoP et doit envoyer un en-tête de preuve DPoP.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_REPLAYED">
+        <source>The DPoP proof has already been used.</source>
+        <target state="translated">La preuve DPoP a déjà été utilisée.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_ATH_MISMATCH">
+        <source>The DPoP proof ath claim does not match the presented access token.</source>
+        <target state="translated">La revendication ath de la preuve DPoP ne correspond pas au jeton d'accès présenté.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_JKT_MALFORMED">
+        <source>The dpop_jkt parameter is not a base64url-encoded SHA-256 JWK thumbprint.</source>
+        <target state="translated">Le paramètre dpop_jkt n'est pas une empreinte JWK SHA-256 encodée en base64url.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_JKT_MISMATCH">
+        <source>The DPoP proof key does not match the key bound to the authorization code.</source>
+        <target state="translated">La clé de la preuve DPoP ne correspond pas à la clé liée au code d'autorisation.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_REFRESH_PROOF_REQUIRED">
+        <source>The refresh token is bound to a DPoP key and must be presented with a matching DPoP proof.</source>
+        <target state="translated">Le jeton d'actualisation est lié à une clé DPoP et doit être présenté avec une preuve DPoP correspondante.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_GRANT">
         <source>The provided grant is invalid, expired, or revoked.</source>
-        <target state="translated">L'autorisation fournie est non valide, expirée ou révoquée.</target>
+        <target state="translated">L'octroi fourni n'est pas valide, a expiré ou a été révoqué.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_TOKEN">
+        <source>Invalid token</source>
+        <target state="translated">Jeton non valide</target>
         <note />
       </trans-unit>
       <trans-unit id="PKCE_VERIFIER_MISMATCH">
         <source>The code_verifier does not match the code_challenge.</source>
-        <target state="translated">code_verifier ne correspond pas à code_challenge.</target>
+        <target state="translated">Le code_verifier ne correspond pas au code_challenge.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_SCOPE">
         <source>The requested scope is not allowed for this client.</source>
-        <target state="translated">La portée demandée n'est pas autorisée pour ce client.</target>
+        <target state="translated">L'étendue demandée n'est pas autorisée pour ce client.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_TARGET">
+        <source>The requested resource is invalid, missing, unknown, or malformed.</source>
+        <target state="translated">La ressource demandée est non valide, manquante, inconnue ou incorrecte.</target>
         <note />
       </trans-unit>
       <trans-unit id="UNAUTHORIZED_GRANT_TYPE">
         <source>The client is not authorized to use this grant type.</source>
-        <target state="translated">Le client n'est pas autorisé à utiliser ce type d'autorisation.</target>
+        <target state="translated">Le client n'est pas autorisé à utiliser ce type d'octroi.</target>
         <note />
       </trans-unit>
       <trans-unit id="ACCESS_DENIED">
@@ -252,7 +422,7 @@
       </trans-unit>
       <trans-unit id="INVALID_REDIRECT_URI">
         <source>The redirect_uri does not match any registered URI.</source>
-        <target state="translated">redirect_uri ne correspond à aucune URI enregistrée.</target>
+        <target state="translated">La redirect_uri ne correspond à aucun URI inscrit.</target>
         <note />
       </trans-unit>
       <trans-unit id="USER_CONSENT_REQUIRED">
@@ -267,7 +437,7 @@
       </trans-unit>
       <trans-unit id="AUTHORIZATION_PENDING">
         <source>The authorization request is still pending.</source>
-        <target state="translated">La requête d'autorisation est toujours en attente.</target>
+        <target state="translated">La demande d'autorisation est toujours en attente.</target>
         <note />
       </trans-unit>
       <trans-unit id="SLOW_DOWN">
@@ -277,37 +447,62 @@
       </trans-unit>
       <trans-unit id="INTERNAL">
         <source>An internal server error occurred.</source>
-        <target state="translated">Une erreur interne du serveur est survenue.</target>
+        <target state="translated">Une erreur de serveur interne s'est produite.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_PROMPT_COMBINATION">
         <source>The '{0}' prompt value cannot be combined with other values.</source>
-        <target state="translated">La valeur prompt '{0}' ne peut pas être combinée avec d'autres valeurs.</target>
+        <target state="translated">La valeur de prompt '{0}' ne peut pas être combinée avec d'autres valeurs.</target>
         <note />
       </trans-unit>
       <trans-unit id="UNSUPPORTED_PROMPT">
         <source>The '{0}' prompt value is not supported for this client.</source>
-        <target state="translated">La valeur prompt '{0}' n'est pas prise en charge pour ce client.</target>
+        <target state="translated">La valeur de prompt '{0}' n'est pas prise en charge pour ce client.</target>
         <note />
       </trans-unit>
       <trans-unit id="USER_IDENTITY_REQUIRED">
         <source>A valid user identity is required for this request.</source>
-        <target state="translated">Une identité utilisateur valide est requise pour cette requête.</target>
+        <target state="translated">Une identité d'utilisateur valide est requise pour cette requête.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_JSON">
+        <source>The authorization_details parameter is not a valid JSON document.</source>
+        <target state="translated">Le paramètre authorization_details n'est pas un document JSON valide.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_ARRAY">
+        <source>The authorization_details parameter must be a JSON array.</source>
+        <target state="translated">Le paramètre authorization_details doit être un tableau JSON.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_OBJECT">
+        <source>Every authorization_details element must be a JSON object.</source>
+        <target state="translated">Chaque élément authorization_details doit être un objet JSON.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_TYPE_MEMBER">
+        <source>Every authorization_details object must carry a string type member.</source>
+        <target state="translated">Chaque objet authorization_details doit comporter un membre type de type chaîne.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_TYPE_UNSUPPORTED">
+        <source>The authorization details type '{0}' is not supported.</source>
+        <target state="translated">Le type de détails d'autorisation '{0}' n'est pas pris en charge.</target>
         <note />
       </trans-unit>
       <trans-unit id="REQUIRED_SETTING_MISSING">
         <source>{0} is enabled but {1} is not set.</source>
-        <target state="translated">{0} est activé mais {1} n'est pas défini.</target>
+        <target state="translated">{0} est activé, mais {1} n'est pas défini.</target>
         <note />
       </trans-unit>
       <trans-unit id="ABSOLUTE_URI_REQUIRED">
         <source>{0} must be an absolute URI.</source>
-        <target state="translated">{0} doit être une URI absolue.</target>
+        <target state="translated">{0} doit être un URI absolu.</target>
         <note />
       </trans-unit>
       <trans-unit id="MISSING_DEPENDENT_SETTING">
         <source>{0} is set but {1} is not set.</source>
-        <target state="translated">{0} est défini mais {1} ne l'est pas.</target>
+        <target state="translated">{0} est défini, mais {1} ne l'est pas.</target>
         <note />
       </trans-unit>
       <trans-unit id="UNABLE_TO_RESOLVE">
@@ -317,7 +512,7 @@
       </trans-unit>
       <trans-unit id="INVALID_FILTER">
         <source>The filter expression is invalid.</source>
-        <target state="translated">L'expression filter est non valide.</target>
+        <target state="translated">L'expression de filtre n'est pas valide.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_UPDATE_MASK">
@@ -337,37 +532,52 @@
       </trans-unit>
       <trans-unit id="INVALID_ORDER_BY">
         <source>The order_by expression is invalid.</source>
-        <target state="translated">L'expression order_by est non valide.</target>
+        <target state="translated">L'expression order_by n'est pas valide.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_REFERENCE">
         <source>'{value}' does not resolve to any registered resource type.</source>
-        <target state="translated">'{value}' ne correspond à aucun type de ressource enregistré.</target>
+        <target state="translated">'{value}' ne correspond à aucun type de ressource inscrit.</target>
         <note />
       </trans-unit>
       <trans-unit id="BACK_CHANNEL_LOGOUT_REQUIRES_SCHEDULING">
         <source>Back-channel logout requires Scheduling.</source>
-        <target state="translated">La déconnexion back-channel nécessite Scheduling.</target>
+        <target state="translated">La déconnexion back-channel requiert Scheduling.</target>
         <note />
       </trans-unit>
       <trans-unit id="PROCESS_NAME_REQUIRED">
         <source>Process name is required.</source>
-        <target state="translated">Le nom du processus est obligatoire.</target>
+        <target state="translated">Le nom du processus est requis.</target>
         <note />
       </trans-unit>
       <trans-unit id="PROCESS_ALREADY_REGISTERED">
         <source>Process definition '{name}' is already registered.</source>
-        <target state="translated">La définition de processus '{name}' est déjà enregistrée.</target>
+        <target state="translated">La définition de processus '{name}' est déjà inscrite.</target>
         <note />
       </trans-unit>
       <trans-unit id="PROCESS_NOT_REGISTERED">
         <source>Process definition '{name}' is not registered.</source>
-        <target state="translated">La définition de processus '{name}' n'est pas enregistrée.</target>
+        <target state="translated">La définition de processus '{name}' n'est pas inscrite.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FLOW_EXPRESSION_INVALID">
+        <source>Condition expression '{expression}' is invalid.</source>
+        <target state="translated">L'expression de condition '{expression}' n'est pas valide.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FLOW_EXPRESSION_LANGUAGE_NOT_REGISTERED">
+        <source>Expression language '{language}' has no registered compiler.</source>
+        <target state="translated">Le langage d'expression '{language}' n'a aucun compilateur inscrit.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FLOW_EXPRESSION_LANGUAGE_REQUIRED">
+        <source>Process '{name}' declares string condition expressions; set Language on its process configuration.</source>
+        <target state="translated">Le processus '{name}' déclare des expressions de condition de chaîne ; définissez Language dans sa configuration de processus.</target>
         <note />
       </trans-unit>
       <trans-unit id="FLOW_RUNTIME_NOT_REGISTERED">
         <source>Flow runtime '{engine}' is not registered with the host.</source>
-        <target state="translated">L'environnement d'exécution de flux '{engine}' n'est pas enregistré auprès de l'hôte.</target>
+        <target state="translated">Le runtime de flux '{engine}' n'est pas inscrit auprès de l'hôte.</target>
         <note />
       </trans-unit>
       <trans-unit id="PROCESS_MESSAGE_NOT_DEFINED">
@@ -375,19 +585,59 @@
         <target state="translated">Le message '{name}' n'est pas défini sur le processus.</target>
         <note />
       </trans-unit>
+      <trans-unit id="PROCESS_TOKEN_NOT_FOUND">
+        <source>Token '{token}' is not found on process '{process}'.</source>
+        <target state="translated">Le jeton '{token}' est introuvable dans le processus '{process}'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_TOKEN_NOT_READY">
+        <source>Token '{token}' is not in a ready state.</source>
+        <target state="translated">Le jeton '{token}' n'est pas dans un état prêt.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_TOKEN_AMBIGUOUS">
+        <source>Multiple ready tokens are available; specify one of: {tokens}.</source>
+        <target state="translated">Plusieurs jetons prêts sont disponibles ; spécifiez l'un des suivants : {tokens}.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_SOURCE_BINDING_AMBIGUOUS">
+        <source>Multiple source bindings match the supplied source type.</source>
+        <target state="translated">Plusieurs liaisons de source correspondent au type de source fourni.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_SOURCE_BINDING_DUPLICATE">
+        <source>A process source binding is declared more than once.</source>
+        <target state="translated">Une liaison de source de processus est déclarée plusieurs fois.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_SOURCE_MEMBER_CONFLICT">
+        <source>Process source bindings target the same member.</source>
+        <target state="translated">Les liaisons de source de processus ciblent le même membre.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_SOURCE_MEMBER_INVALID">
+        <source>A process source binding member must be a writable instance property.</source>
+        <target state="translated">Un membre de liaison de source de processus doit être une propriété d'instance accessible en écriture.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_REQUIRES_BPMN_ENGINE">
+        <source>Element '{element}' (type '{type}') requires the BPMN engine; use UseBpmn() instead of UseStateMachine().</source>
+        <target state="translated">L'élément '{element}' (type '{type}') requiert le moteur BPMN ; utilisez UseBpmn() plutôt que UseStateMachine().</target>
+        <note />
+      </trans-unit>
       <trans-unit id="FLOW_SOURCE_MODIFIED_CONCURRENTLY">
         <source>Source '{name}' was modified concurrently; the flow transition was aborted.</source>
-        <target state="translated">La source '{name}' a été modifiée simultanément ; la transition de flux a été interrompue.</target>
+        <target state="translated">La source '{name}' a été modifiée simultanément ; la transition de flux a été abandonnée.</target>
         <note />
       </trans-unit>
       <trans-unit id="FLOW_TIMER_MISSING_VARIABLE">
         <source>Flow timer job is missing the '{variable}' variable.</source>
-        <target state="translated">Il manque la variable '{variable}' à la tâche du minuteur de flux.</target>
+        <target state="translated">Il manque la variable '{variable}' au travail du minuteur de flux.</target>
         <note />
       </trans-unit>
       <trans-unit id="FLOW_TIMER_REQUIRES_SCHEDULING">
         <source>Process '{name}' reached a timer catch, which requires Scheduling.</source>
-        <target state="translated">Le processus '{name}' a atteint une interception de minuteur, ce qui nécessite Scheduling.</target>
+        <target state="translated">Le processus '{name}' a atteint un événement d'interception de minuteur, ce qui requiert Scheduling.</target>
         <note />
       </trans-unit>
       <trans-unit id="INSIGHT_ACCESS_DENIED">
@@ -402,12 +652,12 @@
       </trans-unit>
       <trans-unit id="STATE_MACHINE_NO_START_EVENT">
         <source>Process definition has no start event.</source>
-        <target state="translated">La définition de processus n'a pas d'événement de début.</target>
+        <target state="translated">La définition de processus n'a aucun événement de début.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_START_EVENT_OUTGOING">
         <source>Start event must have exactly one outgoing sequence flow.</source>
-        <target state="translated">L'événement de début doit avoir exactement un flux séquentiel sortant.</target>
+        <target state="translated">L'événement de début doit avoir exactement un flux de séquence sortant.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_REQUIRES_ONE_START_EVENT">
@@ -422,7 +672,7 @@
       </trans-unit>
       <trans-unit id="STATE_MACHINE_INVALID_TRIGGER">
         <source>Trigger '{trigger}' is not valid from state '{state}'.</source>
-        <target state="translated">Le déclencheur '{trigger}' n'est pas valide depuis l'état '{state}'.</target>
+        <target state="translated">Le déclencheur '{trigger}' n'est pas valide à partir de l'état '{state}'.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_UNKNOWN_CURRENT_STATE">
@@ -442,12 +692,12 @@
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CYCLIC_AUTO_FLOW">
         <source>Cyclic auto-flow detected at element '{name}'; the process cannot reach a stable state.</source>
-        <target state="translated">Flux automatique cyclique détecté sur l'élément '{name}' ; le processus ne peut atteindre un état stable.</target>
+        <target state="translated">Flux automatique cyclique détecté au niveau de l'élément '{name}' ; le processus ne peut pas atteindre un état stable.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_UNKNOWN_TARGET">
         <source>Unknown target element '{name}'.</source>
-        <target state="translated">Élément cible inconnu '{name}'.</target>
+        <target state="translated">Élément cible '{name}' inconnu.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_UNSUPPORTED">
@@ -457,32 +707,42 @@
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_LOOP_UNSUPPORTED">
         <source>Activity '{name}' has loop characteristics which are not supported by the state machine engine.</source>
-        <target state="translated">L'activité '{name}' possède des caractéristiques de boucle non prises en charge par le moteur de machine à états.</target>
+        <target state="translated">L'activité '{name}' a des caractéristiques de boucle qui ne sont pas prises en charge par le moteur de machine à états.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ELEMENT_UNREACHABLE">
         <source>Element '{name}' is not reachable from the start event.</source>
-        <target state="translated">L'élément '{name}' n'est pas accessible depuis l'événement de début.</target>
+        <target state="translated">L'élément '{name}' n'est pas accessible à partir de l'événement de début.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_FLOW_NO_SOURCE">
-        <source>Sequence flow '{id}' has no source element.</source>
-        <target state="translated">Le flux séquentiel '{id}' n'a pas d'élément source.</target>
+        <source>Sequence flow targeting '{target}' has no source element.</source>
+        <target state="translated">Le flux de séquence ciblant '{target}' n'a pas d'élément source.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_FLOW_NO_TARGET">
-        <source>Sequence flow '{id}' has no target element.</source>
-        <target state="translated">Le flux séquentiel '{id}' n'a pas d'élément cible.</target>
+        <source>Sequence flow from '{source}' has no target element.</source>
+        <target state="translated">Le flux de séquence à partir de '{source}' n'a pas d'élément cible.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_FLOW_UNKNOWN_SOURCE">
-        <source>Sequence flow '{id}' references unknown source element '{source}'.</source>
-        <target state="translated">Le flux séquentiel '{id}' fait référence à un élément source inconnu '{source}'.</target>
+        <source>Sequence flow references unknown source element '{source}'.</source>
+        <target state="translated">Le flux de séquence fait référence à un élément source inconnu '{source}'.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_FLOW_UNKNOWN_TARGET">
-        <source>Sequence flow '{id}' references unknown target element '{target}'.</source>
-        <target state="translated">Le flux séquentiel '{id}' fait référence à un élément cible inconnu '{target}'.</target>
+        <source>Sequence flow references unknown target element '{target}'.</source>
+        <target state="translated">Le flux de séquence fait référence à un élément cible inconnu '{target}'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_ELEMENT_NAME_REQUIRED">
+        <source>Element of type '{type}' has no name. Every flow element requires a non-empty name.</source>
+        <target state="translated">L'élément de type '{type}' n'a pas de nom. Chaque élément de flux requiert un nom non vide.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_DUPLICATE_ELEMENT_NAME">
+        <source>Element name '{name}' is used by more than one element. Element names must be unique within a process.</source>
+        <target state="translated">Le nom d'élément '{name}' est utilisé par plusieurs éléments. Les noms d'éléments doivent être uniques dans un processus.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_END_EVENT_OUTGOING">
@@ -512,107 +772,497 @@
       </trans-unit>
       <trans-unit id="STATE_MACHINE_BOUNDARY_UNATTACHED">
         <source>Boundary event '{name}' is not attached to any activity.</source>
-        <target state="translated">L'événement de bordure '{name}' n'est attaché à aucune activité.</target>
+        <target state="translated">L'événement de frontière '{name}' n'est attaché à aucune activité.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_BOUNDARY_UNKNOWN_ACTIVITY">
         <source>Boundary event '{name}' is attached to unknown activity.</source>
-        <target state="translated">L'événement de bordure '{name}' est attaché à une activité inconnue.</target>
+        <target state="translated">L'événement de frontière '{name}' est attaché à une activité inconnue.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_BOUNDARY_NON_INTERRUPTING">
         <source>Boundary event '{name}' is non-interrupting, which is not supported by the state machine engine.</source>
-        <target state="translated">L'événement de bordure '{name}' est non interrompant, ce qui n'est pas pris en charge par le moteur de machine à états.</target>
+        <target state="translated">L'événement de frontière '{name}' est non interruptif, ce qui n'est pas pris en charge par le moteur de machine à états.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_BOUNDARY_OUTGOING_REQUIRED">
         <source>Boundary event '{name}' must have exactly one outgoing flow.</source>
-        <target state="translated">L'événement de bordure '{name}' doit avoir exactement un flux sortant.</target>
+        <target state="translated">L'événement de frontière '{name}' doit avoir exactement un flux sortant.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CANCEL_BOUNDARY_REQUIRES_TRANSACTION">
         <source>Cancel boundary event '{name}' must be attached to a transaction sub-process.</source>
-        <target state="new">Cancel boundary event '{name}' must be attached to a transaction sub-process.</target>
+        <target state="translated">L'événement de frontière d'annulation '{name}' doit être attaché à un sous-processus de transaction.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_TRANSACTION_REQUIRES_END_EVENT">
         <source>Transaction sub-process '{name}' must contain at least one end event.</source>
-        <target state="new">Transaction sub-process '{name}' must contain at least one end event.</target>
+        <target state="translated">Le sous-processus de transaction '{name}' doit contenir au moins un événement de fin.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CATCH_EVENT_NO_OUTGOING">
         <source>Intermediate catch event '{name}' must have at least one outgoing flow.</source>
-        <target state="translated">L'événement de capture intermédiaire '{name}' doit avoir au moins un flux sortant.</target>
+        <target state="translated">L'événement d'interception intermédiaire '{name}' doit avoir au moins un flux sortant.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CATCH_EVENT_GATEWAY_REQUIRED">
         <source>Intermediate catch event '{name}' can only be reached from an EventBasedGateway.</source>
-        <target state="translated">L'événement de capture intermédiaire '{name}' n'est accessible que depuis un EventBasedGateway.</target>
+        <target state="translated">L'événement d'interception intermédiaire '{name}' ne peut être atteint qu'à partir d'un EventBasedGateway.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_NO_OUTGOING">
         <source>Activity '{name}' has no outgoing flow and cannot proceed. Route it to an end event or another element.</source>
-        <target state="translated">L'activité '{name}' n'a pas de flux sortant et ne peut pas continuer. Routez-la vers un événement de fin ou un autre élément.</target>
+        <target state="translated">L'activité '{name}' n'a pas de flux sortant et ne peut pas continuer. Acheminez-la vers un événement de fin ou un autre élément.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_MIXED_GATEWAY">
         <source>Activity '{name}' has mixed outgoing paths (direct and gateway). Each activity can have at most one outgoing path type.</source>
-        <target state="translated">L'activité '{name}' a des chemins sortants mixtes (direct et passerelle). Chaque activité ne peut avoir qu'un seul type de chemin sortant.</target>
+        <target state="translated">L'activité '{name}' a des chemins sortants mixtes (direct et passerelle). Chaque activité peut avoir au plus un type de chemin sortant.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_MIXED_END">
         <source>Activity '{name}' has mixed outgoing paths (end event and other). Each activity can have at most one outgoing path type.</source>
-        <target state="translated">L'activité '{name}' a des chemins sortants mixtes (événement de fin et autre). Chaque activité ne peut avoir qu'un seul type de chemin sortant.</target>
+        <target state="translated">L'activité '{name}' a des chemins sortants mixtes (événement de fin et autre). Chaque activité peut avoir au plus un type de chemin sortant.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_MULTIPLE_DIRECT">
         <source>Activity '{name}' has multiple direct outgoing flows to activities. An activity can have at most one direct outgoing flow.</source>
-        <target state="translated">L'activité '{name}' a plusieurs flux sortants directs vers des activités. Une activité ne peut avoir qu'un seul flux sortant direct.</target>
+        <target state="translated">L'activité '{name}' a plusieurs flux sortants directs vers des activités. Une activité peut avoir au plus un flux sortant direct.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_MULTI_INSTANCE_CARDINALITY_REQUIRED">
         <source>Multi-instance activity '{name}' must define loop cardinality.</source>
-        <target state="new">Multi-instance activity '{name}' must define loop cardinality.</target>
+        <target state="translated">L'activité multi-instances '{name}' doit définir la cardinalité de boucle.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_MULTI_INSTANCE_EVENT_BEHAVIOR_UNSUPPORTED">
         <source>Multi-instance activity '{name}' uses a completion event behavior that is not supported by the BPMN engine.</source>
-        <target state="new">Multi-instance activity '{name}' uses a completion event behavior that is not supported by the BPMN engine.</target>
+        <target state="translated">L'activité multi-instances '{name}' utilise un comportement d'événement d'achèvement qui n'est pas pris en charge par le moteur BPMN.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CALL_ACTIVITY_CALLED_ELEMENT_REQUIRED">
         <source>Call activity '{name}' must define calledElement.</source>
-        <target state="new">Call activity '{name}' must define calledElement.</target>
+        <target state="translated">L'activité d'appel '{name}' doit définir calledElement.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_EVENT_SUBPROCESS_START_TRIGGER_REQUIRED">
         <source>Event sub-process start event '{name}' must define a trigger event definition.</source>
-        <target state="new">Event sub-process start event '{name}' must define a trigger event definition.</target>
+        <target state="translated">L'événement de début du sous-processus d'événements '{name}' doit définir une définition d'événement déclencheur.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ESCALATION_NAME_REQUIRED">
         <source>Escalation event '{name}' must define a non-empty escalation name.</source>
-        <target state="new">Escalation event '{name}' must define a non-empty escalation name.</target>
+        <target state="translated">L'événement d'escalade '{name}' doit définir un nom d'escalade non vide.</target>
         <note />
       </trans-unit>
-      <trans-unit id="PROCESS_TOKEN_NOT_FOUND">
-        <source>Token '{token}' is not found on process '{process}'.</source>
-        <target state="new">Token '{token}' is not found on process '{process}'.</target>
+      <trans-unit id="STATE_MACHINE_NONE_TASK_BOUNDARY_UNREACHABLE">
+        <source>None task '{name}' passes through to its awaited gateway or end event, so boundary events attached to it can never fire. Use a user task, or move the catches into the Await branches.</source>
+        <target state="translated">La tâche none '{name}' passe directement à sa passerelle ou à son événement de fin attendu, de sorte que les événements de frontière qui lui sont attachés ne peuvent jamais se déclencher. Utilisez une tâche utilisateur ou déplacez les interceptions dans les branches Await.</target>
         <note />
       </trans-unit>
-      <trans-unit id="PROCESS_TOKEN_NOT_READY">
-        <source>Token '{token}' is not in a ready state.</source>
-        <target state="new">Token '{token}' is not in a ready state.</target>
+      <trans-unit id="STATE_MACHINE_ENTER_TASK_BYPASSED">
+        <source>Activity '{name}' runs enter task '{enter}' on entry, but the flow from '{source}' targets the activity directly and bypasses it. Route inbound flows through the enter task.</source>
+        <target state="translated">L'activité '{name}' exécute la tâche d'entrée '{enter}' à l'entrée, mais le flux provenant de '{source}' cible directement l'activité et la contourne. Acheminez les flux entrants via la tâche d'entrée.</target>
         <note />
       </trans-unit>
-      <trans-unit id="PROCESS_TOKEN_AMBIGUOUS">
-        <source>Multiple ready tokens are available; specify one of: {tokens}.</source>
-        <target state="new">Multiple ready tokens are available; specify one of: {tokens}.</target>
+      <trans-unit id="BPMN_NOT_IMPLEMENTED">
+        <source>BPMN feature '{feature}' is not yet implemented in this engine version.</source>
+        <target state="translated">La fonctionnalité BPMN '{feature}' n'est pas encore implémentée dans cette version du moteur.</target>
         <note />
       </trans-unit>
-      <trans-unit id="STATE_MACHINE_REQUIRES_BPMN_ENGINE">
-        <source>Element '{element}' (type '{type}') requires the BPMN engine; use UseBpmn() instead of UseStateMachine().</source>
-        <target state="new">Element '{element}' (type '{type}') requires the BPMN engine; use UseBpmn() instead of UseStateMachine().</target>
+      <trans-unit id="BPMN_CALL_ACTIVITY_REQUIRES_SERVICES">
+        <source>BPMN call activity '{name}' requires a service provider; register Schemata.Flow.Bpmn with a process registry.</source>
+        <target state="translated">L'activité d'appel BPMN '{name}' requiert un fournisseur de services ; inscrivez Schemata.Flow.Bpmn avec un registre de processus.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="BPMN_LOOP_NOT_IMPLEMENTED">
+        <source>BPMN activity '{name}' has loop characteristics of type '{type}' which are not yet implemented in this engine version.</source>
+        <target state="translated">L'activité BPMN '{name}' a des caractéristiques de boucle de type '{type}' qui ne sont pas encore implémentées dans cette version du moteur.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="BPMN_TRANSPARENT_GATEWAY_NOT_SUPPORTED">
+        <source>BPMN gateway '{type}' cannot be transparently resolved; route through AdvanceAsync to dispatch it.</source>
+        <target state="translated">La passerelle BPMN '{type}' ne peut pas être résolue de manière transparente ; acheminez-la via AdvanceAsync pour la distribuer.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="BPMN_INVALID_TRIGGER">
+        <source>Trigger '{trigger}' is not valid from state '{state}'.</source>
+        <target state="translated">Le déclencheur '{trigger}' n'est pas valide à partir de l'état '{state}'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_REQUEST">
+        <source>The request is malformed or missing a required parameter.</source>
+        <target state="translated">La requête est incorrecte ou un paramètre obligatoire est manquant.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_CLIENT">
+        <source>Client authentication failed.</source>
+        <target state="translated">Échec de l'authentification du client.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="CONSENT_REQUIRED">
+        <source>The authorization server requires end-user consent.</source>
+        <target state="translated">Le serveur d'autorisation exige le consentement de l'utilisateur final.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGIN_REQUIRED">
+        <source>The authorization server requires end-user authentication.</source>
+        <target state="translated">Le serveur d'autorisation exige l'authentification de l'utilisateur final.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="EXPIRED_TOKEN">
+        <source>The provided token has expired.</source>
+        <target state="translated">Le jeton fourni a expiré.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INTERACTION_REQUIRED">
+        <source>The end-user must interact with the authorization server to continue.</source>
+        <target state="translated">L'utilisateur final doit interagir avec le serveur d'autorisation pour continuer.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ACCOUNT_SELECTION_REQUIRED">
+        <source>The end-user must select an account to continue.</source>
+        <target state="translated">L'utilisateur final doit sélectionner un compte pour continuer.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS">
+        <source>The authorization_details parameter is invalid.</source>
+        <target state="translated">Le paramètre authorization_details n'est pas valide.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_CLIENT_METADATA">
+        <source>The client registration metadata is invalid.</source>
+        <target state="translated">Les métadonnées d'inscription du client ne sont pas valides.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_DPOP_PROOF">
+        <source>The DPoP proof JWT is invalid.</source>
+        <target state="translated">Le JWT de preuve DPoP n'est pas valide.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_REQUEST_OBJECT">
+        <source>The request object is invalid.</source>
+        <target state="translated">L'objet de requête n'est pas valide.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_REQUEST_URI">
+        <source>The request_uri does not resolve to a valid request object.</source>
+        <target state="translated">La request_uri ne correspond pas à un objet de requête valide.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_SOFTWARE_STATEMENT">
+        <source>The software statement is invalid.</source>
+        <target state="translated">La déclaration de logiciel n'est pas valide.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNAPPROVED_SOFTWARE_STATEMENT">
+        <source>The software statement is not approved for use.</source>
+        <target state="translated">La déclaration de logiciel n'est pas approuvée pour utilisation.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="REGISTRATION_NOT_SUPPORTED">
+        <source>The authorization server does not support dynamic client registration.</source>
+        <target state="translated">Le serveur d'autorisation ne prend pas en charge l'inscription dynamique du client.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="REQUEST_NOT_SUPPORTED">
+        <source>The authorization server does not support the request parameter.</source>
+        <target state="translated">Le serveur d'autorisation ne prend pas en charge le paramètre request.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="REQUEST_URI_NOT_SUPPORTED">
+        <source>The authorization server does not support the request_uri parameter.</source>
+        <target state="translated">Le serveur d'autorisation ne prend pas en charge le paramètre request_uri.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="SERVER_ERROR">
+        <source>The authorization server encountered an unexpected condition.</source>
+        <target state="translated">Le serveur d'autorisation a rencontré une condition inattendue.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNAUTHORIZED_CLIENT">
+        <source>The client is not authorized to use this method.</source>
+        <target state="translated">Le client n'est pas autorisé à utiliser cette méthode.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNSUPPORTED_GRANT_TYPE">
+        <source>The authorization grant type is not supported by the authorization server.</source>
+        <target state="translated">Le type d'octroi d'autorisation n'est pas pris en charge par le serveur d'autorisation.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNSUPPORTED_RESPONSE_TYPE">
+        <source>The authorization server does not support obtaining an authorization code using this method.</source>
+        <target state="translated">Le serveur d'autorisation ne prend pas en charge l'obtention d'un code d'autorisation à l'aide de cette méthode.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNSUPPORTED_TOKEN_TYPE">
+        <source>The requested token type is not supported.</source>
+        <target state="translated">Le type de jeton demandé n'est pas pris en charge.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="USE_DPOP_NONCE">
+        <source>The DPoP proof must carry the server-issued nonce.</source>
+        <target state="translated">La preuve DPoP doit contenir le nonce émis par le serveur.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SOURCE_REQUIRES_RESOURCE">
+        <source>A repository source requires a resource parameter.</source>
+        <target state="translated">Une source de référentiel requiert un paramètre de ressource.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_UNKNOWN_SOURCE">
+        <source>Unknown resource '{name}'.</source>
+        <target state="translated">Ressource '{name}' inconnue.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NODE_UNSUPPORTED">
+        <source>Plan node '{node}' is not supported by the repository driver.</source>
+        <target state="translated">Le nœud de plan '{node}' n'est pas pris en charge par le pilote de référentiel.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_STAGE_REQUIRED">
+        <source>Plan node '{node}' is not a nested stage.</source>
+        <target state="translated">Le nœud de plan '{node}' n'est pas une étape imbriquée.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_COLLECTION_MISSING">
+        <source>Driver '{driver}' returned no child collection for nested selection '{alias}' (path '{field}'); declare Nested or include the child collection in raw rows.</source>
+        <target state="translated">Le pilote '{driver}' n'a retourné aucune collection enfant pour la sélection imbriquée '{alias}' (chemin '{field}') ; déclarez Nested ou incluez la collection enfant dans les lignes brutes.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_ANCHOR_INVALID">
+        <source>Nested selection '{alias}' (path '{field}') cannot be anchored to a single source.</source>
+        <target state="translated">La sélection imbriquée '{alias}' (chemin '{field}') ne peut pas être ancrée à une source unique.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_NOT_COLLECTION">
+        <source>Nested selection '{alias}' (path '{field}') targets a non-collection value.</source>
+        <target state="translated">La sélection imbriquée '{alias}' (chemin '{field}') cible une valeur qui n'est pas une collection.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_LOCAL_STAGE_REQUIRED">
+        <source>Plan node '{stage}' is not a local stage.</source>
+        <target state="translated">Le nœud de plan '{stage}' n'est pas une étape locale.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_AGGREGATION_UNSUPPORTED">
+        <source>Unsupported aggregation '{function}'.</source>
+        <target state="translated">Agrégation '{function}' non prise en charge.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SOURCE_REQUIRED">
+        <source>The plan has no source.</source>
+        <target state="translated">Le plan n'a aucune source.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_SOURCE_REQUIRED">
+        <source>A join input has no source.</source>
+        <target state="translated">Une entrée de jointure n'a aucune source.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_DRIVER_UNREGISTERED">
+        <source>No driver '{driver}' is registered.</source>
+        <target state="translated">Aucun pilote '{driver}' n'est inscrit.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SINGLE_SOURCE_STAGE_REQUIRED">
+        <source>Plan node '{stage}' is not a single-source stage.</source>
+        <target state="translated">Le nœud de plan '{stage}' n'est pas une étape à source unique.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_AT_LEAST_ONE_SOURCE">
+        <source>At least one source is required.</source>
+        <target state="translated">Au moins une source est requise.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_ALIAS_DUPLICATE">
+        <source>Duplicate source alias '{alias}'.</source>
+        <target state="translated">Alias de source '{alias}' dupliqué.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_KIND_REQUIRED">
+        <source>A join must specify a kind.</source>
+        <target state="translated">Une jointure doit spécifier un type.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_ALREADY_JOINED">
+        <source>Join aliases '{left}' and '{right}' are already joined.</source>
+        <target state="translated">Les alias de jointure '{left}' et '{right}' sont déjà joints.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_ALL_CONNECTED">
+        <source>All sources must be connected by joins.</source>
+        <target state="translated">Toutes les sources doivent être connectées par des jointures.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_ALIAS_UNKNOWN">
+        <source>Join references unknown alias '{alias}'.</source>
+        <target state="translated">La jointure fait référence à un alias inconnu '{alias}'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_TOP_SKIP_UNSUPPORTED">
+        <source>Mid-pipeline top/skip is not supported at the top level; use top-level page_size/skip.</source>
+        <target state="translated">Top/skip au milieu du pipeline n'est pas pris en charge au niveau supérieur ; utilisez page_size/skip au niveau supérieur.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_TRANSFORM_ONE_OPERATION">
+        <source>A transformation must set exactly one operation.</source>
+        <target state="translated">Une transformation doit définir exactement une opération.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_EXPRESSION_LANGUAGE_UNKNOWN">
+        <source>Unknown expression language '{language}'.</source>
+        <target state="translated">Langage d'expression '{language}' inconnu.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_EXPRESSION_NOT_VALUE_CAPABLE">
+        <source>Language '{language}' cannot compile value expressions.</source>
+        <target state="translated">Le langage '{language}' ne peut pas compiler d'expressions de valeur.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_EXPRESSION_INVALID">
+        <source>Invalid expression '{expression}'.</source>
+        <target state="translated">Expression '{expression}' non valide.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_FLAT_SELECTION_TRANSFORMATIONS">
+        <source>A flat selection cannot carry transformations.</source>
+        <target state="translated">Une sélection à plat ne peut pas contenir de transformations.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SELECTION_ALIAS_REQUIRED">
+        <source>A computed selection requires an alias.</source>
+        <target state="translated">Une sélection calculée requiert un alias.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SELECTION_FIELD_REQUIRED">
+        <source>A selection must specify a field.</source>
+        <target state="translated">Une sélection doit spécifier un champ.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_FIELD_REQUIRED">
+        <source>A nested selection must name its navigation field.</source>
+        <target state="translated">Une sélection imbriquée doit nommer son champ de navigation.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_ALIAS_UNKNOWN">
+        <source>A nested selection '{field}' must name an existing source alias.</source>
+        <target state="translated">Une sélection imbriquée '{field}' doit nommer un alias de source existant.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DEFAULT_ERROR">
+        <source>An unknown failure has occurred.</source>
+        <target state="translated">Une défaillance inconnue s'est produite.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="CONCURRENCY_FAILURE">
+        <source>Optimistic concurrency failure, object has been modified.</source>
+        <target state="translated">Échec d'accès concurrentiel optimiste, l'objet a été modifié.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_USER_NAME">
+        <source>User name '{userName}' is invalid, can only contain letters or digits.</source>
+        <target state="translated">Le nom d'utilisateur '{userName}' n'est pas valide ; il ne peut contenir que des lettres ou des chiffres.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_EMAIL">
+        <source>Email '{email}' is invalid.</source>
+        <target state="translated">L'e-mail '{email}' n'est pas valide.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DUPLICATE_USER_NAME">
+        <source>User name '{userName}' is already taken.</source>
+        <target state="translated">Le nom d'utilisateur '{userName}' est déjà pris.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DUPLICATE_EMAIL">
+        <source>Email '{email}' is already taken.</source>
+        <target state="translated">L'e-mail '{email}' est déjà pris.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_ROLE_NAME">
+        <source>Role name '{role}' is invalid.</source>
+        <target state="translated">Le nom de rôle '{role}' n'est pas valide.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DUPLICATE_ROLE_NAME">
+        <source>Role name '{role}' is already taken.</source>
+        <target state="translated">Le nom de rôle '{role}' est déjà pris.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="USER_ALREADY_IN_ROLE">
+        <source>User already in role '{role}'.</source>
+        <target state="translated">L'utilisateur est déjà dans le rôle '{role}'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="USER_NOT_IN_ROLE">
+        <source>User is not in role '{role}'.</source>
+        <target state="translated">L'utilisateur n'est pas dans le rôle '{role}'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_TOO_SHORT">
+        <source>Passwords must be at least {length} characters.</source>
+        <target state="translated">Les mots de passe doivent comporter au moins {length} caractères.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_UNIQUE_CHARS">
+        <source>Passwords must use at least {uniqueChars} different characters.</source>
+        <target state="translated">Les mots de passe doivent utiliser au moins {uniqueChars} caractères différents.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_NON_ALPHANUMERIC">
+        <source>Passwords must have at least one non-alphanumeric character.</source>
+        <target state="translated">Les mots de passe doivent comporter au moins un caractère non alphanumérique.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_DIGIT">
+        <source>Passwords must have at least one digit ('0'-'9').</source>
+        <target state="translated">Les mots de passe doivent comporter au moins un chiffre ('0'-'9').</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_LOWER">
+        <source>Passwords must have at least one lowercase ('a'-'z').</source>
+        <target state="translated">Les mots de passe doivent comporter au moins une lettre minuscule ('a'-'z').</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_UPPER">
+        <source>Passwords must have at least one uppercase ('A'-'Z').</source>
+        <target state="translated">Les mots de passe doivent comporter au moins une lettre majuscule ('A'-'Z').</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_MISMATCH">
+        <source>Incorrect password.</source>
+        <target state="translated">Mot de passe incorrect.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="RECOVERY_CODE_REDEMPTION_FAILED">
+        <source>Recovery code redemption failed.</source>
+        <target state="translated">Échec de l'échange du code de récupération.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGIN_ALREADY_ASSOCIATED">
+        <source>A user with this login already exists.</source>
+        <target state="translated">Un utilisateur avec cette connexion existe déjà.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="USER_ALREADY_HAS_PASSWORD">
+        <source>User already has a password set.</source>
+        <target state="translated">L'utilisateur a déjà un mot de passe défini.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGOUT_PAGE_TITLE">
+        <source>Logging out</source>
+        <target state="translated">Déconnexion</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGOUT_PAGE_TEXT">
+        <source>Logging out…</source>
+        <target state="translated">Déconnexion…</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGOUT_PAGE_CONTINUE">
+        <source>Continue</source>
+        <target state="translated">Continuer</target>
         <note />
       </trans-unit>
     </body>

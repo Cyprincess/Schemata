@@ -11,7 +11,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Humanizer;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Errors;
 using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Expressions.Skeleton;
@@ -53,7 +55,7 @@ public sealed class RepositoryDriver(IServiceProvider services) : ISourceDriver
         CancellationToken   ct = default
     ) {
         if (!subPlan.Config.Params.TryGetValue("resource", out var value) || value is not string resource) {
-            throw new InsightValidationException(InsightReasons.InvalidArgument, "A repository source requires a resource parameter.");
+            throw new InsightValidationException(InsightReasons.InvalidArgument, SchemataResources.GetResourceString(SchemataResources.INSIGHT_SOURCE_REQUIRES_RESOURCE));
         }
 
         var entityType = ResolveEntityType(resource);
@@ -76,7 +78,7 @@ public sealed class RepositoryDriver(IServiceProvider services) : ISourceDriver
                 }
             }
 
-            throw new InsightValidationException(InsightReasons.UnknownSourceName, $"Unknown resource '{key}'.");
+            throw new InsightValidationException(InsightReasons.UnknownSourceName, LocalizedMessageFormatter.FormatInvariant(SchemataResources.INSIGHT_UNKNOWN_SOURCE, new Dictionary<string, string?> { ["name"] = key })!);
         });
     }
 
@@ -210,7 +212,7 @@ public sealed class RepositoryDriver(IServiceProvider services) : ISourceDriver
                 case SourceNode:
                     break;
                 default:
-                    throw new InsightValidationException(InsightReasons.Unimplemented, $"Plan node '{node.GetType().Name}' is not supported by the repository driver.");
+                    throw new InsightValidationException(InsightReasons.Unimplemented, LocalizedMessageFormatter.FormatInvariant(SchemataResources.INSIGHT_NODE_UNSUPPORTED, new Dictionary<string, string?> { ["node"] = node.GetType().Name })!);
             }
         }
 

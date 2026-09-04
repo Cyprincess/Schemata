@@ -102,6 +102,7 @@ public class SchemataException : Exception
         EnsureErrorInfo(details, status, domain);
         EnsureRequestInfo(details, requestId);
         EnsureLocalizedMessage(details, locale, status);
+        EnsureLocalizedFieldViolations(details, locale);
 
         return new ErrorResponse {
             Error = new() {
@@ -205,6 +206,45 @@ public class SchemataException : Exception
             Locale  = locale,
             Message = message,
         });
+    }
+
+
+    /// <summary>
+    ///     Fills <see cref="ErrorFieldViolation.LocalizedMessage" /> for every violation whose
+    ///     <see cref="ErrorFieldViolation.Reason" /> resolves a resx template in the caller's
+    ///     culture, mirroring <see cref="EnsureLocalizedMessage" /> at the field level.
+    /// </summary>
+    /// <param name="details">Mutable detail list for the response.</param>
+    /// <param name="locale">BCP-47 language tag parsed from <c>Accept-Language</c>.</param>
+    protected static void EnsureLocalizedFieldViolations(List<IErrorDetail> details, string? locale) {
+        if (string.IsNullOrWhiteSpace(locale)) {
+            return;
+        }
+
+        CultureInfo culture;
+        try {
+            culture = CultureInfo.GetCultureInfo(locale);
+        } catch (CultureNotFoundException) {
+            return;
+        }
+
+        foreach (var violation in details.OfType<BadRequestDetail>()
+                                        .SelectMany(d => d.FieldViolations ?? [])
+                                        .Where(v => v.LocalizedMessage is null)) {
+            var template = TryGetResource(violation.Reason, culture);
+            if (LocalizedMessageFormatter.HasPlaceholders(template)) {
+                continue;
+            }
+
+            var message = LocalizedMessageFormatter.Format(template, null, culture);
+            if (string.IsNullOrEmpty(message)) {
+                continue;
+            }
+            violation.LocalizedMessage = new() {
+                Locale  = locale,
+                Message = message,
+            };
+        }
     }
 
     private static string? TryGetResource(string? key, CultureInfo culture) {

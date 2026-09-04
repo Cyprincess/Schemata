@@ -7,17 +7,17 @@
     <body>
       <trans-unit id="DEPENDENCY_AUTO_REGISTERED">
         <source>{0} depends on {1}, it will be added automatically.</source>
-        <target state="translated">{0}, {1} bağımlıdır; otomatik olarak eklenecek.</target>
+        <target state="translated">{0}, {1} öğesine bağımlı; otomatik olarak eklenecek.</target>
         <note />
       </trans-unit>
       <trans-unit id="DEPENDENCY_REQUIRED">
         <source>{0} requires {1}, you should add it manually.</source>
-        <target state="translated">{0}, {1} gerektirir; manuel olarak eklemelisiniz.</target>
+        <target state="translated">{0}, {1} öğesini gerektirir; lütfen el ile ekleyin.</target>
         <note />
       </trans-unit>
       <trans-unit id="DEPENDENCY_SUGGESTED">
         <source>{0} suggests adding {1}.</source>
-        <target state="translated">{0}, {1} eklemenizi önerir.</target>
+        <target state="translated">{0}, {1} eklenmesini önerir.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_ARGUMENT">
@@ -27,17 +27,17 @@
       </trans-unit>
       <trans-unit id="TENANT_RESOLUTION_FAILED">
         <source>Unable to resolve tenant for the current request.</source>
-        <target state="translated">Mevcut istek için kiracı çözülemiyor.</target>
+        <target state="translated">Geçerli istek için kiracı çözümlenemiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="FAILED_PRECONDITION">
         <source>The request cannot be executed in the current system state.</source>
-        <target state="translated">İstek mevcut sistem durumunda yürütülemez.</target>
+        <target state="translated">İstek, geçerli sistem durumunda yürütülemiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="UNAUTHENTICATED">
         <source>The request does not have valid authentication credentials.</source>
-        <target state="translated">İstekte geçerli kimlik doğrulama bilgileri yok.</target>
+        <target state="translated">İsteğin geçerli kimlik doğrulama kimlik bilgileri yok.</target>
         <note />
       </trans-unit>
       <trans-unit id="PERMISSION_DENIED">
@@ -52,12 +52,12 @@
       </trans-unit>
       <trans-unit id="ALREADY_EXISTS">
         <source>The resource already exists.</source>
-        <target state="translated">Kaynak zaten mevcut.</target>
+        <target state="translated">Kaynak zaten var.</target>
         <note />
       </trans-unit>
       <trans-unit id="CONCURRENCY_MISMATCH">
         <source>A concurrency conflict occurred while saving to the database.</source>
-        <target state="translated">Veritabanına kaydederken eşzamanlılık çakışması oluştu.</target>
+        <target state="translated">Veritabanına kaydedilirken eşzamanlılık çakışması oluştu.</target>
         <note />
       </trans-unit>
       <trans-unit id="VALIDATION_ERROR">
@@ -95,49 +95,54 @@
         <target state="translated">'{0}' desteklenmiyor.</target>
         <note />
       </trans-unit>
+      <trans-unit id="NOT_SINGLE">
+        <source>The parameter '{0}' MUST NOT be included more than once.</source>
+        <target state="translated">'{0}' parametresi birden fazla kez dahil EDİLMEMELİDİR.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="NOT_CONFIGURED">
         <source>'{0}' is not configured.</source>
-        <target state="translated">'{0}' yapılandırılmadı.</target>
+        <target state="translated">'{0}' yapılandırılmamış.</target>
         <note />
       </trans-unit>
       <trans-unit id="SECTOR_IDENTIFIER_URI_REQUIRED">
         <source>Application has no sector identifier URI and no redirect URIs.</source>
-        <target state="translated">Uygulamanın sektör tanımlayıcı URI'si ve yönlendirme URI'leri yok.</target>
+        <target state="translated">Uygulamanın sektör tanımlayıcısı URI'si ve yeniden yönlendirme URI'si yok.</target>
         <note />
       </trans-unit>
       <trans-unit id="PATTERN_REQUIRED">
         <source>Cannot resolve a resource name without a pattern.</source>
-        <target state="translated">Desen olmadan kaynak adı çözülemez.</target>
+        <target state="translated">Desen olmadan kaynak adı çözümlenemiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_TABLE_NAME">
         <source>Invalid table name '{0}' of type '{1}'.</source>
-        <target state="translated">'{1}' türünde geçersiz tablo adı '{0}'.</target>
+        <target state="translated">'{1}' türündeki '{0}' tablo adı geçersiz.</target>
         <note />
       </trans-unit>
       <trans-unit id="TABLE_KEY_REQUIRED">
         <source>Entity must have at least one [TableKey].</source>
-        <target state="translated">Varlığın en az bir [TableKey] içermesi gerekir.</target>
+        <target state="translated">Varlık en az bir [TableKey] içermelidir.</target>
         <note />
       </trans-unit>
       <trans-unit id="ENTITY_KEY_COUNT_MISMATCH">
         <source>Entity key count mismatch.</source>
-        <target state="translated">Varlık anahtar sayısı uyuşmuyor.</target>
+        <target state="translated">Varlık anahtar sayısı eşleşmiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="PARAMETER_NOT_RESOLVED">
         <source>Cannot resolve parameter '{0}' of type '{1}'.</source>
-        <target state="translated">'{1}' türünün '{0}' parametresi çözülemiyor.</target>
+        <target state="translated">'{1}' türündeki '{0}' parametresi çözümlenemiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="METHOD_PARAMETER_NOT_RESOLVED">
         <source>Cannot resolve parameter '{0}' of method '{1}' on type '{2}'.</source>
-        <target state="translated">'{2}' türünde '{1}' yönteminin '{0}' parametresi çözülemiyor.</target>
+        <target state="translated">'{2}' türündeki '{1}' yönteminin '{0}' parametresi çözümlenemiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="CONVERSION_FAILED">
         <source>Unable to convert '{0}' to {1}.</source>
-        <target state="translated">'{0}' değeri {1} türüne dönüştürülemiyor.</target>
+        <target state="translated">'{0}', {1} türüne dönüştürülemiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="SOURCE_FIELD_REQUIRED">
@@ -147,7 +152,7 @@
       </trans-unit>
       <trans-unit id="TENANT_NOT_INITIALIZED">
         <source>Tenant is not initialized successfully.</source>
-        <target state="translated">Kiracı başarılı şekilde başlatılmadı.</target>
+        <target state="translated">Kiracı başarıyla başlatılmadı.</target>
         <note />
       </trans-unit>
       <trans-unit id="ENTRY_ASSEMBLY_REQUIRED">
@@ -157,17 +162,17 @@
       </trans-unit>
       <trans-unit id="IMPLEMENTATION_REQUIRED">
         <source>The type {0} does not implement {1}.</source>
-        <target state="translated">{0} türü {1} uygulamıyor.</target>
+        <target state="translated">{0} türü, {1} türünü uygulamıyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_PAYLOAD">
         <source>Invalid request payload.</source>
-        <target state="translated">Geçersiz istek yükü.</target>
+        <target state="translated">İstek yükü geçersiz.</target>
         <note />
       </trans-unit>
       <trans-unit id="CROSS_PARENT_UNSUPPORTED">
         <source>Cross-parent operation is not supported for '{parent}'.</source>
-        <target state="translated">Çapraz üst işlemi '{parent}' için desteklenmiyor.</target>
+        <target state="translated">'{parent}' için üst öğeler arası işlem desteklenmiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_PAGE_TOKEN">
@@ -177,17 +182,17 @@
       </trans-unit>
       <trans-unit id="INVALID_EXPRESSION">
         <source>The {0} expression is malformed.</source>
-        <target state="translated">{0} ifadesinin biçimi hatalı.</target>
+        <target state="translated">{0} ifadesi hatalı biçimlendirilmiş.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_FIELD">
         <source>Invalid field.</source>
-        <target state="translated">Geçersiz alan.</target>
+        <target state="translated">Alan geçersiz.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_FIELD_NAME">
         <source>Invalid field name '{0}'.</source>
-        <target state="translated">Geçersiz alan adı '{0}'.</target>
+        <target state="translated">'{0}' alan adı geçersiz.</target>
         <note />
       </trans-unit>
       <trans-unit id="FUNCTION_NOT_REGISTERED">
@@ -202,12 +207,12 @@
       </trans-unit>
       <trans-unit id="INVALID_PARENT">
         <source>The parent '{parent}' is invalid.</source>
-        <target state="translated">Üst kaynak '{parent}' geçersiz.</target>
+        <target state="translated">'{parent}' üst öğesi geçersiz.</target>
         <note />
       </trans-unit>
       <trans-unit id="AUTHENTICATOR_KEY_REQUIRED">
         <source>The user manager must produce an authenticator key after reset.</source>
-        <target state="translated">Sıfırlamadan sonra kullanıcı yöneticisi bir kimlik doğrulayıcı anahtarı üretmelidir.</target>
+        <target state="translated">Kullanıcı yöneticisi, sıfırlamadan sonra bir kimlik doğrulayıcı anahtarı üretmelidir.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_CLIENT_CREDENTIALS">
@@ -225,9 +230,169 @@
         <target state="translated">İstek birden fazla istemci kimlik doğrulama yöntemi kullanıyor.</target>
         <note />
       </trans-unit>
+      <trans-unit id="UNAUTHORIZED_CLIENT_AUTH_METHOD">
+        <source>The client is registered for a different client authentication method.</source>
+        <target state="translated">İstemci, farklı bir istemci kimlik doğrulama yöntemi için kayıtlı.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_CLIENT_ASSERTION">
+        <source>The client assertion is not a well-formed JWT.</source>
+        <target state="translated">İstemci onayı iyi biçimlendirilmiş bir JWT değil.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_ISSUER_MISMATCH">
+        <source>The client assertion issuer does not match the expected issuer.</source>
+        <target state="translated">İstemci onayının veren tarafı beklenen veren tarafla eşleşmiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_SUBJECT_MISMATCH">
+        <source>The client assertion subject must be the client identifier.</source>
+        <target state="translated">İstemci onayının konusu istemci tanımlayıcısı olmalıdır.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_AUDIENCE_MISMATCH">
+        <source>The client assertion audience does not identify the authorization server.</source>
+        <target state="translated">İstemci onayının hedef kitlesi yetkilendirme sunucusunu tanımlamıyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_EXPIRED">
+        <source>The client assertion is expired or has no expiration time.</source>
+        <target state="translated">İstemci onayının süresi dolmuş veya son kullanma zamanı yok.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_NOT_YET_VALID">
+        <source>The client assertion is not yet valid.</source>
+        <target state="translated">İstemci onayı henüz geçerli değil.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_JTI_REQUIRED">
+        <source>The client assertion must contain a non-empty jti claim.</source>
+        <target state="translated">İstemci onayı boş olmayan bir jti talebi içermelidir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_REPLAYED">
+        <source>The client assertion has already been used.</source>
+        <target state="translated">İstemci onayı zaten kullanılmış.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_ALGORITHM_REJECTED">
+        <source>The client assertion algorithm is missing, unsecured, or not allowed.</source>
+        <target state="translated">İstemci onayı algoritması eksik, güvenli değil veya izin verilmiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_CLIENT_ID_REQUIRED">
+        <source>The client identity must be provided by the client_id parameter or the client assertion subject.</source>
+        <target state="translated">İstemci kimliği, client_id parametresi veya istemci onayının konusu tarafından sağlanmalıdır.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_KEY_NOT_FOUND">
+        <source>No signing key registered for the client can verify the client assertion.</source>
+        <target state="translated">İstemci için kayıtlı imzalama anahtarlarından hiçbiri istemci onayını doğrulayamıyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_ISSUER_UNTRUSTED">
+        <source>The assertion issuer is not a trusted jwt-bearer issuer.</source>
+        <target state="translated">Onayın veren tarafı güvenilen bir jwt-bearer veren tarafı değil.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_SIGNATURE_INVALID">
+        <source>The assertion signature could not be verified.</source>
+        <target state="translated">Onayın imzası doğrulanamadı.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_MALFORMED">
+        <source>The DPoP proof is not a single well-formed JWT.</source>
+        <target state="translated">DPoP kanıtı, iyi biçimlendirilmiş tek bir JWT değil.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_CLAIMS_REQUIRED">
+        <source>The DPoP proof must contain the jti, htm, htu, and iat claims.</source>
+        <target state="translated">DPoP kanıtı jti, htm, htu ve iat taleplerini içermelidir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_TYPE_MISMATCH">
+        <source>The DPoP proof typ header must be dpop+jwt.</source>
+        <target state="translated">DPoP kanıtının typ üst bilgisi dpop+jwt olmalıdır.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_ALGORITHM_REJECTED">
+        <source>The DPoP proof algorithm is missing, unsecured, or not allowed.</source>
+        <target state="translated">DPoP kanıtı algoritması eksik, güvenli değil veya izin verilmiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_JWK_REQUIRED">
+        <source>The DPoP proof must contain a jwk header parameter with the signing public key.</source>
+        <target state="translated">DPoP kanıtı, imzalama ortak anahtarını içeren bir jwk üst bilgi parametresi içermelidir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_PRIVATE_KEY">
+        <source>The DPoP proof jwk header parameter must not contain private key material.</source>
+        <target state="translated">DPoP kanıtının jwk üst bilgi parametresi özel anahtar malzemesi içermemelidir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_SIGNATURE_INVALID">
+        <source>The DPoP proof signature does not verify with the public key in the jwk header parameter.</source>
+        <target state="translated">DPoP kanıtının imzası, jwk üst bilgi parametresindeki ortak anahtarla doğrulanamıyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_HTM_MISMATCH">
+        <source>The DPoP proof htm claim does not match the HTTP request method.</source>
+        <target state="translated">DPoP kanıtının htm talebi HTTP istek yöntemiyle eşleşmiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_HTU_MISMATCH">
+        <source>The DPoP proof htu claim does not match the HTTP request URI.</source>
+        <target state="translated">DPoP kanıtının htu talebi HTTP istek URI'siyle eşleşmiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_NONCE_MISMATCH">
+        <source>The DPoP proof must carry the current server-provided nonce.</source>
+        <target state="translated">DPoP kanıtı, sunucu tarafından sağlanan geçerli nonce değerini taşımalıdır.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_TIME_WINDOW">
+        <source>The DPoP proof creation time is outside the acceptable window.</source>
+        <target state="translated">DPoP kanıtının oluşturma zamanı kabul edilebilir pencerenin dışında.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_REQUIRED">
+        <source>The client is registered to always use DPoP and must send a DPoP proof header.</source>
+        <target state="translated">İstemci, her zaman DPoP kullanacak şekilde kayıtlıdır ve bir DPoP kanıtı üst bilgisi göndermelidir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_REPLAYED">
+        <source>The DPoP proof has already been used.</source>
+        <target state="translated">DPoP kanıtı zaten kullanılmış.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_ATH_MISMATCH">
+        <source>The DPoP proof ath claim does not match the presented access token.</source>
+        <target state="translated">DPoP kanıtının ath talebi sunulan erişim belirteciyle eşleşmiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_JKT_MALFORMED">
+        <source>The dpop_jkt parameter is not a base64url-encoded SHA-256 JWK thumbprint.</source>
+        <target state="translated">dpop_jkt parametresi, base64url ile kodlanmış bir SHA-256 JWK parmak izi değil.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_JKT_MISMATCH">
+        <source>The DPoP proof key does not match the key bound to the authorization code.</source>
+        <target state="translated">DPoP kanıtının anahtarı, yetkilendirme koduna bağlı anahtarla eşleşmiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_REFRESH_PROOF_REQUIRED">
+        <source>The refresh token is bound to a DPoP key and must be presented with a matching DPoP proof.</source>
+        <target state="translated">Yenileme belirteci bir DPoP anahtarına bağlıdır ve eşleşen bir DPoP kanıtıyla sunulmalıdır.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="INVALID_GRANT">
         <source>The provided grant is invalid, expired, or revoked.</source>
-        <target state="translated">Sağlanan yetkilendirme geçersiz, süresi dolmuş veya iptal edilmiş.</target>
+        <target state="translated">Sağlanan izin geçersiz, süresi dolmuş veya iptal edilmiş.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_TOKEN">
+        <source>Invalid token</source>
+        <target state="translated">Belirteç geçersiz</target>
         <note />
       </trans-unit>
       <trans-unit id="PKCE_VERIFIER_MISMATCH">
@@ -237,12 +402,17 @@
       </trans-unit>
       <trans-unit id="INVALID_SCOPE">
         <source>The requested scope is not allowed for this client.</source>
-        <target state="translated">İstenen kapsam bu istemci için izin verilmiyor.</target>
+        <target state="translated">İstenen kapsam bu istemci için izinli değil.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_TARGET">
+        <source>The requested resource is invalid, missing, unknown, or malformed.</source>
+        <target state="translated">İstenen kaynak geçersiz, eksik, bilinmiyor veya hatalı biçimlendirilmiş.</target>
         <note />
       </trans-unit>
       <trans-unit id="UNAUTHORIZED_GRANT_TYPE">
         <source>The client is not authorized to use this grant type.</source>
-        <target state="translated">İstemci bu yetkilendirme türünü kullanmaya yetkili değil.</target>
+        <target state="translated">İstemci bu izin türünü kullanma yetkisine sahip değil.</target>
         <note />
       </trans-unit>
       <trans-unit id="ACCESS_DENIED">
@@ -252,12 +422,12 @@
       </trans-unit>
       <trans-unit id="INVALID_REDIRECT_URI">
         <source>The redirect_uri does not match any registered URI.</source>
-        <target state="translated">redirect_uri kayıtlı hiçbir URI ile eşleşmiyor.</target>
+        <target state="translated">redirect_uri, kayıtlı hiçbir URI ile eşleşmiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="USER_CONSENT_REQUIRED">
         <source>User consent is required.</source>
-        <target state="translated">Kullanıcı izni gereklidir.</target>
+        <target state="translated">Kullanıcı onayı gereklidir.</target>
         <note />
       </trans-unit>
       <trans-unit id="USER_AUTHENTICATION_REQUIRED">
@@ -267,12 +437,12 @@
       </trans-unit>
       <trans-unit id="AUTHORIZATION_PENDING">
         <source>The authorization request is still pending.</source>
-        <target state="translated">Yetkilendirme isteği hâlâ beklemede.</target>
+        <target state="translated">Yetkilendirme isteği hala beklemede.</target>
         <note />
       </trans-unit>
       <trans-unit id="SLOW_DOWN">
         <source>The polling interval is too short. Increase the interval and retry.</source>
-        <target state="translated">Yoklama aralığı çok kısa. Aralığı artırın ve tekrar deneyin.</target>
+        <target state="translated">Yoklama aralığı çok kısa. Aralığı artırın ve yeniden deneyin.</target>
         <note />
       </trans-unit>
       <trans-unit id="INTERNAL">
@@ -295,9 +465,34 @@
         <target state="translated">Bu istek için geçerli bir kullanıcı kimliği gereklidir.</target>
         <note />
       </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_JSON">
+        <source>The authorization_details parameter is not a valid JSON document.</source>
+        <target state="translated">authorization_details parametresi geçerli bir JSON belgesi değil.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_ARRAY">
+        <source>The authorization_details parameter must be a JSON array.</source>
+        <target state="translated">authorization_details parametresi bir JSON dizisi olmalıdır.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_OBJECT">
+        <source>Every authorization_details element must be a JSON object.</source>
+        <target state="translated">Her authorization_details öğesi bir JSON nesnesi olmalıdır.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_TYPE_MEMBER">
+        <source>Every authorization_details object must carry a string type member.</source>
+        <target state="translated">Her authorization_details nesnesi dize değerli bir type üyesi içermelidir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_TYPE_UNSUPPORTED">
+        <source>The authorization details type '{0}' is not supported.</source>
+        <target state="translated">'{0}' yetkilendirme ayrıntıları türü desteklenmiyor.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="REQUIRED_SETTING_MISSING">
         <source>{0} is enabled but {1} is not set.</source>
-        <target state="translated">{0} etkin ancak {1} ayarlanmadı.</target>
+        <target state="translated">{0} etkin, ancak {1} ayarlanmamış.</target>
         <note />
       </trans-unit>
       <trans-unit id="ABSOLUTE_URI_REQUIRED">
@@ -307,27 +502,27 @@
       </trans-unit>
       <trans-unit id="MISSING_DEPENDENT_SETTING">
         <source>{0} is set but {1} is not set.</source>
-        <target state="translated">{0} ayarlandı ancak {1} ayarlanmadı.</target>
+        <target state="translated">{0} ayarlanmış, ancak {1} ayarlanmamış.</target>
         <note />
       </trans-unit>
       <trans-unit id="UNABLE_TO_RESOLVE">
         <source>Unable to resolve {0}.</source>
-        <target state="translated">{0} çözülemiyor.</target>
+        <target state="translated">{0} çözümlenemiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_FILTER">
         <source>The filter expression is invalid.</source>
-        <target state="translated">filter ifadesi geçersiz.</target>
+        <target state="translated">Filtre ifadesi geçersiz.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_UPDATE_MASK">
         <source>The update_mask path '{path}' is invalid: {reason}.</source>
-        <target state="translated">update_mask yolu '{path}' geçersiz: {reason}.</target>
+        <target state="translated">update_mask '{path}' yolu geçersiz: {reason}.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_READ_MASK">
         <source>The read_mask path '{path}' is invalid: {reason}.</source>
-        <target state="translated">read_mask yolu '{path}' geçersiz: {reason}.</target>
+        <target state="translated">read_mask '{path}' yolu geçersiz: {reason}.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_NAME">
@@ -342,67 +537,122 @@
       </trans-unit>
       <trans-unit id="INVALID_REFERENCE">
         <source>'{value}' does not resolve to any registered resource type.</source>
-        <target state="translated">'{value}' kayıtlı bir kaynak türüne çözümlenemiyor.</target>
+        <target state="translated">'{value}', kayıtlı hiçbir kaynak türüne çözümlenmiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="BACK_CHANNEL_LOGOUT_REQUIRES_SCHEDULING">
         <source>Back-channel logout requires Scheduling.</source>
-        <target state="translated">Back-channel oturum kapatma için Scheduling gereklidir.</target>
+        <target state="translated">Back-channel oturumu kapatma, Scheduling gerektirir.</target>
         <note />
       </trans-unit>
       <trans-unit id="PROCESS_NAME_REQUIRED">
         <source>Process name is required.</source>
-        <target state="translated">İşlem adı gereklidir.</target>
+        <target state="translated">Süreç adı gereklidir.</target>
         <note />
       </trans-unit>
       <trans-unit id="PROCESS_ALREADY_REGISTERED">
         <source>Process definition '{name}' is already registered.</source>
-        <target state="translated">Süreç tanımı '{name}' zaten kayıtlı.</target>
+        <target state="translated">'{name}' süreç tanımı zaten kayıtlı.</target>
         <note />
       </trans-unit>
       <trans-unit id="PROCESS_NOT_REGISTERED">
         <source>Process definition '{name}' is not registered.</source>
-        <target state="translated">Süreç tanımı '{name}' kayıtlı değil.</target>
+        <target state="translated">'{name}' süreç tanımı kayıtlı değil.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FLOW_EXPRESSION_INVALID">
+        <source>Condition expression '{expression}' is invalid.</source>
+        <target state="translated">'{expression}' koşul ifadesi geçersiz.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FLOW_EXPRESSION_LANGUAGE_NOT_REGISTERED">
+        <source>Expression language '{language}' has no registered compiler.</source>
+        <target state="translated">'{language}' ifade dili, kayıtlı bir derleyiciye sahip değil.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FLOW_EXPRESSION_LANGUAGE_REQUIRED">
+        <source>Process '{name}' declares string condition expressions; set Language on its process configuration.</source>
+        <target state="translated">'{name}' süreci dize koşul ifadeleri bildiriyor; süreç yapılandırmasında Language değerini ayarlayın.</target>
         <note />
       </trans-unit>
       <trans-unit id="FLOW_RUNTIME_NOT_REGISTERED">
         <source>Flow runtime '{engine}' is not registered with the host.</source>
-        <target state="translated">Akış çalışma zamanı '{engine}' ana bilgisayara kayıtlı değil.</target>
+        <target state="translated">'{engine}' akış çalışma zamanı konakta kayıtlı değil.</target>
         <note />
       </trans-unit>
       <trans-unit id="PROCESS_MESSAGE_NOT_DEFINED">
         <source>Message '{name}' is not defined on the process.</source>
-        <target state="translated">İleti '{name}' süreçte tanımlı değil.</target>
+        <target state="translated">'{name}' iletisi süreçte tanımlı değil.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_TOKEN_NOT_FOUND">
+        <source>Token '{token}' is not found on process '{process}'.</source>
+        <target state="translated">'{token}' belirteci '{process}' sürecinde bulunamadı.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_TOKEN_NOT_READY">
+        <source>Token '{token}' is not in a ready state.</source>
+        <target state="translated">'{token}' belirteci hazır durumda değil.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_TOKEN_AMBIGUOUS">
+        <source>Multiple ready tokens are available; specify one of: {tokens}.</source>
+        <target state="translated">Birden fazla hazır belirteç kullanılabilir; şunlardan birini belirtin: {tokens}.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_SOURCE_BINDING_AMBIGUOUS">
+        <source>Multiple source bindings match the supplied source type.</source>
+        <target state="translated">Birden fazla kaynak bağlaması, sağlanan kaynak türüyle eşleşiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_SOURCE_BINDING_DUPLICATE">
+        <source>A process source binding is declared more than once.</source>
+        <target state="translated">Bir süreç kaynak bağlaması birden fazla kez bildirilmiş.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_SOURCE_MEMBER_CONFLICT">
+        <source>Process source bindings target the same member.</source>
+        <target state="translated">Süreç kaynak bağlamaları aynı üyeyi hedefliyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_SOURCE_MEMBER_INVALID">
+        <source>A process source binding member must be a writable instance property.</source>
+        <target state="translated">Süreç kaynak bağlaması üyesi, yazılabilir bir örnek özelliği olmalıdır.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_REQUIRES_BPMN_ENGINE">
+        <source>Element '{element}' (type '{type}') requires the BPMN engine; use UseBpmn() instead of UseStateMachine().</source>
+        <target state="translated">'{element}' öğesi ('{type}' türü), BPMN altyapısını gerektiriyor; UseStateMachine() yerine UseBpmn() kullanın.</target>
         <note />
       </trans-unit>
       <trans-unit id="FLOW_SOURCE_MODIFIED_CONCURRENTLY">
         <source>Source '{name}' was modified concurrently; the flow transition was aborted.</source>
-        <target state="translated">Kaynak '{name}' eş zamanlı değiştirildi; akış geçişi iptal edildi.</target>
+        <target state="translated">'{name}' kaynağı eşzamanlı olarak değiştirildi; akış geçişi durduruldu.</target>
         <note />
       </trans-unit>
       <trans-unit id="FLOW_TIMER_MISSING_VARIABLE">
         <source>Flow timer job is missing the '{variable}' variable.</source>
-        <target state="translated">Akış zamanlayıcı işinde '{variable}' değişkeni eksik.</target>
+        <target state="translated">Akış zamanlayıcı işi '{variable}' değişkenini içermiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="FLOW_TIMER_REQUIRES_SCHEDULING">
         <source>Process '{name}' reached a timer catch, which requires Scheduling.</source>
-        <target state="translated">İşlem '{name}' bir zamanlayıcı yakalama noktasına ulaştı; Scheduling gerekiyor.</target>
+        <target state="translated">'{name}' süreci, Scheduling gerektiren bir zamanlayıcı yakalamaya ulaştı.</target>
         <note />
       </trans-unit>
       <trans-unit id="INSIGHT_ACCESS_DENIED">
         <source>Access to source '{name}' is denied.</source>
-        <target state="translated">Kaynak '{name}' erişimi reddedildi.</target>
+        <target state="translated">'{name}' kaynağına erişim reddedildi.</target>
         <note />
       </trans-unit>
       <trans-unit id="OPERATION_ALREADY_FINISHED">
         <source>Operation '{name}' has already finished.</source>
-        <target state="translated">İşlem '{name}' zaten tamamlandı.</target>
+        <target state="translated">'{name}' işlemi zaten tamamlandı.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_NO_START_EVENT">
         <source>Process definition has no start event.</source>
-        <target state="translated">Süreç tanımının başlangıç olayı yok.</target>
+        <target state="translated">Süreç tanımında başlangıç olayı yok.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_START_EVENT_OUTGOING">
@@ -422,22 +672,22 @@
       </trans-unit>
       <trans-unit id="STATE_MACHINE_INVALID_TRIGGER">
         <source>Trigger '{trigger}' is not valid from state '{state}'.</source>
-        <target state="translated">Tetikleyici '{trigger}' '{state}' durumundan geçerli değil.</target>
+        <target state="translated">'{trigger}' tetikleyicisi '{state}' durumundan geçerli değil.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_UNKNOWN_CURRENT_STATE">
         <source>Current state '{state}' is not defined on the process.</source>
-        <target state="translated">Geçerli durum '{state}' süreçte tanımlı değil.</target>
+        <target state="translated">Geçerli durum '{state}', süreçte tanımlı değil.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_GATEWAY_UNSUPPORTED">
         <source>Gateway '{name}' is not supported by the state machine engine.</source>
-        <target state="translated">Geçit '{name}' durum makinesi motoru tarafından desteklenmiyor.</target>
+        <target state="translated">'{name}' ağ geçidi, durum makinesi altyapısı tarafından desteklenmiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_GATEWAY_KIND_UNSUPPORTED">
         <source>Gateway '{name}' is not supported by the state machine engine. Only exclusive and event-based gateways are supported.</source>
-        <target state="translated">Geçit '{name}' durum makinesi motoru tarafından desteklenmiyor. Yalnızca özel ve olay tabanlı geçitler desteklenir.</target>
+        <target state="translated">'{name}' ağ geçidi, durum makinesi altyapısı tarafından desteklenmiyor. Yalnızca özel (exclusive) ve olay tabanlı ağ geçitleri destekleniyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CYCLIC_AUTO_FLOW">
@@ -447,172 +697,572 @@
       </trans-unit>
       <trans-unit id="STATE_MACHINE_UNKNOWN_TARGET">
         <source>Unknown target element '{name}'.</source>
-        <target state="translated">Bilinmeyen hedef öğe '{name}'.</target>
+        <target state="translated">'{name}' hedef öğesi bilinmiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_UNSUPPORTED">
         <source>Activity '{name}' is not supported by the state machine engine.</source>
-        <target state="translated">Etkinlik '{name}' durum makinesi motoru tarafından desteklenmiyor.</target>
+        <target state="translated">'{name}' etkinliği, durum makinesi altyapısı tarafından desteklenmiyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_LOOP_UNSUPPORTED">
         <source>Activity '{name}' has loop characteristics which are not supported by the state machine engine.</source>
-        <target state="translated">Etkinlik '{name}' durum makinesi motoru tarafından desteklenmeyen döngü özelliklerine sahip.</target>
+        <target state="translated">'{name}' etkinliği, durum makinesi altyapısı tarafından desteklenmeyen döngü özelliklerine sahip.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ELEMENT_UNREACHABLE">
         <source>Element '{name}' is not reachable from the start event.</source>
-        <target state="translated">Öğe '{name}' başlangıç olayından ulaşılamıyor.</target>
+        <target state="translated">'{name}' öğesine başlangıç olayından ulaşılamıyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_FLOW_NO_SOURCE">
-        <source>Sequence flow '{id}' has no source element.</source>
-        <target state="translated">Sıra akışı '{id}' kaynak öğeye sahip değil.</target>
+        <source>Sequence flow targeting '{target}' has no source element.</source>
+        <target state="translated">'{target}' öğesini hedefleyen sıra akışının kaynak öğesi yok.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_FLOW_NO_TARGET">
-        <source>Sequence flow '{id}' has no target element.</source>
-        <target state="translated">Sıra akışı '{id}' hedef öğeye sahip değil.</target>
+        <source>Sequence flow from '{source}' has no target element.</source>
+        <target state="translated">'{source}' öğesinden gelen sıra akışının hedef öğesi yok.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_FLOW_UNKNOWN_SOURCE">
-        <source>Sequence flow '{id}' references unknown source element '{source}'.</source>
-        <target state="translated">Sıra akışı '{id}' bilinmeyen kaynak öğeye '{source}' başvuruyor.</target>
+        <source>Sequence flow references unknown source element '{source}'.</source>
+        <target state="translated">Sıra akışı, bilinmeyen '{source}' kaynak öğesine başvuruyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_FLOW_UNKNOWN_TARGET">
-        <source>Sequence flow '{id}' references unknown target element '{target}'.</source>
-        <target state="translated">Sıra akışı '{id}' bilinmeyen hedef öğeye '{target}' başvuruyor.</target>
+        <source>Sequence flow references unknown target element '{target}'.</source>
+        <target state="translated">Sıra akışı, bilinmeyen '{target}' hedef öğesine başvuruyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_ELEMENT_NAME_REQUIRED">
+        <source>Element of type '{type}' has no name. Every flow element requires a non-empty name.</source>
+        <target state="translated">'{type}' türündeki öğenin adı yok. Her akış öğesi boş olmayan bir ad gerektirir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_DUPLICATE_ELEMENT_NAME">
+        <source>Element name '{name}' is used by more than one element. Element names must be unique within a process.</source>
+        <target state="translated">'{name}' öğe adı birden fazla öğe tarafından kullanılıyor. Öğe adları bir süreç içinde benzersiz olmalıdır.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_END_EVENT_OUTGOING">
         <source>End event '{name}' must not have outgoing flows.</source>
-        <target state="translated">Bitiş olayı '{name}' giden akışlara sahip olmamalıdır.</target>
+        <target state="translated">'{name}' bitiş olayının giden akışları olmamalıdır.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_EVENT_GATEWAY_PARALLEL_UNSUPPORTED">
         <source>Event-based gateway '{name}' has Parallel=true, which is not supported by the state machine engine. Only exclusive mode (Parallel=false) is supported.</source>
-        <target state="translated">Olay tabanlı geçit '{name}' Parallel=true olarak ayarlandı; bu, durum makinesi motoru tarafından desteklenmiyor. Yalnızca özel mod (Parallel=false) desteklenir.</target>
+        <target state="translated">Olay tabanlı '{name}' ağ geçidinde, durum makinesi altyapısı tarafından desteklenmeyen Parallel=true değeri var. Yalnızca özel mod (Parallel=false) destekleniyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_EVENT_GATEWAY_NO_OUTGOING">
         <source>Event-based gateway '{name}' must have at least one outgoing flow.</source>
-        <target state="translated">Olay tabanlı geçit '{name}' en az bir giden akışa sahip olmalıdır.</target>
+        <target state="translated">Olay tabanlı '{name}' ağ geçidinin en az bir giden akışı olmalıdır.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_EVENT_GATEWAY_TARGET">
         <source>Event-based gateway '{name}' outgoing flow must target an IntermediateCatchEvent.</source>
-        <target state="translated">Olay tabanlı geçit '{name}' giden akışı bir IntermediateCatchEvent hedeflemelidir.</target>
+        <target state="translated">Olay tabanlı '{name}' ağ geçidinin giden akışı bir IntermediateCatchEvent öğesini hedeflemelidir.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_EXCLUSIVE_GATEWAY_NO_OUTGOING">
         <source>Exclusive gateway '{name}' must have at least one outgoing flow.</source>
-        <target state="translated">Özel geçit '{name}' en az bir giden akışa sahip olmalıdır.</target>
+        <target state="translated">Özel '{name}' ağ geçidinin en az bir giden akışı olmalıdır.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_BOUNDARY_UNATTACHED">
         <source>Boundary event '{name}' is not attached to any activity.</source>
-        <target state="translated">Sınır olayı '{name}' hiçbir etkinliğe bağlı değil.</target>
+        <target state="translated">'{name}' sınır olayı hiçbir etkinliğe ekli değil.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_BOUNDARY_UNKNOWN_ACTIVITY">
         <source>Boundary event '{name}' is attached to unknown activity.</source>
-        <target state="translated">Sınır olayı '{name}' bilinmeyen bir etkinliğe bağlı.</target>
+        <target state="translated">'{name}' sınır olayı bilinmeyen bir etkinliğe ekli.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_BOUNDARY_NON_INTERRUPTING">
         <source>Boundary event '{name}' is non-interrupting, which is not supported by the state machine engine.</source>
-        <target state="translated">Sınır olayı '{name}' kesintisizdir; bu, durum makinesi motoru tarafından desteklenmiyor.</target>
+        <target state="translated">'{name}' sınır olayı, durum makinesi altyapısı tarafından desteklenmeyen kesmeyen türdedir.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_BOUNDARY_OUTGOING_REQUIRED">
         <source>Boundary event '{name}' must have exactly one outgoing flow.</source>
-        <target state="translated">Sınır olayı '{name}' tam olarak bir giden akışa sahip olmalıdır.</target>
+        <target state="translated">'{name}' sınır olayının tam olarak bir giden akışı olmalıdır.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CANCEL_BOUNDARY_REQUIRES_TRANSACTION">
         <source>Cancel boundary event '{name}' must be attached to a transaction sub-process.</source>
-        <target state="new">Cancel boundary event '{name}' must be attached to a transaction sub-process.</target>
+        <target state="translated">'{name}' iptal sınır olayı bir işlem alt sürecine eklenmiş olmalıdır.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_TRANSACTION_REQUIRES_END_EVENT">
         <source>Transaction sub-process '{name}' must contain at least one end event.</source>
-        <target state="new">Transaction sub-process '{name}' must contain at least one end event.</target>
+        <target state="translated">'{name}' işlem alt süreci en az bir bitiş olayı içermelidir.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CATCH_EVENT_NO_OUTGOING">
         <source>Intermediate catch event '{name}' must have at least one outgoing flow.</source>
-        <target state="translated">Ara yakalama olayı '{name}' en az bir giden akışa sahip olmalıdır.</target>
+        <target state="translated">'{name}' ara yakalama olayının en az bir giden akışı olmalıdır.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CATCH_EVENT_GATEWAY_REQUIRED">
         <source>Intermediate catch event '{name}' can only be reached from an EventBasedGateway.</source>
-        <target state="translated">Ara yakalama olayı '{name}' yalnızca bir EventBasedGateway'den ulaşılabilir.</target>
+        <target state="translated">'{name}' ara yakalama olayına yalnızca bir EventBasedGateway öğesinden ulaşılabilir.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_NO_OUTGOING">
         <source>Activity '{name}' has no outgoing flow and cannot proceed. Route it to an end event or another element.</source>
-        <target state="translated">Etkinlik '{name}' giden akışı yok ve devam edemez. Bir bitiş olayına veya başka bir öğeye yönlendirin.</target>
+        <target state="translated">'{name}' etkinliğinin giden akışı yok ve devam edemiyor. Bunu bir bitiş olayına veya başka bir öğeye yönlendirin.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_MIXED_GATEWAY">
         <source>Activity '{name}' has mixed outgoing paths (direct and gateway). Each activity can have at most one outgoing path type.</source>
-        <target state="translated">Etkinlik '{name}' karışık giden yollara sahip (doğrudan ve geçit). Her etkinlik en fazla bir giden yol türüne sahip olabilir.</target>
+        <target state="translated">'{name}' etkinliği karmaşık giden yollara sahip (doğrudan ve ağ geçidi). Her etkinliğin en fazla bir giden yol türü olabilir.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_MIXED_END">
         <source>Activity '{name}' has mixed outgoing paths (end event and other). Each activity can have at most one outgoing path type.</source>
-        <target state="translated">Etkinlik '{name}' karışık giden yollara sahip (bitiş olayı ve diğerleri). Her etkinlik en fazla bir giden yol türüne sahip olabilir.</target>
+        <target state="translated">'{name}' etkinliği karmaşık giden yollara sahip (bitiş olayı ve diğer). Her etkinliğin en fazla bir giden yol türü olabilir.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_MULTIPLE_DIRECT">
         <source>Activity '{name}' has multiple direct outgoing flows to activities. An activity can have at most one direct outgoing flow.</source>
-        <target state="translated">Etkinlik '{name}' etkinliklere giden birden fazla doğrudan akışa sahip. Bir etkinlik en fazla bir doğrudan giden akışa sahip olabilir.</target>
+        <target state="translated">'{name}' etkinliği etkinliklere giden birden fazla doğrudan akışa sahip. Bir etkinliğin en fazla bir doğrudan giden akışı olabilir.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_MULTI_INSTANCE_CARDINALITY_REQUIRED">
         <source>Multi-instance activity '{name}' must define loop cardinality.</source>
-        <target state="new">Multi-instance activity '{name}' must define loop cardinality.</target>
+        <target state="translated">Çok örnekli '{name}' etkinliği döngü kardinalitesi tanımlamalıdır.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_MULTI_INSTANCE_EVENT_BEHAVIOR_UNSUPPORTED">
         <source>Multi-instance activity '{name}' uses a completion event behavior that is not supported by the BPMN engine.</source>
-        <target state="new">Multi-instance activity '{name}' uses a completion event behavior that is not supported by the BPMN engine.</target>
+        <target state="translated">Çok örnekli '{name}' etkinliği, BPMN altyapısı tarafından desteklenmeyen bir tamamlama olayı davranışı kullanıyor.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CALL_ACTIVITY_CALLED_ELEMENT_REQUIRED">
         <source>Call activity '{name}' must define calledElement.</source>
-        <target state="new">Call activity '{name}' must define calledElement.</target>
+        <target state="translated">'{name}' çağrı etkinliği calledElement tanımlamalıdır.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_EVENT_SUBPROCESS_START_TRIGGER_REQUIRED">
         <source>Event sub-process start event '{name}' must define a trigger event definition.</source>
-        <target state="new">Event sub-process start event '{name}' must define a trigger event definition.</target>
+        <target state="translated">Olay alt süreci başlangıç olayı '{name}', bir tetikleyici olay tanımı tanımlamalıdır.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ESCALATION_NAME_REQUIRED">
         <source>Escalation event '{name}' must define a non-empty escalation name.</source>
-        <target state="new">Escalation event '{name}' must define a non-empty escalation name.</target>
+        <target state="translated">Yükseltme olayı '{name}', boş olmayan bir yükseltme adı tanımlamalıdır.</target>
         <note />
       </trans-unit>
-      <trans-unit id="PROCESS_TOKEN_NOT_FOUND">
-        <source>Token '{token}' is not found on process '{process}'.</source>
-        <target state="new">Token '{token}' is not found on process '{process}'.</target>
+      <trans-unit id="STATE_MACHINE_NONE_TASK_BOUNDARY_UNREACHABLE">
+        <source>None task '{name}' passes through to its awaited gateway or end event, so boundary events attached to it can never fire. Use a user task, or move the catches into the Await branches.</source>
+        <target state="translated">None görevi '{name}', beklediği ağ geçidine veya bitiş olayına doğrudan geçer; bu nedenle ona ekli sınır olayları hiçbir zaman tetiklenemez. Bir kullanıcı görevi kullanın veya yakalamaları Await dallarına taşıyın.</target>
         <note />
       </trans-unit>
-      <trans-unit id="PROCESS_TOKEN_NOT_READY">
-        <source>Token '{token}' is not in a ready state.</source>
-        <target state="new">Token '{token}' is not in a ready state.</target>
+      <trans-unit id="STATE_MACHINE_ENTER_TASK_BYPASSED">
+        <source>Activity '{name}' runs enter task '{enter}' on entry, but the flow from '{source}' targets the activity directly and bypasses it. Route inbound flows through the enter task.</source>
+        <target state="translated">'{name}' etkinliği girişte '{enter}' giriş görevini çalıştırır, ancak '{source}' öğesinden gelen akış doğrudan etkinliği hedefler ve görevi atlar. Gelen akışları giriş görevi üzerinden yönlendirin.</target>
         <note />
       </trans-unit>
-      <trans-unit id="PROCESS_TOKEN_AMBIGUOUS">
-        <source>Multiple ready tokens are available; specify one of: {tokens}.</source>
-        <target state="new">Multiple ready tokens are available; specify one of: {tokens}.</target>
+      <trans-unit id="BPMN_NOT_IMPLEMENTED">
+        <source>BPMN feature '{feature}' is not yet implemented in this engine version.</source>
+        <target state="translated">'{feature}' BPMN özelliği bu altyapı sürümünde henüz uygulanmadı.</target>
         <note />
       </trans-unit>
-      <trans-unit id="STATE_MACHINE_REQUIRES_BPMN_ENGINE">
-        <source>Element '{element}' (type '{type}') requires the BPMN engine; use UseBpmn() instead of UseStateMachine().</source>
-        <target state="new">Element '{element}' (type '{type}') requires the BPMN engine; use UseBpmn() instead of UseStateMachine().</target>
+      <trans-unit id="BPMN_CALL_ACTIVITY_REQUIRES_SERVICES">
+        <source>BPMN call activity '{name}' requires a service provider; register Schemata.Flow.Bpmn with a process registry.</source>
+        <target state="translated">'{name}' BPMN çağrı etkinliği bir hizmet sağlayıcı gerektirir; Schemata.Flow.Bpmn öğesini bir süreç kayıt defteriyle kaydedin.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="BPMN_LOOP_NOT_IMPLEMENTED">
+        <source>BPMN activity '{name}' has loop characteristics of type '{type}' which are not yet implemented in this engine version.</source>
+        <target state="translated">'{name}' BPMN etkinliği, bu altyapı sürümünde henüz uygulanmamış '{type}' türünde döngü özelliklerine sahip.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="BPMN_TRANSPARENT_GATEWAY_NOT_SUPPORTED">
+        <source>BPMN gateway '{type}' cannot be transparently resolved; route through AdvanceAsync to dispatch it.</source>
+        <target state="translated">'{type}' BPMN ağ geçidi saydam olarak çözümlenemiyor; dağıtmak için AdvanceAsync üzerinden yönlendirin.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="BPMN_INVALID_TRIGGER">
+        <source>Trigger '{trigger}' is not valid from state '{state}'.</source>
+        <target state="translated">'{trigger}' tetikleyicisi '{state}' durumundan geçerli değil.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_REQUEST">
+        <source>The request is malformed or missing a required parameter.</source>
+        <target state="translated">İstek hatalı biçimlendirilmiş veya gerekli bir parametre eksik.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_CLIENT">
+        <source>Client authentication failed.</source>
+        <target state="translated">İstemci kimlik doğrulaması başarısız oldu.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="CONSENT_REQUIRED">
+        <source>The authorization server requires end-user consent.</source>
+        <target state="translated">Yetkilendirme sunucusu son kullanıcı onayı gerektirir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGIN_REQUIRED">
+        <source>The authorization server requires end-user authentication.</source>
+        <target state="translated">Yetkilendirme sunucusu son kullanıcı kimlik doğrulaması gerektirir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="EXPIRED_TOKEN">
+        <source>The provided token has expired.</source>
+        <target state="translated">Sağlanan belirtecin süresi dolmuş.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INTERACTION_REQUIRED">
+        <source>The end-user must interact with the authorization server to continue.</source>
+        <target state="translated">Devam etmek için son kullanıcının yetkilendirme sunucusuyla etkileşimde bulunması gerekir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ACCOUNT_SELECTION_REQUIRED">
+        <source>The end-user must select an account to continue.</source>
+        <target state="translated">Devam etmek için son kullanıcının bir hesap seçmesi gerekir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS">
+        <source>The authorization_details parameter is invalid.</source>
+        <target state="translated">authorization_details parametresi geçersiz.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_CLIENT_METADATA">
+        <source>The client registration metadata is invalid.</source>
+        <target state="translated">İstemci kayıt meta verileri geçersiz.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_DPOP_PROOF">
+        <source>The DPoP proof JWT is invalid.</source>
+        <target state="translated">DPoP kanıt JWT'si geçersiz.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_REQUEST_OBJECT">
+        <source>The request object is invalid.</source>
+        <target state="translated">İstek nesnesi geçersiz.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_REQUEST_URI">
+        <source>The request_uri does not resolve to a valid request object.</source>
+        <target state="translated">request_uri, geçerli bir istek nesnesine çözümlenmiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_SOFTWARE_STATEMENT">
+        <source>The software statement is invalid.</source>
+        <target state="translated">Yazılım bildirimi geçersiz.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNAPPROVED_SOFTWARE_STATEMENT">
+        <source>The software statement is not approved for use.</source>
+        <target state="translated">Yazılım bildirimi kullanım için onaylanmamış.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="REGISTRATION_NOT_SUPPORTED">
+        <source>The authorization server does not support dynamic client registration.</source>
+        <target state="translated">Yetkilendirme sunucusu dinamik istemci kaydını desteklemiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="REQUEST_NOT_SUPPORTED">
+        <source>The authorization server does not support the request parameter.</source>
+        <target state="translated">Yetkilendirme sunucusu request parametresini desteklemiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="REQUEST_URI_NOT_SUPPORTED">
+        <source>The authorization server does not support the request_uri parameter.</source>
+        <target state="translated">Yetkilendirme sunucusu request_uri parametresini desteklemiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="SERVER_ERROR">
+        <source>The authorization server encountered an unexpected condition.</source>
+        <target state="translated">Yetkilendirme sunucusu beklenmeyen bir koşulla karşılaştı.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNAUTHORIZED_CLIENT">
+        <source>The client is not authorized to use this method.</source>
+        <target state="translated">İstemci bu yöntemi kullanma yetkisine sahip değil.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNSUPPORTED_GRANT_TYPE">
+        <source>The authorization grant type is not supported by the authorization server.</source>
+        <target state="translated">Yetkilendirme izin türü, yetkilendirme sunucusu tarafından desteklenmiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNSUPPORTED_RESPONSE_TYPE">
+        <source>The authorization server does not support obtaining an authorization code using this method.</source>
+        <target state="translated">Yetkilendirme sunucusu, bu yöntemle yetkilendirme kodu almayı desteklemiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNSUPPORTED_TOKEN_TYPE">
+        <source>The requested token type is not supported.</source>
+        <target state="translated">İstenen belirteç türü desteklenmiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="USE_DPOP_NONCE">
+        <source>The DPoP proof must carry the server-issued nonce.</source>
+        <target state="translated">DPoP kanıtı, sunucu tarafından verilen nonce değerini taşımalıdır.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SOURCE_REQUIRES_RESOURCE">
+        <source>A repository source requires a resource parameter.</source>
+        <target state="translated">Bir depo kaynağı, bir kaynak parametresi gerektirir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_UNKNOWN_SOURCE">
+        <source>Unknown resource '{name}'.</source>
+        <target state="translated">'{name}' kaynağı bilinmiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NODE_UNSUPPORTED">
+        <source>Plan node '{node}' is not supported by the repository driver.</source>
+        <target state="translated">'{node}' plan düğümü depo sürücüsü tarafından desteklenmiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_STAGE_REQUIRED">
+        <source>Plan node '{node}' is not a nested stage.</source>
+        <target state="translated">'{node}' plan düğümü bir iç içe aşama değil.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_COLLECTION_MISSING">
+        <source>Driver '{driver}' returned no child collection for nested selection '{alias}' (path '{field}'); declare Nested or include the child collection in raw rows.</source>
+        <target state="translated">'{driver}' sürücüsü, iç içe '{alias}' seçimi için ('{field}' yolu) bir alt koleksiyon döndürmedi; Nested bildirin veya alt koleksiyonu ham satırlara ekleyin.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_ANCHOR_INVALID">
+        <source>Nested selection '{alias}' (path '{field}') cannot be anchored to a single source.</source>
+        <target state="translated">İç içe '{alias}' seçimi ('{field}' yolu) tek bir kaynağa sabitlenemiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_NOT_COLLECTION">
+        <source>Nested selection '{alias}' (path '{field}') targets a non-collection value.</source>
+        <target state="translated">İç içe '{alias}' seçimi ('{field}' yolu), koleksiyon olmayan bir değeri hedefliyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_LOCAL_STAGE_REQUIRED">
+        <source>Plan node '{stage}' is not a local stage.</source>
+        <target state="translated">'{stage}' plan düğümü bir yerel aşama değil.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_AGGREGATION_UNSUPPORTED">
+        <source>Unsupported aggregation '{function}'.</source>
+        <target state="translated">Desteklenmeyen toplama: '{function}'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SOURCE_REQUIRED">
+        <source>The plan has no source.</source>
+        <target state="translated">Planın kaynağı yok.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_SOURCE_REQUIRED">
+        <source>A join input has no source.</source>
+        <target state="translated">Bir birleştirme girişinin kaynağı yok.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_DRIVER_UNREGISTERED">
+        <source>No driver '{driver}' is registered.</source>
+        <target state="translated">Kayıtlı '{driver}' sürücüsü yok.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SINGLE_SOURCE_STAGE_REQUIRED">
+        <source>Plan node '{stage}' is not a single-source stage.</source>
+        <target state="translated">'{stage}' plan düğümü tek kaynaklı bir aşama değil.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_AT_LEAST_ONE_SOURCE">
+        <source>At least one source is required.</source>
+        <target state="translated">En az bir kaynak gereklidir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_ALIAS_DUPLICATE">
+        <source>Duplicate source alias '{alias}'.</source>
+        <target state="translated">Yinelenen kaynak diğer adı '{alias}'.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_KIND_REQUIRED">
+        <source>A join must specify a kind.</source>
+        <target state="translated">Bir birleştirme bir tür belirtmelidir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_ALREADY_JOINED">
+        <source>Join aliases '{left}' and '{right}' are already joined.</source>
+        <target state="translated">'{left}' ve '{right}' birleştirme diğer adları zaten birleştirilmiş.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_ALL_CONNECTED">
+        <source>All sources must be connected by joins.</source>
+        <target state="translated">Tüm kaynakların birleştirmelerle bağlanması gerekir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_ALIAS_UNKNOWN">
+        <source>Join references unknown alias '{alias}'.</source>
+        <target state="translated">Birleştirme, bilinmeyen '{alias}' diğer adına başvuruyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_TOP_SKIP_UNSUPPORTED">
+        <source>Mid-pipeline top/skip is not supported at the top level; use top-level page_size/skip.</source>
+        <target state="translated">İşlem hattı ortasındaki top/skip üst düzeyde desteklenmiyor; üst düzey page_size/skip kullanın.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_TRANSFORM_ONE_OPERATION">
+        <source>A transformation must set exactly one operation.</source>
+        <target state="translated">Bir dönüşüm tam olarak bir işlem ayarlamalıdır.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_EXPRESSION_LANGUAGE_UNKNOWN">
+        <source>Unknown expression language '{language}'.</source>
+        <target state="translated">'{language}' ifade dili bilinmiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_EXPRESSION_NOT_VALUE_CAPABLE">
+        <source>Language '{language}' cannot compile value expressions.</source>
+        <target state="translated">'{language}' dili değer ifadelerini derleyemiyor.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_EXPRESSION_INVALID">
+        <source>Invalid expression '{expression}'.</source>
+        <target state="translated">'{expression}' ifadesi geçersiz.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_FLAT_SELECTION_TRANSFORMATIONS">
+        <source>A flat selection cannot carry transformations.</source>
+        <target state="translated">Düz bir seçim dönüşümler taşıyamaz.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SELECTION_ALIAS_REQUIRED">
+        <source>A computed selection requires an alias.</source>
+        <target state="translated">Hesaplanan bir seçim bir diğer ad gerektirir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SELECTION_FIELD_REQUIRED">
+        <source>A selection must specify a field.</source>
+        <target state="translated">Bir seçim bir alan belirtmelidir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_FIELD_REQUIRED">
+        <source>A nested selection must name its navigation field.</source>
+        <target state="translated">İç içe bir seçim, gezinti alanının adını belirtmelidir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_ALIAS_UNKNOWN">
+        <source>A nested selection '{field}' must name an existing source alias.</source>
+        <target state="translated">İç içe '{field}' seçimi, mevcut bir kaynak diğer adının adını belirtmelidir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DEFAULT_ERROR">
+        <source>An unknown failure has occurred.</source>
+        <target state="translated">Bilinmeyen bir hata oluştu.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="CONCURRENCY_FAILURE">
+        <source>Optimistic concurrency failure, object has been modified.</source>
+        <target state="translated">İyimser eşzamanlılık hatası; nesne değiştirilmiş.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_USER_NAME">
+        <source>User name '{userName}' is invalid, can only contain letters or digits.</source>
+        <target state="translated">'{userName}' kullanıcı adı geçersiz; yalnızca harf veya rakam içerebilir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_EMAIL">
+        <source>Email '{email}' is invalid.</source>
+        <target state="translated">'{email}' e-postası geçersiz.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DUPLICATE_USER_NAME">
+        <source>User name '{userName}' is already taken.</source>
+        <target state="translated">'{userName}' kullanıcı adı zaten alınmış.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DUPLICATE_EMAIL">
+        <source>Email '{email}' is already taken.</source>
+        <target state="translated">'{email}' e-postası zaten alınmış.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_ROLE_NAME">
+        <source>Role name '{role}' is invalid.</source>
+        <target state="translated">'{role}' rol adı geçersiz.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DUPLICATE_ROLE_NAME">
+        <source>Role name '{role}' is already taken.</source>
+        <target state="translated">'{role}' rol adı zaten alınmış.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="USER_ALREADY_IN_ROLE">
+        <source>User already in role '{role}'.</source>
+        <target state="translated">Kullanıcı zaten '{role}' rolünde.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="USER_NOT_IN_ROLE">
+        <source>User is not in role '{role}'.</source>
+        <target state="translated">Kullanıcı '{role}' rolünde değil.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_TOO_SHORT">
+        <source>Passwords must be at least {length} characters.</source>
+        <target state="translated">Parolalar en az {length} karakter olmalıdır.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_UNIQUE_CHARS">
+        <source>Passwords must use at least {uniqueChars} different characters.</source>
+        <target state="translated">Parolalar en az {uniqueChars} farklı karakter kullanmalıdır.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_NON_ALPHANUMERIC">
+        <source>Passwords must have at least one non-alphanumeric character.</source>
+        <target state="translated">Parolalar en az bir alfasayısal olmayan karakter içermelidir.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_DIGIT">
+        <source>Passwords must have at least one digit ('0'-'9').</source>
+        <target state="translated">Parolalar en az bir rakam içermelidir ('0'-'9').</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_LOWER">
+        <source>Passwords must have at least one lowercase ('a'-'z').</source>
+        <target state="translated">Parolalar en az bir küçük harf içermelidir ('a'-'z').</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_UPPER">
+        <source>Passwords must have at least one uppercase ('A'-'Z').</source>
+        <target state="translated">Parolalar en az bir büyük harf içermelidir ('A'-'Z').</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_MISMATCH">
+        <source>Incorrect password.</source>
+        <target state="translated">Parola hatalı.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="RECOVERY_CODE_REDEMPTION_FAILED">
+        <source>Recovery code redemption failed.</source>
+        <target state="translated">Kurtarma kodu kullanımı başarısız oldu.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGIN_ALREADY_ASSOCIATED">
+        <source>A user with this login already exists.</source>
+        <target state="translated">Bu oturum açma bilgilerine sahip bir kullanıcı zaten var.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="USER_ALREADY_HAS_PASSWORD">
+        <source>User already has a password set.</source>
+        <target state="translated">Kullanıcının zaten ayarlanmış bir parolası var.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGOUT_PAGE_TITLE">
+        <source>Logging out</source>
+        <target state="translated">Oturum kapatılıyor</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGOUT_PAGE_TEXT">
+        <source>Logging out…</source>
+        <target state="translated">Oturum kapatılıyor…</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGOUT_PAGE_CONTINUE">
+        <source>Continue</source>
+        <target state="translated">Devam et</target>
         <note />
       </trans-unit>
     </body>

@@ -7,17 +7,17 @@
     <body>
       <trans-unit id="DEPENDENCY_AUTO_REGISTERED">
         <source>{0} depends on {1}, it will be added automatically.</source>
-        <target state="translated">{0}은(는) {1}에 의존하므로 자동으로 추가됩니다.</target>
+        <target state="translated">{0}은(는) {1}에 종속되며 자동으로 추가됩니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="DEPENDENCY_REQUIRED">
         <source>{0} requires {1}, you should add it manually.</source>
-        <target state="translated">{0}에는 {1}이(가) 필요합니다. 수동으로 추가하세요.</target>
+        <target state="translated">{0}에 {1}이(가) 필요합니다. 수동으로 추가해야 합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="DEPENDENCY_SUGGESTED">
         <source>{0} suggests adding {1}.</source>
-        <target state="translated">{0}은(는) {1}을(를) 추가할 것을 권장합니다.</target>
+        <target state="translated">{0}에서 {1} 추가를 제안합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_ARGUMENT">
@@ -27,7 +27,7 @@
       </trans-unit>
       <trans-unit id="TENANT_RESOLUTION_FAILED">
         <source>Unable to resolve tenant for the current request.</source>
-        <target state="translated">현재 요청의 테넌트를 확인할 수 없습니다.</target>
+        <target state="translated">현재 요청에 대한 테넌트를 확인할 수 없습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="FAILED_PRECONDITION">
@@ -82,7 +82,7 @@
       </trans-unit>
       <trans-unit id="NOT_EMPTY">
         <source>'{0}' must not be empty.</source>
-        <target state="translated">'{0}'은(는) 비어 있을 수 없습니다.</target>
+        <target state="translated">'{0}'은(는) 비워 둘 수 없습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="UNSUPPORTED_ALGORITHM">
@@ -95,6 +95,11 @@
         <target state="translated">'{0}'은(는) 지원되지 않습니다.</target>
         <note />
       </trans-unit>
+      <trans-unit id="NOT_SINGLE">
+        <source>The parameter '{0}' MUST NOT be included more than once.</source>
+        <target state="translated">매개 변수 '{0}'은(는) 두 번 이상 포함할 수 없습니다.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="NOT_CONFIGURED">
         <source>'{0}' is not configured.</source>
         <target state="translated">'{0}'이(가) 구성되지 않았습니다.</target>
@@ -102,37 +107,37 @@
       </trans-unit>
       <trans-unit id="SECTOR_IDENTIFIER_URI_REQUIRED">
         <source>Application has no sector identifier URI and no redirect URIs.</source>
-        <target state="translated">애플리케이션에 sector identifier URI 및 redirect URI가 없습니다.</target>
+        <target state="translated">애플리케이션에 섹터 식별자 URI도 리디렉션 URI도 없습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="PATTERN_REQUIRED">
         <source>Cannot resolve a resource name without a pattern.</source>
-        <target state="translated">패턴 없이 리소스 이름을 확인할 수 없습니다.</target>
+        <target state="translated">패턴 없이는 리소스 이름을 확인할 수 없습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_TABLE_NAME">
         <source>Invalid table name '{0}' of type '{1}'.</source>
-        <target state="translated">'{1}' 타입의 잘못된 테이블 이름 '{0}'.</target>
+        <target state="translated">'{1}' 형식의 테이블 이름 '{0}'이(가) 잘못되었습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="TABLE_KEY_REQUIRED">
         <source>Entity must have at least one [TableKey].</source>
-        <target state="translated">엔터티에는 적어도 하나의 [TableKey]가 필요합니다.</target>
+        <target state="translated">엔터티에는 [TableKey]가 하나 이상 있어야 합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="ENTITY_KEY_COUNT_MISMATCH">
         <source>Entity key count mismatch.</source>
-        <target state="translated">엔터티 키 개수가 일치하지 않습니다.</target>
+        <target state="translated">엔터티 키 수가 일치하지 않습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="PARAMETER_NOT_RESOLVED">
         <source>Cannot resolve parameter '{0}' of type '{1}'.</source>
-        <target state="translated">'{1}' 타입의 매개변수 '{0}'을(를) 확인할 수 없습니다.</target>
+        <target state="translated">'{1}' 형식의 매개 변수 '{0}'을(를) 확인할 수 없습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="METHOD_PARAMETER_NOT_RESOLVED">
         <source>Cannot resolve parameter '{0}' of method '{1}' on type '{2}'.</source>
-        <target state="translated">'{2}' 타입의 '{1}' 메서드의 매개변수 '{0}'을(를) 확인할 수 없습니다.</target>
+        <target state="translated">'{2}' 형식의 '{1}' 메서드에서 매개 변수 '{0}'을(를) 확인할 수 없습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="CONVERSION_FAILED">
@@ -147,7 +152,7 @@
       </trans-unit>
       <trans-unit id="TENANT_NOT_INITIALIZED">
         <source>Tenant is not initialized successfully.</source>
-        <target state="translated">테넌트가 성공적으로 초기화되지 않았습니다.</target>
+        <target state="translated">테넌트가 제대로 초기화되지 않았습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="ENTRY_ASSEMBLY_REQUIRED">
@@ -157,12 +162,12 @@
       </trans-unit>
       <trans-unit id="IMPLEMENTATION_REQUIRED">
         <source>The type {0} does not implement {1}.</source>
-        <target state="translated">{0} 타입은 {1}을(를) 구현하지 않습니다.</target>
+        <target state="translated">{0} 형식은 {1}을(를) 구현하지 않습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_PAYLOAD">
         <source>Invalid request payload.</source>
-        <target state="translated">잘못된 요청 페이로드입니다.</target>
+        <target state="translated">요청 페이로드가 잘못되었습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="CROSS_PARENT_UNSUPPORTED">
@@ -187,12 +192,12 @@
       </trans-unit>
       <trans-unit id="INVALID_FIELD_NAME">
         <source>Invalid field name '{0}'.</source>
-        <target state="translated">잘못된 필드 이름 '{0}'.</target>
+        <target state="translated">필드 이름 '{0}'이(가) 잘못되었습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="FUNCTION_NOT_REGISTERED">
         <source>Function '{0}' not registered.</source>
-        <target state="translated">함수 '{0}'이(가) 등록되지 않았습니다.</target>
+        <target state="translated">'{0}' 함수가 등록되어 있지 않습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_PAGE_SIZE">
@@ -202,32 +207,192 @@
       </trans-unit>
       <trans-unit id="INVALID_PARENT">
         <source>The parent '{parent}' is invalid.</source>
-        <target state="translated">상위 리소스 '{parent}'이(가) 잘못되었습니다.</target>
+        <target state="translated">상위 '{parent}'이(가) 잘못되었습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="AUTHENTICATOR_KEY_REQUIRED">
         <source>The user manager must produce an authenticator key after reset.</source>
-        <target state="translated">재설정 후 사용자 관리자는 인증자 키를 생성해야 합니다.</target>
+        <target state="translated">다시 설정한 후 사용자 관리자는 인증자 키를 생성해야 합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_CLIENT_CREDENTIALS">
         <source>The client credentials are missing or invalid.</source>
-        <target state="translated">클라이언트 자격 증명이 누락되었거나 잘못되었습니다.</target>
+        <target state="translated">클라이언트 자격 증명이 없거나 잘못되었습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="CLIENT_SECRET_REQUIRED">
         <source>Client secret is required for confidential clients.</source>
-        <target state="translated">기밀 클라이언트에는 클라이언트 시크릿이 필요합니다.</target>
+        <target state="translated">기밀 클라이언트에는 클라이언트 암호가 필요합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="MULTIPLE_CLIENT_AUTH_METHODS">
         <source>The request uses more than one client authentication method.</source>
-        <target state="translated">요청에 여러 클라이언트 인증 방법이 사용되었습니다.</target>
+        <target state="translated">요청이 둘 이상의 클라이언트 인증 방법을 사용합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNAUTHORIZED_CLIENT_AUTH_METHOD">
+        <source>The client is registered for a different client authentication method.</source>
+        <target state="translated">클라이언트에 다른 클라이언트 인증 방법이 등록되어 있습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_CLIENT_ASSERTION">
+        <source>The client assertion is not a well-formed JWT.</source>
+        <target state="translated">클라이언트 어설션이 형식이 올바른 JWT가 아닙니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_ISSUER_MISMATCH">
+        <source>The client assertion issuer does not match the expected issuer.</source>
+        <target state="translated">클라이언트 어설션 발급자가 예상 발급자와 일치하지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_SUBJECT_MISMATCH">
+        <source>The client assertion subject must be the client identifier.</source>
+        <target state="translated">클라이언트 어설션 주체는 클라이언트 식별자여야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_AUDIENCE_MISMATCH">
+        <source>The client assertion audience does not identify the authorization server.</source>
+        <target state="translated">클라이언트 어설션 대상이 권한 부여 서버를 식별하지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_EXPIRED">
+        <source>The client assertion is expired or has no expiration time.</source>
+        <target state="translated">클라이언트 어설션이 만료되었거나 만료 시간이 없습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_NOT_YET_VALID">
+        <source>The client assertion is not yet valid.</source>
+        <target state="translated">클라이언트 어설션이 아직 유효하지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_JTI_REQUIRED">
+        <source>The client assertion must contain a non-empty jti claim.</source>
+        <target state="translated">클라이언트 어설션에는 비어 있지 않은 jti 클레임이 포함되어야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_REPLAYED">
+        <source>The client assertion has already been used.</source>
+        <target state="translated">클라이언트 어설션이 이미 사용되었습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_ALGORITHM_REJECTED">
+        <source>The client assertion algorithm is missing, unsecured, or not allowed.</source>
+        <target state="translated">클라이언트 어설션 알고리즘이 없거나, 보안이 유지되지 않았거나, 허용되지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_CLIENT_ID_REQUIRED">
+        <source>The client identity must be provided by the client_id parameter or the client assertion subject.</source>
+        <target state="translated">클라이언트 ID는 client_id 매개 변수 또는 클라이언트 어설션 주체를 통해 제공해야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_KEY_NOT_FOUND">
+        <source>No signing key registered for the client can verify the client assertion.</source>
+        <target state="translated">클라이언트에 등록된 서명 키 중에서 클라이언트 어설션을 확인할 수 있는 키가 없습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_ISSUER_UNTRUSTED">
+        <source>The assertion issuer is not a trusted jwt-bearer issuer.</source>
+        <target state="translated">어설션 발급자는 신뢰할 수 있는 jwt-bearer 발급자가 아닙니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_SIGNATURE_INVALID">
+        <source>The assertion signature could not be verified.</source>
+        <target state="translated">어설션 서명을 확인할 수 없습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_MALFORMED">
+        <source>The DPoP proof is not a single well-formed JWT.</source>
+        <target state="translated">DPoP 프루프는 형식이 올바른 단일 JWT가 아닙니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_CLAIMS_REQUIRED">
+        <source>The DPoP proof must contain the jti, htm, htu, and iat claims.</source>
+        <target state="translated">DPoP 프루프에는 jti, htm, htu, iat 클레임이 포함되어야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_TYPE_MISMATCH">
+        <source>The DPoP proof typ header must be dpop+jwt.</source>
+        <target state="translated">DPoP 프루프의 typ 헤더는 dpop+jwt여야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_ALGORITHM_REJECTED">
+        <source>The DPoP proof algorithm is missing, unsecured, or not allowed.</source>
+        <target state="translated">DPoP 프루프 알고리즘이 없거나, 보안이 유지되지 않았거나, 허용되지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_JWK_REQUIRED">
+        <source>The DPoP proof must contain a jwk header parameter with the signing public key.</source>
+        <target state="translated">DPoP 프루프에는 서명 공개 키가 포함된 jwk 헤더 매개 변수가 포함되어야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_PRIVATE_KEY">
+        <source>The DPoP proof jwk header parameter must not contain private key material.</source>
+        <target state="translated">DPoP 프루프 jwk 헤더 매개 변수에는 프라이빗 키 자료가 포함되지 않아야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_SIGNATURE_INVALID">
+        <source>The DPoP proof signature does not verify with the public key in the jwk header parameter.</source>
+        <target state="translated">DPoP 프루프 서명이 jwk 헤더 매개 변수의 공개 키로 확인되지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_HTM_MISMATCH">
+        <source>The DPoP proof htm claim does not match the HTTP request method.</source>
+        <target state="translated">DPoP 프루프의 htm 클레임이 HTTP 요청 메서드와 일치하지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_HTU_MISMATCH">
+        <source>The DPoP proof htu claim does not match the HTTP request URI.</source>
+        <target state="translated">DPoP 프루프의 htu 클레임이 HTTP 요청 URI와 일치하지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_NONCE_MISMATCH">
+        <source>The DPoP proof must carry the current server-provided nonce.</source>
+        <target state="translated">DPoP 프루프는 현재 서버에서 제공한 nonce를 전달해야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_TIME_WINDOW">
+        <source>The DPoP proof creation time is outside the acceptable window.</source>
+        <target state="translated">DPoP 프루프 생성 시간이 허용되는 시간 범위를 벗어났습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_REQUIRED">
+        <source>The client is registered to always use DPoP and must send a DPoP proof header.</source>
+        <target state="translated">클라이언트는 항상 DPoP를 사용하도록 등록되어 있으며 DPoP 프루프 헤더를 보내야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_REPLAYED">
+        <source>The DPoP proof has already been used.</source>
+        <target state="translated">DPoP 프루프가 이미 사용되었습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_ATH_MISMATCH">
+        <source>The DPoP proof ath claim does not match the presented access token.</source>
+        <target state="translated">DPoP 프루프의 ath 클레임이 제공된 액세스 토큰과 일치하지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_JKT_MALFORMED">
+        <source>The dpop_jkt parameter is not a base64url-encoded SHA-256 JWK thumbprint.</source>
+        <target state="translated">dpop_jkt 매개 변수는 base64url로 인코딩된 SHA-256 JWK 지문이 아닙니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_JKT_MISMATCH">
+        <source>The DPoP proof key does not match the key bound to the authorization code.</source>
+        <target state="translated">DPoP 프루프 키가 권한 부여 코드에 바인딩된 키와 일치하지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_REFRESH_PROOF_REQUIRED">
+        <source>The refresh token is bound to a DPoP key and must be presented with a matching DPoP proof.</source>
+        <target state="translated">새로 고침 토큰은 DPoP 키에 바인딩되어 있으며 일치하는 DPoP 프루프와 함께 제공해야 합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_GRANT">
         <source>The provided grant is invalid, expired, or revoked.</source>
-        <target state="translated">제공된 권한 부여가 잘못되었거나 만료되었거나 취소되었습니다.</target>
+        <target state="translated">제공된 권한 부여가 잘못되었거나, 만료되었거나, 취소되었습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_TOKEN">
+        <source>Invalid token</source>
+        <target state="translated">잘못된 토큰</target>
         <note />
       </trans-unit>
       <trans-unit id="PKCE_VERIFIER_MISMATCH">
@@ -237,12 +402,17 @@
       </trans-unit>
       <trans-unit id="INVALID_SCOPE">
         <source>The requested scope is not allowed for this client.</source>
-        <target state="translated">이 클라이언트에 요청된 범위가 허용되지 않습니다.</target>
+        <target state="translated">요청된 범위는 이 클라이언트에 허용되지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_TARGET">
+        <source>The requested resource is invalid, missing, unknown, or malformed.</source>
+        <target state="translated">요청된 리소스가 잘못되었거나, 없거나, 알 수 없거나, 형식이 잘못되었습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="UNAUTHORIZED_GRANT_TYPE">
         <source>The client is not authorized to use this grant type.</source>
-        <target state="translated">이 클라이언트는 이 권한 부여 유형을 사용할 권한이 없습니다.</target>
+        <target state="translated">클라이언트에 이 권한 부여 유형을 사용할 권한이 없습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="ACCESS_DENIED">
@@ -267,12 +437,12 @@
       </trans-unit>
       <trans-unit id="AUTHORIZATION_PENDING">
         <source>The authorization request is still pending.</source>
-        <target state="translated">권한 부여 요청이 아직 대기 중입니다.</target>
+        <target state="translated">권한 부여 요청이 아직 보류 중입니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="SLOW_DOWN">
         <source>The polling interval is too short. Increase the interval and retry.</source>
-        <target state="translated">폴링 간격이 너무 짧습니다. 간격을 늘려서 다시 시도하세요.</target>
+        <target state="translated">폴링 간격이 너무 짧습니다. 간격을 늘린 후 다시 시도하세요.</target>
         <note />
       </trans-unit>
       <trans-unit id="INTERNAL">
@@ -295,9 +465,34 @@
         <target state="translated">이 요청에는 유효한 사용자 ID가 필요합니다.</target>
         <note />
       </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_JSON">
+        <source>The authorization_details parameter is not a valid JSON document.</source>
+        <target state="translated">authorization_details 매개 변수가 유효한 JSON 문서가 아닙니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_ARRAY">
+        <source>The authorization_details parameter must be a JSON array.</source>
+        <target state="translated">authorization_details 매개 변수는 JSON 배열이어야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_OBJECT">
+        <source>Every authorization_details element must be a JSON object.</source>
+        <target state="translated">모든 authorization_details 요소는 JSON 개체여야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_TYPE_MEMBER">
+        <source>Every authorization_details object must carry a string type member.</source>
+        <target state="translated">모든 authorization_details 개체에는 문자열 형식 멤버가 있어야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_TYPE_UNSUPPORTED">
+        <source>The authorization details type '{0}' is not supported.</source>
+        <target state="translated">권한 부여 세부 정보 유형 '{0}'은(는) 지원되지 않습니다.</target>
+        <note />
+      </trans-unit>
       <trans-unit id="REQUIRED_SETTING_MISSING">
         <source>{0} is enabled but {1} is not set.</source>
-        <target state="translated">{0}이(가) 활성화되었지만 {1}이(가) 설정되지 않았습니다.</target>
+        <target state="translated">{0}이(가) 사용하도록 설정되었지만 {1}이(가) 설정되지 않았습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="ABSOLUTE_URI_REQUIRED">
@@ -317,7 +512,7 @@
       </trans-unit>
       <trans-unit id="INVALID_FILTER">
         <source>The filter expression is invalid.</source>
-        <target state="translated">filter 식이 잘못되었습니다.</target>
+        <target state="translated">필터 식이 잘못되었습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_UPDATE_MASK">
@@ -342,7 +537,7 @@
       </trans-unit>
       <trans-unit id="INVALID_REFERENCE">
         <source>'{value}' does not resolve to any registered resource type.</source>
-        <target state="translated">'{value}'을(를) 등록된 리소스 유형으로 확인할 수 없습니다.</target>
+        <target state="translated">'{value}'이(가) 등록된 리소스 형식으로 확인되지 않습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="BACK_CHANNEL_LOGOUT_REQUIRES_SCHEDULING">
@@ -362,22 +557,77 @@
       </trans-unit>
       <trans-unit id="PROCESS_NOT_REGISTERED">
         <source>Process definition '{name}' is not registered.</source>
-        <target state="translated">프로세스 정의 '{name}'이(가) 등록되지 않았습니다.</target>
+        <target state="translated">프로세스 정의 '{name}'이(가) 등록되어 있지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FLOW_EXPRESSION_INVALID">
+        <source>Condition expression '{expression}' is invalid.</source>
+        <target state="translated">조건 식 '{expression}'이(가) 잘못되었습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FLOW_EXPRESSION_LANGUAGE_NOT_REGISTERED">
+        <source>Expression language '{language}' has no registered compiler.</source>
+        <target state="translated">식 언어 '{language}'에 등록된 컴파일러가 없습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FLOW_EXPRESSION_LANGUAGE_REQUIRED">
+        <source>Process '{name}' declares string condition expressions; set Language on its process configuration.</source>
+        <target state="translated">'{name}' 프로세스는 문자열 조건 식을 선언합니다. 프로세스 구성에서 Language를 설정하세요.</target>
         <note />
       </trans-unit>
       <trans-unit id="FLOW_RUNTIME_NOT_REGISTERED">
         <source>Flow runtime '{engine}' is not registered with the host.</source>
-        <target state="translated">Flow 런타임 '{engine}'이(가) 호스트에 등록되지 않았습니다.</target>
+        <target state="translated">흐름 런타임 '{engine}'이(가) 호스트에 등록되어 있지 않습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="PROCESS_MESSAGE_NOT_DEFINED">
         <source>Message '{name}' is not defined on the process.</source>
-        <target state="translated">메시지 '{name}'이(가) 프로세스에 정의되지 않았습니다.</target>
+        <target state="translated">'{name}' 메시지가 프로세스에 정의되어 있지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_TOKEN_NOT_FOUND">
+        <source>Token '{token}' is not found on process '{process}'.</source>
+        <target state="translated">'{process}' 프로세스에서 '{token}' 토큰을 찾을 수 없습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_TOKEN_NOT_READY">
+        <source>Token '{token}' is not in a ready state.</source>
+        <target state="translated">'{token}' 토큰이 준비 상태에 있지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_TOKEN_AMBIGUOUS">
+        <source>Multiple ready tokens are available; specify one of: {tokens}.</source>
+        <target state="translated">준비 상태의 토큰이 여러 개 있습니다. {tokens} 중 하나를 지정하세요.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_SOURCE_BINDING_AMBIGUOUS">
+        <source>Multiple source bindings match the supplied source type.</source>
+        <target state="translated">제공된 소스 형식과 일치하는 소스 바인딩이 여러 개 있습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_SOURCE_BINDING_DUPLICATE">
+        <source>A process source binding is declared more than once.</source>
+        <target state="translated">프로세스 소스 바인딩이 두 번 이상 선언되었습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_SOURCE_MEMBER_CONFLICT">
+        <source>Process source bindings target the same member.</source>
+        <target state="translated">프로세스 소스 바인딩이 동일한 멤버를 대상으로 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_SOURCE_MEMBER_INVALID">
+        <source>A process source binding member must be a writable instance property.</source>
+        <target state="translated">프로세스 소스 바인딩 멤버는 쓰기 가능한 인스턴스 속성이어야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_REQUIRES_BPMN_ENGINE">
+        <source>Element '{element}' (type '{type}') requires the BPMN engine; use UseBpmn() instead of UseStateMachine().</source>
+        <target state="translated">요소 '{element}'(형식 '{type}')에는 BPMN 엔진이 필요합니다. UseStateMachine() 대신 UseBpmn()을 사용하세요.</target>
         <note />
       </trans-unit>
       <trans-unit id="FLOW_SOURCE_MODIFIED_CONCURRENTLY">
         <source>Source '{name}' was modified concurrently; the flow transition was aborted.</source>
-        <target state="translated">원본 '{name}'이(가) 동시에 수정되어 흐름 전환이 중단되었습니다.</target>
+        <target state="translated">소스 '{name}'이(가) 동시에 수정되어 흐름 전환이 중단되었습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="FLOW_TIMER_MISSING_VARIABLE">
@@ -387,17 +637,17 @@
       </trans-unit>
       <trans-unit id="FLOW_TIMER_REQUIRES_SCHEDULING">
         <source>Process '{name}' reached a timer catch, which requires Scheduling.</source>
-        <target state="translated">프로세스 '{name}'이(가) 타이머 catch에 도달했습니다. Scheduling이 필요합니다.</target>
+        <target state="translated">'{name}' 프로세스가 타이머 캐치에 도달했으며 여기에는 Scheduling이 필요합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="INSIGHT_ACCESS_DENIED">
         <source>Access to source '{name}' is denied.</source>
-        <target state="translated">원본 '{name}'에 대한 액세스가 거부되었습니다.</target>
+        <target state="translated">'{name}' 소스에 대한 액세스가 거부되었습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="OPERATION_ALREADY_FINISHED">
         <source>Operation '{name}' has already finished.</source>
-        <target state="translated">작업 '{name}'이(가) 이미 완료되었습니다.</target>
+        <target state="translated">'{name}' 작업이 이미 완료되었습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_NO_START_EVENT">
@@ -407,112 +657,122 @@
       </trans-unit>
       <trans-unit id="STATE_MACHINE_START_EVENT_OUTGOING">
         <source>Start event must have exactly one outgoing sequence flow.</source>
-        <target state="translated">시작 이벤트에는 발신 시퀀스 흐름이 정확히 하나 있어야 합니다.</target>
+        <target state="translated">시작 이벤트에는 나가는 시퀀스 흐름이 정확히 하나 있어야 합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_REQUIRES_ONE_START_EVENT">
         <source>State machine requires exactly one start event.</source>
-        <target state="translated">상태 머신에는 시작 이벤트가 정확히 하나 필요합니다.</target>
+        <target state="translated">상태 컴퓨터에는 시작 이벤트가 정확히 하나 있어야 합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_REQUIRES_END_EVENT">
         <source>State machine requires at least one end event.</source>
-        <target state="translated">상태 머신에는 최소 하나의 종료 이벤트가 필요합니다.</target>
+        <target state="translated">상태 컴퓨터에는 종료 이벤트가 하나 이상 있어야 합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_INVALID_TRIGGER">
         <source>Trigger '{trigger}' is not valid from state '{state}'.</source>
-        <target state="translated">트리거 '{trigger}'은(는) 상태 '{state}'에서 유효하지 않습니다.</target>
+        <target state="translated">'{state}' 상태에서 트리거 '{trigger}'은(는) 잘못되었습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_UNKNOWN_CURRENT_STATE">
         <source>Current state '{state}' is not defined on the process.</source>
-        <target state="translated">현재 상태 '{state}'이(가) 프로세스에 정의되지 않았습니다.</target>
+        <target state="translated">현재 상태 '{state}'이(가) 프로세스에 정의되어 있지 않습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_GATEWAY_UNSUPPORTED">
         <source>Gateway '{name}' is not supported by the state machine engine.</source>
-        <target state="translated">게이트웨이 '{name}'은(는) 상태 머신 엔진에서 지원되지 않습니다.</target>
+        <target state="translated">게이트웨이 '{name}'은(는) 상태 컴퓨터 엔진에서 지원되지 않습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_GATEWAY_KIND_UNSUPPORTED">
         <source>Gateway '{name}' is not supported by the state machine engine. Only exclusive and event-based gateways are supported.</source>
-        <target state="translated">게이트웨이 '{name}'은(는) 상태 머신 엔진에서 지원되지 않습니다. 배타 및 이벤트 기반 게이트웨이만 지원됩니다.</target>
+        <target state="translated">게이트웨이 '{name}'은(는) 상태 컴퓨터 엔진에서 지원되지 않습니다. 배타적 게이트웨이와 이벤트 기반 게이트웨이만 지원됩니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CYCLIC_AUTO_FLOW">
         <source>Cyclic auto-flow detected at element '{name}'; the process cannot reach a stable state.</source>
-        <target state="translated">요소 '{name}'에서 순환 자동 흐름이 감지되었습니다. 프로세스가 안정된 상태에 도달할 수 없습니다.</target>
+        <target state="translated">'{name}' 요소에서 순환 자동 흐름이 검색되었으며 프로세스가 안정적인 상태에 도달할 수 없습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_UNKNOWN_TARGET">
         <source>Unknown target element '{name}'.</source>
-        <target state="translated">알 수 없는 대상 요소 '{name}'.</target>
+        <target state="translated">알 수 없는 대상 요소 '{name}'입니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_UNSUPPORTED">
         <source>Activity '{name}' is not supported by the state machine engine.</source>
-        <target state="translated">활동 '{name}'은(는) 상태 머신 엔진에서 지원되지 않습니다.</target>
+        <target state="translated">활동 '{name}'은(는) 상태 컴퓨터 엔진에서 지원되지 않습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_LOOP_UNSUPPORTED">
         <source>Activity '{name}' has loop characteristics which are not supported by the state machine engine.</source>
-        <target state="translated">활동 '{name}'에는 루프 특성이 있어 상태 머신 엔진에서 지원되지 않습니다.</target>
+        <target state="translated">활동 '{name}'에는 상태 컴퓨터 엔진에서 지원되지 않는 루프 특성이 있습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ELEMENT_UNREACHABLE">
         <source>Element '{name}' is not reachable from the start event.</source>
-        <target state="translated">요소 '{name}'은(는) 시작 이벤트에서 도달할 수 없습니다.</target>
+        <target state="translated">'{name}' 요소는 시작 이벤트에서 도달할 수 없습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_FLOW_NO_SOURCE">
-        <source>Sequence flow '{id}' has no source element.</source>
-        <target state="translated">시퀀스 흐름 '{id}'에 소스 요소가 없습니다.</target>
+        <source>Sequence flow targeting '{target}' has no source element.</source>
+        <target state="translated">'{target}'을(를) 대상으로 하는 시퀀스 흐름에는 소스 요소가 없습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_FLOW_NO_TARGET">
-        <source>Sequence flow '{id}' has no target element.</source>
-        <target state="translated">시퀀스 흐름 '{id}'에 대상 요소가 없습니다.</target>
+        <source>Sequence flow from '{source}' has no target element.</source>
+        <target state="translated">'{source}'에서 시작되는 시퀀스 흐름에는 대상 요소가 없습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_FLOW_UNKNOWN_SOURCE">
-        <source>Sequence flow '{id}' references unknown source element '{source}'.</source>
-        <target state="translated">시퀀스 흐름 '{id}'이(가) 알 수 없는 소스 요소 '{source}'을(를) 참조합니다.</target>
+        <source>Sequence flow references unknown source element '{source}'.</source>
+        <target state="translated">시퀀스 흐름이 알 수 없는 소스 요소 '{source}'을(를) 참조합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_FLOW_UNKNOWN_TARGET">
-        <source>Sequence flow '{id}' references unknown target element '{target}'.</source>
-        <target state="translated">시퀀스 흐름 '{id}'이(가) 알 수 없는 대상 요소 '{target}'을(를) 참조합니다.</target>
+        <source>Sequence flow references unknown target element '{target}'.</source>
+        <target state="translated">시퀀스 흐름이 알 수 없는 대상 요소 '{target}'을(를) 참조합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_ELEMENT_NAME_REQUIRED">
+        <source>Element of type '{type}' has no name. Every flow element requires a non-empty name.</source>
+        <target state="translated">'{type}' 형식의 요소에 이름이 없습니다. 모든 흐름 요소에는 비어 있지 않은 이름이 필요합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_DUPLICATE_ELEMENT_NAME">
+        <source>Element name '{name}' is used by more than one element. Element names must be unique within a process.</source>
+        <target state="translated">요소 이름 '{name}'이(가) 둘 이상의 요소에서 사용되고 있습니다. 요소 이름은 프로세스 내에서 고유해야 합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_END_EVENT_OUTGOING">
         <source>End event '{name}' must not have outgoing flows.</source>
-        <target state="translated">종료 이벤트 '{name}'에는 발신 흐름이 없어야 합니다.</target>
+        <target state="translated">종료 이벤트 '{name}'에는 나가는 흐름이 있으면 안 됩니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_EVENT_GATEWAY_PARALLEL_UNSUPPORTED">
         <source>Event-based gateway '{name}' has Parallel=true, which is not supported by the state machine engine. Only exclusive mode (Parallel=false) is supported.</source>
-        <target state="translated">이벤트 기반 게이트웨이 '{name}'에 Parallel=true가 설정되어 있어 상태 머신 엔진에서 지원되지 않습니다. 배타 모드(Parallel=false)만 지원됩니다.</target>
+        <target state="translated">이벤트 기반 게이트웨이 '{name}'에는 상태 컴퓨터 엔진에서 지원되지 않는 Parallel=true가 있습니다. 배타적 모드(Parallel=false)만 지원됩니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_EVENT_GATEWAY_NO_OUTGOING">
         <source>Event-based gateway '{name}' must have at least one outgoing flow.</source>
-        <target state="translated">이벤트 기반 게이트웨이 '{name}'에는 최소 하나의 발신 흐름이 있어야 합니다.</target>
+        <target state="translated">이벤트 기반 게이트웨이 '{name}'에는 나가는 흐름이 하나 이상 있어야 합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_EVENT_GATEWAY_TARGET">
         <source>Event-based gateway '{name}' outgoing flow must target an IntermediateCatchEvent.</source>
-        <target state="translated">이벤트 기반 게이트웨이 '{name}'의 발신 흐름은 IntermediateCatchEvent를 대상으로 해야 합니다.</target>
+        <target state="translated">이벤트 기반 게이트웨이 '{name}'의 나가는 흐름은 IntermediateCatchEvent를 대상으로 해야 합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_EXCLUSIVE_GATEWAY_NO_OUTGOING">
         <source>Exclusive gateway '{name}' must have at least one outgoing flow.</source>
-        <target state="translated">배타 게이트웨이 '{name}'에는 최소 하나의 발신 흐름이 있어야 합니다.</target>
+        <target state="translated">배타적 게이트웨이 '{name}'에는 나가는 흐름이 하나 이상 있어야 합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_BOUNDARY_UNATTACHED">
         <source>Boundary event '{name}' is not attached to any activity.</source>
-        <target state="translated">경계 이벤트 '{name}'이(가) 어떤 활동에도 연결되어 있지 않습니다.</target>
+        <target state="translated">경계 이벤트 '{name}'이(가) 활동에 연결되어 있지 않습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_BOUNDARY_UNKNOWN_ACTIVITY">
@@ -522,97 +782,487 @@
       </trans-unit>
       <trans-unit id="STATE_MACHINE_BOUNDARY_NON_INTERRUPTING">
         <source>Boundary event '{name}' is non-interrupting, which is not supported by the state machine engine.</source>
-        <target state="translated">경계 이벤트 '{name}'이(가) 비중단형이며 상태 머신 엔진에서 지원되지 않습니다.</target>
+        <target state="translated">경계 이벤트 '{name}'은(는) 비중단형이며 상태 컴퓨터 엔진에서 지원되지 않습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_BOUNDARY_OUTGOING_REQUIRED">
         <source>Boundary event '{name}' must have exactly one outgoing flow.</source>
-        <target state="translated">경계 이벤트 '{name}'에는 발신 흐름이 정확히 하나 있어야 합니다.</target>
+        <target state="translated">경계 이벤트 '{name}'에는 나가는 흐름이 정확히 하나 있어야 합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CANCEL_BOUNDARY_REQUIRES_TRANSACTION">
         <source>Cancel boundary event '{name}' must be attached to a transaction sub-process.</source>
-        <target state="new">Cancel boundary event '{name}' must be attached to a transaction sub-process.</target>
+        <target state="translated">취소 경계 이벤트 '{name}'은(는) 트랜잭션 하위 프로세스에 연결되어야 합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_TRANSACTION_REQUIRES_END_EVENT">
         <source>Transaction sub-process '{name}' must contain at least one end event.</source>
-        <target state="new">Transaction sub-process '{name}' must contain at least one end event.</target>
+        <target state="translated">트랜잭션 하위 프로세스 '{name}'에는 종료 이벤트가 하나 이상 포함되어야 합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CATCH_EVENT_NO_OUTGOING">
         <source>Intermediate catch event '{name}' must have at least one outgoing flow.</source>
-        <target state="translated">중간 catch 이벤트 '{name}'에는 최소 하나의 발신 흐름이 있어야 합니다.</target>
+        <target state="translated">중간 캐치 이벤트 '{name}'에는 나가는 흐름이 하나 이상 있어야 합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CATCH_EVENT_GATEWAY_REQUIRED">
         <source>Intermediate catch event '{name}' can only be reached from an EventBasedGateway.</source>
-        <target state="translated">중간 catch 이벤트 '{name}'은(는) EventBasedGateway에서만 도달할 수 있습니다.</target>
+        <target state="translated">중간 캐치 이벤트 '{name}'은(는) EventBasedGateway에서만 도달할 수 있습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_NO_OUTGOING">
         <source>Activity '{name}' has no outgoing flow and cannot proceed. Route it to an end event or another element.</source>
-        <target state="translated">활동 '{name}'에 발신 흐름이 없어 진행할 수 없습니다. 종료 이벤트 또는 다른 요소로 라우팅하세요.</target>
+        <target state="translated">활동 '{name}'에는 나가는 흐름이 없어 계속 진행할 수 없습니다. 종료 이벤트 또는 다른 요소로 라우팅하세요.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_MIXED_GATEWAY">
         <source>Activity '{name}' has mixed outgoing paths (direct and gateway). Each activity can have at most one outgoing path type.</source>
-        <target state="translated">활동 '{name}'에 혼합된 발신 경로(직접 및 게이트웨이)가 있습니다. 활동은 최대 한 가지 발신 경로 유형만 가질 수 있습니다.</target>
+        <target state="translated">활동 '{name}'에는 혼합된 나가는 경로(직접 및 게이트웨이)가 있습니다. 각 활동에는 나가는 경로 유형이 최대 하나만 있을 수 있습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_MIXED_END">
         <source>Activity '{name}' has mixed outgoing paths (end event and other). Each activity can have at most one outgoing path type.</source>
-        <target state="translated">활동 '{name}'에 혼합된 발신 경로(종료 이벤트 및 기타)가 있습니다. 활동은 최대 한 가지 발신 경로 유형만 가질 수 있습니다.</target>
+        <target state="translated">활동 '{name}'에는 혼합된 나가는 경로(종료 이벤트 및 기타)가 있습니다. 각 활동에는 나가는 경로 유형이 최대 하나만 있을 수 있습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_MULTIPLE_DIRECT">
         <source>Activity '{name}' has multiple direct outgoing flows to activities. An activity can have at most one direct outgoing flow.</source>
-        <target state="translated">활동 '{name}'에 여러 직접 발신 흐름이 활동을 향해 있습니다. 활동은 최대 하나의 직접 발신 흐름만 가질 수 있습니다.</target>
+        <target state="translated">활동 '{name}'에는 활동으로 향하는 직접 나가는 흐름이 여러 개 있습니다. 활동에는 직접 나가는 흐름이 최대 하나만 있을 수 있습니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_MULTI_INSTANCE_CARDINALITY_REQUIRED">
         <source>Multi-instance activity '{name}' must define loop cardinality.</source>
-        <target state="new">Multi-instance activity '{name}' must define loop cardinality.</target>
+        <target state="translated">다중 인스턴스 활동 '{name}'은(는) 루프 카디널리티를 정의해야 합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_MULTI_INSTANCE_EVENT_BEHAVIOR_UNSUPPORTED">
         <source>Multi-instance activity '{name}' uses a completion event behavior that is not supported by the BPMN engine.</source>
-        <target state="new">Multi-instance activity '{name}' uses a completion event behavior that is not supported by the BPMN engine.</target>
+        <target state="translated">다중 인스턴스 활동 '{name}'은(는) BPMN 엔진에서 지원되지 않는 완료 이벤트 동작을 사용합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CALL_ACTIVITY_CALLED_ELEMENT_REQUIRED">
         <source>Call activity '{name}' must define calledElement.</source>
-        <target state="new">Call activity '{name}' must define calledElement.</target>
+        <target state="translated">호출 활동 '{name}'은(는) calledElement를 정의해야 합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_EVENT_SUBPROCESS_START_TRIGGER_REQUIRED">
         <source>Event sub-process start event '{name}' must define a trigger event definition.</source>
-        <target state="new">Event sub-process start event '{name}' must define a trigger event definition.</target>
+        <target state="translated">이벤트 하위 프로세스 시작 이벤트 '{name}'은(는) 트리거 이벤트 정의를 정의해야 합니다.</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ESCALATION_NAME_REQUIRED">
         <source>Escalation event '{name}' must define a non-empty escalation name.</source>
-        <target state="new">Escalation event '{name}' must define a non-empty escalation name.</target>
+        <target state="translated">에스컬레이션 이벤트 '{name}'은(는) 비어 있지 않은 에스컬레이션 이름을 정의해야 합니다.</target>
         <note />
       </trans-unit>
-      <trans-unit id="PROCESS_TOKEN_NOT_FOUND">
-        <source>Token '{token}' is not found on process '{process}'.</source>
-        <target state="new">Token '{token}' is not found on process '{process}'.</target>
+      <trans-unit id="STATE_MACHINE_NONE_TASK_BOUNDARY_UNREACHABLE">
+        <source>None task '{name}' passes through to its awaited gateway or end event, so boundary events attached to it can never fire. Use a user task, or move the catches into the Await branches.</source>
+        <target state="translated">None 작업 '{name}'은(는) 대기 중인 게이트웨이 또는 종료 이벤트를 통과하므로 여기에 연결된 경계 이벤트는 발생할 수 없습니다. 사용자 작업을 사용하거나 캐치를 Await 분기로 이동하세요.</target>
         <note />
       </trans-unit>
-      <trans-unit id="PROCESS_TOKEN_NOT_READY">
-        <source>Token '{token}' is not in a ready state.</source>
-        <target state="new">Token '{token}' is not in a ready state.</target>
+      <trans-unit id="STATE_MACHINE_ENTER_TASK_BYPASSED">
+        <source>Activity '{name}' runs enter task '{enter}' on entry, but the flow from '{source}' targets the activity directly and bypasses it. Route inbound flows through the enter task.</source>
+        <target state="translated">활동 '{name}'은(는) 진입 시 enter 작업 '{enter}'를 실행하지만 '{source}'의 흐름은 활동을 직접 대상으로 하여 이를 건너뜁니다. 인바운드 흐름은 enter 작업을 통해 라우팅하세요.</target>
         <note />
       </trans-unit>
-      <trans-unit id="PROCESS_TOKEN_AMBIGUOUS">
-        <source>Multiple ready tokens are available; specify one of: {tokens}.</source>
-        <target state="new">Multiple ready tokens are available; specify one of: {tokens}.</target>
+      <trans-unit id="BPMN_NOT_IMPLEMENTED">
+        <source>BPMN feature '{feature}' is not yet implemented in this engine version.</source>
+        <target state="translated">BPMN 기능 '{feature}'은(는) 이 엔진 버전에서 아직 구현되지 않았습니다.</target>
         <note />
       </trans-unit>
-      <trans-unit id="STATE_MACHINE_REQUIRES_BPMN_ENGINE">
-        <source>Element '{element}' (type '{type}') requires the BPMN engine; use UseBpmn() instead of UseStateMachine().</source>
-        <target state="new">Element '{element}' (type '{type}') requires the BPMN engine; use UseBpmn() instead of UseStateMachine().</target>
+      <trans-unit id="BPMN_CALL_ACTIVITY_REQUIRES_SERVICES">
+        <source>BPMN call activity '{name}' requires a service provider; register Schemata.Flow.Bpmn with a process registry.</source>
+        <target state="translated">BPMN 호출 활동 '{name}'에는 서비스 공급자가 필요합니다. 프로세스 레지스트리를 사용하여 Schemata.Flow.Bpmn을 등록하세요.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="BPMN_LOOP_NOT_IMPLEMENTED">
+        <source>BPMN activity '{name}' has loop characteristics of type '{type}' which are not yet implemented in this engine version.</source>
+        <target state="translated">BPMN 활동 '{name}'에는 이 엔진 버전에서 아직 구현되지 않은 '{type}' 형식의 루프 특성이 있습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="BPMN_TRANSPARENT_GATEWAY_NOT_SUPPORTED">
+        <source>BPMN gateway '{type}' cannot be transparently resolved; route through AdvanceAsync to dispatch it.</source>
+        <target state="translated">BPMN 게이트웨이 '{type}'은(는) 투명하게 확인할 수 없습니다. 디스패치하려면 AdvanceAsync를 통해 라우팅하세요.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="BPMN_INVALID_TRIGGER">
+        <source>Trigger '{trigger}' is not valid from state '{state}'.</source>
+        <target state="translated">'{state}' 상태에서 트리거 '{trigger}'은(는) 잘못되었습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_REQUEST">
+        <source>The request is malformed or missing a required parameter.</source>
+        <target state="translated">요청의 형식이 잘못되었거나 필수 매개 변수가 없습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_CLIENT">
+        <source>Client authentication failed.</source>
+        <target state="translated">클라이언트 인증에 실패했습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="CONSENT_REQUIRED">
+        <source>The authorization server requires end-user consent.</source>
+        <target state="translated">권한 부여 서버에는 최종 사용자 동의가 필요합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGIN_REQUIRED">
+        <source>The authorization server requires end-user authentication.</source>
+        <target state="translated">권한 부여 서버에는 최종 사용자 인증이 필요합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="EXPIRED_TOKEN">
+        <source>The provided token has expired.</source>
+        <target state="translated">제공된 토큰이 만료되었습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INTERACTION_REQUIRED">
+        <source>The end-user must interact with the authorization server to continue.</source>
+        <target state="translated">계속하려면 최종 사용자가 권한 부여 서버와 상호 작용해야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ACCOUNT_SELECTION_REQUIRED">
+        <source>The end-user must select an account to continue.</source>
+        <target state="translated">계속하려면 최종 사용자가 계정을 선택해야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS">
+        <source>The authorization_details parameter is invalid.</source>
+        <target state="translated">authorization_details 매개 변수가 잘못되었습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_CLIENT_METADATA">
+        <source>The client registration metadata is invalid.</source>
+        <target state="translated">클라이언트 등록 메타데이터가 잘못되었습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_DPOP_PROOF">
+        <source>The DPoP proof JWT is invalid.</source>
+        <target state="translated">DPoP 프루프 JWT가 잘못되었습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_REQUEST_OBJECT">
+        <source>The request object is invalid.</source>
+        <target state="translated">요청 개체가 잘못되었습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_REQUEST_URI">
+        <source>The request_uri does not resolve to a valid request object.</source>
+        <target state="translated">request_uri가 유효한 요청 개체로 확인되지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_SOFTWARE_STATEMENT">
+        <source>The software statement is invalid.</source>
+        <target state="translated">소프트웨어 문이 잘못되었습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNAPPROVED_SOFTWARE_STATEMENT">
+        <source>The software statement is not approved for use.</source>
+        <target state="translated">소프트웨어 문은 사용이 승인되지 않았습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="REGISTRATION_NOT_SUPPORTED">
+        <source>The authorization server does not support dynamic client registration.</source>
+        <target state="translated">권한 부여 서버는 동적 클라이언트 등록을 지원하지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="REQUEST_NOT_SUPPORTED">
+        <source>The authorization server does not support the request parameter.</source>
+        <target state="translated">권한 부여 서버는 request 매개 변수를 지원하지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="REQUEST_URI_NOT_SUPPORTED">
+        <source>The authorization server does not support the request_uri parameter.</source>
+        <target state="translated">권한 부여 서버는 request_uri 매개 변수를 지원하지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="SERVER_ERROR">
+        <source>The authorization server encountered an unexpected condition.</source>
+        <target state="translated">권한 부여 서버에서 예기치 않은 상태가 발생했습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNAUTHORIZED_CLIENT">
+        <source>The client is not authorized to use this method.</source>
+        <target state="translated">클라이언트에 이 메서드를 사용할 권한이 없습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNSUPPORTED_GRANT_TYPE">
+        <source>The authorization grant type is not supported by the authorization server.</source>
+        <target state="translated">권한 부여 유형은 권한 부여 서버에서 지원되지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNSUPPORTED_RESPONSE_TYPE">
+        <source>The authorization server does not support obtaining an authorization code using this method.</source>
+        <target state="translated">권한 부여 서버는 이 방법을 사용한 권한 부여 코드 가져오기를 지원하지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNSUPPORTED_TOKEN_TYPE">
+        <source>The requested token type is not supported.</source>
+        <target state="translated">요청된 토큰 유형은 지원되지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="USE_DPOP_NONCE">
+        <source>The DPoP proof must carry the server-issued nonce.</source>
+        <target state="translated">DPoP 프루프는 서버에서 발급한 nonce를 전달해야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SOURCE_REQUIRES_RESOURCE">
+        <source>A repository source requires a resource parameter.</source>
+        <target state="translated">리포지토리 소스에는 리소스 매개 변수가 필요합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_UNKNOWN_SOURCE">
+        <source>Unknown resource '{name}'.</source>
+        <target state="translated">알 수 없는 리소스 '{name}'입니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NODE_UNSUPPORTED">
+        <source>Plan node '{node}' is not supported by the repository driver.</source>
+        <target state="translated">계획 노드 '{node}'은(는) 리포지토리 드라이버에서 지원되지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_STAGE_REQUIRED">
+        <source>Plan node '{node}' is not a nested stage.</source>
+        <target state="translated">계획 노드 '{node}'은(는) 중첩 단계가 아닙니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_COLLECTION_MISSING">
+        <source>Driver '{driver}' returned no child collection for nested selection '{alias}' (path '{field}'); declare Nested or include the child collection in raw rows.</source>
+        <target state="translated">'{driver}' 드라이버가 중첩 선택 '{alias}'(경로 '{field}')에 대한 하위 컬렉션을 반환하지 않았습니다. Nested를 선언하거나 원시 행에 하위 컬렉션을 포함하세요.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_ANCHOR_INVALID">
+        <source>Nested selection '{alias}' (path '{field}') cannot be anchored to a single source.</source>
+        <target state="translated">중첩 선택 '{alias}'(경로 '{field}')은(는) 단일 소스에 고정할 수 없습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_NOT_COLLECTION">
+        <source>Nested selection '{alias}' (path '{field}') targets a non-collection value.</source>
+        <target state="translated">중첩 선택 '{alias}'(경로 '{field}')이(가) 컬렉션이 아닌 값을 대상으로 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_LOCAL_STAGE_REQUIRED">
+        <source>Plan node '{stage}' is not a local stage.</source>
+        <target state="translated">계획 노드 '{stage}'은(는) 로컬 단계가 아닙니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_AGGREGATION_UNSUPPORTED">
+        <source>Unsupported aggregation '{function}'.</source>
+        <target state="translated">지원되지 않는 집계 '{function}'입니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SOURCE_REQUIRED">
+        <source>The plan has no source.</source>
+        <target state="translated">계획에 소스가 없습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_SOURCE_REQUIRED">
+        <source>A join input has no source.</source>
+        <target state="translated">조인 입력에 소스가 없습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_DRIVER_UNREGISTERED">
+        <source>No driver '{driver}' is registered.</source>
+        <target state="translated">'{driver}' 드라이버가 등록되어 있지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SINGLE_SOURCE_STAGE_REQUIRED">
+        <source>Plan node '{stage}' is not a single-source stage.</source>
+        <target state="translated">계획 노드 '{stage}'은(는) 단일 소스 단계가 아닙니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_AT_LEAST_ONE_SOURCE">
+        <source>At least one source is required.</source>
+        <target state="translated">소스가 하나 이상 필요합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_ALIAS_DUPLICATE">
+        <source>Duplicate source alias '{alias}'.</source>
+        <target state="translated">소스 별칭 '{alias}'이(가) 중복되었습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_KIND_REQUIRED">
+        <source>A join must specify a kind.</source>
+        <target state="translated">조인은 종류를 지정해야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_ALREADY_JOINED">
+        <source>Join aliases '{left}' and '{right}' are already joined.</source>
+        <target state="translated">조인 별칭 '{left}' 및 '{right}'이(가) 이미 조인되었습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_ALL_CONNECTED">
+        <source>All sources must be connected by joins.</source>
+        <target state="translated">모든 소스를 조인으로 연결해야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_ALIAS_UNKNOWN">
+        <source>Join references unknown alias '{alias}'.</source>
+        <target state="translated">조인이 알 수 없는 별칭 '{alias}'을(를) 참조합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_TOP_SKIP_UNSUPPORTED">
+        <source>Mid-pipeline top/skip is not supported at the top level; use top-level page_size/skip.</source>
+        <target state="translated">파이프라인 중간의 top/skip은 최상위 수준에서 지원되지 않습니다. 최상위 수준의 page_size/skip을 사용하세요.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_TRANSFORM_ONE_OPERATION">
+        <source>A transformation must set exactly one operation.</source>
+        <target state="translated">변환에는 정확히 하나의 작업을 설정해야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_EXPRESSION_LANGUAGE_UNKNOWN">
+        <source>Unknown expression language '{language}'.</source>
+        <target state="translated">알 수 없는 식 언어 '{language}'입니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_EXPRESSION_NOT_VALUE_CAPABLE">
+        <source>Language '{language}' cannot compile value expressions.</source>
+        <target state="translated">'{language}' 언어는 값 식을 컴파일할 수 없습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_EXPRESSION_INVALID">
+        <source>Invalid expression '{expression}'.</source>
+        <target state="translated">식 '{expression}'이(가) 잘못되었습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_FLAT_SELECTION_TRANSFORMATIONS">
+        <source>A flat selection cannot carry transformations.</source>
+        <target state="translated">평면 선택에는 변환을 포함할 수 없습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SELECTION_ALIAS_REQUIRED">
+        <source>A computed selection requires an alias.</source>
+        <target state="translated">계산된 선택에는 별칭이 필요합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SELECTION_FIELD_REQUIRED">
+        <source>A selection must specify a field.</source>
+        <target state="translated">선택 항목에는 필드를 지정해야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_FIELD_REQUIRED">
+        <source>A nested selection must name its navigation field.</source>
+        <target state="translated">중첩 선택에는 탐색 필드의 이름을 지정해야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_ALIAS_UNKNOWN">
+        <source>A nested selection '{field}' must name an existing source alias.</source>
+        <target state="translated">중첩 선택 '{field}'은(는) 기존 소스 별칭의 이름을 지정해야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DEFAULT_ERROR">
+        <source>An unknown failure has occurred.</source>
+        <target state="translated">알 수 없는 오류가 발생했습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="CONCURRENCY_FAILURE">
+        <source>Optimistic concurrency failure, object has been modified.</source>
+        <target state="translated">낙관적 동시성 오류입니다. 개체가 수정되었습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_USER_NAME">
+        <source>User name '{userName}' is invalid, can only contain letters or digits.</source>
+        <target state="translated">사용자 이름 '{userName}'이(가) 잘못되었습니다. 문자 또는 숫자만 사용할 수 있습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_EMAIL">
+        <source>Email '{email}' is invalid.</source>
+        <target state="translated">전자 메일 '{email}'이(가) 잘못되었습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DUPLICATE_USER_NAME">
+        <source>User name '{userName}' is already taken.</source>
+        <target state="translated">사용자 이름 '{userName}'이(가) 이미 사용 중입니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DUPLICATE_EMAIL">
+        <source>Email '{email}' is already taken.</source>
+        <target state="translated">전자 메일 '{email}'이(가) 이미 사용 중입니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_ROLE_NAME">
+        <source>Role name '{role}' is invalid.</source>
+        <target state="translated">역할 이름 '{role}'이(가) 잘못되었습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DUPLICATE_ROLE_NAME">
+        <source>Role name '{role}' is already taken.</source>
+        <target state="translated">역할 이름 '{role}'이(가) 이미 사용 중입니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="USER_ALREADY_IN_ROLE">
+        <source>User already in role '{role}'.</source>
+        <target state="translated">사용자가 이미 '{role}' 역할에 있습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="USER_NOT_IN_ROLE">
+        <source>User is not in role '{role}'.</source>
+        <target state="translated">사용자가 '{role}' 역할에 없습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_TOO_SHORT">
+        <source>Passwords must be at least {length} characters.</source>
+        <target state="translated">암호는 {length}자 이상이어야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_UNIQUE_CHARS">
+        <source>Passwords must use at least {uniqueChars} different characters.</source>
+        <target state="translated">암호는 서로 다른 문자를 {uniqueChars}개 이상 사용해야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_NON_ALPHANUMERIC">
+        <source>Passwords must have at least one non-alphanumeric character.</source>
+        <target state="translated">암호에는 영숫자가 아닌 문자가 하나 이상 있어야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_DIGIT">
+        <source>Passwords must have at least one digit ('0'-'9').</source>
+        <target state="translated">암호에는 숫자('0'-'9')가 하나 이상 있어야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_LOWER">
+        <source>Passwords must have at least one lowercase ('a'-'z').</source>
+        <target state="translated">암호에는 소문자('a'-'z')가 하나 이상 있어야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_UPPER">
+        <source>Passwords must have at least one uppercase ('A'-'Z').</source>
+        <target state="translated">암호에는 대문자('A'-'Z')가 하나 이상 있어야 합니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_MISMATCH">
+        <source>Incorrect password.</source>
+        <target state="translated">암호가 올바르지 않습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="RECOVERY_CODE_REDEMPTION_FAILED">
+        <source>Recovery code redemption failed.</source>
+        <target state="translated">복구 코드 사용에 실패했습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGIN_ALREADY_ASSOCIATED">
+        <source>A user with this login already exists.</source>
+        <target state="translated">이 로그인을 사용하는 사용자가 이미 있습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="USER_ALREADY_HAS_PASSWORD">
+        <source>User already has a password set.</source>
+        <target state="translated">사용자에게는 이미 암호가 설정되어 있습니다.</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGOUT_PAGE_TITLE">
+        <source>Logging out</source>
+        <target state="translated">로그아웃하는 중</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGOUT_PAGE_TEXT">
+        <source>Logging out…</source>
+        <target state="translated">로그아웃하는 중…</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGOUT_PAGE_CONTINUE">
+        <source>Continue</source>
+        <target state="translated">계속</target>
         <note />
       </trans-unit>
     </body>

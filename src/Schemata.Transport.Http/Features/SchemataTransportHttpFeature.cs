@@ -36,5 +36,6 @@ public sealed class SchemataTransportHttpFeature : FeatureBase
         IApplicationBuilder app,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) => app.UseSchemataExceptionHandler();
+    ) => app.UseSchemataRequestCulture()
+             .UseSchemataExceptionHandler();
 }

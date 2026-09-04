@@ -7,7 +7,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Resource;
 using Schemata.Advice;
 using Schemata.Expressions.Skeleton;
@@ -120,7 +122,7 @@ public sealed class PlanExecutor
     ) {
         var source = FindSource(root);
         if (source is null) {
-            throw new InsightValidationException(InsightReasons.InvalidArgument, "The plan has no source.");
+            throw new InsightValidationException(InsightReasons.InvalidArgument, SchemataResources.GetResourceString(SchemataResources.INSIGHT_SOURCE_REQUIRED));
         }
 
         var driver = await OpenSourceAsync(source, request, principal, ct);
@@ -178,7 +180,7 @@ public sealed class PlanExecutor
     ) {
         var source = FindSource(root);
         if (source is null) {
-            throw new InsightValidationException(InsightReasons.InvalidArgument, "The plan has no source.");
+            throw new InsightValidationException(InsightReasons.InvalidArgument, SchemataResources.GetResourceString(SchemataResources.INSIGHT_SOURCE_REQUIRED));
         }
 
         var driver = await OpenSourceAsync(source, request, principal, ct);
@@ -272,7 +274,7 @@ public sealed class PlanExecutor
     ) {
         var source = FindSource(node);
         if (source is null) {
-            throw new InsightValidationException(InsightReasons.InvalidArgument, "A join input has no source.");
+            throw new InsightValidationException(InsightReasons.InvalidArgument, SchemataResources.GetResourceString(SchemataResources.INSIGHT_JOIN_SOURCE_REQUIRED));
         }
 
         var driver = await OpenSourceAsync(source, request, principal, ct);
@@ -300,7 +302,7 @@ public sealed class PlanExecutor
         if (driver is null) {
             throw new InsightValidationException(
                 InsightReasons.Unimplemented,
-                $"No driver '{source.Config.DriverName}' is registered."
+                LocalizedMessageFormatter.FormatInvariant(SchemataResources.INSIGHT_DRIVER_UNREGISTERED, new Dictionary<string, string?> { ["driver"] = source.Config.DriverName })!
             );
         }
 
@@ -431,7 +433,7 @@ public sealed class PlanExecutor
             OrderNode   => DriverCapabilities.Order,
             var stage   => throw new InsightValidationException(
                                InsightReasons.Unimplemented,
-                               $"Plan node '{stage.GetType().Name}' is not a single-source stage."),
+                               LocalizedMessageFormatter.FormatInvariant(SchemataResources.INSIGHT_SINGLE_SOURCE_STAGE_REQUIRED, new Dictionary<string, string?> { ["stage"] = stage.GetType().Name })!),
         };
 
         return capabilities.HasFlag(required);
@@ -541,7 +543,7 @@ public sealed class PlanExecutor
             SelectionNode selection => selection with { Input = input },
             var stage               => throw new InsightValidationException(
                                            InsightReasons.Unimplemented,
-                                           $"Plan node '{stage.GetType().Name}' is not a single-source stage."),
+                                           LocalizedMessageFormatter.FormatInvariant(SchemataResources.INSIGHT_SINGLE_SOURCE_STAGE_REQUIRED, new Dictionary<string, string?> { ["stage"] = stage.GetType().Name })!),
         };
     }
 
@@ -566,7 +568,7 @@ public sealed class PlanExecutor
             ComputeNode compute     => compute.Input,
             GroupNode group         => group.Input,
             var _ => throw new InsightValidationException(InsightReasons.Unimplemented,
-                                                         $"Plan node '{node.GetType().Name}' is not a single-source stage."),
+                                                         LocalizedMessageFormatter.FormatInvariant(SchemataResources.INSIGHT_SINGLE_SOURCE_STAGE_REQUIRED, new Dictionary<string, string?> { ["node"] = node.GetType().Name })!),
         };
     }
 

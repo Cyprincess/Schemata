@@ -11,8 +11,9 @@ using Schemata.Identity.Foundation.Advisors;
 using Schemata.Identity.Foundation.Commands;
 using Schemata.Identity.Foundation.Controllers;
 using Schemata.Identity.Foundation.Handlers;
-using Schemata.Identity.Foundation.Runtime;
 using Schemata.Identity.Foundation.Queries;
+using Schemata.Identity.Foundation.Runtime;
+using Schemata.Identity.Foundation.Services;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Advisors;
 using Schemata.Identity.Skeleton.Claims;
@@ -105,6 +106,7 @@ public static class ServiceCollectionExtensions
         var builder = services.AddIdentityApiEndpoints<TUser>(configure)
                               .AddRoles<TRole>()
                               .AddUserManager<SchemataUserManager<TUser>>()
+                              .AddErrorDescriber<SchemataErrorDescriber>()
                               .AddClaimsPrincipalFactory<SchemataUserClaimsPrincipalFactory<TUser, TRole>>();
 
         // Registered after AddIdentityApiEndpoints so this assignment is the last one applied to the

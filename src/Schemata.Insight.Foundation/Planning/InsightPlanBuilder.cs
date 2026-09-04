@@ -6,6 +6,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Errors;
 using Schemata.Expressions.Skeleton;
 using Schemata.Insight.Skeleton.Catalog;
 using Schemata.Insight.Skeleton.Models;
@@ -46,7 +48,7 @@ public sealed class InsightPlanBuilder
     /// <returns>The root plan node.</returns>
     public async ValueTask<PlanNode> BuildAsync(QueryInsightRequest request, CancellationToken ct) {
         if (request.Sources.Count == 0) {
-            throw new InsightValidationException(InsightReasons.InvalidArgument, "At least one source is required.");
+            throw new InsightValidationException(InsightReasons.InvalidArgument, SchemataResources.GetResourceString(SchemataResources.INSIGHT_AT_LEAST_ONE_SOURCE));
         }
 
         var configs  = new Dictionary<string, SourceConfig>(StringComparer.Ordinal);
@@ -54,14 +56,14 @@ public sealed class InsightPlanBuilder
         foreach (var binding in request.Sources) {
             if (configs.ContainsKey(binding.Alias)) {
                 throw new InsightValidationException(InsightReasons.InvalidArgument,
-                                                    $"Duplicate source alias '{binding.Alias}'.");
+                                                    LocalizedMessageFormatter.FormatInvariant(SchemataResources.INSIGHT_ALIAS_DUPLICATE, new Dictionary<string, string?> { ["alias"] = binding.Alias })!);
             }
 
             var config = await ResolveAsync(binding.Name, ct);
             if (config is null) {
                 throw new InsightValidationException(
                     InsightReasons.UnknownSourceName,
-                    $"Unknown source '{binding.Name}'.",
+                    LocalizedMessageFormatter.FormatInvariant(SchemataResources.INSIGHT_UNKNOWN_SOURCE, new Dictionary<string, string?> { ["name"] = binding.Name })!,
                     new Dictionary<string, string?> { ["name"] = binding.Name }
                 );
             }
@@ -98,14 +100,19 @@ public sealed class InsightPlanBuilder
     private PlanNode FoldJoins(QueryInsightRequest request, Dictionary<string, PlanNode> subtrees) {
         foreach (var join in request.Joins) {
             if (join.Kind is JoinKind.Unspecified) {
-                throw new InsightValidationException(InsightReasons.InvalidArgument, "A join must specify a kind.");
+                throw new InsightValidationException(InsightReasons.InvalidArgument, SchemataResources.GetResourceString(SchemataResources.INSIGHT_JOIN_KIND_REQUIRED));
             }
 
             var left  = Subtree(subtrees, join.Left);
             var right = Subtree(subtrees, join.Right);
             if (ReferenceEquals(left, right)) {
                 throw new InsightValidationException(InsightReasons.InvalidArgument,
-                                                    $"Join aliases '{join.Left}' and '{join.Right}' are already joined.");
+                                                    LocalizedMessageFormatter.FormatInvariant(
+                                                        SchemataResources.INSIGHT_JOIN_ALREADY_JOINED,
+                                                        new Dictionary<string, string?> {
+                                                            ["left"]  = join.Left,
+                                                            ["right"] = join.Right,
+                                                        })!);
             }
 
             var merged = new JoinNode(left, right, join.Kind, ParsePredicate(join.On, request)) {
@@ -119,7 +126,7 @@ public sealed class InsightPlanBuilder
         var root = subtrees[request.Sources[0].Alias];
         if (root.SourceSet.Count != request.Sources.Count) {
             throw new InsightValidationException(InsightReasons.InvalidArgument,
-                                                "All sources must be connected by joins.");
+                                                SchemataResources.GetResourceString(SchemataResources.INSIGHT_JOIN_ALL_CONNECTED));
         }
 
         return root;
@@ -128,7 +135,7 @@ public sealed class InsightPlanBuilder
     private static PlanNode Subtree(Dictionary<string, PlanNode> subtrees, string alias) {
         return subtrees.TryGetValue(alias, out var node)
             ? node
-            : throw new InsightValidationException(InsightReasons.InvalidArgument, $"Join references unknown alias '{alias}'.");
+            : throw new InsightValidationException(InsightReasons.InvalidArgument, LocalizedMessageFormatter.FormatInvariant(SchemataResources.INSIGHT_JOIN_ALIAS_UNKNOWN, new Dictionary<string, string?> { ["alias"] = alias })!);
     }
 
     private PlanNode ApplyTransform(
@@ -145,8 +152,8 @@ public sealed class InsightPlanBuilder
         if (transform.OrderBy is { } order) {
             try {
                 _services.GetRequiredService<IOrderCompiler>().Parse(order.OrderBy);
-            } catch (ArgumentException ex) {
-                throw new InsightValidationException(InsightReasons.InvalidArgument, ex.Message);
+            } catch (ArgumentException) {
+                throw new InsightValidationException(InsightReasons.InvalidArgument, SchemataResources.GetResourceString(SchemataResources.INVALID_ORDER_BY));
             }
 
             return new OrderNode(input, order.OrderBy) { SourceSet = sourceSet };
@@ -173,14 +180,14 @@ public sealed class InsightPlanBuilder
         if (transform.Top is not null || transform.Skip is not null) {
             if (!allowLimit) {
                 throw new InsightValidationException(InsightReasons.Unimplemented,
-                                                    "Mid-pipeline top/skip is not supported at the top level; use top-level page_size/skip.");
+                                                    SchemataResources.GetResourceString(SchemataResources.INSIGHT_TOP_SKIP_UNSUPPORTED));
             }
 
             return new LimitNode(input, transform.Skip?.Count, transform.Top?.Count) { SourceSet = sourceSet };
         }
 
         throw new InsightValidationException(InsightReasons.InvalidArgument,
-                                            "A transformation must set exactly one operation.");
+                                            SchemataResources.GetResourceString(SchemataResources.INSIGHT_TRANSFORM_ONE_OPERATION));
     }
 
     private ParsedExpression ParsePredicate(InsightExpression expression, QueryInsightRequest request) {
@@ -197,7 +204,7 @@ public sealed class InsightPlanBuilder
         if (compiler is null) {
             throw new InsightValidationException(
                 InsightReasons.UnknownExpressionLanguage,
-                $"Unknown expression language '{language}'.",
+                LocalizedMessageFormatter.FormatInvariant(SchemataResources.INSIGHT_EXPRESSION_LANGUAGE_UNKNOWN, new Dictionary<string, string?> { ["language"] = language })!,
                 new Dictionary<string, string?> { ["language"] = language }
             );
         }
@@ -206,7 +213,7 @@ public sealed class InsightPlanBuilder
             var descriptor = _services.GetKeyedService<ExpressionLanguageDescriptor>(language);
             if (descriptor is null || !descriptor.SupportsValues) {
                 throw new InsightValidationException(InsightReasons.ExpressionLanguageNotValueCapable,
-                                                    $"Language '{language}' cannot compile value expressions.",
+                                                    LocalizedMessageFormatter.FormatInvariant(SchemataResources.INSIGHT_EXPRESSION_NOT_VALUE_CAPABLE, new Dictionary<string, string?> { ["language"] = language })!,
                                                     new Dictionary<string, string?> { ["language"] = language });
             }
         }
@@ -214,7 +221,7 @@ public sealed class InsightPlanBuilder
         try {
             return new(compiler.Parse(expression.Source), language, kind);
         } catch (Exception ex) when (ex is ExpressionException or ArgumentException) {
-            throw new InsightValidationException(InsightReasons.InvalidExpression, $"Invalid expression '{expression.Source}'.");
+            throw new InsightValidationException(InsightReasons.InvalidExpression, LocalizedMessageFormatter.FormatInvariant(SchemataResources.INSIGHT_EXPRESSION_INVALID, new Dictionary<string, string?> { ["expression"] = expression.Source })!);
         }
     }
 
@@ -233,7 +240,7 @@ public sealed class InsightPlanBuilder
 
             if (selection.Transformations.Count > 0) {
                 throw new InsightValidationException(InsightReasons.InvalidArgument,
-                                                    "A flat selection cannot carry transformations.");
+                                                    SchemataResources.GetResourceString(SchemataResources.INSIGHT_FLAT_SELECTION_TRANSFORMATIONS));
             }
 
             if (selection.Expression is { } expression) {
@@ -241,7 +248,7 @@ public sealed class InsightPlanBuilder
                 if (alias is null) {
                     throw new InsightValidationException(
                         InsightReasons.InvalidArgument,
-                        "A computed selection requires an alias."
+                        SchemataResources.GetResourceString(SchemataResources.INSIGHT_SELECTION_ALIAS_REQUIRED)
                     );
                 }
 
@@ -250,7 +257,7 @@ public sealed class InsightPlanBuilder
             }
 
             if (string.IsNullOrWhiteSpace(selection.Field)) {
-                throw new InsightValidationException(InsightReasons.InvalidArgument, "A selection must specify a field.");
+                throw new InsightValidationException(InsightReasons.InvalidArgument, SchemataResources.GetResourceString(SchemataResources.INSIGHT_SELECTION_FIELD_REQUIRED));
             }
 
             var fieldAlias = selection.Alias ?? LastSegment(selection.Field);
@@ -267,7 +274,7 @@ public sealed class InsightPlanBuilder
     ) {
         if (string.IsNullOrWhiteSpace(selection.Field)) {
             throw new InsightValidationException(InsightReasons.InvalidArgument,
-                                                "A nested selection must name its navigation field.");
+                                                SchemataResources.GetResourceString(SchemataResources.INSIGHT_NESTED_FIELD_REQUIRED));
         }
 
         var config      = ParentConfig(selection.Field, configs);
@@ -303,7 +310,7 @@ public sealed class InsightPlanBuilder
         }
 
         throw new InsightValidationException(InsightReasons.InvalidArgument,
-                                            $"A nested selection '{field}' must name an existing source alias.");
+                                            LocalizedMessageFormatter.FormatInvariant(SchemataResources.INSIGHT_NESTED_ALIAS_UNKNOWN, new Dictionary<string, string?> { ["field"] = field })!);
     }
 
     private static string ChildAlias(SelectionSpec selection) {

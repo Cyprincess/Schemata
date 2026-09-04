@@ -6,6 +6,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Errors;
 using Schemata.Expressions.Skeleton;
 using Schemata.Insight.Foundation.Planning;
 using Schemata.Insight.Skeleton.Models;
@@ -61,7 +63,7 @@ public sealed partial class LocalPipelineExecutor
             LimitNode limit         => Limit(rows, limit, ct),
             SelectionNode selection => Select(rows, selection, ct),
             var _ => throw new InsightValidationException(InsightReasons.Unimplemented,
-                                                         $"Plan node '{stage.GetType().Name}' is not a local stage."),
+                                                         LocalizedMessageFormatter.FormatInvariant(SchemataResources.INSIGHT_LOCAL_STAGE_REQUIRED, new Dictionary<string, string?> { ["stage"] = stage.GetType().Name })!),
         };
     }
 
@@ -123,7 +125,7 @@ public sealed partial class LocalPipelineExecutor
             AggregationFunction.Min           => values.Length == 0 ? null : values.Min(RowComparer.Instance),
             AggregationFunction.Max           => values.Length == 0 ? null : values.Max(RowComparer.Instance),
             var _ => throw new InsightValidationException(InsightReasons.InvalidArgument,
-                                                         $"Unsupported aggregation '{aggregation.Function}'."),
+                                                         LocalizedMessageFormatter.FormatInvariant(SchemataResources.INSIGHT_AGGREGATION_UNSUPPORTED, new Dictionary<string, string?> { ["function"] = aggregation.Function.ToString() })!),
         };
     }
 

@@ -27,17 +27,17 @@
       </trans-unit>
       <trans-unit id="TENANT_RESOLUTION_FAILED">
         <source>Unable to resolve tenant for the current request.</source>
-        <target state="translated">无法解析当前请求的租户。</target>
+        <target state="translated">无法为当前请求解析租户。</target>
         <note />
       </trans-unit>
       <trans-unit id="FAILED_PRECONDITION">
         <source>The request cannot be executed in the current system state.</source>
-        <target state="translated">在当前系统状态下无法执行该请求。</target>
+        <target state="translated">无法在当前系统状态下执行请求。</target>
         <note />
       </trans-unit>
       <trans-unit id="UNAUTHENTICATED">
         <source>The request does not have valid authentication credentials.</source>
-        <target state="translated">请求未提供有效的身份验证凭据。</target>
+        <target state="translated">请求没有有效的身份验证凭据。</target>
         <note />
       </trans-unit>
       <trans-unit id="PERMISSION_DENIED">
@@ -47,7 +47,7 @@
       </trans-unit>
       <trans-unit id="NOT_FOUND">
         <source>The requested resource was not found.</source>
-        <target state="translated">未找到请求的资源。</target>
+        <target state="translated">未找到所请求的资源。</target>
         <note />
       </trans-unit>
       <trans-unit id="ALREADY_EXISTS">
@@ -62,12 +62,12 @@
       </trans-unit>
       <trans-unit id="VALIDATION_ERROR">
         <source>One or more validation errors occurred.</source>
-        <target state="translated">发生一项或多项验证错误。</target>
+        <target state="translated">发生了一个或多个验证错误。</target>
         <note />
       </trans-unit>
       <trans-unit id="RESOURCE_EXHAUSTED">
         <source>Rate limit exceeded.</source>
-        <target state="translated">超出速率限制。</target>
+        <target state="translated">已超过速率限制。</target>
         <note />
       </trans-unit>
       <trans-unit id="NAMED_NOT_FOUND">
@@ -77,7 +77,7 @@
       </trans-unit>
       <trans-unit id="GENERIC_ERROR">
         <source>An error occurred.</source>
-        <target state="translated">发生错误。</target>
+        <target state="translated">发生了错误。</target>
         <note />
       </trans-unit>
       <trans-unit id="NOT_EMPTY">
@@ -95,19 +95,24 @@
         <target state="translated">不支持 '{0}'。</target>
         <note />
       </trans-unit>
+      <trans-unit id="NOT_SINGLE">
+        <source>The parameter '{0}' MUST NOT be included more than once.</source>
+        <target state="translated">参数 '{0}' 不得包含多次。</target>
+        <note />
+      </trans-unit>
       <trans-unit id="NOT_CONFIGURED">
         <source>'{0}' is not configured.</source>
-        <target state="translated">'{0}' 未配置。</target>
+        <target state="translated">未配置 '{0}'。</target>
         <note />
       </trans-unit>
       <trans-unit id="SECTOR_IDENTIFIER_URI_REQUIRED">
         <source>Application has no sector identifier URI and no redirect URIs.</source>
-        <target state="translated">应用程序未提供 sector identifier URI,也没有重定向 URI。</target>
+        <target state="translated">应用程序没有 sector identifier URI,也没有重定向 URI。</target>
         <note />
       </trans-unit>
       <trans-unit id="PATTERN_REQUIRED">
         <source>Cannot resolve a resource name without a pattern.</source>
-        <target state="translated">没有模式则无法解析资源名称。</target>
+        <target state="translated">没有模式就无法解析资源名称。</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_TABLE_NAME">
@@ -162,17 +167,17 @@
       </trans-unit>
       <trans-unit id="INVALID_PAYLOAD">
         <source>Invalid request payload.</source>
-        <target state="translated">无效的请求载荷。</target>
+        <target state="translated">无效的请求负载。</target>
         <note />
       </trans-unit>
       <trans-unit id="CROSS_PARENT_UNSUPPORTED">
         <source>Cross-parent operation is not supported for '{parent}'.</source>
-        <target state="translated">不支持针对 '{parent}' 的跨父资源操作。</target>
+        <target state="translated">'{parent}' 不支持跨父级操作。</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_PAGE_TOKEN">
         <source>The page token is invalid or has expired.</source>
-        <target state="translated">页面令牌无效或已过期。</target>
+        <target state="translated">分页令牌无效或已过期。</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_EXPRESSION">
@@ -187,7 +192,7 @@
       </trans-unit>
       <trans-unit id="INVALID_FIELD_NAME">
         <source>Invalid field name '{0}'.</source>
-        <target state="translated">无效的字段名称 '{0}'。</target>
+        <target state="translated">无效的字段名 '{0}'。</target>
         <note />
       </trans-unit>
       <trans-unit id="FUNCTION_NOT_REGISTERED">
@@ -202,12 +207,12 @@
       </trans-unit>
       <trans-unit id="INVALID_PARENT">
         <source>The parent '{parent}' is invalid.</source>
-        <target state="translated">父资源 '{parent}' 无效。</target>
+        <target state="translated">父级 '{parent}' 无效。</target>
         <note />
       </trans-unit>
       <trans-unit id="AUTHENTICATOR_KEY_REQUIRED">
         <source>The user manager must produce an authenticator key after reset.</source>
-        <target state="translated">重置后用户管理器必须生成验证器密钥。</target>
+        <target state="translated">重置后,用户管理器必须生成验证器密钥。</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_CLIENT_CREDENTIALS">
@@ -217,17 +222,177 @@
       </trans-unit>
       <trans-unit id="CLIENT_SECRET_REQUIRED">
         <source>Client secret is required for confidential clients.</source>
-        <target state="translated">机密客户端需要客户端密钥。</target>
+        <target state="translated">机密客户端需要提供客户端机密。</target>
         <note />
       </trans-unit>
       <trans-unit id="MULTIPLE_CLIENT_AUTH_METHODS">
         <source>The request uses more than one client authentication method.</source>
-        <target state="translated">请求使用了多种客户端身份验证方式。</target>
+        <target state="translated">请求使用了不止一种客户端身份验证方法。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNAUTHORIZED_CLIENT_AUTH_METHOD">
+        <source>The client is registered for a different client authentication method.</source>
+        <target state="translated">客户端注册使用的是另一种客户端身份验证方法。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_CLIENT_ASSERTION">
+        <source>The client assertion is not a well-formed JWT.</source>
+        <target state="translated">客户端断言不是格式正确的 JWT。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_ISSUER_MISMATCH">
+        <source>The client assertion issuer does not match the expected issuer.</source>
+        <target state="translated">客户端断言的颁发者与预期的颁发者不匹配。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_SUBJECT_MISMATCH">
+        <source>The client assertion subject must be the client identifier.</source>
+        <target state="translated">客户端断言的主题必须是客户端标识符。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_AUDIENCE_MISMATCH">
+        <source>The client assertion audience does not identify the authorization server.</source>
+        <target state="translated">客户端断言的受众未标识授权服务器。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_EXPIRED">
+        <source>The client assertion is expired or has no expiration time.</source>
+        <target state="translated">客户端断言已过期或没有过期时间。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_NOT_YET_VALID">
+        <source>The client assertion is not yet valid.</source>
+        <target state="translated">客户端断言尚未生效。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_JTI_REQUIRED">
+        <source>The client assertion must contain a non-empty jti claim.</source>
+        <target state="translated">客户端断言必须包含非空的 jti 声明。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_REPLAYED">
+        <source>The client assertion has already been used.</source>
+        <target state="translated">客户端断言已被使用。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_ALGORITHM_REJECTED">
+        <source>The client assertion algorithm is missing, unsecured, or not allowed.</source>
+        <target state="translated">客户端断言的算法缺失、未受保护或不受允许。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_CLIENT_ID_REQUIRED">
+        <source>The client identity must be provided by the client_id parameter or the client assertion subject.</source>
+        <target state="translated">客户端标识必须由 client_id 参数或客户端断言的主题提供。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_KEY_NOT_FOUND">
+        <source>No signing key registered for the client can verify the client assertion.</source>
+        <target state="translated">为客户端注册的签名密钥均无法验证客户端断言。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_ISSUER_UNTRUSTED">
+        <source>The assertion issuer is not a trusted jwt-bearer issuer.</source>
+        <target state="translated">断言的颁发者不是受信任的 jwt-bearer 颁发者。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ASSERTION_SIGNATURE_INVALID">
+        <source>The assertion signature could not be verified.</source>
+        <target state="translated">无法验证断言的签名。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_MALFORMED">
+        <source>The DPoP proof is not a single well-formed JWT.</source>
+        <target state="translated">DPoP 证明不是单个格式正确的 JWT。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_CLAIMS_REQUIRED">
+        <source>The DPoP proof must contain the jti, htm, htu, and iat claims.</source>
+        <target state="translated">DPoP 证明必须包含 jti、htm、htu 和 iat 声明。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_TYPE_MISMATCH">
+        <source>The DPoP proof typ header must be dpop+jwt.</source>
+        <target state="translated">DPoP 证明的 typ 标头必须为 dpop+jwt。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_ALGORITHM_REJECTED">
+        <source>The DPoP proof algorithm is missing, unsecured, or not allowed.</source>
+        <target state="translated">DPoP 证明的算法缺失、未受保护或不受允许。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_JWK_REQUIRED">
+        <source>The DPoP proof must contain a jwk header parameter with the signing public key.</source>
+        <target state="translated">DPoP 证明必须包含带有签名公钥的 jwk 标头参数。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_PRIVATE_KEY">
+        <source>The DPoP proof jwk header parameter must not contain private key material.</source>
+        <target state="translated">DPoP 证明的 jwk 标头参数不得包含私钥材料。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_SIGNATURE_INVALID">
+        <source>The DPoP proof signature does not verify with the public key in the jwk header parameter.</source>
+        <target state="translated">DPoP 证明的签名无法使用 jwk 标头参数中的公钥进行验证。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_HTM_MISMATCH">
+        <source>The DPoP proof htm claim does not match the HTTP request method.</source>
+        <target state="translated">DPoP 证明的 htm 声明与 HTTP 请求方法不匹配。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_HTU_MISMATCH">
+        <source>The DPoP proof htu claim does not match the HTTP request URI.</source>
+        <target state="translated">DPoP 证明的 htu 声明与 HTTP 请求 URI 不匹配。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_NONCE_MISMATCH">
+        <source>The DPoP proof must carry the current server-provided nonce.</source>
+        <target state="translated">DPoP 证明必须携带服务器当前提供的 nonce。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_TIME_WINDOW">
+        <source>The DPoP proof creation time is outside the acceptable window.</source>
+        <target state="translated">DPoP 证明的创建时间超出了可接受的时间范围。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_REQUIRED">
+        <source>The client is registered to always use DPoP and must send a DPoP proof header.</source>
+        <target state="translated">客户端已注册为始终使用 DPoP,必须发送 DPoP 证明标头。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_REPLAYED">
+        <source>The DPoP proof has already been used.</source>
+        <target state="translated">DPoP 证明已被使用。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_PROOF_ATH_MISMATCH">
+        <source>The DPoP proof ath claim does not match the presented access token.</source>
+        <target state="translated">DPoP 证明的 ath 声明与所出示的访问令牌不匹配。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_JKT_MALFORMED">
+        <source>The dpop_jkt parameter is not a base64url-encoded SHA-256 JWK thumbprint.</source>
+        <target state="translated">dpop_jkt 参数不是 base64url 编码的 SHA-256 JWK 指纹。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_JKT_MISMATCH">
+        <source>The DPoP proof key does not match the key bound to the authorization code.</source>
+        <target state="translated">DPoP 证明的密钥与绑定到授权码的密钥不匹配。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DPOP_REFRESH_PROOF_REQUIRED">
+        <source>The refresh token is bound to a DPoP key and must be presented with a matching DPoP proof.</source>
+        <target state="translated">刷新令牌已绑定到 DPoP 密钥,必须随匹配的 DPoP 证明一起出示。</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_GRANT">
         <source>The provided grant is invalid, expired, or revoked.</source>
-        <target state="translated">提供的授权无效、已过期或已撤销。</target>
+        <target state="translated">提供的授权许可无效、已过期或已被吊销。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_TOKEN">
+        <source>Invalid token</source>
+        <target state="translated">无效的令牌</target>
         <note />
       </trans-unit>
       <trans-unit id="PKCE_VERIFIER_MISMATCH">
@@ -237,17 +402,22 @@
       </trans-unit>
       <trans-unit id="INVALID_SCOPE">
         <source>The requested scope is not allowed for this client.</source>
-        <target state="translated">此客户端不允许使用所请求的范围。</target>
+        <target state="translated">此客户端不允许使用所请求的作用域。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_TARGET">
+        <source>The requested resource is invalid, missing, unknown, or malformed.</source>
+        <target state="translated">所请求的资源无效、缺失、未知或格式不正确。</target>
         <note />
       </trans-unit>
       <trans-unit id="UNAUTHORIZED_GRANT_TYPE">
         <source>The client is not authorized to use this grant type.</source>
-        <target state="translated">此客户端未被授权使用该授权类型。</target>
+        <target state="translated">客户端无权使用此授权许可类型。</target>
         <note />
       </trans-unit>
       <trans-unit id="ACCESS_DENIED">
         <source>The resource owner or authorization server denied the request.</source>
-        <target state="translated">资源所有者或授权服务器拒绝了请求。</target>
+        <target state="translated">资源所有者或授权服务器拒绝了该请求。</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_REDIRECT_URI">
@@ -262,7 +432,7 @@
       </trans-unit>
       <trans-unit id="USER_AUTHENTICATION_REQUIRED">
         <source>User authentication is required.</source>
-        <target state="translated">需要用户身份验证。</target>
+        <target state="translated">需要进行用户身份验证。</target>
         <note />
       </trans-unit>
       <trans-unit id="AUTHORIZATION_PENDING">
@@ -272,7 +442,7 @@
       </trans-unit>
       <trans-unit id="SLOW_DOWN">
         <source>The polling interval is too short. Increase the interval and retry.</source>
-        <target state="translated">轮询间隔过短,请增大间隔后重试。</target>
+        <target state="translated">轮询间隔太短。请增大间隔后重试。</target>
         <note />
       </trans-unit>
       <trans-unit id="INTERNAL">
@@ -282,17 +452,42 @@
       </trans-unit>
       <trans-unit id="INVALID_PROMPT_COMBINATION">
         <source>The '{0}' prompt value cannot be combined with other values.</source>
-        <target state="translated">'{0}' prompt 值不能与其他值组合使用。</target>
+        <target state="translated">'{0}' 提示值不能与其他值组合使用。</target>
         <note />
       </trans-unit>
       <trans-unit id="UNSUPPORTED_PROMPT">
         <source>The '{0}' prompt value is not supported for this client.</source>
-        <target state="translated">'{0}' prompt 值不被此客户端支持。</target>
+        <target state="translated">此客户端不支持 '{0}' 提示值。</target>
         <note />
       </trans-unit>
       <trans-unit id="USER_IDENTITY_REQUIRED">
         <source>A valid user identity is required for this request.</source>
-        <target state="translated">此请求需要有效的用户身份。</target>
+        <target state="translated">此请求需要有效的用户标识。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_JSON">
+        <source>The authorization_details parameter is not a valid JSON document.</source>
+        <target state="translated">authorization_details 参数不是有效的 JSON 文档。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_ARRAY">
+        <source>The authorization_details parameter must be a JSON array.</source>
+        <target state="translated">authorization_details 参数必须是 JSON 数组。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_OBJECT">
+        <source>Every authorization_details element must be a JSON object.</source>
+        <target state="translated">每个 authorization_details 元素都必须是 JSON 对象。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_TYPE_MEMBER">
+        <source>Every authorization_details object must carry a string type member.</source>
+        <target state="translated">每个 authorization_details 对象都必须带有字符串类型的 type 成员。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS_TYPE_UNSUPPORTED">
+        <source>The authorization details type '{0}' is not supported.</source>
+        <target state="translated">不支持的授权详情类型 '{0}'。</target>
         <note />
       </trans-unit>
       <trans-unit id="REQUIRED_SETTING_MISSING">
@@ -307,7 +502,7 @@
       </trans-unit>
       <trans-unit id="MISSING_DEPENDENT_SETTING">
         <source>{0} is set but {1} is not set.</source>
-        <target state="translated">{0} 已设置,但 {1} 未设置。</target>
+        <target state="translated">已设置 {0},但 {1} 未设置。</target>
         <note />
       </trans-unit>
       <trans-unit id="UNABLE_TO_RESOLVE">
@@ -317,7 +512,7 @@
       </trans-unit>
       <trans-unit id="INVALID_FILTER">
         <source>The filter expression is invalid.</source>
-        <target state="translated">filter 表达式无效。</target>
+        <target state="translated">筛选表达式无效。</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_UPDATE_MASK">
@@ -332,7 +527,7 @@
       </trans-unit>
       <trans-unit id="INVALID_NAME">
         <source>The requested resource name '{name}' is invalid.</source>
-        <target state="translated">请求的资源名称 '{name}' 无效。</target>
+        <target state="translated">所请求的资源名称 '{name}' 无效。</target>
         <note />
       </trans-unit>
       <trans-unit id="INVALID_ORDER_BY">
@@ -342,22 +537,22 @@
       </trans-unit>
       <trans-unit id="INVALID_REFERENCE">
         <source>'{value}' does not resolve to any registered resource type.</source>
-        <target state="translated">'{value}' 无法解析为任何已注册的资源类型。</target>
+        <target state="translated">'{value}' 未解析到任何已注册的资源类型。</target>
         <note />
       </trans-unit>
       <trans-unit id="BACK_CHANNEL_LOGOUT_REQUIRES_SCHEDULING">
         <source>Back-channel logout requires Scheduling.</source>
-        <target state="translated">反向通道注销需要 Scheduling 模块。</target>
+        <target state="translated">后端通道注销需要 Scheduling。</target>
         <note />
       </trans-unit>
       <trans-unit id="PROCESS_NAME_REQUIRED">
         <source>Process name is required.</source>
-        <target state="translated">流程名称是必填项。</target>
+        <target state="translated">必须提供流程名称。</target>
         <note />
       </trans-unit>
       <trans-unit id="PROCESS_ALREADY_REGISTERED">
         <source>Process definition '{name}' is already registered.</source>
-        <target state="translated">流程定义 '{name}' 已经注册。</target>
+        <target state="translated">流程定义 '{name}' 已注册。</target>
         <note />
       </trans-unit>
       <trans-unit id="PROCESS_NOT_REGISTERED">
@@ -365,34 +560,89 @@
         <target state="translated">流程定义 '{name}' 未注册。</target>
         <note />
       </trans-unit>
+      <trans-unit id="FLOW_EXPRESSION_INVALID">
+        <source>Condition expression '{expression}' is invalid.</source>
+        <target state="translated">条件表达式 '{expression}' 无效。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FLOW_EXPRESSION_LANGUAGE_NOT_REGISTERED">
+        <source>Expression language '{language}' has no registered compiler.</source>
+        <target state="translated">表达式语言 '{language}' 没有已注册的编译器。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="FLOW_EXPRESSION_LANGUAGE_REQUIRED">
+        <source>Process '{name}' declares string condition expressions; set Language on its process configuration.</source>
+        <target state="translated">流程 '{name}' 声明了字符串条件表达式;请在其流程配置上设置 Language。</target>
+        <note />
+      </trans-unit>
       <trans-unit id="FLOW_RUNTIME_NOT_REGISTERED">
         <source>Flow runtime '{engine}' is not registered with the host.</source>
-        <target state="translated">Flow 运行时 '{engine}' 未在主机上注册。</target>
+        <target state="translated">流程运行时 '{engine}' 未在主机中注册。</target>
         <note />
       </trans-unit>
       <trans-unit id="PROCESS_MESSAGE_NOT_DEFINED">
         <source>Message '{name}' is not defined on the process.</source>
-        <target state="translated">流程未定义消息 '{name}'。</target>
+        <target state="translated">消息 '{name}' 未在流程中定义。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_TOKEN_NOT_FOUND">
+        <source>Token '{token}' is not found on process '{process}'.</source>
+        <target state="translated">在流程 '{process}' 上找不到令牌 '{token}'。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_TOKEN_NOT_READY">
+        <source>Token '{token}' is not in a ready state.</source>
+        <target state="translated">令牌 '{token}' 未处于就绪状态。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_TOKEN_AMBIGUOUS">
+        <source>Multiple ready tokens are available; specify one of: {tokens}.</source>
+        <target state="translated">有多个就绪令牌可用;请指定其中一个:{tokens}。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_SOURCE_BINDING_AMBIGUOUS">
+        <source>Multiple source bindings match the supplied source type.</source>
+        <target state="translated">多个源绑定与所提供的源类型匹配。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_SOURCE_BINDING_DUPLICATE">
+        <source>A process source binding is declared more than once.</source>
+        <target state="translated">流程源绑定被声明了多次。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_SOURCE_MEMBER_CONFLICT">
+        <source>Process source bindings target the same member.</source>
+        <target state="translated">流程源绑定指向了同一成员。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PROCESS_SOURCE_MEMBER_INVALID">
+        <source>A process source binding member must be a writable instance property.</source>
+        <target state="translated">流程源绑定成员必须是可写的实例属性。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_REQUIRES_BPMN_ENGINE">
+        <source>Element '{element}' (type '{type}') requires the BPMN engine; use UseBpmn() instead of UseStateMachine().</source>
+        <target state="translated">元素 '{element}'(类型 '{type}')需要 BPMN 引擎;请使用 UseBpmn() 而不是 UseStateMachine()。</target>
         <note />
       </trans-unit>
       <trans-unit id="FLOW_SOURCE_MODIFIED_CONCURRENTLY">
         <source>Source '{name}' was modified concurrently; the flow transition was aborted.</source>
-        <target state="translated">源 '{name}' 被并发修改;流程转换已中止。</target>
+        <target state="translated">源 '{name}' 已被并发修改;流程转换已中止。</target>
         <note />
       </trans-unit>
       <trans-unit id="FLOW_TIMER_MISSING_VARIABLE">
         <source>Flow timer job is missing the '{variable}' variable.</source>
-        <target state="translated">流程定时器作业缺少 '{variable}' 变量。</target>
+        <target state="translated">流程计时器作业缺少 '{variable}' 变量。</target>
         <note />
       </trans-unit>
       <trans-unit id="FLOW_TIMER_REQUIRES_SCHEDULING">
         <source>Process '{name}' reached a timer catch, which requires Scheduling.</source>
-        <target state="translated">流程 '{name}' 抵达计时器捕获,需要 Scheduling 模块。</target>
+        <target state="translated">流程 '{name}' 到达了计时器捕获点,这需要 Scheduling。</target>
         <note />
       </trans-unit>
       <trans-unit id="INSIGHT_ACCESS_DENIED">
         <source>Access to source '{name}' is denied.</source>
-        <target state="translated">拒绝访问源 '{name}'。</target>
+        <target state="translated">对源 '{name}' 的访问被拒绝。</target>
         <note />
       </trans-unit>
       <trans-unit id="OPERATION_ALREADY_FINISHED">
@@ -402,17 +652,17 @@
       </trans-unit>
       <trans-unit id="STATE_MACHINE_NO_START_EVENT">
         <source>Process definition has no start event.</source>
-        <target state="translated">流程定义没有起始事件。</target>
+        <target state="translated">流程定义没有开始事件。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_START_EVENT_OUTGOING">
         <source>Start event must have exactly one outgoing sequence flow.</source>
-        <target state="translated">起始事件必须有且仅有一个出向序列流。</target>
+        <target state="translated">开始事件必须有且仅有一个传出的顺序流。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_REQUIRES_ONE_START_EVENT">
         <source>State machine requires exactly one start event.</source>
-        <target state="translated">状态机需要有且仅有一个起始事件。</target>
+        <target state="translated">状态机必须有且仅有一个开始事件。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_REQUIRES_END_EVENT">
@@ -427,7 +677,7 @@
       </trans-unit>
       <trans-unit id="STATE_MACHINE_UNKNOWN_CURRENT_STATE">
         <source>Current state '{state}' is not defined on the process.</source>
-        <target state="translated">流程中未定义当前状态 '{state}'。</target>
+        <target state="translated">当前状态 '{state}' 未在流程中定义。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_GATEWAY_UNSUPPORTED">
@@ -437,12 +687,12 @@
       </trans-unit>
       <trans-unit id="STATE_MACHINE_GATEWAY_KIND_UNSUPPORTED">
         <source>Gateway '{name}' is not supported by the state machine engine. Only exclusive and event-based gateways are supported.</source>
-        <target state="translated">状态机引擎不支持网关 '{name}'。仅支持排他与基于事件的网关。</target>
+        <target state="translated">状态机引擎不支持网关 '{name}'。仅支持排他网关和基于事件的网关。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CYCLIC_AUTO_FLOW">
         <source>Cyclic auto-flow detected at element '{name}'; the process cannot reach a stable state.</source>
-        <target state="translated">在元素 '{name}' 处检测到循环自动流;流程无法达到稳定状态。</target>
+        <target state="translated">在元素 '{name}' 处检测到循环自动流转;流程无法达到稳定状态。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_UNKNOWN_TARGET">
@@ -457,57 +707,67 @@
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_LOOP_UNSUPPORTED">
         <source>Activity '{name}' has loop characteristics which are not supported by the state machine engine.</source>
-        <target state="translated">活动 '{name}' 带有循环特征,状态机引擎不支持。</target>
+        <target state="translated">活动 '{name}' 具有状态机引擎不支持的循环特性。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ELEMENT_UNREACHABLE">
         <source>Element '{name}' is not reachable from the start event.</source>
-        <target state="translated">元素 '{name}' 从起始事件不可达。</target>
+        <target state="translated">无法从开始事件到达元素 '{name}'。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_FLOW_NO_SOURCE">
-        <source>Sequence flow '{id}' has no source element.</source>
-        <target state="translated">序列流 '{id}' 没有源元素。</target>
+        <source>Sequence flow targeting '{target}' has no source element.</source>
+        <target state="translated">以 '{target}' 为目标的顺序流没有源元素。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_FLOW_NO_TARGET">
-        <source>Sequence flow '{id}' has no target element.</source>
-        <target state="translated">序列流 '{id}' 没有目标元素。</target>
+        <source>Sequence flow from '{source}' has no target element.</source>
+        <target state="translated">来自 '{source}' 的顺序流没有目标元素。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_FLOW_UNKNOWN_SOURCE">
-        <source>Sequence flow '{id}' references unknown source element '{source}'.</source>
-        <target state="translated">序列流 '{id}' 引用了未知的源元素 '{source}'。</target>
+        <source>Sequence flow references unknown source element '{source}'.</source>
+        <target state="translated">顺序流引用了未知的源元素 '{source}'。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_FLOW_UNKNOWN_TARGET">
-        <source>Sequence flow '{id}' references unknown target element '{target}'.</source>
-        <target state="translated">序列流 '{id}' 引用了未知的目标元素 '{target}'。</target>
+        <source>Sequence flow references unknown target element '{target}'.</source>
+        <target state="translated">顺序流引用了未知的目标元素 '{target}'。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_ELEMENT_NAME_REQUIRED">
+        <source>Element of type '{type}' has no name. Every flow element requires a non-empty name.</source>
+        <target state="translated">类型为 '{type}' 的元素没有名称。每个流程元素都必须具有非空名称。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="STATE_MACHINE_DUPLICATE_ELEMENT_NAME">
+        <source>Element name '{name}' is used by more than one element. Element names must be unique within a process.</source>
+        <target state="translated">元素名称 '{name}' 被多个元素使用。元素名称在一个流程内必须唯一。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_END_EVENT_OUTGOING">
         <source>End event '{name}' must not have outgoing flows.</source>
-        <target state="translated">结束事件 '{name}' 不得有出向流。</target>
+        <target state="translated">结束事件 '{name}' 不能有传出的流。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_EVENT_GATEWAY_PARALLEL_UNSUPPORTED">
         <source>Event-based gateway '{name}' has Parallel=true, which is not supported by the state machine engine. Only exclusive mode (Parallel=false) is supported.</source>
-        <target state="translated">基于事件的网关 '{name}' 设置了 Parallel=true,状态机引擎不支持。仅支持排他模式(Parallel=false)。</target>
+        <target state="translated">基于事件的网关 '{name}' 设置了 Parallel=true,状态机引擎不支持此设置。仅支持排他模式(Parallel=false)。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_EVENT_GATEWAY_NO_OUTGOING">
         <source>Event-based gateway '{name}' must have at least one outgoing flow.</source>
-        <target state="translated">基于事件的网关 '{name}' 必须至少有一个出向流。</target>
+        <target state="translated">基于事件的网关 '{name}' 必须至少有一个传出的流。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_EVENT_GATEWAY_TARGET">
         <source>Event-based gateway '{name}' outgoing flow must target an IntermediateCatchEvent.</source>
-        <target state="translated">基于事件的网关 '{name}' 的出向流必须指向 IntermediateCatchEvent。</target>
+        <target state="translated">基于事件的网关 '{name}' 的传出流必须以 IntermediateCatchEvent 为目标。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_EXCLUSIVE_GATEWAY_NO_OUTGOING">
         <source>Exclusive gateway '{name}' must have at least one outgoing flow.</source>
-        <target state="translated">排他网关 '{name}' 必须至少有一个出向流。</target>
+        <target state="translated">排他网关 '{name}' 必须至少有一个传出的流。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_BOUNDARY_UNATTACHED">
@@ -517,32 +777,32 @@
       </trans-unit>
       <trans-unit id="STATE_MACHINE_BOUNDARY_UNKNOWN_ACTIVITY">
         <source>Boundary event '{name}' is attached to unknown activity.</source>
-        <target state="translated">边界事件 '{name}' 附加到未知的活动。</target>
+        <target state="translated">边界事件 '{name}' 附加到了未知的活动。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_BOUNDARY_NON_INTERRUPTING">
         <source>Boundary event '{name}' is non-interrupting, which is not supported by the state machine engine.</source>
-        <target state="translated">边界事件 '{name}' 是非中断的,状态机引擎不支持。</target>
+        <target state="translated">边界事件 '{name}' 为非中断型,状态机引擎不支持该类型。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_BOUNDARY_OUTGOING_REQUIRED">
         <source>Boundary event '{name}' must have exactly one outgoing flow.</source>
-        <target state="translated">边界事件 '{name}' 必须有且仅有一个出向流。</target>
+        <target state="translated">边界事件 '{name}' 必须有且仅有一个传出的流。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CANCEL_BOUNDARY_REQUIRES_TRANSACTION">
         <source>Cancel boundary event '{name}' must be attached to a transaction sub-process.</source>
-        <target state="new">Cancel boundary event '{name}' must be attached to a transaction sub-process.</target>
+        <target state="translated">取消边界事件 '{name}' 必须附加到事务子流程。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_TRANSACTION_REQUIRES_END_EVENT">
         <source>Transaction sub-process '{name}' must contain at least one end event.</source>
-        <target state="new">Transaction sub-process '{name}' must contain at least one end event.</target>
+        <target state="translated">事务子流程 '{name}' 必须至少包含一个结束事件。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CATCH_EVENT_NO_OUTGOING">
         <source>Intermediate catch event '{name}' must have at least one outgoing flow.</source>
-        <target state="translated">中间捕获事件 '{name}' 必须至少有一个出向流。</target>
+        <target state="translated">中间捕获事件 '{name}' 必须至少有一个传出的流。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CATCH_EVENT_GATEWAY_REQUIRED">
@@ -552,67 +812,457 @@
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_NO_OUTGOING">
         <source>Activity '{name}' has no outgoing flow and cannot proceed. Route it to an end event or another element.</source>
-        <target state="translated">活动 '{name}' 没有出向流,无法继续。请将其连接到结束事件或其他元素。</target>
+        <target state="translated">活动 '{name}' 没有传出的流,无法继续。请将其路由到结束事件或其他元素。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_MIXED_GATEWAY">
         <source>Activity '{name}' has mixed outgoing paths (direct and gateway). Each activity can have at most one outgoing path type.</source>
-        <target state="translated">活动 '{name}' 有混合的出向路径(直接与网关)。每个活动最多只能有一种出向路径类型。</target>
+        <target state="translated">活动 '{name}' 存在混合的传出路径(直接和网关)。每个活动最多只能有一种传出路径类型。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_MIXED_END">
         <source>Activity '{name}' has mixed outgoing paths (end event and other). Each activity can have at most one outgoing path type.</source>
-        <target state="translated">活动 '{name}' 有混合的出向路径(结束事件与其他)。每个活动最多只能有一种出向路径类型。</target>
+        <target state="translated">活动 '{name}' 存在混合的传出路径(结束事件和其他)。每个活动最多只能有一种传出路径类型。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ACTIVITY_MULTIPLE_DIRECT">
         <source>Activity '{name}' has multiple direct outgoing flows to activities. An activity can have at most one direct outgoing flow.</source>
-        <target state="translated">活动 '{name}' 有多个直接通向其他活动的出向流。一个活动最多只能有一条直接出向流。</target>
+        <target state="translated">活动 '{name}' 有多条指向活动的直接传出流。一个活动最多只能有一条直接传出流。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_MULTI_INSTANCE_CARDINALITY_REQUIRED">
         <source>Multi-instance activity '{name}' must define loop cardinality.</source>
-        <target state="new">Multi-instance activity '{name}' must define loop cardinality.</target>
+        <target state="translated">多实例活动 '{name}' 必须定义循环基数。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_MULTI_INSTANCE_EVENT_BEHAVIOR_UNSUPPORTED">
         <source>Multi-instance activity '{name}' uses a completion event behavior that is not supported by the BPMN engine.</source>
-        <target state="new">Multi-instance activity '{name}' uses a completion event behavior that is not supported by the BPMN engine.</target>
+        <target state="translated">多实例活动 '{name}' 使用了 BPMN 引擎不支持的完成事件行为。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_CALL_ACTIVITY_CALLED_ELEMENT_REQUIRED">
         <source>Call activity '{name}' must define calledElement.</source>
-        <target state="new">Call activity '{name}' must define calledElement.</target>
+        <target state="translated">调用活动 '{name}' 必须定义 calledElement。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_EVENT_SUBPROCESS_START_TRIGGER_REQUIRED">
         <source>Event sub-process start event '{name}' must define a trigger event definition.</source>
-        <target state="new">Event sub-process start event '{name}' must define a trigger event definition.</target>
+        <target state="translated">事件子流程的开始事件 '{name}' 必须定义触发事件定义。</target>
         <note />
       </trans-unit>
       <trans-unit id="STATE_MACHINE_ESCALATION_NAME_REQUIRED">
         <source>Escalation event '{name}' must define a non-empty escalation name.</source>
-        <target state="new">Escalation event '{name}' must define a non-empty escalation name.</target>
+        <target state="translated">升级事件 '{name}' 必须定义非空的升级名称。</target>
         <note />
       </trans-unit>
-      <trans-unit id="PROCESS_TOKEN_NOT_FOUND">
-        <source>Token '{token}' is not found on process '{process}'.</source>
-        <target state="new">Token '{token}' is not found on process '{process}'.</target>
+      <trans-unit id="STATE_MACHINE_NONE_TASK_BOUNDARY_UNREACHABLE">
+        <source>None task '{name}' passes through to its awaited gateway or end event, so boundary events attached to it can never fire. Use a user task, or move the catches into the Await branches.</source>
+        <target state="translated">None 任务 '{name}' 会直接透传到其等待的网关或结束事件,因此附加到它的边界事件永远不会触发。请改用用户任务,或将捕获点移入 Await 分支。</target>
         <note />
       </trans-unit>
-      <trans-unit id="PROCESS_TOKEN_NOT_READY">
-        <source>Token '{token}' is not in a ready state.</source>
-        <target state="new">Token '{token}' is not in a ready state.</target>
+      <trans-unit id="STATE_MACHINE_ENTER_TASK_BYPASSED">
+        <source>Activity '{name}' runs enter task '{enter}' on entry, but the flow from '{source}' targets the activity directly and bypasses it. Route inbound flows through the enter task.</source>
+        <target state="translated">活动 '{name}' 在进入时运行 enter 任务 '{enter}',但来自 '{source}' 的流直接以该活动为目标,绕过了它。请将传入流路由为经过 enter 任务。</target>
         <note />
       </trans-unit>
-      <trans-unit id="PROCESS_TOKEN_AMBIGUOUS">
-        <source>Multiple ready tokens are available; specify one of: {tokens}.</source>
-        <target state="new">Multiple ready tokens are available; specify one of: {tokens}.</target>
+      <trans-unit id="BPMN_NOT_IMPLEMENTED">
+        <source>BPMN feature '{feature}' is not yet implemented in this engine version.</source>
+        <target state="translated">此引擎版本尚未实现 BPMN 功能 '{feature}'。</target>
         <note />
       </trans-unit>
-      <trans-unit id="STATE_MACHINE_REQUIRES_BPMN_ENGINE">
-        <source>Element '{element}' (type '{type}') requires the BPMN engine; use UseBpmn() instead of UseStateMachine().</source>
-        <target state="new">Element '{element}' (type '{type}') requires the BPMN engine; use UseBpmn() instead of UseStateMachine().</target>
+      <trans-unit id="BPMN_CALL_ACTIVITY_REQUIRES_SERVICES">
+        <source>BPMN call activity '{name}' requires a service provider; register Schemata.Flow.Bpmn with a process registry.</source>
+        <target state="translated">BPMN 调用活动 '{name}' 需要服务提供程序;请在流程注册表中注册 Schemata.Flow.Bpmn。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="BPMN_LOOP_NOT_IMPLEMENTED">
+        <source>BPMN activity '{name}' has loop characteristics of type '{type}' which are not yet implemented in this engine version.</source>
+        <target state="translated">BPMN 活动 '{name}' 具有类型为 '{type}' 的循环特性,此引擎版本尚未实现该特性。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="BPMN_TRANSPARENT_GATEWAY_NOT_SUPPORTED">
+        <source>BPMN gateway '{type}' cannot be transparently resolved; route through AdvanceAsync to dispatch it.</source>
+        <target state="translated">BPMN 网关 '{type}' 无法透明解析;请通过 AdvanceAsync 进行路由以调度它。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="BPMN_INVALID_TRIGGER">
+        <source>Trigger '{trigger}' is not valid from state '{state}'.</source>
+        <target state="translated">触发器 '{trigger}' 在状态 '{state}' 下无效。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_REQUEST">
+        <source>The request is malformed or missing a required parameter.</source>
+        <target state="translated">请求格式不正确或缺少必需的参数。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_CLIENT">
+        <source>Client authentication failed.</source>
+        <target state="translated">客户端身份验证失败。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="CONSENT_REQUIRED">
+        <source>The authorization server requires end-user consent.</source>
+        <target state="translated">授权服务器需要最终用户同意。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGIN_REQUIRED">
+        <source>The authorization server requires end-user authentication.</source>
+        <target state="translated">授权服务器需要对最终用户进行身份验证。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="EXPIRED_TOKEN">
+        <source>The provided token has expired.</source>
+        <target state="translated">提供的令牌已过期。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INTERACTION_REQUIRED">
+        <source>The end-user must interact with the authorization server to continue.</source>
+        <target state="translated">最终用户必须与授权服务器交互才能继续。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="ACCOUNT_SELECTION_REQUIRED">
+        <source>The end-user must select an account to continue.</source>
+        <target state="translated">最终用户必须选择一个账户才能继续。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_AUTHORIZATION_DETAILS">
+        <source>The authorization_details parameter is invalid.</source>
+        <target state="translated">authorization_details 参数无效。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_CLIENT_METADATA">
+        <source>The client registration metadata is invalid.</source>
+        <target state="translated">客户端注册元数据无效。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_DPOP_PROOF">
+        <source>The DPoP proof JWT is invalid.</source>
+        <target state="translated">DPoP 证明 JWT 无效。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_REQUEST_OBJECT">
+        <source>The request object is invalid.</source>
+        <target state="translated">请求对象无效。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_REQUEST_URI">
+        <source>The request_uri does not resolve to a valid request object.</source>
+        <target state="translated">request_uri 未解析到有效的请求对象。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_SOFTWARE_STATEMENT">
+        <source>The software statement is invalid.</source>
+        <target state="translated">软件声明无效。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNAPPROVED_SOFTWARE_STATEMENT">
+        <source>The software statement is not approved for use.</source>
+        <target state="translated">软件声明未获批准使用。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="REGISTRATION_NOT_SUPPORTED">
+        <source>The authorization server does not support dynamic client registration.</source>
+        <target state="translated">授权服务器不支持动态客户端注册。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="REQUEST_NOT_SUPPORTED">
+        <source>The authorization server does not support the request parameter.</source>
+        <target state="translated">授权服务器不支持 request 参数。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="REQUEST_URI_NOT_SUPPORTED">
+        <source>The authorization server does not support the request_uri parameter.</source>
+        <target state="translated">授权服务器不支持 request_uri 参数。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="SERVER_ERROR">
+        <source>The authorization server encountered an unexpected condition.</source>
+        <target state="translated">授权服务器遇到了意外情况。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNAUTHORIZED_CLIENT">
+        <source>The client is not authorized to use this method.</source>
+        <target state="translated">客户端无权使用此方法。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNSUPPORTED_GRANT_TYPE">
+        <source>The authorization grant type is not supported by the authorization server.</source>
+        <target state="translated">授权服务器不支持此授权许可类型。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNSUPPORTED_RESPONSE_TYPE">
+        <source>The authorization server does not support obtaining an authorization code using this method.</source>
+        <target state="translated">授权服务器不支持使用此方法获取授权码。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="UNSUPPORTED_TOKEN_TYPE">
+        <source>The requested token type is not supported.</source>
+        <target state="translated">不支持所请求的令牌类型。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="USE_DPOP_NONCE">
+        <source>The DPoP proof must carry the server-issued nonce.</source>
+        <target state="translated">DPoP 证明必须携带服务器颁发的 nonce。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SOURCE_REQUIRES_RESOURCE">
+        <source>A repository source requires a resource parameter.</source>
+        <target state="translated">存储库源需要资源参数。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_UNKNOWN_SOURCE">
+        <source>Unknown resource '{name}'.</source>
+        <target state="translated">未知的资源 '{name}'。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NODE_UNSUPPORTED">
+        <source>Plan node '{node}' is not supported by the repository driver.</source>
+        <target state="translated">存储库驱动程序不支持计划节点 '{node}'。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_STAGE_REQUIRED">
+        <source>Plan node '{node}' is not a nested stage.</source>
+        <target state="translated">计划节点 '{node}' 不是嵌套阶段。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_COLLECTION_MISSING">
+        <source>Driver '{driver}' returned no child collection for nested selection '{alias}' (path '{field}'); declare Nested or include the child collection in raw rows.</source>
+        <target state="translated">驱动程序 '{driver}' 未为嵌套选择 '{alias}'(路径 '{field}')返回子集合;请声明 Nested,或在原始行中包含子集合。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_ANCHOR_INVALID">
+        <source>Nested selection '{alias}' (path '{field}') cannot be anchored to a single source.</source>
+        <target state="translated">嵌套选择 '{alias}'(路径 '{field}')无法锚定到单一源。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_NOT_COLLECTION">
+        <source>Nested selection '{alias}' (path '{field}') targets a non-collection value.</source>
+        <target state="translated">嵌套选择 '{alias}'(路径 '{field}')以非集合值为目标。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_LOCAL_STAGE_REQUIRED">
+        <source>Plan node '{stage}' is not a local stage.</source>
+        <target state="translated">计划节点 '{stage}' 不是本地阶段。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_AGGREGATION_UNSUPPORTED">
+        <source>Unsupported aggregation '{function}'.</source>
+        <target state="translated">不支持的聚合 '{function}'。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SOURCE_REQUIRED">
+        <source>The plan has no source.</source>
+        <target state="translated">计划没有源。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_SOURCE_REQUIRED">
+        <source>A join input has no source.</source>
+        <target state="translated">联接输入没有源。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_DRIVER_UNREGISTERED">
+        <source>No driver '{driver}' is registered.</source>
+        <target state="translated">未注册驱动程序 '{driver}'。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SINGLE_SOURCE_STAGE_REQUIRED">
+        <source>Plan node '{stage}' is not a single-source stage.</source>
+        <target state="translated">计划节点 '{stage}' 不是单源阶段。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_AT_LEAST_ONE_SOURCE">
+        <source>At least one source is required.</source>
+        <target state="translated">至少需要一个源。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_ALIAS_DUPLICATE">
+        <source>Duplicate source alias '{alias}'.</source>
+        <target state="translated">源别名 '{alias}' 重复。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_KIND_REQUIRED">
+        <source>A join must specify a kind.</source>
+        <target state="translated">联接必须指定类型。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_ALREADY_JOINED">
+        <source>Join aliases '{left}' and '{right}' are already joined.</source>
+        <target state="translated">联接别名 '{left}' 和 '{right}' 已联接。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_ALL_CONNECTED">
+        <source>All sources must be connected by joins.</source>
+        <target state="translated">所有源都必须通过联接连通。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_JOIN_ALIAS_UNKNOWN">
+        <source>Join references unknown alias '{alias}'.</source>
+        <target state="translated">联接引用了未知别名 '{alias}'。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_TOP_SKIP_UNSUPPORTED">
+        <source>Mid-pipeline top/skip is not supported at the top level; use top-level page_size/skip.</source>
+        <target state="translated">不支持在顶层使用管道中段的 top/skip;请使用顶层的 page_size/skip。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_TRANSFORM_ONE_OPERATION">
+        <source>A transformation must set exactly one operation.</source>
+        <target state="translated">一个转换必须恰好设置一个操作。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_EXPRESSION_LANGUAGE_UNKNOWN">
+        <source>Unknown expression language '{language}'.</source>
+        <target state="translated">未知的表达式语言 '{language}'。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_EXPRESSION_NOT_VALUE_CAPABLE">
+        <source>Language '{language}' cannot compile value expressions.</source>
+        <target state="translated">语言 '{language}' 无法编译值表达式。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_EXPRESSION_INVALID">
+        <source>Invalid expression '{expression}'.</source>
+        <target state="translated">表达式 '{expression}' 无效。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_FLAT_SELECTION_TRANSFORMATIONS">
+        <source>A flat selection cannot carry transformations.</source>
+        <target state="translated">扁平选择不能包含转换。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SELECTION_ALIAS_REQUIRED">
+        <source>A computed selection requires an alias.</source>
+        <target state="translated">计算的选择需要别名。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_SELECTION_FIELD_REQUIRED">
+        <source>A selection must specify a field.</source>
+        <target state="translated">选择必须指定字段。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_FIELD_REQUIRED">
+        <source>A nested selection must name its navigation field.</source>
+        <target state="translated">嵌套选择必须指定其导航字段。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INSIGHT_NESTED_ALIAS_UNKNOWN">
+        <source>A nested selection '{field}' must name an existing source alias.</source>
+        <target state="translated">嵌套选择 '{field}' 必须指定现有的源别名。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DEFAULT_ERROR">
+        <source>An unknown failure has occurred.</source>
+        <target state="translated">发生了未知失败。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="CONCURRENCY_FAILURE">
+        <source>Optimistic concurrency failure, object has been modified.</source>
+        <target state="translated">乐观并发失败,对象已被修改。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_USER_NAME">
+        <source>User name '{userName}' is invalid, can only contain letters or digits.</source>
+        <target state="translated">用户名 '{userName}' 无效,只能包含字母或数字。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_EMAIL">
+        <source>Email '{email}' is invalid.</source>
+        <target state="translated">电子邮件 '{email}' 无效。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DUPLICATE_USER_NAME">
+        <source>User name '{userName}' is already taken.</source>
+        <target state="translated">用户名 '{userName}' 已被占用。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DUPLICATE_EMAIL">
+        <source>Email '{email}' is already taken.</source>
+        <target state="translated">电子邮件 '{email}' 已被占用。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="INVALID_ROLE_NAME">
+        <source>Role name '{role}' is invalid.</source>
+        <target state="translated">角色名 '{role}' 无效。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="DUPLICATE_ROLE_NAME">
+        <source>Role name '{role}' is already taken.</source>
+        <target state="translated">角色名 '{role}' 已被占用。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="USER_ALREADY_IN_ROLE">
+        <source>User already in role '{role}'.</source>
+        <target state="translated">用户已属于角色 '{role}'。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="USER_NOT_IN_ROLE">
+        <source>User is not in role '{role}'.</source>
+        <target state="translated">用户不属于角色 '{role}'。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_TOO_SHORT">
+        <source>Passwords must be at least {length} characters.</source>
+        <target state="translated">密码长度必须至少为 {length} 个字符。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_UNIQUE_CHARS">
+        <source>Passwords must use at least {uniqueChars} different characters.</source>
+        <target state="translated">密码必须使用至少 {uniqueChars} 个不同字符。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_NON_ALPHANUMERIC">
+        <source>Passwords must have at least one non-alphanumeric character.</source>
+        <target state="translated">密码必须至少包含一个非字母数字字符。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_DIGIT">
+        <source>Passwords must have at least one digit ('0'-'9').</source>
+        <target state="translated">密码必须至少包含一个数字('0'-'9')。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_LOWER">
+        <source>Passwords must have at least one lowercase ('a'-'z').</source>
+        <target state="translated">密码必须至少包含一个小写字母('a'-'z')。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_REQUIRES_UPPER">
+        <source>Passwords must have at least one uppercase ('A'-'Z').</source>
+        <target state="translated">密码必须至少包含一个大写字母('A'-'Z')。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="PASSWORD_MISMATCH">
+        <source>Incorrect password.</source>
+        <target state="translated">密码不正确。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="RECOVERY_CODE_REDEMPTION_FAILED">
+        <source>Recovery code redemption failed.</source>
+        <target state="translated">恢复代码兑换失败。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGIN_ALREADY_ASSOCIATED">
+        <source>A user with this login already exists.</source>
+        <target state="translated">已存在具有此登录名的用户。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="USER_ALREADY_HAS_PASSWORD">
+        <source>User already has a password set.</source>
+        <target state="translated">用户已设置了密码。</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGOUT_PAGE_TITLE">
+        <source>Logging out</source>
+        <target state="translated">正在注销</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGOUT_PAGE_TEXT">
+        <source>Logging out…</source>
+        <target state="translated">正在注销…</target>
+        <note />
+      </trans-unit>
+      <trans-unit id="LOGOUT_PAGE_CONTINUE">
+        <source>Continue</source>
+        <target state="translated">继续</target>
         <note />
       </trans-unit>
     </body>

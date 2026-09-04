@@ -51,6 +51,27 @@ public static partial class LocalizedMessageFormatter
         return Format(template, args is null ? null : NormalizeMetadata(args), CultureInfo.InvariantCulture);
     }
 
+    /// <summary>
+    ///     Resolves <paramref name="resourceKey" /> from
+    ///     <see cref="SchemataResources" /> in the current UI culture and renders it
+    ///     with <paramref name="args" />, for messages delivered to the caller
+    ///     without a locale-aware response boundary.
+    /// </summary>
+    /// <param name="resourceKey">The resx data name.</param>
+    /// <param name="args">Optional named substitution arguments.</param>
+    public static string? FormatLocalized(string resourceKey, IReadOnlyDictionary<string, string?>? args = null) {
+        var template = SchemataResources.GetResourceString(resourceKey);
+        return Format(template, args is null ? null : NormalizeMetadata(args), CultureInfo.CurrentCulture);
+    }
+
+    /// <summary>
+    ///     Whether the template carries named or positional placeholders that require
+    ///     arguments to render.
+    /// </summary>
+    internal static bool HasPlaceholders(string? template) {
+        return template is not null && (NamedPlaceholderPattern().IsMatch(template) || PositionalPlaceholderPattern().IsMatch(template));
+    }
+
     internal static Dictionary<string, string> NormalizeMetadata(IReadOnlyDictionary<string, string?> args) {
         return args.ToDictionary(kv => kv.Key, kv => kv.Value ?? string.Empty);
     }
@@ -101,6 +122,9 @@ public static partial class LocalizedMessageFormatter
             return template;
         }
     }
+
+    [GeneratedRegex(@"\{\d+\}", RegexOptions.Compiled)]
+    private static partial Regex PositionalPlaceholderPattern();
 
     [GeneratedRegex(@"\{(?<name>[A-Za-z_][A-Za-z0-9_]*)\}", RegexOptions.Compiled)]
     private static partial Regex NamedPlaceholderPattern();

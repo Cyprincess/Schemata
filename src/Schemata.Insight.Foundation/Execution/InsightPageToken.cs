@@ -1,4 +1,5 @@
 using System;
+using Schemata.Abstractions;
 using Schemata.Insight.Foundation.Planning;
 
 namespace Schemata.Insight.Foundation.Execution;
@@ -23,6 +24,6 @@ internal static class InsightPageToken
             // Falls through to the validation error below.
         }
 
-        throw new InsightValidationException(InsightReasons.InvalidArgument, "Invalid page token.");
+        throw new InsightValidationException(InsightReasons.InvalidArgument, SchemataResources.GetResourceString(SchemataResources.INVALID_PAGE_TOKEN));
     }
 }
