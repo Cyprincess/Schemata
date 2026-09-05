@@ -178,7 +178,7 @@ internal sealed class SchedulingHandlerSupport(DefaultScheduler scheduler, Schem
 
         _ = Task.Run(async () => {
             try {
-                await Task.Delay(delay, entry.Cts.Token);
+                await Task.Delay(delay, scheduler.Time, entry.Cts.Token);
                 if (!entry.Cts.Token.IsCancellationRequested) {
                     scheduler.SignalDispatcher();
                 }

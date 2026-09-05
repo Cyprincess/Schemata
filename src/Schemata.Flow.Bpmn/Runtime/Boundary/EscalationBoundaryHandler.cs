@@ -126,7 +126,13 @@ public sealed class EscalationBoundaryHandler
         foreach (var scopeName in scopeMap.ScopeChain(process, throwing.ScopeName)) {
             var boundary = FindMatchingErrorBoundary(scopeName, scopeMap, error);
             if (boundary is not null) {
-                return await FireBoundaryAsync(engine, definition, process, throwing, working, boundary, boundary.Definition!, eventName, scopeMap, execution);
+                if (boundary.Definition is not ErrorDefinition trigger) {
+                    throw new FailedPreconditionException(
+                        SchemataResources.STATE_MACHINE_UNKNOWN_TARGET,
+                        new Dictionary<string, string?> { ["name"] = boundary.Name });
+                }
+
+                return await FireBoundaryAsync(engine, definition, process, throwing, working, boundary, trigger, eventName, scopeMap, execution);
             }
         }
 

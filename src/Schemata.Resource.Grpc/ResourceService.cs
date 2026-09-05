@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoBuf.Grpc;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Messaging.Skeleton;
 using Schemata.Resource.Foundation.Commands;
@@ -79,17 +80,27 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary>
     }
 
     public virtual async ValueTask<TDetail> UpdateAsync(TRequest request, CallContext context = default) {
+        if (string.IsNullOrWhiteSpace(request.CanonicalName)) {
+            throw new InvalidArgumentException(
+                message: $"{typeof(TRequest).Name}.{nameof(ICanonicalName.CanonicalName)} is required.");
+        }
+
         var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
         var result = await dispatcher.SendAsync<UpdateResourceRequest<TEntity, TRequest, TDetail>, UpdateResultBase<TDetail>>(
-            new(request.CanonicalName!, request, Http?.User), context.CancellationToken);
+            new(request.CanonicalName, request, Http?.User), context.CancellationToken);
 
         return result.Detail!;
     }
 
     public virtual async ValueTask<TDetail?> DeleteAsync(DeleteRequest request, CallContext context = default) {
+        if (string.IsNullOrWhiteSpace(request.CanonicalName)) {
+            throw new InvalidArgumentException(
+                message: $"{nameof(DeleteRequest)}.{nameof(ICanonicalName.CanonicalName)} is required.");
+        }
+
         var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
         var result = await dispatcher.SendAsync<DeleteResourceRequest<TEntity, TDetail>, DeleteResultBase<TDetail>>(
-            new(request.CanonicalName!, request.Etag, Http?.User, request.AllowMissing), context.CancellationToken);
+            new(request.CanonicalName, request.Etag, Http?.User, request.AllowMissing), context.CancellationToken);
 
         return result.Detail;
     }

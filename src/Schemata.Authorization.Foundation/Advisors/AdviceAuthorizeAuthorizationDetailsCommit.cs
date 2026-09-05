@@ -1,10 +1,13 @@
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Commands;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
@@ -45,7 +48,15 @@ public sealed class AdviceAuthorizeAuthorizationDetailsCommit<TApp> : IAuthorize
         // Rich authorization is feature-scoped: the validating advisor publishes the accepted
         // grant set on the context, and stamping here keeps the raw parameter from reaching the
         // interaction payload and the grant when no feature published one.
-        authz.Request!.AuthorizationDetails = ctx.TryGet<AuthorizationDetailsGrant>(out var details) ? details?.Json : null;
+        var request = authz.Request;
+        if (request is null) {
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                SchemataResources.GetResourceString(SchemataResources.INVALID_REQUEST)
+            );
+        }
+
+        request.AuthorizationDetails = ctx.TryGet<AuthorizationDetailsGrant>(out var details) ? details?.Json : null;
 
         return Task.FromResult(AdviseResult.Continue);
     }

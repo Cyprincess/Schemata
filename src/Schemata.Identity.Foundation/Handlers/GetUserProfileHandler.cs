@@ -15,5 +15,11 @@ internal sealed class GetUserProfileHandler<TUser>(IdentityOperationHandler<TUse
     public Task<IdentityResult<ClaimsStore>> HandleAsync(
         GetUserProfileQuery<TUser> request,
         CancellationToken          ct = default
-    ) => operations.ProfileAsync(IdentityRequestHandler.Require(request).Principal!, ct);
+    ) {
+        if (request.Principal is null) {
+            return Task.FromResult(IdentityResult<ClaimsStore>.Challenge());
+        }
+
+        return operations.ProfileAsync(request.Principal, ct);
+    }
 }

@@ -232,6 +232,35 @@ public class ResourceOperationHandlerUpdateShould
         repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact]
+    public async Task NullDetailMapping_ThrowsInvalidOperation() {
+        var request = new Student { Name = "s1" };
+        var entity  = new Student { Name = "s1", CanonicalName = "students/s1" };
+
+        var repository = new Mock<IRepository<Student>>();
+        repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Mock.Of<IDisposable>());
+        repository.Setup(r => r.SingleOrDefaultAsync(
+                       It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(),
+                       It.IsAny<CancellationToken>()))
+                  .Returns(new ValueTask<Student?>(entity));
+        repository.Setup(r => r.UpdateAsync(entity, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        var mapper = new Mock<ISimpleMapper>(MockBehavior.Strict);
+        mapper.Setup(m => m.Map<Student, Student>(request, entity));
+        mapper.Setup(m => m.Map<Student, Student>(entity)).Returns((Student?)null);
+
+        using var services = Services<Student, Student, Student>();
+        using var ambient  = AdviceContext.Establish(new(services));
+        var handler = new ResourceOperationHandler<Student, Student, Student, Student>(
+            services, repository.Object, mapper.Object);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => handler.UpdateAsync("students/s1", request, null, CancellationToken.None));
+
+        Assert.Contains(typeof(Student).FullName!, ex.Message);
+    }
+
     private static Mock<IRepository<T>> MissingRepository<T>() where T : class {
         var repository = new Mock<IRepository<T>>();
         repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Mock.Of<IDisposable>());

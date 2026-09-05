@@ -11,7 +11,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Google.Api.CommonProtos" />
     <PackageReference Include="Grpc.AspNetCore.Server" />
     <PackageReference Include="protobuf-net" />
     <PackageReference Include="protobuf-net.Grpc" />

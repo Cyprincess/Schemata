@@ -233,13 +233,18 @@ public sealed class RedisCacheProvider : ICacheProvider
             return;
         }
 
-        CacheEntryOptions options;
+        CacheEntryOptions? options;
         try {
-            options = JsonSerializer.Deserialize<CacheEntryOptions>((byte[]?)bytes)!;
+            options = JsonSerializer.Deserialize<CacheEntryOptions>((byte[]?)bytes);
         } catch (JsonException) {
             // Corrupt metadata is unusable for sliding-expiration refresh; drop it so the next
             // write creates a readable companion key.
             await _db.KeyDeleteAsync(meta);
+            return;
+        }
+
+        if (options is null) {
+            // Stored bytes held a valid JSON null; nothing to refresh, same as a missing entry.
             return;
         }
 

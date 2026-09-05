@@ -34,17 +34,18 @@ public class AuthorizationPipelineAdvisorShould
         var advisor = CreateAdvisor(_ => (nameof(Operations.Update), typeof(Product)));
         var calls   = 0;
 
-        Task<string> Next(CancellationToken _) {
-            calls++;
-            return Task.FromResult("completed");
-        }
-
         var result = await advisor.AdviseAsync(Context(), request, Next, CancellationToken.None);
 
         Assert.Equal("completed", result);
         Assert.Equal(1, calls);
         _resolver.Verify(value => value.Resolve(nameof(Operations.Update), typeof(Product)), Times.Once);
         _matcher.Verify(value => value.IsMatch(principal, "product.update"), Times.Once);
+        return;
+
+        Task<string> Next(CancellationToken _) {
+            calls++;
+            return Task.FromResult("completed");
+        }
     }
 
     [Theory]
@@ -58,11 +59,6 @@ public class AuthorizationPipelineAdvisorShould
         var advisor = CreateAdvisor(_ => (operation, typeof(Product)));
         var calls   = 0;
 
-        Task<string> Next(CancellationToken _) {
-            calls++;
-            return Task.FromResult("completed");
-        }
-
         var exception = await Assert.ThrowsAsync<PermissionDeniedException>(() =>
                                                                                 advisor.AdviseAsync(Context(), new(principal), Next, CancellationToken.None));
 
@@ -70,6 +66,12 @@ public class AuthorizationPipelineAdvisorShould
         Assert.Equal("PERMISSION_DENIED", exception.Status);
         Assert.Equal(0, calls);
         _resolver.Verify(value => value.Resolve(nameof(Operations.Get), typeof(Product)), Times.Never);
+        return;
+
+        Task<string> Next(CancellationToken _) {
+            calls++;
+            return Task.FromResult("completed");
+        }
     }
 
     [Fact]
@@ -147,17 +149,18 @@ public class AuthorizationPipelineAdvisorShould
         var       calls        = 0;
         var       received     = default(CancellationToken);
 
-        Task<string> Next(CancellationToken ct) {
-            calls++;
-            received = ct;
-            return Task.FromResult("completed");
-        }
-
         var result = await advisor.AdviseAsync(Context(), new(principal), Next, cancellation.Token);
 
         Assert.Equal("completed", result);
         Assert.Equal(1, calls);
         Assert.Equal(cancellation.Token, received);
+        return;
+
+        Task<string> Next(CancellationToken ct) {
+            calls++;
+            received = ct;
+            return Task.FromResult("completed");
+        }
     }
 
     [Fact]
@@ -187,17 +190,18 @@ public class AuthorizationPipelineAdvisorShould
         var advisor = CreateAdvisor(_ => (nameof(Operations.List), typeof(Product)));
         var calls   = 0;
 
-        Task<string> Next(CancellationToken _) {
-            calls++;
-            return Task.FromResult("completed");
-        }
-
         var exception = await Assert.ThrowsAsync<PermissionDeniedException>(() =>
                                                                                 advisor.AdviseAsync(Context(), new(null), Next, CancellationToken.None));
 
         Assert.Equal(403, exception.Code);
         Assert.Equal(0, calls);
         _matcher.Verify(value => value.IsMatch(It.IsAny<ClaimsPrincipal>(), It.IsAny<string>()), Times.Never);
+        return;
+
+        Task<string> Next(CancellationToken _) {
+            calls++;
+            return Task.FromResult("completed");
+        }
     }
 
     private AuthorizationPipelineAdvisor<TestRequest, string> CreateAdvisor(Func<TestRequest, (string Operation, Type? Entity)> resolve) {

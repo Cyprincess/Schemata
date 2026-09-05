@@ -15,5 +15,11 @@ internal sealed class ResetUserPasswordHandler<TUser>(IdentityOperationHandler<T
     public Task<IdentityResult<Unit>> HandleAsync(
         ResetUserPasswordRequest<TUser> request,
         CancellationToken               ct = default
-    ) => operations.ResetAsync(IdentityRequestHandler.Require(request).Request, request.Principal!, ct);
+    ) {
+        if (request.Principal is null) {
+            return Task.FromResult(IdentityResult<Unit>.Challenge());
+        }
+
+        return operations.ResetAsync(IdentityRequestHandler.Require(request).Request, request.Principal, ct);
+    }
 }

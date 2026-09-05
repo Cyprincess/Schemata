@@ -146,9 +146,17 @@ public sealed class JwtBearerGrantHandler<TApp>(
                 );
         }
 
+        var subject = presented.Subject;
+        if (string.IsNullOrWhiteSpace(subject)) {
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
+            );
+        }
+
         var claims = new List<Claim> {
             new(Claims.ClientId, application.ClientId),
-            new(IdentityClaims.Subject, presented.Subject!),
+            new(IdentityClaims.Subject, subject),
         };
 
         var identity = new ClaimsPrincipal(new ClaimsIdentity(claims, SchemataAuthorizationSchemes.Bearer));

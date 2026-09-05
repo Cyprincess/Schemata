@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Event.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
@@ -40,7 +41,12 @@ public sealed class FlowEventCatchHandler : IFlowCatchHandler
     }
 
     public async ValueTask ArmAsync(FlowTransitionContext context, CancellationToken ct = default) {
-        _subscriptions.Join(context.UnitOfWork!);
+        if (context.UnitOfWork is null) {
+            throw new FailedPreconditionException(
+                message: $"Flow event subscriptions for token '{context.Token.CanonicalName}' require an active unit of work.");
+        }
+
+        _subscriptions.Join(context.UnitOfWork);
 
         var token       = context.Token;
         var definition  = context.Definition;

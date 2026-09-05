@@ -98,6 +98,13 @@ public sealed class RepositoryDriver(IServiceProvider services) : ISourceDriver
             var shape = Lower(subPlan.Root);
             var residuals = new List<Func<TEntity, bool>>();
 
+            var repo = services.GetRequiredService<IRepository<TEntity>>();
+            var entities = repo.ListAsync<TEntity>(q => Query(q), ct);
+            var rows = Rows(entities, residuals, shape.Items, subPlan.SourceAlias, ct);
+            var schema = SchemaBuilder.For(typeof(TEntity), shape.Items, subPlan.SourceAlias);
+
+            return new RepositorySourceResult(rows, schema, scope);
+
             IQueryable<TEntity> Query(IQueryable<TEntity> source) {
                 var query = source;
                 if (entitlement is not null) {
@@ -106,8 +113,8 @@ public sealed class RepositoryDriver(IServiceProvider services) : ISourceDriver
 
                 foreach (var filter in shape.Filters) {
                     var compiler = services.GetRequiredKeyedService<IExpressionCompiler>(filter.Predicate.Language);
-                    var planner = services.GetRequiredKeyedService<IExpressionPushdownPlanner>(filter.Predicate.Language);
-                    var plan = planner.Plan(filter.Predicate.Tree, ExpressionCapabilities.Relational);
+                    var planner  = services.GetRequiredKeyedService<IExpressionPushdownPlanner>(filter.Predicate.Language);
+                    var plan     = planner.Plan(filter.Predicate.Tree, ExpressionCapabilities.Relational);
                     if (plan.Pushed is not null) {
                         query = query.Where(compiler.Compile<TEntity, bool>(plan.Pushed));
                     }
@@ -127,13 +134,6 @@ public sealed class RepositoryDriver(IServiceProvider services) : ISourceDriver
 
                 return query;
             }
-
-            var repo = services.GetRequiredService<IRepository<TEntity>>();
-            var entities = repo.ListAsync<TEntity>(q => Query(q), ct);
-            var rows = Rows(entities, residuals, shape.Items, subPlan.SourceAlias, ct);
-            var schema = SchemaBuilder.For(typeof(TEntity), shape.Items, subPlan.SourceAlias);
-
-            return new RepositorySourceResult(rows, schema, scope);
         } catch {
             await scope.DisposeAsync();
             throw;
@@ -192,6 +192,9 @@ public sealed class RepositoryDriver(IServiceProvider services) : ISourceDriver
         OrderNode? order = null;
         var items = ImmutableArray<SelectionItem>.Empty;
 
+        Visit(root);
+        return new(filters.ToImmutable(), order, items);
+
         void Visit(PlanNode node) {
             switch (node) {
                 case SelectionNode selection:
@@ -215,9 +218,6 @@ public sealed class RepositoryDriver(IServiceProvider services) : ISourceDriver
                     throw new InsightValidationException(InsightReasons.Unimplemented, LocalizedMessageFormatter.FormatInvariant(SchemataResources.INSIGHT_NODE_UNSUPPORTED, new Dictionary<string, string?> { ["node"] = node.GetType().Name })!);
             }
         }
-
-        Visit(root);
-        return new(filters.ToImmutable(), order, items);
     }
 
     private static async IAsyncEnumerable<IReadOnlyDictionary<string, object?>> Rows<TEntity>(

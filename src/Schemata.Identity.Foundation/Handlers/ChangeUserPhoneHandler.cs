@@ -15,5 +15,11 @@ internal sealed class ChangeUserPhoneHandler<TUser>(IdentityOperationHandler<TUs
     public Task<IdentityResult<Unit>> HandleAsync(
         ChangeUserPhoneRequest<TUser> request,
         CancellationToken             ct = default
-    ) => operations.ChangePhoneAsync(IdentityRequestHandler.Require(request).Request, request.Principal!, ct);
+    ) {
+        if (request.Principal is null) {
+            return Task.FromResult(IdentityResult<Unit>.Challenge());
+        }
+
+        return operations.ChangePhoneAsync(IdentityRequestHandler.Require(request).Request, request.Principal, ct);
+    }
 }

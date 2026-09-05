@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
@@ -111,6 +112,7 @@ internal sealed class RabbitMqRequestConsumerHost : BackgroundService
         } catch (Exception ex) {
             // A handler failure must not take the consumer loop down; the caller sees a timeout.
             _logger?.LogError(ex, "Request {RoutingKey} failed.", ea.RoutingKey);
+            await ReplyErrorAsync(ea, ex, ct);
         }
     }
 
@@ -149,5 +151,30 @@ internal sealed class RabbitMqRequestConsumerHost : BackgroundService
 
         // Replies go through the default exchange straight to the caller's exclusive reply queue.
         await channel.BasicPublishAsync(string.Empty, replyTo, true, props, body, ct);
+    }
+
+    private async Task ReplyErrorAsync(BasicDeliverEventArgs ea, Exception ex, CancellationToken ct) {
+        var replyTo = ea.BasicProperties.ReplyTo;
+        if (string.IsNullOrEmpty(replyTo) || _channel is not { } channel) {
+            return;
+        }
+
+        var props = new BasicProperties {
+            ContentType   = "application/json",
+            CorrelationId = ea.BasicProperties.CorrelationId,
+            Headers       = new Dictionary<string, object?> { [RequestErrorHeaders.RemoteError] = true },
+        };
+
+        // Only the stable reason code crosses the wire; the server's exception details must not
+        // leak to the caller.
+        var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(
+            new RemoteRequestError(ex is OperationCanceledException ? "cancelled" : "internal"), _json));
+
+        try {
+            // A dead channel must not take the consumer loop down; the caller's timeout is the backstop.
+            await channel.BasicPublishAsync(string.Empty, replyTo, true, props, body, ct);
+        } catch (Exception publish) {
+            _logger?.LogWarning(publish, "Failed to deliver the error reply for {RoutingKey}.", ea.RoutingKey);
+        }
     }
 }

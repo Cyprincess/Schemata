@@ -54,6 +54,11 @@ public sealed class AdviceIntrospectionAuthorizationDetails<TApp> : IIntrospecti
         IntrospectionContext<TApp> introspection,
         CancellationToken                  ct = default
     ) {
+        var response = introspection.Response;
+        if (response is null) {
+            return Task.FromResult(AdviseResult.Block);
+        }
+
         var principal = introspection.Principal;
         if (principal is null) {
             return Task.FromResult(AdviseResult.Continue);
@@ -65,7 +70,7 @@ public sealed class AdviceIntrospectionAuthorizationDetails<TApp> : IIntrospecti
 
         var details = GetAuthorizationDetails(principal, audiences);
         if (details is not null) {
-            introspection.Response!.AuthorizationDetails = details;
+            response.AuthorizationDetails = details;
         }
 
         return Task.FromResult(AdviseResult.Continue);

@@ -65,6 +65,14 @@ public sealed class AdviceRequestDpop<TApp>(
         TokenRequest      request,
         CancellationToken ct = default
     ) {
+        var clientId = application.ClientId;
+        if (string.IsNullOrWhiteSpace(clientId)) {
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.ClientId)
+            );
+        }
+
         var proof = ctx.TryGet<DpopProof>(out var carrier) ? carrier?.Value : null;
 
         if (string.IsNullOrWhiteSpace(proof)) {
@@ -87,12 +95,13 @@ public sealed class AdviceRequestDpop<TApp>(
         var key = NonceProvider;
         string jkt;
         try {
-            jkt = await proofs.ValidateAsync(proof, "POST", new(htu), null, key, application.ClientId!, ct);
+            jkt = await proofs.ValidateAsync(proof, "POST", new(htu), null, key, clientId, ct);
         } catch (OAuthException ex) when (ex.Status == OAuthErrors.UseDpopNonce) {
             // §8: the validator's nonce step rejected the proof; answer with HTTP 400
             // use_dpop_nonce and the stored value in a DPoP-Nonce response header.
             var nonce = (await nonces.GetOrCreateAsync(
-                null, key, application.ClientId!, null, dpop.Value.NonceLifetime, ct)).Value!;
+                null, key, clientId, null, dpop.Value.NonceLifetime, ct)).Value
+                ?? throw new InvalidOperationException("The DPoP nonce store returned an empty nonce value.");
             ex.Headers ??= new Dictionary<string, string>();
             ex.Headers[Headers.DpopNonce] = nonce;
             throw;

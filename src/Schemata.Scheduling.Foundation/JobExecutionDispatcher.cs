@@ -244,8 +244,8 @@ public sealed class JobExecutionDispatcher(
             try {
                 if (notifySucceeded) {
                     await observer.OnSucceededAsync(job, context, ct);
-                } else if (notifyFailed) {
-                    await observer.OnFailedAsync(job, context, exception!, ct);
+                } else if (notifyFailed && exception is { } failure) {
+                    await observer.OnFailedAsync(job, context, failure, ct);
                 } else if (notifyBlocked) {
                     await observer.OnBlockedAsync(job, context, ct);
                 } else if (notifySkipped) {

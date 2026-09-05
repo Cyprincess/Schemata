@@ -18,7 +18,7 @@ public class CacheTokenStoreShould
     [Fact]
     public async Task Same_Slot_Twice_Returns_The_Stored_Value() {
         var (cache, _, _) = Cache();
-        var store = new CacheTokenStore(cache.Object);
+        var store = new CacheTokenStore(cache.Object, TimeProvider.System);
 
         var first  = await store.GetOrCreateAsync(null, "dpop", "as:client-1", "candidate", TimeSpan.FromMinutes(5));
         var second = await store.GetOrCreateAsync(null, "dpop", "as:client-1", "candidate", TimeSpan.FromMinutes(5));
@@ -53,7 +53,7 @@ public class CacheTokenStoreShould
              .Callback((string key, byte[] _, CacheEntryOptions _, CancellationToken _) =>
                  store[key] = Encoding.UTF8.GetBytes("winner"))
              .ReturnsAsync(false);
-        var sut = new CacheTokenStore(cache.Object);
+        var sut = new CacheTokenStore(cache.Object, TimeProvider.System);
 
         var row = await sut.GetOrCreateAsync(null, "dpop", "as:client-1", "candidate", TimeSpan.FromMinutes(5));
 
@@ -68,7 +68,7 @@ public class CacheTokenStoreShould
                      It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
                      It.IsAny<CancellationToken>()))
              .ReturnsAsync(false);
-        var sut = new CacheTokenStore(cache.Object);
+        var sut = new CacheTokenStore(cache.Object, TimeProvider.System);
 
         var row = await sut.GetOrCreateAsync(null, "dpop", "as:client-1", "candidate", TimeSpan.FromMinutes(5));
 
@@ -78,7 +78,7 @@ public class CacheTokenStoreShould
     [Fact]
     public async Task GetOrCreate_Mints_A_Value_When_Given_None() {
         var (cache, _, _) = Cache();
-        var sut = new CacheTokenStore(cache.Object);
+        var sut = new CacheTokenStore(cache.Object, TimeProvider.System);
 
         var row = await sut.GetOrCreateAsync(null, "dpop", "as:client-1", null, TimeSpan.FromMinutes(5));
 
@@ -88,7 +88,7 @@ public class CacheTokenStoreShould
     [Fact]
     public async Task Get_Set_And_Remove_Round_Trip_The_Slot_Value() {
         var (cache, _, _) = Cache();
-        var sut = new CacheTokenStore(cache.Object);
+        var sut = new CacheTokenStore(cache.Object, TimeProvider.System);
 
         await sut.SetAsync(null, "device", "rate:k-1", "3", TimeSpan.FromSeconds(10));
         var stored = await sut.GetAsync(null, "device", "rate:k-1");
@@ -102,7 +102,7 @@ public class CacheTokenStoreShould
     [Fact]
     public async Task Distinct_Slots_Are_Addressed_Independently() {
         var (cache, _, _) = Cache();
-        var sut = new CacheTokenStore(cache.Object);
+        var sut = new CacheTokenStore(cache.Object, TimeProvider.System);
 
         await sut.SetAsync(null, "dpop", "as:client-1", "as-value", TimeSpan.FromMinutes(5));
         await sut.SetAsync(null, "dpop", "rs:client-1", "rs-value", TimeSpan.FromMinutes(5));
@@ -114,7 +114,7 @@ public class CacheTokenStoreShould
     [Fact]
     public async Task State_Machine_Operations_Are_Not_Supported() {
         var (cache, _, _) = Cache();
-        var sut = new CacheTokenStore(cache.Object);
+        var sut = new CacheTokenStore(cache.Object, TimeProvider.System);
         var token = new SchemataToken { Name = "nonce" };
 
         await Assert.ThrowsAsync<NotSupportedException>(() => sut.TryRedeemAsync(token));
@@ -127,7 +127,7 @@ public class CacheTokenStoreShould
     [Fact]
     public async Task Queries_And_Row_Crud_Are_Not_Supported() {
         var (cache, _, _) = Cache();
-        var sut = new CacheTokenStore(cache.Object);
+        var sut = new CacheTokenStore(cache.Object, TimeProvider.System);
 
         await Assert.ThrowsAsync<NotSupportedException>(() => sut.FindByReferenceIdAsync("ref-1"));
         await Assert.ThrowsAsync<NotSupportedException>(() => sut.FindByNameAsync("nonce"));

@@ -113,13 +113,13 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         await _repository.UpdateAsync(entity, ct);
 
         if (!finalize) {
-            var staged = _mapper.Map<TEntity, TDetail>(entity);
+            var staged = RequireDetail(_mapper.Map<TEntity, TDetail>(entity));
             return new() { Detail = staged };
         }
 
         await _repository.CommitAsync(ct);
 
-        var detail = _mapper.Map<TEntity, TDetail>(entity);
+        var detail = RequireDetail(_mapper.Map<TEntity, TDetail>(entity));
 
         return new() { Detail = detail };
     }
@@ -163,13 +163,13 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         await _repository.AddAsync(entity, ct);
 
         if (!finalize) {
-            var staged = _mapper.Map<TEntity, TDetail>(entity);
+            var staged = RequireDetail(_mapper.Map<TEntity, TDetail>(entity));
             return new() { Detail = staged };
         }
 
         await _repository.CommitAsync(ct);
 
-        var detail = _mapper.Map<TEntity, TDetail>(entity);
+        var detail = RequireDetail(_mapper.Map<TEntity, TDetail>(entity));
 
         return new() { Detail = detail };
     }

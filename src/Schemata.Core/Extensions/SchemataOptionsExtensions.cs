@@ -60,7 +60,9 @@ public static class SchemataOptionsExtensions
     /// <param name="schemata">The options container.</param>
     /// <param name="type">The concrete feature type.</param>
     public static void AddFeature(this SchemataOptions schemata, Type type) {
-        var feature = Utilities.CreateInstance<ISimpleFeature>(type, schemata.CreateLogger(type))!;
+        var feature = Utilities.CreateInstance<ISimpleFeature>(type, schemata.CreateLogger(type))
+                      ?? throw new InvalidOperationException(
+                          $"Feature type {type.FullName} has no public constructor.");
         schemata.AddFeature(type, feature);
     }
 

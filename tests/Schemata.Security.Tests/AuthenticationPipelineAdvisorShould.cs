@@ -31,17 +31,18 @@ public class AuthenticationPipelineAdvisorShould
         var calls = 0;
         var received = default(CancellationToken);
 
-        Task<string> Next(CancellationToken ct) {
-            calls++;
-            received = ct;
-            return Task.FromResult("completed");
-        }
-
         var result = await advisor.AdviseAsync(Context(), request, Next, cancellation.Token);
 
         Assert.Equal("completed", result);
         Assert.Equal(1, calls);
         Assert.Equal(cancellation.Token, received);
+        return;
+
+        Task<string> Next(CancellationToken ct) {
+            calls++;
+            received = ct;
+            return Task.FromResult("completed");
+        }
     }
 
     [Fact]
@@ -49,17 +50,18 @@ public class AuthenticationPipelineAdvisorShould
         var advisor = new AuthenticationPipelineAdvisor<TestRequest, string>(_ => (nameof(Operations.Get), typeof(Product)));
         var calls = 0;
 
-        Task<string> Next(CancellationToken _) {
-            calls++;
-            return Task.FromResult("completed");
-        }
-
         var exception = await Assert.ThrowsAsync<UnauthenticatedException>(() =>
-            advisor.AdviseAsync(Context(), new(null), Next, CancellationToken.None));
+                                                                               advisor.AdviseAsync(Context(), new(null), Next, CancellationToken.None));
 
         Assert.Equal(401, exception.Code);
         Assert.Equal("UNAUTHENTICATED", exception.Status);
         Assert.Equal(0, calls);
+        return;
+
+        Task<string> Next(CancellationToken _) {
+            calls++;
+            return Task.FromResult("completed");
+        }
     }
 
     [Fact]
@@ -67,15 +69,16 @@ public class AuthenticationPipelineAdvisorShould
         var advisor = new AuthenticationPipelineAdvisor<TestRequest, string>(_ => (nameof(Operations.Create), typeof(PublicProduct)));
         var calls = 0;
 
-        Task<string> Next(CancellationToken _) {
-            calls++;
-            return Task.FromResult("completed");
-        }
-
         var result = await advisor.AdviseAsync(Context(), new(null), Next, CancellationToken.None);
 
         Assert.Equal("completed", result);
         Assert.Equal(1, calls);
+        return;
+
+        Task<string> Next(CancellationToken _) {
+            calls++;
+            return Task.FromResult("completed");
+        }
     }
 
     [Fact]

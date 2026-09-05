@@ -35,9 +35,10 @@ public static class ServiceCollectionExtensions
         where TProvider : class, IModulesProvider
         where TRunner : class, IModulesRunner {
         var provider = typeof(TProvider);
-        var modules = Utilities.CreateInstance<IModulesProvider>(provider, schemata.CreateLogger(provider), configuration, environment, TimeProvider.System)!
-                               .GetModules()
-                               .ToList();
+        var providerInstance = Utilities.CreateInstance<IModulesProvider>(provider, schemata.CreateLogger(provider), configuration, environment, TimeProvider.System)
+                             ?? throw new InvalidOperationException(
+                                 $"Module provider type {provider.FullName} has no public constructor.");
+        var modules = providerInstance.GetModules().ToList();
         schemata.SetModules(modules);
 
         if (services.Any(s => s.ServiceType == typeof(IModulesRunner))) {
@@ -45,7 +46,9 @@ public static class ServiceCollectionExtensions
         }
 
         var runner  = typeof(TRunner);
-        var context = Utilities.CreateInstance<IModulesRunner>(runner, schemata.CreateLogger(runner), schemata, configuration, environment)!;
+        var context = Utilities.CreateInstance<IModulesRunner>(runner, schemata.CreateLogger(runner), schemata, configuration, environment)
+                   ?? throw new InvalidOperationException(
+                       $"Module runner type {runner.FullName} has no public constructor.");
         context.ConfigureServices(services, configuration, environment);
         services.TryAddSingleton<IModulesRunner>(_ => context);
 

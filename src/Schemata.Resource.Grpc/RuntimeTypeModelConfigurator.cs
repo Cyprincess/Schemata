@@ -35,7 +35,7 @@ internal static class RuntimeTypeModelConfigurator
             SchemataProtoModelConfigurator.ConfigureType(model, resource.Request);
             SchemataProtoModelConfigurator.ConfigureType(model, resource.Detail);
             SchemataProtoModelConfigurator.ConfigureType(model, resource.Summary);
-            SchemataProtoModelConfigurator.ConfigureListResultType(model, resource.Summary!);
+            SchemataProtoModelConfigurator.ConfigureListResultType(model, resource.Summary);
         }
 
         foreach (var resource in registry.Resources) {

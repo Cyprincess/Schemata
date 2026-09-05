@@ -252,6 +252,11 @@ internal sealed class FlowHandlerSupport(
         string?             sourceName
     ) {
         if (source is ICanonicalName canonicalSource) {
+            if (canonicalSource.CanonicalName is null) {
+                throw new FailedPreconditionException(
+                    message: $"Process '{registration.Name}' source '{canonicalSource.GetType().Name}' has no canonical name; specify a source name.");
+            }
+
             if (sourceType is null) {
                 throw new FailedPreconditionException(
                     SchemataResources.PROCESS_SOURCE_BINDING_AMBIGUOUS,
@@ -276,7 +281,7 @@ internal sealed class FlowHandlerSupport(
             return (
                 binding.BindingName,
                 FlowSourceTypeNames.ToName(sourceType),
-                canonicalSource.CanonicalName!,
+                canonicalSource.CanonicalName,
                 source is IConcurrency concurrency ? concurrency.Timestamp : null);
         }
 
@@ -286,7 +291,12 @@ internal sealed class FlowHandlerSupport(
                 message: $"Process '{registration.Name}' binds {types.Count} source types; specify a source name.");
         }
 
-        return (types[0].Key, FlowSourceTypeNames.ToName(types[0].Value.SourceType), sourceName!, null);
+        if (sourceName is null) {
+            throw new FailedPreconditionException(
+                message: $"Process '{registration.Name}' source '{types[0].Key}' has no canonical name; specify a source name.");
+        }
+
+        return (types[0].Key, FlowSourceTypeNames.ToName(types[0].Value.SourceType), sourceName, null);
     }
 
     internal static object? DeserializePayload(object? payload, Type? type) {

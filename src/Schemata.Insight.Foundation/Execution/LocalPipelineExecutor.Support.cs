@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -130,7 +131,7 @@ public sealed partial class LocalPipelineExecutor
     }
 
     private static double ToDouble(object? value) {
-        return Convert.ToDouble(value);
+        return Convert.ToDouble(value, CultureInfo.InvariantCulture);
     }
 
     private IExpressionCompiler Compiler(string language) {

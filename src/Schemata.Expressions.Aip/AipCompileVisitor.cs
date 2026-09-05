@@ -327,7 +327,11 @@ internal sealed class AipCompileVisitor
             return BuildEqual(left, right);
         }
 
-        return Expression.MakeBinary(op.Type!.Value, left, ConvertIfNeeded(right, left.Type));
+        if (op.Type is not { } type) {
+            throw new ParseException("Unsupported AIP comparator.", op.Position);
+        }
+
+        return Expression.MakeBinary(type, left, ConvertIfNeeded(right, left.Type));
     }
 
     private static Expression BuildEqual(Expression left, Expression right) {

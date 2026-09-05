@@ -35,18 +35,6 @@ public sealed class InProcessRequestDispatcher(IServiceProvider services) : ICom
         var ctx = new AdviceContext(services);
         using var _ = AdviceContext.Establish(ctx);
 
-        Task<TResponse> Handle(CancellationToken token) {
-            var handlers = services.GetServices<IRequestHandler<TRequest, TResponse>>().ToList();
-
-            return handlers.Count switch {
-                1 => handlers[0].HandleAsync(request, token),
-                0 => throw new InvalidOperationException(
-                    $"No request handler registered for request type '{typeof(TRequest).FullName}'."),
-                _ => throw new InvalidOperationException(
-                    $"Multiple request handlers registered for request type '{typeof(TRequest).FullName}'. Expected exactly one."),
-            };
-        }
-
         if (request is not (ICommand or ICommand<TResponse> or IQuery<TResponse>)) {
             return await Handle(ct);
         }
@@ -63,6 +51,18 @@ public sealed class InProcessRequestDispatcher(IServiceProvider services) : ICom
         }
 
         return await next(ct);
+
+        Task<TResponse> Handle(CancellationToken token) {
+            var handlers = services.GetServices<IRequestHandler<TRequest, TResponse>>().ToList();
+
+            return handlers.Count switch {
+                1 => handlers[0].HandleAsync(request, token),
+                0 => throw new InvalidOperationException(
+                    $"No request handler registered for request type '{typeof(TRequest).FullName}'."),
+                _ => throw new InvalidOperationException(
+                    $"Multiple request handlers registered for request type '{typeof(TRequest).FullName}'. Expected exactly one."),
+            };
+        }
     }
 
     /// <inheritdoc cref="ICommandDispatcher.SendAsync{TCommand}" />
