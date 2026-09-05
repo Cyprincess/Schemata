@@ -26,6 +26,7 @@
 
     <None Include="..\..\artifacts\bin\Schemata.Modeling.Generator\$(Configuration)\netstandard2.0\Parlot.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
     <None Include="..\..\artifacts\bin\Schemata.Modeling.Generator\$(Configuration)\netstandard2.0\Schemata.Modeling.Generator.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="_._" Pack="true" PackagePath="lib/$(TargetFramework)" Visible="false" />
   </ItemGroup>
 
 </Project>

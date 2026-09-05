@@ -6,7 +6,6 @@
     <LangVersion>preview</LangVersion>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>preview</AnalysisLevel>
-    <NoWarn>$(NoWarn);CS1591;NU5118;NU5128;AD0001</NoWarn>
     <Nullable>enable</Nullable>
     <ImplicitUsings>false</ImplicitUsings>
     <DebugSymbols>true</DebugSymbols>
