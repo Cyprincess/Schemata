@@ -9,6 +9,7 @@ using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using Schemata.Abstractions;
 using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Runtime;
 using Schemata.Transport.RabbitMq;
 
 namespace Schemata.Messaging.RabbitMq.Runtime;
@@ -112,6 +113,12 @@ internal sealed class RabbitMqRequestDispatcher : ICommandDispatcher, IQueryDisp
             return await tcs.Task.WaitAsync(ct);
         } finally {
             _replyTypes.TryRemove(correlationId, out _);
+
+            // The entry's timeout would otherwise fire a TimeoutException at a wrapper nobody
+            // observes any more.
+            if (_correlation.Abandon(correlationId)) {
+                tcs.TrySetCanceled(ct);
+            }
         }
     }
 
@@ -175,7 +182,17 @@ internal sealed class RabbitMqRequestDispatcher : ICommandDispatcher, IQueryDisp
             return Task.CompletedTask;
         }
 
-        var body     = Encoding.UTF8.GetString(ea.Body.Span);
+        var body = Encoding.UTF8.GetString(ea.Body.Span);
+
+        // The broker boxes header values; a hand-rolled publisher may emit the flag as a string.
+        if (ea.BasicProperties.Headers?.TryGetValue(RequestErrorHeaders.RemoteError, out var flagged) == true
+         && flagged is true or "true" or "True") {
+            var error = JsonSerializer.Deserialize<RemoteRequestError>(body, _json);
+            _correlation.Fail(correlationId, new RemoteRequestException(error?.Reason ?? "internal", null));
+
+            return Task.CompletedTask;
+        }
+
         var response = JsonSerializer.Deserialize(body, responseType, _json);
         _correlation.Complete(correlationId, response);
 

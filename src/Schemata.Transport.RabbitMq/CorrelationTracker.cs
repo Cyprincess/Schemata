@@ -101,5 +101,33 @@ public sealed class CorrelationTracker : IDisposable
         return true;
     }
 
+    /// <summary>Fails the tracked request for <paramref name="correlationId" /> with a remote error.</summary>
+    public bool Fail(string correlationId, Exception exception) {
+        if (!_pending.TryRemove(correlationId, out var pending)) {
+            return false;
+        }
+
+        // Release the pending timeout's delay timer.
+        pending.Timeout.Cancel();
+        pending.Timeout.Dispose();
+        pending.Source.TrySetException(exception);
+
+        return true;
+    }
+
+    /// <summary>Cancels and removes a pending request that the caller abandoned.</summary>
+    public bool Abandon(string correlationId) {
+        if (!_pending.TryRemove(correlationId, out var pending)) {
+            return false;
+        }
+
+        // Release the pending timeout's delay timer.
+        pending.Timeout.Cancel();
+        pending.Timeout.Dispose();
+        pending.Source.TrySetCanceled();
+
+        return true;
+    }
+
     private sealed record Pending(TaskCompletionSource<object?> Source, CancellationTokenSource Timeout);
 }

@@ -195,27 +195,27 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
             switch (provider) {
                 case EstimateProvider.PostgreSql: {
                     var sql = query.ToSqlQuery(new() { InlineParameters = false });
-                    var json = Context.Execute<string>("EXPLAIN (FORMAT JSON) " + sql.Sql, sql.Parameters.ToArray());
+                    var json = await Context.ExecuteAsync<string>("EXPLAIN (FORMAT JSON) " + sql.Sql, ct, sql.Parameters.ToArray());
                     if (EstimateQueries.TryParsePostgreSql(json, out var rows)) return rows;
                     break;
                 }
                 case EstimateProvider.MySql: {
                     var sql = query.ToSqlQuery(new() { InlineParameters = false });
-                    var json = Context.Execute<string>("EXPLAIN FORMAT=JSON " + sql.Sql, sql.Parameters.ToArray());
+                    var json = await Context.ExecuteAsync<string>("EXPLAIN FORMAT=JSON " + sql.Sql, ct, sql.Parameters.ToArray());
                     if (EstimateQueries.TryParseMySql(json, out var rows)) return rows;
                     break;
                 }
                 case EstimateProvider.SqlServer: {
                     var full = $"{table.SchemaName ?? "dbo"}.{table.TableName}";
-                    var rows = Context.Execute<long>(
+                    var rows = await Context.ExecuteAsync<long>(
                         "SELECT COALESCE(SUM(p.[rows]), 0) FROM sys.partitions p WHERE p.object_id = OBJECT_ID(@full) AND p.index_id IN (0,1)",
-                        new DataParameter("@full", full));
+                        ct, new DataParameter("@full", full));
                     return rows;
                 }
                 case EstimateProvider.Sqlite: {
-                    var rows = Context.Execute<long?>(
+                    var rows = await Context.ExecuteAsync<long?>(
                         "SELECT MAX(stat) FROM sqlite_stat1 WHERE tbl = @t",
-                        new DataParameter("@t", table.TableName));
+                        ct, new DataParameter("@t", table.TableName));
                     if (rows is not null) return rows.Value;
                     break;
                 }

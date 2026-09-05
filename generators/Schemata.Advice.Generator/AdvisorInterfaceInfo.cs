@@ -52,13 +52,21 @@ internal sealed class AdvisorInterfaceInfo : IEquatable<AdvisorInterfaceInfo>
             var hash = 17;
             hash = hash * 31 + InterfaceFullyQualifiedName.GetHashCode();
             hash = hash * 31 + InterfaceMinimalName.GetHashCode();
-            hash = hash * 31 + InterfaceTypeParameters.GetHashCode();
-            hash = hash * 31 + InterfaceTypeConstraints.GetHashCode();
-            hash = hash * 31 + AdvisorTypeArguments.GetHashCode();
-            hash = hash * 31 + RunMethodParameters.GetHashCode();
-            hash = hash * 31 + RunMethodArguments.GetHashCode();
+            hash = hash * 31 + ContentHash(InterfaceTypeParameters);
+            hash = hash * 31 + ContentHash(InterfaceTypeConstraints);
+            hash = hash * 31 + ContentHash(AdvisorTypeArguments);
+            hash = hash * 31 + ContentHash(RunMethodParameters);
+            hash = hash * 31 + ContentHash(RunMethodArguments);
             hash = hash * 31 + ConstructedAdvisorType.GetHashCode();
             return hash;
+        }
+
+        static int ContentHash(List<string> values) {
+            var h = 19;
+            foreach (var v in values) {
+                h = h * 31 + StringComparer.Ordinal.GetHashCode(v);
+            }
+            return h;
         }
     }
 }
