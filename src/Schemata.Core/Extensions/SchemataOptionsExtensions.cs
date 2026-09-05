@@ -115,9 +115,10 @@ public static class SchemataOptionsExtensions
             }
 
             if (attribute is InformationAttribute info && schemata.HasFeature<SchemataLoggingFeature>()) {
-#pragma warning disable CA2254
-                schemata.Logger.Log(info.Level, info.Message, info.Parameters);
-#pragma warning restore CA2254
+                var state = (Message: info.Message, Args: info.Parameters);
+                schemata.Logger.Log(
+                    info.Level, default, state, null,
+                    (s, _) => s.Args is { Length: > 0 } ? string.Format(s.Message, s.Args) : s.Message);
             }
         }
 

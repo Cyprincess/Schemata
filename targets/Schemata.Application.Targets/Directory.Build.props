@@ -19,9 +19,19 @@
           Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)_._" Pack="true" PackagePath="lib/net8.0" Visible="false" />
+    <None Include="$(MSBuildThisFileDirectory)_._" Pack="true" PackagePath="lib/net10.0" Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\generators\Schemata.Advice.Generator\Schemata.Advice.Generator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
   <ItemGroup Condition=" '$(UseDSLTargets)' == 'true' ">
     <None Include="..\..\artifacts\bin\Schemata.Modeling.Generator\$(Configuration)\netstandard2.0\Parlot.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
     <None Include="..\..\artifacts\bin\Schemata.Modeling.Generator\$(Configuration)\netstandard2.0\Schemata.Modeling.Generator.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <ProjectReference Include="..\..\generators\Schemata.Modeling.Generator\Schemata.Modeling.Generator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(UseModularTargets)' == 'true' ">
