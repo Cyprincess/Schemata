@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using ProtoBuf.Grpc.Client;
 using Schemata.Resource.Grpc.Integration.Tests.Fixtures;
@@ -14,12 +15,21 @@ public class ResourceGrpcIntegrationShould
     public ResourceGrpcIntegrationShould(WebAppFactory factory) { _factory = factory; }
 
     [Fact]
-    public async Task List_ReturnsResult() {
+    public async Task List_Returns_Populated_Envelope() {
         var (channel, clientFactory) = _factory.CreateGrpcChannelWithClient();
         var client = channel.CreateGrpcService<IResourceService<Student, Student, Student, Student>>(clientFactory);
 
+        var created = await client.CreateAsync(new() { FullName = "GrpcListStudent" });
+
         var result = await client.ListAsync(new());
+
         Assert.NotNull(result);
+        Assert.NotNull(result.Entities);
+        var listed = Assert.Single(result.Entities, s => s.CanonicalName == created.CanonicalName);
+        Assert.Equal("GrpcListStudent", listed.FullName);
+        Assert.NotNull(result.TotalSize);
+        Assert.True(result.TotalSize >= result.Entities.Count);
+        Assert.True(string.IsNullOrEmpty(result.NextPageToken));
     }
 
     [Fact]
@@ -29,10 +39,14 @@ public class ResourceGrpcIntegrationShould
 
         var created = await client.CreateAsync(new() { FullName = "GrpcStudent" });
         Assert.NotNull(created);
-        Assert.False(string.IsNullOrWhiteSpace(created.CanonicalName), "CanonicalName should be auto-set");
+        Assert.Equal("GrpcStudent", created.FullName);
+        Assert.NotEqual(Guid.Empty, created.Uid);
+        Assert.StartsWith("students/", created.CanonicalName);
 
         var fetched = await client.GetAsync(new() { CanonicalName = created.CanonicalName });
-        Assert.Equal("GrpcStudent", fetched.FullName);
+        Assert.Equal(created.FullName, fetched.FullName);
+        Assert.Equal(created.Uid, fetched.Uid);
+        Assert.Equal(created.CanonicalName, fetched.CanonicalName);
     }
 
     [Fact]
@@ -40,14 +54,14 @@ public class ResourceGrpcIntegrationShould
         var (channel, clientFactory) = _factory.CreateGrpcChannelWithClient();
         var client = channel.CreateGrpcService<IResourceService<Student, Student, Student, Student>>(clientFactory);
 
-        // A hard-delete resource maps a missing allow_missing delete to an empty success response.
-        var exception = await Record.ExceptionAsync(() => client
-                                                         .DeleteAsync(new() {
-                                                              CanonicalName = "students/does-not-exist",
-                                                              AllowMissing  = true,
-                                                          })
-                                                         .AsTask());
+        // A hard delete resolves to an empty message per AIP-135; allow_missing
+        // suppresses NotFound for a name that never existed. Proto has no null
+        // message, so the empty response carries no resource state.
+        var deleted = await client.DeleteAsync(new() {
+            CanonicalName = "students/does-not-exist",
+            AllowMissing  = true,
+        });
 
-        Assert.Null(exception);
+        Assert.True(string.IsNullOrEmpty(deleted?.CanonicalName));
     }
 }

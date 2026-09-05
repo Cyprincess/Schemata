@@ -11,6 +11,8 @@ using Schemata.Core;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
+using Schemata.Abstractions.Advisors;
+using Schemata.Report.Skeleton.Advisors;
 using Schemata.Expressions.Aip;
 using Schemata.Expressions.Cel;
 using Schemata.Expressions.Order;
@@ -35,7 +37,8 @@ public sealed class ReportActorConcurrencyHarness : IAsyncDisposable
     public required ServiceProvider  Root       { get; init; }
 
     /// <param name="withActor">Installs the Report.Actor bridge when true; otherwise the control-group, unwrapped path.</param>
-    public static async Task<ReportActorConcurrencyHarness> BuildAsync(bool withActor) {
+    /// <param name="snapshotAdvisor">Optional extra <see cref="IReportSnapshotAdvisor" /> installed on the root provider.</param>
+    public static async Task<ReportActorConcurrencyHarness> BuildAsync(bool withActor, IReportSnapshotAdvisor? snapshotAdvisor = null) {
         var connectionString = $"Data Source=file:{Guid.NewGuid():n}?mode=memory&cache=shared";
         var connection       = new SqliteConnection(connectionString);
         connection.Open();
@@ -69,6 +72,9 @@ public sealed class ReportActorConcurrencyHarness : IAsyncDisposable
         }
 
         builder.Invoke(services);
+        if (snapshotAdvisor is not null) {
+            services.AddSingleton<IReportSnapshotAdvisor>(snapshotAdvisor);
+        }
 
         var root = services.BuildServiceProvider();
 

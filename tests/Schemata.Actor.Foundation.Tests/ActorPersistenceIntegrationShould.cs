@@ -24,7 +24,7 @@ namespace Schemata.Actor.Foundation.Tests;
 public sealed class ActorPersistenceIntegrationShould
 {
     [Fact]
-    public async Task RoundTripStateThroughARealEfCoreRepository() {
+    public async Task Round_Trip_State_Through_A_Real_EfCore_Repository() {
         using var connection = new SqliteConnection("Data Source=:memory:");
         connection.Open();
 

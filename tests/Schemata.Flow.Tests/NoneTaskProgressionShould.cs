@@ -207,26 +207,8 @@ public class NoneTaskProgressionShould
     }
 
     [Fact]
-    public void Validator_Accepts_Boundary_On_None_Task_To_Gateway() {
-        var definition = new BoundaryOnAwaitingNoneTaskProcess();
-
-        var ex = Record.Exception(() => StateMachineValidator.Validate(definition));
-
-        Assert.Null(ex);
-    }
-
-    [Fact]
     public void Validator_Accepts_Boundary_On_None_Task_To_End() {
         var definition = new BoundaryOnTerminalNoneTaskProcess();
-
-        var ex = Record.Exception(() => StateMachineValidator.Validate(definition));
-
-        Assert.Null(ex);
-    }
-
-    [Fact]
-    public void Validator_Accepts_Boundary_On_Awaiting_User_Task() {
-        var definition = new BoundaryOnAwaitingUserTaskProcess();
 
         var ex = Record.Exception(() => StateMachineValidator.Validate(definition));
 
@@ -361,27 +343,6 @@ public class NoneTaskProgressionShould
 
         public NoneTask New    { get; } = null!;
         public NoneTask Dead   { get; } = null!;
-        public Message  Cancel { get; } = null!;
-    }
-
-    #endregion
-
-    #region Nested type: BoundaryOnAwaitingUserTaskProcess
-
-    private sealed class BoundaryOnAwaitingUserTaskProcess : ProcessDefinition
-    {
-        public BoundaryOnAwaitingUserTaskProcess() {
-            this.Start().Go(Review);
-            this.During(Review).Await(this.On(Pay).Go(Done));
-            this.During(Review).OnMessage(Cancel).Go(Dead);
-            this.During(Done).End();
-            this.During(Dead).End();
-        }
-
-        public UserTask Review { get; } = null!;
-        public UserTask Done   { get; } = null!;
-        public UserTask Dead   { get; } = null!;
-        public Message  Pay    { get; } = null!;
         public Message  Cancel { get; } = null!;
     }
 

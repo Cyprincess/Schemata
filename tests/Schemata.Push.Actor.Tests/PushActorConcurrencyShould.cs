@@ -10,6 +10,7 @@ using Schemata.Messaging.Skeleton;
 using Schemata.Push.Actor.Tests.Fixtures;
 using Schemata.Push.Foundation.Commands;
 using Schemata.Push.Foundation.Handlers;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Push.Skeleton;
 using Schemata.Push.Skeleton.Entities;
 using Xunit;
@@ -55,33 +56,32 @@ public class PushActorConcurrencyShould
     }
 
     [Fact]
-    public async Task Concurrent_Adds_Without_Actor_Bridge_Race_The_Uniqueness_Guard() {
-        await using var harness = await PushActorConcurrencyHarness.BuildAsync(withActor: false);
+    public async Task Add_Committed_Inside_Another_Adds_Uniqueness_Window_Surfaces_Already_Exists() {
+        var gate = new FirstAddCommitGate();
+        await using var harness = await PushActorConcurrencyHarness.BuildAsync(withActor: false, addAdvisor: gate);
 
-        using var ready = new Barrier(Concurrency);
-        var tasks = Enumerable.Range(0, Concurrency)
-                              .Select(_ => Task.Run(async () => {
-                                  await using var inner = harness.Root.CreateAsyncScope();
-                                  var handler = inner.ServiceProvider.GetRequiredService<
-                                      IRequestHandler<AddPushSubscriptionRequest, PushSubscriptionResult>>();
-                                  ready.SignalAndWait();
-                                  try {
-                                      await handler.HandleAsync(new("owners/one", "email", "primary"), CancellationToken.None);
-                                      return (Exception?)null;
-                                  }
-                                  catch (Exception ex) {
-                                      return ex;
-                                  }
-                              }))
-                              .ToArray();
-        var outcomes = await Task.WhenAll(tasks);
+        await using var parkedScope = harness.Root.CreateAsyncScope();
+        var parked = Task.Run(() => parkedScope.ServiceProvider.GetRequiredService<
+                                   IRequestHandler<AddPushSubscriptionRequest, PushSubscriptionResult>>()
+                              .HandleAsync(new("owners/one", "email", "primary"), CancellationToken.None));
 
-        var rows      = await SubscriptionRows(harness);
-        var conflicts = outcomes.Count(outcome => outcome is not null);
-        Assert.True(
-            conflicts > 0 || rows.Count > 1,
-            "Control group neither raced the uniqueness guard nor created duplicate rows: the harness " +
-            "is not manufacturing genuine contention, so the actor-enabled case proves nothing.");
+        // The parked add's uniqueness lookup has passed and its row is not committed yet.
+        await gate.Holding.WaitAsync(TimeSpan.FromSeconds(30));
+
+        await using var racingScope = harness.Root.CreateAsyncScope();
+        var racing = await racingScope.ServiceProvider.GetRequiredService<
+                         IRequestHandler<AddPushSubscriptionRequest, PushSubscriptionResult>>()
+                     .HandleAsync(new("owners/one", "email", "primary"), CancellationToken.None);
+        Assert.Equal("owners/one", racing.Owner);
+
+        gate.Release();
+
+        // The uniqueness protection is optimistic: an insert landing between the lookup and the
+        // commit surfaces as ALREADY_EXISTS.
+        await Assert.ThrowsAsync<AlreadyExistsException>(() => parked);
+
+        var rows = await SubscriptionRows(harness);
+        Assert.Single(rows);
     }
 
     [Fact]

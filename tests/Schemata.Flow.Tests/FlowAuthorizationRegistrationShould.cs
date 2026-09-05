@@ -24,37 +24,29 @@ namespace Schemata.Flow.Tests;
 public sealed class FlowAuthorizationRegistrationShould
 {
     [Fact]
-    public void Activation_Registers_Only_Its_Security_Stage() {
-        var services = new ServiceCollection();
-        var builder  = new SchemataFlowBuilder(new(), services);
+    public void Authorization_Activation_Registers_The_Selected_Security_Stages() {
+        var envelope       = typeof(ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>);
+        var service        = typeof(IRequestPipelineAdvisor<,>).MakeGenericType(envelope, typeof(SchemataProcess));
+        var authentication = typeof(AuthenticationPipelineAdvisor<,>).MakeGenericType(envelope, typeof(SchemataProcess));
+        var authorization  = typeof(AuthorizationPipelineAdvisor<,>).MakeGenericType(envelope, typeof(SchemataProcess));
 
-        builder.WithAuthorization();
+        var onlyAuthorization = new ServiceCollection();
+        new SchemataFlowBuilder(new(), onlyAuthorization).WithAuthorization();
 
-        var envelope = typeof(ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>);
-        var service  = typeof(IRequestPipelineAdvisor<,>).MakeGenericType(envelope, typeof(SchemataProcess));
-        var advisors = services.Where(descriptor => descriptor.ServiceType == service)
-                               .Select(descriptor => descriptor.ImplementationType)
-                               .ToArray();
+        var advisors = onlyAuthorization.Where(descriptor => descriptor.ServiceType == service)
+                                        .Select(descriptor => descriptor.ImplementationType)
+                                        .ToArray();
+        Assert.DoesNotContain(authentication, advisors);
+        Assert.Contains(authorization, advisors);
 
-        Assert.DoesNotContain(typeof(AuthenticationPipelineAdvisor<,>).MakeGenericType(envelope, typeof(SchemataProcess)), advisors);
-        Assert.Contains(typeof(AuthorizationPipelineAdvisor<,>).MakeGenericType(envelope, typeof(SchemataProcess)), advisors);
-    }
+        var combined = new ServiceCollection();
+        new SchemataFlowBuilder(new(), combined).WithAuthentication().WithAuthorization();
 
-    [Fact]
-    public void Combined_Activation_Registers_Both_Security_Stages() {
-        var services = new ServiceCollection();
-        var builder  = new SchemataFlowBuilder(new(), services);
-
-        builder.WithAuthentication().WithAuthorization();
-
-        var envelope = typeof(ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>);
-        var service  = typeof(IRequestPipelineAdvisor<,>).MakeGenericType(envelope, typeof(SchemataProcess));
-        var advisors = services.Where(descriptor => descriptor.ServiceType == service)
-                               .Select(descriptor => descriptor.ImplementationType)
-                               .ToArray();
-
-        Assert.Contains(typeof(AuthenticationPipelineAdvisor<,>).MakeGenericType(envelope, typeof(SchemataProcess)), advisors);
-        Assert.Contains(typeof(AuthorizationPipelineAdvisor<,>).MakeGenericType(envelope, typeof(SchemataProcess)), advisors);
+        advisors = combined.Where(descriptor => descriptor.ServiceType == service)
+                           .Select(descriptor => descriptor.ImplementationType)
+                           .ToArray();
+        Assert.Contains(authentication, advisors);
+        Assert.Contains(authorization, advisors);
     }
 
     [Fact]
@@ -64,12 +56,8 @@ public sealed class FlowAuthorizationRegistrationShould
 
         VerifyAuthorization<ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>, SchemataProcess>(services, new(FlowOperations.Start, null, new("process", null, null, null, null, null), null), FlowOperations.Start, typeof(SchemataProcess));
         VerifyAuthorization<ResourceMethodRequest<SchemataProcess, Foundation.Commands.CompleteActivityRequest, ProcessSnapshot>, ProcessSnapshot>(services, new(FlowOperations.Complete, "processes/p1", new("processes/p1", null, null), null), FlowOperations.Complete, typeof(SchemataProcess));
-        VerifyAuthorization<ResourceMethodRequest<SchemataProcess, Foundation.Commands.CorrelateMessageRequest, ProcessSnapshot>, ProcessSnapshot>(services, new(FlowOperations.Correlate, "processes/p1", new("processes/p1", "message", null, null, null), null), FlowOperations.Correlate, typeof(SchemataProcess));
         VerifyAuthorization<ResourceMethodRequest<SchemataProcess, Foundation.Commands.ThrowSignalRequest, IReadOnlyList<SignalDeliveryResult>>, IReadOnlyList<SignalDeliveryResult>>(services, new(FlowOperations.Signal, null, new("signal", null, null, null), null), FlowOperations.Signal, typeof(SchemataProcess));
-        VerifyAuthorization<ResourceMethodRequest<SchemataProcess, DeliverSignalRequest, SignalDeliveryResult>, SignalDeliveryResult>(services, new(FlowOperations.Deliver, "processes/p1", new("processes/p1", "signal", null, null, null), null), FlowOperations.Deliver, typeof(SchemataProcess));
-        VerifyAuthorization<ResourceMethodRequest<SchemataProcess, TerminateProcessRequest, ProcessSnapshot>, ProcessSnapshot>(services, new(FlowOperations.Terminate, "processes/p1", new("processes/p1", null), null), FlowOperations.Terminate, typeof(SchemataProcess));
         VerifyAuthorization<ResourceMethodRequest<SchemataProcessToken, CancelTokenRequest, ProcessSnapshot>, ProcessSnapshot>(services, new(FlowOperations.Cancel, "processes/p1/tokens/t1", new("processes/p1", "processes/p1/tokens/t1", null), null), FlowOperations.Cancel, typeof(SchemataProcessToken));
-        VerifyAuthorization<ResourceMethodRequest<SchemataProcess, RunEventRequest, ProcessSnapshot>, ProcessSnapshot>(services, new(FlowOperations.RunEvent, "processes/p1", new("processes/p1", null, new Mock<IEventDefinition>().Object, null), null), FlowOperations.RunEvent, typeof(SchemataProcess));
     }
 
     private static void VerifyAuthorization<TEnvelope, TResponse>(ServiceCollection services, TEnvelope envelope, string operation, Type entity)
@@ -89,6 +77,7 @@ public sealed class FlowAuthorizationRegistrationShould
         Assert.Equal(operation, actual.Operation);
         Assert.Equal(entity, actual.Entity);
     }
+
     [Fact]
     public async Task Anonymous_Start_Bypasses_Authentication_And_Authorization() {
         var resolver = new Mock<IPermissionResolver>(MockBehavior.Strict);

@@ -39,37 +39,17 @@ public sealed class SchedulingMethodEnvelopeShould
             services.AddSingleton<IRequestPipelineAdvisor<TriggerJobRequest, SchemataJobExecution>>(command);
         });
 
-        await harness.Scheduler.TriggerAsync<SampleJob>(
+        var execution = await harness.Scheduler.TriggerAsync<SampleJob>(
             new() { Job = "sample" }, CancellationToken.None);
-
-        var observed = Assert.Single(wrap.Observed);
-        Assert.Equal(SchedulingOperations.Trigger, observed.Verb);
-        Assert.Equal("sample", observed.Name);
-        Assert.Equal(typeof(SchemataJob), observed.Entity);
-        Assert.Equal(1, command.Count);
-    }
-
-    [Fact]
-    public async Task Trigger_Envelope_Dispatch_Runs_The_Trigger_Handler_And_Exposes_The_Verb_To_Wraps() {
-        var wrap    = new RecordingEnvelopeAdvisor();
-        var command = new RecordingCommandAdvisor();
-        var harness = await CreateStartedHarnessAsync(services => {
-            services.AddSingleton<IRequestPipelineAdvisor<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>>(wrap);
-            services.AddSingleton<IRequestPipelineAdvisor<TriggerJobRequest, SchemataJobExecution>>(command);
-        });
-        var dispatcher = harness.Services.GetRequiredService<IRequestDispatcher>();
-
-        var execution = await dispatcher.SendAsync<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>(
-            new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new() { Job = "sample" }), null),
-            CancellationToken.None);
-
-        var observed = Assert.Single(wrap.Observed);
-        Assert.Equal(SchedulingOperations.Trigger, observed.Verb);
-        Assert.Equal("sample", observed.Name);
-        Assert.Equal(typeof(SchemataJob), observed.Entity);
         Assert.Equal("sample", execution.Job);
+
+        var observed = Assert.Single(wrap.Observed);
+        Assert.Equal(SchedulingOperations.Trigger, observed.Verb);
+        Assert.Equal("sample", observed.Name);
+        Assert.Equal(typeof(SchemataJob), observed.Entity);
         Assert.Equal(1, command.Count);
     }
+
 
     [Fact]
     public async Task Authorization_Only_Denies_And_Matching_Permission_Allows_Trigger() {

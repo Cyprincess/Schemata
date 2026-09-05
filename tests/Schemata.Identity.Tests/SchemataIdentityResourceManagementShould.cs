@@ -29,11 +29,17 @@ public class SchemataIdentityResourceManagementShould
         using var app = builder.Build();
         var registry = app.Services.GetRequiredService<ResourceRegistry>();
 
+        var user = registry.GetResource(typeof(SchemataUser));
+        Assert.NotNull(user);
+        Assert.NotNull(user.Endpoints);
         Assert.Equal(
             [HttpResourceAttribute.Name, GrpcResourceAttribute.Name],
-            registry.GetResource(typeof(SchemataUser))!.Endpoints!.OrderBy(endpoint => endpoint, System.StringComparer.Ordinal));
+            user.Endpoints.OrderBy(endpoint => endpoint, System.StringComparer.Ordinal));
+        var role = registry.GetResource(typeof(SchemataRole));
+        Assert.NotNull(role);
+        Assert.NotNull(role.Endpoints);
         Assert.Equal(
             [HttpResourceAttribute.Name, GrpcResourceAttribute.Name],
-            registry.GetResource(typeof(SchemataRole))!.Endpoints!.OrderBy(endpoint => endpoint, System.StringComparer.Ordinal));
+            role.Endpoints.OrderBy(endpoint => endpoint, System.StringComparer.Ordinal));
     }
 }

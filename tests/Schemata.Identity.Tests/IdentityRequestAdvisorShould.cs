@@ -71,9 +71,10 @@ public class IdentityRequestAdvisorShould
         IdentityOperation operation,
         IdentityStatus    status,
         System.Func<IdentityHandler<SchemataUser>, Task<IdentityResult<TResponse>>> invoke
-    ) {
+    ) where TResponse : class {
+        TResponse? payload = status == IdentityStatus.Success ? NewPayload<TResponse>() : null;
         var expected = status == IdentityStatus.Success
-            ? IdentityResult<TResponse>.Success(default)
+            ? IdentityResult<TResponse>.Success(payload)
             : IdentityResult<TResponse>.Challenge();
         var advisor = new Mock<IIdentityRequestAdvisor<TRequest>>();
         advisor.SetupGet(value => value.Order).Returns(0);
@@ -93,8 +94,13 @@ public class IdentityRequestAdvisorShould
 
         var actual = await invoke(host.Handler);
 
-        Assert.Same(expected, actual);
         Assert.Equal(status, actual.Status);
+        if (status == IdentityStatus.Success) {
+            Assert.Same(payload, actual.Data);
+        }
+        else {
+            Assert.Null(actual.Data);
+        }
         advisor.Verify(value => value.AdviseAsync(
                            It.IsAny<AdviceContext>(),
                            It.IsAny<TRequest>(),
@@ -103,5 +109,15 @@ public class IdentityRequestAdvisorShould
                            It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(userInvocations, host.Users.Invocations.Count);
         Assert.Equal(signInInvocations, host.SignIn.Invocations.Count);
+    }
+
+    private static TResponse NewPayload<TResponse>()
+        where TResponse : class {
+        if (typeof(TResponse) == typeof(ClaimsPrincipal)) { return (TResponse)(object)Principal; }
+        if (typeof(TResponse) == typeof(Unit)) { return (TResponse)(object)Unit.Value; }
+        if (typeof(TResponse) == typeof(ClaimsStore)) { return (TResponse)(object)new ClaimsStore(); }
+        if (typeof(TResponse) == typeof(AuthenticatorResponse)) { return (TResponse)(object)new AuthenticatorResponse(); }
+
+        throw new Xunit.Sdk.XunitException($"No payload fixture for response type '{typeof(TResponse)}'.");
     }
 }

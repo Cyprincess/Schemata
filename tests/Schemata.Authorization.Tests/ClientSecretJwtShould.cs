@@ -347,13 +347,17 @@ public class ClientSecretJwtShould
         string?                subject = ClientId,
         string?                jti     = null
     ) {
+        var claims = new Dictionary<string, object> {
+            ["aud"] = new[] { Issuer + Endpoints.Token },
+            ["jti"] = jti ?? Guid.NewGuid().ToString(),
+        };
+        if (subject is not null) {
+            claims["sub"] = subject;
+        }
+
         var descriptor = new SecurityTokenDescriptor {
-            Issuer  = ClientId,
-            Claims  = new Dictionary<string, object> {
-                ["sub"] = subject!,
-                ["aud"] = new[] { Issuer + Endpoints.Token },
-                ["jti"] = jti ?? Guid.NewGuid().ToString(),
-            },
+            Issuer             = ClientId,
+            Claims             = claims,
             Expires            = Now.AddMinutes(5).UtcDateTime,
             NotBefore          = Now.AddMinutes(-1).UtcDateTime,
             IssuedAt           = Now.AddMinutes(-1).UtcDateTime,

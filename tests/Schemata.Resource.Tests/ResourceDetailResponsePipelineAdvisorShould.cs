@@ -40,7 +40,8 @@ public class ResourceDetailResponsePipelineAdvisorShould
         using var services = BuildServices<Detail>(CreateRepository(), CreateMapper(detail));
         var result = await DispatchCreateAsync(services);
 
-        Assert.Equal("tenants/t1", result.Detail!.Parent);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1", result.Detail.Parent);
         Assert.Equal(WeakTag(Timestamp), result.Detail.EntityTag);
     }
 
@@ -53,7 +54,8 @@ public class ResourceDetailResponsePipelineAdvisorShould
         var result = await DispatchGetAsync<Detail>(services);
 
         // Derivation overrides whatever the mapping left behind.
-        Assert.Equal("tenants/t1", result.Detail!.Parent);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1", result.Detail.Parent);
         Assert.Equal(WeakTag(Timestamp), result.Detail.EntityTag);
     }
 
@@ -64,7 +66,8 @@ public class ResourceDetailResponsePipelineAdvisorShould
         using var services = BuildServices<Detail>(CreateRepository(), CreateMapper(detail));
         var result = await DispatchUpdateAsync(services);
 
-        Assert.Equal("tenants/t1", result.Detail!.Parent);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1", result.Detail.Parent);
         Assert.Equal(WeakTag(Timestamp), result.Detail.EntityTag);
     }
 
@@ -76,7 +79,8 @@ public class ResourceDetailResponsePipelineAdvisorShould
         using var services = BuildServices<Detail>(CreateRepository(), CreateMapper(detail));
         var result = await DispatchGetAsync<Detail>(services);
 
-        Assert.Equal("tenants/t1", result.Detail!.Parent);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1", result.Detail.Parent);
         Assert.Null(result.Detail.EntityTag);
     }
 
@@ -88,7 +92,8 @@ public class ResourceDetailResponsePipelineAdvisorShould
             options: new() { SuppressFreshness = true });
         var result = await DispatchGetAsync<Detail>(services);
 
-        Assert.Equal("tenants/t1", result.Detail!.Parent);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1", result.Detail.Parent);
         Assert.Null(result.Detail.EntityTag);
     }
 
@@ -102,7 +107,8 @@ public class ResourceDetailResponsePipelineAdvisorShould
         });
         var result = await DispatchGetAsync<Detail>(services);
 
-        Assert.Equal("tenants/t1", result.Detail!.Parent);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1", result.Detail.Parent);
         Assert.Equal("W/\"custom\"", result.Detail.EntityTag);
     }
 

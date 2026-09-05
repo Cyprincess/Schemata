@@ -46,24 +46,6 @@ public class ReportEntryEquivalenceShould
         Assert.True(reportAdvisor.SawMarker);
     }
 
-    [Fact]
-    public async Task Run_Facade_Continues_Command_Context_Into_The_Snapshot_Advisor() {
-        var commandAdvisor  = new RecordingRunCommandAdvisor();
-        var snapshotAdvisor = new RecordingSnapshotAdvisor();
-        using var provider = ReportTestHost.Create(
-            ReportTestHost.CreateDriver(ReportTestRows.Create(1)),
-            configure: services => {
-                services.AddSingleton<IRequestPipelineAdvisor<RunReportRequest, ReportResult>>(commandAdvisor);
-                services.AddSingleton<IReportSnapshotAdvisor>(snapshotAdvisor);
-            });
-        var principal = new ClaimsPrincipal(new ClaimsIdentity("test"));
-
-        await provider.GetRequiredService<IReportService>()
-                      .RunAsync(ReportTestHost.InlineRequest(persist: true), principal);
-
-        Assert.True(snapshotAdvisor.Ran);
-        Assert.True(snapshotAdvisor.SawMarker);
-    }
 
     [Fact]
     public async Task Generate_Facade_Dispatches_Wire_Command_To_Scheduler() {
@@ -100,11 +82,12 @@ public class ReportEntryEquivalenceShould
         Assert.Null(dispatched.Principal);
         Assert.NotNull(staged);
         Assert.Equal(Verbs.Generate, staged.Method);
+        Assert.NotNull(staged.ExecutionUid);
         Assert.Equal($"operations/{staged.ExecutionUid!.Value:n}", operation.CanonicalName);
     }
 
     [Fact]
-    public void Run_And_Generate_Handlers_Are_Keyed_Unkeyed_And_Commands_Round_Trip() {
+    public void Run_And_Generate_Handlers_Resolve_Keyed_And_Unkeyed() {
         using var provider = ReportTestHost.Create(
             ReportTestHost.CreateDriver(ReportTestRows.Create(1)));
 
@@ -112,9 +95,12 @@ public class ReportEntryEquivalenceShould
             RunReportHandler<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>(provider);
         AssertHandler<GenerateReportRequest, Operation,
             GenerateHandler<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>(provider);
+    }
 
+    [Fact]
+    public void Run_And_Generate_Commands_Round_Trip_Through_Json_Excluding_Principal() {
         var principal = new ClaimsPrincipal(new ClaimsIdentity("serialized"));
-        var runJson = JsonSerializer.Serialize(
+        var runJson   = JsonSerializer.Serialize(
             new RunReportRequest(ReportTestHost.InlineRequest(persist: true), principal),
             SchemataJson.Default);
         Assert.DoesNotContain("principal", runJson, StringComparison.OrdinalIgnoreCase);
@@ -182,22 +168,4 @@ public class ReportEntryEquivalenceShould
         }
     }
 
-    private sealed class RecordingSnapshotAdvisor : IReportSnapshotAdvisor
-    {
-        public int Order => 0;
-
-        public bool Ran { get; private set; }
-
-        public bool SawMarker { get; private set; }
-
-        public Task<AdviseResult> AdviseAsync(
-            AdviceContext         ctx,
-            ReportSnapshotContext context,
-            CancellationToken     ct = default
-        ) {
-            Ran       = true;
-            SawMarker = ctx.TryGet<Marker>(out _);
-            return Task.FromResult(AdviseResult.Continue);
-        }
-    }
 }

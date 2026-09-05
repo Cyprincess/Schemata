@@ -207,7 +207,8 @@ public class ResourceMethodEnvelopeShould
             <DeleteResourceRequest<SoftEntity, SoftDetail>, DeleteResultBase<SoftDetail>>(
                 new("entities/e1", null, null), CancellationToken.None);
 
-        Assert.Equal("tenants/t1", result.Detail!.Parent);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1", result.Detail.Parent);
         Assert.Equal(WeakTag(Timestamp), result.Detail.EntityTag);
     }
 

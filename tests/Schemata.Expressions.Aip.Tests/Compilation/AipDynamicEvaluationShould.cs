@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Schemata.Expressions.Skeleton;
 using Xunit;
 
 namespace Schemata.Expressions.Aip.Tests.Compilation;
@@ -72,7 +73,7 @@ public class AipDynamicEvaluationShould
     public void Reject_Function_In_Dynamic_Evaluation() {
         var tree = _compiler.Parse("regex(o.name, 'a')");
 
-        Assert.ThrowsAny<Exception>(() => _compiler.Compile<IReadOnlyDictionary<string, object?>, bool>(tree));
+        Assert.Throws<ExpressionException>(() => _compiler.Compile<IReadOnlyDictionary<string, object?>, bool>(tree));
     }
 
     private Func<IReadOnlyDictionary<string, object?>, bool> Predicate(string source) {

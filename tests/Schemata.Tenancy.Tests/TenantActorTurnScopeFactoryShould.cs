@@ -35,19 +35,37 @@ public class TenantActorTurnScopeFactoryShould
 
     [Fact]
     public async Task CreateAsync_BuildsTheTurnScope_FromTheTenantIsolatedProvider() {
-        var tenant = new SchemataTenant { Uid = Guid.NewGuid() };
-        var disposalLog = new List<string>();
-        var tenantOnlyProvider = new ServiceCollection().AddScoped<TenantOnlyMarker>().BuildServiceProvider();
-        var (root, _) = BuildRoot(tenant, disposalLog, tenantOnlyProvider);
+        var tenant       = new SchemataTenant { Uid = Guid.NewGuid() };
+        var disposalLog  = new List<string>();
+        var restorations = new List<(IServiceProvider Target, IReadOnlyDictionary<string, string?> Items)>();
+        var tenantOnlyProvider = new ServiceCollection()
+                                 .AddScoped<TenantOnlyMarker>()
+                                 .AddTransient<IMessageContextPropagator>(_ => new RecordingPropagator(restorations))
+                                 .BuildServiceProvider();
+        var (root, providerFactory) = BuildRoot(tenant, disposalLog, tenantOnlyProvider);
 
         var factory = new TenantActorTurnScopeFactory<SchemataTenant>(root.GetRequiredService<IServiceScopeFactory>());
         var context = new MessageContext(new Dictionary<string, string?> { [TenantIdKey] = tenant.Uid.ToString("D") });
 
         await using var scope = await factory.CreateAsync(context);
+        var first = scope.ServiceProvider.GetService<TenantOnlyMarker>();
 
         // Only registered in the tenant-isolated provider, never in the host root: resolving it
         // proves the turn scope descends from the tenant provider, not a scope off the root.
-        Assert.NotNull(scope.ServiceProvider.GetService<TenantOnlyMarker>());
+        Assert.NotNull(first);
+        Assert.NotSame(root, scope.ServiceProvider);
+        Assert.NotSame(tenantOnlyProvider, scope.ServiceProvider);
+
+        // The turn's propagator restoration runs against the final scope's own provider with the
+        // message context's items — the isolated provider is where tenant state reaches the turn.
+        var (target, items) = Assert.Single(restorations);
+        Assert.Same(scope.ServiceProvider, target);
+        Assert.Equal(tenant.Uid.ToString("D"), items[TenantIdKey]);
+
+        // Each turn builds its own scope from the tenant provider; container state is per turn.
+        await using var second = await factory.CreateAsync(context);
+        Assert.NotSame(first, second.ServiceProvider.GetService<TenantOnlyMarker>());
+        Assert.Equal(2, providerFactory.ProviderBuilds);
     }
 
     [Fact]
@@ -127,8 +145,11 @@ public class TenantActorTurnScopeFactoryShould
     {
         public SchemataTenant? ObservedTenant { get; private set; }
 
+        public int ProviderBuilds { get; private set; }
+
         public ITenantProviderLease CreateServiceProvider(ITenantContextAccessor<SchemataTenant> accessor) {
             ObservedTenant = accessor.Tenant;
+            ProviderBuilds++;
 
             return new StubLease(tenantProvider, disposalLog);
         }
@@ -139,5 +160,20 @@ public class TenantActorTurnScopeFactoryShould
         public IServiceProvider Provider => provider;
 
         public void Dispose() => disposalLog.Add("final-lease");
+    }
+
+    private sealed class RecordingPropagator(List<(IServiceProvider Target, IReadOnlyDictionary<string, string?> Items)> restorations)
+        : IMessageContextPropagator
+    {
+        public void Capture(IDictionary<string, string?> items, IServiceProvider source) { }
+
+        public ValueTask RestoreAsync(
+            IReadOnlyDictionary<string, string?> items,
+            IServiceProvider                     target,
+            CancellationToken                    ct = default
+        ) {
+            restorations.Add((target, items));
+            return ValueTask.CompletedTask;
+        }
     }
 }

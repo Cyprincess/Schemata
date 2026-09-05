@@ -43,6 +43,7 @@ public class ReportServiceIntegrationShould : IClassFixture<WebAppFactory>
         var pending = await reports.GenerateAsync(new() { Name = "dsl-records", Persist = true });
         Assert.False(pending.Done);
 
+        Assert.NotNull(pending.CanonicalName);
         var completed = await WaitForDoneAsync(operations, pending.CanonicalName!);
         var result    = ReportResults.FromOperation(completed);
         Assert.NotNull(result.Snapshot);
@@ -115,7 +116,9 @@ public class ReportServiceIntegrationShould : IClassFixture<WebAppFactory>
                                 },
                             },
                             CancellationToken.None);
+        Assert.NotNull(execution.CanonicalName);
         var result = ReportResults.FromOperation(await WaitForDoneAsync(operations, execution.CanonicalName!));
+        Assert.NotNull(result.Snapshot);
         return result.Snapshot!;
     }
 

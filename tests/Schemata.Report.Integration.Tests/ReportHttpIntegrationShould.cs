@@ -32,7 +32,8 @@ public class ReportHttpIntegrationShould : IClassFixture<WebAppFactory>
         Assert.True(generated.IsSuccessStatusCode, await generated.Content.ReadAsStringAsync());
         var operation = await Json(generated);
         Assert.True(operation.GetProperty("done").GetBoolean());
-        var operationName = operation.GetProperty("name").GetString()!;
+        var operationName = operation.GetProperty("name").GetString();
+        Assert.NotNull(operationName);
 
         var found = await client.GetAsync("/v1/" + operationName);
         Assert.Equal(HttpStatusCode.OK, found.StatusCode);
@@ -43,7 +44,8 @@ public class ReportHttpIntegrationShould : IClassFixture<WebAppFactory>
         Assert.Equal(HttpStatusCode.OK, snapshots.StatusCode);
         var snapshot = (await Json(snapshots)).GetProperty("snapshots")[0];
         Assert.Equal(operationName, snapshot.GetProperty("operation").GetString());
-        var snapshotName = snapshot.GetProperty("name").GetString()!;
+        var snapshotName = snapshot.GetProperty("name").GetString();
+        Assert.NotNull(snapshotName);
 
         var get = await client.GetAsync("/v1/" + snapshotName);
         Assert.Equal(HttpStatusCode.OK, get.StatusCode);
@@ -65,7 +67,8 @@ public class ReportHttpIntegrationShould : IClassFixture<WebAppFactory>
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
         var pending = await Json(response);
         Assert.False(pending.GetProperty("done").GetBoolean());
-        var operationName = pending.GetProperty("name").GetString()!;
+        var operationName = pending.GetProperty("name").GetString();
+        Assert.NotNull(operationName);
 
         var complete = await WaitForDoneAsync(client, operationName);
         Assert.True(complete.GetProperty("done").GetBoolean());
@@ -99,7 +102,9 @@ public class ReportHttpIntegrationShould : IClassFixture<WebAppFactory>
         });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var created = await Json(response);
-        return created.GetProperty("name").GetString()!.Split('/').Last();
+        var name = created.GetProperty("name").GetString();
+        Assert.NotNull(name);
+        return name.Split('/').Last();
     }
 
     private static Task<HttpResponseMessage> GenerateAsync(HttpClient client, string body) {

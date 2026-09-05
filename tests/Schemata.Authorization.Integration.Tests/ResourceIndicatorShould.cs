@@ -104,7 +104,9 @@ public class ResourceIndicatorShould
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var token   = JsonDocument.Parse(await response.Content.ReadAsStreamAsync()).RootElement;
-        var payload = Payload(token.GetProperty("access_token").GetString()!);
+        var accessToken = token.GetProperty("access_token").GetString();
+        Assert.NotNull(accessToken);
+        var payload = Payload(accessToken);
         Assert.True(payload.TryGetProperty(Claims.Audience, out var aud));
         Assert.Equal(JsonValueKind.Array, aud.ValueKind);
         Assert.Equal(new[] { Calendar, Contacts }, aud.EnumerateArray().Select(entry => entry.GetString()));
@@ -127,7 +129,9 @@ public class ResourceIndicatorShould
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var token   = JsonDocument.Parse(await response.Content.ReadAsStreamAsync()).RootElement;
-        var payload = Payload(token.GetProperty("access_token").GetString()!);
+        var accessToken = token.GetProperty("access_token").GetString();
+        Assert.NotNull(accessToken);
+        var payload = Payload(accessToken);
         Assert.True(payload.TryGetProperty(Claims.Audience, out var aud));
         Assert.Equal(JsonValueKind.String, aud.ValueKind);
         Assert.Equal(Issuer, aud.GetString());
@@ -152,7 +156,9 @@ public class ResourceIndicatorShould
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var pair    = JsonDocument.Parse(await response.Content.ReadAsStreamAsync()).RootElement;
-        var payload = Payload(pair.GetProperty("id_token").GetString()!);
+        var idToken = pair.GetProperty("id_token").GetString();
+        Assert.NotNull(idToken);
+        var payload = Payload(idToken);
         Assert.True(payload.TryGetProperty(Claims.Audience, out var aud));
         Assert.Equal("code-client", aud.GetString());
     }
@@ -176,10 +182,12 @@ public class ResourceIndicatorShould
 
         var pair = JsonDocument.Parse(await exchange.Content.ReadAsStreamAsync()).RootElement;
 
+        var accessToken = pair.GetProperty("access_token").GetString();
+        Assert.NotNull(accessToken);
         var response = await client.PostAsync(
             "/connect/introspect",
             new FormUrlEncodedContent(new Dictionary<string, string> {
-                ["token"]         = pair.GetProperty("access_token").GetString()!,
+                ["token"]         = accessToken,
                 ["client_id"]     = "introspect-client",
                 ["client_secret"] = "introspect-secret",
             }));
@@ -210,12 +218,13 @@ public class ResourceIndicatorShould
 
         var pair = JsonDocument.Parse(await exchange.Content.ReadAsStreamAsync()).RootElement;
         var refreshToken = pair.GetProperty("refresh_token").GetString();
+        Assert.NotNull(refreshToken);
 
         var response = await client.SendAsync(Token(new() {
             new("grant_type", GrantTypes.RefreshToken),
             new("client_id", "code-client"),
             new("client_secret", "code-secret"),
-            new("refresh_token", refreshToken!),
+            new("refresh_token", refreshToken),
             new("resource", Contacts),
         }));
 
@@ -241,12 +250,14 @@ public class ResourceIndicatorShould
         Assert.Equal(HttpStatusCode.OK, exchange.StatusCode);
 
         var pair = JsonDocument.Parse(await exchange.Content.ReadAsStreamAsync()).RootElement;
+        var refreshToken = pair.GetProperty("refresh_token").GetString();
+        Assert.NotNull(refreshToken);
 
         var response = await client.SendAsync(Token(new() {
             new("grant_type", GrantTypes.RefreshToken),
             new("client_id", "code-client"),
             new("client_secret", "code-secret"),
-            new("refresh_token", pair.GetProperty("refresh_token").GetString()!),
+            new("refresh_token", refreshToken),
             new("resource", Foreign),
         }));
 
@@ -266,8 +277,9 @@ public class ResourceIndicatorShould
             + "&resource=" + Uri.EscapeDataString("https://cal.example.com/#row"));
 
         Assert.Equal(HttpStatusCode.Found, response.StatusCode);
-
-        var query = HttpUtility.ParseQueryString(response.Headers.Location!.Query);
+        var location = response.Headers.Location;
+        Assert.NotNull(location);
+        var query = HttpUtility.ParseQueryString(location.Query);
         Assert.Equal(OAuthErrors.InvalidTarget, query["error"]);
     }
 
@@ -295,18 +307,28 @@ public class ResourceIndicatorShould
         var authorize = await client.GetAsync(url);
         Assert.Equal(HttpStatusCode.Found, authorize.StatusCode);
 
-        var interaction = HttpUtility.ParseQueryString(authorize.Headers.Location!.Query);
+        var location = authorize.Headers.Location;
+        Assert.NotNull(location);
+        var interaction = HttpUtility.ParseQueryString(location.Query);
+        var code     = interaction[Parameters.Code];
+        var codeType = interaction[Parameters.CodeType];
+        Assert.NotNull(code);
+        Assert.NotNull(codeType);
         var approve = await client.PostAsync(
             "/connect/interact",
             new FormUrlEncodedContent(new Dictionary<string, string> {
-                ["code"]      = interaction[Parameters.Code]!,
-                ["code_type"] = interaction[Parameters.CodeType]!,
+                ["code"]      = code,
+                ["code_type"] = codeType,
             }));
         var approveBody = await approve.Content.ReadAsStringAsync();
         Assert.True(HttpStatusCode.Found == approve.StatusCode, approveBody);
 
-        var callback = HttpUtility.ParseQueryString(approve.Headers.Location!.Query);
-        return callback[Parameters.Code]!;
+        var callbackLocation = approve.Headers.Location;
+        Assert.NotNull(callbackLocation);
+        var callback = HttpUtility.ParseQueryString(callbackLocation.Query);
+        var callbackCode = callback[Parameters.Code];
+        Assert.NotNull(callbackCode);
+        return callbackCode;
     }
 
     /// <summary>
@@ -333,7 +355,10 @@ public class ResourceIndicatorShould
         }
 
         var response = await signIn.IssueAsync(principal, properties, AuthorizationSignInResponseKind.Callback);
-        return response.Callback!.Parameters[Parameters.Code]!;
+        Assert.NotNull(response.Callback);
+        var mintedCode = response.Callback.Parameters[Parameters.Code];
+        Assert.NotNull(mintedCode);
+        return mintedCode;
     }
 
     private static HttpRequestMessage Token(List<KeyValuePair<string, string>> fields) {

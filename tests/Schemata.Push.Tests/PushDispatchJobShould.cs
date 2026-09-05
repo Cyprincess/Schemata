@@ -78,6 +78,7 @@ public class PushDispatchJobShould
 
         await new PushDispatchJob(provider).ExecuteAsync(context, CancellationToken.None);
 
+        Assert.NotNull(execution.Output);
         var output = JsonSerializer.Deserialize<List<TransportResult>>(execution.Output!, SchemataJson.Default);
         Assert.NotNull(output);
         Assert.Equal(expected, output);

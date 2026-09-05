@@ -92,8 +92,8 @@ public class CacheTokenStoreShould
 
         await sut.SetAsync(null, "device", "rate:k-1", "3", TimeSpan.FromSeconds(10));
         var stored = await sut.GetAsync(null, "device", "rate:k-1");
-
-        Assert.Equal("3", stored!.Value);
+        Assert.NotNull(stored);
+        Assert.Equal("3", stored.Value);
 
         await sut.RemoveAsync(null, "device", "rate:k-1");
         Assert.Null(await sut.GetAsync(null, "device", "rate:k-1"));
@@ -107,8 +107,12 @@ public class CacheTokenStoreShould
         await sut.SetAsync(null, "dpop", "as:client-1", "as-value", TimeSpan.FromMinutes(5));
         await sut.SetAsync(null, "dpop", "rs:client-1", "rs-value", TimeSpan.FromMinutes(5));
 
-        Assert.Equal("as-value", (await sut.GetAsync(null, "dpop", "as:client-1"))!.Value);
-        Assert.Equal("rs-value", (await sut.GetAsync(null, "dpop", "rs:client-1"))!.Value);
+        var asToken = await sut.GetAsync(null, "dpop", "as:client-1");
+        Assert.NotNull(asToken);
+        Assert.Equal("as-value", asToken.Value);
+        var rsToken = await sut.GetAsync(null, "dpop", "rs:client-1");
+        Assert.NotNull(rsToken);
+        Assert.Equal("rs-value", rsToken.Value);
     }
 
     [Fact]

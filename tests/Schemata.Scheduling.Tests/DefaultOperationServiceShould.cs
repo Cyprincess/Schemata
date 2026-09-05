@@ -41,7 +41,8 @@ public class DefaultOperationServiceShould
                               EndTime       = row.EndTime,
                               Output        = row.Output,
                           };
-                      var snapshot = predicate!(new[] { source }.AsQueryable()).SingleOrDefault();
+                      Assert.NotNull(predicate);
+                      var snapshot = predicate(new[] { source }.AsQueryable()).SingleOrDefault();
                       firstRead.TrySetResult();
 
                       return new(snapshot);
@@ -146,9 +147,10 @@ public class DefaultOperationServiceShould
                              It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>? predicate,
                             CancellationToken _) => {
+                      Assert.NotNull(predicate);
                       firstRead.TrySetResult();
                       return new(
-                          predicate!(new[] { row }.AsQueryable()).SingleOrDefault());
+                          predicate(new[] { row }.AsQueryable()).SingleOrDefault());
                   });
         var service = CreateService(executions, pollInterval: TimeSpan.FromMilliseconds(5));
         using var cts = new CancellationTokenSource();
@@ -174,12 +176,16 @@ public class DefaultOperationServiceShould
                              It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>?>(),
                              It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>? predicate,
-                            CancellationToken _) =>
-                      new(predicate!(rows.AsQueryable()).SingleOrDefault()));
+                            CancellationToken _) => {
+                      Assert.NotNull(predicate);
+                      return new(
+                          predicate(rows.AsQueryable()).SingleOrDefault());
+                  });
         var service = CreateService(executions);
         var uid = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
         var created = await service.CreateTerminalAsync("demo", "{}", null, uid, CancellationToken.None);
+        Assert.NotNull(created.CanonicalName);
         var loaded = await service.GetAsync(created.CanonicalName!, CancellationToken.None);
 
         var persisted = Assert.Single(rows);
@@ -200,8 +206,11 @@ public class DefaultOperationServiceShould
                              It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>?>(),
                              It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>? predicate,
-                            CancellationToken _) =>
-                      new(predicate!(new[] { row }.AsQueryable()).SingleOrDefault()));
+                            CancellationToken _) => {
+                      Assert.NotNull(predicate);
+                      return new(
+                          predicate(new[] { row }.AsQueryable()).SingleOrDefault());
+                  });
         return executions;
     }
 

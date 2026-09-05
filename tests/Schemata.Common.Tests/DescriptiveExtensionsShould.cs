@@ -15,8 +15,10 @@ public class DescriptiveExtensionsShould
 
         Assert.Equal("Approval", target.DisplayName);
         Assert.Equal("Routes a request to an approver.", target.Description);
-        Assert.Equal("审批", target.DisplayNames!["zh-Hans"]);
-        Assert.Equal("把请求路由给审批人。", target.Descriptions!["zh-Hans"]);
+        Assert.NotNull(target.DisplayNames);
+        Assert.NotNull(target.Descriptions);
+        Assert.Equal("审批", target.DisplayNames["zh-Hans"]);
+        Assert.Equal("把请求路由给审批人。", target.Descriptions["zh-Hans"]);
     }
 
     [Fact]
@@ -48,7 +50,8 @@ public class DescriptiveExtensionsShould
 
         typeof(Declaration).ApplyLabels(target);
 
-        Assert.Equal("审批", target.DisplayNames!["ZH-HANS"]);
+        Assert.NotNull(target.DisplayNames);
+        Assert.Equal("审批", target.DisplayNames["ZH-HANS"]);
     }
 
     [DisplayName("Approval")]

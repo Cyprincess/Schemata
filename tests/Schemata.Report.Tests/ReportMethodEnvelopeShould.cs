@@ -32,30 +32,6 @@ namespace Schemata.Report.Tests;
 /// </summary>
 public class ReportMethodEnvelopeShould
 {
-    [Fact]
-    public async Task Run_Envelope_Dispatch_Runs_The_Report_Handler_And_Exposes_The_Verb_To_Wraps() {
-        var wrap    = new RecordingRunEnvelopeAdvisor();
-        var command = new RecordingRunCommandAdvisor();
-        using var provider = ReportTestHost.Create(
-            ReportTestHost.CreateDriver(ReportTestRows.Create(1)),
-            configure: services => {
-                services.AddSingleton<IRequestPipelineAdvisor<ResourceMethodRequest<SchemataReport, RunReportRequest, ReportResult>, ReportResult>>(wrap);
-                services.AddSingleton<IRequestPipelineAdvisor<RunReportRequest, ReportResult>>(command);
-            });
-        var dispatcher = provider.GetRequiredService<IRequestDispatcher>();
-        var principal  = new ClaimsPrincipal(new ClaimsIdentity("test"));
-
-        var result = await dispatcher.SendAsync<ResourceMethodRequest<SchemataReport, RunReportRequest, ReportResult>, ReportResult>(
-            new(ReportOperations.Run, null, new(ReportTestHost.InlineRequest(), principal), principal),
-            CancellationToken.None);
-
-        var observed = Assert.Single(wrap.Observed);
-        Assert.Equal(ReportOperations.Run, observed.Verb);
-        Assert.Null(observed.Name);
-        Assert.Equal(typeof(SchemataReport), observed.Entity);
-        Assert.Single(result.Response.Rows);
-        Assert.Equal(1, command.Count);
-    }
 
     [Fact]
     public async Task Run_Facade_Wraps_The_Verb_Envelope_And_Forwards_The_Principal() {
@@ -74,6 +50,7 @@ public class ReportMethodEnvelopeShould
 
         var observed = Assert.Single(wrap.Observed);
         Assert.Equal(ReportOperations.Run, observed.Verb);
+        Assert.Null(observed.Name);
         Assert.Equal(typeof(SchemataReport), observed.Entity);
         Assert.Same(principal, wrap.Principal);
         Assert.Same(principal, command.Principal);

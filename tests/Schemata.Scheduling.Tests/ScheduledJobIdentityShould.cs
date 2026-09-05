@@ -28,17 +28,21 @@ public class ScheduledJobIdentityShould
     }
 
     [Fact]
-    public void KeepAClosedGenericJobKeyAddressable() {
-        var key = new DefaultScheduledJobRegistry().ResolveKey(typeof(ProbeJob<ProbePayload>))!;
+    public void Keep_A_Closed_Generic_Job_Key_Addressable() {
+        var key = new DefaultScheduledJobRegistry().ResolveKey(typeof(ProbeJob<ProbePayload>));
+
+        Assert.NotNull(key);
 
         Assert.True(key.Length < 128, $"Derived key is {key.Length} characters: {key}");
         Assert.Equal(-1, key.IndexOfAny(Unaddressable));
     }
 
     [Fact]
-    public void ResolveAClosedGenericJobBackFromItsDerivedKey() {
+    public void Resolve_A_Closed_Generic_Job_Back_From_Its_Derived_Key() {
         var registry = new DefaultScheduledJobRegistry();
-        var key      = registry.ResolveKey(typeof(ProbeJob<ProbePayload>))!;
+        var key      = registry.ResolveKey(typeof(ProbeJob<ProbePayload>));
+
+        Assert.NotNull(key);
 
         Assert.Equal(typeof(ProbeJob<ProbePayload>), registry.Resolve(key));
     }
@@ -79,6 +83,7 @@ public class ScheduledJobIdentityShould
         var initializer = new SchedulingInitializer(scheduler.Object, Options.Create(options), EmptyRepositories(),
                                                     new DefaultScheduledJobRegistry());
         await initializer.StartAsync(CancellationToken.None);
+        Assert.NotNull(initializer.ExecuteTask);
         await initializer.ExecuteTask!;
         await initializer.StopAsync(CancellationToken.None);
 

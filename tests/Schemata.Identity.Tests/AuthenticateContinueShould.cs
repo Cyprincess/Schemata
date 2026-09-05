@@ -18,7 +18,7 @@ namespace Schemata.Identity.Tests;
 public class AuthenticateContinueShould
 {
     [Fact]
-    public async Task ResumeTheRequestThatTriggeredTheSignIn() {
+    public async Task Resume_The_Request_That_Triggered_The_SignIn() {
         var context = LoginContinuationShould.Context("https://id.example.com/sign-in");
         await LoginContinuation.RedirectToLoginAsync(Redirect(context));
 
@@ -28,7 +28,7 @@ public class AuthenticateContinueShould
     }
 
     [Fact]
-    public void RejectAContinuationPointingOffSite() {
+    public void Reject_A_Continuation_Pointing_Off_Site() {
         var context = LoginContinuationShould.Context("https://id.example.com/sign-in");
         var forged = LoginContinuation.Protector(context.RequestServices).Protect("https://evil.example.com/steal");
 
@@ -36,14 +36,14 @@ public class AuthenticateContinueShould
     }
 
     [Fact]
-    public void RejectAContinuationTheServerDidNotIssue() {
+    public void Reject_A_Continuation_The_Server_Did_Not_Issue() {
         var context = LoginContinuationShould.Context("https://id.example.com/sign-in");
 
         Assert.Throws<ValidationException>(() => Continue(context, "not-a-protected-payload"));
     }
 
     [Fact]
-    public void RejectAContinuationIssuedForAnotherPurpose() {
+    public void Reject_A_Continuation_Issued_For_Another_Purpose() {
         var context = LoginContinuationShould.Context("https://id.example.com/sign-in");
         var foreign = context.RequestServices.GetRequiredService<IDataProtectionProvider>()
                              .CreateProtector("Some.Other.Purpose")
@@ -53,7 +53,7 @@ public class AuthenticateContinueShould
     }
 
     [Fact]
-    public void RejectAMissingContinuation() {
+    public void Reject_A_Missing_Continuation() {
         var context = LoginContinuationShould.Context("https://id.example.com/sign-in");
 
         Assert.Throws<ValidationException>(() => Continue(context, null));

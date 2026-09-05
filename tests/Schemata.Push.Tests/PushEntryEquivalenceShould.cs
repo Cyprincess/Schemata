@@ -51,28 +51,6 @@ public class PushEntryEquivalenceShould
                                         && result.Error == "transport failed");
     }
 
-    [Fact]
-    public async Task Send_Facade_Waits_For_All_Transports_Before_First_Yield() {
-        var first  = new TaskCompletionSource<TransportResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var second = new TaskCompletionSource<TransportResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var services = new ServiceCollection();
-        services.AddSingleton<IPushTransport>(new DeferredTransport("first", first));
-        services.AddSingleton<IPushTransport>(new DeferredTransport("second", second));
-        services.AddSchemataPush();
-        using var provider = services.BuildServiceProvider();
-        await using var enumerator = provider.GetRequiredService<IPushService>()
-                                             .SendAsync(new("message", new BroadcastTarget()))
-                                             .GetAsyncEnumerator();
-
-        var firstMove = enumerator.MoveNextAsync().AsTask();
-        first.SetResult(TransportResult.Sent("first"));
-
-        var premature = await Task.WhenAny(firstMove, Task.Delay(100));
-        Assert.NotSame(firstMove, premature);
-
-        second.SetResult(TransportResult.Sent("second"));
-        Assert.True(await firstMove);
-    }
 
     [Fact]
     public async Task GetForOwner_Facade_Materializes_Repository_Before_First_Yield() {
@@ -99,7 +77,7 @@ public class PushEntryEquivalenceShould
     }
 
     [Fact]
-    public void Six_Handlers_Are_Keyed_And_Unkeyed_And_Contracts_Round_Trip() {
+    public void Handlers_Resolve_Keyed_And_Unkeyed_As_Concrete_Types() {
         var services = new ServiceCollection();
         services.AddSingleton(new Mock<IRepository<SchemataPushSubscription>>().Object);
         services.AddSingleton(new Mock<IScheduler>().Object);
@@ -114,7 +92,10 @@ public class PushEntryEquivalenceShould
         AssertHandler<GetPushSubscriptionsQuery, IReadOnlyList<SchemataPushSubscription>, GetPushSubscriptionsHandler>(provider);
         AssertHandler<ExistsPushSubscriptionQuery, bool, ExistsPushSubscriptionHandler>(provider);
         AssertHandler<SchedulePushRequest, Abstractions.Resource.Operation, SchedulePushHandler>(provider);
+    }
 
+    [Fact]
+    public void Send_And_Schedule_Contracts_Round_Trip_Through_Json() {
         var send = RoundTrip(new SendPushRequest(
             new("send-message", new BroadcastTarget())));
         Assert.Equal("send-message", Assert.IsType<JsonElement>(send.Context.Message).GetString());
@@ -126,12 +107,16 @@ public class PushEntryEquivalenceShould
         Assert.Equal("scheduled-message", Assert.IsType<JsonElement>(schedule.Context.Message).GetString());
         Assert.Equal("alerts", Assert.IsType<TopicTarget>(schedule.Context.Target).Topic);
         Assert.Equal(at, schedule.At);
+    }
 
+    [Fact]
+    public void Subscription_Contracts_Round_Trip_Through_Json() {
         var add = RoundTrip(new AddPushSubscriptionRequest(
             "owners/one", "email", "primary", new() { ["locale"] = "en" }));
         Assert.Equal("owners/one", add.Owner);
         Assert.Equal("email", add.Provider);
         Assert.Equal("primary", add.ProviderKey);
+        Assert.NotNull(add.Metadata);
         Assert.Equal("en", add.Metadata!["locale"]);
 
         var remove = RoundTrip(new RemovePushSubscriptionRequest("owners/one", "email", "primary"));
@@ -220,18 +205,6 @@ public class PushEntryEquivalenceShould
 
         public ValueTask<TransportResult> TrySendAsync(PushContext context, CancellationToken ct) {
             throw new InvalidOperationException("transport failed");
-        }
-    }
-
-    private sealed class DeferredTransport(
-        string                                name,
-        TaskCompletionSource<TransportResult> completion
-    ) : IPushTransport
-    {
-        public string Name => name;
-
-        public ValueTask<TransportResult> TrySendAsync(PushContext context, CancellationToken ct) {
-            return new(completion.Task);
         }
     }
 

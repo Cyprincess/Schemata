@@ -79,8 +79,10 @@ public class AipPushdownPlannerShould
         Assert.True(plan.HasPushed);
         Assert.True(plan.HasResidual);
 
-        var pushed   = _compiler.Compile<Row, bool>(plan.Pushed!).Compile();
-        var residual = _compiler.Compile<Row, bool>(plan.Residual!).Compile();
+        Assert.NotNull(plan.Pushed);
+        Assert.NotNull(plan.Residual);
+        var pushed   = _compiler.Compile<Row, bool>(plan.Pushed).Compile();
+        var residual = _compiler.Compile<Row, bool>(plan.Residual).Compile();
 
         Assert.True(pushed(new() { Age        = 1 }));
         Assert.False(pushed(new() { Age       = 2 }));
@@ -91,8 +93,13 @@ public class AipPushdownPlannerShould
     [Fact]
     public void Pushed_And_Residual_Together_Equal_Original() {
         var plan     = Plan("age = 1 AND profile.locale = 'en'");
-        var pushed   = _compiler.Compile<Row, bool>(plan.Pushed!).Compile();
-        var residual = _compiler.Compile<Row, bool>(plan.Residual!).Compile();
+        Assert.True(plan.HasPushed);
+        Assert.True(plan.HasResidual);
+
+        Assert.NotNull(plan.Pushed);
+        Assert.NotNull(plan.Residual);
+        var pushed   = _compiler.Compile<Row, bool>(plan.Pushed).Compile();
+        var residual = _compiler.Compile<Row, bool>(plan.Residual).Compile();
         var original = _compiler.Compile<Row, bool>(_compiler.Parse("age = 1 AND profile.locale = 'en'")).Compile();
 
         Row[] rows = [

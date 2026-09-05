@@ -50,7 +50,8 @@ public class AuthorizationSignInServiceShould
         Assert.False(string.IsNullOrWhiteSpace(result.Token.AccessToken));
         Assert.Equal(Schemes.Bearer, result.Token.TokenType);
         Assert.Equal("api", result.Token.Scope);
-        Assert.Equal(TokenTypes.AccessToken, created!.Type);
+        Assert.NotNull(created);
+        Assert.Equal(TokenTypes.AccessToken, created.Type);
         Assert.Null(http.Response.ContentType);
         Assert.Empty(http.Response.Headers);
         Assert.Equal(0, http.Response.Body.Length);
@@ -82,7 +83,8 @@ public class AuthorizationSignInServiceShould
         Assert.Equal(ResponseModes.Query, result.Callback.ResponseMode);
         Assert.Equal("state-1", result.Callback.Parameters[Parameters.State]);
         Assert.False(string.IsNullOrWhiteSpace(result.Callback.Parameters[Parameters.Code]));
-        Assert.Equal(TokenTypes.AuthorizationCode, created!.Type);
+        Assert.NotNull(created);
+        Assert.Equal(TokenTypes.AuthorizationCode, created.Type);
         Assert.Null(http.Response.ContentType);
         Assert.Empty(http.Response.Headers);
         Assert.Equal(0, http.Response.Body.Length);
@@ -163,7 +165,9 @@ public class AuthorizationSignInServiceShould
             [Properties.Scope]     = "api",
         }, AuthorizationSignInResponseKind.Token);
 
-        var at = new JsonWebTokenHandler().ReadJsonWebToken(result.Token!.AccessToken!);
+        Assert.NotNull(result.Token);
+        Assert.NotNull(result.Token.AccessToken);
+        var at = new JsonWebTokenHandler().ReadJsonWebToken(result.Token.AccessToken);
 
         Assert.Contains("https://issuer.example", at.Audiences);
     }
@@ -190,7 +194,9 @@ public class AuthorizationSignInServiceShould
             [Properties.Nonce]     = "nonce-1",
         }, AuthorizationSignInResponseKind.Token);
 
-        var id = new JsonWebTokenHandler().ReadJsonWebToken(result.Token!.IdToken!);
+        Assert.NotNull(result.Token);
+        Assert.NotNull(result.Token.IdToken);
+        var id = new JsonWebTokenHandler().ReadJsonWebToken(result.Token.IdToken);
 
         Assert.Equal("client-1", id.Audiences.Single());
         Assert.DoesNotContain("https://issuer.example", id.Audiences);
@@ -215,9 +221,10 @@ public class AuthorizationSignInServiceShould
             [Properties.Scope]     = "api",
             [Properties.DpopJkt]   = "0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I",
         }, AuthorizationSignInResponseKind.Token);
-
-        Assert.Equal(Schemes.Dpop, result.Token!.TokenType);
-        var at = new JsonWebTokenHandler().ReadJsonWebToken(result.Token.AccessToken!);
+        Assert.NotNull(result.Token);
+        Assert.Equal(Schemes.Dpop, result.Token.TokenType);
+        Assert.NotNull(result.Token.AccessToken);
+        var at = new JsonWebTokenHandler().ReadJsonWebToken(result.Token.AccessToken);
         Assert.True(at.TryGetPayloadValue<JsonElement>(Claims.Cnf, out var cnf));
         Assert.Equal("0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I", cnf.GetProperty("jkt").GetString());
     }
@@ -243,9 +250,12 @@ public class AuthorizationSignInServiceShould
             [Properties.Scope]        = Scopes.OpenId,
             [Properties.DpopJkt]      = Thumbprint,
         }, AuthorizationSignInResponseKind.Callback);
-
-        var code = JsonSerializer.Deserialize<AuthorizationCodePayload>(created!.Payload!)!.Request;
-        Assert.Equal(Thumbprint, code!.DpopJkt);
+        Assert.NotNull(created);
+        Assert.NotNull(created.Payload);
+        var code = JsonSerializer.Deserialize<AuthorizationCodePayload>(created.Payload);
+        Assert.NotNull(code);
+        Assert.NotNull(code.Request);
+        Assert.Equal(Thumbprint, code.Request.DpopJkt);
     }
     [Fact]
     public async Task Inherit_The_Cnf_Binding_Into_The_Refresh_Token() {
@@ -262,9 +272,10 @@ public class AuthorizationSignInServiceShould
             [Properties.Scope]     = $"{Scopes.OpenId} {Scopes.OfflineAccess}",
             [Properties.DpopJkt]   = Thumbprint,
         }, AuthorizationSignInResponseKind.Token);
-
-        Assert.Equal(Schemes.Dpop, result.Token!.TokenType);
-        var refresh = new JsonWebTokenHandler().ReadJsonWebToken(result.Token.RefreshToken!);
+        Assert.NotNull(result.Token);
+        Assert.Equal(Schemes.Dpop, result.Token.TokenType);
+        Assert.NotNull(result.Token.RefreshToken);
+        var refresh = new JsonWebTokenHandler().ReadJsonWebToken(result.Token.RefreshToken);
         Assert.True(refresh.TryGetPayloadValue<JsonElement>(Claims.Cnf, out var cnf));
         Assert.Equal(Thumbprint, cnf.GetProperty(Claims.Jkt).GetString());
     }

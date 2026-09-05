@@ -1,3 +1,4 @@
+using System;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -18,30 +19,42 @@ public class ResourceHttpIntegrationShould : IClassFixture<WebAppFactory>
 
     [Fact]
     public async Task Get_AllStudents_Returns200WithList() {
-        var client   = _factory.CreateClient();
+        var client = _factory.CreateClient();
+        var created = await client.PostAsync("/v1/students",
+                                             new StringContent("""{"full_name":"HttpListStudent"}""", Encoding.UTF8,
+                                                               "application/json"));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
         var response = await client.GetAsync("/v1/students");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        // AIP-132/AIP-140: repeated results ride the plural collection field.
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(JsonValueKind.Array, body.GetProperty("students").ValueKind);
+        var listed = Assert.Single(body.GetProperty("students").EnumerateArray(),
+                                   s => s.GetProperty("full_name").GetString() == "HttpListStudent");
+        Assert.False(string.IsNullOrWhiteSpace(listed.GetProperty("name").GetString()));
+        Assert.Equal(JsonValueKind.Number, body.GetProperty("total_size").ValueKind);
+        Assert.True(body.GetProperty("total_size").GetInt32() >= 1);
+        Assert.True(!body.TryGetProperty("next_page_token", out var token) || token.ValueKind == JsonValueKind.Null);
     }
 
     [Fact]
     public async Task Post_NewStudent_Returns201() {
         var client   = _factory.CreateClient();
-        var response = await client.PostAsJsonAsync("/v1/students", new Student { FullName = "Test" });
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Post_NewStudent_ResponseBodyContainsStudent() {
-        var client   = _factory.CreateClient();
-        var response = await client.PostAsJsonAsync("/v1/students", new Student { FullName = "Returned" });
-
+        var response = await client.PostAsync("/v1/students",
+                                              new StringContent("""{"full_name":"Test"}""", Encoding.UTF8,
+                                                                "application/json"));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var json    = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var hasName = json.TryGetProperty("name", out var nameProp) || json.TryGetProperty("Name", out nameProp);
-
-        Assert.True(hasName, "Response should contain a 'name' property");
-        Assert.False(string.IsNullOrWhiteSpace(nameProp.GetString()), "Name should be non-empty");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("Test", body.GetProperty("full_name").GetString());
+        var name = body.GetProperty("name").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(name));
+        Assert.StartsWith("students/", name);
+        var uid = body.GetProperty("uid").GetString();
+        Assert.NotNull(uid);
+        Assert.NotEqual(Guid.Empty, Guid.Parse(uid));
     }
 
     [Fact]
@@ -54,7 +67,8 @@ public class ResourceHttpIntegrationShould : IClassFixture<WebAppFactory>
         var gotName = body.TryGetProperty("name", out var nameProp) || body.TryGetProperty("Name", out nameProp);
         Assert.True(gotName);
 
-        var name     = nameProp.GetString()!;
+        var name     = nameProp.GetString();
+        Assert.NotNull(name);
         var response = await client.DeleteAsync($"/v1/{name}");
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
@@ -81,7 +95,8 @@ public class ResourceHttpIntegrationShould : IClassFixture<WebAppFactory>
                                                                "application/json"));
         var body = await created.Content.ReadFromJsonAsync<Student>();
 
-        var response = await client.GetAsync($"/v1/{body!.Name}:preview");
+        Assert.NotNull(body);
+        var response = await client.GetAsync($"/v1/{body.Name}:preview");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var preview = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -94,7 +109,8 @@ public class ResourceHttpIntegrationShould : IClassFixture<WebAppFactory>
         var created = await client.PostAsJsonAsync("/v1/students", new Student { FullName = "PostRejected" });
         var body    = await created.Content.ReadFromJsonAsync<Student>();
 
-        var response = await client.PostAsJsonAsync($"/v1/{body!.Name}:preview", new Student());
+        Assert.NotNull(body);
+        var response = await client.PostAsJsonAsync($"/v1/{body.Name}:preview", new Student());
 
         Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
     }
@@ -108,7 +124,8 @@ public class ResourceHttpIntegrationShould : IClassFixture<WebAppFactory>
                                                                "application/json"));
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var createBody = await created.Content.ReadFromJsonAsync<JsonElement>();
-        var name       = createBody.GetProperty("name").GetString()!;
+        var name       = createBody.GetProperty("name").GetString();
+        Assert.NotNull(name);
 
         var deleted = await client.DeleteAsync($"/v1/{name}");
         Assert.Equal(HttpStatusCode.OK, deleted.StatusCode);

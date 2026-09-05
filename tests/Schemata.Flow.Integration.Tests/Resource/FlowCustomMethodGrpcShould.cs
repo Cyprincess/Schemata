@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using Grpc.Core;
 using ProtoBuf;
 using ProtoBuf.Meta;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Flow.Foundation.Commands;
@@ -52,7 +53,12 @@ public class FlowCustomMethodGrpcShould : IClassFixture<GrpcWebAppFactory>
     public async Task SignalProcess_Empty_Broadcast_Returns_Response() {
         var response = await Call<SchemataProcess, FlowModels.ThrowSignalRequest, EmptyResourceResponse>(
             "signal", new() { SignalName = "approved" });
+
+        // The broadcast custom method always answers the AIP-136 empty envelope: the response
+        // materializes, but carries no resource state on the wire.
         Assert.NotNull(response);
+        Assert.Null(((ICanonicalName)response).Name);
+        Assert.Null(((ICanonicalName)response).CanonicalName);
     }
 
     [Fact]

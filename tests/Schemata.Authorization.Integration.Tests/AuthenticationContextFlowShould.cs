@@ -53,7 +53,9 @@ public class AuthenticationContextFlowShould
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var pair    = JsonDocument.Parse(await response.Content.ReadAsStreamAsync()).RootElement;
-        var payload = Payload(pair.GetProperty("id_token").GetString()!);
+        var idToken = pair.GetProperty("id_token").GetString();
+        Assert.NotNull(idToken);
+        var payload = Payload(idToken);
 
         Assert.Equal(AuthTime, payload.GetProperty(Claims.AuthTime).GetInt64());
         Assert.Equal(Multifactor, payload.GetProperty(Claims.Acr).GetString());
@@ -73,8 +75,10 @@ public class AuthenticationContextFlowShould
         var response = await client.SendAsync(Token(code));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var token   = JsonDocument.Parse(await response.Content.ReadAsStreamAsync()).RootElement;
-        var payload = Payload(token.GetProperty("access_token").GetString()!);
+        var token       = JsonDocument.Parse(await response.Content.ReadAsStreamAsync()).RootElement;
+        var accessToken = token.GetProperty("access_token").GetString();
+        Assert.NotNull(accessToken);
+        var payload = Payload(accessToken);
 
         Assert.Equal(AuthTime, payload.GetProperty(Claims.AuthTime).GetInt64());
         Assert.Equal(Multifactor, payload.GetProperty(Claims.Acr).GetString());
@@ -95,7 +99,9 @@ public class AuthenticationContextFlowShould
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var pair    = JsonDocument.Parse(await response.Content.ReadAsStreamAsync()).RootElement;
-        var payload = Payload(pair.GetProperty("id_token").GetString()!);
+        var idToken = pair.GetProperty("id_token").GetString();
+        Assert.NotNull(idToken);
+        var payload = Payload(idToken);
 
         Assert.False(payload.TryGetProperty(Claims.AuthTime, out var _));
         Assert.False(payload.TryGetProperty(Claims.Acr, out var _));
@@ -118,22 +124,32 @@ public class AuthenticationContextFlowShould
 
         var authorize = await client.GetAsync(url);
         Assert.True(HttpStatusCode.Found == authorize.StatusCode, await authorize.Content.ReadAsStringAsync());
+        var location = authorize.Headers.Location;
+        Assert.NotNull(location);
         Assert.True(
-            authorize.Headers.Location!.IsAbsoluteUri
-         && "https://localhost/interact" == authorize.Headers.Location.GetLeftPart(UriPartial.Path),
-            authorize.Headers.Location!.ToString());
+            location.IsAbsoluteUri
+         && "https://localhost/interact" == location.GetLeftPart(UriPartial.Path),
+            location.ToString());
 
-        var interaction = HttpUtility.ParseQueryString(authorize.Headers.Location!.Query);
+        var interaction = HttpUtility.ParseQueryString(location.Query);
+        var code     = interaction[Parameters.Code];
+        var codeType = interaction[Parameters.CodeType];
+        Assert.NotNull(code);
+        Assert.NotNull(codeType);
         var approve = await client.PostAsync(
             "/connect/interact",
             new FormUrlEncodedContent(new Dictionary<string, string> {
-                ["code"]      = interaction[Parameters.Code]!,
-                ["code_type"] = interaction[Parameters.CodeType]!,
+                ["code"]      = code,
+                ["code_type"] = codeType,
             }));
         var approveBody = await approve.Content.ReadAsStringAsync();
         Assert.True(HttpStatusCode.Found == approve.StatusCode, approveBody);
-        var callback = HttpUtility.ParseQueryString(approve.Headers.Location!.Query);
-        return callback[Parameters.Code]!;
+        var callbackLocation = approve.Headers.Location;
+        Assert.NotNull(callbackLocation);
+        var callback = HttpUtility.ParseQueryString(callbackLocation.Query);
+        var callbackCode = callback[Parameters.Code];
+        Assert.NotNull(callbackCode);
+        return callbackCode;
     }
 
     private static HttpRequestMessage Token(string code) {

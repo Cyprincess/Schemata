@@ -68,8 +68,10 @@ public class ReportMethodHandlerShould
         var snapshot = Assert.Single(state.Snapshots);
         Assert.NotNull(uid);
         Assert.Equal($"operations/{uid.Value:n}", snapshot.Operation);
+        Assert.NotNull(output);
         var terminal = JsonSerializer.Deserialize<ReportOperationOutput>(output!, SchemataJson.Default);
-        Assert.Equal(snapshot.CanonicalName, terminal!.Snapshot);
+        Assert.NotNull(terminal);
+        Assert.Equal(snapshot.CanonicalName, terminal.Snapshot);
         operations.Verify(service => service.CreateTerminalAsync(
             "generate", output, null, uid, It.IsAny<CancellationToken>()), Times.Once);
         driver.Verify(value => value.ExecuteAsync(
@@ -101,9 +103,11 @@ public class ReportMethodHandlerShould
         Assert.False(result.Done);
         Assert.NotNull(context);
         Assert.Equal("generate", context!.Method);
+        Assert.NotNull(context.ArgsJson);
         var replayed = Assert.IsType<ReportRequest>(
             JsonSerializer.Deserialize<ReportRequest>(context.ArgsJson!, SchemataJson.Default));
         Assert.True(replayed.Persist);
+        Assert.NotNull(replayed.Query);
         var source = Assert.Single(replayed.Query!.Sources);
         Assert.Equal(("r", "rows"), (source.Alias, source.Name));
         scheduler.Verify(

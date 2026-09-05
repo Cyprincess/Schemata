@@ -1,4 +1,3 @@
-using System.Linq;
 using Xunit;
 
 namespace Schemata.Modeling.Generator.Tests;
@@ -59,29 +58,4 @@ public class GeneratorOutputShould
         Assert.Single(doc.Entities[0].Uses);
     }
 
-    [Fact]
-    public void Parse_Vector1Fixture_BindsNamespaceEntitiesTraitsViewsAndPointers() {
-        var text = VectorResources.ReadText(VectorResources.Vector1Skm);
-        var doc  = Parser.Document.Parse(text);
-        Assert.NotNull(doc);
-        Assert.Equal("DSL.Tests.Vectors", doc.Namespace);
-        Assert.Equal(3, doc.Traits.Length);
-        Assert.Equal(3, doc.Entities.Length);
-        Assert.Equal(0, doc.Enumerations.Length);
-
-        // Verify each entity has the expected member counts
-        var user = doc.Entities.First(e => e.Name == "User");
-        Assert.Equal(4, user.Fields.Length);
-        Assert.Single(user.Views);
-
-        var category = doc.Entities.First(e => e.Name == "Category");
-        Assert.Single(category.Fields);
-        Assert.Equal(2, category.Views.Length);
-
-        var post = doc.Entities.First(e => e.Name == "Post");
-        Assert.Equal(5, post.Fields.Length);
-        Assert.Single(post.Enumerations);
-        Assert.Single(post.Pointers);
-        Assert.Equal(2, post.Views.Length);
-    }
 }

@@ -130,7 +130,8 @@ public class ClientAuthMethodConstraintShould
             .Setup(a => a.AuthenticateAsync(
                 null,
                 It.Is<Dictionary<string, List<string?>>?>(
-                    form => form!.ContainsKey(Parameters.ClientAssertionType)
+                    form => form != null
+                         && form.ContainsKey(Parameters.ClientAssertionType)
                          && form.ContainsKey(Parameters.ClientAssertion)),
                 It.IsAny<Dictionary<string, List<string?>>?>(),
                 It.IsAny<CancellationToken>()))

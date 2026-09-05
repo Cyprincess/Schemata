@@ -51,6 +51,7 @@ public sealed class StageJobExecutionResultHandlerShould
         Assert.Equal(ScheduleType.Cron, persisted.ScheduleType);
         Assert.Equal("0 * * * *", persisted.CronExpression);
         Assert.Equal("""{"count":3}""", persisted.ArgsJson);
+        Assert.NotNull(persisted.Variables);
         Assert.Equal("gold", persisted.Variables!["tier"]);
         Assert.True(persisted.Replay);
 

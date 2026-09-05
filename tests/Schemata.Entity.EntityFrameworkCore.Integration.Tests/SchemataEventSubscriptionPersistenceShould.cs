@@ -33,7 +33,8 @@ public sealed class SchemataEventSubscriptionPersistenceShould
 
         await using var readDb = await provider.GetRequiredService<IDbContextFactory<SubscriptionDbContext>>().CreateDbContextAsync();
         var stored = await readDb.Subscriptions.FirstOrDefaultAsync(subscription => subscription.EventType == "payment");
-        Assert.Equal("processes/p1/tokens/t1", stored!.Token);
+        Assert.NotNull(stored);
+        Assert.Equal("processes/p1/tokens/t1", stored.Token);
     }
 
     private sealed class SubscriptionDbContext(DbContextOptions<SubscriptionDbContext> options) : DbContext(options)

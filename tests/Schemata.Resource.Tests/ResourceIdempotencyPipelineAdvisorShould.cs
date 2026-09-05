@@ -75,7 +75,8 @@ public class ResourceIdempotencyPipelineAdvisorShould
 
         var result = await DispatchCreateAsync(services, request);
 
-        Assert.Equal("tenants/t1/hosts/h9", result.Detail!.CanonicalName);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1/hosts/h9", result.Detail.CanonicalName);
         repository.Verify(r => r.AddAsync(It.IsAny<Entity>(), It.IsAny<CancellationToken>()), Times.Never);
         mapper.Verify(m => m.Map<Request, Entity>(It.IsAny<Request>()), Times.Never);
         cache.Verify(c => c.TryAddAsync(
@@ -97,7 +98,8 @@ public class ResourceIdempotencyPipelineAdvisorShould
 
         var result = await DispatchUpdateAsync(services, "entities/e1", request);
 
-        Assert.Equal("tenants/t1/hosts/h9", result.Detail!.CanonicalName);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1/hosts/h9", result.Detail.CanonicalName);
         repository.Verify(r => r.SingleOrDefaultAsync(
                               It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
                               It.IsAny<CancellationToken>()), Times.Never);
@@ -126,7 +128,8 @@ public class ResourceIdempotencyPipelineAdvisorShould
 
         var result = await DispatchCreateAsync(services, request);
 
-        Assert.Equal("tenants/t1/hosts/h9", result.Detail!.CanonicalName);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1/hosts/h9", result.Detail.CanonicalName);
         repository.Verify(r => r.AddAsync(It.IsAny<Entity>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -196,7 +199,8 @@ public class ResourceIdempotencyPipelineAdvisorShould
         var payload = JsonDocument.Parse(store[reservation.Key]).RootElement.GetProperty("Payload");
         Assert.Equal("tenants/t1", payload.GetProperty("Parent").GetString());
         Assert.Equal(WeakTag(Timestamp), payload.GetProperty("EntityTag").GetString());
-        Assert.Equal("tenants/t1", result.Detail!.Parent);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1", result.Detail.Parent);
     }
 
     [Fact]
@@ -224,7 +228,8 @@ public class ResourceIdempotencyPipelineAdvisorShould
         var payload = JsonDocument.Parse(store[reservation.Key]).RootElement.GetProperty("Payload");
         Assert.Equal("tenants/t1", payload.GetProperty("Parent").GetString());
         Assert.Equal(WeakTag(Timestamp), payload.GetProperty("EntityTag").GetString());
-        Assert.Equal("tenants/t1", result.Detail!.Parent);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1", result.Detail.Parent);
     }
 
     [Fact]
@@ -274,7 +279,8 @@ public class ResourceIdempotencyPipelineAdvisorShould
 
         var result = await DispatchCreateAsync(services, new() { DisplayName = "anonymous" });
 
-        Assert.Equal("tenants/t1/hosts/h1", result.Detail!.CanonicalName);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1/hosts/h1", result.Detail.CanonicalName);
         repository.Verify(r => r.AddAsync(It.IsAny<Entity>(), It.IsAny<CancellationToken>()), Times.Once);
         cache.Verify(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         cache.Verify(c => c.TryAddAsync(
@@ -328,7 +334,7 @@ public class ResourceIdempotencyPipelineAdvisorShould
         // so the fallback TryAddAsync commits were also issued — 4 total TryAddAsync calls at the same key.
         Assert.NotNull(firstKey);
         cache.Verify(c => c.TryAddAsync(
-                         firstKey!,
+                         firstKey,
                          It.IsAny<byte[]>(),
                          It.IsAny<CacheEntryOptions>(),
                          It.IsAny<CancellationToken>()), Times.Exactly(4));
@@ -351,9 +357,11 @@ public class ResourceIdempotencyPipelineAdvisorShould
         Assert.Single(reserved);
         Assert.Single(replaced);
         repository.Verify(r => r.AddAsync(It.IsAny<Entity>(), It.IsAny<CancellationToken>()), Times.Once);
-        Assert.Equal(first.Detail!.CanonicalName, second.Detail!.CanonicalName);
-        Assert.Equal(first.Detail.Parent, second.Detail!.Parent);
-        Assert.Equal(first.Detail.EntityTag, second.Detail!.EntityTag);
+        Assert.NotNull(first.Detail);
+        Assert.NotNull(second.Detail);
+        Assert.Equal(first.Detail.CanonicalName, second.Detail.CanonicalName);
+        Assert.Equal(first.Detail.Parent, second.Detail.Parent);
+        Assert.Equal(first.Detail.EntityTag, second.Detail.EntityTag);
     }
 
     [Fact]

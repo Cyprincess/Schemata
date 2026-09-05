@@ -7,7 +7,7 @@ namespace Schemata.Insight.Tests;
 public class InsightSourceNamingShould
 {
     [Fact]
-    public void ReadTheResourceIdentityFromThePattern() {
+    public void Read_The_Resource_Identity_From_The_Pattern() {
         var descriptor = ResourceNameDescriptor.ForType<SchemataInsightSource>();
 
         Assert.Equal("InsightSource", descriptor.Singular);
@@ -16,7 +16,7 @@ public class InsightSourceNamingShould
     }
 
     [Fact]
-    public void ResolveTheCanonicalNameOfAPersistedSource() {
+    public void Resolve_The_Canonical_Name_Of_A_Persisted_Source() {
         var descriptor = ResourceNameDescriptor.ForType<SchemataInsightSource>();
 
         var resolved = descriptor.Resolve(new SchemataInsightSource { Name = "orders" });
@@ -25,7 +25,7 @@ public class InsightSourceNamingShould
     }
 
     [Fact]
-    public void ParseAPersistedSourceNameBackToItsLeaf() {
+    public void Parse_A_Persisted_Source_Name_Back_To_Its_Leaf() {
         var descriptor = ResourceNameDescriptor.ForType<SchemataInsightSource>();
 
         var parsed = descriptor.ParseCanonicalName("insightSources/orders");
