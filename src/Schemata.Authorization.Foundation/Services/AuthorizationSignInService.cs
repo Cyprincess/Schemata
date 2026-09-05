@@ -195,9 +195,23 @@ public sealed class AuthorizationSignInService<TApp>(
         AdviceContext                ctx,
         CancellationToken            ct
     ) {
-        items.TryGetValue(Properties.ResponseType, out var responseType);
-        var responseTypes = responseType!.Split(' ');
-        items.TryGetValue(Properties.RedirectUri, out var redirectUri);
+        if (!items.TryGetValue(Properties.ResponseType, out var responseType)
+         || string.IsNullOrWhiteSpace(responseType)) {
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.ResponseType)
+            );
+        }
+
+        var responseTypes = responseType.Split(' ');
+        if (!items.TryGetValue(Properties.RedirectUri, out var redirectUri)
+         || string.IsNullOrWhiteSpace(redirectUri)) {
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                SchemataResources.GetResourceString(SchemataResources.INVALID_REQUEST)
+            );
+        }
+
         items.TryGetValue(Properties.ResponseMode, out var responseMode);
         var parameters = new Dictionary<string, string?>();
         items.TryGetValue(Properties.State, out var state);
@@ -227,7 +241,7 @@ public sealed class AuthorizationSignInService<TApp>(
                 issuer, items, id, config.Value.IdTokenLifetime, at, parameters.GetValueOrDefault(Parameters.Code));
         }
 
-        return new(redirectUri!, parameters, responseMode);
+        return new(redirectUri, parameters, ResponseModeService.ResolveMode(responseMode, responseType));
     }
 
     private async Task<string> CreateAuthorizationCodeAsync(

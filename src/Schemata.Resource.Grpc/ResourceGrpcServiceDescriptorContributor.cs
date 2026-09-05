@@ -25,7 +25,7 @@ internal sealed class ResourceGrpcServiceDescriptorContributor : IGrpcServiceDes
 
         var types = registry.Resources
                             .Where(GrpcResourceHelper.IsGrpcEnabled)
-                            .Select(r => typeof(IResourceService<,,,>).MakeGenericType(r.Entity, r.Request!, r.Detail!, r.Summary!))
+                            .Select(r => typeof(IResourceService<,,,>).MakeGenericType(r.Entity, r.Request, r.Detail, r.Summary))
                             .ToArray();
 
         if (types.Length == 0) {

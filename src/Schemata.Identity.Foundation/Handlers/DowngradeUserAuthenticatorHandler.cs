@@ -15,5 +15,11 @@ internal sealed class DowngradeUserAuthenticatorHandler<TUser>(IdentityOperation
     public Task<IdentityResult<Unit>> HandleAsync(
         DowngradeUserAuthenticatorRequest<TUser> request,
         CancellationToken                        ct = default
-    ) => operations.DowngradeAsync(IdentityRequestHandler.Require(request).Request, request.Principal!, ct);
+    ) {
+        if (request.Principal is null) {
+            return Task.FromResult(IdentityResult<Unit>.Challenge());
+        }
+
+        return operations.DowngradeAsync(IdentityRequestHandler.Require(request).Request, request.Principal, ct);
+    }
 }

@@ -86,6 +86,14 @@ public sealed class EventOutboxDispatcher(
     }
 
     private async Task DeliverAsync(IServiceProvider scoped, SchemataEvent record, CancellationToken ct) {
+        var eventType = record.EventType;
+        if (eventType is null) {
+            // Unrecoverable pending data: replay cannot proceed, so skip the row rather than
+            // faulting the dispatch loop or claiming it.
+            logger?.LogError("Skipping pending outbox row {Uid}: missing event type.", record.Uid);
+            return;
+        }
+
         // Claim the row before broker publish so competing dispatchers skip it.
         record.State = EventState.Publishing;
         try {
@@ -96,7 +104,7 @@ public sealed class EventOutboxDispatcher(
 
         try {
             var delivery = await publisher!.PublishAsync(new(
-                record.EventType!,
+                eventType,
                 record.Payload,
                 record.CorrelationId,
                 record.SourceType,

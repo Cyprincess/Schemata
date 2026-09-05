@@ -15,5 +15,11 @@ internal sealed class LoginUserHandler<TUser>(IdentityOperationHandler<TUser> op
     public Task<IdentityResult<ClaimsPrincipal>> HandleAsync(
         LoginUserRequest<TUser> request,
         CancellationToken       ct = default
-    ) => operations.LoginAsync(IdentityRequestHandler.Require(request).Request, request.Principal!, ct);
+    ) {
+        if (request.Principal is null) {
+            return Task.FromResult(IdentityResult<ClaimsPrincipal>.Challenge());
+        }
+
+        return operations.LoginAsync(IdentityRequestHandler.Require(request).Request, request.Principal, ct);
+    }
 }

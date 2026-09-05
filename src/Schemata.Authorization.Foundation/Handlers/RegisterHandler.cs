@@ -102,7 +102,8 @@ public sealed class RegisterHandler<TApp>(
         }
 
         var created = await apps.CreateAsync(application, ct);
-        if (created is null) {
+        var clientId = created?.ClientId;
+        if (created is null || string.IsNullOrWhiteSpace(clientId)) {
             throw new OAuthException(OAuthErrors.InvalidClientMetadata,
                 SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS));
         }
@@ -117,7 +118,7 @@ public sealed class RegisterHandler<TApp>(
         response.ClientSecret             = _plainClientSecret;
         response.ClientSecretExpiresAt    = _plainClientSecret is null ? null : 0; // 0 = does not expire
         response.RegistrationAccessToken  = reference;
-        response.RegistrationClientUri    = BuildRegistrationClientUri(options.Value, created.ClientId!);
+        response.RegistrationClientUri    = BuildRegistrationClientUri(options.Value, clientId);
 
         return response;
     }

@@ -52,7 +52,6 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<IQueryDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
 
         services.Configure<SchemataReportOptions>(_ => { });
-        services.TryAddSingleton(TimeProvider.System);
         services.TryAddScoped<ReportExecutionContext>();
 
         services.TryAddScoped<GenerateHandler<TReport, TSnapshot, TChunk>>();

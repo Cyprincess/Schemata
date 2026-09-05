@@ -47,13 +47,18 @@ public sealed class AdviceIntrospectionDpop<TApp> : IIntrospectionAdvisor<TApp>
         IntrospectionContext<TApp> introspection,
         CancellationToken                  ct = default
     ) {
+        var response = introspection.Response;
+        if (response is null) {
+            return Task.FromResult(AdviseResult.Block);
+        }
+
         var cnf = GetCnf(introspection.Principal);
         if (cnf is null) {
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        introspection.Response!.Cnf      = cnf;
-        introspection.Response.TokenType = cnf.ContainsKey(Claims.Jkt) ? Schemes.Dpop : Schemes.Bearer;
+        response.Cnf       = cnf;
+        response.TokenType = cnf.ContainsKey(Claims.Jkt) ? Schemes.Dpop : Schemes.Bearer;
 
         return Task.FromResult(AdviseResult.Continue);
     }

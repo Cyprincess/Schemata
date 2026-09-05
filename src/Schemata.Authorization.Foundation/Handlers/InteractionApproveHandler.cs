@@ -10,6 +10,11 @@ namespace Schemata.Authorization.Foundation.Handlers;
 internal sealed class InteractionApproveHandler(InteractionEndpoint endpoint)
     : IRequestHandler<InteractionApproveRequest, AuthorizationResult>
 {
-    public Task<AuthorizationResult> HandleAsync(InteractionApproveRequest request, CancellationToken ct = default)
-        => endpoint.ApproveAsync(request.Request, request.Principal!, request.Issuer, ct);
+    public Task<AuthorizationResult> HandleAsync(InteractionApproveRequest request, CancellationToken ct = default) {
+        if (request.Principal is null) {
+            return Task.FromResult(AuthorizationResult.Challenge());
+        }
+
+        return endpoint.ApproveAsync(request.Request, request.Principal, request.Issuer, ct);
+    }
 }

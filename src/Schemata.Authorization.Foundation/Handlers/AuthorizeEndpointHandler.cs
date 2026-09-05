@@ -10,6 +10,11 @@ namespace Schemata.Authorization.Foundation.Handlers;
 internal sealed class AuthorizeEndpointHandler(AuthorizeEndpoint endpoint)
     : IRequestHandler<AuthorizeEndpointRequest, AuthorizationResult>
 {
-    public Task<AuthorizationResult> HandleAsync(AuthorizeEndpointRequest request, CancellationToken ct = default)
-        => endpoint.AuthorizeAsync(request.Request, request.Principal!, ct);
+    public Task<AuthorizationResult> HandleAsync(AuthorizeEndpointRequest request, CancellationToken ct = default) {
+        if (request.Principal is null) {
+            return Task.FromResult(AuthorizationResult.Challenge());
+        }
+
+        return endpoint.AuthorizeAsync(request.Request, request.Principal, ct);
+    }
 }

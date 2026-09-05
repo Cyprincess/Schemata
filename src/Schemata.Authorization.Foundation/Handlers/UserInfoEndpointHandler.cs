@@ -10,6 +10,11 @@ namespace Schemata.Authorization.Foundation.Handlers;
 internal sealed class UserInfoEndpointHandler(UserInfoEndpoint endpoint)
     : IRequestHandler<UserInfoEndpointQuery, AuthorizationResult>
 {
-    public Task<AuthorizationResult> HandleAsync(UserInfoEndpointQuery request, CancellationToken ct = default)
-        => endpoint.HandleAsync(request.Principal!, ct);
+    public Task<AuthorizationResult> HandleAsync(UserInfoEndpointQuery request, CancellationToken ct = default) {
+        if (request.Principal is null) {
+            return Task.FromResult(AuthorizationResult.Challenge());
+        }
+
+        return endpoint.HandleAsync(request.Principal, ct);
+    }
 }

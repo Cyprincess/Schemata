@@ -24,9 +24,9 @@ namespace Schemata.Security.Foundation.Stores;
 public class RepositoryTokenStore : ITokenStore<SchemataToken>
 {
     private readonly IRepository<SchemataToken> _repository;
-    private readonly TimeProvider?       _time;
+    private readonly TimeProvider _time;
 
-    public RepositoryTokenStore(IRepository<SchemataToken> repository, TimeProvider? time = null) {
+    public RepositoryTokenStore(IRepository<SchemataToken> repository, TimeProvider time) {
         _repository = repository;
         _time       = time;
     }
@@ -291,7 +291,7 @@ public class RepositoryTokenStore : ITokenStore<SchemataToken>
 
     #endregion
 
-    private DateTime Now() => _time?.GetUtcNow().UtcDateTime ?? DateTime.UtcNow;
+    private DateTime Now() => _time.GetUtcNow().UtcDateTime;
 
     private static string MintValue() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 }

@@ -15,17 +15,18 @@ public class RequestPipelineAdvisorShould
 
         var advisor = new TracingPipelineAdvisor(trail);
 
-        Task<string> Continuation(CancellationToken _) {
-            trail.Add("handler");
-            return Task.FromResult("handler-result");
-        }
-
         var ctx = new AdviceContext(new EmptyServiceProvider());
 
         var result = await advisor.AdviseAsync(ctx, new("hub"), Continuation, CancellationToken.None);
 
         Assert.Equal(["before", "handler", "after"], trail);
         Assert.Equal("handler-result::after", result);
+        return;
+
+        Task<string> Continuation(CancellationToken _) {
+            trail.Add("handler");
+            return Task.FromResult("handler-result");
+        }
     }
 
     [Fact]
@@ -34,16 +35,17 @@ public class RequestPipelineAdvisorShould
 
         var advisor = new ShortCircuitPipelineAdvisor("short");
 
-        Task<string> Continuation(CancellationToken _) {
-            trail.Add("handler");
-            return Task.FromResult("handler-result");
-        }
-
         var ctx = new AdviceContext(new EmptyServiceProvider());
 
         var result = await advisor.AdviseAsync(ctx, new("hub"), Continuation, CancellationToken.None);
 
         Assert.Equal("short", result);
         Assert.Empty(trail);
+        return;
+
+        Task<string> Continuation(CancellationToken _) {
+            trail.Add("handler");
+            return Task.FromResult("handler-result");
+        }
     }
 }

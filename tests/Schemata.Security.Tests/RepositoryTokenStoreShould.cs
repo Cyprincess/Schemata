@@ -316,7 +316,7 @@ public class RepositoryTokenStoreShould
         var repository = new Mock<IRepository<SchemataToken>>();
         configure?.Invoke(repository);
 
-        return (new(repository.Object, time?.Object), repository);
+        return (new(repository.Object, time?.Object ?? TimeProvider.System), repository);
     }
 
     private static Mock<TimeProvider> NewClock() {

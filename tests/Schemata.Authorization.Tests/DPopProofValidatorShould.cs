@@ -54,7 +54,7 @@ public class DPopProofValidatorShould
         string             proof,
         string?            accessToken   = null,
         string?            nonceProvider = null,
-        string?            nonceName     = null,
+        string             nonceName     = "client-1",
         string             htm           = "POST",
         Uri?               htu           = null
     ) {

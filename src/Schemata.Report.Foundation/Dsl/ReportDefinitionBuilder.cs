@@ -177,7 +177,10 @@ public sealed class ReportDefinitionBuilder
             return new() { Filter = new(new(filter.Predicate.Source, filter.Predicate.Language)) };
         }
 
-        var group = source.GroupBy!;
+        if (source.GroupBy is not { } group) {
+            throw new ArgumentException("A transformation must define a filter or a grouping.", nameof(source));
+        }
+
         return new() {
             GroupBy = new(group.Keys, ImmutableArray.CreateRange(group.Aggregations)),
         };

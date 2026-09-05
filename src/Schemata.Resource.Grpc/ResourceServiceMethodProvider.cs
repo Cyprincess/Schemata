@@ -75,10 +75,6 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
 
         var allowed = registry.GetResource(typeof(TEntity))?.Operations;
 
-        bool IsAllowed(Operations verb) {
-            return allowed is null || Array.IndexOf(allowed, verb) >= 0;
-        }
-
         var metadata = Array.Empty<object>();
 
         if (IsAllowed(Operations.List)) {
@@ -119,7 +115,9 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
 
         if (IsAllowed(Operations.Delete)) {
             // Soft-deletable resources respond with the updated resource per AIP-164;
-            // hard-deletable resources respond with Empty per AIP-135.
+            // hard-deletable resources respond with Empty per AIP-135. The unary binder
+            // constrains responses to non-nullable, so allow_missing and advisor-resolved
+            // deletes cross the null-forgiving operator as an empty message.
             if (typeof(ISoftDelete).IsAssignableFrom(typeof(TEntity))) {
                 context.AddUnaryMethod(
                     new Method<DeleteRequest, TDetail>(MethodType.Unary, service, GrpcResourceNaming.MethodName(descriptor, Operations.Delete), GrpcMarshallers.Create<DeleteRequest>(model), GrpcMarshallers.Create<TDetail>(model)), metadata,
@@ -136,6 +134,12 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
                         return new();
                     });
             }
+        }
+
+        return;
+
+        bool IsAllowed(Operations verb) {
+            return allowed is null || Array.IndexOf(allowed, verb) >= 0;
         }
     }
 }

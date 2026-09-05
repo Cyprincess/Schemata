@@ -92,7 +92,14 @@ public sealed class DiscoveryHandler<TScope>(
                 );
         }
 
-        var names = await scopes.ListAsync(ct: ct).Map(s => s.Name!, ct).ToListAsync(ct);
+        var names = await scopes.ListAsync(ct: ct)
+            .Map(
+                s => s.Name
+                  ?? throw new OAuthException(
+                      OAuthErrors.ServerError,
+                      SchemataResources.GetResourceString(SchemataResources.INTERNAL)),
+                ct)
+            .ToListAsync(ct);
         document.ScopesSupported = [..names];
 
         return AuthorizationResult.Content(document);

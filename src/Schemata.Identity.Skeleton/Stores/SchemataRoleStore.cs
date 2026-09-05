@@ -194,7 +194,8 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<T
             throw new ArgumentNullException(nameof(role));
         }
 
-        return await RoleClaimsRepository.ListAsync(q => q.Where(rc => rc.RoleId.Equals(role.Uid)), ct)
+        return await RoleClaimsRepository.ListAsync(q => q.Where(rc => rc.RoleId.Equals(role.Uid)
+                                                                    && rc.ClaimValue != null), ct)
                                          .Map(c => new Claim(c.ClaimType!, c.ClaimValue!), ct)
                                          .ToListAsync(ct);
     }

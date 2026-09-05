@@ -126,9 +126,9 @@ public static class ServiceCollectionExtensions
                                        .ToArray();
 
         var entity  = resource.Entity;
-        var request = resource.Request!;
-        var detail  = resource.Detail!;
-        var summary = resource.Summary!;
+        var request = resource.Request;
+        var detail  = resource.Detail;
+        var summary = resource.Summary;
 
         AddStandardHandlers(services, entity, request, detail, summary);
 

@@ -48,7 +48,7 @@ internal static class ResourceAuthorizationRegistration
         ResourceAttribute resource,
         IReadOnlyList<ResourceMethodAttribute> methods
     ) {
-        AddAuthenticationStandardMethod.MakeGenericMethod(resource.Entity, resource.Request!, resource.Detail!, resource.Summary!)
+        AddAuthenticationStandardMethod.MakeGenericMethod(resource.Entity, resource.Request, resource.Detail, resource.Summary)
                                       .Invoke(null, [services]);
         foreach (var method in methods) {
             var descriptor = ResourceMethodHandlerHelper.Describe(resource.Entity, method.Handler)!;
@@ -62,7 +62,7 @@ internal static class ResourceAuthorizationRegistration
         ResourceAttribute resource,
         IReadOnlyList<ResourceMethodAttribute> methods
     ) {
-        AddAuthorizationStandardMethod.MakeGenericMethod(resource.Entity, resource.Request!, resource.Detail!, resource.Summary!)
+        AddAuthorizationStandardMethod.MakeGenericMethod(resource.Entity, resource.Request, resource.Detail, resource.Summary)
                                      .Invoke(null, [services]);
         foreach (var method in methods) {
             var descriptor = ResourceMethodHandlerHelper.Describe(resource.Entity, method.Handler)!;

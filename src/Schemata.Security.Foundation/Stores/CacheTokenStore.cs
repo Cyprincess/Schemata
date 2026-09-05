@@ -26,9 +26,9 @@ namespace Schemata.Security.Foundation.Stores;
 public class CacheTokenStore : ITokenStore<SchemataToken>
 {
     private readonly ICacheProvider _cache;
-    private readonly TimeProvider?  _time;
+    private readonly TimeProvider _time;
 
-    public CacheTokenStore(ICacheProvider cache, TimeProvider? time = null) {
+    public CacheTokenStore(ICacheProvider cache, TimeProvider time) {
         _cache = cache;
         _time  = time;
     }
@@ -171,7 +171,7 @@ public class CacheTokenStore : ITokenStore<SchemataToken>
         };
     }
 
-    private DateTime Now() => _time?.GetUtcNow().UtcDateTime ?? DateTime.UtcNow;
+    private DateTime Now() => _time.GetUtcNow().UtcDateTime;
 
     private static string MintValue() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 }

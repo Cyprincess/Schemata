@@ -15,5 +15,11 @@ internal sealed class RefreshUserHandler<TUser>(IdentityOperationHandler<TUser> 
     public Task<IdentityResult<ClaimsPrincipal>> HandleAsync(
         RefreshUserRequest<TUser> request,
         CancellationToken         ct = default
-    ) => operations.RefreshAsync(IdentityRequestHandler.Require(request).Ticket, request.Principal!, ct);
+    ) {
+        if (request.Principal is null) {
+            return Task.FromResult(IdentityResult<ClaimsPrincipal>.Challenge());
+        }
+
+        return operations.RefreshAsync(IdentityRequestHandler.Require(request).Ticket, request.Principal, ct);
+    }
 }

@@ -218,8 +218,9 @@ public class SchemataAuthenticationHandler<TApp>(
         }
 
         var entity = await tokens.FindByReferenceIdAsync(token, ct);
-        if (string.IsNullOrWhiteSpace(entity?.Application)
-         || entity.Type != TokenTypes.AccessToken
+        var nonceName = entity?.Application;
+        if (string.IsNullOrWhiteSpace(nonceName)
+         || entity?.Type != TokenTypes.AccessToken
          || entity.Status != TokenStatuses.Valid) {
             if (flavor == Schemes.Dpop) {
                 StageDpopChallenge(OAuthErrors.InvalidToken);
@@ -279,14 +280,14 @@ public class SchemataAuthenticationHandler<TApp>(
 
         string thumbprint;
         try {
-            thumbprint = await proofs.ValidateAsync(proof, Request.Method, htu, token, nonceKey, entity.Application, ct);
+            thumbprint = await proofs.ValidateAsync(proof, Request.Method, htu, token, nonceKey, nonceName, ct);
         } catch (OAuthException ex) when (ex.Status == OAuthErrors.UseDpopNonce) {
             // §9: 401 use_dpop_nonce with the current value in a DPoP-Nonce response header;
             // the client retries with it in the proof's nonce claim.
             StageDpopChallenge(
                 OAuthErrors.UseDpopNonce,
                 (await nonces.GetOrCreateAsync(
-                    null, nonceKey, entity.Application, null, dpop.Value.NonceLifetime, ct)).Value);
+                    null, nonceKey, nonceName, null, dpop.Value.NonceLifetime, ct)).Value);
             return AuthenticateResult.NoResult();
         } catch (OAuthException) {
             StageDpopChallenge(OAuthErrors.InvalidDpopProof);

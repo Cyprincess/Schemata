@@ -114,6 +114,15 @@ internal sealed class ActorInstance : IActorRef
             var result = timeout is { } value
                 ? await completion.Task.WaitAsync(value, ct)
                 : await completion.Task.WaitAsync(ct);
+
+            // A null reply is legitimate for reference and Nullable<T> responses; only a plain
+            // value type would crash on the unbox.
+            if (result is null
+                && typeof(TResponse).IsValueType
+                && Nullable.GetUnderlyingType(typeof(TResponse)) is null) {
+                throw new InvalidOperationException($"Actor '{Id}' replied null for a response of type '{typeof(TResponse)}'.");
+            }
+
             return (TResponse)result!;
         } catch {
             // Timed out or the caller gave up: drop the pending-reply entry. If this item is

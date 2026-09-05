@@ -73,6 +73,16 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         return ResourceNotFound(ResourceNameDescriptor.ForType<TEntity>().Collection);
     }
 
+    private TDetail RequireDetail(TDetail? detail) {
+        if (detail is null) {
+            throw new InvalidOperationException(
+                $"Could not map '{typeof(TEntity).FullName}' to '{typeof(TDetail).FullName}'."
+            );
+        }
+
+        return detail;
+    }
+
     private TotalSizeMode ResolveTotalSizeMode() {
         var options = _sp.GetService<IOptions<SchemataResourceOptions>>()?.Value;
         if (options is null) {

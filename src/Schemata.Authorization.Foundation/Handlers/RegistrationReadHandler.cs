@@ -46,9 +46,13 @@ internal sealed class RegistrationReadHandler<TApp>(
             return null;
         }
 
+        if (string.IsNullOrWhiteSpace(token.Payload)) {
+            return null;
+        }
+
         string bound;
         try {
-            bound = JsonSerializer.Deserialize<RegistrationTokenPayload>(token.Payload!)?.ClientId ?? string.Empty;
+            bound = JsonSerializer.Deserialize<RegistrationTokenPayload>(token.Payload)?.ClientId ?? string.Empty;
         } catch (JsonException) {
             return null;
         }

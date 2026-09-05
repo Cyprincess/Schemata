@@ -15,5 +15,11 @@ internal sealed class EnrollUserAuthenticatorHandler<TUser>(IdentityOperationHan
     public Task<IdentityResult<Unit>> HandleAsync(
         EnrollUserAuthenticatorRequest<TUser> request,
         CancellationToken                     ct = default
-    ) => operations.EnrollAsync(IdentityRequestHandler.Require(request).Request, request.Principal!, ct);
+    ) {
+        if (request.Principal is null) {
+            return Task.FromResult(IdentityResult<Unit>.Challenge());
+        }
+
+        return operations.EnrollAsync(IdentityRequestHandler.Require(request).Request, request.Principal, ct);
+    }
 }

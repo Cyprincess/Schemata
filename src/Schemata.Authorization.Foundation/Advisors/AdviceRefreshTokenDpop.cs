@@ -47,7 +47,15 @@ public sealed class AdviceRefreshTokenDpop<TApp> : IRefreshTokenAdvisor<TApp>
         RefreshTokenContext<TApp>     exchange,
         CancellationToken             ct = default
     ) {
-        var jkt = DPopProofValidator.ReadBoundThumbprint(exchange.Principal!);
+        var principal = exchange.Principal;
+        if (principal is null) {
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
+            );
+        }
+
+        var jkt = DPopProofValidator.ReadBoundThumbprint(principal);
         if (!string.IsNullOrWhiteSpace(jkt)) {
             var bound = ctx.TryGet<DpopBinding>(out var binding) ? binding?.Jkt : null;
             if (bound != jkt) {

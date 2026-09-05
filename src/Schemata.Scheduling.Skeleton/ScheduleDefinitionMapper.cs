@@ -40,7 +40,9 @@ public static class ScheduleDefinitionMapper
     /// <summary>Reconstructs the <see cref="IScheduleDefinition" /> represented by <paramref name="job" />.</summary>
     public static IScheduleDefinition ToDefinition(SchemataJob job) {
         return job.ScheduleType switch {
-            ScheduleType.OneTime  => new OneTimeSchedule(job.NextRunTime!.Value),
+            ScheduleType.OneTime  => job.NextRunTime is { } runTime
+                ? new OneTimeSchedule(runTime)
+                : throw new ArgumentOutOfRangeException(nameof(job), "OneTime job requires a NextRunTime."),
             ScheduleType.Periodic => new PeriodicSchedule(TimeSpan.FromTicks(job.IntervalTicks!.Value), job.AnchorTime),
             ScheduleType.Cron     => new CronSchedule(job.CronExpression!),
             var _                 => throw new ArgumentOutOfRangeException(),

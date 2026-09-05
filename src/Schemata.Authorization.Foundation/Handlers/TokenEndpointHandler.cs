@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
@@ -30,7 +31,12 @@ internal sealed class TokenEndpointHandler(TokenEndpoint endpoint)
         if (result.Status == AuthorizationStatus.SignIn
          && ctx.TryGet<DpopBinding>(out var binding)
          && binding is not null) {
-            result.Properties![Properties.DpopJkt] = binding.Jkt;
+            if (result.Properties is null) {
+                throw new InvalidOperationException(
+                    "The sign-in result carries no properties to attach the DPoP binding to.");
+            }
+
+            result.Properties[Properties.DpopJkt] = binding.Jkt;
         }
 
         return result;

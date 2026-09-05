@@ -43,17 +43,17 @@ public class ResourceAttribute : Attribute
     /// <summary>
     ///     The type used for create and update request bodies.
     /// </summary>
-    public Type? Request { get; }
+    public Type Request { get; }
 
     /// <summary>
     ///     The type used for single-resource read responses.
     /// </summary>
-    public Type? Detail { get; }
+    public Type Detail { get; }
 
     /// <summary>
     ///     The type used for each item in a list response.
     /// </summary>
-    public Type? Summary { get; }
+    public Type Summary { get; }
 
     /// <summary>
     ///     When set, restricts which endpoint types expose this resource.

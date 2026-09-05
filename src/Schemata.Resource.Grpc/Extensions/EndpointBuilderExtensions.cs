@@ -46,7 +46,7 @@ public static class EndpointBuilderExtensions
                 continue;
             }
 
-            var service = typeof(ResourceService<,,,>).MakeGenericType(resource.Entity, resource.Request!, resource.Detail!, resource.Summary!);
+            var service = typeof(ResourceService<,,,>).MakeGenericType(resource.Entity, resource.Request, resource.Detail, resource.Summary);
 
             if (MapGrpcService(endpoints, service) is not IEndpointConventionBuilder builder) {
                 continue;

@@ -160,8 +160,16 @@ public sealed class DeviceCodeHandler<TApp>(
         // See RFC 8628 §3.4.
         await tokens.RevokeAsync(token, ct);
 
+        var subject = token.Parent;
+        if (string.IsNullOrWhiteSpace(subject)) {
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
+            );
+        }
+
         var claims = new List<Claim> {
-            new(IdentityClaims.Subject, token.Parent!),
+            new(IdentityClaims.Subject, subject),
             new(Claims.ClientId, application.ClientId),
         };
 

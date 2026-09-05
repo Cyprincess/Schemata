@@ -1521,7 +1521,13 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         string?                    previousState,
         FlowExecutionContext       execution
     ) {
-        var outFlow   = definition.FirstOutgoing(gateway)!;
+        var outFlow = definition.FirstOutgoing(gateway);
+        if (outFlow is null) {
+            throw new FailedPreconditionException(
+                SchemataResources.STATE_MACHINE_EXCLUSIVE_GATEWAY_NO_OUTGOING,
+                new Dictionary<string, string?> { ["name"] = gateway.Name });
+        }
+
         var variables = new Dictionary<string, int>();
         var resolved  = await ResolveTargetAsync(definition, outFlow.Target, variables, TokenView(token), execution, process, token);
 

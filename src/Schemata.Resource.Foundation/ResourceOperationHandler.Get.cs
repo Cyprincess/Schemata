@@ -76,7 +76,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             return entityResult;
         }
 
-        var detail = _mapper.Map<TEntity, TDetail>(entity);
+        var detail = RequireDetail(_mapper.Map<TEntity, TDetail>(entity));
 
         return new() { Detail = detail };
     }
