@@ -72,7 +72,8 @@ public class PlanExecutorShould
         await using var materialized = await executor.MaterializeAsync(plan, new(), null);
         var rows = await ReadAsync(materialized.Rows);
 
-        Assert.IsType<SourceNode>(received!.Root);
+        Assert.NotNull(received);
+        Assert.IsType<SourceNode>(received.Root);
         Assert.Equal(
             [1, 2, 3],
             rows.Select(row => Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(row["p"])["value"])
@@ -120,7 +121,8 @@ public class PlanExecutorShould
         await using var materialized = await executor.MaterializeAsync(plan, new(), null);
         var grouped = Assert.Single(await ReadAsync(materialized.Rows));
 
-        Assert.IsType<ComputeNode>(received!.Root);
+        Assert.NotNull(received);
+        Assert.IsType<ComputeNode>(received.Root);
         Assert.Equal("ready", grouped["computed"]);
         Assert.Equal(2, grouped["count"]);
     }
@@ -173,8 +175,9 @@ public class PlanExecutorShould
         var row = Assert.Single(response.Rows);
         var children = Assert.IsAssignableFrom<IReadOnlyList<IReadOnlyDictionary<string, object?>>>(row["children"]);
         var child = Assert.Single(children);
+        Assert.NotNull(received);
+        var pushed = Assert.IsType<SelectionNode>(received.Root);
 
-        var pushed = Assert.IsType<SelectionNode>(received!.Root);
         Assert.Collection(pushed.Items, item => Assert.Equal(SelectionKind.Nested, item.Kind));
         Assert.Equal("first", child["name"]);
         AssertSchemaMatchesRows(response, ["children"]);
@@ -197,8 +200,9 @@ public class PlanExecutorShould
         await using var materialized = await executor.MaterializeAsync(plan, new(), null);
         var rows = await ReadAsync(materialized.Rows);
         var row = Assert.Single(rows);
+        Assert.NotNull(received);
+        Assert.IsType<SourceNode>(received.Root);
 
-        Assert.IsType<SourceNode>(received!.Root);
         Assert.Equal("computed-0", row["computed"]);
         AssertSchemaMatchesRows(materialized.Schema, rows, ["computed"]);
     }
@@ -221,7 +225,8 @@ public class PlanExecutorShould
         var row = Assert.Single(response.Rows);
         var children = Assert.IsAssignableFrom<IReadOnlyList<IReadOnlyDictionary<string, object?>>>(row["children"]);
 
-        var pushed = Assert.IsType<SelectionNode>(received!.Root);
+        Assert.NotNull(received);
+        var pushed = Assert.IsType<SelectionNode>(received.Root);
         Assert.Collection(pushed.Items, item => Assert.Equal(SelectionKind.Nested, item.Kind));
         Assert.Equal("computed-7", row["computed"]);
         Assert.Equal("first", Assert.Single(children)["name"]);
@@ -295,7 +300,8 @@ public class PlanExecutorShould
         var row = Assert.Single(response.Rows);
         var children = Assert.IsAssignableFrom<IReadOnlyList<IReadOnlyDictionary<string, object?>>>(row["children"]);
 
-        Assert.IsType<SourceNode>(received!.Root);
+        Assert.NotNull(received);
+        Assert.IsType<SourceNode>(received.Root);
         Assert.Equal("first", Assert.Single(children)["name"]);
     }
 
@@ -395,7 +401,8 @@ public class PlanExecutorShould
         var row = Assert.Single(response.Rows);
         var children = Assert.IsAssignableFrom<IReadOnlyList<IReadOnlyDictionary<string, object?>>>(row["children"]);
 
-        Assert.IsType<SourceNode>(received!.Root);
+        Assert.NotNull(received);
+        Assert.IsType<SourceNode>(received.Root);
         Assert.Equal("computed-7", row["computed"]);
         Assert.Equal("first", Assert.Single(children)["name"]);
     }

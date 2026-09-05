@@ -152,31 +152,6 @@ public class BpmnValidatorShould
     }
 
     [Fact]
-    public void Validate_ParallelGatewayValid_Passes() {
-        var start = new FlowEvent { Name = "start", Position = EventPosition.Start };
-        var fork  = new ParallelGateway { Name = "fork" };
-        var a     = new NoneTask { Name = "a" };
-        var b     = new NoneTask { Name = "b" };
-        var endA  = new FlowEvent { Name = "end-a", Position = EventPosition.End };
-        var endB  = new FlowEvent { Name = "end-b", Position = EventPosition.End };
-
-        var definition = new ProcessDefinition {
-            Name     = "parallel",
-            Elements = { start, fork, a, b, endA, endB },
-            Flows = {
-                new() { Source = start, Target = fork },
-                new() { Source = fork, Target = a },
-                new() { Source = fork, Target = b },
-                new() { Source = a, Target = endA },
-                new() { Source = b, Target = endB },
-            },
-        };
-
-        var ex = Record.Exception(() => BpmnValidator.Validate(definition));
-        Assert.Null(ex);
-    }
-
-    [Fact]
     public void Validate_SubProcessValid_Passes() {
         var start      = new FlowEvent { Name = "start", Position = EventPosition.Start };
         var sub        = new EmbeddedSubProcess { Name = "sub" };

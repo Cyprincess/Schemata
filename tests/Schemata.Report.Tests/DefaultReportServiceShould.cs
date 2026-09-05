@@ -186,8 +186,11 @@ public class DefaultReportServiceShould
 
         var result = await service.RunAsync(ReportTestHost.InlineRequest(persist: true));
         var values = new List<int>();
+        Assert.NotNull(result.Snapshot);
         await foreach (var row in store.ReadRowsAsync(result.Snapshot!)) {
-            values.Add(((System.Text.Json.JsonElement)row["value"]!).GetInt32());
+            var raw = row["value"];
+            Assert.NotNull(raw);
+            values.Add(((System.Text.Json.JsonElement)raw).GetInt32());
         }
 
         Assert.Equal([0, 1, 2, 3, 4], values);

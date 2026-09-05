@@ -49,7 +49,8 @@ public class ReportGenerationJobShould
         var operation = await service.GenerateAsync(ReportTestHost.InlineRequest());
 
         Assert.NotNull(triggered);
-        var uid = Assert.IsType<Guid>(context!.ExecutionUid);
+        Assert.NotNull(context);
+        var uid = Assert.IsType<Guid>(context.ExecutionUid);
         Assert.Equal(uid, triggered!.Uid);
         Assert.Equal($"operations/{triggered.Uid:n}", operation.CanonicalName);
         Assert.False(operation.Done);
@@ -102,8 +103,10 @@ public class ReportGenerationJobShould
             Execution = execution,
         }, CancellationToken.None);
 
+        Assert.NotNull(execution.Output);
         var output = JsonSerializer.Deserialize<ReportOperationOutput>(execution.Output!, SchemataJson.Default);
-        Assert.Equal("reports/daily/snapshots/s1", output!.Snapshot);
+        Assert.NotNull(output);
+        Assert.Equal("reports/daily/snapshots/s1", output.Snapshot);
         Assert.Null(output.Response);
     }
 

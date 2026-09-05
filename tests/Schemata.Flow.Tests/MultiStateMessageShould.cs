@@ -21,15 +21,6 @@ namespace Schemata.Flow.Tests;
 public class MultiStateMessageShould
 {
     [Fact]
-    public void Validator_AcceptsSameMessage_AcrossMultipleAwaitStates() {
-        var definition = new MultiAwaitProcess();
-
-        var ex = Record.Exception(() => StateMachineValidator.Validate(definition));
-
-        Assert.Null(ex);
-    }
-
-    [Fact]
     public void Validator_AcceptsSameMessage_OnBoundary_AcrossMultipleActivities() {
         var definition = new MultiBoundaryProcess();
 

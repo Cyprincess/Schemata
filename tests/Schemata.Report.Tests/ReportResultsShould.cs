@@ -61,6 +61,7 @@ public class ReportResultsShould
 
         Assert.Equal(ReportReasons.OperationFailed, exception.Reason);
         Assert.Equal("Generation failed.", exception.Message);
+        Assert.NotNull(exception.Metadata);
         Assert.Equal("13", exception.Metadata!["code"]);
     }
 }

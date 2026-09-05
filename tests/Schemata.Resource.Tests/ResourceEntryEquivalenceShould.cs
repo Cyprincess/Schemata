@@ -62,8 +62,9 @@ public sealed class ResourceEntryEquivalenceShould
         var dispatcherResult = await dispatcher.SendAsync<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>(
             new(new() { Name = "e1" }, principal), CancellationToken.None);
 
-        Assert.Equal(controllerDetail.Name, dispatcherResult.Detail!.Name);
-        Assert.Equal(controllerDetail.CanonicalName, dispatcherResult.Detail!.CanonicalName);
+        Assert.NotNull(dispatcherResult.Detail);
+        Assert.Equal(controllerDetail.Name, dispatcherResult.Detail.Name);
+        Assert.Equal(controllerDetail.CanonicalName, dispatcherResult.Detail.CanonicalName);
         Assert.Equal(1, controllerSpy.Count);
         Assert.Equal(1, dispatcherSpy.Count);
     }
@@ -86,8 +87,9 @@ public sealed class ResourceEntryEquivalenceShould
         var dispatcherResult = await dispatcher.SendAsync<GetResourceQueryRequest<Entity, Detail>, GetResultBase<Detail>>(
             new(new() { CanonicalName = "entities/e1" }, principal), CancellationToken.None);
 
-        Assert.Equal(controllerDetail.Name, dispatcherResult.Detail!.Name);
-        Assert.Equal(controllerDetail.CanonicalName, dispatcherResult.Detail!.CanonicalName);
+        Assert.NotNull(dispatcherResult.Detail);
+        Assert.Equal(controllerDetail.Name, dispatcherResult.Detail.Name);
+        Assert.Equal(controllerDetail.CanonicalName, dispatcherResult.Detail.CanonicalName);
         Assert.Equal(1, controllerSpy.Count);
         Assert.Equal(1, dispatcherSpy.Count);
     }
@@ -117,7 +119,8 @@ public sealed class ResourceEntryEquivalenceShould
     }
 
     private static ErrorInfoDetail ErrorInfo(SchemataException exception) {
-        return exception.Details!.OfType<ErrorInfoDetail>().Single();
+        Assert.NotNull(exception.Details);
+        return exception.Details.OfType<ErrorInfoDetail>().Single();
     }
 
     /// <summary>Builds a controller wired exactly as ASP.NET Core would: a fabricated per-request
@@ -167,7 +170,8 @@ public sealed class ResourceEntryEquivalenceShould
 
         var mapper = new Mock<ISimpleMapper>();
         if (entity is not null) {
-            mapper.Setup(m => m.Map<Entity, Detail>(entity)).Returns(detail!);
+            Assert.NotNull(detail);
+            mapper.Setup(m => m.Map<Entity, Detail>(entity)).Returns(detail);
         }
 
         return (repository, mapper);

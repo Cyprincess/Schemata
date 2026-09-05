@@ -203,24 +203,34 @@ public class DPopTokenEndpointShould : IDisposable
             + "&code_challenge_method=S256");
         Assert.Equal(HttpStatusCode.Found, authorize.StatusCode);
 
-        var interaction = System.Web.HttpUtility.ParseQueryString(authorize.Headers.Location!.Query);
+        var location = authorize.Headers.Location;
+        Assert.NotNull(location);
+        var interaction = System.Web.HttpUtility.ParseQueryString(location.Query);
+        var code     = interaction[Parameters.Code];
+        var codeType = interaction[Parameters.CodeType];
+        Assert.NotNull(code);
+        Assert.NotNull(codeType);
         var approve = await client.PostAsync(
             "/connect/interact",
             new FormUrlEncodedContent(new Dictionary<string, string> {
-                ["code"]      = interaction[Parameters.Code]!,
-                ["code_type"] = interaction[Parameters.CodeType]!,
+                ["code"]      = code,
+                ["code_type"] = codeType,
             }));
         var approveBody = await approve.Content.ReadAsStringAsync();
         Assert.True(HttpStatusCode.Found == approve.StatusCode, approveBody);
 
-        var callback = System.Web.HttpUtility.ParseQueryString(approve.Headers.Location!.Query);
+        var callbackLocation = approve.Headers.Location;
+        Assert.NotNull(callbackLocation);
+        var callback = System.Web.HttpUtility.ParseQueryString(callbackLocation.Query);
+        var callbackCode = callback[Parameters.Code];
+        Assert.NotNull(callbackCode);
 
         // Wire leg 2: the code exchange carries no DPoP proof — plain Bearer with no cnf member.
         var response = await client.SendAsync(Post(new() {
             ["grant_type"]    = GrantTypes.AuthorizationCode,
             ["client_id"]     = "code-client",
             ["client_secret"] = "code-secret",
-            ["code"]          = callback[Parameters.Code]!,
+            ["code"]          = callbackCode,
             ["redirect_uri"]  = RedirectUri,
             ["code_verifier"] = Verifier,
         }, null));
@@ -253,8 +263,10 @@ public class DPopTokenEndpointShould : IDisposable
             [Properties.RedirectUri]  = RedirectUri,
             [Properties.DpopJkt]      = jkt,
         }, AuthorizationSignInResponseKind.Callback);
-
-        return response.Callback!.Parameters[Parameters.Code]!;
+        Assert.NotNull(response.Callback);
+        var mintedCode = response.Callback.Parameters[Parameters.Code];
+        Assert.NotNull(mintedCode);
+        return mintedCode;
     }
 
     private async Task<(string RefreshToken, string Jkt, string Nonce, RsaSecurityKey Key, Dictionary<string, object> Jwk)>
@@ -268,8 +280,10 @@ public class DPopTokenEndpointShould : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var token = JsonDocument.Parse(await response.Content.ReadAsStreamAsync()).RootElement;
+        var refreshToken = token.GetProperty("refresh_token").GetString();
+        Assert.NotNull(refreshToken);
         return (
-            token.GetProperty("refresh_token").GetString()!,
+            refreshToken,
             jkt,
             nonce,
             key,
@@ -341,10 +355,12 @@ public class DPopTokenEndpointShould : IDisposable
         var rsa        = RSA.Create(2048);
         _keys.Add(rsa);
         var parameters = rsa.ExportParameters(false);
+        Assert.NotNull(parameters.Modulus);
+        Assert.NotNull(parameters.Exponent);
         var jwk = new Dictionary<string, object> {
             ["kty"] = "RSA",
-            ["n"]   = Base64UrlEncoder.Encode(parameters.Modulus!),
-            ["e"]   = Base64UrlEncoder.Encode(parameters.Exponent!),
+            ["n"]   = Base64UrlEncoder.Encode(parameters.Modulus),
+            ["e"]   = Base64UrlEncoder.Encode(parameters.Exponent),
         };
         return (new(rsa), jwk);
     }

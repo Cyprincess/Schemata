@@ -299,7 +299,8 @@ public sealed class InsightAdvisorShould
             QueryInsightRequest request,
             CancellationToken   ct = default
         ) {
-            var plan = ctx.Get<PlanNode>()!;
+            var plan = ctx.Get<PlanNode>();
+            Assert.NotNull(plan);
             ctx.Set(await advise(plan, request, ct));
             return AdviseResult.Continue;
         }

@@ -24,7 +24,9 @@ public class RequestedAcrValuesShould
             new() { Username = "alice", Password = "password", TwoFactorCode = "123456", AcrValues = AuthenticationContextClasses.Password },
             Principal);
 
-        Assert.Equal(AuthenticationContextClasses.Password, result.Data!.FindFirst("acr")?.Value);
+        Assert.Equal(IdentityStatus.Success, result.Status);
+        Assert.NotNull(result.Data);
+        Assert.Equal(AuthenticationContextClasses.Password, result.Data.FindFirst("acr")?.Value);
     }
 
     [Fact]
@@ -37,7 +39,9 @@ public class RequestedAcrValuesShould
             Principal);
 
         // Core §5.5.1.1: the unsatisfied voluntary request keeps the performed level.
-        Assert.Equal(AuthenticationContextClasses.Password, result.Data!.FindFirst("acr")?.Value);
+        Assert.Equal(IdentityStatus.Success, result.Status);
+        Assert.NotNull(result.Data);
+        Assert.Equal(AuthenticationContextClasses.Password, result.Data.FindFirst("acr")?.Value);
     }
 
     [Fact]
@@ -54,7 +58,9 @@ public class RequestedAcrValuesShould
             },
             Principal);
 
-        Assert.Equal(AuthenticationContextClasses.Multifactor, result.Data!.FindFirst("acr")?.Value);
+        Assert.Equal(IdentityStatus.Success, result.Status);
+        Assert.NotNull(result.Data);
+        Assert.Equal(AuthenticationContextClasses.Multifactor, result.Data.FindFirst("acr")?.Value);
     }
 
     [Fact]
@@ -66,7 +72,9 @@ public class RequestedAcrValuesShould
             new() { Username = "alice", Password = "password", AcrValues = "urn:example:acr:vip" },
             Principal);
 
-        Assert.Equal(AuthenticationContextClasses.Password, result.Data!.FindFirst("acr")?.Value);
+        Assert.Equal(IdentityStatus.Success, result.Status);
+        Assert.NotNull(result.Data);
+        Assert.Equal(AuthenticationContextClasses.Password, result.Data.FindFirst("acr")?.Value);
     }
 
     [Fact]
@@ -78,7 +86,9 @@ public class RequestedAcrValuesShould
             new() { Username = "alice", Password = "password", TwoFactorCode = "123456", AcrValues = "   " },
             Principal);
 
-        Assert.Equal(AuthenticationContextClasses.Multifactor, result.Data!.FindFirst("acr")?.Value);
+        Assert.Equal(IdentityStatus.Success, result.Status);
+        Assert.NotNull(result.Data);
+        Assert.Equal(AuthenticationContextClasses.Multifactor, result.Data.FindFirst("acr")?.Value);
     }
 
     private static IdentityHandlerTestHost Host() {

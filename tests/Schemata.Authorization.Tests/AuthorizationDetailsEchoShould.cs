@@ -51,8 +51,9 @@ public class AuthorizationDetailsEchoShould
 
         var created = CapturedAuthorization(f.AuthzMgr);
         Assert.Equal(Grant, created.AuthorizationDetails);
-        Assert.Equal(Grant, result.Properties![Properties.AuthorizationDetails]);
-        Assert.Equal("authorizations/auth-generated", result.Properties![Properties.AuthorizationName]);
+        Assert.NotNull(result.Properties);
+        Assert.Equal(Grant, result.Properties[Properties.AuthorizationDetails]);
+        Assert.Equal("authorizations/auth-generated", result.Properties[Properties.AuthorizationName]);
     }
 
     [Fact]
@@ -62,7 +63,8 @@ public class AuthorizationDetailsEchoShould
                          new() { Code = "interact-ref" }, CreatePrincipal(), Issuer, CancellationToken.None);
 
         Assert.Null(CapturedAuthorization(f.AuthzMgr).AuthorizationDetails);
-        Assert.Null(result.Properties![Properties.AuthorizationDetails]);
+        Assert.NotNull(result.Properties);
+        Assert.Null(result.Properties[Properties.AuthorizationDetails]);
     }
 
 
@@ -89,16 +91,18 @@ public class AuthorizationDetailsEchoShould
 
         Assert.Equal(AdviseResult.Handle, result);
         Assert.True(ctx.TryGet<AuthorizationResult>(out var signIn));
+        Assert.NotNull(signIn);
         var invocation = Assert.Single(
             authzMgr.Invocations,
             i => i.Method.Name == nameof(IAuthorizationManager<SchemataAuthorization>.CreateAsync));
         var created = Assert.IsType<SchemataAuthorization>(invocation.Arguments[0]);
         Assert.Equal(Grant, created.AuthorizationDetails);
-        Assert.Equal(Grant, signIn!.Properties![Properties.AuthorizationDetails]);
+        Assert.NotNull(signIn.Properties);
+        Assert.Equal(Grant, signIn.Properties[Properties.AuthorizationDetails]);
     }
 
     [Fact]
-    public async Task CarryTheGrantSetIntoTheCodePayload() {
+    public async Task Carry_The_Grant_Set_Into_The_Code_Payload() {
         using var provider = new ServiceCollection().BuildServiceProvider();
         var (service, tokens) = CreateSignInService(provider);
         SchemataToken? created = null;
@@ -115,12 +119,16 @@ public class AuthorizationDetailsEchoShould
             [Properties.AuthorizationDetails] = Grant,
         }, AuthorizationSignInResponseKind.Callback);
 
-        var code = JsonSerializer.Deserialize<AuthorizationCodePayload>(created!.Payload!)!.Request;
-        Assert.Equal(Grant, code!.AuthorizationDetails);
+        Assert.NotNull(created);
+        Assert.NotNull(created.Payload);
+        var code = JsonSerializer.Deserialize<AuthorizationCodePayload>(created.Payload);
+        Assert.NotNull(code);
+        Assert.NotNull(code.Request);
+        Assert.Equal(Grant, code.Request.AuthorizationDetails);
     }
 
     [Fact]
-    public async Task RestoreTheGrantSetOnTheCodeExchangeFerry() {
+    public async Task Restore_The_Grant_Set_On_The_Code_Exchange_Ferry() {
         var payload = JsonSerializer.Serialize(new AuthorizationCodePayload {
             Request = new() {
                 ClientId             = "test-client",
@@ -171,11 +179,12 @@ public class AuthorizationDetailsEchoShould
         }, null, CancellationToken.None);
 
         Assert.Equal(AuthorizationStatus.SignIn, result.Status);
-        Assert.Equal(Grant, result.Properties![Properties.AuthorizationDetails]);
+        Assert.NotNull(result.Properties);
+        Assert.Equal(Grant, result.Properties[Properties.AuthorizationDetails]);
     }
 
     [Fact]
-    public async Task MintTheGrantSetAsAnAccessTokenClaim() {
+    public async Task Mint_The_Grant_Set_As_An_Access_Token_Claim() {
         using var provider = new ServiceCollection()
                             .AddSingleton<IClaimsAdvisor>(new AdviceClaimsAudience(
                                 Options.Create(new SchemataAuthorizationOptions { Issuer = "https://issuer.example" })))
@@ -193,14 +202,16 @@ public class AuthorizationDetailsEchoShould
             [Properties.AuthorizationDetails] = Grant,
         }, AuthorizationSignInResponseKind.Token);
 
-        var at = new JsonWebTokenHandler().ReadJsonWebToken(result.Token!.AccessToken!);
+        Assert.NotNull(result.Token);
+        Assert.NotNull(result.Token.AccessToken);
+        var at = new JsonWebTokenHandler().ReadJsonWebToken(result.Token.AccessToken);
         Assert.True(at.TryGetPayloadValue<JsonElement>(Claims.AuthorizationDetails, out var claim));
         Assert.Equal(JsonValueKind.Array, claim.ValueKind);
         Assert.Equal("payment_initiation", claim[0].GetProperty("type").GetString());
     }
 
     [Fact]
-    public async Task KeepTheGrantSetOutOfTheIdToken() {
+    public async Task Keep_The_Grant_Set_Out_Of_The_Id_Token() {
         using var provider = new ServiceCollection()
                             .AddSingleton<IClaimsAdvisor>(new AdviceClaimsAudience(
                                 Options.Create(new SchemataAuthorizationOptions { Issuer = "https://issuer.example" })))
@@ -220,12 +231,14 @@ public class AuthorizationDetailsEchoShould
             [Properties.AuthorizationDetails] = Grant,
         }, AuthorizationSignInResponseKind.Token);
 
-        var id = new JsonWebTokenHandler().ReadJsonWebToken(result.Token!.IdToken!);
+        Assert.NotNull(result.Token);
+        Assert.NotNull(result.Token.IdToken);
+        var id = new JsonWebTokenHandler().ReadJsonWebToken(result.Token.IdToken);
         Assert.False(id.TryGetPayloadValue<JsonElement>(Claims.AuthorizationDetails, out var _));
     }
 
     [Fact]
-    public async Task EchoTheDetailsMatchingTheIntrospectedTokenAudience() {
+    public async Task Echo_The_Details_Matching_The_Introspected_Token_Audience() {
         var f        = CreateIntrospectionFixture();
         using var ambient = AdviceContext.Establish(new(f.Sp));
         var details =
@@ -243,10 +256,19 @@ public class AuthorizationDetailsEchoShould
         var response = await f.Handler.HandleAsync(new() { Token = jwt }, null, CancellationToken.None);
 
         Assert.True(response.Active);
-        var echoed = JsonNode.Parse(response.AuthorizationDetails!)!.AsArray();
+        Assert.NotNull(response.AuthorizationDetails);
+        var echoed = Assert.IsType<JsonArray>(JsonNode.Parse(response.AuthorizationDetails));
         Assert.Equal(2, echoed.Count);
-        Assert.Equal("payment_initiation", echoed[0]!["type"]!.GetValue<string>());
-        Assert.Equal("medical_record",     echoed[1]!["type"]!.GetValue<string>());
+        var first      = echoed[0];
+        Assert.NotNull(first);
+        var firstType  = first["type"];
+        Assert.NotNull(firstType);
+        Assert.Equal("payment_initiation", firstType.GetValue<string>());
+        var second     = echoed[1];
+        Assert.NotNull(second);
+        var secondType = second["type"];
+        Assert.NotNull(secondType);
+        Assert.Equal("medical_record", secondType.GetValue<string>());
     }
 
     [Fact]

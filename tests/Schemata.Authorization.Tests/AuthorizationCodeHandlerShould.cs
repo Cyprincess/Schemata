@@ -261,7 +261,7 @@ public class AuthorizationCodeHandlerShould
         Assert.Equal(TestScope, result.Properties[Properties.Scope]);
         Assert.Equal(TestNonce, result.Properties[Properties.Nonce]);
 
-        var identity = result.Principal!.Identity as ClaimsIdentity;
+        var identity = result.Principal.Identity as ClaimsIdentity;
         Assert.NotNull(identity);
         Assert.Equal(SchemataAuthorizationSchemes.Bearer, identity.AuthenticationType);
         Assert.Contains(identity.Claims, c => c is { Type: Claims.ClientId, Value: TestClientId });
@@ -282,9 +282,16 @@ public class AuthorizationCodeHandlerShould
         var result = await handler.HandleAsync(CreateRequest(), null, CancellationToken.None);
 
         Assert.Equal(AuthorizationStatus.SignIn, result.Status);
-        Assert.Equal("urn:schemata:acr:classes:multifactor", result.Principal!.FindFirst(Claims.Acr)!.Value);
-        Assert.Equal("""["pwd","otp"]""", result.Principal!.FindFirst(Claims.Amr)!.Value);
-        Assert.Equal("1767225600", result.Principal!.FindFirst(Claims.AuthTime)!.Value);
+        Assert.NotNull(result.Principal);
+        var acr      = result.Principal.FindFirst(Claims.Acr);
+        var amr      = result.Principal.FindFirst(Claims.Amr);
+        var authTime = result.Principal.FindFirst(Claims.AuthTime);
+        Assert.NotNull(acr);
+        Assert.NotNull(amr);
+        Assert.NotNull(authTime);
+        Assert.Equal("urn:schemata:acr:classes:multifactor", acr.Value);
+        Assert.Equal("""["pwd","otp"]""", amr.Value);
+        Assert.Equal("1767225600", authTime.Value);
     }
 
     [Fact]
@@ -300,7 +307,8 @@ public class AuthorizationCodeHandlerShould
         var result = await handler.HandleAsync(CreateRequest(), null, CancellationToken.None);
 
         Assert.Equal(AuthorizationStatus.SignIn, result.Status);
-        Assert.DoesNotContain(result.Principal!.Claims, c => c.Type is Claims.Acr or Claims.Amr or Claims.AuthTime);
+        Assert.NotNull(result.Principal);
+        Assert.DoesNotContain(result.Principal.Claims, c => c.Type is Claims.Acr or Claims.Amr or Claims.AuthTime);
     }
 
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider

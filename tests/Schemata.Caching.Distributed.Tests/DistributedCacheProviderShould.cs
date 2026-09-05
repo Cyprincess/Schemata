@@ -116,16 +116,29 @@ public class DistributedCacheProviderShould
         var provider = CreateProvider();
         const int count = 128;
 
-        var tasks = Enumerable.Range(0, count).Select(i => Task.Run(async () => {
-            var key   = "key-" + (i % 8);
-            var value = Bytes("v" + i);
-            await provider.TryAddAsync(key, value, NewOptions());
-            await provider.TryReplaceAsync(key, value, Bytes("r"), NewOptions());
-            await provider.GetAsync(key);
-            await provider.TryRemoveAsync(key, Bytes("r"));
-        }));
+        // Disjoint keys per task make every compare-and-swap succeed, so a false
+        // return or a surviving entry is a defect rather than a scheduling artifact.
+        var outcomes = await Task.WhenAll(Enumerable.Range(0, count).Select(i => Task.Run(async () => {
+            var key = "key-" + i;
 
-        await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(30));
+            var added    = await provider.TryAddAsync(key, Bytes("v" + i), NewOptions());
+            var replaced = await provider.TryReplaceAsync(key, Bytes("v" + i), Bytes("r"), NewOptions());
+            var observed = await provider.GetAsync(key);
+            var removed  = await provider.TryRemoveAsync(key, Bytes("r"));
+
+            return (Added: added, Replaced: replaced, Observed: observed, Removed: removed);
+        }))).WaitAsync(TimeSpan.FromSeconds(30));
+
+        Assert.All(outcomes, outcome => {
+            Assert.True(outcome.Added);
+            Assert.True(outcome.Replaced);
+            Assert.True(outcome.Removed);
+            Assert.Equal(Bytes("r"), outcome.Observed);
+        });
+
+        var survivors = await Task.WhenAll(Enumerable.Range(0, count)
+                                                  .Select(i => provider.GetAsync("key-" + i)));
+        Assert.All(survivors, survivor => Assert.Null(survivor));
     }
 
     private static DistributedCacheProvider CreateProvider() {

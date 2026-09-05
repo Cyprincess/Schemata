@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Threading.Tasks;
 using Schemata.Actor.Foundation.Tests.Fixtures;
 using Xunit;
@@ -23,15 +22,19 @@ public class TellShould
     [Fact]
     public async Task Tell_ReturnsWithoutWaitingForTheHandlerToFinish() {
         var (system, _, _) = ActorSystemFactory.Create();
-        var actor           = await system.SpawnAsync(new("versatile", "a"), new(typeof(VersatileActor)));
+        var gate           = new ManualGate();
+        var actor          = await system.SpawnAsync(new("gated", "a"), new(typeof(GatedActor), [gate]));
 
-        var sw = Stopwatch.StartNew();
-        await actor.TellAsync(new SlowPing(TimeSpan.FromSeconds(5)));
-        sw.Stop();
+        await actor.TellAsync(new GateAndWait());
 
-        // The mailbox write completes immediately; it never waits for the slow handler turn it
-        // just enqueued (which sleeps for five seconds).
-        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(1));
+        // The handler reaches the gate only by actually executing the turn, so this handshake
+        // proves TellAsync already returned while the handler is still in flight.
+        await gate.Started.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.False(gate.TurnCompleted.IsCompleted);
+
+        gate.Release();
+        await gate.TurnCompleted.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     [Fact]

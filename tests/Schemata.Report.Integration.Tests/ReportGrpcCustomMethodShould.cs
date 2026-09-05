@@ -30,7 +30,11 @@ public class ReportGrpcCustomMethodShould : IClassFixture<WebAppFactory>
             "generate", new() { Name = "dsl-records", Persist = true, Sync = true });
 
         Assert.True(operation.Done);
-        var output = JsonSerializer.Deserialize<ReportOperationOutput>(operation.Response!.Output!, SchemataJson.Default);
+        var response = operation.Response;
+        Assert.NotNull(response);
+        var payload = response.Output;
+        Assert.NotNull(payload);
+        var output = JsonSerializer.Deserialize<ReportOperationOutput>(payload, SchemataJson.Default);
         Assert.NotNull(output);
         Assert.False(string.IsNullOrWhiteSpace(output.Snapshot));
     }
@@ -39,7 +43,11 @@ public class ReportGrpcCustomMethodShould : IClassFixture<WebAppFactory>
     public async Task ReadSnapshot_Current_Dictionary_Row_Wire_Returns_Unknown() {
         var operation = await Call<SchemataReport, GenerateReportRequest, Operation>(
             "generate", new() { Name = "dsl-records", Persist = true, Sync = true });
-        var output = JsonSerializer.Deserialize<ReportOperationOutput>(operation.Response!.Output!, SchemataJson.Default);
+        var operationResponse = operation.Response;
+        Assert.NotNull(operationResponse);
+        var snapshotPayload = operationResponse.Output;
+        Assert.NotNull(snapshotPayload);
+        var output = JsonSerializer.Deserialize<ReportOperationOutput>(snapshotPayload, SchemataJson.Default);
         Assert.NotNull(output);
         Assert.False(string.IsNullOrWhiteSpace(output.Snapshot));
         var request = new ReadSnapshotRequest { CanonicalName = output.Snapshot, PageSize = 2 };
@@ -75,7 +83,8 @@ public class ReportGrpcCustomMethodShould : IClassFixture<WebAppFactory>
             GrpcResourceNaming.CustomMethodName(descriptor, verb),
             GrpcMarshallers.Create<TRequest>(model),
             GrpcMarshallers.Create<TResponse>(model));
-        using var call = _factory.CreateGrpcChannel().CreateCallInvoker().AsyncUnaryCall(method, null, new(), request);
+        using var channel = _factory.CreateGrpcChannel();
+        using var call = channel.CreateCallInvoker().AsyncUnaryCall(method, null, new(), request);
         return await call.ResponseAsync;
     }
 }

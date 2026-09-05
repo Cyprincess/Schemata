@@ -64,7 +64,8 @@ public class CustomMethodGrpcShould : IClassFixture<WebAppFactory>
             "wait", new() { CanonicalName = done.CanonicalName, Timeout = TimeSpan.FromMilliseconds(50) });
 
         Assert.True(cancelled.Done);
-        Assert.Equal(1, cancelled.Error!.Code);
+        Assert.NotNull(cancelled.Error);
+        Assert.Equal(1, cancelled.Error.Code);
         Assert.True(waited.Done);
     }
 
@@ -121,7 +122,8 @@ public class CustomMethodGrpcShould : IClassFixture<WebAppFactory>
         var execution = await executions.FirstOrDefaultAsync(query => query.Where(row => row.Method == "purge"));
         Assert.NotNull(execution);
         Assert.Equal(execution.CanonicalName, operation.Name ?? operation.CanonicalName);
-        var args = System.Text.Json.JsonSerializer.Deserialize<PurgeOperationArgs>(execution.ArgsJson!, SchemataJson.Default);
+        Assert.NotNull(execution.ArgsJson);
+        var args = System.Text.Json.JsonSerializer.Deserialize<PurgeOperationArgs>(execution.ArgsJson, SchemataJson.Default);
         Assert.NotNull(args);
         Assert.False(args.Force);
     }

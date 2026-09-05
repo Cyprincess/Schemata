@@ -75,15 +75,6 @@ public class MapsterShould
     }
 
     [Fact]
-    public void Map_FieldWithIgnorePredicate_CompilesWithoutSourceField() {
-        var mapper = CreateMapper();
-
-        var result = mapper.Map<Destination>(new Source { Name = "Hidden" });
-
-        Assert.NotNull(result);
-    }
-
-    [Fact]
     public void Map_FieldWithIgnorePredicate_AppliesConditionPerInstance() {
         var mapper = CreateMapper();
 
@@ -91,7 +82,9 @@ public class MapsterShould
         var hidden  = mapper.Map<Destination>(new Source { Name = "Hidden", Nickname  = "stealth" });
         var visible = mapper.Map<Destination>(new Source { Name = "Visible", Nickname = "bright" });
 
-        Assert.Null(hidden!.Nickname);
-        Assert.Equal("bright", visible!.Nickname);
+        Assert.NotNull(hidden);
+        Assert.NotNull(visible);
+        Assert.Null(hidden.Nickname);
+        Assert.Equal("bright", visible.Nickname);
     }
 }

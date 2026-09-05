@@ -67,7 +67,8 @@ public class SchedulingCustomMethodShould : IClassFixture<WebAppFactory>
         Assert.NotNull(operation);
         Assert.Equal(execution.CanonicalName, operation.Name ?? operation.CanonicalName);
         Assert.True(operation.Done);
-        Assert.Equal(1, operation.Error!.Code);
+        Assert.NotNull(operation.Error);
+        Assert.Equal(1, operation.Error.Code);
     }
 
     [Fact]
@@ -100,8 +101,12 @@ public class SchedulingCustomMethodShould : IClassFixture<WebAppFactory>
 
         Assert.Equal(HttpStatusCode.OK, doneResponse.StatusCode);
         Assert.Equal(HttpStatusCode.OK, openResponse.StatusCode);
-        Assert.True((await doneResponse.Content.ReadFromJsonAsync<Operation>(SchemataJson.Default))!.Done);
-        Assert.False((await openResponse.Content.ReadFromJsonAsync<Operation>(SchemataJson.Default))!.Done);
+        var done = await doneResponse.Content.ReadFromJsonAsync<Operation>(SchemataJson.Default);
+        Assert.NotNull(done);
+        var open = await openResponse.Content.ReadFromJsonAsync<Operation>(SchemataJson.Default);
+        Assert.NotNull(open);
+        Assert.True(done.Done);
+        Assert.False(open.Done);
     }
 
     [Fact]

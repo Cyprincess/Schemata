@@ -10,7 +10,7 @@ public class ScheduledJobKeyShould
     private static readonly char[] Unaddressable = ['`', '[', ']', ',', '=', ' ', '/'];
 
     [Fact]
-    public void KeepTheTokenCleanupKeyWithinThePersistedColumn() {
+    public void Keep_The_Token_Cleanup_Key_Within_The_Persisted_Column() {
         var registry = new DefaultScheduledJobRegistry();
         registry.RegisterAll([typeof(TokenCleanupJob)]);
 
@@ -22,7 +22,7 @@ public class ScheduledJobKeyShould
     }
 
     [Fact]
-    public void ResolveTheTokenCleanupJobBackFromItsPersistedKey() {
+    public void Resolve_The_Token_Cleanup_Job_Back_From_Its_Persisted_Key() {
         var registry = new DefaultScheduledJobRegistry();
         registry.RegisterAll([typeof(TokenCleanupJob)]);
 
@@ -31,7 +31,7 @@ public class ScheduledJobKeyShould
     }
 
     [Fact]
-    public void KeepTheBackChannelLogoutKeyAddressable() {
+    public void Keep_The_Back_Channel_Logout_Key_Addressable() {
         var registry = new DefaultScheduledJobRegistry();
         registry.RegisterAll([typeof(BackChannelLogoutJob)]);
 

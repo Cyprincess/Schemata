@@ -52,7 +52,8 @@ public class PurgeJobShould
         Assert.NotNull(staged);
         Assert.Equal("purge", staged.Method);
         Assert.NotEqual(Guid.Empty, staged.ExecutionUid);
-        var args = JsonSerializer.Deserialize<PurgeOperationArgs>(staged.ArgsJson!, SchemataJson.Default);
+        Assert.NotNull(staged.ArgsJson);
+        var args = JsonSerializer.Deserialize<PurgeOperationArgs>(staged.ArgsJson, SchemataJson.Default);
         Assert.NotNull(args);
         Assert.Equal("*", args.Filter);
         Assert.Equal("aip", args.Language);
@@ -92,7 +93,8 @@ public class PurgeJobShould
             Execution = execution,
         }, CancellationToken.None);
 
-        var result = JsonSerializer.Deserialize<PurgeResponse>(execution.Output!, SchemataJson.Default);
+        Assert.NotNull(execution.Output);
+        var result = JsonSerializer.Deserialize<PurgeResponse>(execution.Output, SchemataJson.Default);
         Assert.NotNull(result);
         Assert.Equal(1, result.PurgeCount);
         Assert.Equal(["schools/one/students/a"], result.PurgeSample);
@@ -133,7 +135,8 @@ public class PurgeJobShould
             Execution = execution,
         }, CancellationToken.None);
 
-        var result = JsonSerializer.Deserialize<PurgeResponse>(execution.Output!, SchemataJson.Default);
+        Assert.NotNull(execution.Output);
+        var result = JsonSerializer.Deserialize<PurgeResponse>(execution.Output, SchemataJson.Default);
         Assert.NotNull(result);
         Assert.Equal(1, result.PurgeCount);
         Assert.Empty(result.PurgeSample);

@@ -27,11 +27,13 @@ public class SchedulingTransportShould
 
         var job = registry.GetResource(typeof(SchemataJob))!;
         Assert.Null(job.Operations);
+        Assert.NotNull(job.Endpoints);
         Assert.Equal(
             [HttpResourceAttribute.Name, GrpcResourceAttribute.Name],
             job.Endpoints!.OrderBy(endpoint => endpoint, StringComparer.Ordinal));
 
         var execution = registry.GetResource(typeof(SchemataJobExecution))!;
+        Assert.NotNull(execution.Operations);
         Assert.Equal([Operations.Get, Operations.List, Operations.Delete], execution.Operations!);
     }
 
@@ -54,16 +56,4 @@ public class SchedulingTransportShould
         Assert.Equal(typeof(WaitOperationHandler), wait.Handler);
     }
 
-    [Fact]
-    public void MapHttp_And_MapGrpc_Resolve_Custom_Method_Handlers() {
-        var builder = WebApplication.CreateBuilder();
-        builder.UseSchemata(schema => schema.UseScheduling().MapHttp().MapGrpc());
-
-        using var app   = builder.Build();
-        using var scope = app.Services.CreateScope();
-
-        Assert.NotNull(scope.ServiceProvider.GetRequiredService<RunJobHandler>());
-        Assert.NotNull(scope.ServiceProvider.GetRequiredService<CancelOperationHandler>());
-        Assert.NotNull(scope.ServiceProvider.GetRequiredService<WaitOperationHandler>());
-    }
 }

@@ -58,20 +58,111 @@ public class IdentityEntryEquivalenceShould
         var principal = new ClaimsPrincipal(new ClaimsIdentity("test"));
         var ticket    = new AuthenticationTicket(principal, "refresh");
 
-        Assert.NotNull(RoundTrip(new RegisterUserRequest<SchemataUser>(new(), principal)).Request);
-        Assert.NotNull(RoundTrip(new LoginUserRequest<SchemataUser>(new(), principal)).Request);
-        Assert.Null(RoundTrip(new RefreshUserRequest<SchemataUser>(ticket, principal)).Ticket);
+        var register = RoundTrip(new RegisterUserRequest<SchemataUser>(new() {
+            Username     = "alice",
+            EmailAddress = "alice@example.com",
+            PhoneNumber  = "+15550001",
+            Password     = "secret-1",
+            UseCookies   = true,
+        }, principal)).Request;
+        Assert.Equal("alice", register.Username);
+        Assert.Equal("alice@example.com", register.EmailAddress);
+        Assert.Equal("+15550001", register.PhoneNumber);
+        Assert.Equal("secret-1", register.Password);
+        Assert.True(register.UseCookies);
+
+        var login = RoundTrip(new LoginUserRequest<SchemataUser>(new() {
+            Username              = "alice",
+            Password              = "secret-2",
+            TwoFactorCode         = "012345",
+            TwoFactorRecoveryCode = "recovery-1",
+            AcrValues             = "mfa",
+            UseCookies            = false,
+        }, principal)).Request;
+        Assert.Equal("alice", login.Username);
+        Assert.Equal("secret-2", login.Password);
+        Assert.Equal("012345", login.TwoFactorCode);
+        Assert.Equal("recovery-1", login.TwoFactorRecoveryCode);
+        Assert.Equal("mfa", login.AcrValues);
+        Assert.False(login.UseCookies);
+
+        var refresh = RoundTrip(new RefreshUserRequest<SchemataUser>(ticket, principal));
+        Assert.Null(refresh.Ticket);
+        AssertEmptyWire(new RefreshUserRequest<SchemataUser>(ticket, principal));
+
         Assert.NotNull(RoundTrip(new GetUserProfileQuery<SchemataUser>(principal)));
-        Assert.NotNull(RoundTrip(new ChangeUserEmailRequest<SchemataUser>(new(), principal)).Request);
-        Assert.NotNull(RoundTrip(new ChangeUserPhoneRequest<SchemataUser>(new(), principal)).Request);
-        Assert.NotNull(RoundTrip(new ChangeUserPasswordRequest<SchemataUser>(new(), principal)).Request);
-        Assert.NotNull(RoundTrip(new ForgotUserPasswordRequest<SchemataUser>(new(), principal)).Request);
-        Assert.NotNull(RoundTrip(new ResetUserPasswordRequest<SchemataUser>(new(), principal)).Request);
-        Assert.NotNull(RoundTrip(new ConfirmUserRequest<SchemataUser>(new(), principal)).Request);
-        Assert.NotNull(RoundTrip(new SendUserConfirmationCodeRequest<SchemataUser>(new(), principal)).Request);
+        AssertEmptyWire(new GetUserProfileQuery<SchemataUser>(principal));
+
+        AssertProfile(RoundTrip(new ChangeUserEmailRequest<SchemataUser>(new() {
+            EmailAddress = "email-1@example.com",
+            PhoneNumber  = "+15550002",
+            OldPassword  = "old-1",
+            NewPassword  = "new-1",
+        }, principal)).Request, "email-1@example.com", "+15550002", "old-1", "new-1");
+
+        AssertProfile(RoundTrip(new ChangeUserPhoneRequest<SchemataUser>(new() {
+            EmailAddress = "phone-1@example.com",
+            PhoneNumber  = "+15550003",
+            OldPassword  = "old-2",
+            NewPassword  = "new-2",
+        }, principal)).Request, "phone-1@example.com", "+15550003", "old-2", "new-2");
+
+        AssertProfile(RoundTrip(new ChangeUserPasswordRequest<SchemataUser>(new() {
+            EmailAddress = "password-1@example.com",
+            PhoneNumber  = "+15550004",
+            OldPassword  = "old-3",
+            NewPassword  = "new-3",
+        }, principal)).Request, "password-1@example.com", "+15550004", "old-3", "new-3");
+
+        AssertContact(RoundTrip(new ForgotUserPasswordRequest<SchemataUser>(new() {
+            EmailAddress = "forgot-1@example.com",
+            PhoneNumber  = "+15550005",
+        }, principal)).Request, "forgot-1@example.com", "+15550005");
+
+        var reset = RoundTrip(new ResetUserPasswordRequest<SchemataUser>(new() {
+            EmailAddress = "reset-1@example.com",
+            PhoneNumber  = "+15550006",
+            Code         = "reset-code-1",
+            Password     = "new-secret-1",
+        }, principal)).Request;
+        Assert.Equal("reset-1@example.com", reset.EmailAddress);
+        Assert.Equal("+15550006", reset.PhoneNumber);
+        Assert.Equal("reset-code-1", reset.Code);
+        Assert.Equal("new-secret-1", reset.Password);
+
+        var confirm = RoundTrip(new ConfirmUserRequest<SchemataUser>(new() {
+            EmailAddress = "confirm-1@example.com",
+            PhoneNumber  = "+15550007",
+            Code         = "confirm-code-1",
+        }, principal)).Request;
+        Assert.Equal("confirm-1@example.com", confirm.EmailAddress);
+        Assert.Equal("+15550007", confirm.PhoneNumber);
+        Assert.Equal("confirm-code-1", confirm.Code);
+
+        AssertContact(RoundTrip(new SendUserConfirmationCodeRequest<SchemataUser>(new() {
+            EmailAddress = "send-code-1@example.com",
+            PhoneNumber  = "+15550008",
+        }, principal)).Request, "send-code-1@example.com", "+15550008");
+
         Assert.NotNull(RoundTrip(new GetUserAuthenticatorRequest<SchemataUser>(principal)));
-        Assert.NotNull(RoundTrip(new EnrollUserAuthenticatorRequest<SchemataUser>(new(), principal)).Request);
-        Assert.NotNull(RoundTrip(new DowngradeUserAuthenticatorRequest<SchemataUser>(new(), principal)).Request);
+        AssertEmptyWire(new GetUserAuthenticatorRequest<SchemataUser>(principal));
+
+        AssertAuthenticator(RoundTrip(new EnrollUserAuthenticatorRequest<SchemataUser>(new() {
+            TwoFactorCode         = "654321",
+            TwoFactorRecoveryCode = "recovery-2",
+        }, principal)).Request, "654321", "recovery-2");
+
+        AssertAuthenticator(RoundTrip(new DowngradeUserAuthenticatorRequest<SchemataUser>(new() {
+            TwoFactorCode         = "098765",
+            TwoFactorRecoveryCode = "recovery-3",
+        }, principal)).Request, "098765", "recovery-3");
+
+        var alice = RoundTrip(new RegisterUserRequest<SchemataUser>(
+                                  new() { Username = "alice", Password = "shared" }, principal)).Request;
+        var bob = RoundTrip(new RegisterUserRequest<SchemataUser>(
+                                new() { Username = "bob", Password = "shared" }, principal)).Request;
+        Assert.NotEqual(alice.Username, bob.Username);
+        Assert.Equal(alice.Password, bob.Password);
     }
 
     [Fact]
@@ -196,6 +287,27 @@ public class IdentityEntryEquivalenceShould
         var result = Assert.IsType<T>(JsonSerializer.Deserialize<T>(json, SchemataJson.Default));
         Assert.Null(result.Principal);
         return result;
+    }
+
+    private static void AssertEmptyWire<T>(T request) where T : class, IRequestPrincipal {
+        Assert.Equal("{}", JsonSerializer.Serialize(request, SchemataJson.Default));
+    }
+
+    private static void AssertProfile(ProfileRequest request, string email, string phone, string oldPassword, string newPassword) {
+        Assert.Equal(email, request.EmailAddress);
+        Assert.Equal(phone, request.PhoneNumber);
+        Assert.Equal(oldPassword, request.OldPassword);
+        Assert.Equal(newPassword, request.NewPassword);
+    }
+
+    private static void AssertContact(ForgetRequest request, string email, string phone) {
+        Assert.Equal(email, request.EmailAddress);
+        Assert.Equal(phone, request.PhoneNumber);
+    }
+
+    private static void AssertAuthenticator(AuthenticatorRequest request, string code, string recovery) {
+        Assert.Equal(code, request.TwoFactorCode);
+        Assert.Equal(recovery, request.TwoFactorRecoveryCode);
     }
 
     private static void AssertHandler<TRequest, TResponse, THandler>(IServiceCollection services)

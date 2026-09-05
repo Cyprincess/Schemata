@@ -19,15 +19,15 @@ using Xunit;
 namespace Schemata.Report.Actor.Tests;
 
 /// <summary>
-///     Concurrency acceptance for the Report.Actor bridge (spec §7.2). N tasks fire the real
-///     scheduled generation job (<see cref="ReportGenerationJob{TReport,TSnapshot,TChunk}" /> →
-///     dispatcher → the wrapped <c>RunReportRequest</c> handler) at the same report name
-///     simultaneously, each from its own DI scope. The report retains one snapshot, so the retention
-///     "list all snapshots then trim" step races. With the bridge installed the per-name actor
-///     serializes every generation, no concurrency conflict is raised, and retention converges
-///     to exactly one succeeded snapshot; the control group without the bridge raises concurrency
-///     conflicts or leaves excess succeeded snapshots behind, proving the harness manufactures
-///     genuine contention.
+///     Concurrency acceptance for the Report.Actor bridge (spec §7.2). With the bridge installed,
+///     N tasks fire the real scheduled generation job
+///     (<see cref="ReportGenerationJob{TReport,TSnapshot,TChunk}" /> → dispatcher → the wrapped
+///     <c>RunReportRequest</c> handler) at the same report name simultaneously, each from its own
+///     DI scope; the per-name actor serializes every generation, no concurrency conflict is
+///     raised, and retention converges to exactly one succeeded snapshot. The control group
+///     parks the first ungated generation mid-write through
+///     <see cref="SnapshotFinalizationGate" />, proving a second generation of the same report
+///     runs to completion inside that window — the overlap the bridge makes impossible.
 /// </summary>
 public class ReportActorConcurrencyShould
 {
@@ -63,17 +63,24 @@ public class ReportActorConcurrencyShould
     }
 
     [Fact]
-    public async Task Concurrent_Scheduled_Generations_Without_Actor_Produce_Contention() {
-        await using var harness = await ReportActorConcurrencyHarness.BuildAsync(withActor: false);
+    public async Task Second_Ungated_Generation_Completes_While_The_First_Is_Mid_Write_And_Retention_Converges() {
+        var gate = new SnapshotFinalizationGate();
+        await using var harness = await ReportActorConcurrencyHarness.BuildAsync(withActor: false, snapshotAdvisor: gate);
 
-        var outcome    = await RunConcurrentGenerationsAsync(harness);
-        var succeeded  = await SucceededSnapshotsAsync(harness);
+        var first = Task.Run(() => ExecuteGenerationAsync(harness));
 
-        Assert.True(
-            outcome.Conflicts.Count > 0 || succeeded.Count > 1,
-            $"Control group raised {outcome.Conflicts.Count} concurrency conflicts and retained " +
-            $"{succeeded.Count} succeeded snapshots: the harness is not manufacturing genuine retention " +
-            "contention, so the actor-enabled case proves nothing.");
+        // The first generation is parked at finalization: chunks committed, header not yet Succeeded.
+        await gate.Holding.WaitAsync(TimeSpan.FromSeconds(30));
+
+        await ExecuteGenerationAsync(harness);
+        var overlapped = await SucceededSnapshotsAsync(harness);
+        var secondUid  = Assert.Single(overlapped).Uid;
+
+        gate.Release();
+        await first.WaitAsync(TimeSpan.FromSeconds(30));
+
+        var retained = Assert.Single(await SucceededSnapshotsAsync(harness));
+        Assert.NotEqual(secondUid, retained.Uid);
     }
 
     private static async Task<ConcurrencyOutcome> RunConcurrentGenerationsAsync(ReportActorConcurrencyHarness harness) {
@@ -106,5 +113,14 @@ public class ReportActorConcurrencyShould
                             .Where(snapshot => snapshot.Report == ReportActorConcurrencyHarness.ReportName
                                             && snapshot.State == SnapshotState.Succeeded)
                             .ToListAsync();
+    }
+
+    private static async Task ExecuteGenerationAsync(ReportActorConcurrencyHarness harness) {
+        var job = harness.Root.GetRequiredService<
+            ReportGenerationJob<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>();
+        var context = new JobContext {
+            Variables = new Dictionary<string, string?> { ["report"] = ReportActorConcurrencyHarness.ReportName },
+        };
+        await job.ExecuteAsync(context, CancellationToken.None);
     }
 }

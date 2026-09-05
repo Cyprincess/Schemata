@@ -48,7 +48,9 @@ public class AcrValuesFlowShould
         var authorize = await client.GetAsync(url);
         Assert.Equal(HttpStatusCode.Found, authorize.StatusCode);
 
-        var interaction = HttpUtility.ParseQueryString(authorize.Headers.Location!.Query);
+        var location = authorize.Headers.Location;
+        Assert.NotNull(location);
+        var interaction = HttpUtility.ParseQueryString(location.Query);
         var details     = await client.GetAsync(
             "/connect/interact"
           + "?code="      + HttpUtility.UrlEncode(interaction[Parameters.Code])
@@ -132,17 +134,27 @@ public class AcrValuesFlowShould
         var authorize = await client.GetAsync(AuthorizeUrl(acrValues));
         Assert.True(HttpStatusCode.Found == authorize.StatusCode, await authorize.Content.ReadAsStringAsync());
 
-        var interaction = HttpUtility.ParseQueryString(authorize.Headers.Location!.Query);
+        var location = authorize.Headers.Location;
+        Assert.NotNull(location);
+        var interaction = HttpUtility.ParseQueryString(location.Query);
+        var code     = interaction[Parameters.Code];
+        var codeType = interaction[Parameters.CodeType];
+        Assert.NotNull(code);
+        Assert.NotNull(codeType);
         var approve = await client.PostAsync(
             "/connect/interact",
             new FormUrlEncodedContent(new Dictionary<string, string> {
-                ["code"]      = interaction[Parameters.Code]!,
-                ["code_type"] = interaction[Parameters.CodeType]!,
+                ["code"]      = code,
+                ["code_type"] = codeType,
             }));
         Assert.True(HttpStatusCode.Found == approve.StatusCode, await approve.Content.ReadAsStringAsync());
 
-        var callback = HttpUtility.ParseQueryString(approve.Headers.Location!.Query);
-        return callback[Parameters.Code]!;
+        var callbackLocation = approve.Headers.Location;
+        Assert.NotNull(callbackLocation);
+        var callback = HttpUtility.ParseQueryString(callbackLocation.Query);
+        var callbackCode = callback[Parameters.Code];
+        Assert.NotNull(callbackCode);
+        return callbackCode;
     }
 
     private static async Task<JsonElement> Exchange(HttpClient client, string code) {
@@ -159,7 +171,9 @@ public class AcrValuesFlowShould
         Assert.True(HttpStatusCode.OK == response.StatusCode, await response.Content.ReadAsStringAsync());
 
         var pair = JsonDocument.Parse(await response.Content.ReadAsStreamAsync()).RootElement;
-        return Payload(pair.GetProperty("id_token").GetString()!);
+        var idToken = pair.GetProperty("id_token").GetString();
+        Assert.NotNull(idToken);
+        return Payload(idToken);
     }
 
     /// <summary>Decodes a JWT payload segment into its raw JSON so scalar and array shapes are visible.</summary>

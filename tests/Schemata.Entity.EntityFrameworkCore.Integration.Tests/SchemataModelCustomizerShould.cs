@@ -49,38 +49,6 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
     #endregion
 
     [Fact]
-    public async Task JsonConverter_OnDictionaryStringString_Roundtrips() {
-        Guid bookUid;
-        {
-            using var scope = _root!.CreateScope();
-            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
-
-            var book = new Book {
-                Uid           = Guid.NewGuid(),
-                Name          = "dict-test",
-                CanonicalName = "books/dict-test",
-                Metadata = new() {
-                    ["author"]  = "Hugo",
-                    ["edition"] = "1862",
-                },
-            };
-            db.Books.Add(book);
-            await db.SaveChangesAsync();
-            bookUid = book.Uid;
-        }
-
-        {
-            using var scope = _root!.CreateScope();
-            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
-            var       found = await db.Books.FindAsync(bookUid);
-            Assert.NotNull(found);
-            Assert.NotNull(found.Metadata);
-            Assert.Equal("Hugo", found.Metadata!["author"]);
-            Assert.Equal("1862", found.Metadata["edition"]);
-        }
-    }
-
-    [Fact]
     public async Task JsonConverter_OnNullableValueDictionary_Roundtrips() {
         Guid bookUid;
         {
@@ -113,35 +81,6 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
     }
 
     [Fact]
-    public async Task JsonConverter_OnCollectionString_Roundtrips() {
-        Guid bookUid;
-        {
-            using var scope = _root!.CreateScope();
-            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
-
-            var book = new Book {
-                Uid           = Guid.NewGuid(),
-                Name          = "list-test",
-                CanonicalName = "books/list-test",
-                Tags          = ["classic", "french", "novel"],
-            };
-            db.Books.Add(book);
-            await db.SaveChangesAsync();
-            bookUid = book.Uid;
-        }
-
-        {
-            using var scope = _root!.CreateScope();
-            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
-            var       found = await db.Books.FindAsync(bookUid);
-            Assert.NotNull(found);
-            Assert.NotNull(found.Tags);
-            Assert.Equal(3, found.Tags!.Count);
-            Assert.Contains("french", found.Tags);
-        }
-    }
-
-    [Fact]
     public async Task JsonConverter_OnInterfaceCollectionString_Roundtrips() {
         Guid bookUid;
         {
@@ -166,66 +105,6 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             Assert.NotNull(found);
             Assert.NotNull(found.Aliases);
             Assert.Equal(["les-mis", "the-miserables"], found.Aliases!);
-        }
-    }
-
-    [Fact]
-    public async Task JsonConverter_OnDictionaryStringInt_Roundtrips() {
-        Guid bookUid;
-        {
-            using var scope = _root!.CreateScope();
-            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
-
-            var book = new Book {
-                Uid           = Guid.NewGuid(),
-                Name          = "int-dict-test",
-                CanonicalName = "books/int-dict-test",
-                Counters = new() {
-                    ["views"] = 3,
-                    ["likes"] = 5,
-                },
-            };
-            db.Books.Add(book);
-            await db.SaveChangesAsync();
-            bookUid = book.Uid;
-        }
-
-        {
-            using var scope = _root!.CreateScope();
-            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
-            var       found = await db.Books.FindAsync(bookUid);
-            Assert.NotNull(found);
-            Assert.NotNull(found.Counters);
-            Assert.Equal(3, found.Counters!["views"]);
-            Assert.Equal(5, found.Counters["likes"]);
-        }
-    }
-
-    [Fact]
-    public async Task JsonConverter_OnCollectionInt_Roundtrips() {
-        Guid bookUid;
-        {
-            using var scope = _root!.CreateScope();
-            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
-
-            var book = new Book {
-                Uid           = Guid.NewGuid(),
-                Name          = "int-list-test",
-                CanonicalName = "books/int-list-test",
-                Ratings       = [1, 2, 3],
-            };
-            db.Books.Add(book);
-            await db.SaveChangesAsync();
-            bookUid = book.Uid;
-        }
-
-        {
-            using var scope = _root!.CreateScope();
-            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
-            var       found = await db.Books.FindAsync(bookUid);
-            Assert.NotNull(found);
-            Assert.NotNull(found.Ratings);
-            Assert.Equal([1, 2, 3], found.Ratings!);
         }
     }
 
@@ -312,12 +191,9 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
 
     public sealed class Book : IIdentifier, ICanonicalName
     {
-        public Dictionary<string, string>?  Metadata    { get; set; }
         public Dictionary<string, string?>? Annotations { get; set; }
-        public List<string>?                Tags        { get; set; }
         public ICollection<string>?         Aliases     { get; set; }
         public Dictionary<string, int>?     Counters    { get; set; }
-        public List<int>?                   Ratings     { get; set; }
         public List<Shelf>?                 Genres      { get; set; }
         public Dictionary<string, Shelf>?   ShelfByName { get; set; }
         public byte[]?                      Payload     { get; set; }

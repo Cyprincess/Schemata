@@ -8,7 +8,9 @@ using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Advisors;
+using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Handlers;
+using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
@@ -97,8 +99,13 @@ public class ClientCredentialsHandlerShould
 
         var result = await handler.HandleAsync(request, null, CancellationToken.None);
 
-        Assert.NotNull(result);
-        Assert.NotNull(result.Principal);
+        Assert.Equal(AuthorizationStatus.SignIn, result.Status);
+        Assert.Equal("test-client", Assert.Single(result.Principal!.Claims, claim => claim.Type == Claims.ClientId).Value);
+        var identity = Assert.Single(result.Principal!.Identities);
+        Assert.True(identity.IsAuthenticated);
+        Assert.Equal(SchemataAuthorizationSchemes.Bearer, identity.AuthenticationType);
+        Assert.NotNull(result.Properties);
+        Assert.Equal(GrantTypes.ClientCredentials, result.Properties![Properties.GrantType]);
     }
 
     [Fact]
@@ -132,8 +139,13 @@ public class ClientCredentialsHandlerShould
 
         var result = await handler.HandleAsync(request, null, CancellationToken.None);
 
-        Assert.NotNull(result);
-        Assert.NotNull(result.Principal);
+        Assert.Equal(AuthorizationStatus.SignIn, result.Status);
+        Assert.Equal("test-client", Assert.Single(result.Principal!.Claims, claim => claim.Type == Claims.ClientId).Value);
+        var identity = Assert.Single(result.Principal!.Identities);
+        Assert.True(identity.IsAuthenticated);
+        Assert.Equal(SchemataAuthorizationSchemes.Bearer, identity.AuthenticationType);
+        Assert.NotNull(result.Properties);
+        Assert.Equal(GrantTypes.ClientCredentials, result.Properties![Properties.GrantType]);
     }
 
     [Fact]

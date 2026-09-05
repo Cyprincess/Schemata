@@ -26,7 +26,7 @@ public class ResourceNameStructuralIdentityShould
     }
 
     [Fact]
-    public void ScopeAMultiLevelParentToItsExactBranch() {
+    public void Scope_A_Multi_Level_Parent_To_Its_Exact_Branch() {
         var container = new ResourceRequestContainer<ScopedChild>();
         ResourceIdentifiers.ApplyParent(container, "orgs/o1/projects/p1");
 
@@ -34,7 +34,7 @@ public class ResourceNameStructuralIdentityShould
     }
 
     [Fact]
-    public void ScopeAFullCanonicalNameToASingleRow() {
+    public void Scope_A_Full_Canonical_Name_To_A_Single_Row() {
         var container = new ResourceRequestContainer<ScopedChild>();
         ResourceIdentifiers.Apply(container, "orgs/o1/projects/p1/children/leaf");
 

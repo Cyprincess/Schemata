@@ -15,9 +15,15 @@ public class LocalizedErrorResponseShould
         try {
             var exception = new NotFoundException();
 
-            var response = (ErrorResponse)exception.CreateErrorResponse(locale: "zh-CN")!;
+            var result = exception.CreateErrorResponse(locale: "zh-CN");
+            Assert.NotNull(result);
+            var response = Assert.IsType<ErrorResponse>(result);
 
-            var localized = response.Error!.Details!.OfType<LocalizedMessageDetail>().Single();
+            var error   = response.Error;
+            Assert.NotNull(error);
+            var details = error.Details;
+            Assert.NotNull(details);
+            var localized = Assert.Single(details.OfType<LocalizedMessageDetail>());
             Assert.Equal("zh-CN", localized.Locale);
             Assert.NotEqual(exception.Message, localized.Message);
         } finally {
@@ -29,9 +35,15 @@ public class LocalizedErrorResponseShould
     public void CreateErrorResponse_ForAbsentLocale_LeavesMessageUnlocalized() {
         var exception = new NotFoundException();
 
-        var response = (ErrorResponse)exception.CreateErrorResponse()!;
+        var result = exception.CreateErrorResponse();
+        Assert.NotNull(result);
+        var response = Assert.IsType<ErrorResponse>(result);
 
-        Assert.Empty(response.Error!.Details!.OfType<LocalizedMessageDetail>());
+        var error   = response.Error;
+        Assert.NotNull(error);
+        var details = error.Details;
+        Assert.NotNull(details);
+        Assert.Empty(details.OfType<LocalizedMessageDetail>());
     }
 
     [Fact]
@@ -44,14 +56,19 @@ public class LocalizedErrorResponseShould
             },
         ]);
 
-        var response = (ErrorResponse)exception.CreateErrorResponse(locale: "zh-CN")!;
+        var result = exception.CreateErrorResponse(locale: "zh-CN");
+        Assert.NotNull(result);
+        var response = Assert.IsType<ErrorResponse>(result);
 
-        var violation = response.Error!.Details!.OfType<BadRequestDetail>()
-                                 .Single()
-                                 .FieldViolations!
-                                 .Single();
+        var error   = response.Error;
+        Assert.NotNull(error);
+        var details = error.Details;
+        Assert.NotNull(details);
+        var badRequest = Assert.Single(details.OfType<BadRequestDetail>());
+        Assert.NotNull(badRequest.FieldViolations);
+        var violation = Assert.Single(badRequest.FieldViolations);
         Assert.NotNull(violation.LocalizedMessage);
-        Assert.Equal("zh-CN", violation.LocalizedMessage!.Locale);
+        Assert.Equal("zh-CN", violation.LocalizedMessage.Locale);
         Assert.NotEqual(violation.Description, violation.LocalizedMessage.Message);
     }
 
@@ -65,12 +82,17 @@ public class LocalizedErrorResponseShould
             },
         ]);
 
-        var response = (ErrorResponse)exception.CreateErrorResponse(locale: "zh-CN")!;
+        var result = exception.CreateErrorResponse(locale: "zh-CN");
+        Assert.NotNull(result);
+        var response = Assert.IsType<ErrorResponse>(result);
 
-        var violation = response.Error!.Details!.OfType<BadRequestDetail>()
-                                 .Single()
-                                 .FieldViolations!
-                                 .Single();
+        var error   = response.Error;
+        Assert.NotNull(error);
+        var details = error.Details;
+        Assert.NotNull(details);
+        var badRequest = Assert.Single(details.OfType<BadRequestDetail>());
+        Assert.NotNull(badRequest.FieldViolations);
+        var violation = Assert.Single(badRequest.FieldViolations);
         Assert.Null(violation.LocalizedMessage);
     }
 }

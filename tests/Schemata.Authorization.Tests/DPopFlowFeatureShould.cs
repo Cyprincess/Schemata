@@ -1,12 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Text.Encodings.Web;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Moq;
 using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Features;
@@ -14,8 +11,6 @@ using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
-using Schemata.Security.Skeleton.Entities;
-using Schemata.Security.Skeleton.Services;
 using Schemata.Core;
 using Xunit;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
@@ -101,21 +96,5 @@ public class DPopFlowFeatureShould
             .AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), discovery);
 
         Assert.Null(discovery.Document);
-    }
-    [Fact]
-    public void Construct_The_Authentication_Handler_Without_The_Dpop_Services() {
-        var authz = new SchemataAuthorizationOptions();
-
-        var handler = new SchemataAuthenticationHandler<SchemataApplication>(
-            Mock.Of<IOptionsMonitor<SchemataAuthenticationHandlerOptions>>(),
-            NullLoggerFactory.Instance,
-            UrlEncoder.Default,
-            TestSecurityKeys.CreateTokenService(authz),
-            Mock.Of<ITokenStore<SchemataToken>>(),
-            Mock.Of<IAuthorizationSignInService>(),
-            Mock.Of<IAuthorizationSignInHttpWriter>(),
-            Options.Create(new DPopOptions()));
-
-        Assert.NotNull(handler);
     }
 }

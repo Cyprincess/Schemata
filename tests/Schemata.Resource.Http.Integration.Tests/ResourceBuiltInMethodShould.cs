@@ -76,7 +76,8 @@ public class ResourceBuiltInMethodShould : IClassFixture<WebAppFactory>
         var execution = await executions.FirstOrDefaultAsync(
             query => query.Where(row => row.Method == "purge"));
         Assert.NotNull(execution);
-        var args = JsonSerializer.Deserialize<PurgeOperationArgs>(execution.ArgsJson!, SchemataJson.Default);
+        Assert.NotNull(execution.ArgsJson);
+        var args = JsonSerializer.Deserialize<PurgeOperationArgs>(execution.ArgsJson, SchemataJson.Default);
         Assert.NotNull(args);
         Assert.Equal("*", args.Filter);
         Assert.Equal("aip", args.Language);
@@ -88,7 +89,9 @@ public class ResourceBuiltInMethodShould : IClassFixture<WebAppFactory>
             "/v1/trashes", new Trash { FullName = fullName });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        return body.GetProperty("name").GetString()!;
+        var name = body.GetProperty("name").GetString();
+        Assert.NotNull(name);
+        return name;
     }
 
     private async Task<Trash?> FindTrashAsync(string canonicalName) {

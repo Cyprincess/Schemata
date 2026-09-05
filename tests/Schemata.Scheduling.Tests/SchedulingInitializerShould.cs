@@ -41,6 +41,7 @@ public class SchedulingInitializerShould
         var initializer = new SchedulingInitializer(scheduler.Object, Options.Create(new SchemataSchedulingOptions()),
                                                     services, new DefaultScheduledJobRegistry());
         await initializer.StartAsync(CancellationToken.None);
+        Assert.NotNull(initializer.ExecuteTask);
         await initializer.ExecuteTask!;
 
         scheduler.Verify(s => s.StartAsync(It.IsAny<CancellationToken>()), Times.Once);
@@ -76,6 +77,7 @@ public class SchedulingInitializerShould
         var initializer = new SchedulingInitializer(scheduler.Object, Options.Create(new SchemataSchedulingOptions()),
                                                     services, new DefaultScheduledJobRegistry());
         await initializer.StartAsync(CancellationToken.None);
+        Assert.NotNull(initializer.ExecuteTask);
         await initializer.ExecuteTask!;
 
         Assert.Equal(ExecutionState.Failed, orphan.State);

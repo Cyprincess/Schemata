@@ -30,7 +30,8 @@ public class ConcurrencyShould : IAsyncLifetime
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 var entity = await LoadAsync(repository, id);
-                original        = entity!.Timestamp;
+                Assert.NotNull(entity);
+                original        = entity.Timestamp;
                 entity.FullName = "updated";
                 await repository.UpdateAsync(entity);
                 await repository.CommitAsync();
@@ -41,7 +42,8 @@ public class ConcurrencyShould : IAsyncLifetime
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 var entity = await LoadAsync(repository, id);
-                Assert.Equal("updated", entity!.FullName);
+                Assert.NotNull(entity);
+                Assert.Equal("updated", entity.FullName);
                 Assert.NotEqual(original, entity.Timestamp);
                 Assert.NotEqual(Guid.Empty, entity.Timestamp);
             }
@@ -57,7 +59,8 @@ public class ConcurrencyShould : IAsyncLifetime
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 var entity = await LoadAsync(repository, id);
-                stale = entity!.Timestamp;
+                Assert.NotNull(entity);
+                stale = entity.Timestamp;
             }
         }
 
@@ -65,7 +68,8 @@ public class ConcurrencyShould : IAsyncLifetime
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 var entity = await LoadAsync(repository, id);
-                entity!.FullName = "advanced";
+                Assert.NotNull(entity);
+                entity.FullName = "advanced";
                 await repository.UpdateAsync(entity);
                 await repository.CommitAsync();
             }
@@ -75,7 +79,8 @@ public class ConcurrencyShould : IAsyncLifetime
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 var entity = await LoadAsync(repository, id);
-                entity!.Timestamp = stale;
+                Assert.NotNull(entity);
+                entity.Timestamp = stale;
                 entity.FullName   = "rejected";
                 await Assert.ThrowsAsync<AbortedException>(() => repository.UpdateAsync(entity));
             }
@@ -85,7 +90,8 @@ public class ConcurrencyShould : IAsyncLifetime
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 var entity = await LoadAsync(repository, id);
-                Assert.Equal("advanced", entity!.FullName);
+                Assert.NotNull(entity);
+                Assert.Equal("advanced", entity.FullName);
             }
         }
     }

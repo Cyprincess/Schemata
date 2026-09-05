@@ -9,7 +9,6 @@ using Moq;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Handlers;
-using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
@@ -87,10 +86,4 @@ public class OpSessionServiceShould
                                                        It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    [Fact]
-    public async Task NoOp_Service_Invalidates_Without_Throwing() {
-        var service = new NoOpOpSessionService();
-
-        await service.InvalidateAsync(Principal(), "user-1", "sid-1", CancellationToken.None);
-    }
 }

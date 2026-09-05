@@ -29,7 +29,10 @@ public class JobExecutionCancellationShould
         executions.Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(), It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> query, CancellationToken _) => ToAsync(query(new[] { execution }.AsQueryable())));
         executions.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>?>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>? query, CancellationToken _) => new(query!(new[] { execution }.AsQueryable()).SingleOrDefault()));
+                  .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>? query, CancellationToken _) => {
+                      Assert.NotNull(query);
+                      return new(query(new[] { execution }.AsQueryable()).SingleOrDefault());
+                  });
         executions.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         executions.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var registry = new DefaultScheduledJobRegistry();

@@ -217,6 +217,7 @@ public class MissedFirePolicyShould
         internal List<DateTime> Fires { get; } = [];
 
         public Task ExecuteAsync(JobContext context, CancellationToken ct) {
+            Assert.NotNull(context.StartTime);
             Fires.Add(context.StartTime!.Value);
             return Task.CompletedTask;
         }

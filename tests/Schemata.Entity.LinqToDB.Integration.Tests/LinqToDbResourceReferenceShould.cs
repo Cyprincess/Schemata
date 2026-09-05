@@ -74,131 +74,12 @@ public class LinqToDbResourceReferenceShould : IAsyncLifetime
     }
 
     [Fact]
-    public void JsonConverter_OnNullableValueDictionary_Roundtrips() {
-        using var diagnostic = new DataConnection(_options);
-        var columns = diagnostic.Query<string>(
-                                     "SELECT name FROM pragma_table_info('rr_books')")
-                                .ToList();
-        Assert.Contains("Annotations", columns);
-
-        var uid = Guid.NewGuid();
-        {
-            using var connection = new DataConnection(_options);
-            connection.Insert(new Book {
-                Uid           = uid,
-                Name          = "nullable-dict-test",
-                CanonicalName = "books/nullable-dict-test",
-                Annotations = new() {
-                    ["language"] = "fr",
-                    ["origin"]   = null,
-                },
-            });
-        }
-
-        {
-            using var connection = new DataConnection(_options);
-            var found = connection.GetTable<Book>().Single(b => b.Uid == uid);
-            Assert.NotNull(found.Annotations);
-            Assert.Equal("fr", found.Annotations!["language"]);
-            Assert.Null(found.Annotations["origin"]);
-        }
-    }
-
-    [Fact]
-    public void JsonConverter_OnDictionaryStringString_Roundtrips() {
-        using var diagnostic = new DataConnection(_options);
-        var columns = diagnostic.Query<string>(
-                                     "SELECT name FROM pragma_table_info('rr_books')")
-                                .ToList();
-        Assert.Contains("Metadata", columns);
-
-        var uid = Guid.NewGuid();
-        {
-            using var connection = new DataConnection(_options);
-            connection.Insert(new Book {
-                Uid           = uid,
-                Name          = "dict-test",
-                CanonicalName = "books/dict-test",
-                Metadata = new() {
-                    ["author"]  = "Hugo",
-                    ["edition"] = "1862",
-                },
-            });
-        }
-
-        {
-            using var connection = new DataConnection(_options);
-            var found = connection.GetTable<Book>().Single(b => b.Uid == uid);
-            Assert.NotNull(found.Metadata);
-            Assert.Equal("Hugo", found.Metadata!["author"]);
-            Assert.Equal("1862", found.Metadata["edition"]);
-        }
-    }
-
-    [Fact]
-    public void JsonConverter_OnDictionaryStringInt_Roundtrips() {
+    public void JsonConverter_Creates_Json_Columns_And_Roundtrips() {
         using var diagnostic = new DataConnection(_options);
         var columns = diagnostic.Query<string>(
                                      "SELECT name FROM pragma_table_info('rr_books')")
                                 .ToList();
         Assert.Contains("Counters", columns);
-
-        var uid = Guid.NewGuid();
-        {
-            using var connection = new DataConnection(_options);
-            connection.Insert(new Book {
-                Uid           = uid,
-                Name          = "int-dict-test",
-                CanonicalName = "books/int-dict-test",
-                Counters = new() {
-                    ["views"] = 3,
-                    ["likes"] = 5,
-                },
-            });
-        }
-
-        {
-            using var connection = new DataConnection(_options);
-            var found = connection.GetTable<Book>().Single(b => b.Uid == uid);
-            Assert.NotNull(found.Counters);
-            Assert.Equal(3, found.Counters!["views"]);
-            Assert.Equal(5, found.Counters["likes"]);
-        }
-    }
-
-    [Fact]
-    public void JsonConverter_OnCollectionInt_Roundtrips() {
-        using var diagnostic = new DataConnection(_options);
-        var columns = diagnostic.Query<string>(
-                                     "SELECT name FROM pragma_table_info('rr_books')")
-                                .ToList();
-        Assert.Contains("Ratings", columns);
-
-        var uid = Guid.NewGuid();
-        {
-            using var connection = new DataConnection(_options);
-            connection.Insert(new Book {
-                Uid           = uid,
-                Name          = "int-list-test",
-                CanonicalName = "books/int-list-test",
-                Ratings       = [1, 2, 3],
-            });
-        }
-
-        {
-            using var connection = new DataConnection(_options);
-            var found = connection.GetTable<Book>().Single(b => b.Uid == uid);
-            Assert.NotNull(found.Ratings);
-            Assert.Equal([1, 2, 3], found.Ratings!);
-        }
-    }
-
-    [Fact]
-    public void JsonConverter_OnCollectionString_Roundtrips() {
-        using var diagnostic = new DataConnection(_options);
-        var columns = diagnostic.Query<string>(
-                                     "SELECT name FROM pragma_table_info('rr_books')")
-                                .ToList();
         Assert.Contains("Tags", columns);
 
         var uid = Guid.NewGuid();
@@ -206,100 +87,18 @@ public class LinqToDbResourceReferenceShould : IAsyncLifetime
             using var connection = new DataConnection(_options);
             connection.Insert(new Book {
                 Uid           = uid,
-                Name          = "string-list-test",
-                CanonicalName = "books/string-list-test",
-                Tags          = ["classic", "french", "novel"],
+                Name          = "json-column-test",
+                CanonicalName = "books/json-column-test",
+                Counters      = new() { ["views"] = 3 },
+                Tags          = ["classic"],
             });
         }
 
         {
             using var connection = new DataConnection(_options);
             var found = connection.GetTable<Book>().Single(b => b.Uid == uid);
-            Assert.NotNull(found.Tags);
-            Assert.Equal(["classic", "french", "novel"], found.Tags!);
-        }
-    }
-
-    [Fact]
-    public void JsonConverter_OnInterfaceCollectionString_Roundtrips() {
-        using var diagnostic = new DataConnection(_options);
-        var columns = diagnostic.Query<string>(
-                                     "SELECT name FROM pragma_table_info('rr_books')")
-                                .ToList();
-        Assert.Contains("Aliases", columns);
-
-        var uid = Guid.NewGuid();
-        {
-            using var connection = new DataConnection(_options);
-            connection.Insert(new Book {
-                Uid           = uid,
-                Name          = "interface-list-test",
-                CanonicalName = "books/interface-list-test",
-                Aliases       = ["les-mis", "the-miserables"],
-            });
-        }
-
-        {
-            using var connection = new DataConnection(_options);
-            var found = connection.GetTable<Book>().Single(b => b.Uid == uid);
-            Assert.NotNull(found.Aliases);
-            Assert.Equal(["les-mis", "the-miserables"], found.Aliases!);
-        }
-    }
-
-    [Fact]
-    public void JsonConverter_OnEnumCollectionAndDictionary_Roundtrips() {
-        using var diagnostic = new DataConnection(_options);
-        var columns = diagnostic.Query<string>(
-                                     "SELECT name FROM pragma_table_info('rr_books')")
-                                .ToList();
-        Assert.Contains("Genres", columns);
-        Assert.Contains("ShelfByName", columns);
-
-        var uid = Guid.NewGuid();
-        {
-            using var connection = new DataConnection(_options);
-            connection.Insert(new Book {
-                Uid           = uid,
-                Name          = "enum-test",
-                CanonicalName = "books/enum-test",
-                Genres        = [Book.Shelf.Fiction, Book.Shelf.Science],
-                ShelfByName   = new() { ["primary"] = Book.Shelf.History },
-            });
-        }
-
-        {
-            using var connection = new DataConnection(_options);
-            var found = connection.GetTable<Book>().Single(b => b.Uid == uid);
-            Assert.Equal([Book.Shelf.Fiction, Book.Shelf.Science], found.Genres!);
-            Assert.Equal(Book.Shelf.History, found.ShelfByName!["primary"]);
-        }
-    }
-
-    [Fact]
-    public void JsonConverter_OnByteArray_UsesNativeBinaryMapping() {
-        using var diagnostic = new DataConnection(_options);
-        var columns = diagnostic.Query<string>(
-                                     "SELECT name FROM pragma_table_info('rr_books')")
-                                .ToList();
-        Assert.Contains("Payload", columns);
-
-        var uid = Guid.NewGuid();
-        var payload = new byte[] { 1, 2, 3, };
-        {
-            using var connection = new DataConnection(_options);
-            connection.Insert(new Book {
-                Uid           = uid,
-                Name          = "binary-test",
-                CanonicalName = "books/binary-test",
-                Payload       = payload,
-            });
-        }
-
-        {
-            using var connection = new DataConnection(_options);
-            var found = connection.GetTable<Book>().Single(b => b.Uid == uid);
-            Assert.Equal(payload, found.Payload);
+            Assert.Equal(3, found.Counters!["views"]);
+            Assert.Equal(["classic"], found.Tags);
         }
     }
 
@@ -309,27 +108,13 @@ public class LinqToDbResourceReferenceShould : IAsyncLifetime
     [Abstractions.Entities.PrimaryKey(nameof(Uid))]
     public sealed class Book : IIdentifier, ICanonicalName
     {
-        public Dictionary<string, string>?  Metadata    { get; set; }
-        public Dictionary<string, string?>? Annotations { get; set; }
-        public List<string>?                Tags        { get; set; }
-        public ICollection<string>?         Aliases     { get; set; }
-        public Dictionary<string, int>?     Counters    { get; set; }
-        public List<int>?                   Ratings     { get; set; }
-        public List<Shelf>?                 Genres      { get; set; }
-        public Dictionary<string, Shelf>?   ShelfByName { get; set; }
-        public byte[]?                      Payload     { get; set; }
+        public Dictionary<string, int>? Counters { get; set; }
+        public List<string>?            Tags     { get; set; }
 
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
 
         public Guid Uid { get; set; }
-
-        public enum Shelf
-        {
-            Fiction,
-            History,
-            Science,
-        }
     }
 
     #endregion

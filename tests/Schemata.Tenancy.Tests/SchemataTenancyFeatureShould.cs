@@ -16,20 +16,6 @@ namespace Schemata.Tenancy.Tests;
 public class SchemataTenancyFeatureShould
 {
     [Fact]
-    public void ConfigureServices_DoesNotThrow_WhenRegisteringTheTenantPropagator() {
-        var services = new ServiceCollection();
-        var feature  = new SchemataTenancyFeature<NoOpTenantManager, SchemataTenant>();
-
-        // TryAddEnumerable rejects a factory-based descriptor whose inferred implementation type
-        // equals its service type (IMessageContextPropagator); this call is where that check runs,
-        // synchronously, at registration time - before a provider is ever built.
-        var exception = Record.Exception(() =>
-            feature.ConfigureServices(services, new(), new(), new ConfigurationBuilder().Build(), environment: null!));
-
-        Assert.Null(exception);
-    }
-
-    [Fact]
     public void ConfigureServices_MakesThePropagator_ResolvableBothAsTheInterfaceCollectionAndTheConcreteType() {
         var services = new ServiceCollection();
         var feature  = new SchemataTenancyFeature<NoOpTenantManager, SchemataTenant>();
