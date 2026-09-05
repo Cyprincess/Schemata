@@ -44,13 +44,6 @@ public class EventContext
     public SchemataEvent? Record { get; set; }
 
     /// <summary>
-    ///     Whether delivery goes through a durable broker that can fail after the audit row is
-    ///     written. The bus sets this so the audit observer records the row as
-    ///     <see cref="EventState.Pending" /> for outbox delivery.
-    /// </summary>
-    public bool RequiresOutboxDelivery { get; set; }
-
-    /// <summary>
     ///     Optional originating business entity attached by
     ///     <see cref="IEventBus.PublishAsync{TEvent}(TEvent, object, System.Threading.CancellationToken)" />.
     ///     The audit observer captures its

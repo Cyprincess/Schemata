@@ -15,11 +15,17 @@ public sealed class HandlerResolver
     /// <summary>Initializes a resolver over the supplied service provider.</summary>
     public HandlerResolver(IServiceProvider services) { _services = services; }
 
+    /// <summary>Whether any handler is registered for the runtime event type.</summary>
+    /// <param name="eventType">The runtime type of the event.</param>
+    public bool HasHandlers(Type eventType) {
+        var closed = typeof(IEventHandler<>).MakeGenericType(eventType);
+        return _services.GetServices(closed).Any() || _services.GetServices<IEventHandler<IEvent>>().Any();
+    }
+
     /// <summary>Invokes every registered event handler for <typeparamref name="TEvent"/> under the given <see cref="EventRouting"/>.</summary>
     public Task InvokeEventHandlersAsync<TEvent>(TEvent @event, EventRouting routing, CancellationToken ct)
         where TEvent : IEvent {
         var handlers = _services.GetServices<IEventHandler<TEvent>>().ToList();
-
         if (handlers.Count == 0) {
             var fallback = _services.GetServices<IEventHandler<IEvent>>().ToList();
             if (fallback.Count > 0) {

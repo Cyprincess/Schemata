@@ -15,8 +15,10 @@ public sealed class EventProducerBuilder
     public IServiceCollection Services { get; }
 
     /// <summary>Registers the in-process <see cref="IEventBus"/> implementation.</summary>
+    /// <summary>Registers the in-process <see cref="IEventBus"/> implementation.</summary>
     public EventProducerBuilder UseInProcess() {
         Services.TryAddScoped<IEventBus, InProcessEventBus>();
+        Services.TryAddScoped<HandlerResolver>();
         return this;
     }
 }

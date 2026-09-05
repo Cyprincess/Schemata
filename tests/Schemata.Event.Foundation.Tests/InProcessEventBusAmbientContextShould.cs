@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -5,9 +8,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Abstractions.Advisors;
+using Schemata.Entity.Repository;
 using Schemata.Event.Foundation.Runtime;
 using Schemata.Event.Skeleton;
 using Schemata.Event.Skeleton.Advisors;
+using Schemata.Event.Skeleton.Entities;
 using Xunit;
 
 namespace Schemata.Event.Foundation.Tests;
@@ -24,10 +29,22 @@ public class InProcessEventBusAmbientContextShould
     public async Task Establish_TheDispatchContext_AsAmbient_ForThePublishAdvisor() {
         var registry = new Mock<IEventTypeRegistry>();
         registry.Setup(r => r.RequireName(typeof(SampleEvent))).Returns("sample");
-        var advisor  = new RecordingPublishAdvisor();
+        registry.Setup(r => r.GetRouting(It.IsAny<Type>())).Returns(EventRouting.Broadcast);
+
+        var subscriptions = new Mock<IRepository<SchemataEventSubscription>>();
+        subscriptions.Setup(r => r.ListAsync(
+                          It.IsAny<Func<IQueryable<SchemataEventSubscription>, IQueryable<SchemataEventSubscription>>>(),
+                          It.IsAny<CancellationToken>()))
+                     .Returns(EmptyAsync<SchemataEventSubscription>());
+
+        var advisor = new RecordingPublishAdvisor();
 
         await using var services = new ServiceCollection()
                                    .AddSingleton(registry.Object)
+                                   .AddSingleton(subscriptions.Object)
+                                   .AddSingleton<IEventDispatchContext>(new EventDispatchContext())
+                                   .AddSingleton<HandlerResolver>()
+                                   .AddSingleton<IEventHandler<SampleEvent>>(Mock.Of<IEventHandler<SampleEvent>>())
                                    .AddSingleton<IEventPublishAdvisor>(advisor)
                                    .BuildServiceProvider();
 
@@ -39,7 +56,11 @@ public class InProcessEventBusAmbientContextShould
         Assert.Null(AdviceContext.Current);
     }
 
-    private sealed class SampleEvent : IEvent;
+    private static async IAsyncEnumerable<T> EmptyAsync<T>() {
+        yield break;
+    }
+
+    public sealed class SampleEvent : IEvent;
 
     private sealed class RecordingPublishAdvisor : IEventPublishAdvisor
     {

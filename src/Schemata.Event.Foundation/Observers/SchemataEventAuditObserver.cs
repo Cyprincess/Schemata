@@ -33,7 +33,7 @@ public sealed class SchemataEventAuditObserver : IEventLifecycleObserver
             EventType     = context.EventType,
             Payload       = context.Payload,
             CorrelationId = context.CorrelationId,
-            State         = context.RequiresOutboxDelivery ? EventState.Pending : EventState.Recorded,
+            State         = EventState.Recorded,
         };
 
         if (context.Source is not null) {
@@ -45,22 +45,6 @@ public sealed class SchemataEventAuditObserver : IEventLifecycleObserver
         context.Record = record;
 
         await _records.AddAsync(record, ct);
-        await _records.CommitAsync(ct);
-    }
-
-    public async Task OnDeliveredAsync(EventContext context, CancellationToken ct = default) {
-        var record = context.Record;
-        if (record is null && !string.IsNullOrEmpty(context.CorrelationId)) {
-            var correlationId = context.CorrelationId;
-            record = await _records.FirstOrDefaultAsync(q => q.Where(r => r.CorrelationId == correlationId), ct);
-        }
-
-        if (record is null) {
-            return;
-        }
-
-        record.State = EventState.Recorded;
-        await _records.UpdateAsync(record, ct);
         await _records.CommitAsync(ct);
     }
 

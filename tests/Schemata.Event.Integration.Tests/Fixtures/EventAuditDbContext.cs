@@ -8,4 +8,5 @@ public class EventAuditDbContext : DbContext
     public EventAuditDbContext(DbContextOptions<EventAuditDbContext> options) : base(options) { }
 
     public DbSet<SchemataEvent> SchemataEvents { get; set; } = null!;
+    public DbSet<SchemataEventSubscription> SchemataEventSubscriptions { get; set; } = null!;
 }

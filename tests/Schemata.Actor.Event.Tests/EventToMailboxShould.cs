@@ -12,7 +12,6 @@ using Schemata.Actor.Foundation;
 using Schemata.Actor.Skeleton;
 using Schemata.Core;
 using Schemata.Entity.Repository;
-using Schemata.Event.Foundation;
 using Schemata.Event.Skeleton;
 using Schemata.Event.Skeleton.Entities;
 using Schemata.Messaging.Skeleton;
@@ -22,13 +21,13 @@ namespace Schemata.Actor.Event.Tests;
 
 /// <summary>
 ///     Exercises the event-to-mailbox bridge through the real <see cref="IEventBus" /> pipeline - the
-///     same producer/observer/outbox/consumer path a production host wires - so a mistake in how
+///     same producer/observer/consumer path a production host wires - so wiring mistakes in how
 ///     <c>RouteEvent</c> registers the forwarder against that pipeline (wrong service type, wrong
-///     lifetime, the bus never resolving it) surfaces as a failed publish or an empty mailbox rather
-///     than being masked by invoking the handler directly. <see cref="IRepository{TEntity}" /> for the
-///     bus's own outbox/subscription audit rows is a functional in-memory double (the same style
-///     <c>Schemata.Event.Foundation.Tests</c> itself uses for these two types) - this suite verifies
-///     the bridge's wiring against the real bus, not Event.Foundation's own persistence layer.
+///     lifetime, the bus never resolving it) surface as a failed publish or an empty mailbox.
+///     <see cref="IRepository{TEntity}" /> for the bus's subscription and audit rows is a functional
+///     in-memory double (the same style <c>Schemata.Event.Foundation.Tests</c> itself uses for these
+///     two types) - this suite verifies the bridge's wiring against the real bus, not
+///     Event.Foundation's own persistence layer.
 /// </summary>
 public class EventToMailboxShould
 {
@@ -51,34 +50,25 @@ public class EventToMailboxShould
 
         await using var root = services.BuildServiceProvider();
 
-        // Real outbox delivery: the producer only records a Pending audit row; this background
-        // loop is what actually calls the consumer path (HandlerResolver -> IEventHandler<TEvent>).
-        var dispatcher = root.GetRequiredService<EventOutboxDispatcher>();
-        await dispatcher.StartAsync(CancellationToken.None);
-
-        try {
-            var @event = new OrderPlaced("order-1");
-            await using (var scope = root.CreateAsyncScope()) {
-                var bus = scope.ServiceProvider.GetRequiredService<IEventBus>();
-                await bus.PublishAsync(@event);
-            }
-
-            var system = root.GetRequiredService<IActorSystem>();
-            var actor  = await system.GetAsync(new("recorder", "order-1"));
-
-            IMessage? received = null;
-            var deadline = DateTime.UtcNow.AddSeconds(5);
-            while (received is null && DateTime.UtcNow < deadline) {
-                received = await actor.AskAsync<GetReceived, IMessage?>(new());
-                if (received is null) {
-                    await Task.Delay(TimeSpan.FromMilliseconds(50));
-                }
-            }
-
-            Assert.Equal(@event, received);
-        } finally {
-            await dispatcher.StopAsync(CancellationToken.None);
+        var @event = new OrderPlaced("order-1");
+        await using (var scope = root.CreateAsyncScope()) {
+            var bus = scope.ServiceProvider.GetRequiredService<IEventBus>();
+            await bus.PublishAsync(@event);
         }
+
+        var system = root.GetRequiredService<IActorSystem>();
+        var actor  = await system.GetAsync(new("recorder", "order-1"));
+
+        IMessage? received = null;
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (received is null && DateTime.UtcNow < deadline) {
+            received = await actor.AskAsync<GetReceived, IMessage?>(new());
+            if (received is null) {
+                await Task.Delay(TimeSpan.FromMilliseconds(50));
+            }
+        }
+
+        Assert.Equal(@event, received);
     }
 
     [Fact]

@@ -42,6 +42,7 @@ public sealed class EventAuditFixture : IAsyncLifetime
                                                               .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
 
         services.AddRepository<SchemataEvent, EfCoreRepository<EventAuditDbContext, SchemataEvent>>();
+        services.AddRepository<SchemataEventSubscription, EfCoreRepository<EventAuditDbContext, SchemataEventSubscription>>();
         services.AddScoped<IUnitOfWork<EventAuditDbContext>, EfCoreUnitOfWork<EventAuditDbContext>>();
 
         services.AddLogging();
