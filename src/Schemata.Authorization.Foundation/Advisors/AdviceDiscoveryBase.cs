@@ -37,6 +37,7 @@ public sealed class AdviceDiscoveryBase : IDiscoveryAdvisor
         discovery.Document               ??= new();
         discovery.Document.TokenEndpoint =   $"{issuer}{Endpoints.Token}";
         discovery.Document.JwksUri       =   $"{issuer}/.well-known/{Endpoints.Jwks}";
+        discovery.Document.ClaimsParameterSupported = true;
 
         return Task.FromResult(AdviseResult.Continue);
     }

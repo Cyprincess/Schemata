@@ -257,6 +257,29 @@ public class SchemataApplication : IIdentifier, ICanonicalName, IDescriptive, IC
     /// </summary>
     public virtual ICollection<string>? AuthorizationDetailsTypes { get; set; }
 
+    /// <summary>
+    ///     <c>userinfo_signed_response_alg</c> — JWS algorithm the UserInfo response is signed
+    ///     with, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse">
+    ///         OpenID Connect Core 1.0 §5.3.2: Successful UserInfo Response
+    ///     </seealso>
+    ///     . <see langword="null" /> leaves the response as plain JSON.
+    /// </summary>
+    public virtual string? UserinfoSignedResponseAlg { get; set; }
+
+    /// <summary>
+    ///     <c>userinfo_encrypted_response_alg</c> — JWE key management algorithm encrypting the
+    ///     UserInfo response with the client's registered public key (Core 1.0 §5.3.2).
+    ///     <see langword="null" /> leaves the response unencrypted.
+    /// </summary>
+    public virtual string? UserinfoEncryptedResponseAlg { get; set; }
+
+    /// <summary>
+    ///     <c>userinfo_encrypted_response_enc</c> — JWE content encryption algorithm
+    ///     (Core 1.0 §5.3.2); defaults to the server's content encryption algorithm.
+    /// </summary>
+    public virtual string? UserinfoEncryptedResponseEnc { get; set; }
+
     #region ICanonicalName Members
 
     public virtual string? Name

@@ -233,6 +233,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope> : IInteract
             [Properties.DpopJkt]             = authorize.DpopJkt,
             [Properties.SessionId]           = sid,
             [Properties.MaxAge]              = authorize.MaxAge,
+            [Properties.ClaimsRequest]       = authorize.Claims,
         };
 
         await _tokens.RevokeAsync(interaction, ct);

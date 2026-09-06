@@ -74,6 +74,17 @@ public class AuthorizeRequest
     public string? AuthorizationDetails { get; set; }
 
     /// <summary>
+    ///     Raw <c>claims</c> request parameter listing individually requested Claims for the
+    ///     UserInfo endpoint and/or the ID Token, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter">
+    ///         OpenID Connect Core 1.0 §5.5: Requesting Claims using the "claims" Request
+    ///         Parameter
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? Claims { get; set; }
+
+    /// <summary>
     ///     Opaque value for CSRF protection, returned unchanged in the redirect.
     ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.1">
     ///         RFC 6749: The OAuth 2.0 Authorization

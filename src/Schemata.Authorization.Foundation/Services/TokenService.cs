@@ -112,6 +112,15 @@ public class TokenService(
         return (new(primaryKey, algorithm), encrypting, validation);
     }
 
+    /// <summary>
+    ///     Resolves the issuer's active signing credentials — the newest valid signing row —
+    ///     so callers composing their own token descriptors sign with the same key and
+    ///     algorithm (and rotation semantics) as every token the server issues.
+    /// </summary>
+    public async Task<SigningCredentials> ResolveSigningCredentials(CancellationToken ct = default) {
+        return (await ResolveCredentials(ct)).Signing;
+    }
+
     private async Task<List<SchemataSecurity>> ListRowsAsync(string usage, CancellationToken ct) {
         var rows = new List<SchemataSecurity>();
         await foreach (var row in securities.ListByParentAsync(

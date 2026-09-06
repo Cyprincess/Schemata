@@ -69,6 +69,15 @@ public sealed class RegistrationResponse
     /// <summary><c>token_endpoint_auth_signing_alg</c>.</summary>
     public string? TokenEndpointAuthSigningAlg { get; set; }
 
+    /// <summary><c>userinfo_signed_response_alg</c>.</summary>
+    public string? UserinfoSignedResponseAlg { get; set; }
+
+    /// <summary><c>userinfo_encrypted_response_alg</c>.</summary>
+    public string? UserinfoEncryptedResponseAlg { get; set; }
+
+    /// <summary><c>userinfo_encrypted_response_enc</c>.</summary>
+    public string? UserinfoEncryptedResponseEnc { get; set; }
+
     /// <summary><c>contacts</c>.</summary>
     public List<string>? Contacts { get; set; }
 

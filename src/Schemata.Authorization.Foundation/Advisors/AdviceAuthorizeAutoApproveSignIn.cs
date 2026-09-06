@@ -120,6 +120,7 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
             [Properties.AuthorizationName]   = authorization.CanonicalName,
             [Properties.SessionId]           = sid,
             [Properties.MaxAge]              = authz.Request?.MaxAge,
+            [Properties.ClaimsRequest]       = authz.Request?.Claims,
         };
 
         properties[Properties.AuthorizationDetails] = json;

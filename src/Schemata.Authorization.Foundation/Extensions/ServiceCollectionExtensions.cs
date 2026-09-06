@@ -121,6 +121,7 @@ public static class ServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceRequestScopeValidation<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceTokenResource<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeResource<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeClaims<TApp>>());
 
         // Advisors consuming ambient feature slots on behalf of the handlers, keeping
         // optional-feature consumption out of the canonical handler flows.
@@ -130,6 +131,9 @@ public static class ServiceCollectionExtensions
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceClaimsAudience>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceClaimsAuthenticationContext>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceClaimsUserinfoRequest>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationClaimsRequest>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationUserinfoRequest>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationSubject>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationProfile>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationEmail>());
@@ -147,6 +151,7 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<
             IAuthorizationSignInHttpWriter,
             AuthorizationSignInHttpWriter>();
+        services.TryAddScoped<IUserInfoResponseProtector, UserInfoResponseProtector<TApp>>();
         services.TryAddScoped<InProcessRequestDispatcher>();
         services.TryAddScoped<IRequestDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
         services.TryAddScoped<ICommandDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());

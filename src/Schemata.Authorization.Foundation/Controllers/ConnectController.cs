@@ -59,6 +59,8 @@ public partial class ConnectController(
         return result.Status switch {
             AuthorizationStatus.Redirect when !string.IsNullOrWhiteSpace(result.RedirectUri) =>
                 Redirect(result.RedirectUri),
+            AuthorizationStatus.Content when result.Data is UserInfoJwt jwt =>
+                Content(jwt.Value, UserInfoJwt.ContentType),
             AuthorizationStatus.Content   => new JsonResult(result.Data),
             AuthorizationStatus.Challenge => result.Data is string scheme ? Challenge(scheme) : Challenge(),
             var _                         => throw new NoContentException(),

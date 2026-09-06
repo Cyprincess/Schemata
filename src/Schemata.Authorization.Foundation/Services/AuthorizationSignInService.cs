@@ -60,6 +60,18 @@ public sealed class AuthorizationSignInService<TApp>(
             ctx.Set(new DpopBinding(dpopJkt));
         }
 
+        // OpenID Connect Core 1.0 §5.5: re-publish the approved claims request so the claims
+        // and destination advisors can apply it (id_token additions, the userinfo-request
+        // access-token claim) without this service interpreting the parameter. The full
+        // request rides the code exchange; a refresh continuation carries only the persisted
+        // userinfo names.
+        var claimsRequest = ClaimsRequest.Parse(items.GetValueOrDefault(Properties.ClaimsRequest))
+                         ?? ClaimsRequest.FromUserinfoNames(items.GetValueOrDefault(Properties.UserinfoClaims));
+        if (claimsRequest is not null) {
+            ctx.Set(claimsRequest);
+        }
+
+
         if (principal.Identity is not ClaimsIdentity identity) {
             throw new InvalidOperationException(
                 "Authorization sign-in service requires a principal with a ClaimsIdentity.");
@@ -280,6 +292,8 @@ public sealed class AuthorizationSignInService<TApp>(
 
         items.TryGetValue(Properties.AuthorizationDetails, out var authorizationDetails);
         request.AuthorizationDetails = authorizationDetails;
+        items.TryGetValue(Properties.ClaimsRequest, out var claimsRequest);
+        request.Claims = claimsRequest;
 
         // The claims advisor publishes the approved authentication context; persisting it lets
         // the later code exchange mint acr/amr/auth_time without a session.

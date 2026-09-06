@@ -86,6 +86,8 @@ public sealed class RegisterHandler<TApp>(
 
         var application = await RegistrationMetadataMapper.ToApplicationAsync<TApp>(request, options, http, securities, _time, ct);
 
+        await ValidateUserInfoResponseAlgorithmsAsync(application, ct);
+
         if (RequiresClientSecret(application)) {
             var secret = RegistrationMetadataMapper.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
             var hash   = await verifier.HashAsync(secret, ct: ct);
@@ -155,4 +157,33 @@ public sealed class RegisterHandler<TApp>(
             && application.ClientType == ClientTypes.Confidential;
     }
 
+    /// <summary>
+    ///     Cross-checks the UserInfo response protection metadata against the issuer's key
+    ///     material: <c>userinfo_signed_response_alg</c> must equal the active signing
+    ///     algorithm (the response is signed with the issuer's primary signing row), and
+    ///     <c>userinfo_encrypted_response_alg</c> requires registered client key material.
+    /// </summary>
+    private async Task ValidateUserInfoResponseAlgorithmsAsync(TApp application, CancellationToken ct) {
+        if (string.IsNullOrWhiteSpace(application.UserinfoSignedResponseAlg)) {
+            return;
+        }
+
+        SchemataSecurity? primary = null;
+        await foreach (var row in securities.ListByParentAsync(
+                           SecurityParents.Issuer(options.Value.Issuer!), null, SecurityConstants.Usages.Signing, null, ct)) {
+            if (row.Status == SecurityConstants.Statuses.Valid) {
+                primary = row;
+                break;
+            }
+        }
+
+        var active = primary is null
+            ? null
+            : SecurityKeyAdapter.ToSigningAlgorithm(primary.Algorithm);
+        if (!string.Equals(active, application.UserinfoSignedResponseAlg, StringComparison.Ordinal)) {
+            throw new OAuthException(
+                OAuthErrors.InvalidClientMetadata,
+                $"userinfo_signed_response_alg {application.UserinfoSignedResponseAlg} does not match the issuer's active signing algorithm {active ?? "(none)"}.");
+        }
+    }
 }

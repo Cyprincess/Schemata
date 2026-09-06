@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Threading;
@@ -199,7 +200,7 @@ public sealed class AuthorizationCodeHandler<TApp>(
         var identity = new ClaimsPrincipal(new ClaimsIdentity(claims, SchemataAuthorizationSchemes.Bearer));
         var props = new Dictionary<string, string?> {
             [Properties.GrantType]         = GrantTypes.AuthorizationCode,
-            [Properties.Resources]         = resources.Count > 0 ? string.Join(" ", resources) : null,
+            [Properties.Resources]         = resources.Count > 0 ? string.Join(' ', resources) : null,
             [Properties.Scope]             = granted,
             [Properties.Nonce]             = payload.Nonce,
             [Properties.SessionId]         = token.SessionId,
@@ -208,6 +209,10 @@ public sealed class AuthorizationCodeHandler<TApp>(
         };
 
         props[Properties.AuthorizationDetails] = payload.AuthorizationDetails;
+        props[Properties.ClaimsRequest]        = payload.Claims;
+        props[Properties.UserinfoClaims]       = ClaimsRequest.Parse(payload.Claims)?.Userinfo is { Count: > 0 } names
+            ? string.Join(' ', names.Keys)
+            : null;
         return AuthorizationResult.SignIn(identity, props);
     }
 

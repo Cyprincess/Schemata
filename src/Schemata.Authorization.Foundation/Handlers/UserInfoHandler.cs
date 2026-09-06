@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
@@ -7,6 +8,7 @@ using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
+using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
@@ -29,7 +31,7 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     and finally filters claims by <see cref="IDestinationAdvisor" /> to
 ///     only include those allowed for the <c>userinfo</c> destination.
 /// </summary>
-public sealed class UserInfoHandler : UserInfoEndpoint
+public sealed class UserInfoHandler(IUserInfoResponseProtector? protector) : UserInfoEndpoint
 {
     public override async Task<AuthorizationResult> HandleAsync(ClaimsPrincipal principal, CancellationToken ct) {
         var ctx = AdviceContext.Require();
@@ -43,7 +45,6 @@ public sealed class UserInfoHandler : UserInfoEndpoint
             Principal       = principal,
             InternalSubject = sub,
             GrantedScopes   = scopes,
-            IsEndUserToken  = !string.IsNullOrWhiteSpace(sub),
         };
 
         switch (await Advisor.For<IUserInfoAdvisor>()
@@ -114,6 +115,10 @@ public sealed class UserInfoHandler : UserInfoEndpoint
                             g => g.Key,
                             g => g.Count() == 1 ? (object)g.First().Value : g.Select(c => c.Value).ToArray());
 
-        return AuthorizationResult.Content(dict);
+        // Core 1.0 §5.3.2: a client that registered userinfo_signed_response_alg (and/or the
+        // encryption parameters) receives the claim set as a JWT instead of plain JSON.
+        var jwt = protector is null ? null : await protector.ProtectAsync(client, dict, ct);
+
+        return AuthorizationResult.Content(jwt is null ? dict : jwt);
     }
 }

@@ -49,7 +49,7 @@ public class UserInfoHandlerShould
         services.AddSingleton(destinationAdvisor.Object);
         using var provider = services.BuildServiceProvider();
         using var ambient  = AdviceContext.Establish(new(provider));
-        var       handler  = new UserInfoHandler();
+        var       handler  = new UserInfoHandler(protector: null);
         var principal = new ClaimsPrincipal(new ClaimsIdentity([
             new(IdentityClaims.Subject, "user-1"),
             new(Claims.ClientId, "client-1"),

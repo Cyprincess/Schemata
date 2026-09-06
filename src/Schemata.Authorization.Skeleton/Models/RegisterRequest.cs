@@ -62,6 +62,15 @@ public class RegisterRequest
     /// <summary><c>id_token_signed_response_alg</c>.</summary>
     public string? IdTokenSignedResponseAlg { get; set; }
 
+    /// <summary><c>userinfo_signed_response_alg</c>. JWS algorithm signing the UserInfo response.</summary>
+    public string? UserinfoSignedResponseAlg { get; set; }
+
+    /// <summary><c>userinfo_encrypted_response_alg</c>. JWE key management algorithm (client's public key).</summary>
+    public string? UserinfoEncryptedResponseAlg { get; set; }
+
+    /// <summary><c>userinfo_encrypted_response_enc</c>. JWE content encryption algorithm.</summary>
+    public string? UserinfoEncryptedResponseEnc { get; set; }
+
     /// <summary><c>token_endpoint_auth_signing_alg</c>.</summary>
     public string? TokenEndpointAuthSigningAlg { get; set; }
 

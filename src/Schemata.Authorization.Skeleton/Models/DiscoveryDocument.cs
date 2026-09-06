@@ -128,6 +128,20 @@ public sealed class DiscoveryDocument
     public List<string>? TokenEndpointAuthSigningAlgValuesSupported { get; set; }
 
     /// <summary>
+    ///     Whether the authorization server supports the <c>claims</c> request parameter, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata">
+    ///         OpenID Connect Discovery 1.0 §3: OpenID Provider Metadata
+    ///     </seealso>
+    ///     and
+    ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter">
+    ///         OpenID Connect Core 1.0 §5.5: Requesting Claims using the "claims" Request
+    ///         Parameter
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public bool? ClaimsParameterSupported { get; set; }
+
+    /// <summary>
     ///     JWS <c>alg</c> values the authorization server supports for DPoP proof JWTs, per
     ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9449.html#section-5.1">
     ///         RFC 9449: OAuth 2.0 Demonstrating Proof

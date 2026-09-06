@@ -243,6 +243,13 @@ public static class AuthorizationConstants
 
         /// <summary>End-user authentication time claim.</summary>
         public const string AuthTime            = "auth_time";
+
+        /// <summary>
+        ///     Private access-token claim carrying the space-joined UserInfo claim names requested
+        ///     through the <c>claims</c> parameter (Core 1.0 §5.5), so the UserInfo endpoint can
+        ///     widen its output beyond the scope-derived set. Not a registered JWT claim.
+        /// </summary>
+        public const string UserinfoRequest     = ".userinfo_request";
     }
 
     #endregion
@@ -1494,6 +1501,16 @@ public static class AuthorizationConstants
         ///     .
         /// </summary>
         public const string AuthorizationDetails = "authorization_details";
+
+        /// <summary>
+        ///     OpenID Connect claims request parameter, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter">
+        ///         OpenID Connect Core 1.0 §5.5: Requesting Claims using the "claims" Request
+        ///         Parameter
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string Claims = "claims";
     }
 
     #endregion
@@ -1622,6 +1639,12 @@ public static class AuthorizationConstants
 
         /// <summary>Serialized DPoP proof key thumbprint property key.</summary>
         public const string DpopJkt            = ".dpop_jkt";
+
+        /// <summary>Serialized raw claims request property key (OpenID Connect Core 1.0 §5.5).</summary>
+        public const string ClaimsRequest      = ".claims_request";
+
+        /// <summary>Serialized space-joined UserInfo claim request property key (Core 1.0 §5.5).</summary>
+        public const string UserinfoClaims     = ".userinfo_claims";
     }
 
     #endregion

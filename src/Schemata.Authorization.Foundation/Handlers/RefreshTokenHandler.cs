@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -203,11 +204,15 @@ public sealed class RefreshTokenHandler<TApp>(
 
         var identity = new ClaimsPrincipal(new ClaimsIdentity(claims, SchemataAuthorizationSchemes.Bearer));
         return AuthorizationResult.SignIn(identity, new() {
-            [Properties.GrantType]         = GrantTypes.RefreshToken,
-            [Properties.Scope]             = issuedScope,
-            [Properties.Resources]         = grantedResources.Length > 0 ? string.Join(" ", grantedResources) : null,
+            [Properties.GrantType]      = GrantTypes.RefreshToken,
+            [Properties.Scope]          = issuedScope,
+            [Properties.Resources]      = grantedResources.Length > 0 ? string.Join(" ", grantedResources) : null,
             [Properties.AuthorizationName] = token.Authorization,
-            [Properties.SessionId]         = token.SessionId,
+            [Properties.SessionId]      = token.SessionId,
+
+            // §5.5: republish the UserInfo claim names persisted on the refresh token so the
+            // claim advisors keep carrying them onto the renewed access token.
+            [Properties.UserinfoClaims] = principal.FindFirstValue(Claims.UserinfoRequest),
         });
     }
 
