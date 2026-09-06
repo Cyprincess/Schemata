@@ -49,6 +49,7 @@ public class SchemataAuthenticationHandler<TApp>(
     IAuthorizationSignInService                           signIns,
     IAuthorizationSignInHttpWriter                        writer,
     IOptions<DPopOptions>                                 dpop,
+    IOptions<SchemataAuthorizationOptions>                config = null!,
     DPopProofValidator?                                   proofs = null,
     [FromKeyedServices(SecurityConstants.TokenTypes.Nonce)] ITokenStore<SchemataToken>? nonces = null
 ) : SignInAuthenticationHandler<SchemataAuthenticationHandlerOptions>(options, logger, encoder)
@@ -230,8 +231,8 @@ public class SchemataAuthenticationHandler<TApp>(
         }
 
         var principal = entity.Format switch {
-            TokenFormats.Reference when !string.IsNullOrWhiteSpace(entity.Payload) => await ValidateReferencePayload(entity.Payload, entity.Application),
-            TokenFormats.Jwt or TokenFormats.Jwe => await issuer.Validate(token, entity.Application),
+            TokenFormats.Reference when !string.IsNullOrWhiteSpace(entity.Payload) => await ValidateReferencePayload(entity.Payload),
+            TokenFormats.Jwt or TokenFormats.Jwe => await issuer.Validate(token),
             var _                                => null,
         };
 
@@ -249,6 +250,21 @@ public class SchemataAuthenticationHandler<TApp>(
         principal = new(new ClaimsIdentity(claims, Scheme.Name, IdentityClaims.Subject, IdentityClaims.Role));
 
         var jkt = DPopProofValidator.ReadBoundThumbprint(principal);
+
+        // RFC 9068 §4: this handler is the resource-server side of this issuer; the token's
+        // aud must name this server itself (the default resource or the issuer it mints for
+        // self-addressed tokens), never the canonical application reference of the client
+        // that requested it. Tokens audience-restricted to external resources are invalid
+        // here and rejected with invalid_token.
+        if (!AcceptsAudience(principal)) {
+            if (flavor == Schemes.Dpop) {
+                StageDpopChallenge(OAuthErrors.InvalidToken);
+            } else {
+                StageBearerChallenge(OAuthErrors.InvalidToken);
+            }
+
+            return AuthenticateResult.NoResult();
+        }
 
         // §7.2 Figure 18: a DPoP-bound token received via Bearer MUST be rejected, with the
         // error on the Bearer challenge — the scheme the client actually used.
@@ -303,16 +319,45 @@ public class SchemataAuthenticationHandler<TApp>(
         // transition; the proof is still enforced, only cnf-bound tokens are compared.
         return AuthenticateResult.Success(new(principal, Scheme.Name));
     }
-
     /// <summary>Validates a Reference-format stored payload; an invalid payload
     ///     yields no principal.</summary>
     /// <param name="payload">Stored payload of the token row.</param>
-    /// <param name="application">Application canonical name used as the validation audience.</param>
-    private async Task<ClaimsPrincipal?> ValidateReferencePayload(string payload, string? application) {
-        return await issuer.Validate(payload, application);
+    private async Task<ClaimsPrincipal?> ValidateReferencePayload(string payload) {
+        return await issuer.Validate(payload);
+    }
+
+    /// <summary>
+    ///     Whether the principal's <c>aud</c> claim names this server as a resource server,
+    ///     per RFC 9068 §4: at least one audience must match
+    ///     <see cref="SchemataAuthorizationOptions.ResourceAudiences" /> or, when unset, the
+    ///     non-blank default resource and issuer.
+    /// </summary>
+    internal bool AcceptsAudience(ClaimsPrincipal principal) {
+        var options = config.Value;
+        var accepted = options.ResourceAudiences is { Count: > 0 } cached
+            ? cached
+            : DefaultResourceAudiences(options);
+
+        return principal.FindAll(Claims.Audience).Any(a => accepted.Contains(a.Value));
+    }
+
+    /// <summary>The audiences this server mints for itself: the non-blank default resource
+    ///     and the issuer.</summary>
+    internal static List<string> DefaultResourceAudiences(SchemataAuthorizationOptions options) {
+        var audiences = new List<string>(2);
+        if (!string.IsNullOrWhiteSpace(options.DefaultResource)) {
+            audiences.Add(options.DefaultResource);
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.Issuer)) {
+            audiences.Add(options.Issuer);
+        }
+
+        return audiences;
     }
 
     private AuthenticateResult StageDpopChallenge(string error, string? nonce = null) {
+
         Context.Items[ChallengeErrorItem] = error;
 
         if (nonce is not null) {

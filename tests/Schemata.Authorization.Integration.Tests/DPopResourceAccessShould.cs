@@ -213,7 +213,9 @@ public class DPopResourceAccessShould
 
         var claims = new List<Claim> {
             new(IdentityClaims.Subject, app),
-            new(Claims.Audience, app),
+            // RFC 9068 §2.2/§3: the minted access token audience is the default resource
+            // (the issuer here) — not the client's canonical reference.
+            new(Claims.Audience, "https://localhost"),
             new(Claims.Scope, Scopes.OpenId + " " + Scopes.Profile),
             new(Claims.ClientId, "test-client"),
         };

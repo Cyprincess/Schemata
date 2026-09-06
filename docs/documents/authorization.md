@@ -312,6 +312,7 @@ secrets live in rows under each application (see Managers). Lifetimes and format
 | `Issuer`                                    | —                | Required (`iss` claim, discovery base URL)                  |
 | Issuer signing rows                         | —                | `SchemataSecurity` rows under `SecurityParents.Issuer(Issuer)` with `usage=signing`; the newest `valid` row signs, `valid` and `retired` rows verify |
 | Issuer encryption rows                      | none             | `usage=encryption` rows; the newest `valid` row encrypts JWE output, with the row `Algorithm` as the JWE `alg` |
+| `ResourceAudiences` | `null` | Audiences this server accepts for itself when validating presented access tokens as a resource server (RFC 9068 §4); defaults to the non-blank `DefaultResource` and `Issuer` |
 | `ContentEncryptionAlgorithm`                | `A256CBC-HS512`  | JWE `enc` for encrypted tokens |
 | `AccessTokenFormat`                         | `Jwe`            | `Jwt`, `Jwe`, or `Reference`                                |
 | `RefreshTokenFormat`                        | `Reference`      |                                                             |
@@ -352,6 +353,7 @@ mechanism; the host configures it).
 | RFC 6749 §5.2, OIDC Core §3.1.2.6 | Token-endpoint error-code families | Enforced |
 | RFC 8252 §7.3/§8.3 | Loopback redirect URI port variance (`localhost` excluded by §8.3) | Enforced |
 | RFC 9068 §2.1/§2.2, RFC 8707 §2 | Access token `typ: at+jwt`; `aud` = `DefaultResource ?? Issuer` when no resource parameter is sent | Enforced |
+| RFC 9068 §4 | Resource-server validation: presented access tokens pass signature and the `aud` claim must name this server itself (`ResourceAudiences`, defaulting to the non-blank default resource and issuer); tokens audience-restricted to external resources are rejected with `invalid_token` | Enforced |
 | OIDC Core §2 | ID token `aud` = `client_id` | Enforced |
 | RFC 7517 §4.5 | JWKS publishes every valid and retired issuer signing row with its `kid`; multi-key sets require `kid` on each row | Enforced |
 | RFC 9700 §4.16 | Rendered pages carry `X-Frame-Options: DENY` and `CSP: frame-ancestors 'self'` | Enforced |

@@ -113,6 +113,20 @@ public class SchemataAuthorizationOptions
     /// </summary>
     public string? DefaultResource { get; set; }
 
+    /// <summary>
+    ///     Audience values this server accepts for itself when it validates presented access
+    ///     tokens as a resource server (UserInfo, framework-hosted resources), per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9068.html#section-4">
+    ///         RFC 9068: JSON Web Token (JWT) Profile
+    ///     for OAuth 2.0 Access Tokens §4: Validating JWT Access Tokens
+    ///     </seealso>
+    ///     : the token's <c>aud</c> MUST contain a resource indicator the resource server
+    ///     expects for itself. Defaults to the non-blank <see cref="DefaultResource" /> and
+    ///     <see cref="Issuer" /> — the audience the server mints when no resource parameter
+    ///     is sent. Tokens audience-restricted to external resources are rejected here.
+    /// </summary>
+    public List<string>? ResourceAudiences { get; set; }
+
     /// <summary>JWE content encryption algorithm (e.g., "A256CBC-HS512"); defaults to A256CBC-HS512.</summary>
     public string ContentEncryptionAlgorithm { get; set; } = ContentEncryptionAlgorithms.Aes256CbcHmacSha512;
 
