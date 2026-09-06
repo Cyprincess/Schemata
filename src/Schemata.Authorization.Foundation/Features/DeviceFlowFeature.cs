@@ -4,7 +4,10 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions;
 using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Foundation.Commands;
 using Schemata.Authorization.Foundation.Handlers;
+using Schemata.Messaging.Skeleton;
+using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Security.Skeleton.Entities;
@@ -48,7 +51,9 @@ public sealed class DeviceFlowFeature<TApp, TAuth, TScope> : IAuthorizationFlowF
         });
 
         services.TryAddScoped<DeviceAuthorizeEndpoint, DeviceAuthorizeHandler<TApp>>();
-        services.TryAddKeyedScoped<IGrantHandler, DeviceCodeHandler<TApp>>(GrantTypes.DeviceCode);
+        services.TryAddScoped<
+            IRequestHandler<DeviceAuthorizeEndpointRequest, AuthorizationResult>,
+            EndpointDispatchHandler<DeviceAuthorizeEndpointRequest, DeviceAuthorizeEndpoint, AuthorizationResult>>();
         services.TryAddKeyedScoped<IInteractionHandler, DeviceInteractionHandler<TApp, TAuth, TScope>>(TokenTypeUris.UserCode);
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryDeviceFlow>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDeviceAuthorizeAdvisor<TApp>, AdviceDeviceAuthorizeEndpointPermission<TApp>>());

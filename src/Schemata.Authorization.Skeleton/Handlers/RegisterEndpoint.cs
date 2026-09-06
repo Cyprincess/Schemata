@@ -13,4 +13,13 @@ public abstract class RegisterEndpoint
 {
     /// <summary>Processes a registration request and creates a new client.</summary>
     public abstract Task<RegistrationResponse> HandleAsync(RegisterRequest request, string? bearerToken, CancellationToken ct);
+
+    /// <summary>
+    ///     Reads back a registered client's metadata with its registration access token, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-registration-1_0.html">
+    ///         OpenID Connect Dynamic Client Registration 1.0 §3.3: Client Read Request
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public abstract Task<RegistrationResponse?> ReadAsync(string? clientId, string? bearerToken, CancellationToken ct);
 }

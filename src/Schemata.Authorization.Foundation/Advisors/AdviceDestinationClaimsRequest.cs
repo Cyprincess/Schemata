@@ -31,7 +31,7 @@ public sealed class AdviceDestinationClaimsRequest : IDestinationAdvisor
         CancellationToken ct = default
     ) {
         if (ctx.TryGet<ClaimsRequest>(out var request)
-         && request.IdToken is { Count: > 0 }
+         && request?.IdToken is { Count: > 0 }
          && request.IdToken.ContainsKey(claim.Type)) {
             destinations.Add(ClaimDestinations.IdentityToken);
         }

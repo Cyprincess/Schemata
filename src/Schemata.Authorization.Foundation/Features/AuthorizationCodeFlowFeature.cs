@@ -4,8 +4,11 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions;
 using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Foundation.Commands;
 using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Skeleton.Advisors;
+using Schemata.Messaging.Skeleton;
+using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
@@ -33,7 +36,7 @@ namespace Schemata.Authorization.Foundation.Features;
 /// <typeparam name="TAuth">The authorization entity type.</typeparam>
 /// <typeparam name="TScope">The scope entity type.</typeparam>
 /// <remarks>
-///     Installed via <c>UseCodeFlow()</c> on <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope}" />.
+///     Installed via <c>UseAuthorizationCodeFlow()</c> on <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope}" />.
 /// </remarks>
 /// <seealso cref="IAuthorizationFlowFeature" />
 public sealed class AuthorizationCodeFlowFeature<TApp, TAuth, TScope> : IAuthorizationFlowFeature
@@ -62,6 +65,9 @@ public sealed class AuthorizationCodeFlowFeature<TApp, TAuth, TScope> : IAuthori
         });
 
         services.TryAddScoped<AuthorizeEndpoint, AuthorizeHandler<TApp>>();
+        services.TryAddScoped<
+            IRequestHandler<AuthorizeEndpointRequest, AuthorizationResult>,
+            EndpointDispatchHandler<AuthorizeEndpointRequest, AuthorizeEndpoint, AuthorizationResult>>();
 
         services.TryAddKeyedScoped<IGrantHandler, AuthorizationCodeHandler<TApp>>(GrantTypes.AuthorizationCode);
         services.TryAddKeyedScoped<IInteractionHandler, AuthorizeInteractionHandler<TApp, TAuth, TScope>>(TokenTypeUris.Interaction);

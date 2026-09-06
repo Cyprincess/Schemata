@@ -58,10 +58,12 @@ builder.UseSchemata(schema => {
         o.Issuer         = "https://localhost";
         o.InteractionUri = "https://localhost/interact";
     })
-                              .UseCodeFlow()
+                              .UseAuthorizationCodeFlow()
                               .UseClientCredentialsFlow()
                               .UseRefreshTokenFlow()
                               .UseJwtBearerGrant()
+                              .UseResourceIndicators()
+                              .UseClaimsParameter()
                               .UseIntrospection()
                               .UseUserInfo()
                               .MapHttp();

@@ -1,7 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions;
+using Schemata.Authorization.Foundation.Commands;
 using Schemata.Authorization.Foundation.Handlers;
+using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Handlers;
+using Schemata.Authorization.Foundation.Queries;
+using Schemata.Messaging.Skeleton;
 using Schemata.Core;
 
 namespace Schemata.Authorization.Foundation.Features;
@@ -26,6 +31,15 @@ public sealed class InteractionFeature : IAuthorizationFlowFeature
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddScoped<InteractionEndpoint, InteractionHandler>();
+        services.TryAddScoped<
+            IRequestHandler<InteractionApproveRequest, AuthorizationResult>,
+            EndpointDispatchHandler<InteractionApproveRequest, InteractionEndpoint, AuthorizationResult>>();
+        services.TryAddScoped<
+            IRequestHandler<InteractionDenyRequest, Unit>,
+            EndpointDispatchHandler<InteractionDenyRequest, InteractionEndpoint, Unit>>();
+        services.TryAddScoped<
+            IRequestHandler<InteractionDetailsQuery, AuthorizationResult>,
+            EndpointDispatchHandler<InteractionDetailsQuery, InteractionEndpoint, AuthorizationResult>>();
     }
 
     #endregion

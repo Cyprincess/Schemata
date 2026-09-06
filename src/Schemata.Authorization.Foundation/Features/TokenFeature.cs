@@ -1,7 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Authorization.Foundation.Commands;
 using Schemata.Authorization.Foundation.Handlers;
+using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Handlers;
+using Schemata.Messaging.Skeleton;
 using Schemata.Core;
 
 namespace Schemata.Authorization.Foundation.Features;
@@ -23,6 +26,9 @@ public sealed class TokenFeature : IAuthorizationFlowFeature
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddScoped<TokenEndpoint, TokenHandler>();
+        services.TryAddScoped<
+            IRequestHandler<TokenEndpointRequest, AuthorizationResult>,
+            EndpointDispatchHandler<TokenEndpointRequest, TokenEndpoint, AuthorizationResult>>();
     }
 
     #endregion

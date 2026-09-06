@@ -1,11 +1,15 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Authorization.Foundation.Advisors;
-using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Skeleton.Advisors;
+using Schemata.Authorization.Foundation.Handlers;
+using Schemata.Authorization.Foundation.Queries;
+using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Entities;
-using Schemata.Security.Skeleton.Entities;
+using Schemata.Messaging.Skeleton;
 using Schemata.Authorization.Skeleton.Handlers;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Authorization.Skeleton.Models;
 using Schemata.Core;
 
 namespace Schemata.Authorization.Foundation.Features;
@@ -34,6 +38,13 @@ public sealed class DynamicRegistrationFeature<TApp> : IAuthorizationFlowFeature
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddScoped<RegisterEndpoint, RegisterHandler<TApp>>();
+        services.TryAddScoped<
+            IRequestHandler<RegisterEndpointQuery, RegistrationResponse>,
+            EndpointDispatchHandler<RegisterEndpointQuery, RegisterEndpoint, RegistrationResponse>>();
+        services.TryAddScoped<
+            IRequestHandler<RegisterReadQuery, RegistrationResponse?>,
+            EndpointDispatchHandler<RegisterReadQuery, RegisterEndpoint, RegistrationResponse?>>();
+        services.AddHttpClient(nameof(RegistrationMetadataMapper));
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryRegistration>());
     }
 
@@ -48,5 +59,5 @@ public sealed class DynamicRegistrationFeature<TApp> : IAuthorizationFlowFeature
 internal static class DynamicRegistrationFeature
 {
     /// <summary>The default feature ordering value (chained after its predecessor).</summary>
-    public const int DefaultOrder = DPopFlowFeature.DefaultOrder + 100;
+    public const int DefaultOrder = DemonstratingProofOfPossessionFeature.DefaultOrder + 100;
 }

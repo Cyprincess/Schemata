@@ -30,7 +30,7 @@ schema.UseAuthorization(o => {
       })
       .UseIdentity()                  // bridge Identity user claims into tokens
       .UseClientCredentialsFlow()
-      .UseCodeFlow()
+      .UseAuthorizationCodeFlow()
       .UseRefreshTokenFlow();
 ```
 
@@ -38,7 +38,7 @@ schema.UseAuthorization(o => {
 
 | Method                       | Grant / endpoint                                                         |
 | ---------------------------- | ------------------------------------------------------------------------ |
-| `UseCodeFlow()`              | `authorization_code` with PKCE — `/Connect/Authorize` + `/Connect/Token` |
+| `UseAuthorizationCodeFlow()`              | `authorization_code` with PKCE — `/Connect/Authorize` + `/Connect/Token` |
 | `UseClientCredentialsFlow()` | `client_credentials` — `/Connect/Token`                                  |
 | `UseRefreshTokenFlow()`      | `refresh_token` — `/Connect/Token`                                       |
 | `UseDeviceFlow()`            | device code — `/Connect/Device`                                          |

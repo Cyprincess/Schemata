@@ -315,8 +315,7 @@ public class RegisterHandlerShould
                 RedirectUris = ["https://rp.example/cb"],
             });
 
-        var reader = new RegistrationReadHandler<SchemataApplication>(apps.Object, tokens.Object, securities.Object);
-        var read   = await reader.HandleAsync(new(created.ClientId, created.RegistrationAccessToken), CancellationToken.None);
+        var read   = await handler.ReadAsync(created.ClientId, created.RegistrationAccessToken, CancellationToken.None);
 
         Assert.NotNull(read);
         Assert.Equal(created.ClientId, read.ClientId);
@@ -336,8 +335,7 @@ public class RegisterHandlerShould
                 RedirectUris = ["https://rp.example/cb"],
             });
 
-        var reader = new RegistrationReadHandler<SchemataApplication>(apps.Object, tokens.Object, securities.Object);
-        var read   = await reader.HandleAsync(new(created.ClientId, created.RegistrationAccessToken), CancellationToken.None);
+        var read   = await handler.ReadAsync(created.ClientId, created.RegistrationAccessToken, CancellationToken.None);
 
         Assert.NotNull(read);
         Assert.Equal("""{"keys":[{"kty":"RSA","kid":"rp-1","use":"sig","n":"x","e":"AQAB"}]}""", read.Jwks);
@@ -355,8 +353,7 @@ public class RegisterHandlerShould
         apps.Setup(m => m.FindByClientIdAsync(mine.ClientId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new SchemataApplication { ClientId = mine.ClientId });
 
-        var reader = new RegistrationReadHandler<SchemataApplication>(apps.Object, tokens.Object, securities.Object);
-        var read   = await reader.HandleAsync(new(mine.ClientId, other.RegistrationAccessToken), CancellationToken.None);
+        var read   = await handler.ReadAsync(mine.ClientId, other.RegistrationAccessToken, CancellationToken.None);
 
         Assert.Null(read);
     }
@@ -365,8 +362,7 @@ public class RegisterHandlerShould
     public async Task Reject_Read_Back_With_An_Unknown_Token() {
         var (handler, apps, tokens, _, _, securities) = Create();
 
-        var reader = new RegistrationReadHandler<SchemataApplication>(apps.Object, tokens.Object, securities.Object);
-        var read   = await reader.HandleAsync(new("whatever", "not-a-known-token"), CancellationToken.None);
+        var read   = await handler.ReadAsync("whatever", "not-a-known-token", CancellationToken.None);
 
         Assert.Null(read);
     }
@@ -382,8 +378,7 @@ public class RegisterHandlerShould
 
         store.Single().Payload = "not-json";
 
-        var reader = new RegistrationReadHandler<SchemataApplication>(apps.Object, tokens.Object, securities.Object);
-        var read   = await reader.HandleAsync(new(created.ClientId, created.RegistrationAccessToken), CancellationToken.None);
+        var read   = await handler.ReadAsync(created.ClientId, created.RegistrationAccessToken, CancellationToken.None);
 
         Assert.Null(read);
     }

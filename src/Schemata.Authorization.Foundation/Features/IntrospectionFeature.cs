@@ -2,10 +2,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Handlers;
+using Schemata.Authorization.Foundation.Queries;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
-using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
+using Schemata.Authorization.Skeleton.Models;
+using Schemata.Messaging.Skeleton;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Core;
 
 namespace Schemata.Authorization.Foundation.Features;
@@ -29,6 +32,9 @@ public sealed class IntrospectionFeature<TApp> : IAuthorizationFlowFeature
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddScoped<IntrospectionEndpoint, IntrospectionHandler<TApp>>();
+        services.TryAddScoped<
+            IRequestHandler<IntrospectionEndpointQuery, IntrospectionResponse>,
+            EndpointDispatchHandler<IntrospectionEndpointQuery, IntrospectionEndpoint, IntrospectionResponse>>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryIntrospection>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IIntrospectionAdvisor<TApp>, AdviceIntrospectionProtectedResource<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IIntrospectionAdvisor<TApp>, AdviceIntrospectionTokenValidation<TApp>>());

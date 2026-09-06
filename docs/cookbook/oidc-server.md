@@ -78,7 +78,7 @@ var builder = WebApplication.CreateBuilder(args)
                   o.PermitResponseType("code");
               })
               .UseIdentity()           // bridge Identity claims into tokens
-              .UseCodeFlow()
+              .UseAuthorizationCodeFlow()
               .UseRefreshTokenFlow()
               .UseUserInfo();
 
@@ -96,7 +96,7 @@ var builder = WebApplication.CreateBuilder(args)
 
 `UseAuthorization()` installs `SchemataAuthorizationFeature` at priority 460,000,000. It depends on
 `SchemataAuthenticationFeature`, `SchemataTransportHttpFeature`, and `SchemataWellKnownFeature`,
-pulled in automatically. `UseCodeFlow()` adds the authorize and token endpoints plus the PKCE,
+pulled in automatically. `UseAuthorizationCodeFlow()` adds the authorize and token endpoints plus the PKCE,
 consent, and interaction advisors; `UseRefreshTokenFlow()` adds the refresh grant; `UseUserInfo()`
 adds `/Connect/Profile`. The `.UseIdentity()` on the authorization builder wires user claims into
 issued tokens.
@@ -242,7 +242,7 @@ decision, it issues a short-lived interaction token and redirects the browser to
 - `POST /Connect/Interact` — approves; the server records consent and continues the code flow.
 - `DELETE /Connect/Interact` — denies.
 
-You build the consent SPA; the protocol endpoints are already wired by `UseCodeFlow()`.
+You build the consent SPA; the protocol endpoints are already wired by `UseAuthorizationCodeFlow()`.
 
 ## Step 5 — Custom entity types (optional)
 
@@ -256,7 +256,7 @@ public class MyApplication : SchemataApplication
 
 schema.UseAuthorization<MyApplication, SchemataAuthorization, SchemataScope, SchemataToken>(o => { /* ... */ })
       .UseIdentity()
-      .UseCodeFlow();
+      .UseAuthorizationCodeFlow();
 ```
 
 Constraints: `TApp : SchemataApplication`, `TAuth : SchemataAuthorization, new()`,
@@ -269,7 +269,7 @@ Constraints: `TApp : SchemataApplication`, `TAuth : SchemataAuthorization, new()
 row, when that row carries no `Algorithm` or loadable material, or when a multi-key set carries
 a blank `Kid`. Seed the signing row (Step 3) before issuing tokens.
 
-**`UseCodeFlow()` requires an absolute `InteractionUri`** — `AuthorizationCodeFlowFeature` checks it
+**`UseAuthorizationCodeFlow()` requires an absolute `InteractionUri`** — `AuthorizationCodeFlowFeature` checks it
 once at startup and throws `InvalidOperationException` for a blank value or one that is relative.
 `https://localhost:5001/consent` passes; `/consent` does not.
 
@@ -281,7 +281,7 @@ so a public client sends `code_challenge` with `code_challenge_method=S256`. [RF
 defines the S256 transformation, and [RFC 7636 §4.4.1](https://datatracker.ietf.org/doc/html/rfc7636#section-4.4.1)
 defines the authorization-endpoint response when a server requires PKCE. [RFC 9700 §2.1.1](https://datatracker.ietf.org/doc/html/rfc9700#section-2.1.1)
 sets the current requirement: public clients MUST use PKCE and authorization servers MUST support
-it. Relax per deployment with `UseCodeFlow(o => o.RelaxPkce())`; production deployments should
+it. Relax per deployment with `UseAuthorizationCodeFlow(o => o.RelaxPkce())`; production deployments should
 assess that exception against their threat model.
 
 **The bridge is opt-in** — without `.UseIdentity()` on the authorization builder, tokens carry only

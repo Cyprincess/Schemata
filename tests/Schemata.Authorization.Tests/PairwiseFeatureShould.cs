@@ -22,7 +22,7 @@ public class PairwiseFeatureShould
     public void Register_The_Pairwise_Machinery() {
         var services = new ServiceCollection();
         services.AddSingleton(Options.Create(new SchemataAuthorizationOptions()));
-        new PairwiseFeature<SchemataApplication>().ConfigureServices(services, new(), new());
+        new PairwiseSubjectsFeature<SchemataApplication>().ConfigureServices(services, new(), new());
 
         Assert.Contains(services, d => d.ServiceType == typeof(IClaimsAdvisor)
                                    && d.ImplementationType == typeof(AdviceClaimsPairwise<SchemataApplication>));
@@ -52,7 +52,7 @@ public class PairwiseFeatureShould
     private static async Task<DiscoveryContext> Advise_Discovery(SchemataAuthorizationOptions options) {
         var services = new ServiceCollection();
         services.AddSingleton(Options.Create(options));
-        new PairwiseFeature<SchemataApplication>().ConfigureServices(services, new(), new());
+        new PairwiseSubjectsFeature<SchemataApplication>().ConfigureServices(services, new(), new());
         using var provider = services.BuildServiceProvider();
 
         // Mirrors the DiscoveryHandler baseline: public subjects before the feature advisors run.

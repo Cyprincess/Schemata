@@ -3,8 +3,9 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Handlers;
-using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Advisors;
+using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Core;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
@@ -34,6 +35,8 @@ public sealed class JwtBearerGrantFeature<TApp> : IAuthorizationFlowFeature
     public int Order => JwtBearerGrantFeature.DefaultOrder;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
+        services.TryAddSingleton<ClientAssertionValidator>();
+        services.TryAddSingleton<ClientAssertionChannel>();
         services.TryAddKeyedScoped<IGrantHandler, JwtBearerGrantHandler<TApp>>(GrantTypes.JwtBearer);
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryJwtBearerGrant>());
     }

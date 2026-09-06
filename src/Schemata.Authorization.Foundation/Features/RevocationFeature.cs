@@ -1,10 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions;
 using Schemata.Authorization.Foundation.Advisors;
+using Schemata.Authorization.Foundation.Commands;
 using Schemata.Authorization.Foundation.Handlers;
-using Schemata.Authorization.Skeleton.Advisors;
+using Schemata.Messaging.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
-using Schemata.Security.Skeleton.Entities;
+using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Core;
 
@@ -28,6 +30,9 @@ public sealed class RevocationFeature<TApp> : IAuthorizationFlowFeature
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddScoped<RevocationEndpoint, RevocationHandler<TApp>>();
+        services.TryAddScoped<
+            IRequestHandler<RevokeEndpointRequest, Unit>,
+            EndpointDispatchHandler<RevokeEndpointRequest, RevocationEndpoint, Unit>>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRevocationAdvisor<TApp>, AdviceRevocationEndpointPermission<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRevocationAdvisor<TApp>, AdviceRevocationTokenValidation<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryRevocation>());

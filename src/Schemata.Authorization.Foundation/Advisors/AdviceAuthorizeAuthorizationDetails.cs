@@ -30,7 +30,7 @@ public static class AdviceAuthorizeAuthorizationDetails
 ///     , and publishes the accepted grant set on the ambient advice context.
 /// </summary>
 /// <remarks>
-///     Registered only by <see cref="Features.RichAuthorizationFeature{TApp}" />. Without the
+///     Registered only by <see cref="Features.RichAuthorizationRequestsFeature{TApp}" />. Without the
 ///     feature the parameter is ignored — RFC 6749 §3.1 requires the authorization server to
 ///     ignore unrecognized request parameters — so it binds, reaches no grant, and never reaches
 ///     the interaction payload.

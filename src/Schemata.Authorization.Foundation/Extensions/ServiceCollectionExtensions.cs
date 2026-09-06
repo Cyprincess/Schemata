@@ -112,34 +112,21 @@ public static class ServiceCollectionExtensions
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IClientAuthentication<TApp>, ClientSecretBasicAuthentication<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IClientAuthentication<TApp>, ClientSecretPostAuthentication<TApp>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClientAuthentication<TApp>, ClientSecretJwtAuthentication<TApp>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClientAuthentication<TApp>, PrivateKeyJwtAuthentication<TApp>>());
         services.TryAddScoped<IClientAuthenticationService<TApp>, ClientAuthenticationService<TApp>>();
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceRequestEndpointPermission<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceRequestGrantPermission<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceRequestScopeValidation<TApp>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceTokenResource<TApp>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeResource<TApp>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeClaims<TApp>>());
-
-        // Advisors consuming ambient feature slots on behalf of the handlers, keeping
-        // optional-feature consumption out of the canonical handler flows.
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeAuthorizationDetailsCommit<TApp>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<ICodeExchangeAdvisor<TApp>, AdviceCodeExchangeDpop<TApp>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IRefreshTokenAdvisor<TApp>, AdviceRefreshTokenDpop<TApp>>());
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceClaimsAudience>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceClaimsAuthenticationContext>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceClaimsUserinfoRequest>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationClaimsRequest>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationUserinfoRequest>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationSubject>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationProfile>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationEmail>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationPhone>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationAddress>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDestinationAdvisor, AdviceDestinationRole>());
+
 
         services.TryAddScoped<DiscoveryHandler<TScope>>();
         services.TryAddScoped<JwksHandler>();
@@ -151,21 +138,16 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<
             IAuthorizationSignInHttpWriter,
             AuthorizationSignInHttpWriter>();
-        services.TryAddScoped<IUserInfoResponseProtector, UserInfoResponseProtector<TApp>>();
         services.TryAddScoped<InProcessRequestDispatcher>();
         services.TryAddScoped<IRequestDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
         services.TryAddScoped<ICommandDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
         services.TryAddScoped<IQueryDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        AddAuthorizationHandlers<TApp>(services);
         services.TryAddScoped<ISubjectIdentifierService, SubjectIdentifierService>();
         services.TryAddScoped<IOpSessionService, NoOpOpSessionService>();
 
         services.TryAddScoped<IApplicationManager<TApp>, SchemataApplicationManager<TApp>>();
         services.TryAddScoped<IScopeManager<TScope>, SchemataScopeManager<TScope>>();
         services.TryAddScoped<IAuthorizationManager<TAuth>, SchemataAuthorizationManager<TAuth>>();
-        services.TryAddSingleton<ClientAssertionValidator>();
-        services.TryAddSingleton<ClientAssertionChannel>();
-
         services.AddAuthorization(o => o.AddPolicy(SchemataAuthorizationPolicies.Profile, p => {
             p.RequireAuthenticatedUser();
             p.AddAuthenticationSchemes(options.BearerScheme);
@@ -179,47 +161,6 @@ public static class ServiceCollectionExtensions
         services.AddScheduledJob<TokenCleanupJob>();
 
         return services;
-    }
-    private static void AddAuthorizationHandlers<TApp>(IServiceCollection services)
-        where TApp : SchemataApplication
-    {
-        services.TryAddScoped<
-            IRequestHandler<AuthorizeEndpointRequest, AuthorizationResult>,
-            AuthorizeEndpointHandler>();
-        services.TryAddScoped<
-            IRequestHandler<TokenEndpointRequest, AuthorizationResult>,
-            TokenEndpointHandler>();
-        services.TryAddScoped<
-            IRequestHandler<RevokeEndpointRequest, Unit>,
-            RevokeEndpointHandler>();
-        services.TryAddScoped<
-            IRequestHandler<DeviceAuthorizeEndpointRequest, AuthorizationResult>,
-            DeviceAuthorizeEndpointHandler>();
-        services.TryAddScoped<
-            IRequestHandler<EndSessionEndpointRequest, AuthorizationResult>,
-            EndSessionEndpointHandler>();
-        services.TryAddScoped<
-            IRequestHandler<InteractionApproveRequest, AuthorizationResult>,
-            InteractionApproveHandler>();
-        services.TryAddScoped<
-            IRequestHandler<InteractionDenyRequest, Unit>,
-            InteractionDenyHandler>();
-        services.TryAddScoped<
-            IRequestHandler<IntrospectionEndpointQuery, IntrospectionResponse>,
-            IntrospectionEndpointHandler>();
-        services.TryAddScoped<
-            IRequestHandler<UserInfoEndpointQuery, AuthorizationResult>,
-            UserInfoEndpointHandler>();
-        services.TryAddScoped<
-            IRequestHandler<InteractionDetailsQuery, AuthorizationResult>,
-            InteractionDetailsHandler>();
-        services.TryAddScoped<
-            IRequestHandler<RegisterEndpointQuery, RegistrationResponse>,
-            RegisterEndpointHandler>();
-        services.TryAddScoped<
-            IRequestHandler<RegisterReadQuery, RegistrationResponse?>,
-            RegistrationReadHandler<TApp>>();
-        services.AddHttpClient(nameof(RegistrationMetadataMapper));
     }
 
 }

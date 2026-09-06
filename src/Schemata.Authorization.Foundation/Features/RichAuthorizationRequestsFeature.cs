@@ -28,16 +28,17 @@ namespace Schemata.Authorization.Foundation.Features;
 ///     <see cref="IAuthorizationDetailTypeDescriptor" /> services; consent-page presentation of the granted
 ///     details is the host's responsibility (the interaction payload carries them).
 /// </remarks>
-public sealed class RichAuthorizationFeature<TApp> : IAuthorizationFlowFeature
+public sealed class RichAuthorizationRequestsFeature<TApp> : IAuthorizationFlowFeature
     where TApp : SchemataApplication
 {
     #region IAuthorizationFlowFeature Members
 
-    public int Order => RichAuthorizationFeature.DefaultOrder;
+    public int Order => RichAuthorizationRequestsFeature.DefaultOrder;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddSingleton<AuthorizationDetailsService>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeAuthorizationDetails<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeAuthorizationDetailsCommit<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IIntrospectionAdvisor<TApp>, AdviceIntrospectionAuthorizationDetails<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryRichAuthorization>());
     }
@@ -77,10 +78,10 @@ public sealed class AdviceDiscoveryRichAuthorization(IEnumerable<IAuthorizationD
 
 
 /// <summary>
-///     Ordering anchor for <see cref="RichAuthorizationFeature{TApp}" /> so successor features can chain
+///     Ordering anchor for <see cref="RichAuthorizationRequestsFeature{TApp}" /> so successor features can chain
 ///     off its <c>DefaultOrder</c> without naming type arguments.
 /// </summary>
-internal static class RichAuthorizationFeature
+internal static class RichAuthorizationRequestsFeature
 {
     /// <summary>The default feature ordering value (chained after its predecessor).</summary>
     public const int DefaultOrder = JwtBearerGrantFeature.DefaultOrder + 100;

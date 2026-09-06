@@ -101,14 +101,10 @@ public sealed class AuthorizationSignInService<TApp>(
             : null;
         var subject = principal.FindFirstValue(IdentityClaims.Subject);
 
-        // RFC 9449 §6.1: a DPoP-bound token carries the proof key thumbprint under cnf.jkt;
-        // the claim is tagged for the access token destination only.
+        // RFC 9449 §6.1: the DPoP feature publishes its key binding as an ambient marker;
+        // the feature's claims advisor mints the cnf claim. The response token_type follows
+        // the binding here — a plain data mapping, not feature policy.
         var binding = ctx.TryGet<DpopBinding>(out var dpop) ? dpop : null;
-        if (binding is not null) {
-            var cnf = new Claim(Claims.Cnf, $"{{\"jkt\":\"{binding.Jkt}\"}}", JsonClaimValueTypes.Json);
-            cnf.Properties[ClaimDestinations.AccessToken] = Parameters.Token;
-            claims.Add(cnf);
-        }
 
         switch (await Advisor.For<IClaimsAdvisor>().RunAsync(ctx, claims, ct)) {
             case AdviseResult.Continue:

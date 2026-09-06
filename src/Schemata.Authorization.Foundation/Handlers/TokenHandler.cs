@@ -4,7 +4,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Authorization.Foundation.Commands;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Authorization.Skeleton.Models;
@@ -23,6 +25,12 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     </seealso>
 ///     .
 /// </summary>
+/// <remarks>
+///     Grant handlers consume the header map for client authentication and then drop it, so the
+///     DPoP proof is published to the ambient context for the proof advisor, and a granted
+///     binding crosses the dispatch boundary back to the sign-in issuer through the result
+///     properties.
+/// </remarks>
 public sealed class TokenHandler(IServiceProvider sp) : TokenEndpoint
 {
     public override async Task<AuthorizationResult> HandleAsync(
@@ -30,6 +38,13 @@ public sealed class TokenHandler(IServiceProvider sp) : TokenEndpoint
         Dictionary<string, List<string?>>? headers,
         CancellationToken                  ct
     ) {
+        var ctx = AdviceContext.Require();
+
+        ctx.Set(new DpopProof(headers is not null
+            && headers.TryGetValue(Headers.Dpop, out var values)
+            ? values.Find(v => !string.IsNullOrWhiteSpace(v))
+            : null));
+
         var grant = request.GrantType;
 
         var handler = sp.GetKeyedService<IGrantHandler>(grant);
@@ -40,6 +55,19 @@ public sealed class TokenHandler(IServiceProvider sp) : TokenEndpoint
             );
         }
 
-        return await handler.HandleAsync(request, headers, ct);
+        var result = await handler.HandleAsync(request, headers, ct);
+
+        if (result.Status == AuthorizationStatus.SignIn
+         && ctx.TryGet<DpopBinding>(out var binding)
+         && binding is not null) {
+            if (result.Properties is null) {
+                throw new InvalidOperationException(
+                    "The sign-in result carries no properties to attach the DPoP binding to.");
+            }
+
+            result.Properties[Properties.DpopJkt] = binding.Jkt;
+        }
+
+        return result;
     }
 }

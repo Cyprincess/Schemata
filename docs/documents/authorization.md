@@ -29,7 +29,7 @@ builder.UseSchemata(schema => {
               o.Issuer = "https://auth.example.com";
           })
           .UseIdentity()                          // bridge in the Identity subject provider
-          .UseCodeFlow()
+          .UseAuthorizationCodeFlow()
           .UseRefreshTokenFlow()
           .UseUserInfo();
 });
@@ -157,13 +157,16 @@ endpoints below are the ones the code implements:
 
 | Builder method               | Grant type / endpoint                                             | Flow feature                                                            |
 | ---------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `UseCodeFlow()`              | `authorization_code` (+ PKCE), `/Connect/Authorize`               | `AuthorizationCodeFlowFeature` (+ `TokenFeature`, `InteractionFeature`) |
+| `UseAuthorizationCodeFlow()`              | `authorization_code` (+ PKCE), `/Connect/Authorize`               | `AuthorizationCodeFlowFeature` (+ `TokenFeature`, `InteractionFeature`) |
 | `UseClientCredentialsFlow()` | `client_credentials`                                              | `ClientCredentialsFlowFeature`                                          |
 | `UseRefreshTokenFlow()`      | `refresh_token`                                                   | `RefreshTokenFlowFeature`                                               |
 | `UseDeviceFlow()`            | `urn:ietf:params:oauth:grant-type:device_code`, `/Connect/Device` (RFC 8628 §§3.1, 3.4) | `DeviceFlowFeature` (+ `InteractionFeature`)                            |
 | `UseTokenExchange()`         | `urn:ietf:params:oauth:grant-type:token-exchange` (RFC 8693 §2.1)                       | `TokenExchangeFeature`                                                  |
 | `UseJwtBearerGrant()`        | `urn:ietf:params:oauth:grant-type:jwt-bearer` (RFC 7523 §3.1; needs a trusted issuer)   | `JwtBearerGrantFeature<TApp>`                                           |
-| `UseRichAuthorizationRequests()` | `authorization_details` at `/Connect/Authorize` (RFC 9396 §6; ignored when the feature is absent) | `RichAuthorizationFeature<TApp>`                              |
+| `UseRichAuthorizationRequests()` | `authorization_details` at `/Connect/Authorize` (RFC 9396 §6; ignored when the feature is absent) | `RichAuthorizationRequestsFeature<TApp>`                              |
+| `UseResourceIndicators()`    | `resource` at `/Connect/Authorize` and `/Connect/Token` (RFC 8707 §§2-2.2; ignored when the feature is absent) | `ResourceIndicatorsFeature<TApp>`                                       |
+| `UseClaimsParameter()`       | `claims` at `/Connect/Authorize` (OIDC Core §5.5; ignored when the feature is absent) | `ClaimsParameterFeature<TApp>`                                                  |
+| `UseClientAssertionAuthentication()` | `client_secret_jwt` / `private_key_jwt` client authentication channels (RFC 7523 §2) | `ClientAssertionAuthenticationFeature<TApp>`                          |
 | `UseIntrospection()`         | `/Connect/Introspect` (RFC 7662 §§2.1–2.2)                                             | `IntrospectionFeature`                                                  |
 | `UseRevocation()`            | `/Connect/Revoke` (RFC 7009 §§2.1–2.2)                                                 | `RevocationFeature`                                                     |
 | `UseDynamicClientRegistration()` | `/Connect/Register` (OIDC DCR 1.0 §§3.1-3.3; registration gated by a host-supplied `IInitialAccessTokenValidator`; anonymous requests rejected with 401) | `DynamicRegistrationFeature`                                            |
@@ -171,9 +174,9 @@ endpoints below are the ones the code implements:
 | `UseEndSession()`            | `/Connect/EndSession` (OpenID Connect RP-Initiated Logout 1.0 §2)                     | `EndSessionFeature`                                                     |
 | `UseFrontChannelLogout()`    | front-channel logout metadata                                     | `FrontChannelLogoutFeature`                                             |
 | `UseBackChannelLogout()`     | back-channel logout queue + notifier                              | `BackChannelLogoutFeature`                                              |
-| `UsePairwiseSubjects()`      | pairwise `sub` projection + discovery advertisement (OIDC Core 1.0 §8)  | `PairwiseFeature<TApp>`                                                 |
+| `UsePairwiseSubjects()`      | pairwise `sub` projection + discovery advertisement (OIDC Core 1.0 §8)  | `PairwiseSubjectsFeature<TApp>`                                                 |
 
-`UseCodeFlow` and `UseRefreshTokenFlow` accept optional `Action<CodeFlowOptions>` /
+`UseAuthorizationCodeFlow` and `UseRefreshTokenFlow` accept optional `Action<CodeFlowOptions>` /
 `Action<RefreshTokenFlowOptions>` configurators. `TokenFeature` is shared: any grant that lands on
 `/Connect/Token` pulls it in.
 

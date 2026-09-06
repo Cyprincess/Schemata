@@ -114,7 +114,7 @@ public class RichAuthorizationShould
     public void Register_The_Advisors_And_The_Details_Service() {
         var services = new ServiceCollection();
 
-        new RichAuthorizationFeature<SchemataApplication>().ConfigureServices(services, new(), new());
+        new RichAuthorizationRequestsFeature<SchemataApplication>().ConfigureServices(services, new(), new());
 
         using var provider = services.BuildServiceProvider();
 

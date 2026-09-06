@@ -29,7 +29,7 @@ public class DPopFlowFeatureShould
             options.RequireForAllClients();
         });
 
-        new DPopFlowFeature<SchemataApplication>().ConfigureServices(services, new(), configurators);
+        new DemonstratingProofOfPossessionFeature<SchemataApplication>().ConfigureServices(services, new(), configurators);
 
         // Mirrors SchemataBuilder.Invoke: the features configure first, then each outstanding
         // configurator is bound as IConfigureOptions<TOptions>. Configurators.Invoke itself is

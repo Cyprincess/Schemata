@@ -34,12 +34,12 @@ namespace Schemata.Authorization.Foundation.Features;
 ///     Installed via <c>UsePairwiseSubjects()</c> on
 ///     <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope}" />.
 /// </remarks>
-public sealed class PairwiseFeature<TApp> : IAuthorizationFlowFeature
+public sealed class PairwiseSubjectsFeature<TApp> : IAuthorizationFlowFeature
     where TApp : SchemataApplication
 {
     #region IAuthorizationFlowFeature Members
 
-    public int Order => PairwiseFeature.DefaultOrder;
+    public int Order => PairwiseSubjectsFeature.DefaultOrder;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceClaimsPairwise<TApp>>());
@@ -101,11 +101,11 @@ public sealed class AdviceDiscoveryPairwise(IOptions<SchemataAuthorizationOption
 
 
 /// <summary>
-///     Ordering anchor for <see cref="PairwiseFeature{TApp}" /> so successor features can chain
+///     Ordering anchor for <see cref="PairwiseSubjectsFeature{TApp}" /> so successor features can chain
 ///     off its <c>DefaultOrder</c> without naming type arguments.
 /// </summary>
-internal static class PairwiseFeature
+internal static class PairwiseSubjectsFeature
 {
     /// <summary>The default feature ordering value (chained after its predecessor).</summary>
-    public const int DefaultOrder = RichAuthorizationFeature.DefaultOrder + 100;
+    public const int DefaultOrder = RichAuthorizationRequestsFeature.DefaultOrder + 100;
 }

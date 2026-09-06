@@ -30,16 +30,19 @@ namespace Schemata.Authorization.Foundation.Features;
 ///     <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope}" />.
 /// </remarks>
 /// <seealso cref="ClientCredentialsFlowFeature{TApp}" />
-public sealed class DPopFlowFeature<TApp> : IAuthorizationFlowFeature
+public sealed class DemonstratingProofOfPossessionFeature<TApp> : IAuthorizationFlowFeature
     where TApp : SchemataApplication
 {
     #region IAuthorizationFlowFeature Members
 
-    public int Order => DPopFlowFeature.DefaultOrder;
+    public int Order => DemonstratingProofOfPossessionFeature.DefaultOrder;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddSingleton<DPopProofValidator>();
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceClaimsDpopBinding>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceRequestDpop<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ICodeExchangeAdvisor<TApp>, AdviceCodeExchangeDpop<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IRefreshTokenAdvisor<TApp>, AdviceRefreshTokenDpop<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeDpopJkt<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryDpop>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IIntrospectionAdvisor<TApp>, AdviceIntrospectionDpop<TApp>>());
@@ -64,10 +67,10 @@ public sealed class DPopFlowFeature<TApp> : IAuthorizationFlowFeature
 
 
 /// <summary>
-///     Ordering anchor for <see cref="DPopFlowFeature{TApp}" /> so successor features can chain
+///     Ordering anchor for <see cref="DemonstratingProofOfPossessionFeature{TApp}" /> so successor features can chain
 ///     off its <c>DefaultOrder</c> without naming type arguments.
 /// </summary>
-internal static class DPopFlowFeature
+internal static class DemonstratingProofOfPossessionFeature
 {
     /// <summary>The default feature ordering value (chained after its predecessor).</summary>
     public const int DefaultOrder = TokenExchangeFeature.DefaultOrder + 100;

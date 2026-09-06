@@ -125,6 +125,37 @@ public sealed class RegisterHandler<TApp>(
         return response;
     }
 
+    public override async Task<RegistrationResponse?> ReadAsync(string? clientId, string? bearerToken, CancellationToken ct) {
+        if (string.IsNullOrWhiteSpace(bearerToken) || string.IsNullOrWhiteSpace(clientId)) {
+            return null;
+        }
+
+        var token = await tokens.FindByReferenceIdAsync(bearerToken, ct);
+        if (token?.Type != TokenTypes.Registration
+            || token.Status != TokenStatuses.Valid
+            || token.ExpireTime is { } expiry && expiry <= _time.GetUtcNow().UtcDateTime) {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(token.Payload)) {
+            return null;
+        }
+
+        string bound;
+        try {
+            bound = JsonSerializer.Deserialize<RegistrationTokenPayload>(token.Payload)?.ClientId ?? string.Empty;
+        } catch (JsonException) {
+            return null;
+        }
+
+        if (!string.Equals(bound, clientId, StringComparison.Ordinal)) {
+            return null;
+        }
+
+        var application = await apps.FindByClientIdAsync(clientId, ct);
+        return application is null ? null : await RegistrationMetadataMapper.ToResponse(application, securities, ct);
+    }
+
     #endregion
 
     private async Task IssueRegistrationTokenAsync(TApp application, string reference, CancellationToken ct) {

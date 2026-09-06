@@ -32,7 +32,7 @@ public static class SchemataAuthorizationBuilderExtensions
     ///     .
     /// </summary>
     /// <returns>The builder for chaining.</returns>
-    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope> UseCodeFlow<TApp, TAuth, TScope>(
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope> UseAuthorizationCodeFlow<TApp, TAuth, TScope>(
         this SchemataAuthorizationBuilder<TApp, TAuth, TScope> builder,
         Action<CodeFlowOptions>?                                       configure = null
     )
@@ -154,6 +154,74 @@ public static class SchemataAuthorizationBuilderExtensions
     }
 
     /// <summary>
+    ///     Enables resource indicators, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8707.html">
+    ///         RFC 8707: Resource Indicators for OAuth 2.0
+    ///     </seealso>
+    ///     : the <c>resource</c> parameter is validated at the authorize endpoint and
+    ///     adopted at the token endpoint, audience-restricting issued tokens. Without the
+    ///     feature the parameter is ignored and audiences fall back to
+    ///     <c>DefaultResource ?? Issuer</c>.
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    /// <seealso cref="ResourceIndicatorsFeature{TApp}" />
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope> UseResourceIndicators<TApp, TAuth, TScope>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope> builder
+    )
+        where TApp : SchemataApplication
+        where TAuth : SchemataAuthorization
+        where TScope : SchemataScope {
+        builder.AddFlowFeature<ResourceIndicatorsFeature<TApp>>();
+        return builder;
+    }
+
+    /// <summary>
+    ///     Enables the OIDC <c>claims</c> request parameter, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter">
+    ///         OpenID Connect Core 1.0 §5.5: Requesting Claims using the "claims" Request
+    ///         Parameter
+    ///     </seealso>
+    ///     : parameter validation at the authorize endpoint, requested claims joining the
+    ///     ID Token and widening the UserInfo output, and the
+    ///     <c>claims_parameter_supported</c> discovery metadata. Without the feature the
+    ///     parameter is ignored (§5.5 leaves support OPTIONAL).
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    /// <seealso cref="ClaimsParameterFeature{TApp}" />
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope> UseClaimsParameter<TApp, TAuth, TScope>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope> builder
+    )
+        where TApp : SchemataApplication
+        where TAuth : SchemataAuthorization
+        where TScope : SchemataScope {
+        builder.AddFlowFeature<ClaimsParameterFeature<TApp>>();
+        return builder;
+    }
+
+    /// <summary>
+    ///     Enables JWT assertion client authentication, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7523.html#section-2">
+    ///         RFC 7523: JSON Web Token (JWT) Profile for OAuth 2.0 Client
+    ///         Authentication and Authorization Grants §2: Client Authentication
+    ///     </seealso>
+    ///     : the <c>client_secret_jwt</c> and <c>private_key_jwt</c> channels join the
+    ///     client authentication chain. Without the feature only the RFC 6749 baseline
+    ///     channels are registered; add the assertion method names to
+    ///     <see cref="SchemataAuthorizationOptions.AllowedClientAuthMethods" /> when enabled.
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    /// <seealso cref="ClientAssertionAuthenticationFeature{TApp}" />
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope> UseClientAssertionAuthentication<TApp, TAuth, TScope>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope> builder
+    )
+        where TApp : SchemataApplication
+        where TAuth : SchemataAuthorization
+        where TScope : SchemataScope {
+        builder.AddFlowFeature<ClientAssertionAuthenticationFeature<TApp>>();
+        return builder;
+    }
+
+    /// <summary>
     ///     Enables the Token Introspection endpoint,
     ///     per <seealso href="https://www.rfc-editor.org/rfc/rfc7662.html">RFC 7662: OAuth 2.0 Token Introspection</seealso>
     ///     .
@@ -175,7 +243,7 @@ public static class SchemataAuthorizationBuilderExtensions
         where TApp : SchemataApplication
         where TAuth : SchemataAuthorization
         where TScope : SchemataScope {
-        builder.AddFlowFeature<RichAuthorizationFeature<TApp>>();
+        builder.AddFlowFeature<RichAuthorizationRequestsFeature<TApp>>();
         return builder;
     }
 
@@ -240,12 +308,11 @@ public static class SchemataAuthorizationBuilderExtensions
         where TApp : SchemataApplication
         where TAuth : SchemataAuthorization
         where TScope : SchemataScope {
-        builder.AddFlowFeature<UserInfoFeature>();
+        builder.AddFlowFeature<UserInfoFeature<TApp>>();
         return builder;
     }
 
     /// <summary>
-    ///     Enables pairwise subject identifiers, per
     ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#SubjectIDTypes">
     ///         OpenID Connect Core 1.0 §8: Subject Identifier Types
     ///     </seealso>
@@ -257,14 +324,14 @@ public static class SchemataAuthorizationBuilderExtensions
     ///     configure the feature but never enable it.
     /// </remarks>
     /// <returns>The builder for chaining.</returns>
-    /// <seealso cref="PairwiseFeature{TApp}" />
+    /// <seealso cref="PairwiseSubjectsFeature{TApp}" />
     public static SchemataAuthorizationBuilder<TApp, TAuth, TScope> UsePairwiseSubjects<TApp, TAuth, TScope>(
         this SchemataAuthorizationBuilder<TApp, TAuth, TScope> builder
     )
         where TApp : SchemataApplication
         where TAuth : SchemataAuthorization
         where TScope : SchemataScope {
-        builder.AddFlowFeature<PairwiseFeature<TApp>>();
+        builder.AddFlowFeature<PairwiseSubjectsFeature<TApp>>();
         return builder;
     }
 
@@ -343,7 +410,7 @@ public static class SchemataAuthorizationBuilderExtensions
             builder.Configurators.Set(configure);
         }
 
-        builder.AddFlowFeature<DPopFlowFeature<TApp>>();
+        builder.AddFlowFeature<DemonstratingProofOfPossessionFeature<TApp>>();
         return builder;
     }
 }

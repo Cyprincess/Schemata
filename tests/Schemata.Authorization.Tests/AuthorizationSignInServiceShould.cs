@@ -204,7 +204,9 @@ public class AuthorizationSignInServiceShould
 
     [Fact]
     public async Task Bind_The_Cnf_Claim_And_The_Dpop_Token_Type_When_A_Binding_Is_Present() {
-        using var provider = new ServiceCollection().BuildServiceProvider();
+        using var provider = new ServiceCollection()
+                            .AddSingleton<IClaimsAdvisor>(new AdviceClaimsDpopBinding())
+                            .BuildServiceProvider();
         var (service, tokens) = Create(provider);
         tokens.Setup(value => value.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync((SchemataToken? token, CancellationToken _) => token);
@@ -259,7 +261,9 @@ public class AuthorizationSignInServiceShould
     }
     [Fact]
     public async Task Inherit_The_Cnf_Binding_Into_The_Refresh_Token() {
-        using var provider = Provider(out var _);
+        using var provider = new ServiceCollection()
+                            .AddSingleton<IClaimsAdvisor>(new AdviceClaimsDpopBinding())
+                            .BuildServiceProvider();
         var (service, tokens) = Create(provider, TokenFormats.Jwt);
         tokens.Setup(value => value.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync((SchemataToken? token, CancellationToken _) => token);

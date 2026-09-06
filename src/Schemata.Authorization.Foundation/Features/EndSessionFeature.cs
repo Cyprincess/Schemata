@@ -1,8 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Authorization.Foundation.Advisors;
+using Schemata.Authorization.Foundation.Commands;
 using Schemata.Authorization.Foundation.Handlers;
+using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
+using Schemata.Authorization.Foundation.Advisors;
+using Schemata.Messaging.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Core;
@@ -27,6 +30,9 @@ public sealed class EndSessionFeature<TApp> : IAuthorizationFlowFeature
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddScoped<EndSessionEndpoint, EndSessionHandler<TApp>>();
+        services.TryAddScoped<
+            IRequestHandler<EndSessionEndpointRequest, AuthorizationResult>,
+            EndpointDispatchHandler<EndSessionEndpointRequest, EndSessionEndpoint, AuthorizationResult>>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryEndSession>());
     }
 
@@ -41,5 +47,5 @@ public sealed class EndSessionFeature<TApp> : IAuthorizationFlowFeature
 internal static class EndSessionFeature
 {
     /// <summary>The default feature ordering value (chained after its predecessor).</summary>
-    public const int DefaultOrder = PairwiseFeature.DefaultOrder + 100;
+    public const int DefaultOrder = PairwiseSubjectsFeature.DefaultOrder + 100;
 }

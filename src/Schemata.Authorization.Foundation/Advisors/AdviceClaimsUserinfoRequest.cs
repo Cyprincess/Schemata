@@ -28,7 +28,7 @@ public sealed class AdviceClaimsUserinfoRequest : IClaimsAdvisor
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        if (!ctx.TryGet<ClaimsRequest>(out var request) || request.Userinfo is not { Count: > 0 } names) {
+        if (!ctx.TryGet<ClaimsRequest>(out var request) || request?.Userinfo is not { Count: > 0 } names) {
             return Task.FromResult(AdviseResult.Continue);
         }
 

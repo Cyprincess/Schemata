@@ -36,7 +36,7 @@ namespace Schemata.Authorization.Foundation.Authentication;
 /// </summary>
 /// <remarks>
 ///     The DPoP scheme and its services are registered only by
-///     <see cref="Features.DPopFlowFeature{TApp}" />; the nullable proof validator and
+///     <see cref="Features.DemonstratingProofOfPossessionFeature{TApp}" />; the nullable proof validator and
 ///     nonce store keep the handler constructible for hosts without that feature, whose
 ///     DPoP flavor instance then never exists.
 /// </remarks>
@@ -49,7 +49,7 @@ public class SchemataAuthenticationHandler<TApp>(
     IAuthorizationSignInService                           signIns,
     IAuthorizationSignInHttpWriter                        writer,
     IOptions<DPopOptions>                                 dpop,
-    IOptions<SchemataAuthorizationOptions>                config = null!,
+    IOptions<SchemataAuthorizationOptions>                config,
     DPopProofValidator?                                   proofs = null,
     [FromKeyedServices(SecurityConstants.TokenTypes.Nonce)] ITokenStore<SchemataToken>? nonces = null
 ) : SignInAuthenticationHandler<SchemataAuthenticationHandlerOptions>(options, logger, encoder)
