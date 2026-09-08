@@ -45,14 +45,13 @@ public sealed class SchedulingInitializer : BackgroundService
         _time      = time ?? TimeProvider.System;
     }
 
-    public override Task StartAsync(CancellationToken ct) {
+    public override async Task StartAsync(CancellationToken ct) {
         _registry.RegisterAll(_options.Value.Jobs.Select(j => j.JobType));
-        return base.StartAsync(ct);
+        await _scheduler.StartAsync(ct);
+        await base.StartAsync(ct);
     }
 
     protected override async Task ExecuteAsync(CancellationToken st) {
-        await _scheduler.StartAsync(st);
-
         await FailOrphanedRunningAsync(st);
 
         foreach (var registration in _options.Value.Jobs) {
