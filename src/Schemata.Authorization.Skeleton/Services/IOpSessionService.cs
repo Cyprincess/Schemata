@@ -11,11 +11,18 @@ namespace Schemata.Authorization.Skeleton.Services;
 ///     </seealso>
 ///     .
 /// </summary>
-/// <remarks>
-///     Phase 0 adds invalidation; Phase 6 extends issuance as the single source of the
-///     OP session identifier (<c>sid</c>).
-/// </remarks>
 public interface IOpSessionService
 {
+
+    /// <summary>
+    ///     Establishes (or rotates) the OP session for the given principal / subject and returns
+    ///     the new session identifier, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-session-1_0.html#OPRequest">
+    ///         OpenID Connect Session Management 1.0 §3.2: OP Request
+    ///     </seealso>
+    ///     . Returns the issued sid; when the host has no session backing it returns
+    ///     <see langword="null" />.
+    /// </summary>
+    Task<string?> IssueAsync(ClaimsPrincipal? principal, string? subject, CancellationToken ct = default);
     Task InvalidateAsync(ClaimsPrincipal? principal, string? subject, string? sessionId, CancellationToken ct = default);
 }

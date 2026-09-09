@@ -136,6 +136,11 @@ public class CacheTokenStore : ITokenStore<SchemataToken>
     }
 
     /// <exception cref="NotSupportedException">The cache store serves key-value slots only.</exception>
+    public Task<long> RevokeByDeviceAsync(string? deviceId, CancellationToken ct = default) {
+        throw NotSupported();
+    }
+
+    /// <exception cref="NotSupportedException">The cache store serves key-value slots only.</exception>
     public Task<long> PruneAsync(CancellationToken ct = default) {
         throw NotSupported();
     }

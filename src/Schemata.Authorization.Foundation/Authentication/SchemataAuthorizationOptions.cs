@@ -231,5 +231,4 @@ public class SchemataAuthorizationOptions
         AllowedResponseTypes.Add(normalized);
         return this;
     }
-
 }

@@ -15,7 +15,9 @@ namespace Schemata.Security.Skeleton.Entities;
 [CanonicalName("tokens/{token}")]
 [PrimaryKey(nameof(Uid))]
 [Index(nameof(Parent), nameof(Provider), nameof(Name), IsUnique = true)]
+
 [Index(nameof(Type), nameof(Status))]
+[Index(nameof(DeviceId))]
 [Index(nameof(ReferenceId), IsUnique = true)]
 public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimestamp, IExpiration
 {
@@ -39,6 +41,9 @@ public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimesta
     ///     Enables session-aware logout to revoke all tokens associated with a single session.
     /// </summary>
     public virtual string? SessionId { get; set; }
+
+    /// <summary>Device identifier for Native SSO device_secret rows.</summary>
+    public virtual string? DeviceId { get; set; }
 
     /// <summary>
     ///     Token type: <c>"access_token"</c>, <c>"refresh_token"</c>, <c>"authorization_code"</c>,

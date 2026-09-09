@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
@@ -98,7 +99,7 @@ public sealed class AdviceAuthorizePrompt<TApp>(
                         OAuthErrors.InvalidRequest,
                         string.Format(SchemataResources.GetResourceString(SchemataResources.INVALID_PROMPT_COMBINATION), PromptValues.None)
                     );
-                case true when (authz.Principal?.Identity?.IsAuthenticated != true):
+                case true when !ctx.Has<ParEndpointValidation>() && authz.Principal?.Identity?.IsAuthenticated != true:
                     throw new OAuthException(
                         OAuthErrors.LoginRequired,
                         SchemataResources.GetResourceString(SchemataResources.USER_AUTHENTICATION_REQUIRED)
@@ -119,6 +120,10 @@ public sealed class AdviceAuthorizePrompt<TApp>(
                 OAuthErrors.InvalidRequest,
                 string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), Parameters.MaxAge)
             );
+        }
+
+        if (ctx.Has<ParEndpointValidation>()) {
+            return AdviseResult.Continue;
         }
 
         var context = _contexts is null ? null : await _contexts.GetContextAsync(authz.Principal, ct);

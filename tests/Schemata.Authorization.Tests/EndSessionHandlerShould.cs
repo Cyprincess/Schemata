@@ -37,7 +37,7 @@ public class EndSessionHandlerShould
 
         var sp = services.BuildServiceProvider();
 
-        return new(apps.Object, tokenService, Options.Create(opts), new NoOpOpSessionService(), sp,
+        return new(apps.Object, tokenService, Options.Create(opts), new DefaultOpSessionService(), sp,
                     NullLogger<EndSessionHandler<SchemataApplication>>.Instance);
     }
 

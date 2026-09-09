@@ -59,6 +59,18 @@ public sealed class AuthorizeHandler<TApp>(
             ResponseMode = ResponseModeService.ResolveMode(request.ResponseMode, request.ResponseType),
         };
 
+        switch (await Advisor.For<IAuthorizeRequestAdvisor<TApp>>().RunAsync(ctx, authz, ct)) {
+            case AdviseResult.Continue:
+                break;
+            case AdviseResult.Handle when ctx.TryGet<AuthorizationResult>(out var normalized):
+                return normalized!;
+            case AdviseResult.Block:
+            default:
+                throw new OAuthException(
+                    OAuthErrors.InvalidRequest,
+                    SchemataResources.GetResourceString(SchemataResources.INVALID_REQUEST));
+        }
+
         switch (await Advisor.For<IAuthorizeAdvisor<TApp>>()
                              .RunAsync(ctx, authz, ct)) {
             case AdviseResult.Continue:

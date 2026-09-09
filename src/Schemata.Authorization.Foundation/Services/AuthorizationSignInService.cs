@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,14 +15,15 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Authorization.Foundation.Authentication;
-using Schemata.Authorization.Skeleton;
-using Schemata.Authorization.Skeleton.Advisors;
+using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Security.Skeleton.Entities;
-using Schemata.Security.Skeleton.Services;
+using Schemata.Authorization.Skeleton;
+using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
+using Schemata.Security.Skeleton.Services;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Services;
@@ -32,14 +35,15 @@ public sealed class AuthorizationSignInService<TApp>(
     IOptions<JsonSerializerOptions>        json,
     TokenService                           issuer,
     IApplicationManager<TApp>              apps,
-    ITokenStore<SchemataToken>                    tokens,
+    ITokenStore<SchemataToken>             tokens,
     IServiceProvider                       services,
-    TimeProvider?                          time = null
+    TimeProvider?                          time = null,
+    IOpSessionService?                     sessions = null
 ) : IAuthorizationSignInService
     where TApp : SchemataApplication
 {
     private readonly TimeProvider _time = time ?? TimeProvider.System;
-
+    private readonly IApplicationManager<TApp> _apps = apps;
     public async Task<AuthorizationSignInResponse> IssueAsync(
         ClaimsPrincipal                       principal,
         IDictionary<string, string?>?          properties,
@@ -97,9 +101,25 @@ public sealed class AuthorizationSignInService<TApp>(
         var claims = identity.Claims.ToList();
         var client = principal.FindFirstValue(Claims.ClientId);
         var app = !string.IsNullOrWhiteSpace(client)
-            ? (await apps.FindByClientIdAsync(client, ct))?.CanonicalName
+            ? (await _apps.FindByClientIdAsync(client, ct))?.CanonicalName
             : null;
         var subject = principal.FindFirstValue(IdentityClaims.Subject);
+
+        var sessionService = sessions ?? services.GetService(typeof(IOpSessionService)) as IOpSessionService;
+        if (callback && sessionService is not null) {
+            sid = await sessionService.IssueAsync(principal, subject, ct) ?? sid;
+            if (!string.IsNullOrWhiteSpace(sid)) {
+                items[Properties.SessionId] = sid;
+                if (identity.FindFirst(Claims.SessionId) is { } currentSid
+                    && !string.Equals(currentSid.Value, sid, StringComparison.Ordinal)) {
+                    identity.RemoveClaim(currentSid);
+                }
+
+                if (!identity.HasClaim(claim => claim.Type == Claims.SessionId)) {
+                    identity.AddClaim(new(Claims.SessionId, sid));
+                }
+            }
+        }
 
         // RFC 9449 §6.1: the DPoP feature publishes its key binding as an ambient marker;
         // the feature's claims advisor mints the cnf claim. The response token_type follows
@@ -143,7 +163,7 @@ public sealed class AuthorizationSignInService<TApp>(
             ? new(null, await IssueCallbackAsync(
                 client, scope, subject, app, authorizationName, sid, items, access, id, ctx, ct))
             : new(await IssueTokenAsync(
-                subject, app, authorizationName, sid, scope, items, access, id, binding, ct), null);
+                subject, app, authorizationName, sid, scope, items, access, id, binding, ctx, ct), null);
     }
 
     private async Task<TokenResponse> IssueTokenAsync(
@@ -156,6 +176,7 @@ public sealed class AuthorizationSignInService<TApp>(
         List<Claim>                  access,
         List<Claim>                  id,
         DpopBinding?                 binding,
+        AdviceContext                ctx,
         CancellationToken            ct
     ) {
         var at = await SchemataAuthenticationHandler<TApp>.CreateTokenAsync(
@@ -178,8 +199,19 @@ public sealed class AuthorizationSignInService<TApp>(
 
         if (ScopeParser.Contains(scope, Scopes.OpenId)
          && SchemataAuthenticationHandler<TApp>.IsUserGrant(items)) {
+            var idClaims = id;
+            if (ctx.TryGet<DeviceSecretIssuance>(out var foundDeviceSecret) && foundDeviceSecret is { } deviceSecret) {
+                response.DeviceSecret = deviceSecret.DeviceSecret;
+                idClaims = [..id];
+                var signing = await issuer.ResolveSigningCredentials(ct);
+                idClaims.Add(new Claim(Claims.DsHash, TokenService.ComputeHash(deviceSecret.DeviceSecret, signing)));
+                if (!string.IsNullOrWhiteSpace(deviceSecret.SessionId)) {
+                    idClaims.Add(new Claim(Claims.SessionId, deviceSecret.SessionId));
+                }
+            }
+
             response.IdToken = await SchemataAuthenticationHandler<TApp>.CreateIdToken(
-                issuer, items, id, config.Value.IdTokenLifetime, response.AccessToken, null);
+                issuer, items, idClaims, config.Value.IdTokenLifetime, response.AccessToken, null);
         }
 
         if (items.TryGetValue(Properties.IssuedTokenType, out var issuedType)
@@ -249,6 +281,15 @@ public sealed class AuthorizationSignInService<TApp>(
                 issuer, items, id, config.Value.IdTokenLifetime, at, parameters.GetValueOrDefault(Parameters.Code));
         }
 
+        if (services.GetService(typeof(Microsoft.AspNetCore.Http.IHttpContextAccessor))
+                is Microsoft.AspNetCore.Http.IHttpContextAccessor { HttpContext: { } http }
+            && SessionStateContext.TryGet(http, out var carriedSessionState)) {
+            parameters[Parameters.SessionState] = carriedSessionState;
+        } else if (ctx.TryGet<SessionStateFormulation>(out var foundSessionState)
+                   && foundSessionState is { } sessionState) {
+            parameters[Parameters.SessionState] = sessionState.Value;
+        }
+
         return new(redirectUri, parameters, ResponseModeService.ResolveMode(responseMode, responseType));
     }
 
@@ -293,10 +334,10 @@ public sealed class AuthorizationSignInService<TApp>(
 
         // The claims advisor publishes the approved authentication context; persisting it lets
         // the later code exchange mint acr/amr/auth_time without a session.
-        var payload = new AuthorizationCodePayload { Request = request };
-        if (ctx.TryGet<AuthenticationContext>(out var context)) {
-            payload.Context = context;
-        }
+        var payload = new AuthorizationCodePayload {
+            Request = request,
+            Context = ctx.TryGet<AuthenticationContext>(out var context) ? context : null,
+        };
 
         var reference = issuer.CreateReference();
         var now       = _time.GetUtcNow().UtcDateTime;

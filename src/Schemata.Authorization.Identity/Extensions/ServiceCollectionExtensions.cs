@@ -36,9 +36,7 @@ public static class ServiceCollectionExtensions
 
         services.TryAddScoped(typeof(ISubjectProvider), provider);
         services.AddHttpContextAccessor();
-        // Replace, not TryAdd: the Foundation default (NoOp session service) must lose to this
-        // host integration regardless of registration order.
-        services.Replace(ServiceDescriptor.Scoped<IOpSessionService, OpSessionService>());
+        services.TryAddScoped<IOpSessionTerminator, IdentityOpSessionTerminator>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceClaimsSubject>());
 
         return services;

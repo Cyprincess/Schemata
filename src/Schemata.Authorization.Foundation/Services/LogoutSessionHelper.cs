@@ -1,8 +1,10 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Security.Skeleton.Entities;
 using Schemata.Security.Skeleton.Services;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Services;
 
@@ -13,24 +15,37 @@ namespace Schemata.Authorization.Foundation.Services;
 /// </summary>
 internal static class LogoutSessionHelper
 {
-    /// <summary>
-    ///     Collects unique application names from all non-expired tokens
-    ///     associated with the given session or subject.  Session lookup is
-    ///     preferred when available (more targeted); falls back to subject
-    ///     lookup when no session tokens are found.
-    /// </summary>
+    public static readonly string[] LogoutParticipantTypes = [
+        TokenTypes.AccessToken,
+        TokenTypes.RefreshToken,
+        TokenTypes.IdToken,
+        TokenTypes.AuthorizationCode,
+    ];
+
     public static async Task<HashSet<string>> GetSessionClientsAsync(
         ITokenStore<SchemataToken>   tokens,
         string?               subject,
         string?               session,
         CancellationToken     ct
     ) {
+        return await GetSessionClientsAsync(tokens, subject, session, LogoutParticipantTypes, ct);
+    }
+
+    public static async Task<HashSet<string>> GetSessionClientsAsync(
+        ITokenStore<SchemataToken>   tokens,
+        string?               subject,
+        string?               session,
+        IReadOnlyCollection<string> types,
+        CancellationToken     ct
+    ) {
         var clients = new HashSet<string>();
 
         if (!string.IsNullOrWhiteSpace(session)) {
             await foreach (var token in tokens.ListBySessionAsync(session, ct)) {
-                if (!string.IsNullOrWhiteSpace(token.Application)) {
-                    clients.Add(token.Application);
+                if (types.Count == 0 || (token.Type is { } t && types.Contains(t))) {
+                    if (!string.IsNullOrWhiteSpace(token.Application)) {
+                        clients.Add(token.Application);
+                    }
                 }
             }
         }
@@ -43,8 +58,10 @@ internal static class LogoutSessionHelper
         }
 
         await foreach (var token in tokens.ListByParentAsync(subject, ct: ct)) {
-            if (!string.IsNullOrWhiteSpace(token.Application)) {
-                clients.Add(token.Application);
+            if (types.Count == 0 || (token.Type is { } t && types.Contains(t))) {
+                if (!string.IsNullOrWhiteSpace(token.Application)) {
+                    clients.Add(token.Application);
+                }
             }
         }
 

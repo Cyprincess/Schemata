@@ -154,6 +154,94 @@ public static class SchemataAuthorizationBuilderExtensions
     }
 
     /// <summary>
+    ///     Enables JWT-Secured Authorization Requests passed by value, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9101.html">
+    ///         RFC 9101: JWT-Secured Authorization Request (JAR)
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    /// <seealso cref="JwtSecuredAuthorizationRequestsFeature{TApp}" />
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope> UseJwtSecuredAuthorizationRequests<TApp, TAuth, TScope>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope> builder,
+        Action<JwtSecuredAuthorizationRequestsOptions>? configure = null
+    )
+        where TApp : SchemataApplication
+        where TAuth : SchemataAuthorization
+        where TScope : SchemataScope {
+        if (configure is not null) {
+            builder.Configurators.Set(configure);
+        }
+
+        builder.AddFlowFeature<JwtSecuredAuthorizationRequestsFeature<TApp>>();
+        return builder;
+    }
+
+    /// <summary>
+    ///     Enables Pushed Authorization Requests, including signed request objects pushed through
+    ///     the PAR endpoint, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9126.html">
+    ///         RFC 9126: OAuth 2.0 Pushed Authorization Requests
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    /// <seealso cref="PushedAuthorizationRequestsFeature{TApp}" />
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope> UsePushedAuthorizationRequests<TApp, TAuth, TScope>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope> builder,
+        Action<PushedAuthorizationRequestsOptions>? configure = null
+    )
+        where TApp : SchemataApplication
+        where TAuth : SchemataAuthorization
+        where TScope : SchemataScope {
+        if (configure is not null) {
+            builder.Configurators.Set(configure);
+        }
+
+        builder.AddFlowFeature<TokenFeature>();
+        builder.AddFlowFeature<PushedAuthorizationRequestsFeature<TApp>>();
+        return builder;
+    }
+
+    /// <summary>
+    ///     Enables OpenID Connect Native SSO device secrets and their token-exchange profile.
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope> UseNativeSingleSignOn<TApp, TAuth, TScope>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope> builder,
+        Action<NativeSingleSignOnOptions>? configure = null
+    )
+        where TApp : SchemataApplication
+        where TAuth : SchemataAuthorization
+        where TScope : SchemataScope {
+        if (configure is not null) {
+            builder.Configurators.Set(configure);
+        }
+
+        builder.AddFlowFeature<TokenFeature>();
+        builder.AddFlowFeature<TokenExchangeFeature<TApp>>();
+        builder.AddFlowFeature<NativeSingleSignOnFeature<TApp>>();
+        return builder;
+    }
+
+    /// <summary>Enables OpenID Connect Session Management and the OP check-session iframe.</summary>
+    /// <returns>The builder for chaining.</returns>
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope> UseSessionManagement<TApp, TAuth, TScope>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope> builder,
+        Action<SessionManagementOptions>? configure = null
+    )
+        where TApp : SchemataApplication
+        where TAuth : SchemataAuthorization
+        where TScope : SchemataScope {
+        if (configure is not null) {
+            builder.Configurators.Set(configure);
+        }
+
+        builder.AddFlowFeature<SessionManagementFeature<TApp>>();
+        return builder;
+    }
+
+    /// <summary>
     ///     Enables resource indicators, per
     ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8707.html">
     ///         RFC 8707: Resource Indicators for OAuth 2.0

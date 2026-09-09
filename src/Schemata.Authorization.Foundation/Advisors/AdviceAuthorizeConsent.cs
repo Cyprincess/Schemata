@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
@@ -53,6 +54,10 @@ public sealed class AdviceAuthorizeConsent<TApp, TAuth>(IAuthorizationManager<TA
         AuthorizeContext<TApp> authz,
         CancellationToken      ct = default
     ) {
+        if (ctx.Has<ParEndpointValidation>()) {
+            return AdviseResult.Continue;
+        }
+
         var prompts = authz.Request?.Prompt?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [];
         var consent = prompts.Contains(PromptValues.Consent);
         var none    = prompts.Contains(PromptValues.None);

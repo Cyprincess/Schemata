@@ -163,7 +163,7 @@ public static class RegistrationMetadataMapper
             DefaultAcrValues                    = application.DefaultAcrValues?.ToList(),
             InitiateLoginUri                    = application.InitiateLoginUri,
             FrontChannelLogoutUri               = application.FrontChannelLogoutUri,
-            FrontChannelLogoutSessionRequired   = application.FrontChannelLogoutSessionRequired,
+            FrontChannelLogoutSessionRequired = application.FrontChannelLogoutSessionRequired,
             BackChannelLogoutUri                = application.BackChannelLogoutUri,
             BackChannelLogoutSessionRequired    = application.BackChannelLogoutSessionRequired,
             SoftwareId                          = application.SoftwareId,

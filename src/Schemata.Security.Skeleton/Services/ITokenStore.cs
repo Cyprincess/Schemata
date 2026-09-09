@@ -70,6 +70,10 @@ public interface ITokenStore<TToken> where TToken : SchemataToken
     /// <summary>Revokes all non-revoked tokens associated with a login session, returning the count.</summary>
     Task<long> RevokeBySessionAsync(string? sessionId, CancellationToken ct = default);
 
+
+    /// <summary>Revokes all non-revoked tokens tagged with the given device identifier, returning the count.</summary>
+    Task<long> RevokeByDeviceAsync(string? deviceId, CancellationToken ct = default);
+
     /// <summary>Removes expired or revoked tokens; the store owns its clock, with the threshold = now.</summary>
     Task<long> PruneAsync(CancellationToken ct = default);
 

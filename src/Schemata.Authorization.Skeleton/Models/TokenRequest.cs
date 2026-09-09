@@ -172,4 +172,14 @@ public class TokenRequest
     ///     </seealso>
     /// </summary>
     public string? Audience { get; set; }
+
+    /// <summary>
+    ///     Persisted Native SSO device secret accompanying a <c>authorization_code</c> or
+    ///     <c>refresh_token</c> exchange, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-native-sso-1_0.html#RefreshResponse">
+    ///         OpenID Connect Native SSO for Mobile Apps 1.0 §3.4: Native SSO and Refresh
+    ///     </seealso>
+    ///     . An unrecognizable value is treated as absent per §3.4.
+    /// </summary>
+    public string? DeviceSecret { get; set; }
 }

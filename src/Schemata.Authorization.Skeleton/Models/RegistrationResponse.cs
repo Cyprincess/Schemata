@@ -134,4 +134,31 @@ public sealed class RegistrationResponse
 
     /// <summary><c>software_version</c>.</summary>
     public string? SoftwareVersion { get; set; }
+
+    /// <summary>
+    ///     <c>require_pushed_authorization_requests</c>, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9126.html#section-5.1">
+    ///         RFC 9126: OAuth 2.0 Pushed Authorization Requests §5.1
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public bool? RequirePushedAuthorizationRequests { get; set; }
+
+    /// <summary>
+    ///     <c>request_object_signing_alg</c>, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9101.html#section-3">
+    ///         RFC 9101: JWT-Secured Authorization Request (JAR) §3
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? RequestObjectSigningAlg { get; set; }
+
+    /// <summary>
+    ///     <c>require_signed_request_object</c>, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9101.html#section-10.5">
+    ///         RFC 9101 §10.5
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public bool? RequireSignedRequestObject { get; set; }
 }

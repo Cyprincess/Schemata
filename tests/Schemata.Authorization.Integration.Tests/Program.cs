@@ -66,6 +66,9 @@ builder.UseSchemata(schema => {
                               .UseClaimsParameter()
                               .UseIntrospection()
                               .UseUserInfo()
+                              .UsePushedAuthorizationRequests()
+                              .UseNativeSingleSignOn()
+                              .UseSessionManagement()
                               .MapHttp();
 
     if (builder.Environment.EnvironmentName == "Dpop") {

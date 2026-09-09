@@ -162,4 +162,26 @@ public class AuthorizeRequest
     ///     </seealso>
     /// </summary>
     public string? AcrValues { get; set; }
+    /// <summary>
+    ///     JWT-secured request object carrying the authorization request parameters,
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9101.html#section-2">
+    ///         RFC 9101: The JWT Secured Authorization Request (JAR) §2: Request Object
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? Request { get; set; }
+
+    /// <summary>
+    ///     Reference to a previously pushed authorization request, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9126.html#section-2.1">
+    ///         RFC 9126: OAuth 2.0 Pushed Authorization Requests §2.1: Request Parameter
+    ///     </seealso>
+    ///     ; also the URL form
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9101.html#section-3">
+    ///         RFC 9101 §3
+    ///     </seealso>
+    ///     references a stored request object.
+    /// </summary>
+    public string? RequestUri { get; set; }
 }

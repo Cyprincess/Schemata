@@ -7,6 +7,8 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions.Advisors;
 using Moq;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
@@ -23,10 +25,20 @@ using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Tests;
 
-public class RegisterHandlerShould
+public class RegisterHandlerShould : IDisposable
 {
+    private readonly ServiceProvider _provider = new ServiceCollection().BuildServiceProvider();
+    private readonly IDisposable _ambient;
     private readonly List<SchemataSecurity> _rows = new();
 
+    public RegisterHandlerShould() {
+        _ambient = AdviceContext.Establish(new AdviceContext(_provider));
+    }
+
+    public void Dispose() {
+        _ambient.Dispose();
+        _provider.Dispose();
+    }
     private (RegisterHandler<SchemataApplication> Handler, Mock<IApplicationManager<SchemataApplication>> Apps, Mock<ITokenStore<SchemataToken>> Tokens, List<SchemataToken> Store, SchemataAuthorizationOptions Options, Mock<ISecurityStore<SchemataSecurity>> Securities) Create(
         Action<SchemataAuthorizationOptions>? configure = null,
         HttpMessageHandler?                   handler   = null
@@ -96,6 +108,7 @@ public class RegisterHandlerShould
         var response = await handler.HandleAsync(new() {
             RedirectUris = ["https://rp.example/cb"],
             ClientName   = "RP",
+            FrontChannelLogoutSessionRequired = true,
         }, null, CancellationToken.None);
 
         Assert.NotNull(response.ClientId);
@@ -104,6 +117,7 @@ public class RegisterHandlerShould
         Assert.Equal(0, response.ClientSecretExpiresAt);
         Assert.NotNull(response.ClientIdIssuedAt);
         Assert.Equal("RP", response.ClientName);
+        Assert.True(response.FrontChannelLogoutSessionRequired);
         Assert.NotNull(response.GrantTypes);
         Assert.Contains(GrantTypes.AuthorizationCode, response.GrantTypes);
     }
@@ -415,8 +429,7 @@ public class RegisterHandlerShould
 
         var denyAll = new RegisterHandler<SchemataApplication>(
             apps.Object, tokens.Object, TestSecurityKeys.CreateTokenService(options),
-            Options.Create(options),
-            new Mock<IHttpClientFactory>().Object,
+            Options.Create(options), new Mock<IHttpClientFactory>().Object,
             new Mock<ISecurityStore<SchemataSecurity>>().Object, new Mock<ISecretVerifier>().Object);
 
         var ex = await Assert.ThrowsAsync<OAuthException>(

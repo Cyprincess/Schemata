@@ -121,6 +121,27 @@ public class TokenService(
         return (await ResolveCredentials(ct)).Signing;
     }
 
+    /// <summary>
+    ///     Computes the OIDC left-half base64url hash of <paramref name="value" /> with the algorithm
+    ///     of <paramref name="signing" />, identical to the <c>at_hash</c> / <c>c_hash</c> math at OIDC Core §3.1.3.8.
+    /// </summary>
+    public static string ComputeHash(string value, SigningCredentials signing) {
+        return ComputeHash(value, signing.Algorithm);
+    }
+
+    /// <summary>
+    ///     Computes the OIDC left-half base64url hash using the named JWS signing algorithm.
+    /// </summary>
+    /// <param name="value">ASCII token value to hash.</param>
+    /// <param name="algorithm">JWS signing algorithm whose hash size determines the digest.</param>
+    /// <returns>The base64url-encoded left half of the digest.</returns>
+    public static string ComputeHash(string value, string algorithm) {
+        var       bytes  = Encoding.ASCII.GetBytes(value);
+        using var hash   = CryptoProviderFactory.Default.CreateHashAlgorithm(GetHashAlgorithm(algorithm));
+        var       hashed = hash.ComputeHash(bytes);
+        return Base64UrlEncoder.Encode(hashed, 0, hashed.Length / 2);
+    }
+
     private async Task<List<SchemataSecurity>> ListRowsAsync(string usage, CancellationToken ct) {
         var rows = new List<SchemataSecurity>();
         await foreach (var row in securities.ListByParentAsync(
@@ -258,15 +279,6 @@ public class TokenService(
         return new(result.ClaimsIdentity);
     }
 
-    // at_hash and c_hash use the leftmost 128 bits
-    // (half) of the SHA-2 hash of the ASCII-encoded value.
-    // See OpenID Connect Core 1.0 §3.1.3.8.
-    private static string ComputeHash(string value, string algorithm) {
-        var       bytes  = Encoding.ASCII.GetBytes(value);
-        using var hash   = CryptoProviderFactory.Default.CreateHashAlgorithm(GetHashAlgorithm(algorithm));
-        var       hashed = hash.ComputeHash(bytes);
-        return Base64UrlEncoder.Encode(hashed, 0, hashed.Length / 2);
-    }
 
     private static string GetHashAlgorithm(string algorithm) {
         return algorithm switch {

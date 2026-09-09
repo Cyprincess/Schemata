@@ -112,6 +112,15 @@ public static class AuthorizationConstants
         /// <summary>Access token hash claim.</summary>
         public const string AtHash              = "at_hash";
 
+        /// <summary>
+        ///     Device secret hash claim binding an ID token to the device secret, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-native-sso-1_0.html">
+        ///         OpenID Connect Native SSO for Mobile Apps 1.0 §3.4.1: Native SSO ID Token
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string DsHash             = "ds_hash";
+
         /// <summary>Audience claim.</summary>
         public const string Audience            = "aud";
 
@@ -650,6 +659,20 @@ public static class AuthorizationConstants
 
         /// <summary>JWKS (JSON Web Key Set) endpoint path.</summary>
         public const string Jwks = "jwks";
+
+        /// <summary>
+        ///     Pushed authorization request endpoint path, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9126.html#section-2">RFC 9126: OAuth 2.0 Pushed Authorization Requests §2: Pushed Authorization Request Endpoint</seealso>
+        ///     .
+        /// </summary>
+        public const string Par = "/Connect/Par";
+
+        /// <summary>
+        ///     Session-management check_session_iframe endpoint path, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-session-1_0.html#OPiframe">OpenID Connect Session Management 1.0 §3.2: OP iframe</seealso>
+        ///     .
+        /// </summary>
+        public const string CheckSession = "/Connect/CheckSession";
     }
 
     #endregion
@@ -1511,6 +1534,64 @@ public static class AuthorizationConstants
         ///     .
         /// </summary>
         public const string Claims = "claims";
+
+        /// <summary>OAuth redirect_uri authorization request parameter.</summary>
+        public const string RedirectUri = "redirect_uri";
+
+        /// <summary>OAuth scope authorization request parameter.</summary>
+        public const string Scope = "scope";
+
+        /// <summary>OpenID Connect prompt authorization request parameter.</summary>
+        public const string Prompt = "prompt";
+
+        /// <summary>OpenID Connect display authorization request parameter.</summary>
+        public const string Display = "display";
+
+        /// <summary>OpenID Connect login_hint authorization request parameter.</summary>
+        public const string LoginHint = "login_hint";
+
+        /// <summary>OpenID Connect id_token_hint authorization request parameter.</summary>
+        public const string IdTokenHint = "id_token_hint";
+
+        /// <summary>OpenID Connect acr_values authorization request parameter.</summary>
+        public const string AcrValues = "acr_values";
+
+        /// <summary>
+        ///     JWT-Secured Authorization Request object carried by value, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9101.html#section-4">
+        ///         RFC 9101: The OAuth 2.0 Authorization Framework: JWT-Secured Authorization Request
+        ///         (JAR) §4: Request Object
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string Request = "request";
+
+        /// <summary>
+        ///     Reference to a pushed or stored authorization request object, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9126.html#section-2.2">
+        ///         RFC 9126: OAuth 2.0 Pushed Authorization Requests §2.2: Successful Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string RequestUri = "request_uri";
+
+        /// <summary>
+        ///     Device secret presented with the authorization code and refresh token grants, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-native-sso-1_0.html">
+        ///         OpenID Connect Native SSO for Mobile Apps 1.0 §3.3: Token Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string DeviceSecret = "device_secret";
+
+        /// <summary>
+        ///     Session state value returned in the authorization response, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-session-1_0.html#CreatingUpdatingSessions">
+        ///         OpenID Connect Session Management 1.0 §3: Creating and Updating Sessions
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string SessionState = "session_state";
     }
 
     #endregion
@@ -1700,6 +1781,17 @@ public static class AuthorizationConstants
 
     #endregion
 
+    #region Nested type: RequestUriPrefixes
+
+    /// <summary>URN prefixes issued as authorization request references.</summary>
+    public static class RequestUriPrefixes
+    {
+        /// <summary>RFC 9126 pushed authorization request URI prefix.</summary>
+        public const string Par = "urn:ietf:params:oauth:request_uri:";
+    }
+
+    #endregion
+
     #region Nested type: Schemes
 
     /// <summary>
@@ -1724,6 +1816,7 @@ public static class AuthorizationConstants
 
         /// <summary>
         ///     DPoP authentication scheme name, also the token_type value of DPoP-bound access
+        ///
         ///     tokens, per
         ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9449.html#section-7.1">
         ///         RFC 9449: OAuth 2.0 Demonstrating Proof
@@ -1781,6 +1874,15 @@ public static class AuthorizationConstants
         ///     .
         /// </summary>
         public const string OfflineAccess = "offline_access";
+
+        /// <summary>
+        ///     Requests a device secret for same-device cross-application single sign-on, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-native-sso-1_0.html">
+        ///         OpenID Connect Native SSO for Mobile Apps 1.0 §3.1: Authentication Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string DeviceSso = "device_sso";
     }
 
     #endregion
@@ -2057,6 +2159,9 @@ public static class AuthorizationConstants
 
         /// <summary>The token has been denied by the user.</summary>
         public const string Denied = "denied";
+
+        /// <summary>The token has been superseded by a rotated replacement and is no longer valid.</summary>
+        public const string Superseded = "superseded";
     }
 
     #endregion
@@ -2109,6 +2214,21 @@ public static class AuthorizationConstants
         ///     .
         /// </summary>
         public const string Registration = "registration";
+
+        /// <summary>
+        ///     A pushed authorization request stored for later consumption at the authorization endpoint,
+        ///     per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9126.html">RFC 9126: OAuth 2.0 Pushed Authorization Requests</seealso>
+        ///     .
+        /// </summary>
+        public const string ParRequest = "par_request";
+
+        /// <summary>
+        ///     A device secret issued for same-device single sign-on, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-native-sso-1_0.html">OpenID Connect Native SSO for Mobile Apps 1.0</seealso>
+        ///     .
+        /// </summary>
+        public const string DeviceSecret = "device_secret";
     }
 
     #endregion
@@ -2201,6 +2321,15 @@ public static class AuthorizationConstants
 
         /// <summary>Schemata-internal token type URI for a logout interaction token.</summary>
         public const string Logout = "urn:schemata:authorization:token-type:logout";
+
+        /// <summary>
+        ///     Device secret actor token type URI used in the Native SSO token exchange, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-native-sso-1_0.html">
+        ///         OpenID Connect Native SSO for Mobile Apps 1.0 §4.1: Token Exchange Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string DeviceSecret = "urn:openid:params:token-type:device-secret";
     }
 
     #endregion

@@ -11,12 +11,7 @@ using Schemata.Authorization.Skeleton.Services;
 namespace Schemata.Authorization.Identity;
 
 /// <summary>
-///     Host-session-backed <see cref="IOpSessionService" />: invalidation signs the end user out of
-///     the ASP.NET Core host session (cookie authentication schemes), per
-///     <seealso href="https://openid.net/specs/openid-connect-rpinitiated-1_0.html">
-///         OpenID Connect RP-Initiated Logout 1.0 §2: Logout Request
-///     </seealso>
-///     .
+///     Signs the user out of ASP.NET Core Identity when an OP session is invalidated.
 /// </summary>
 /// <remarks>
 ///     Sign-out names the host schemes explicitly: the ASP.NET Core host has no
@@ -24,14 +19,17 @@ namespace Schemata.Authorization.Identity;
 ///     and a scheme-less <see cref="AuthenticationHttpContextExtensions.SignOutAsync(HttpContext)" />
 ///     would throw and trip the end-session fail-closed path.
 /// </remarks>
-public sealed class OpSessionService(
+public sealed class IdentityOpSessionTerminator(
     IHttpContextAccessor                      accessor,
     IOptions<SchemataAuthorizationOptions>    options
-) : IOpSessionService
+) : IOpSessionTerminator
 {
-    #region IOpSessionService Members
-
-    public async Task InvalidateAsync(ClaimsPrincipal? principal, string? subject, string? sessionId, CancellationToken ct = default) {
+    public async Task TerminateAsync(
+        ClaimsPrincipal? principal,
+        string?          subject,
+        string?          sessionId,
+        CancellationToken ct = default
+    ) {
         if (accessor.HttpContext is not { } http) {
             return;
         }
@@ -40,5 +38,4 @@ public sealed class OpSessionService(
         await http.SignOutAsync(options.Value.CodeScheme);
     }
 
-    #endregion
 }

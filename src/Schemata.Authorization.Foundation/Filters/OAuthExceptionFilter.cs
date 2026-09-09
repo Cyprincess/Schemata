@@ -41,6 +41,10 @@ public sealed class OAuthExceptionFilter(IOptions<SchemataAuthorizationOptions> 
                 parameters[Claims.Issuer] = options.Value.Issuer;
             }
 
+            if (SessionStateContext.TryGet(context.HttpContext, out var sessionState)) {
+                parameters[Parameters.SessionState] = sessionState;
+            }
+
             context.Result = ResponseModeService.CreateCallback(
                 oauth.RedirectUri,
                 parameters.Where(p => p.Value is not null).ToDictionary(p => p.Key, p => p.Value),

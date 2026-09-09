@@ -247,6 +247,28 @@ public class RepositoryTokenStore : ITokenStore<SchemataToken>
         return count;
     }
 
+    public async Task<long> RevokeByDeviceAsync(string? deviceId, CancellationToken ct = default) {
+        ct.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrWhiteSpace(deviceId)) {
+            return 0;
+        }
+
+        long count = 0;
+
+        await foreach (var token in _repository.ListAsync(
+                           q => q.Where(t => t.DeviceId == deviceId && t.Status != Statuses.Revoked),
+                           ct)) {
+            token.Status = Statuses.Revoked;
+            await _repository.UpdateAsync(token, ct);
+            count++;
+        }
+
+        await _repository.CommitAsync(ct);
+
+        return count;
+    }
+
     public async Task<long> PruneAsync(CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 

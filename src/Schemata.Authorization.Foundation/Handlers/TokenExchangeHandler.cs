@@ -114,7 +114,9 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
                 );
         }
 
-        var handler = sp.GetKeyedService<ITokenExchangeHandler<TApp>>(request.SubjectTokenType);
+        var compositeKey = $"{request.SubjectTokenType}|{request.RequestedTokenType ?? string.Empty}";
+        var handler      = sp.GetKeyedService<ITokenExchangeHandler<TApp>>(compositeKey)
+                         ?? sp.GetKeyedService<ITokenExchangeHandler<TApp>>(request.SubjectTokenType);
         if (handler is null) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,

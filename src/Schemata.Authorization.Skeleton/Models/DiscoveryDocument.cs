@@ -181,4 +181,60 @@ public sealed class DiscoveryDocument
     ///     </seealso>
     /// </summary>
     public bool? AuthorizationResponseIssParameterSupported { get; set; }
+
+    /// <summary>
+    ///     URL of the pushed authorization request endpoint, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9126.html#section-5">
+    ///         RFC 9126: OAuth 2.0 Pushed Authorization Requests §5: Authorization Server Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? PushedAuthorizationRequestEndpoint { get; set; }
+
+    /// <summary>
+    ///     Whether the authorization server accepts authorization requests only through the pushed
+    ///     authorization request endpoint, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9126.html#section-5">
+    ///         RFC 9126: OAuth 2.0 Pushed Authorization Requests §5: Authorization Server Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public bool? RequirePushedAuthorizationRequests { get; set; }
+
+    /// <summary>
+    ///     JWS <c>alg</c> values the authorization server supports for signed request objects, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9101.html#section-10.5">
+    ///         RFC 9101: JWT-Secured Authorization Request (JAR) §10.5: Request Object Signing
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public List<string>? RequestObjectSigningAlgValuesSupported { get; set; }
+
+    /// <summary>
+    ///     Whether the authorization server requires authorization requests to be signed request
+    ///     objects, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9101.html#section-10.5">
+    ///         RFC 9101: JWT-Secured Authorization Request (JAR) §10.5: Request Object Signing
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public bool? RequireSignedRequestObject { get; set; }
+
+    /// <summary>
+    ///     Whether the authorization server supports Native SSO device secrets, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-native-sso-1_0.html">
+    ///         OpenID Connect Native SSO for Mobile Apps 1.0 §5: Authorization Server Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public bool? NativeSsoSupported { get; set; }
+
+    /// <summary>
+    ///     URL of an OP iframe that supports cross-origin communication for session state, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-session-1_0.html#OPMetadata">
+    ///         OpenID Connect Session Management 1.0 §3.3: OP iframe Discovery
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? CheckSessionIframe { get; set; }
 }

@@ -7,8 +7,11 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Advice;
+using Schemata.Abstractions.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Services;
+using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Authorization.Skeleton.Managers;
@@ -84,7 +87,16 @@ public sealed class RegisterHandler<TApp>(
             }
         }
 
-        var application = await RegistrationMetadataMapper.ToApplicationAsync<TApp>(request, options, http, securities, _time, ct);
+        var application = await RegistrationMetadataMapper.ToApplicationAsync<TApp>(
+            request, options, http, securities, _time, ct);
+
+        var ctx = AdviceContext.Require();
+        if (await Advisor.For<IRegistrationRequestAdvisor<TApp>>()
+                         .RunAsync(ctx, request, application, ct) != AdviseResult.Continue) {
+            throw new OAuthException(
+                OAuthErrors.InvalidClientMetadata,
+                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS));
+        }
 
         await ValidateUserInfoResponseAlgorithmsAsync(application, ct);
 
@@ -122,6 +134,13 @@ public sealed class RegisterHandler<TApp>(
         response.RegistrationAccessToken  = reference;
         response.RegistrationClientUri    = BuildRegistrationClientUri(options.Value, clientId);
 
+        if (await Advisor.For<IRegistrationResponseAdvisor<TApp>>()
+                         .RunAsync(ctx, created, response, ct) != AdviseResult.Continue) {
+            throw new OAuthException(
+                OAuthErrors.InvalidClientMetadata,
+                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS));
+        }
+
         return response;
     }
 
@@ -153,7 +172,16 @@ public sealed class RegisterHandler<TApp>(
         }
 
         var application = await apps.FindByClientIdAsync(clientId, ct);
-        return application is null ? null : await RegistrationMetadataMapper.ToResponse(application, securities, ct);
+        if (application is null) {
+            return null;
+        }
+
+        var response = await RegistrationMetadataMapper.ToResponse(application, securities, ct);
+        var ctx = AdviceContext.Require();
+        return await Advisor.For<IRegistrationResponseAdvisor<TApp>>()
+                            .RunAsync(ctx, application, response, ct) == AdviseResult.Continue
+            ? response
+            : null;
     }
 
     #endregion

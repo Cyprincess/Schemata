@@ -117,6 +117,9 @@ public static class ServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceRequestEndpointPermission<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceRequestGrantPermission<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceRequestScopeValidation<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<
+            IAuthorizeRequestAdvisor<TApp>,
+            AdviceAuthorizationRequestRepresentation<TApp>>());
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceClaimsAudience>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IClaimsAdvisor, AdviceClaimsAuthenticationContext>());
@@ -143,7 +146,7 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<ICommandDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
         services.TryAddScoped<IQueryDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
         services.TryAddScoped<ISubjectIdentifierService, SubjectIdentifierService>();
-        services.TryAddScoped<IOpSessionService, NoOpOpSessionService>();
+        services.TryAddScoped<IOpSessionService, DefaultOpSessionService>();
 
         services.TryAddScoped<IApplicationManager<TApp>, SchemataApplicationManager<TApp>>();
         services.TryAddScoped<IScopeManager<TScope>, SchemataScopeManager<TScope>>();

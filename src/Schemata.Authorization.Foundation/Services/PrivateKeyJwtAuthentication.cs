@@ -67,7 +67,7 @@ public sealed class PrivateKeyJwtAuthentication<TApp>(
         var clientId  = channel.ResolveClientId(form, assertion);
         var app       = await channel.FindApplicationAsync(apps, clientId, ct);
 
-        var keys = await SelectKeysAsync(app, assertion, ct);
+        var keys = await ClientKeyResolver<TApp>.ResolveAsync(app, assertion, securities, http, cache, security, ct);
 
         var token = await assertions.ValidateAsync(
             assertion,
@@ -93,49 +93,6 @@ public sealed class PrivateKeyJwtAuthentication<TApp>(
 
     #endregion
 
-    private async Task<IReadOnlyList<SecurityKey>> SelectKeysAsync(TApp app, string assertion, CancellationToken ct) {
-        var client    = http.CreateClient(SecurityKeyMaterialExtensions.HttpClientName);
-        var materials = new List<SchemataKeyMaterial>();
-
-        await foreach (var row in securities.ListByParentAsync(
-                           SecurityParents.Application(app),
-                           null,
-                           SecurityConstants.Usages.Authentication,
-                           null,
-                           ct)) {
-            if (row.Status is not (SecurityConstants.Statuses.Valid or SecurityConstants.Statuses.Retired)) {
-                continue;
-            }
-
-            var material = await row.ToKeyMaterialAsync(client, cache, security.Value.KeyCacheLifetime, ct);
-            if (material is null) {
-                continue;
-            }
-
-            switch (material.Material) {
-                case SecurityKeyMaterial.JwkJson or SecurityKeyMaterial.JwksJson:
-                    materials.Add(material);
-                    break;
-                // Asymmetric imports belong to the caller; keys of other shapes are not
-                // assertion-key material here.
-                case SecurityKeyMaterial.RsaKey rsa:
-                    rsa.Key.Dispose();
-                    break;
-                case SecurityKeyMaterial.EcKey ec:
-                    ec.Key.Dispose();
-                    break;
-            }
-        }
-
-        if (materials.Count == 0) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.ASSERTION_KEY_NOT_FOUND)
-            );
-        }
-
-        return SelectKeys(SecurityKeyAdapter.ToJsonWebKeySet(materials), assertion);
-    }
 
     private ISet<string> AllowedAlgorithms(TApp app) {
         return string.IsNullOrWhiteSpace(app.TokenEndpointAuthSigningAlg)
@@ -143,22 +100,4 @@ public sealed class PrivateKeyJwtAuthentication<TApp>(
             : new(StringComparer.Ordinal) { app.TokenEndpointAuthSigningAlg };
     }
 
-    private IReadOnlyList<SecurityKey> SelectKeys(JsonWebKeySet keyset, string assertion) {
-        var kid = channel.Peek(assertion)?.Kid;
-
-        var selected = string.IsNullOrEmpty(kid)
-            ? keyset.Keys
-            : keyset.Keys.Where(key => key.Kid == kid).ToList();
-
-        // Zero matches, an ambiguous multi-key set without a kid, or an empty key set all
-        // leave no single key to verify with.
-        if (selected.Count != 1) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.ASSERTION_KEY_NOT_FOUND)
-            );
-        }
-
-        return [selected[0]];
-    }
 }

@@ -109,4 +109,32 @@ public class RegisterRequest
 
     /// <summary><c>software_statement</c>. Signed software statement JWT, stored verbatim.</summary>
     public string? SoftwareStatement { get; set; }
+
+    /// <summary>
+    ///     <c>require_pushed_authorization_requests</c>, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9126.html#section-5.1">
+    ///         RFC 9126: OAuth 2.0 Pushed Authorization Requests §5.1: Indicating Server Support
+    ///     </seealso>
+    ///     . <see langword="true" /> binds the client to PAR for every authorization request.
+    /// </summary>
+    public bool? RequirePushedAuthorizationRequests { get; set; }
+
+    /// <summary>
+    ///     <c>request_object_signing_alg</c>, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9101.html#section-3">
+    ///         RFC 9101: JWT-Secured Authorization Request (JAR) §3: Request Object Registration
+    ///     </seealso>
+    ///     . The single JWS algorithm the client uses to sign request objects;
+    ///     <see langword="null" /> leaves the choice open to the server.
+    /// </summary>
+    public string? RequestObjectSigningAlg { get; set; }
+
+    /// <summary>
+    ///     <c>require_signed_request_object</c>, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9101.html#section-10.5">
+    ///         RFC 9101 §10.5: Choice of Algorithms
+    ///     </seealso>
+    ///     . When <see langword="true" /> the client refuses unsigned request objects.
+    /// </summary>
+    public bool? RequireSignedRequestObject { get; set; }
 }
