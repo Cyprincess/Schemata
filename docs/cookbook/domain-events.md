@@ -6,8 +6,9 @@ A repository committed advisor that publishes a domain event after the database 
 advisor implements `IRepositoryCommittedAdvisor<Student>`, so it receives the committed entity
 snapshot once the commit boundary has closed rather than firing during the mutation pipeline.
 
-The event bus records every publish in a durable outbox and drains it from a background dispatcher,
-so delivery is at-least-once even though the advisor calls `PublishAsync` after the commit.
+The in-process bus awaits handlers within `PublishAsync`; the RabbitMQ bus awaits broker
+confirmation. The business commit and publish are separate operations. A crash or publish failure
+after the commit can lose the event: the bus has no transactional outbox or automatic publish retry.
 
 Production code rarely writes this advisor by hand: the `Schemata.Entity.Event` bridge ships it as
 `UseEvent()` on the repository builder (Step 3). This recipe still walks the hand-rolled advisor so
@@ -40,6 +41,8 @@ type name is never used as a routing key.
 ## Step 2: Register the event wire name
 
 ```csharp
+using Microsoft.AspNetCore.Builder;
+
 builder.UseSchemata(schema => {
     schema.UseEvent()
           .RegisterEvent<StudentCreated>("students/student-created")
@@ -50,7 +53,7 @@ builder.UseSchemata(schema => {
 ```
 
 `RegisterEvent<T>(name)` stores the mapping in `IEventTypeRegistry`. `PublishAsync` resolves the name
-via `RequireName(type)` before recording the outbox row; an unregistered type throws
+via `RequireName(type)` before dispatch or broker publication; an unregistered type throws
 `InvalidOperationException` at the call.
 
 **Assertion:** the application starts without throwing on `IEventTypeRegistry.RequireName`.
@@ -164,6 +167,8 @@ boundary.
 ## Step 5: Register the advisor
 
 ```csharp
+using Microsoft.AspNetCore.Builder;
+using Schemata.Entity.Repository.Advisors;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -189,6 +194,11 @@ scoped bus as a captive dependency.
 ## Step 6: Implement the handler
 
 ```csharp
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Schemata.Event.Skeleton;
+
 public sealed class StudentCreatedHandler : IEventHandler<StudentCreated>
 {
     private readonly ILogger<StudentCreatedHandler> _logger;
@@ -204,11 +214,11 @@ public sealed class StudentCreatedHandler : IEventHandler<StudentCreated>
 }
 ```
 
-The handler runs when the outbox dispatcher drains the published row, which may be after the HTTP
-response has returned.
+With the in-process provider configured in Step 2, `PublishAsync` awaits this handler before
+returning. RabbitMQ runs the handler in its consumer host separately from the producer call.
 
-**Assertion:** `POST /v1/students` with a valid body logs `"Student 'Alice' created at ..."` shortly
-after the repository commit succeeds.
+**Assertion:** `POST /v1/students` with a valid body logs `Student 'Alice' created at ...` during
+the committed advisor, before a successful HTTP response.
 
 ## Step 7: Name the event audit row
 
@@ -270,13 +280,13 @@ Trace, line by line:
 ## Common pitfalls
 
 **Calling `PublishAsync` from a create/update/remove advisor.** Mutation advisors run before the
-commit boundary. The outbox row is recorded immediately, so if `CommitAsync` later fails the event is
-already queued and the dispatcher will deliver it. Publish from a committed advisor so the row is
-recorded only after the commit succeeds.
+commit boundary. In-process handlers or a RabbitMQ publish can already execute when `CommitAsync`
+later fails. Publish from a committed advisor so delivery begins after the commit succeeds.
 
-**Expecting the handler to run before `PublishAsync` returns.** `PublishAsync` records the outbox row
-and returns; the handler runs later from the dispatcher. Side effects are observable asynchronously,
-so handlers must be idempotent.
+**Treating publish as atomic with the business commit.** In-process handler failures propagate,
+but the business data stays committed. RabbitMQ confirmation proves broker acceptance, not
+consumer success. The audit row does not close the crash window after the business commit, and
+the bus does not retry failed publishes. Application-owned retries need idempotent handlers.
 
 **Publishing unregistered event types.** Register every published type with `RegisterEvent<T>(name)`
 during startup; a missing registration throws `InvalidOperationException` from the committed advisor
@@ -285,8 +295,9 @@ at publish time.
 **Missing event audit Name advisor.** When `EventAuditNameAdvisor` is absent,
 `InProcessEventBus.NotifyPublishedAsync` logs
 `IEventLifecycleObserver.OnPublishedAsync threw for event '{EventType}'.` at `Warning`, the
-`SchemataEvent` row does not persist, and `PublishAsync` returns successfully. Treat that warning
-literal as an audit-misconfiguration signal.
+`SchemataEvent` row does not persist, and in-process handler dispatch continues. The call can still
+fail for a handler or consume-stage error. RabbitMQ propagates a publish-observer failure before
+broker publication. Treat the warning as an in-process audit-misconfiguration signal.
 
 **Scoped advisor captured as singleton.** `IEventBus` is scoped. Registering the advisor as a
 singleton captures the first bus instance and reuses it across requests. Register the advisor as
@@ -296,5 +307,5 @@ scoped.
 
 - [guides/event-bus.md](../guides/event-bus.md) — `UseEvent`, producers, consumers, handlers
 - [cookbook/rabbitmq-event-bus.md](rabbitmq-event-bus.md) — RabbitMQ transport for cross-service events
-- [documents/event/dispatch-pipeline.md](../documents/event/dispatch-pipeline.md) — the outbox and dispatcher
+- [documents/event/dispatch-pipeline.md](../documents/event/dispatch-pipeline.md) — publish, consume, and audit boundaries
 - [documents/event/overview.md](../documents/event/overview.md) — wire-name contract and `IEventTypeRegistry`

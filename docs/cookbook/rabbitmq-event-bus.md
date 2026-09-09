@@ -14,7 +14,11 @@ Events and request/reply are **two packages**: `Schemata.Event.RabbitMq` broadca
 
 - A running RabbitMQ broker (default `localhost:5672`, credentials `guest/guest`).
 - The `Schemata.Event.RabbitMq` package added to your project.
-- A persistence provider (EF Core or LinqToDB) so the outbox audit rows can be stored.
+- A persistence provider (EF Core or LinqToDB) with repositories for `SchemataEvent` and
+  `SchemataEventSubscription`, plus the [event audit Name advisor](domain-events.md#step-7-name-the-event-audit-row).
+- A persisted `SchemataEventSubscription` with `EventType = "orders/order-placed"`, a unique
+  `SubscriptionId`, and the application's target. `UseHandler` registers DI handlers, not subscription
+  rows; the RabbitMQ consumer acknowledges and drops registered events without a matching row.
 - Familiarity with the in-process bus from [guides/event-bus.md](../guides/event-bus.md).
 
 ## Step 1: Define the event and request types
@@ -41,7 +45,7 @@ public sealed class PriceResult
 }
 ```
 
-Fire-and-forget types implement `IEvent` from `Schemata.Event.Skeleton`; request/reply types
+Broadcast types implement `IEvent` from `Schemata.Event.Skeleton`; request/reply types
 implement `IRequest<TResponse>` from `Schemata.Messaging.Skeleton`, which is a separate package so
 that request/reply carries no dependency on the event domain. The CLR type name is never the routing
 key; the event gets its wire name in Step 2, the request in Step 6.
@@ -51,6 +55,8 @@ key; the event gets its wire name in Step 2, the request in Step 6.
 ## Step 2: Register events and wire up RabbitMQ
 
 ```csharp
+using Microsoft.AspNetCore.Builder;
+
 builder.UseSchemata(schema => {
     schema.UseEvent()
           .RegisterEvent<OrderPlaced>("orders/order-placed")
@@ -60,7 +66,7 @@ builder.UseSchemata(schema => {
           }, c => {
               c.HostName = "localhost";
           }))
-          .UseConsumer(c => c.UseRabbitMq())
+          .UseConsumer(c => c.UseInProcess().UseRabbitMq())
        .UseHandler<OrderPlaced, OrderPlacedHandler>();
 });
 ```
@@ -69,17 +75,20 @@ builder.UseSchemata(schema => {
 broadcast events only — `PriceQuery` and `PriceResult` are never registered here, because the
 request dispatcher keeps its own registry (Step 6).
 
-`UseRabbitMq()` on the producer registers `RabbitMqEventBus` as a scoped `IEventBus` and
-`RabbitMqEventOutboxPublisher` as the outbox publisher. On the consumer it registers
-`RabbitMqConsumerHost` as a hosted service. Both sides also call `AddRabbitMqTransport()`, which
-contributes the shared broker connection and the `CorrelationTracker` — the first delegate configures
-topology (`RabbitMqEventOptions`), the second the connection (`RabbitMqConnectionOptions`).
+`UseRabbitMq()` on the producer registers `RabbitMqEventBus` as a scoped `IEventBus`. On the
+consumer it registers `RabbitMqConsumerHost` as a hosted service; `UseInProcess()` supplies its
+handler resolver and dispatch context. Both RabbitMQ extensions call `AddRabbitMqTransport()`
+for the shared connection provider and `CorrelationTracker`. The first delegate configures
+topology (`RabbitMqEventOptions`), and the second configures the connection (`RabbitMqConnectionOptions`).
 
 **Assertion:** `dotnet run` starts without throwing on `IEventTypeRegistry.RequireName`.
 
 ## Step 3: Implement the handlers
 
 ```csharp
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Schemata.Event.Skeleton;
 using Schemata.Messaging.Skeleton;
 
@@ -103,7 +112,7 @@ public sealed class PriceQueryHandler : IRequestHandler<PriceQuery, PriceResult>
 }
 ```
 
-`IEventHandler<T>` (`Schemata.Event.Skeleton`) handles fire-and-forget events;
+`IEventHandler<T>` (`Schemata.Event.Skeleton`) handles broadcast events;
 `IRequestHandler<TRequest, TResponse>` (`Schemata.Messaging.Skeleton`) handles request/reply. Only
 one request handler per request type may be registered.
 
@@ -112,6 +121,12 @@ one request handler per request type may be registered.
 ## Step 4: Publish an event
 
 ```csharp
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Schemata.Event.Skeleton;
+
 public sealed class OrdersController : ControllerBase
 {
     private readonly IEventBus _bus;
@@ -128,55 +143,71 @@ public sealed class OrdersController : ControllerBase
 }
 ```
 
-`PublishAsync` records the event as a `Pending` outbox row and returns. The `EventOutboxDispatcher`
-replays the row through `RabbitMqEventOutboxPublisher`, which opens a publisher-confirm channel,
-serializes the payload, and publishes with `BasicProperties.DeliveryMode = DeliveryModes.Persistent`.
-The publish completes only
-after the broker confirms receipt, then the row is marked delivered.
+`PublishAsync` runs publish advisors and audit observers, opens a publisher-confirm channel,
+and publishes a persistent message to the exchange. It awaits broker confirmation, then runs
+`OnDeliveredAsync` observers before returning. Consumer handling runs separately.
 
-**Assertion:** `POST /orders` returns `202 Accepted` and the management UI shows one message on
-`schemata.events` once the dispatcher drains the outbox.
+The audit row is committed as `Recorded` before broker publication and is not a durable delivery
+queue. The bus supplies neither a transactional outbox nor automatic publish retries. A business
+transaction and broker acceptance remain separate, and a failed post-confirm observer can fault
+the call after the broker has accepted the message.
+
+**Assertion:** after the consumer has declared and bound its queue and the matching subscription
+exists, `POST /orders` returns `202 Accepted` after broker confirmation, and the consumer logs
+the order. A fast consumer can leave the queue empty by the time you inspect it.
 
 ## Step 5: Verify DLX routing
 
 `RabbitMqConsumerHost` declares the main queue with `x-dead-letter-exchange` set to
-`RabbitMqEventOptions.DeadLetterExchange` (default `schemata.events.dlx`, a topic exchange). A message
-is dead-lettered when:
+`RabbitMqEventOptions.DeadLetterExchange` (default `schemata.events.dlx`, a topic exchange).
+It rejects unknown routing keys without requeue. For registered events with matching persisted
+subscriptions, it also rejects handler, consume-advisor, observer, and deserialization failures.
+Registered events with no matching subscriptions are acknowledged and dropped instead.
 
-- The handler throws.
-- The routing key resolves to an unregistered event type.
-- Deserialization returns null.
+To observe a rejected message, first declare a durable inspection queue in the management UI and
+bind it to `schemata.events.dlx` with routing key `#`. The consumer declares the DLX but does not
+create or bind a dead-letter queue. Publish a message with an unregistered routing key from the
+management UI or `rabbitmqadmin`. The consumer logs a warning and calls
+`BasicNackAsync(requeue: false)`.
 
-To observe it, publish a message with an unregistered routing key from the management UI or
-`rabbitmqadmin`. The consumer logs a warning and calls `BasicNackAsync(requeue: false)`, routing the
-message to `schemata.events.dlx`.
+Setting `DeadLetterExchange = string.Empty` skips the DLX declaration and queue argument; without
+a broker-supplied dead-letter policy, rejected messages are discarded.
 
-Set `DeadLetterExchange = string.Empty` to skip the DLX declaration; poison messages are then rejected
-without requeue and dropped.
-
-**Assertion:** after publishing a message with routing key `unknown/type`, the `schemata.events.dlx`
-exchange receives one message.
+**Assertion:** the inspection queue receives the message published with routing key `unknown/type`.
 
 ## Step 6: Perform a request/reply call
 
-Request/reply is **not** on the event bus. It is a separate package, `Schemata.Messaging.RabbitMq`,
-sharing the same broker connection:
+`Schemata.Messaging.RabbitMq` provides request/reply over the shared broker connection. Add that
+package for this optional step, register the request handler, and configure its wire name:
 
 ```csharp
-schema.ConfigureServices(services =>
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Messaging.Skeleton;
+
+schema.ConfigureServices(services => {
+    services.AddScoped<IRequestHandler<PriceQuery, PriceResult>, PriceQueryHandler>();
     services.AddRabbitMqRequestDispatcher(options => {
-        options.QueueName = "pricing";                       // omit on a send-only process
+        options.QueueName = "pricing";
         options.Register<PriceQuery, PriceResult>("pricing.quote");
-    }));
+    });
+});
 ```
 
 ```csharp
-[HttpGet("price/{productId}")]
-public async Task<IActionResult> GetPrice(string productId, CancellationToken ct)
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Schemata.Messaging.Skeleton;
+
+public sealed class PricingController(IRequestDispatcher dispatcher) : ControllerBase
 {
-    var result = await _dispatcher.SendAsync<PriceQuery, PriceResult>(
-        new PriceQuery { ProductId = productId }, ct);
-    return Ok(result);
+    [HttpGet("price/{productId}")]
+    public async Task<IActionResult> GetPrice(string productId, CancellationToken ct)
+    {
+        var result = await dispatcher.SendAsync<PriceQuery, PriceResult>(
+            new PriceQuery { ProductId = productId }, ct);
+        return Ok(result);
+    }
 }
 ```
 
@@ -184,8 +215,8 @@ public async Task<IActionResult> GetPrice(string productId, CancellationToken ct
 `reply.<guid>` per dispatcher, publishes the request with `ReplyTo` and a tracker `CorrelationId`,
 and awaits a `TaskCompletionSource<TResponse>` held by `CorrelationTracker`. The consumer host
 resolves `IRequestHandler<PriceQuery, PriceResult>`, invokes it, and publishes the response straight
-back to the reply queue. Unlike `PublishAsync`, this runs synchronously over the broker rather than
-through the outbox.
+back to the reply queue. A request waits for that response; event `PublishAsync` waits only for
+broker confirmation and its producer-side observers.
 
 The timeout is `RabbitMqRequestOptions.RequestTimeoutMs` (default 30,000 ms); on timeout the tracker
 faults the task with `TimeoutException`.
@@ -194,16 +225,15 @@ faults the task with `TimeoutException`.
 
 ## Common pitfalls
 
-**The bus connects lazily.** `RabbitMqEventBus` and `RabbitMqEventOutboxPublisher` do not open the
-broker connection in their constructors — the connection, reply channel, and consumer come up on
-the first publish, guarded by a `SemaphoreSlim`. A broker that is down at startup no longer blocks
-the host; the failure surfaces on the first publish instead. Because the bus is scoped, each scope
-still gets its own connection on first use — inject `IEventBus` into long-lived services
-(controllers, background workers) so short-lived scopes don't each pay the connect cost.
+**Connection lifetime differs from bus scope.** `RabbitMqEventBus` uses the shared connection
+provider and opens a publisher-confirm channel per publish. The provider connects lazily under a
+semaphore; event bus scopes share its connection. A producer-only host connects on first publish,
+while `RabbitMqConsumerHost` requests the connection when its background service starts. Broker
+unavailability can therefore fail the consumer service before any event is published.
 
 **Single handler per request type.** Registering a second `IRequestHandler<TRequest, TResponse>` for
 the same pair makes the dispatcher throw ("Multiple request handlers registered"). For fan-out, use
-`IEventHandler<T>` with a fire-and-forget event.
+`IEventHandler<T>` with a broadcast event.
 
 **The request type must carry a registered wire name.** `Register<TRequest, TResponse>(name)` in
 `AddRabbitMqRequestDispatcher` is mandatory — a CLR type name never travels on the wire. Sending an
@@ -227,6 +257,6 @@ events.
 ## See also
 
 - [guides/event-bus.md](../guides/event-bus.md) — in-process event bus basics
-- [documents/event/overview.md](../documents/event/overview.md) — wire-name contract and the outbox
+- [documents/event/overview.md](../documents/event/overview.md) — wire-name contract and audit records
 - [documents/event/providers.md](../documents/event/providers.md) — InProcess and RabbitMQ providers
 - [cookbook/domain-events.md](domain-events.md) — publishing events from a committed advisor

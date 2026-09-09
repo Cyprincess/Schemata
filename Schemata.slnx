@@ -115,6 +115,7 @@
     <Project Path="tests/Schemata.Authorization.Integration.Tests/Schemata.Authorization.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Authorization.Tests/Schemata.Authorization.Tests.csproj" />
     <Project Path="tests/Schemata.Caching.Distributed.Tests/Schemata.Caching.Distributed.Tests.csproj" />
+    <Project Path="tests/Schemata.Caching.Redis.Tests/Schemata.Caching.Redis.Tests.csproj" />
     <Project Path="tests/Schemata.Common.Tests/Schemata.Common.Tests.csproj" />
     <Project Path="tests/Schemata.Core.Tests/Schemata.Core.Tests.csproj" />
     <Project Path="tests/Schemata.Domain.Skeleton.Tests/Schemata.Domain.Skeleton.Tests.csproj" />

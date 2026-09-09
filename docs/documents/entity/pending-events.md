@@ -97,9 +97,10 @@ to `IHasPendingEvents`, which both shapes satisfy.
 
 - **Publishing from a mutation advisor.** `IRepositoryAddAdvisor` and friends run *before* the
   commit. Events raised there escape even when the transaction rolls back. Use this bridge instead.
-- **Expecting the commit to roll back when a subscriber throws.** It cannot: the data is already
-  committed by the time the advisor runs. Treat delivery as at-most-once unless you pair it with the
-  event outbox.
+- **Expecting the commit to roll back when a subscriber throws.** The data is already committed
+  when the advisor runs. In-process publishing awaits handlers; RabbitMQ publishing awaits broker
+  confirmation. The event bus provides neither a transactional outbox nor automatic publish retry,
+  so applications must handle the gap between the business commit and successful publication.
 - **Registering the advisor by hand with `AddScoped(typeof(...))`.** That replaces the advisor chain
   rather than joining it, silently disabling every other committed advisor. Call `UseEvent()`.
 - **Reusing an entity instance across two commits and expecting the events twice.** The buffer is

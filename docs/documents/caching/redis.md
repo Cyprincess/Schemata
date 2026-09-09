@@ -1,6 +1,6 @@
 # Redis Cache Provider
 
-`RedisCacheProvider` is the `ICacheProvider` implementation backed by Redis via StackExchange.Redis. It is the correct choice for multi-process and cluster deployments because its collection operations use native Redis Set commands, which are atomic at the Redis server level.
+`RedisCacheProvider` is the `ICacheProvider` implementation backed by Redis via StackExchange.Redis. It uses native Redis Set commands for collection membership across application processes. Redis Cluster deployments require each cache key and its companion metadata key to share a hash slot.
 
 ## Where the code lives
 
@@ -25,7 +25,7 @@ scripts that read the current value, compare it to the expected bytes, and apply
 match — value key and metadata key together — returning whether the change occurred. Running the
 compare and the write in one script makes each operation atomic across processes.
 
-`RemoveAsync` deletes both the value key and the metadata key in a transaction.
+`RemoveAsync` deletes both the value key and the metadata key in a single multi-key delete command.
 
 ### Collection operations
 
@@ -38,7 +38,7 @@ Collection operations use native Redis Set commands:
 | `CollectionRemoveAsync`  | `SREM`        |
 | `CollectionClearAsync`   | `DEL`         |
 
-These commands are atomic at the Redis server level, so collection operations stay safe across multiple processes and cluster nodes without in-process locking.
+Each native Set command is atomic at the Redis server. Provider methods can also update metadata or perform follow-up commands; the full method is not necessarily one atomic operation. Operations involving both the collection key and its metadata require a shared hash slot in Redis Cluster.
 
 ### Sliding expiration via metadata key
 
@@ -53,10 +53,17 @@ The metadata key shares the same TTL as the value key, so both expire together.
 
 ## Concurrency safety
 
-**Scope: cluster-safe.** Collection operations are atomic at the Redis server level (`SADD`,
-`SMEMBERS`, `SREM`, `DEL`); multiple application instances can add and remove members from the
-same set concurrently. Key-value operations are also cluster-safe: `TryAddAsync` uses `SET NX`,
-and the compare-and-swap operations run server-side Lua scripts.
+Multiple application instances can add and remove members from the same set through native Redis
+commands. `TryAddAsync` uses `SET NX` for insert-if-absent, and compare-and-swap operations use
+Lua scripts. These server-side primitives coordinate concurrent callers; they do not make every
+provider method atomic across its separate commands.
+
+**Redis Cluster key requirement:** transactions, Lua scripts, and multi-key deletion require all
+participating keys to hash to the same slot. The provider appends `:__meta__` to the supplied key
+and does not add a hash tag. Supply a key such as `cache:{entry:42}` so its metadata key
+`cache:{entry:42}:__meta__` retains the same nonempty `{entry:42}` tag. Untagged keys do not
+guarantee this placement. See the Redis Cluster specification's
+[hash-tag rules](https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/#hash-tags).
 
 Cache and database commits are not atomic together: there is no distributed transaction spanning
 Redis and the application database. Consumers can defer cache writes until after the database
@@ -81,7 +88,6 @@ services.AddRedisCache();
 
 ## Extension points
 
-- **Custom database selection**: subclass `RedisCacheProvider` and override the constructor to call `multiplexer.GetDatabase(dbIndex)` for a specific database number.
 - **Key prefix**: wrap `RedisCacheProvider` in a decorator that prepends a tenant or environment prefix to all keys.
 
 ## Design motivation
@@ -92,7 +98,7 @@ Using native Redis Set commands for collection operations eliminates the read-mo
 
 - Cache and database are not atomic together. A crash between database commit and cache eviction leaves stale entries until TTL expires. This is an inherent limitation of any cache-aside pattern.
 - The metadata key (`key + ":__meta__"`) doubles the number of Redis keys. Plan key eviction policies accordingly.
-- `RedisCacheProvider` uses `IDatabase`, not `IServer`. Cluster-mode Redis routes commands by key slot; all operations on a single key are routed to the correct node automatically. Cross-slot operations (e.g., multi-key transactions) are not used.
+- Redis Cluster support depends on the shared-slot key requirement above. The provider uses multi-key transactions, Lua scripts, and deletion; automatic single-key routing does not make cross-slot operations valid.
 
 ## See also
 

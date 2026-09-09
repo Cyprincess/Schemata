@@ -1,9 +1,9 @@
 # Event Dispatch Pipeline
 
-The bus separates publishing from handler invocation through a transactional outbox. `PublishAsync`
-runs the publish-side advisor pipeline, records an audit row, and returns; it does not call
-handlers. The `EventOutboxDispatcher` background service later claims that row and replays it through
-the handler resolver, the consume-side advisor pipeline, and the lifecycle observers.
+`PublishAsync` runs the publish-side advisor pipeline and lifecycle observers before dispatch.
+`InProcessEventBus` then awaits handlers inline. `RabbitMqEventBus` publishes directly to the broker
+and awaits publisher confirmation; `RabbitMqConsumerHost` invokes handlers separately. Audit rows
+record these lifecycle callbacks. They are not a transactional outbox or a publish-retry queue.
 
 The bus is broadcast-only. Request/reply is a different shape — one handler, one answer — and lives
 on `IRequestDispatcher` in [Messaging](../messaging/overview.md).
@@ -12,8 +12,9 @@ on `IRequestDispatcher` in [Messaging](../messaging/overview.md).
 
 | Package                     | Key files                                                                                                                                                                                                                                             |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Schemata.Event.Skeleton`   | `Advisors/IEventPublishAdvisor.cs`, `Advisors/IEventConsumeAdvisor.cs`, `IEventLifecycleObserver.cs`, `IEventOutboxPublisher.cs`, `EventOutboxMessage.cs`, `EventOutboxDelivery.cs`, `EventContext.cs`, `IEventDispatchContext.cs`, `EventRouting.cs` |
-| `Schemata.Event.Foundation` | `Internal/InProcessEventBus.cs`, `Internal/InProcessEventOutboxPublisher.cs`, `EventOutboxDispatcher.cs`, `Internal/HandlerResolver.cs`, `Observers/SchemataEventAuditObserver.cs`                                                                    |
+| `Schemata.Event.Skeleton` | `Advisors/IEventPublishAdvisor.cs`, `Advisors/IEventConsumeAdvisor.cs`, `IEventLifecycleObserver.cs`, `EventContext.cs`, `IEventDispatchContext.cs`, `EventRouting.cs` |
+| `Schemata.Event.Foundation` | `Runtime/InProcessEventBus.cs`, `Runtime/HandlerResolver.cs`, `Observers/SchemataEventAuditObserver.cs` |
+| `Schemata.Event.RabbitMq` | `Runtime/RabbitMqEventBus.cs`, `Runtime/RabbitMqConsumerHost.cs` |
 
 ## Publish path
 
@@ -21,16 +22,20 @@ on `IRequestDispatcher` in [Messaging](../messaging/overview.md).
 
 1. `IEventTypeRegistry.RequireName(@event.GetType())` — throws if unregistered.
 2. Builds an `EventContext` with the wire name, JSON payload, a fresh correlation id,
-   `RequiresOutboxDelivery = true`, and the optional source entity.
+   and the optional source entity, within a new DI scope and `AdviceContext`.
 3. Runs the `IEventPublishAdvisor` pipeline (sorted by `Order`).
    - `Continue` proceeds; `Block` throws `InvalidOperationException("Event publish blocked by advisor.")`;
      `Handle` with a value stashed in `AdviceContext` sets `Result` and returns without recording.
-4. Notifies every `IEventLifecycleObserver.OnPublishedAsync`. The audit observer writes a
-   `SchemataEvent` row in state `Pending` (because `RequiresOutboxDelivery` is set) only when
-   the application has registered the Event audit Name advisor described in
-   [Audit row names](#audit-row-names); without it the canonical-name resolve throws and the
-   observer call exits without a row.
-5. Wakes the `EventOutboxDispatcher` via `NotifyPending()` and returns. No handler has run.
+4. Notifies `IEventLifecycleObserver.OnPublishedAsync`. The audit observer adds and commits a
+   `SchemataEvent` row in state `Recorded`; audit persistence needs the naming configuration
+   described in [Audit row names](#audit-row-names). The in-process bus logs observer failures and
+   continues; the RabbitMQ bus propagates them before contacting the broker.
+5. The in-process bus loads subscriptions and invokes registered handlers with the original event
+   instance. If neither typed nor fallback handlers exist, it returns successfully without consume
+   callbacks. The RabbitMQ bus opens a publisher-confirm channel, declares the durable exchange,
+   and awaits a mandatory publish with `DeliveryModes.Persistent`.
+6. RabbitMQ calls `OnDeliveredAsync` after confirmation. In-process dispatch runs consume advisors
+   and observers before returning. Neither provider automatically retries a failed publish.
 
 ## Audit row names
 
@@ -56,109 +61,111 @@ The application Name advisor runs at order `50_000_000`, before this built-in pr
 is `null`, `Resolve` throws on `events/{event}`, and the audit observer's `AddAsync` call
 never commits a row.
 
-`InProcessEventBus.NotifyPublishedAsync` (see `Schemata.Event.Foundation.Internal.InProcessEventBus`)
-catches that exception, logs the literal
-`IEventLifecycleObserver.OnPublishedAsync threw for event '{EventType}'.` at `Warning`, and
-continues to the next observer. `PublishAsync` then wakes the outbox dispatcher and returns
-successfully. Storage contains no audit row. Application monitoring can treat that warning
-literal as an audit misconfiguration signal.
+`InProcessEventBus.NotifyPublishedAsync` (in `Schemata.Event.Foundation.Runtime`) catches audit
+observer failures, logs `IEventLifecycleObserver.OnPublishedAsync threw for event '{EventType}'.`
+at `Warning`, and continues toward handler dispatch. Missing audit persistence therefore does not
+by itself prevent in-process delivery. `RabbitMqEventBus` propagates the same observer failure and
+does not publish to the broker. Configure audit naming and persistence on both producer types.
 
-## Outbox dispatch
+## Delivery and transaction boundaries
 
-`EventOutboxDispatcher` is a `BackgroundService` that wakes on `NotifyPending()` or every 30 seconds.
-Each pass claims rows in state `Pending`, plus any `Publishing` row a crashed dispatcher left stale
-past a five-minute claim timeout (batch size 100). For each row:
+`PublishAsync` performs delivery work within the call. A RabbitMQ confirmation records broker
+acceptance, not consumer success or a commit of the application's business transaction. An
+`OnDeliveredAsync` failure can fault the call after the broker has already accepted the message.
 
-1. Transitions the row to `Publishing` under its concurrency token; an `AbortedException` means a
-   competing dispatcher won the claim, so the row is skipped.
-2. Calls `IEventOutboxPublisher.PublishAsync(EventOutboxMessage)`, passing the persisted payload,
-   correlation id, and source snapshot.
-3. Inspects the returned `EventOutboxDelivery`:
-   - `Delivered` — the broker accepted the message; a downstream consumer sets the terminal state.
-     The dispatcher marks the row `Recorded` as a fallback.
-   - `Consumed` — the publisher already replayed handlers in-process and the consume path owns the
-     terminal `Succeeded`/`Failed` state; the dispatcher leaves it untouched.
-4. On a publish failure, returns the row to `Pending`, increments `RetryCount`, records the error,
-   and the next pass retries. Delivery is at-least-once.
+`SchemataEventAuditObserver` commits its audit row before delivery and has no replay loop. A
+`Recorded` row can remain after a failed publish, a publish with no in-process handlers, or a
+RabbitMQ consume whose repository cannot find the producer's row. The audit observer's inherited
+`OnDeliveredAsync` is a no-op; broker confirmation does not change the audit state.
 
-The default `InProcessEventOutboxPublisher` returns `Consumed`; `RabbitMqEventOutboxPublisher`
-returns `Delivered`.
+Publishing from a committed repository advisor protects against publishing a rolled-back mutation,
+but a crash between business commit and publish can still lose the event. Applications own any
+atomic delivery mechanism and retry policy they require.
 
 ## Consume path
 
-The in-process publisher (`InProcessEventOutboxPublisher.PublishAsync`) and the RabbitMQ consumer
-(`RabbitMqConsumerHost`) share the same consume shape:
+The in-process bus loads matching subscriptions, probes for handlers, and dispatches the original
+event instance. An empty subscription list does not suppress registered in-process handlers.
 
-1. Resolve the wire name back to a CLR type via `IEventTypeRegistry.Resolve`. An unknown name is a
-   poison message (dropped in-process, dead-lettered on RabbitMQ).
-2. Deserialize the payload and load matching subscriptions through
-   `IRepository<SchemataEventSubscription>.ListMatchingAsync`, exposing them on
-   `IEventDispatchContext`.
-3. Invoke handlers through `HandlerResolver.InvokeEventHandlersAsync` under the type's
-   `EventRouting`.
-4. In a `finally` block, run the `IEventConsumeAdvisor` pipeline, then notify every
-   `IEventLifecycleObserver.OnConsumedAsync`. The first observer failure is captured into
-   `EventContext.Exception` while the remaining observers still run; the captured exception is
-   rethrown after the loop (see [IEventLifecycleObserver](#ieventlifecycleobserver)).
+`RabbitMqConsumerHost` resolves the routing key through `IEventTypeRegistry.Resolve`, loads matching
+subscriptions, and deserializes the payload. An unknown wire name is rejected without requeue. A
+known event with no matching persisted subscriptions is acknowledged and dropped before handler
+dispatch. With subscriptions present, a null or invalid payload or a missing handler fails delivery.
 
-`EventContext.Result` (or `Exception`) reflects the handler outcome before the consume pipeline runs.
+Both paths invoke `HandlerResolver.InvokeEventHandlersAsync` under the event's `EventRouting`, set
+`EventContext.Result = true` on success, and capture handler failures in `EventContext.Exception`.
+They run consume advisors after handler invocation, including handler failures. RabbitMQ does this
+in a `finally` block; in-process dispatch captures the exception and runs the consume path before
+rethrowing. An advisor exception exits before consume observers run.
+
+Consume observers run with the audit observer last. The first observer failure is captured in
+`EventContext.Exception`; remaining observers still run, then the failure propagates. In-process
+failures reach the publish caller. RabbitMQ acknowledges successful handling and rejects failures
+with `BasicNackAsync(requeue: false)` for the configured dead-letter routing. It logs acknowledgment
+transport failures separately.
 
 ## IEventPublishAdvisor
 
 ```csharp
+using Schemata.Abstractions.Advisors;
+using Schemata.Event.Skeleton;
+
 public interface IEventPublishAdvisor : IAdvisor<EventContext>;
 ```
 
-Runs before the row is recorded. `Block` throws; `Handle` returns a cached result without recording
-an outbox row. No built-in publish advisor ships.
+Runs before lifecycle observers and delivery. `Block` throws; `Handle` with a value in
+`AdviceContext` returns without recording or dispatching. A `Handle` without a value also throws.
+Applications register their own publish advisors.
 
 ## IEventConsumeAdvisor
 
 ```csharp
+using Schemata.Abstractions.Advisors;
+using Schemata.Event.Skeleton;
+
 public interface IEventConsumeAdvisor : IAdvisor<EventContext>;
 ```
 
-Runs in the `finally` block after handler invocation, so it always executes whether the handler
-returned or threw. Inspect `EventContext.Exception` to route to a dead-letter queue, emit metrics,
-or count retries. The bus consumes all three `AdviseResult` values identically here — the advisor is
-observational at this stage.
+Runs after handler invocation, including captured handler failures. Inspect `EventContext.Exception`
+to emit metrics or implement application-owned failure handling. The bus ignores the returned
+`AdviseResult`; an exception still propagates and prevents the subsequent observer callbacks.
 
 ## IEventLifecycleObserver
 
 ```csharp
+using System.Threading;
+using System.Threading.Tasks;
+using Schemata.Event.Skeleton;
+
 public interface IEventLifecycleObserver
 {
     Task OnPublishedAsync(EventContext context, CancellationToken ct = default);
-    Task OnDeliveredAsync(EventContext context, CancellationToken ct = default);  // default no-op
+    Task OnDeliveredAsync(EventContext context, CancellationToken ct = default)
+        => Task.CompletedTask;
     Task OnConsumedAsync(EventContext context, CancellationToken ct = default);
 }
 ```
 
-Registered through `TryAddEnumerable` as scoped. `OnPublishedAsync` fires after the publish advisor
-returns `Continue`; `OnDeliveredAsync` fires after a durable broker confirms a publish (the outbox
-path); `OnConsumedAsync` fires after handler dispatch settles.
+Registered through `TryAddEnumerable` as scoped. `OnPublishedAsync` runs after publish advisors
+continue; `OnDeliveredAsync` runs only in the RabbitMQ producer after confirmation;
+`OnConsumedAsync` runs after the consume advisors.
 
 Failure handling differs by callback:
 
-- `OnPublishedAsync`: the in-process bus catches each failure, logs it at `Warning`, and runs the
-  next observer, so a publish stays successful when an observer throws (see
-  [Audit row names](#audit-row-names)).
-- `OnDeliveredAsync`: a failure propagates. In the in-process replay it escapes before any handler
-  runs; in both outbox publishers it escapes to `EventOutboxDispatcher`'s failure path, which
-  returns the row to `Pending`, increments `RetryCount`, and records `RecentError`.
-- `OnConsumedAsync`: the first failure is captured into `EventContext.Exception` and the remaining
-  observers still run, so the audit observer can record `Failed` with `RecentError`; the captured
-  exception is then rethrown. `InProcessEventOutboxPublisher` and `RabbitMqConsumerHost` share the
-  pattern, and the rethrow reaches the outbox failure path or the RabbitMQ consumer loop.
+- `OnPublishedAsync`: the in-process bus logs each failure at `Warning` and continues. The RabbitMQ
+  bus propagates the first failure before publishing.
+- `OnDeliveredAsync`: RabbitMQ propagates a failure after broker acceptance. Subsequent observers
+  do not run and the bus does not retry. In-process publishing does not call this callback.
+- `OnConsumedAsync`: the first failure is captured while remaining observers run, with the audit
+  observer last. The failure then reaches the in-process caller or RabbitMQ's rejection path.
 
 The built-in `SchemataEventAuditObserver`:
 
-- `OnPublishedAsync` — writes the `SchemataEvent` row as `Pending` when `RequiresOutboxDelivery` is
-  set, otherwise `Recorded`; captures the source snapshot.
-- `OnDeliveredAsync` — transitions the row to `Recorded`, recovering it by `CorrelationId` if the
-  context lost its `Record` reference (cross-process delivery).
-- `OnConsumedAsync` — sets `Succeeded` (with the serialized response) or `Failed` (with the error),
-  recovering the producer's row by `CorrelationId` on cross-process consume.
+- `OnPublishedAsync` adds and commits a `Recorded` row with the source snapshot.
+- `OnDeliveredAsync` uses the interface's default no-op implementation.
+- `OnConsumedAsync` sets `Succeeded` with the serialized result or `Failed` with the error. If the
+  context lacks a record, it queries by `CorrelationId`; it returns without writing when no row
+  is visible. Cross-process audit updates therefore require access to the producer's audit store.
 
 ## HandlerResolver
 
@@ -168,7 +175,8 @@ The built-in `SchemataEventAuditObserver`:
 - `CompetingConsumers` — invokes only the first registered `IEventHandler<TEvent>`.
 
 When no `IEventHandler<TEvent>` is registered, the resolver falls back to `IEventHandler<IEvent>`
-instances; with neither, it throws `InvalidOperationException`.
+instances; with neither, invocation throws `InvalidOperationException`. The in-process publish
+path probes with `HasHandlers(Type)` first and treats zero handlers as a successful broadcast.
 
 The resolver handles events only. `IRequest<TResponse>` and `IRequestHandler<TRequest, TResponse>`
 belong to `Schemata.Messaging.Skeleton`, and their dispatch belongs to `IRequestDispatcher` — see
@@ -177,6 +185,9 @@ belong to `Schemata.Messaging.Skeleton`, and their dispatch belongs to `IRequest
 ## IEventDispatchContext
 
 ```csharp
+using System.Collections.Generic;
+using Schemata.Event.Skeleton.Entities;
+
 public interface IEventDispatchContext
 {
     IReadOnlyList<SchemataEventSubscription>? MatchedSubscriptions { get; }
@@ -189,18 +200,16 @@ the matched subscriptions before handler invocation; handlers and advisors read 
 
 ## SchemataEventSubscription
 
-Subscriptions are persisted entities in `Schemata.Event.Skeleton.Entities`:
+Selected subscription fields are listed below; the full entity and framework traits are declared in
+`src/Schemata.Event.Skeleton/Entities/SchemataEventSubscription.cs`.
 
-```csharp
-public class SchemataEventSubscription : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
-{
-    public string  EventType      { get; set; }
-    public string? CorrelationKey { get; set; }
-    public string  Target         { get; set; }
-    public string  SubscriptionId { get; set; }
-    // plus framework traits (Uid, Name, CanonicalName, Timestamp, CreateTime, UpdateTime)
-}
-```
+| Field | Type |
+| --- | --- |
+| `EventType` | `string` |
+| `CorrelationKey` | `string?` |
+| `Target` | `string` |
+| `Token` | `string?` |
+| `SubscriptionId` | `string` |
 
 `IRepository<SchemataEventSubscription>.ListMatchingAsync(eventType, correlationKey)` returns
 subscriptions matching the wire name and the optional correlation key. The extension lives in
@@ -211,6 +220,9 @@ subscriptions matching the wire name and the optional correlation key. The exten
 `EventRouting` is configured per event type via `EventBuilder.ConfigureRouting<TEvent>(routing)`:
 
 ```csharp
+using Microsoft.AspNetCore.Builder;
+using Schemata.Event.Skeleton;
+
 schema.UseEvent()
       .RegisterEvent<OrderPlaced>("orders/order-placed")
       .ConfigureRouting<OrderPlaced>(EventRouting.CompetingConsumers);
@@ -220,12 +232,12 @@ The default is `Broadcast`.
 
 ## Caveats
 
-- `PublishAsync` returns before any handler runs. Handler effects are observable only after the
-  outbox dispatcher drains the row.
+- In-process `PublishAsync` awaits handlers; RabbitMQ `PublishAsync` awaits broker confirmation,
+  not consumer completion. Audit persistence does not provide atomic delivery or automatic retries.
 - `IEventHandler<IEvent>` is a fallback: it receives any event with no more specific handler
   registered.
-- An `IEventLifecycleObserver` that throws inside `OnDeliveredAsync` or `OnConsumedAsync` fails the
-  delivery; `OnPublishedAsync` failures in the in-process bus are isolated at `Warning`.
+- A RabbitMQ `OnDeliveredAsync` failure can reach the caller after broker acceptance. Consume
+  observer failures propagate; in-process `OnPublishedAsync` failures are isolated at `Warning`.
 
 ## See also
 

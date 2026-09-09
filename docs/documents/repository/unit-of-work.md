@@ -118,8 +118,8 @@ each enlisted repository registered, in turn dispatching that repository's commi
 committed sink throws, the unit of work collects the errors and rethrows them (single error directly,
 several as an `AggregateException`) after running the remaining sinks.
 
-Query-cache eviction uses this pipeline: updated and removed entities evict reverse-indexed cache
-entries after commit; added entities do not.
+Query-cache eviction uses this pipeline: any added, updated, or removed entity publishes a new
+generation for its type after commit, invalidating entity results, aggregates, and projections.
 
 ## Reopening after commit
 

@@ -18,7 +18,7 @@ public static class AdviceCommittedEvictCache
 }
 
 /// <summary>
-///     Evicts query-cache entries for updated and removed entities after a repository commit.
+///     Invalidates all cached queries for the entity type after a repository commit with changes.
 /// </summary>
 /// <typeparam name="TEntity">The entity type whose committed changes invalidate cached queries.</typeparam>
 public sealed class AdviceCommittedEvictCache<TEntity> : IRepositoryCommittedAdvisor<TEntity>
@@ -30,7 +30,7 @@ public sealed class AdviceCommittedEvictCache<TEntity> : IRepositoryCommittedAdv
     /// <summary>
     ///     Initializes a cache-eviction advisor with the cache provider and query-cache options.
     /// </summary>
-    /// <param name="cache">The cache provider containing query results and reverse indexes.</param>
+    /// <param name="cache">The cache provider containing query results and generation metadata.</param>
     /// <param name="options">The query-cache options controlling eviction.</param>
     public AdviceCommittedEvictCache(ICacheProvider cache, IOptions<SchemataQueryCacheOptions> options) {
         _cache   = cache;
@@ -49,38 +49,11 @@ public sealed class AdviceCommittedEvictCache<TEntity> : IRepositoryCommittedAdv
             return AdviseResult.Continue;
         }
 
-        foreach (var entity in changes.Updated) {
-            await EvictAsync(_cache, typeof(TEntity), entity, ct);
-        }
-
-        foreach (var entity in changes.Removed) {
-            await EvictAsync(_cache, typeof(TEntity), entity, ct);
+        if (changes.Added.Count > 0 || changes.Updated.Count > 0 || changes.Removed.Count > 0) {
+            await _cache.SetAsync(CacheGeneration<TEntity>.Key, Guid.NewGuid().ToByteArray(), new(), ct);
         }
 
         return AdviseResult.Continue;
     }
 
-    private static async Task EvictAsync(
-        ICacheProvider    cache,
-        Type              entityType,
-        object            entity,
-        CancellationToken ct
-    ) {
-        var index = ReverseIndex.BuildKey(entityType, entity);
-        if (index is null) {
-            return;
-        }
-
-        var keys = await cache.CollectionMembersAsync(index, ct);
-        if (keys is not { Count: > 0 }) {
-            await cache.CollectionClearAsync(index, ct);
-            return;
-        }
-
-        foreach (var key in keys) {
-            await cache.RemoveAsync(key, ct);
-        }
-
-        await cache.CollectionClearAsync(index, ct);
-    }
 }

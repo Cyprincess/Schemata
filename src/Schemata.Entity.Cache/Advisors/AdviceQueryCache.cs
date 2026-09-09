@@ -60,7 +60,12 @@ public sealed class AdviceQueryCache<TEntity, TResult, T> : IRepositoryQueryAdvi
             return AdviseResult.Continue;
         }
 
-        var key = context.ToCacheKey();
+        var queryKey = context.ToCacheKey();
+        if (string.IsNullOrWhiteSpace(queryKey)) {
+            return AdviseResult.Continue;
+        }
+
+        var key = await CacheGeneration<TEntity>.CaptureAsync(_cache, context, queryKey, ct);
         if (string.IsNullOrWhiteSpace(key)) {
             return AdviseResult.Continue;
         }

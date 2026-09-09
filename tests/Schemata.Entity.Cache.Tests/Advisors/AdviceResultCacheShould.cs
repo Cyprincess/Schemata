@@ -1,189 +1,73 @@
 using System;
-using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Moq;
 using Schemata.Abstractions.Advisors;
-using Schemata.Caching.Skeleton;
 using Schemata.Entity.Cache.Advisors;
 using Schemata.Entity.Cache.Tests.Fixtures;
-using Schemata.Entity.Repository;
 using Xunit;
 
 namespace Schemata.Entity.Cache.Tests.Advisors;
 
+[Trait("Layer", "Unit")]
 public class AdviceResultCacheShould
 {
-    private static IOptions<SchemataQueryCacheOptions> DefaultOptions() {
-        return Options.Create(new SchemataQueryCacheOptions());
+    [Fact]
+    public async Task Fill_WithoutQuerySnapshot_DoesNotPublishResult() {
+        using var cache = new QueryCacheTestContext();
+        await cache.Fill(cache.Query<int>(), 7);
+        Assert.Equal(AdviseResult.Continue, await cache.Read(cache.Query<int>()));
     }
 
     [Fact]
-    public async Task Advise_WithResult_StoresInCache() {
-        var mock = new Mock<ICacheProvider>();
-        mock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
-                                   It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
-        var advisor    = new AdviceResultCache<Student, Student, Student>(mock.Object, DefaultOptions());
-        var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var repository = new Mock<IRepository<Student>>().Object;
-        var data       = new[] { new Student { Uid = Guid.NewGuid(), FullName = "Alice" } }.AsQueryable();
-        var context = new QueryContext<Student, Student, Student>(repository, data) {
-            Result = new() { Uid = Guid.NewGuid(), FullName = "Alice" },
-        };
-
-        var result = await advisor.AdviseAsync(ctx, context, CancellationToken.None);
-
-        Assert.Equal(AdviseResult.Continue, result);
-        var key = context.ToCacheKey();
-        Assert.NotNull(key);
-        mock.Verify(
-            x => x.SetAsync(key, It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(), It.IsAny<CancellationToken>()),
-            Times.Once);
+    public async Task Fill_WithNullResult_LeavesQueryUncached() {
+        using var cache = new QueryCacheTestContext();
+        var query = cache.Query<Student>();
+        await cache.Read(query);
+        await cache.Fill(query, null!);
+        Assert.Equal(AdviseResult.Continue, await cache.Read(cache.Query<Student>()));
     }
 
     [Fact]
-    public async Task Advise_NullResult_DoesNotStore() {
-        var mock       = new Mock<ICacheProvider>();
-        var advisor    = new AdviceResultCache<Student, Student, Student>(mock.Object, DefaultOptions());
-        var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var repository = new Mock<IRepository<Student>>().Object;
-        var data       = new[] { new Student { Uid = Guid.NewGuid(), FullName = "Alice" } }.AsQueryable();
-        var context    = new QueryContext<Student, Student, Student>(repository, data) { Result = null };
+    public async Task Fill_UsesConfiguredAbsoluteLifetime_DespiteRepeatedReads() {
+        using var cache = new QueryCacheTestContext();
+        cache.Options.Ttl = TimeSpan.FromSeconds(7);
+        var query = cache.Query<int>();
+        await cache.Read(query);
+        await cache.Fill(query, 7);
 
-        var result = await advisor.AdviseAsync(ctx, context, CancellationToken.None);
-
-        Assert.Equal(AdviseResult.Continue, result);
-        mock.Verify(
-            x => x.SetAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
-                            It.IsAny<CancellationToken>()), Times.Never);
+        cache.Elapsed = TimeSpan.FromSeconds(6);
+        var hit = cache.Query<int>();
+        Assert.Equal(AdviseResult.Handle, await cache.Read(hit));
+        Assert.Equal(7, hit.Result);
+        cache.Elapsed = TimeSpan.FromSeconds(7);
+        Assert.Equal(AdviseResult.Continue, await cache.Read(cache.Query<int>()));
     }
 
     [Fact]
-    public async Task Advise_Suppressed_DoesNotStore() {
-        var mock    = new Mock<ICacheProvider>();
-        var advisor = new AdviceResultCache<Student, Student, Student>(mock.Object, DefaultOptions());
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        ctx.Set(new QueryCacheSuppressed());
-        var repository = new Mock<IRepository<Student>>().Object;
-        var data       = new[] { new Student { Uid = Guid.NewGuid(), FullName = "Alice" } }.AsQueryable();
-        var context = new QueryContext<Student, Student, Student>(repository, data) {
-            Result = new() { Uid = Guid.NewGuid(), FullName = "Alice" },
-        };
+    public async Task Fill_WhenSuppressed_DoesNotReadOrReplaceCachedResult() {
+        using var cache = new QueryCacheTestContext();
+        var query = cache.Query<int>();
+        await cache.Read(query);
+        await cache.Fill(query, 7);
 
-        var result = await advisor.AdviseAsync(ctx, context, CancellationToken.None);
+        using (cache.Advice.Use<QueryCacheSuppressed>()) {
+            Assert.Equal(AdviseResult.Continue, await cache.Read(cache.Query<int>()));
+            await cache.Fill(query, 9);
+        }
 
-        Assert.Equal(AdviseResult.Continue, result);
-        mock.Verify(
-            x => x.SetAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
-                            It.IsAny<CancellationToken>()), Times.Never);
+        var next = cache.Query<int>();
+        Assert.Equal(AdviseResult.Handle, await cache.Read(next));
+        Assert.Equal(7, next.Result);
     }
 
     [Fact]
-    public async Task Advise_SingularResult_RegistersCacheKeyInCollection() {
-        var mock = new Mock<ICacheProvider>();
-        mock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
-                                   It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        mock.Setup(x => x.CollectionAddAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CacheEntryOptions>(),
-                                             It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
-        var advisor    = new AdviceResultCache<Student, Student, Student>(mock.Object, DefaultOptions());
-        var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var repository = new Mock<IRepository<Student>>().Object;
-        var data       = new[] { new Student { Uid = Guid.NewGuid(), FullName = "Alice" } }.AsQueryable();
-        var entity     = new Student { Uid = Guid.NewGuid(), FullName = "Alice" };
-        var context    = new QueryContext<Student, Student, Student>(repository, data) { Result = entity };
-
-        var result = await advisor.AdviseAsync(ctx, context, CancellationToken.None);
-
-        Assert.Equal(AdviseResult.Continue, result);
-        var cacheKey = context.ToCacheKey();
-        Assert.NotNull(cacheKey);
-        var indexKey = ReverseIndex.BuildKey(typeof(Student), entity);
-        Assert.NotNull(indexKey);
-        mock.Verify(
-            x => x.CollectionAddAsync(indexKey, cacheKey, It.IsAny<CacheEntryOptions>(),
-                                      It.IsAny<CancellationToken>()), Times.Once);
+    public async Task Fill_AfterQuerySuppressionEnds_StillRequiresSnapshot() {
+        using var cache = new QueryCacheTestContext();
+        var query = cache.Query<int>();
+        using (cache.Advice.Use<QueryCacheSuppressed>()) {
+            await cache.Read(query);
+        }
+        await cache.Fill(query, 7);
+        Assert.Equal(AdviseResult.Continue, await cache.Read(cache.Query<int>()));
     }
 
-    [Fact]
-    public async Task Advise_CollectionAggregateResult_SkipsCollection() {
-        var mock = new Mock<ICacheProvider>();
-        mock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
-                                   It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
-        var advisor    = new AdviceResultCache<Student, Student, int>(mock.Object, DefaultOptions());
-        var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var repository = new Mock<IRepository<Student>>().Object;
-        var data       = new[] { new Student { Uid = Guid.NewGuid() } }.AsQueryable();
-        var context    = new QueryContext<Student, Student, int>(repository, data) { Result = 5 };
-
-        var result = await advisor.AdviseAsync(ctx, context, CancellationToken.None);
-
-        Assert.Equal(AdviseResult.Continue, result);
-        mock.Verify(
-            x => x.CollectionAddAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CacheEntryOptions>(),
-                                      It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task Advise_ProjectionResultNotTEntity_DoesNotThrowAndSkipsCollection() {
-        var mock = new Mock<ICacheProvider>();
-        mock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
-                                   It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
-        var advisor    = new AdviceResultCache<Student, StudentDto, StudentDto>(mock.Object, DefaultOptions());
-        var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var repository = new Mock<IRepository<Student>>().Object;
-        var data = new[] { new Student { Uid = Guid.NewGuid(), FullName = "Alice" } }.AsQueryable()
-                                                                                           .Select(s => new StudentDto(
-                                                                                                       s.Uid,
-                                                                                                       s.FullName));
-        var context = new QueryContext<Student, StudentDto, StudentDto>(repository, data) {
-            Result = new(Guid.NewGuid(), "Alice"),
-        };
-
-        var result = await advisor.AdviseAsync(ctx, context, CancellationToken.None);
-
-        Assert.Equal(AdviseResult.Continue, result);
-        mock.Verify(
-            x => x.CollectionAddAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CacheEntryOptions>(),
-                                      It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task Advise_ConfiguredTtl_AppliesToStoredEntry() {
-        CacheEntryOptions? captured = null;
-        var                mock     = new Mock<ICacheProvider>();
-        mock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
-                                   It.IsAny<CancellationToken>()))
-            .Callback<string, byte[], CacheEntryOptions, CancellationToken>((
-                                                                                _,
-                                                                                _,
-                                                                                opts,
-                                                                                _
-                                                                            ) => captured = opts)
-            .Returns(Task.CompletedTask);
-
-        var options    = Options.Create(new SchemataQueryCacheOptions { Ttl = TimeSpan.FromSeconds(7) });
-        var advisor    = new AdviceResultCache<Student, Student, Student>(mock.Object, options);
-        var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var repository = new Mock<IRepository<Student>>().Object;
-        var data       = new[] { new Student { Uid = Guid.NewGuid() } }.AsQueryable();
-        var context = new QueryContext<Student, Student, Student>(repository, data) {
-            Result = new() { Uid = Guid.NewGuid(), FullName = "Alice" },
-        };
-
-        await advisor.AdviseAsync(ctx, context, CancellationToken.None);
-
-        Assert.NotNull(captured);
-        Assert.Equal(TimeSpan.FromSeconds(7), captured!.SlidingExpiration);
-    }
 }

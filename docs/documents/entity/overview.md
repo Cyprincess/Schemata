@@ -129,6 +129,6 @@ which keeps it easy to test, serialize, and share across assembly boundaries.
 ## See also
 
 - [traits.md](traits.md) — full trait reference with advisor order numbers
-- [query-cache.md](query-cache.md) — `Schemata.Entity.Cache` advisors, reverse index, committed eviction
+- [query-cache.md](query-cache.md) — `Schemata.Entity.Cache` advisors, type generations, committed eviction
 - [repository/mutation-pipeline.md](../repository/mutation-pipeline.md) — add/update/remove advisor chains
 - [repository/query-pipeline.md](../repository/query-pipeline.md) — build-query/query/result advisor chains

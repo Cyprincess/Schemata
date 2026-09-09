@@ -35,10 +35,8 @@ public static class AdviceResultCache
 ///         not auto-registered.
 ///     </para>
 ///     <para>
-///         Singular queries (where <typeparamref name="T" /> is a reference type that equals
-///         <typeparamref name="TEntity" />) additionally record their cache key in the
-///         <see cref="ReverseIndex" /> so <see cref="AdviceCommittedEvictCache{TEntity}" />
-///         can evict by entity primary key.
+///         Results use the generation captured before database execution so a late fill cannot
+///         repopulate the generation published by a concurrent commit.
 ///     </para>
 ///     <para>Suppressed when <see cref="QueryCacheSuppressed" /> is present in the advice context.</para>
 /// </remarks>
@@ -75,27 +73,15 @@ public class AdviceResultCache<TEntity, TResult, T> : IRepositoryResultAdvisor<T
             return AdviseResult.Continue;
         }
 
-        var key = context.ToCacheKey();
-        if (string.IsNullOrWhiteSpace(key)) {
+        if (!CacheGeneration<TEntity>.TryGetKey(context, out var key) || key is null) {
             return AdviseResult.Continue;
         }
 
         var ttl   = _options.Value.Ttl;
         var bytes = JsonSerializer.SerializeToUtf8Bytes(context.Result);
         await _cache.SetAsync(key, bytes, new() {
-            SlidingExpiration = ttl,
+            AbsoluteExpirationRelativeToNow = ttl,
         }, ct);
-
-        if (context.Result is not TEntity entity) {
-            return AdviseResult.Continue;
-        }
-
-        var index = ReverseIndex.BuildKey(typeof(TEntity), entity);
-        if (index is not null) {
-            await _cache.CollectionAddAsync(index, key, new() {
-                SlidingExpiration = ttl,
-            }, ct);
-        }
 
         return AdviseResult.Continue;
     }

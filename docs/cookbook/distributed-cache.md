@@ -44,7 +44,7 @@ var builder = WebApplication.CreateBuilder(args)
 
 ## Step 2: Configure TTL and understand the cache key
 
-`SchemataQueryCacheOptions.Ttl` is the sliding expiration applied to cached results and reverse-index entries (default 5 minutes). The cache key comes from `QueryContext.ToCacheKey()`, which stringizes the built LINQ expression tree — so the filter, ordering, and `Skip`/`Take` operators all factor into the key — appends `typeof(T).FullName`, and hashes the result. Two queries with different LINQ produce different keys.
+`SchemataQueryCacheOptions.Ttl` is the absolute lifetime of cached results (default 5 minutes); cache hits do not extend it. The query key comes from `QueryContext.ToCacheKey()`, which stringizes the built LINQ expression tree, appends `typeof(T).FullName`, and hashes the result. Filters, ordering, and `Skip`/`Take` operators factor into the key. The stored result key also includes the root entity type's generation captured before query execution. Generation metadata does not expire.
 
 ```csharp
 services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
@@ -103,9 +103,9 @@ using (repository.SuppressQueryCache())
 
 - **`UseQueryCache` lives on `SchemataRepositoryBuilder`.** Chain it after `AddRepository`. The `ICacheProvider` (via `AddDistributedCache` or `AddRedisCache`) must also be registered, separately.
 - **`AddDistributedCache` and `AddRedisCache` both use `TryAddSingleton`.** Calling both registers only the first. Pick one per application.
-- **`DistributedCacheProvider` is single-process safe only for collection operations.** The reverse index that maps an entity to its cache keys is stored in the same `IDistributedCache`. With an in-memory backend, each process holds its own index, so eviction in one process does not reach the others. Use Redis for multi-process deployments.
-- **Redis collection operations are cluster-safe.** `RedisCacheProvider` uses native Redis Set commands (`SADD`, `SMEMBERS`, `SREM`, `DEL`) for the reverse index, atomic at the server. (Its atomic compare-and-swap key-value operations use Lua scripts; the query cache does not use them.)
-- **Rollback skips eviction.** If `CommitAsync` throws and the transaction rolls back, committed advisors do not run. The cache may serve stale data until the TTL expires.
+- **Processes must share a backing cache for invalidation.** An in-memory backend is private to each process. A commit publishes a new entity-type generation into the selected provider, invalidating entity results, aggregates, and projections. Use a shared backend for multi-process deployments.
+- **Redis deployment constraints apply to provider operations.** See [Redis](../documents/caching/redis.md) for hash-slot requirements when using Redis Cluster.
+- **Database commit and cache invalidation are non-atomic.** Rollback skips invalidation. A crash or cache failure after database commit but before generation publication can leave old entries selectable until their absolute TTL expires.
 
 ## See also
 

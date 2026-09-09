@@ -168,16 +168,14 @@ public sealed class SchemataBuilder
         Services.Clear();
 
         var modules = Options.GetFeatures();
-        if (modules is null) {
-            return this;
-        }
+        if (modules is not null) {
+            var features = modules.Values.ToList();
 
-        var features = modules.Values.ToList();
+            features.Sort((a, b) => a.Order.CompareTo(b.Order));
 
-        features.Sort((a, b) => a.Order.CompareTo(b.Order));
-
-        foreach (var feature in features) {
-            feature.ConfigureServices(services, Options, Configurators, Configuration, Environment);
+            foreach (var feature in features) {
+                feature.ConfigureServices(services, Options, Configurators, Configuration, Environment);
+            }
         }
 
         Configurators.Invoke(services);

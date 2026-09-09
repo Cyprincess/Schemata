@@ -135,10 +135,7 @@ public sealed class RedisCacheProvider : ICacheProvider
     }
 
     public async Task RemoveAsync(string key, CancellationToken ct = default) {
-        var tx = _db.CreateTransaction();
-        await tx.KeyDeleteAsync(key);
-        await tx.KeyDeleteAsync(GetMetaKey(key));
-        await tx.ExecuteAsync();
+        await _db.KeyDeleteAsync([key, GetMetaKey(key)]);
     }
 
     public async Task CollectionAddAsync(

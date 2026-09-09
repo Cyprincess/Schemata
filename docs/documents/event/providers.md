@@ -1,26 +1,27 @@
 # Event Providers
 
 Two transport backends ship: an in-process bus for single-process deployments and testing, and a
-RabbitMQ bus for multi-process or distributed scenarios. Both enforce the `IEventTypeRegistry`
-wire-name contract and both drive the same outbox dispatcher; they differ in how a published row
-reaches handlers.
+RabbitMQ bus for multi-process scenarios. Both enforce the `IEventTypeRegistry` wire-name contract.
+The in-process bus awaits handlers; the RabbitMQ bus awaits publisher confirmation.
 
 ## Where the code lives
 
 | Package                     | Key files                                                                                                                                                                                                                                                                                   |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Schemata.Event.Foundation` | `Internal/InProcessEventBus.cs`, `Internal/InProcessEventOutboxPublisher.cs`, `SchemataEventSubscriptionExtensions.cs`, `EventOutboxDispatcher.cs`, `Builders/EventProducerBuilder.cs`, `Builders/EventConsumerBuilder.cs`                                                                  |
-| `Schemata.Event.RabbitMq`   | `RabbitMqEventOptions.cs`, `Internal/RabbitMqEventBus.cs`, `Internal/RabbitMqConsumerHost.cs`, `Internal/RabbitMqEventOutboxPublisher.cs`, `Extensions/EventProducerBuilderRabbitMqExtensions.cs`, `Extensions/EventConsumerBuilderRabbitMqExtensions.cs` |
-| `Schemata.Transport.RabbitMq` | `RabbitMqConnectionOptions.cs`, `IRabbitMqConnectionProvider.cs`, `CorrelationTracker.cs`, `Internal/RabbitMqConnectionProvider.cs`, `Extensions/ServiceCollectionExtensions.cs` |
+| `Schemata.Event.Foundation` | `Runtime/InProcessEventBus.cs`, `Runtime/HandlerResolver.cs`, `SchemataEventSubscriptionExtensions.cs`, `Builders/EventProducerBuilder.cs`, `Builders/EventConsumerBuilder.cs` |
+| `Schemata.Event.RabbitMq` | `RabbitMqEventOptions.cs`, `Runtime/RabbitMqEventBus.cs`, `Runtime/RabbitMqConsumerHost.cs`, `Extensions/EventProducerBuilderRabbitMqExtensions.cs`, `Extensions/EventConsumerBuilderRabbitMqExtensions.cs` |
+| `Schemata.Transport.RabbitMq` | `RabbitMqConnectionOptions.cs`, `IRabbitMqConnectionProvider.cs`, `CorrelationTracker.cs`, `Runtime/RabbitMqConnectionProvider.cs`, `Extensions/ServiceCollectionExtensions.cs` |
 
 ## In-process provider
 
-Suitable for single-process applications and tests. Handlers run on the same host that published,
-driven by the outbox dispatcher rather than inline.
+Suitable for single-process applications and tests. Handlers run on the publishing host within
+`PublishAsync`, which awaits their completion.
 
 ### Registration
 
 ```csharp
+using Microsoft.AspNetCore.Builder;
+
 schema.UseEvent()
       .RegisterEvent<OrderPlaced>("orders/order-placed")
       .UseProducer(p => p.UseInProcess())
@@ -41,11 +42,11 @@ provider (EF Core or LinqToDB) must register for the in-process consumer to reso
 
 ### Behavior
 
-`InProcessEventBus.PublishAsync` records a `Pending` outbox row and returns (see
-[Dispatch Pipeline](dispatch-pipeline.md)). The `EventOutboxDispatcher` claims the row and calls the
-default `InProcessEventOutboxPublisher`, which deserializes the payload, loads subscriptions, runs
-handlers, then the consume advisors and lifecycle observers. It returns `EventOutboxDelivery.Consumed`
-because the consume path already owns the terminal `Succeeded`/`Failed` state.
+`InProcessEventBus.PublishAsync` runs publish advisors and observers, loads subscriptions, and
+passes the original event instance to registered handlers. It then runs consume advisors and
+observers before returning or propagating a failure. With no typed or fallback handlers, it returns
+successfully without consume callbacks. A persisted subscription is not required for an in-process
+handler to run. See [Dispatch Pipeline](dispatch-pipeline.md).
 
 ### Subscription persistence
 
@@ -63,17 +64,24 @@ and owned by `Schemata.Transport.RabbitMq`.
 ### Registration
 
 ```csharp
+using Microsoft.AspNetCore.Builder;
+
 schema.UseEvent()
       .RegisterEvent<OrderPlaced>("orders/order-placed")
       .UseProducer(p => p.UseRabbitMq())
-      .UseConsumer(c => c.UseRabbitMq());
+      .UseConsumer(c => c.UseInProcess().UseRabbitMq());
 ```
 
-`UseRabbitMq()` on the producer registers `RabbitMqEventBus` as a scoped `IEventBus` and
-`RabbitMqEventOutboxPublisher` as the `IEventOutboxPublisher` singleton. On the consumer it registers
-`RabbitMqConsumerHost` as a hosted service. Both call `AddRabbitMqTransport()`, which contributes the
-shared `IRabbitMqConnectionProvider` and `CorrelationTracker` singletons; calling it from both sides
-is idempotent, which is what keeps one connection per process.
+`UseRabbitMq()` on the producer registers `RabbitMqEventBus` as a scoped `IEventBus`. On the
+consumer it registers `RabbitMqConsumerHost` as a hosted service. `UseInProcess()` supplies that
+host's scoped handler resolver and dispatch context. Both RabbitMQ extensions call
+`AddRabbitMqTransport()`, which uses `TryAddSingleton` for the shared connection provider and
+`CorrelationTracker`.
+
+Configure repositories for `SchemataEvent` and `SchemataEventSubscription`, audit naming as described
+in [Dispatch Pipeline](dispatch-pipeline.md#audit-row-names), and matching persisted subscriptions.
+The RabbitMQ consumer acknowledges and drops a registered event with no matching subscription;
+`UseHandler` alone does not create a subscription row.
 
 ### Connection lifecycle
 
@@ -81,12 +89,12 @@ The broker connection belongs to `IRabbitMqConnectionProvider` in `Schemata.Tran
 every client in the process shares that one `IConnection`. It is not opened in any constructor: the
 provider connects lazily on the first `GetConnectionAsync` call, guarded by a `SemaphoreSlim(1, 1)`
 so concurrent first callers share one connection attempt. A failed attempt leaves the field null so
-the next call retries cleanly. A host with an unreachable broker starts normally; only the first
-publish or consume observes the failure.
+the next connection request can attempt initialization again. A producer-only host connects on
+publish; a consumer host requests the connection when its background service starts, so broker
+unavailability can fail that service.
 
-Channels remain per-client and are disposed by their owner: the bus keeps its reply channel, the
-consumer host its consume channel, and the outbox publisher opens a publisher-confirm channel per
-publish. None of them closes the shared connection.
+Each publish opens and disposes a publisher-confirm channel. The consumer host owns its consume
+channel. The event bus has no reply channel, and neither client closes the shared connection.
 
 ### RabbitMqEventOptions
 
@@ -132,23 +140,27 @@ The wire name is the RabbitMQ routing key. `"orders/order-placed"` becomes the r
 topic exchange. `RabbitMqConsumerHost` binds the queue with `#`, receiving every routing key and
 resolving each back to a CLR type through the registry.
 
-### Outbox and confirms
+### Publisher confirmation and audit records
 
-`RabbitMqEventBus.PublishAsync` records the `Pending` outbox row through the audit observer, exactly
-as the in-process bus does. The `EventOutboxDispatcher` replays the row through
-`RabbitMqEventOutboxPublisher`, which opens a publisher-confirm channel
-(`CreateChannelOptions(publisherConfirmations: true, publisherConfirmationTracking: true)`),
-publishes with `DeliveryModes.Persistent`, and completes only on broker confirmation. It returns
-`EventOutboxDelivery.Delivered`, so a downstream `RabbitMqConsumerHost` records the terminal state on
-consume.
+`RabbitMqEventBus.PublishAsync` runs publish advisors and observers, then opens a channel with
+publisher confirmations and confirmation tracking enabled. It declares the durable exchange and
+awaits `BasicPublishAsync` with a persistent message and `mandatory: true`, then calls
+`OnDeliveredAsync` observers. The call waits for broker acceptance, not consumer success.
+
+The audit observer commits a `Recorded` row before the broker publish and does not change its state
+on confirmation. A consumer updates that row only if its repository can find it by `CorrelationId`.
+The row is an audit record, not a transactional outbox; the bus does not automatically retry a
+failed publish. Business commits, audit commits, and broker acceptance are separate operations.
 
 ### Dead-letter exchange
 
 `RabbitMqConsumerHost` declares the queue with `x-dead-letter-exchange` set to `DeadLetterExchange`
-(default `schemata.events.dlx`, a topic exchange). A message is rejected with `BasicNackAsync(requeue: false)`
-— and so dead-lettered — when the handler throws, the routing key resolves to an unregistered type,
-or deserialization returns null. Setting `DeadLetterExchange = string.Empty` skips the DLX
-declaration; poison messages are then rejected without requeue and dropped.
+(default `schemata.events.dlx`, declared as a topic exchange). It acknowledges registered events
+with no matching subscriptions. With subscriptions present, handler, consume-advisor, observer, or
+deserialization failures are rejected with `BasicNackAsync(requeue: false)`. Unknown routing keys
+are also rejected. Rejected messages use the configured dead-letter routing; a bound dead-letter
+queue is needed to retain them. Setting `DeadLetterExchange = string.Empty` skips this declaration
+and queue argument, so rejected messages are discarded unless broker policy supplies a DLX.
 
 ### Backpressure
 
@@ -159,21 +171,20 @@ stops the broker from sending more work rather than starving other consumers.
 
 The event bus is broadcast-only. Cross-process request/reply is `Schemata.Messaging.RabbitMq`, which
 registers its own `IRequestDispatcher` through `AddRabbitMqRequestDispatcher(...)` and owns its reply
-queue and correlation handling. Both packages share the one `IConnection` and the
-`CorrelationTracker` from `Schemata.Transport.RabbitMq`. See [Messaging](../messaging/overview.md).
+queue and correlation handling. Both packages use the shared connection provider; request/reply
+uses `CorrelationTracker` from `Schemata.Transport.RabbitMq`. See [Messaging](../messaging/overview.md).
 
 ## Caveats (RabbitMQ)
 
-- `RabbitMqEventBus` is registered scoped but opens a broker connection in its constructor using
-  synchronous waits on async connection open (`GetAwaiter().GetResult()`). Inject `IEventBus` into
-  long-lived services; many short-lived scopes each open a connection.
+- `IEventBus` is scoped; the broker connection provider is shared. A publish opens a channel, not a
+  separate connection per scope. A failed post-confirm observer can fault `PublishAsync` after the
+  broker accepted the message, so caller-owned retries need idempotent consumers.
 - `IEventHandler<IEvent>` is a fallback path: with no more specific handler for a wire name, the
   fallback handler receives the message.
 
 ## Extension points
 
 - Implement `IEventBus` (scoped) to replace the transport.
-- Implement `IEventOutboxPublisher` (singleton) to replay outbox rows over a custom broker.
 - Implement `IEventPublishAdvisor` or `IEventConsumeAdvisor` to add cross-cutting behavior without
   touching the transport.
 

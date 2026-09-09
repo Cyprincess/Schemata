@@ -38,12 +38,11 @@ The interface has two surfaces:
   `TryRemoveAsync` (atomic compare-and-delete) for the atomic operations an idempotency or lock pattern
   needs.
 - **Collection** — `CollectionAddAsync`, `CollectionMembersAsync`, `CollectionRemoveAsync`,
-  `CollectionClearAsync` provide set semantics for consumers that need atomic reverse-index
-  bookkeeping.
+  `CollectionClearAsync` provide set semantics for membership bookkeeping.
 
-The atomic operations are where the providers diverge: `RedisCacheProvider` implements all three;
-`DistributedCacheProvider` throws `NotSupportedException` for `TryAddAsync`, `TryReplaceAsync`, and
-`TryRemoveAsync`, because `IDistributedCache` exposes no atomic compare-and-swap.
+`RedisCacheProvider` implements the atomic operations at the server. `DistributedCacheProvider`
+serializes them with striped in-process locks because `IDistributedCache` exposes no native
+compare-and-swap. Its guarantees therefore apply only within one process.
 
 ## CacheEntryOptions
 
@@ -88,13 +87,15 @@ IDistributedCache / Redis
 
 ## Design rationale
 
-The collection surface exists because reverse-index bookkeeping requires set semantics; a plain
-key-value store would force a read-modify-write cycle. `DistributedCacheProvider` guards it with
-in-process locks, and `RedisCacheProvider` delegates to native Redis sets.
+The collection surface supports set membership without requiring consumers to implement a
+read-modify-write cycle. `DistributedCacheProvider` guards it with in-process locks, and
+`RedisCacheProvider` delegates to native Redis sets.
 
-The atomic compare-and-swap operations are an optional capability. Providers that throw
-`NotSupportedException` (as `DistributedCacheProvider` does) still serve any consumer that does not
-exercise CAS. Patterns that need atomic reserve-and-swap require `RedisCacheProvider`.
+Query caching uses key-value generation tokens. It initializes missing metadata through `TryAddAsync`
+and reads the stored token before database execution. Every candidate is unique and published once,
+so concurrent initializers may cause extra cache misses even with process-local atomicity, but cannot
+restore a generation containing old results. Consumers requiring cross-process atomic reserve-and-swap
+semantics need a provider with server-side atomic operations.
 
 ## See also
 

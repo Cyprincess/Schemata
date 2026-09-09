@@ -99,7 +99,7 @@ or `SoftDeleteSuppressed` is active, the entity is physically removed.
 `IRepositoryCommittedAdvisor<TEntity>` runs after a standalone repository commit or a unit-of-work
 commit succeeds, receiving the `CommitChanges<TEntity>` snapshot of added, updated, and removed
 entities. The cache package registers `AdviceCommittedEvictCache<TEntity>` at order 900,000,000; it
-evicts reverse-indexed cache entries for updated and removed entities and honors
+publishes a new entity-type cache generation for added, updated, or removed entities and honors
 `QueryCacheEvictionSuppressed`. Committed advisors do not run when persistence fails or the unit of work
 rolls back.
 
