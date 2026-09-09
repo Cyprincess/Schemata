@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -11,13 +12,12 @@ using LinqToDB;
 using LinqToDB.Async;
 using LinqToDB.Concurrency;
 using LinqToDB.Data;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
+using Schemata.Entity.Repository.Estimation;
 
 namespace Schemata.Entity.LinqToDB;
 
@@ -38,7 +38,6 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     where TEntity : class
 {
     private readonly Func<TContext>   _factory;
-    private readonly ILogger?         _logger;
     private          TContext         _context;
 
     /// <summary>
@@ -48,7 +47,6 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     /// <param name="factory">A factory that creates a new <typeparamref name="TContext" /> instance.</param>
     public LinqToDbRepository(IServiceProvider sp, Func<TContext> factory) : base(sp) {
         _factory = factory;
-        _logger  = sp.GetService<ILogger<LinqToDbRepository<TContext, TEntity>>>();
         _context = factory();
 
         var entity = typeof(TEntity);
@@ -176,55 +174,54 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         return query.LongCountAsync(ct);
     }
 
-    public override async ValueTask<long> EstimateCountAsync<TResult>(
+    public override async ValueTask<long?> EstimateCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
     ) {
-        try {
-            var query    = await BuildQueryAsync(predicate, ct);
-            var provider = EstimateQueries.GetProvider(Context.DataProvider.Name);
-            if (provider is EstimateProvider.None) {
-                return await base.EstimateCountAsync(predicate, ct);
-            }
+        ct.ThrowIfCancellationRequested();
+        var provider = EstimateQueries.GetProvider(Context.DataProvider.Name);
+        if (provider is EstimateProvider.None) return null;
+        var query = await BuildQueryAsync(predicate, ct);
 
-            if ((provider is EstimateProvider.SqlServer or EstimateProvider.Sqlite) && EstimateQueries.HasWhere(query.Expression)) {
-                return await base.EstimateCountAsync(predicate, ct);
+        if (provider is EstimateProvider.Sqlite) {
+            if (!EstimateQueries.IsTableRoot<TEntity>(query.Expression, TableName)) return null;
+            var mapping = Context.MappingSchema.GetEntityDescriptor(typeof(TEntity), Context.Options.ConnectionOptions.OnEntityDescriptorCreated);
+            if (mapping.QueryFilterLambda is not null || mapping.QueryFilterFunc is not null
+             || mapping.InheritanceMapping.Count != 0 || mapping.InheritanceRoot is not null
+             || mapping.HasCalculatedMembers || mapping.SchemaName is not null || mapping.DatabaseName is not null) return null;
+            var exists = await Context.ExecuteAsync<long>(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sqlite_stat1')", ct);
+            if (exists == 0) return null;
+            var stat = await Context.ExecuteAsync<string?>(
+                "SELECT stat FROM sqlite_stat1 WHERE tbl = @t AND (idx IS NULL OR idx IN "
+                + "(SELECT name FROM pragma_index_list(@t) WHERE partial = 0)) ORDER BY idx LIMIT 1", ct, new DataParameter("@t", TableName));
+            if (stat is null) return null;
+            var end = stat.IndexOf(' ');
+            var cardinality = end < 0 ? stat.AsSpan() : stat.AsSpan(0, end);
+            if (!long.TryParse(cardinality, NumberStyles.None, CultureInfo.InvariantCulture, out var rows)) {
+                throw new FormatException("Invalid SQLite table cardinality statistic.");
             }
-
-            var table = Context.GetTable<TEntity>();
-            switch (provider) {
-                case EstimateProvider.PostgreSql: {
-                    var sql = query.ToSqlQuery(new() { InlineParameters = false });
-                    var json = await Context.ExecuteAsync<string>("EXPLAIN (FORMAT JSON) " + sql.Sql, ct, sql.Parameters.ToArray());
-                    if (EstimateQueries.TryParsePostgreSql(json, out var rows)) return rows;
-                    break;
-                }
-                case EstimateProvider.MySql: {
-                    var sql = query.ToSqlQuery(new() { InlineParameters = false });
-                    var json = await Context.ExecuteAsync<string>("EXPLAIN FORMAT=JSON " + sql.Sql, ct, sql.Parameters.ToArray());
-                    if (EstimateQueries.TryParseMySql(json, out var rows)) return rows;
-                    break;
-                }
-                case EstimateProvider.SqlServer: {
-                    var full = $"{table.SchemaName ?? "dbo"}.{table.TableName}";
-                    var rows = await Context.ExecuteAsync<long>(
-                        "SELECT COALESCE(SUM(p.[rows]), 0) FROM sys.partitions p WHERE p.object_id = OBJECT_ID(@full) AND p.index_id IN (0,1)",
-                        ct, new DataParameter("@full", full));
-                    return rows;
-                }
-                case EstimateProvider.Sqlite: {
-                    var rows = await Context.ExecuteAsync<long?>(
-                        "SELECT MAX(stat) FROM sqlite_stat1 WHERE tbl = @t",
-                        ct, new DataParameter("@t", table.TableName));
-                    if (rows is not null) return rows.Value;
-                    break;
-                }
-            }
-        } catch (Exception ex) {
-            _logger?.LogWarning(ex, "Count estimate failed; falling back to an exact count.");
+            return rows;
         }
 
-        return await base.EstimateCountAsync(predicate, ct);
+        if (provider is EstimateProvider.MySql && EstimateQueries.HasMySqlUnsupportedShape(query.Expression)) return null;
+        var sql = query.ToSqlQuery(new() { InlineParameters = false });
+        var parameters = sql.Parameters.ToArray();
+        switch (provider) {
+            case EstimateProvider.PostgreSql:
+                return QueryPlanEstimate.Parse(await Context.ExecuteAsync<string>("EXPLAIN (FORMAT JSON) " + sql.Sql, ct, parameters),
+                    QueryEstimateProvider.PostgreSql);
+            case EstimateProvider.MySql:
+                return QueryPlanEstimate.Parse(await Context.ExecuteAsync<string>("EXPLAIN FORMAT=JSON " + sql.Sql, ct, parameters),
+                    QueryEstimateProvider.MySql);
+            case EstimateProvider.SqlServer:
+                if (((IDataContext)Context).CloseAfterUse) return null;
+                var connection = await Context.OpenDbConnectionAsync(ct);
+                return await QueryPlanEstimate.EstimateSqlServerAsync(connection, Context.Transaction, Context.CommandTimeout,
+                    token => Context.ExecuteAsync<string>(sql.Sql, token, parameters), ct);
+            default:
+                throw new ArgumentOutOfRangeException(nameof(provider), provider, null);
+        }
     }
 
     protected override IUnitOfWork CreateUnitOfWork() {

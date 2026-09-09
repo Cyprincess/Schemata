@@ -5,6 +5,10 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions.Resource;
+using Schemata.Core.Building;
 using Schemata.Resource.Http.Integration.Tests.Fixtures;
 using Xunit;
 
@@ -37,6 +41,46 @@ public class ResourceHttpIntegrationShould : IClassFixture<WebAppFactory>
         Assert.Equal(JsonValueKind.Number, body.GetProperty("total_size").ValueKind);
         Assert.True(body.GetProperty("total_size").GetInt32() >= 1);
         Assert.True(!body.TryGetProperty("next_page_token", out var token) || token.ValueKind == JsonValueKind.Null);
+    }
+
+    [Theory]
+    [InlineData(TotalSizeMode.Estimated)]
+    [InlineData(TotalSizeMode.None)]
+    [InlineData(TotalSizeMode.Exact)]
+    public async Task Get_PagedStudents_PreservesTotalPresenceAndContinuation(TotalSizeMode mode) {
+        using var factory = _factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            services.PostConfigure<SchemataResourceOptions>(options => options.TotalSize = mode)));
+        using var client = factory.CreateClient();
+        var fullName = $"CountPresence{mode}";
+        for (var i = 0; i < 2; i++) {
+            var created = await client.PostAsync("/v1/students",
+                new StringContent(JsonSerializer.Serialize(new { full_name = fullName }), Encoding.UTF8, "application/json"));
+            Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+            var student = await created.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal(fullName, student.GetProperty("full_name").GetString());
+        }
+
+        var query = "/v1/students?filter=" + Uri.EscapeDataString($"full_name=\"{fullName}\"") + "&page_size=1";
+        var response = await client.GetAsync(query);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var first = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(fullName, Assert.Single(first.GetProperty("students").EnumerateArray())
+                                          .GetProperty("full_name").GetString());
+        if (mode == TotalSizeMode.Exact) {
+            Assert.Equal(2, first.GetProperty("total_size").GetInt32());
+        } else {
+            Assert.False(first.TryGetProperty("total_size", out _));
+        }
+
+        var token = first.GetProperty("next_page_token").GetString();
+        Assert.False(string.IsNullOrEmpty(token));
+        var next = await client.GetAsync(query + "&page_token=" + Uri.EscapeDataString(token!));
+        Assert.Equal(HttpStatusCode.OK, next.StatusCode);
+        var second = await next.Content.ReadFromJsonAsync<JsonElement>();
+        var firstName = Assert.Single(first.GetProperty("students").EnumerateArray()).GetProperty("name").GetString();
+        var secondName = Assert.Single(second.GetProperty("students").EnumerateArray()).GetProperty("name").GetString();
+        Assert.NotEqual(firstName, secondName);
+        Assert.False(second.TryGetProperty("next_page_token", out _));
     }
 
     [Fact]

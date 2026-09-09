@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
+using Schemata.Entity.Repository.Estimation;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
@@ -50,6 +51,26 @@ public static class SchemataRepositoryBuilderExtensions
         where TContext : DbContext {
         builder.Services.TryAddScoped<IUnitOfWork<TContext>, EfCoreUnitOfWork<TContext>>();
 
+        return builder;
+    }
+
+    /// <summary>
+    ///     Opts this context into database-plan estimates for supported root entity queries.
+    /// </summary>
+    /// <remarks>
+    ///     Plan commands bypass EF DbCommandInterceptor callbacks, including security-sensitive command rewrites.
+    ///     Enable only when query filters and repository advisors fully express visibility constraints, or register
+    ///     a custom IEfCoreCountEstimator instead. Connection callbacks still run when EF opens the connection.
+    /// </remarks>
+    public static SchemataRepositoryBuilder WithCountEstimates<TContext>(
+        this SchemataRepositoryBuilder builder,
+        QueryEstimateProvider provider
+    ) where TContext : DbContext {
+        if (!Enum.IsDefined(provider)) {
+            throw new ArgumentOutOfRangeException(nameof(provider));
+        }
+
+        builder.Services.TryAddScoped<IEfCoreCountEstimator<TContext>>(_ => new EfCoreCountEstimator<TContext>(provider));
         return builder;
     }
 }

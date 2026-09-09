@@ -16,8 +16,9 @@ public class ListResultBase<TSummary> : IEntitiesResult<TSummary>
     public virtual IList<TSummary>? Entities { get; set; }
 
     /// <summary>
-    ///     Total number of matching resources across all pages.
-    ///     <see langword="null" /> indicates the server skipped total computation.
+    ///     Total number of matching resources across all pages, optionally estimated by the repository.
+    ///     <see langword="null" /> indicates total computation was skipped or an estimate was unavailable.
+    ///     Estimated values are capped at <see cref="int.MaxValue" />; pagination follows <see cref="NextPageToken" />.
     /// </summary>
     public virtual int? TotalSize { get; set; }
 

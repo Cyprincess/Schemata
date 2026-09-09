@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Advice;
@@ -131,6 +132,20 @@ public class EfCoreRepository<TContext, TEntity> : RepositoryBase<TEntity>
 
     protected override Task<long> LongCountAsync<TResult>(IQueryable<TResult> query, CancellationToken ct) {
         return query.LongCountAsync(ct);
+    }
+
+    public override async ValueTask<long?> EstimateCountAsync<TResult>(
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken ct = default
+    ) {
+        ct.ThrowIfCancellationRequested();
+        var estimator = ServiceProvider.GetService<IEfCoreCountEstimator<TContext>>();
+        if (estimator is null) {
+            return null;
+        }
+
+        var query = await BuildQueryAsync(predicate, ct);
+        return await estimator.EstimateAsync(Context, query, ct);
     }
 
     protected override IUnitOfWork CreateUnitOfWork() { return new EfCoreUnitOfWork<TContext>(_factory); }

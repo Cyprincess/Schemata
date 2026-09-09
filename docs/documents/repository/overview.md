@@ -38,7 +38,7 @@ ValueTask<int>      CountAsync<TResult>(
     Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate, CancellationToken ct = default);
 ValueTask<long>     LongCountAsync<TResult>(
     Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate, CancellationToken ct = default);
-ValueTask<long>     EstimateCountAsync<TResult>(
+ValueTask<long?>    EstimateCountAsync<TResult>(
     Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate, CancellationToken ct = default);
 
 // Key-based lookup
@@ -66,17 +66,22 @@ queryable. `GetAsync` reads the key properties off the supplied entity and deleg
 
 ### EstimateCountAsync
 
-`EstimateCountAsync` is a virtual passthrough: the base implementation delegates to `LongCountAsync`
-(exact), and `EfCoreRepository` does not override it. `LinqToDbRepository` overrides it per backend:
+`EstimateCountAsync` returns a nullable estimate of the scoped query's result count. The default
+interface and base implementations return `null`. Unsupported providers or query shapes also return
+`null`; callers that require exact totals must explicitly choose `CountAsync` or `LongCountAsync`.
+Estimation never falls back to either exact-count method. Cancellation, database failures, and invalid
+plan data propagate to the caller.
 
-- **PostgreSQL** — `EXPLAIN (FORMAT JSON)` of the query, reading `Plan Rows`.
-- **MySQL / MariaDB** — `EXPLAIN FORMAT=JSON`, reading `rows_examined_per_scan` /
-  `rows_produced_per_join`.
-- **SQL Server** — `sys.partitions` row sum, only when the predicate carries no `Where`.
-- **SQLite** — `sqlite_stat1` max stat, only when the predicate carries no `Where`.
+EF Core provides per-context opt-in through `WithCountEstimates<TContext>(QueryEstimateProvider)` or
+a custom `IEfCoreCountEstimator<TContext>`. The built-in estimator uses public EF APIs to create a
+parameterized command; command execution bypasses EF command interceptors, so opt-in requires a review
+of security-sensitive command rewrites. LinqToDB selects estimation by its registered database provider.
 
-An unrecognized backend or any failure during estimation falls back to the exact `LongCountAsync`
-passthrough, so an estimate never fails the request.
+The plan backends are PostgreSQL `EXPLAIN (FORMAT JSON)`, MySQL `EXPLAIN FORMAT=JSON`, and SQL Server
+`SHOWPLAN_XML`. These request optimizer plans without executing the SELECT for a count. LinqToDB also
+supports SQLite statistics for a restricted unfiltered table query and returns `null` for MariaDB or
+unrecognized provider names. See [Repository Providers](providers.md) for activation, query-shape limits,
+and connection requirements.
 
 ## Mutation API
 

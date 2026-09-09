@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using LinqToDB.Data;
 using Microsoft.Extensions.DependencyInjection;
@@ -51,11 +53,35 @@ public class SchemaAndEstimateShould : IAsyncLifetime
         using var statsScope = _fixture.ServiceProvider.CreateScope();
         var connection = statsScope.ServiceProvider.GetRequiredService<TestDataConnection>();
         connection.Execute("ANALYZE");
-        var stat = connection.Execute<long>("SELECT CAST(MAX(stat) AS INTEGER) FROM sqlite_stat1 WHERE tbl = 'Students'");
+        connection.Execute("UPDATE sqlite_stat1 SET stat = '123 1' WHERE tbl = 'Students'");
+        connection.Execute("CREATE INDEX a_partial_students ON Students(Grade) WHERE Grade = 99");
+        connection.Execute("INSERT INTO sqlite_stat1(tbl, idx, stat) VALUES ('Students', 'a_partial_students', '1 1')");
 
         var (estimatedRepository, estimatedScope) = _fixture.CreateScopeWithRepository();
         using (estimatedScope) {
-            Assert.Equal(stat, await estimatedRepository.EstimateCountAsync<Student>(null));
+            Assert.Null(await estimatedRepository.EstimateCountAsync<Student>(null));
+            using var suppression = estimatedRepository.SuppressQuerySoftDelete();
+            Assert.Equal(123L, await estimatedRepository.EstimateCountAsync<Student>(null));
+            Assert.Null(await estimatedRepository.EstimateCountAsync(q => q.Where(student => student.Grade == 2)));
+            Assert.Null(await estimatedRepository.EstimateCountAsync(q => q.Take(1)));
+            Assert.Null(await estimatedRepository.EstimateCountAsync(q => q.Select(student => student.Grade)));
+        }
+    }
+
+    [Fact]
+    public async Task EstimateCountAsync_MissingStatistics_ReturnsNull() {
+        var (repository, scope) = _fixture.CreateScopeWithRepository();
+        using (scope) {
+            using var suppression = repository.SuppressQuerySoftDelete();
+            Assert.Null(await repository.EstimateCountAsync<Student>(null));
+        }
+    }
+
+    [Fact]
+    public async Task EstimateCountAsync_Cancelled_PropagatesCancellation() {
+        var (repository, scope) = _fixture.CreateScopeWithRepository();
+        using (scope) {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => repository.EstimateCountAsync<Student>(null, new CancellationToken(true)).AsTask());
         }
     }
 }

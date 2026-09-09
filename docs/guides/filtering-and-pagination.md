@@ -87,13 +87,13 @@ curl "http://localhost:5000/v1/students?order_by=age%20DESC%2Cfull_name%20ASC"
 
 ## Pagination
 
-A list response carries the page, a total count, and a continuation token:
+A list response carries the page, an optional total count, and a continuation token:
 
 | Field             | Description                                                           |
 | ----------------- | --------------------------------------------------------------------- |
 | `students`        | The page of results                                                   |
-| `total_size`      | Total count across all pages                                          |
-| `next_page_token` | Pass as `page_token` for the next page; `null` when there are no more |
+| `total_size`      | Matching count across all pages; optional and potentially estimated    |
+| `next_page_token` | Pass as `page_token` for the next page; omitted when there are no more |
 
 ```shell
 curl "http://localhost:5000/v1/students?page_size=2"
@@ -109,6 +109,12 @@ curl "http://localhost:5000/v1/students?page_size=2"
   "next_page_token": "eyJza..."
 }
 ```
+
+`Exact` is the default total-size mode. Configure `SchemataResourceOptions.TotalSize` globally or
+`ResourceAttribute.TotalSize` per resource to select `Estimated` or `None`. An unavailable estimate
+omits `total_size` without falling back to an exact count. Local residual filters also omit the total
+in estimated mode. Continue from `next_page_token`, even if the estimate is zero or smaller than the
+number of resources returned. See [Filtering](../documents/resource/filtering.md#pagination) for mode details.
 
 The token is opaque and signed; pass it back verbatim to continue:
 

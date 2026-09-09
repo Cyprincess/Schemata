@@ -48,6 +48,48 @@ build-query advisors, and applies the caller's predicate. When a build-query adv
 the query is replaced with `q.Where(_ => false)` so it returns no rows. Scalar methods then run the
 query advisor (cache-hit short-circuit), execute, and run the result advisor (cache store).
 
+### Count estimates
+
+`EstimateCountAsync` returns `null` until an `IEfCoreCountEstimator<TContext>` is registered. Opt in once
+per context using the repository builder; this applies to all repositories using that context type.
+
+The example assumes application-defined `Student` and `AppDbContext` types, an `IServiceCollection`
+named `services`, a SQL Server connection string, and the corresponding EF database-provider package.
+
+```csharp
+using Microsoft.AspNetCore.Builder;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Entity.EntityFrameworkCore;
+using Schemata.Entity.Repository;
+using Schemata.Entity.Repository.Estimation;
+
+services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
+        .UseEntityFrameworkCore<AppDbContext>((sp, options) => options.UseSqlServer(connectionString))
+        .WithCountEstimates<AppDbContext>(QueryEstimateProvider.SqlServer);
+```
+
+The other choices are `QueryEstimateProvider.PostgreSql` and `QueryEstimateProvider.MySql`. The selected
+dialect must match the EF provider; SQLite and unmatched providers return `null`. The built-in estimator
+accepts mapped entity-root queries with supported filters, ordering, and tracking options. Projections,
+paging, grouping, distinct/set operations, explicit includes, raw-SQL roots, `IgnoreQueryFilters`, and
+unknown query extensions return `null`. Auto-includes are excluded from the estimate's constant projection.
+Translation failures for otherwise supported queries propagate.
+
+The estimator runs after repository build-query advisors and retains EF query filters. It creates a
+parameterized `DbCommand` through public `CreateDbCommand`, preserving its parameters, transaction, and
+timeout. Direct plan execution bypasses every EF `DbCommandInterceptor` callback, including command
+rewrites that enforce security. Enable the built-in estimator only when query filters and repository
+advisors fully express visibility constraints. EF connection callbacks still run when the estimator
+opens the connection, and a connection it opens is closed on completion. Use each context serially.
+
+For application-specific visibility or unsupported query shapes, register an implementation of
+`Schemata.Entity.EntityFrameworkCore.IEfCoreCountEstimator<TContext>` in DI instead. Its method is
+`ValueTask<long?> EstimateAsync<TResult>(TContext context, IQueryable<TResult> query, CancellationToken ct)`.
+The context remains repository-owned; custom estimators must preserve query visibility, return `null`
+when unsupported, and propagate cancellation and failures. The built-in registration uses `TryAddScoped`,
+so an existing custom registration is preserved.
+
 ### Mutation methods
 
 `AddAsync` runs the add advisors, then calls `Context.AddAsync(entity)`. `UpdateAsync` runs the update
@@ -114,10 +156,30 @@ is logged at warning level.
 
 ### EstimateCountAsync
 
-`LinqToDbRepository` overrides `EstimateCountAsync` per backend: PostgreSQL and MySQL/MariaDB read the
-optimizer's `EXPLAIN` estimate, SQL Server sums `sys.partitions` rows, and SQLite reads `sqlite_stat1`.
-The two metadata paths apply only when the predicate has no `Where`. Unrecognized backends and
-estimation failures fall back to the exact `LongCountAsync` passthrough.
+`LinqToDbRepository` estimates the query after build-query advisors using native parameter binding.
+Supported plan backends are:
+
+| Backend | Plan and result cardinality |
+| --- | --- |
+| PostgreSQL | `EXPLAIN (FORMAT JSON)`, root `Plan Rows`. |
+| MySQL | `EXPLAIN FORMAT=JSON`, `rows_produced_per_join` for a table or final nested-loop table, including ordering wrappers. |
+| SQL Server | `SET SHOWPLAN_XML ON`, root result `RelOp.EstimateRows`, then `SET SHOWPLAN_XML OFF`. |
+
+These commands request optimizer estimates; they use neither `ANALYZE` nor an exact count. MySQL shapes
+with grouping, distinct, windowing, set operations, semi/anti joins, or LINQ pagination return `null`.
+SQL Server requires a connection that stays open across SHOWPLAN commands; `CloseAfterUse` contexts
+return `null`. Restoration runs even after cancellation or query failure. A restoration failure closes
+the connection and propagates the error. Concurrent use of that connection is unsupported.
+
+SQLite reads the first cardinality integer in `sqlite_stat1` only for a full-table identity query.
+Filters, ordering, paging, projections, query-filter mappings, inheritance mappings, calculated members,
+and non-default schema/database mappings are unsupported. Missing statistics return `null`.
+MariaDB and unrecognized providers also return `null`.
+
+Both repository providers share plan parsing in
+`src/Schemata.Entity.Repository/Estimation/QueryPlanEstimate.cs`. Well-formed unsupported plans return
+`null`; malformed plan data and invalid cardinalities fail explicitly. Database errors and cancellation
+propagate, and neither provider falls back to `CountAsync` or `LongCountAsync`.
 
 ## Provider comparison
 
@@ -130,7 +192,7 @@ estimation failures fall back to the exact `LongCountAsync` passthrough.
 | `UpdateAsync`                      | Detach, `Context.Update`, bump token                | `UpdateOptimisticAsync` or `UpdateAsync`              |
 | Concurrency on update              | `DbUpdateConcurrencyException` → `AbortedException` | zero-row `UpdateOptimisticAsync` → `AbortedException` |
 | Unique-constraint violation        | `AlreadyExistsException` with type + canonical name | bare `AlreadyExistsException`                         |
-| `EstimateCountAsync`               | exact (`LongCountAsync` passthrough)                | per-backend estimate, exact fallback                  |
+| `EstimateCountAsync`               | opt-in plan estimate or custom estimator; otherwise `null` | per-backend plan/statistics estimate or `null` |
 
 ## Extension points
 

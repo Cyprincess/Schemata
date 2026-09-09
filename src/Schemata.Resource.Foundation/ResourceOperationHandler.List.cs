@@ -158,8 +158,11 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         if (residual is null) {
             totalSize = ResolveTotalSizeMode() switch {
                 TotalSizeMode.None => null,
-                TotalSizeMode.Estimated => (int)Math.Min(
-                    await _repository.EstimateCountAsync(q => container.Query(q), ct.Value), int.MaxValue),
+                TotalSizeMode.Estimated => await _repository.EstimateCountAsync(q => container.Query(q), ct.Value) switch {
+                    null => null,
+                    < 0 => throw new InvalidOperationException("A count estimate cannot be negative."),
+                    var estimate => (int)Math.Min(estimate.Value, int.MaxValue),
+                },
                 var _ => await _repository.CountAsync(q => container.Query(q), ct.Value),
             };
 
@@ -185,12 +188,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
                 superset, residual, token.Skip, token.PageSize, resolved!.MaxResidualScanRows,
                 mode is TotalSizeMode.Exact, ct.Value);
 
-            totalSize = mode switch {
-                TotalSizeMode.None => null,
-                TotalSizeMode.Estimated => (int)Math.Min(
-                    await _repository.EstimateCountAsync(q => container.Query(q), ct.Value), int.MaxValue),
-                var _ => scan.Total,
-            };
+            totalSize = scan.Total;
 
             summaries = new(scan.Page.Count);
             foreach (var entity in scan.Page) {

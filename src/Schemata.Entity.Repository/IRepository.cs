@@ -205,18 +205,18 @@ public interface IRepository<TEntity> : IRepository
     );
 
     /// <summary>
-    ///     Estimates the number of entities matching the predicate. Defaults to the exact
-    ///     <see cref="LongCountAsync{TResult}" />; providers with cheaper statistics
-    ///     (e.g. table cardinality estimates) can override.
+    ///     Estimates the number of results after query scoping. Returns <see langword="null" />
+    ///     when the provider or query shape cannot supply an estimate.
     /// </summary>
     /// <typeparam name="TResult">The projected result type.</typeparam>
     /// <param name="predicate">An optional query transformation.</param>
     /// <param name="ct">A cancellation token.</param>
-    ValueTask<long> EstimateCountAsync<TResult>(
+    ValueTask<long?> EstimateCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
     ) {
-        return LongCountAsync(predicate, ct);
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult<long?>(null);
     }
 
     /// <summary>

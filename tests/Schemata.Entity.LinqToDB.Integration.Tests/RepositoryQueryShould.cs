@@ -62,12 +62,12 @@ public class RepositoryQueryShould : IAsyncLifetime
     #endregion
 
     [Fact]
-    public async Task EstimateCountAsync_OnSqlite_ReturnsExactFallbackCount() {
+    public async Task EstimateCountAsync_FilteredSqliteQuery_ReturnsNull() {
         var (repository, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
             var count = await repository.EstimateCountAsync(q => q.Where(student => student.Grade == 2));
 
-            Assert.Equal(2L, count);
+            Assert.Null(count);
         }
     }
 }

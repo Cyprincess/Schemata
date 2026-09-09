@@ -1,5 +1,11 @@
 using System;
 using System.Threading.Tasks;
+using Grpc.Net.Client;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using ProtoBuf.Grpc.Configuration;
+using Schemata.Abstractions.Resource;
+using Schemata.Core.Building;
 using ProtoBuf.Grpc.Client;
 using Schemata.Resource.Grpc.Integration.Tests.Fixtures;
 using Xunit;
@@ -30,6 +36,38 @@ public class ResourceGrpcIntegrationShould
         Assert.NotNull(result.TotalSize);
         Assert.True(result.TotalSize >= result.Entities.Count);
         Assert.True(string.IsNullOrEmpty(result.NextPageToken));
+    }
+
+    [Theory]
+    [InlineData(TotalSizeMode.Estimated)]
+    [InlineData(TotalSizeMode.None)]
+    [InlineData(TotalSizeMode.Exact)]
+    public async Task List_PagedStudents_PreservesTotalPresenceAndContinuation(TotalSizeMode mode) {
+        using var factory = _factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            services.PostConfigure<SchemataResourceOptions>(options => options.TotalSize = mode)));
+        using var http = factory.CreateClient(new() { BaseAddress = new("http://localhost") });
+        using var channel = GrpcChannel.ForAddress(http.BaseAddress!, new() { HttpClient = http });
+        var clientFactory = ClientFactory.Create(factory.Services.GetRequiredService<BinderConfiguration>());
+        var client = channel.CreateGrpcService<IResourceService<Student, Student, Student, Student>>(clientFactory);
+        var fullName = $"CountPresence{mode}";
+        var filter = $"full_name=\"{fullName}\"";
+        var one = await client.CreateAsync(new() { FullName = fullName });
+        var two = await client.CreateAsync(new() { FullName = fullName });
+
+        var first = await client.ListAsync(new() { Filter = filter, PageSize = 1 });
+        Assert.Equal(mode == TotalSizeMode.Exact ? 2 : (int?)null, first.TotalSize);
+        var firstRow = Assert.Single(first.Entities!);
+        Assert.Contains(firstRow.CanonicalName, new[] { one.CanonicalName, two.CanonicalName });
+        Assert.False(string.IsNullOrEmpty(first.NextPageToken));
+
+        var second = await client.ListAsync(new() {
+            Filter = filter, PageSize = 1, PageToken = first.NextPageToken,
+        });
+        Assert.Equal(mode == TotalSizeMode.Exact ? 2 : (int?)null, second.TotalSize);
+        var secondRow = Assert.Single(second.Entities!);
+        Assert.Contains(secondRow.CanonicalName, new[] { one.CanonicalName, two.CanonicalName });
+        Assert.NotEqual(firstRow.CanonicalName, secondRow.CanonicalName);
+        Assert.True(string.IsNullOrEmpty(second.NextPageToken));
     }
 
     [Fact]

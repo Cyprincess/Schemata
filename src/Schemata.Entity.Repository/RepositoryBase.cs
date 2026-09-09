@@ -403,11 +403,12 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return context.Result;
     }
 
-    public virtual ValueTask<long> EstimateCountAsync<TResult>(
+    public virtual ValueTask<long?> EstimateCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
     ) {
-        return LongCountAsync(predicate, ct);
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult<long?>(null);
     }
 
     public abstract Task AddAsync(TEntity entity, CancellationToken ct = default);

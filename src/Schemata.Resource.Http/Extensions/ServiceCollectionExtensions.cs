@@ -30,6 +30,7 @@ public static class ServiceCollectionExtensions
                 .Configure<ResourceRegistry, IOptions<SchemataResourceOptions>>((mvc, registry, opts) => {
                      mvc.Conventions.Add(new ResourceControllerConvention(registry, opts.Value.AuthenticationScheme));
                      mvc.Conventions.Add(new ResourceMethodControllerConvention(registry, opts.Value.AuthenticationScheme));
+                     mvc.ModelMetadataDetailsProviders.Add(new ListRequestBindingMetadataProvider());
                  });
 
         services.AddMvcCore()
