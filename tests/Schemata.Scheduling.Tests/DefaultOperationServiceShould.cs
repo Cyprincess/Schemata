@@ -165,13 +165,18 @@ public class DefaultOperationServiceShould
     }
 
     [Fact]
-    public async Task Create_Terminal_Writes_Addressable_Done_Row() {
+    public async Task Execute_Exposes_Persisted_Identity_Before_Work_And_Completes_Same_Row() {
         var rows = new List<SchemataJobExecution>();
         var executions = new Mock<IRepository<SchemataJobExecution>>();
         executions.Setup(r => r.AddAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
-                  .Callback<SchemataJobExecution, CancellationToken>((row, _) => rows.Add(row))
+                  .Callback<SchemataJobExecution, CancellationToken>((row, _) => {
+                      row.Name = "consumer-inline";
+                      row.CanonicalName = "operations/consumer-inline";
+                      rows.Add(row);
+                  })
                   .Returns(Task.CompletedTask);
         executions.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        executions.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         executions.Setup(r => r.FirstOrDefaultAsync(
                              It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>?>(),
                              It.IsAny<CancellationToken>()))
@@ -182,22 +187,66 @@ public class DefaultOperationServiceShould
                           predicate(rows.AsQueryable()).SingleOrDefault());
                   });
         var service = CreateService(executions);
-        var uid = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
-        var created = await service.CreateTerminalAsync("demo", "{}", null, uid, CancellationToken.None);
-        Assert.NotNull(created.CanonicalName);
+        var created = await service.ExecuteAsync("demo", (operation, _) => {
+            Assert.Equal("operations/consumer-inline", operation.CanonicalName);
+            Assert.Equal(ExecutionState.Running, Assert.Single(rows).State);
+            executions.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+            return ValueTask.FromResult<string?>("{}");
+        }, CancellationToken.None);
         var loaded = await service.GetAsync(created.CanonicalName!, CancellationToken.None);
 
         var persisted = Assert.Single(rows);
-        Assert.Equal(uid, persisted.Uid);
-        Assert.Equal(uid.ToString("n"), persisted.Name);
-        Assert.Equal($"operations/{uid:n}", persisted.CanonicalName);
+        Assert.Equal("consumer-inline", persisted.Name);
+        Assert.Equal("operations/consumer-inline", persisted.CanonicalName);
         Assert.Equal(ExecutionState.Succeeded, persisted.State);
         Assert.True(created.Done);
         Assert.Equal("{}", created.Response?.Output);
         Assert.True(loaded.Done);
         Assert.Equal(created.Name, loaded.Name);
-        executions.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        executions.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task Execute_Records_Callback_Failure_On_The_Persisted_Operation() {
+        var row = CreateExecution(ExecutionState.Running);
+        var repository = CreateInlineRepository(row);
+        var service = CreateService(repository);
+        var operation = await service.ExecuteAsync("demo", (_, _) => throw new InvalidOperationException("source failed"));
+        Assert.True(operation.Done);
+        Assert.Equal("source failed", operation.Error?.Message);
+        repository.Verify(value => value.UpdateAsync(
+            It.Is<SchemataJobExecution>(execution => execution.State == ExecutionState.Failed
+                                                  && execution.RecentError == "source failed"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_Persists_Cancellation_With_A_Live_Cleanup_Token_And_Rethrows() {
+        var row = CreateExecution(ExecutionState.Running);
+        var repository = CreateInlineRepository(row);
+        var service = CreateService(repository);
+        using var cancellation = new CancellationTokenSource();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await service.ExecuteAsync("demo", (_, token) => {
+            cancellation.Cancel();
+            throw new OperationCanceledException(token);
+        }, cancellation.Token));
+        repository.Verify(value => value.UpdateAsync(
+            It.Is<SchemataJobExecution>(execution => execution.State == ExecutionState.Cancelled),
+            It.Is<CancellationToken>(token => token.CanBeCanceled && !token.IsCancellationRequested)), Times.Once);
+    }
+
+    private static Mock<IRepository<SchemataJobExecution>> CreateInlineRepository(SchemataJobExecution row) {
+        var repository = new Mock<IRepository<SchemataJobExecution>>();
+        repository.Setup(value => value.AddAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
+                  .Callback<SchemataJobExecution, CancellationToken>((execution, _) => {
+                      execution.Name = row.Name;
+                      execution.CanonicalName = row.CanonicalName;
+                  }).Returns(Task.CompletedTask);
+        repository.Setup(value => value.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
+                  .Returns(Task.CompletedTask);
+        repository.Setup(value => value.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        return repository;
     }
 
     private static Mock<IRepository<SchemataJobExecution>> CreateRepositoryReturning(SchemataJobExecution row) {

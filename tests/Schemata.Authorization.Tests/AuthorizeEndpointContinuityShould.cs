@@ -40,9 +40,7 @@ public sealed class AuthorizeEndpointContinuityShould
         tokens.Setup(t => t.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>()))
               .ReturnsAsync((SchemataToken token, CancellationToken _) => token);
 
-        var options = new SchemataAuthorizationOptions();
-        options.Issuer         = "https://localhost";
-        options.InteractionUri = "https://localhost/consent";
+        var options = new SchemataAuthorizationOptions { Issuer = "https://localhost", InteractionUri = "https://localhost/consent" };
 
         var services = new ServiceCollection();
         services.AddSingleton<IRequestPipelineAdvisor<AuthorizeEndpointRequest, AuthorizationResult>>(marker);

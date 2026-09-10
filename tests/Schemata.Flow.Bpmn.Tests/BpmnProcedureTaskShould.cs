@@ -126,7 +126,7 @@ public class BpmnProcedureTaskShould
             definition,
             process,
             started.Tokens,
-            new(Mock.Of<IUnitOfWork>(), services),
+            Schemata.Flow.Tests.FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), services),
             message,
             42,
             token.CanonicalName,

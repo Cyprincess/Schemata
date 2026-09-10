@@ -28,7 +28,7 @@ public interface ISecurityStore<TSecurity> where TSecurity : SchemataSecurity
     /// <param name="status">Status filter; <see langword="null" /> for all.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>
-    ///     Rows ordered by create time descending, name ascending as tiebreak under the
+    ///     Rows ordered by create time descending, key ascending as tiebreak under the
     ///     store's collation. Consumers rely on this ordering.
     /// </returns>
     IAsyncEnumerable<TSecurity> ListByParentAsync(string? parent, string? kind = null, string? usage = null,

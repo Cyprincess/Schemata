@@ -2,7 +2,6 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Common;
 using Schemata.Messaging.Skeleton;
 using Schemata.Scheduling.Foundation.Commands;
 using Schemata.Scheduling.Skeleton;
@@ -23,7 +22,6 @@ internal sealed class DefaultTriggerJobHandler(SchedulingHandlerSupport support)
         var jobKey   = registry.ResolveKey(request.JobType);
         var context  = request.Context;
         var job = new SchemataJob {
-            Name          = context.Job,
             CanonicalName = context.Job,
             JobKey        = jobKey,
             ArgsJson      = context.ArgsJson,
@@ -46,20 +44,15 @@ internal sealed class DefaultTriggerJobHandler(SchedulingHandlerSupport support)
         if (context.StartTime.GetValueOrDefault() <= scheduler.Time.GetUtcNow().UtcDateTime) {
             scheduler.SignalDispatcher();
         } else {
-            await support.ArmOneShotTimerAsync(job);
+            await support.ArmOneShotTimerAsync(job, timerKey: context.Execution.CanonicalName);
         }
 
         return context.Execution;
     }
 
     private static SchemataJobExecution BuildExecution(SchemataJob job, JobContext context) {
-        var name       = (context.ExecutionUid ?? Guid.NewGuid()).ToString("n");
-        var descriptor = ResourceNameDescriptor.ForType<SchemataJobExecution>();
-
         return new() {
             Uid           = context.ExecutionUid.GetValueOrDefault(),
-            Name          = name,
-            CanonicalName = $"{descriptor.Collection}/{name}",
             Job           = job.CanonicalName,
             Method        = context.Method,
             JobKey        = context.JobKey ?? job.JobKey,

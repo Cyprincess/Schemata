@@ -26,6 +26,7 @@ public class ClientAuthMethodConstraintShould
         return new() {
             Uid                     = Guid.NewGuid(),
             ClientId                = "my-client",
+            CanonicalName           = "applications/my-client",
             ClientType              = "confidential",
             TokenEndpointAuthMethod = method,
         };

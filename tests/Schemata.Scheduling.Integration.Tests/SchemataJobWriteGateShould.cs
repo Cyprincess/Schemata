@@ -126,6 +126,70 @@ public class SchemataJobWriteGateShould : IAsyncLifetime
         Assert.Null(row.RecentError);
     }
 
+    [Fact]
+    public async Task ScheduleSlot_Updates_ConsumerNamed_Job_And_Cancels_Its_Execution() {
+        var scheduler = _fixture.Services.GetRequiredService<IScheduler>();
+        var job = new SchemataJob {
+            Key = "application:daily",
+            JobKey = BlockingJob.Key,
+            State = JobState.Active,
+            NextRunTime = _fixture.Clock.Now.AddHours(1),
+        };
+        await scheduler.ScheduleAsync(job, CancellationToken.None);
+        Assert.StartsWith("consumer-", job.Name);
+        var name = job.CanonicalName;
+        var replacement = new SchemataJob {
+            Key = job.Key,
+            JobKey = BlockingJob.Key,
+            State = JobState.Active,
+            NextRunTime = _fixture.Clock.Now.AddHours(2),
+            ArgsJson = "updated",
+        };
+        await scheduler.ScheduleAsync(replacement, CancellationToken.None);
+        Assert.Equal(name, replacement.CanonicalName);
+        var stored = await _fixture.JobAsync(job.Name!);
+        Assert.NotNull(stored);
+        Assert.Equal("updated", stored.ArgsJson);
+
+        await scheduler.UnscheduleAsync(name!, CancellationToken.None);
+        Assert.Equal(JobState.Paused, (await _fixture.JobAsync(job.Name!))!.State);
+        var (executions, scope) = _fixture.CreateScope<SchemataJobExecution>();
+        using (scope) {
+            var row = await executions.FirstOrDefaultAsync(query => query.Where(value => value.Job == name));
+            Assert.NotNull(row);
+            Assert.StartsWith("consumer-", row.Name);
+            Assert.NotEqual(row.Uid.ToString("n"), row.Name);
+            Assert.Equal(ExecutionState.Cancelled, row.State);
+        }
+    }
+
+    [Fact]
+    public async Task Supplied_Job_Name_Is_Preserved() {
+        var scheduler = _fixture.Services.GetRequiredService<IScheduler>();
+        var job = new SchemataJob {
+            Name = "caller-owned", JobKey = BlockingJob.Key,
+            State = JobState.Active, NextRunTime = _fixture.Clock.Now.AddHours(1),
+        };
+        await scheduler.ScheduleAsync(job, CancellationToken.None);
+        Assert.Equal("caller-owned", job.Name);
+        Assert.Equal("jobs/caller-owned", job.CanonicalName);
+    }
+
+    [Fact]
+    public async Task Missing_Naming_Policy_Rejects_Job_And_Execution_Creation() {
+        var fixture = new SchedulingFixture(supplyNames: false);
+        await fixture.InitializeAsync();
+        try {
+            var scheduler = fixture.Services.GetRequiredService<IScheduler>();
+            await Assert.ThrowsAsync<ValidationException>(() => scheduler.ScheduleAsync(new() {
+                JobKey = BlockingJob.Key, State = JobState.Active, NextRunTime = fixture.Clock.Now.AddHours(1),
+            }, CancellationToken.None));
+            await Assert.ThrowsAsync<ValidationException>(() => scheduler.TriggerAsync<BlockingJob>(new(), CancellationToken.None));
+        } finally {
+            await fixture.DisposeAsync();
+        }
+    }
+
     private static ValueTask<SchemataJob?> LoadAsync(IRepository<SchemataJob> repository) {
         return repository.FirstOrDefaultAsync<SchemataJob>(
             q => q.Where(job => job.Name == "control-job"), CancellationToken.None);

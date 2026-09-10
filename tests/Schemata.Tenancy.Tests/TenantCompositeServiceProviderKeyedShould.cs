@@ -23,12 +23,12 @@ public class TenantCompositeServiceProviderKeyedShould
         services.AddKeyedSingleton<IKeyedMarker, RootKeyedMarker>("overridden");
         services.AddKeyedSingleton<IKeyedMarker, RootKeyedMarker>("root-only");
 
-        var options = new SchemataTenancyOptions();
-        options.TenantOverrides[TenantId(id)] = [s => {
-            s.AddKeyedSingleton<IKeyedMarker, TenantKeyedMarker>("overridden");
-            s.AddKeyedSingleton<IKeyedConsumer, KeyedTypeConsumer>("type");
-            s.AddKeyedSingleton<IKeyedConsumer>("factory", (provider, _) => new KeyedFactoryConsumer(provider.GetRequiredService<IRootDependency>()));
-        }];
+        var options = new SchemataTenancyOptions { TenantOverrides = { [TenantId(id)] = [s => {
+                s.AddKeyedSingleton<IKeyedMarker, TenantKeyedMarker>("overridden");
+                s.AddKeyedSingleton<IKeyedConsumer, KeyedTypeConsumer>("type");
+                s.AddKeyedSingleton<IKeyedConsumer>("factory", (provider, _) => new KeyedFactoryConsumer(provider.GetRequiredService<IRootDependency>()));
+            }]
+        } };
 
         using var root  = services.BuildServiceProvider();
         using var cache = BuildCache();
@@ -54,11 +54,11 @@ public class TenantCompositeServiceProviderKeyedShould
         services.AddSingleton<IRootDependency, RootDependency>();
         services.AddKeyedSingleton<IKeyedMarker, RootKeyedMarker>("root");
 
-        var options = new SchemataTenancyOptions();
-        options.TenantOverrides[TenantId(id)] = [s => {
-            s.AddSingleton<CompositeProbe>();
-            s.AddKeyedSingleton<IKeyedMarker, TenantKeyedMarker>("tenant");
-        }];
+        var options = new SchemataTenancyOptions { TenantOverrides = { [TenantId(id)] = [s => {
+                s.AddSingleton<CompositeProbe>();
+                s.AddKeyedSingleton<IKeyedMarker, TenantKeyedMarker>("tenant");
+            }]
+        } };
 
         using var root  = services.BuildServiceProvider();
         using var cache = BuildCache();
@@ -93,12 +93,12 @@ public class TenantCompositeServiceProviderKeyedShould
         var services = new ServiceCollection();
         services.AddSingleton<IRootDependency, RootDependency>();
 
-        var options = new SchemataTenancyOptions();
-        options.TenantOverrides[TenantId(id)] = [s => {
-            s.Insert(0, ServiceDescriptor.Singleton<IInsertedConsumer, InsertedConsumer>());
-            s.AddSingleton<IReplacementConsumer, InitialReplacementConsumer>();
-            s.Replace(ServiceDescriptor.Singleton<IReplacementConsumer, ReplacementConsumer>());
-        }];
+        var options = new SchemataTenancyOptions { TenantOverrides = { [TenantId(id)] = [s => {
+                s.Insert(0, ServiceDescriptor.Singleton<IInsertedConsumer, InsertedConsumer>());
+                s.AddSingleton<IReplacementConsumer, InitialReplacementConsumer>();
+                s.Replace(ServiceDescriptor.Singleton<IReplacementConsumer, ReplacementConsumer>());
+            }]
+        } };
 
         using var root  = services.BuildServiceProvider();
         using var cache = BuildCache();
@@ -112,9 +112,8 @@ public class TenantCompositeServiceProviderKeyedShould
 
     [Fact]
     public void Open_Generic_Override_Is_Rejected_When_Building_Tenant_Container() {
-        const string id = "alpha";
-        var options = new SchemataTenancyOptions();
-        options.TenantOverrides[TenantId(id)] = [s => s.AddSingleton(typeof(IGenericMarker<>), typeof(GenericMarker<>))];
+        const string id      = "alpha";
+        var          options = new SchemataTenancyOptions { TenantOverrides = { [TenantId(id)] = [s => s.AddSingleton(typeof(IGenericMarker<>), typeof(GenericMarker<>))] } };
 
         using var root  = new ServiceCollection().BuildServiceProvider();
         using var cache = BuildCache();
@@ -129,8 +128,7 @@ public class TenantCompositeServiceProviderKeyedShould
         const string id = "alpha";
         var singleton = new Mock<IAsyncDisposable>();
         singleton.Setup(disposable => disposable.DisposeAsync()).Returns(ValueTask.CompletedTask);
-        var options = new SchemataTenancyOptions();
-        options.TenantOverrides[TenantId(id)] = [s => s.AddSingleton<IAsyncDisposable>(_ => singleton.Object)];
+        var options = new SchemataTenancyOptions { TenantOverrides = { [TenantId(id)] = [s => s.AddSingleton<IAsyncDisposable>(_ => singleton.Object)] } };
 
         using var root = new ServiceCollection().BuildServiceProvider();
         await using var cache = BuildCache();

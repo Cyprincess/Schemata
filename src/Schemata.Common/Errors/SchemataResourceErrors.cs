@@ -69,16 +69,16 @@ public static class SchemataResourceErrors
         string?     name        = null,
         string?     description = null,
         string      reason      = ErrorReasons.ResourceNotFound) {
-        var resource = ResourceType(type);
-        var exception  = new NotFoundException(reason: null);
-        exception.Details = [
-            new ErrorInfoDetail { Reason = reason },
-            new ResourceInfoDetail {
-                ResourceType = resource,
-                ResourceName = name,
-                Description  = description,
-            },
-        ];
+        var resource  = ResourceType(type);
+        var exception = new NotFoundException(reason: null) { Details = [
+                new ErrorInfoDetail { Reason = reason },
+                new ResourceInfoDetail {
+                    ResourceType = resource,
+                    ResourceName = name,
+                    Description  = description,
+                },
+            ]
+        };
         return exception;
     }
 
@@ -110,16 +110,16 @@ public static class SchemataResourceErrors
         string?     name        = null,
         string?     description = null,
         string      reason      = ErrorReasons.ResourceAlreadyExists) {
-        var resource = ResourceType(type);
-        var exception  = new AlreadyExistsException(reason: null);
-        exception.Details = [
-            new ErrorInfoDetail { Reason = reason },
-            new ResourceInfoDetail {
-                ResourceType = resource,
-                ResourceName = name,
-                Description  = description,
-            },
-        ];
+        var resource  = ResourceType(type);
+        var exception = new AlreadyExistsException(reason: null) { Details = [
+                new ErrorInfoDetail { Reason = reason },
+                new ResourceInfoDetail {
+                    ResourceType = resource,
+                    ResourceName = name,
+                    Description  = description,
+                },
+            ]
+        };
         return exception;
     }
 
@@ -140,25 +140,25 @@ public static class SchemataResourceErrors
         string? subject     = null,
         string? description = null,
         string  reason      = ErrorReasons.PreconditionNotSatisfied) {
-        var resource = ResourceType(typeof(T));
-        var exception  = new FailedPreconditionException(reason: null);
-        exception.Details = [
-            new ErrorInfoDetail { Reason = reason },
-            new ResourceInfoDetail {
-                ResourceType = resource,
-                ResourceName = name,
-                Description  = description,
-            },
-            new PreconditionFailureDetail {
-                Violations = [
-                    new() {
-                        Type        = resource,
-                        Subject     = subject,
-                        Description = description,
-                    },
-                ],
-            },
-        ];
+        var resource  = ResourceType(typeof(T));
+        var exception = new FailedPreconditionException(reason: null) { Details = [
+                new ErrorInfoDetail { Reason = reason },
+                new ResourceInfoDetail {
+                    ResourceType = resource,
+                    ResourceName = name,
+                    Description  = description,
+                },
+                new PreconditionFailureDetail {
+                    Violations = [
+                        new() {
+                            Type        = resource,
+                            Subject     = subject,
+                            Description = description,
+                        },
+                    ],
+                },
+            ]
+        };
         return exception;
     }
 
@@ -179,17 +179,17 @@ public static class SchemataResourceErrors
         string? owner       = null,
         string? description = null,
         string  reason      = ErrorReasons.InsufficientPermission) {
-        var resource = ResourceType(typeof(T));
-        var exception  = new PermissionDeniedException(reason: null);
-        exception.Details = [
-            new ErrorInfoDetail { Reason = reason },
-            new ResourceInfoDetail {
-                ResourceType = resource,
-                ResourceName = name,
-                Owner        = owner,
-                Description  = description,
-            },
-        ];
+        var resource  = ResourceType(typeof(T));
+        var exception = new PermissionDeniedException(reason: null) { Details = [
+                new ErrorInfoDetail { Reason = reason },
+                new ResourceInfoDetail {
+                    ResourceType = resource,
+                    ResourceName = name,
+                    Owner        = owner,
+                    Description  = description,
+                },
+            ]
+        };
         return exception;
     }
 
@@ -208,16 +208,16 @@ public static class SchemataResourceErrors
         string? name        = null,
         string? description = null,
         string  reason      = ErrorReasons.ConcurrencyMismatch) {
-        var resource = ResourceType(typeof(T));
-        var exception  = new AbortedException(reason: null);
-        exception.Details = [
-            new ErrorInfoDetail { Reason = reason },
-            new ResourceInfoDetail {
-                ResourceType = resource,
-                ResourceName = name,
-                Description  = description,
-            },
-        ];
+        var resource  = ResourceType(typeof(T));
+        var exception = new AbortedException(reason: null) { Details = [
+                new ErrorInfoDetail { Reason = reason },
+                new ResourceInfoDetail {
+                    ResourceType = resource,
+                    ResourceName = name,
+                    Description  = description,
+                },
+            ]
+        };
         return exception;
     }
 

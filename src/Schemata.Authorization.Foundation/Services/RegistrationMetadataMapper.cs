@@ -36,14 +36,11 @@ public static class RegistrationMetadataMapper
         [ResponseTypes.Code] = [GrantTypes.AuthorizationCode],
     };
 
-    /// <summary>Validates the request, mints the client identifier, maps the request onto a new
-    /// application entity, and stores <c>jwks</c> / <c>jwks_uri</c> material as security rows.</summary>
+    /// <summary>Validates registration metadata and maps it onto a new application with an OAuth client identifier.</summary>
     public static async Task<TApp> ToApplicationAsync<TApp>(
         RegisterRequest                        request,
         IOptions<SchemataAuthorizationOptions> options,
         IHttpClientFactory                     http,
-        ISecurityStore<SchemataSecurity>       securities,
-        TimeProvider?                          time = null,
         CancellationToken                      ct   = default
     )
         where TApp : SchemataApplication, new()
@@ -92,28 +89,6 @@ public static class RegistrationMetadataMapper
             SoftwareStatement                   = request.SoftwareStatement,
             Permissions                         = BuildPermissions(request, grantTypes, responseTypes, options),
         };
-
-        if (!string.IsNullOrWhiteSpace(request.Jwks)) {
-            await securities.CreateAsync(new() {
-                Parent = SecurityParents.Application(application),
-                Name   = application.ClientId,
-                Kind   = SecurityConstants.Kinds.Jwks,
-                Usage  = SecurityConstants.Usages.Authentication,
-                Value  = request.Jwks,
-                Status = SecurityConstants.Statuses.Valid,
-            }, ct);
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.JwksUri)) {
-            await securities.CreateAsync(new() {
-                Parent = SecurityParents.Application(application),
-                Name   = application.ClientId,
-                Kind   = SecurityConstants.Kinds.JwksUri,
-                Usage  = SecurityConstants.Usages.Authentication,
-                Value  = request.JwksUri,
-                Status = SecurityConstants.Statuses.Valid,
-            }, ct);
-        }
 
         return application;
     }

@@ -87,9 +87,9 @@ public class ReportSchedulingShould
     [Fact]
     public async Task Definition_Change_Reschedules() {
         var scheduler = CreateScheduler();
-        scheduler.Setup(value => value.UnscheduleAsync("jobs/report-daily", It.IsAny<CancellationToken>()))
+        scheduler.Setup(value => value.UnscheduleAsync("jobs/consumer-weekly", It.IsAny<CancellationToken>()))
                  .Returns(Task.CompletedTask);
-        var advisor = new AdviceReportScheduleSync<SchemataReport>(scheduler.Object);
+        var advisor = new AdviceReportScheduleSync<SchemataReport>(scheduler.Object, StoredJob());
         var changes = new CommitChanges<SchemataReport> {
             Updated = [PeriodicReport("daily", "0 6 * * *")],
         };
@@ -101,16 +101,16 @@ public class ReportSchedulingShould
             CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
-        scheduler.Verify(value => value.UnscheduleAsync("jobs/report-daily", It.IsAny<CancellationToken>()), Times.Once);
+        scheduler.Verify(value => value.UnscheduleAsync("jobs/consumer-weekly", It.IsAny<CancellationToken>()), Times.Once);
         VerifySchedule(scheduler, "daily", "0 6 * * *", Times.Once());
     }
 
     [Fact]
     public async Task Definition_Removal_Unschedules() {
         var scheduler = CreateScheduler();
-        scheduler.Setup(value => value.UnscheduleAsync("jobs/report-daily", It.IsAny<CancellationToken>()))
+        scheduler.Setup(value => value.UnscheduleAsync("jobs/consumer-weekly", It.IsAny<CancellationToken>()))
                  .Returns(Task.CompletedTask);
-        var advisor = new AdviceReportScheduleSync<SchemataReport>(scheduler.Object);
+        var advisor = new AdviceReportScheduleSync<SchemataReport>(scheduler.Object, StoredJob());
 
         await advisor.AdviseAsync(
             new(EmptyServices()),
@@ -118,7 +118,7 @@ public class ReportSchedulingShould
             new() { Removed = [PeriodicReport("daily", "0 0 * * *")] },
             CancellationToken.None);
 
-        scheduler.Verify(value => value.UnscheduleAsync("jobs/report-daily", It.IsAny<CancellationToken>()), Times.Once);
+        scheduler.Verify(value => value.UnscheduleAsync("jobs/consumer-weekly", It.IsAny<CancellationToken>()), Times.Once);
         scheduler.Verify(
             value => value.ScheduleAsync(
                 It.IsAny<SchemataJob>(),
@@ -207,8 +207,8 @@ public class ReportSchedulingShould
     private static void VerifySchedule(Mock<IScheduler> scheduler, string name, string expression, Times times) {
         scheduler.Verify(
             value => value.ScheduleAsync(
-                It.Is<SchemataJob>(job => job.Name == $"report-{name}"
-                                          && job.CanonicalName == $"jobs/report-{name}"
+                It.Is<SchemataJob>(job => job.Key == $"report:{name}"
+                                          && job.Name == null && job.CanonicalName == null
                                           && job.JobKey == ReportJobKeyResolver.Key
                                           && job.ScheduleType == ScheduleType.Cron
                                           && job.CronExpression == expression),
@@ -216,6 +216,13 @@ public class ReportSchedulingShould
                                                                     && variables["report"] == name),
                 It.IsAny<CancellationToken>()),
             times);
+    }
+
+    private static IRepository<SchemataJob> StoredJob() {
+        var rows = new List<SchemataJob> {
+            new() { Key = "report:daily", Name = "consumer-weekly", CanonicalName = "jobs/consumer-weekly" },
+        };
+        return new ReportPersistenceState().CreateRepository(rows);
     }
 
     private static Mock<IReportDefinitionStore> CreateDefinitionStore(params SchemataReport[] reports) {

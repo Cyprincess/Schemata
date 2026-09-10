@@ -146,11 +146,8 @@ public sealed class ReportSnapshotWriter<TReport, TSnapshot, TChunk>
 
     private static TSnapshot CreateHeader(SchemataReport? report, ReportRunKind kind, string? operation) {
         var reportName = report?.Name ?? "inline";
-        var name       = Guid.NewGuid().ToString("n");
         return new() {
-            Name          = name,
             Report        = reportName,
-            CanonicalName = $"reports/{reportName}/snapshots/{name}",
             RunKind       = kind,
             State         = SnapshotState.Pending,
             Operation     = operation,
@@ -192,12 +189,9 @@ public sealed class ReportSnapshotWriter<TReport, TSnapshot, TChunk>
     ) {
         await using var scope = _scopes.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IRepository<TChunk>>();
-        var chunkName  = $"chunk-{index}";
         var chunk = new TChunk {
-            Name          = chunkName,
             Report        = header.Report,
             Snapshot      = header.Name,
-            CanonicalName = $"{header.CanonicalName}/chunks/{chunkName}",
             Index         = index,
             RowCount      = rows.Count,
             Rows          = JsonSerializer.Serialize(rows, SchemataJson.Default),

@@ -102,7 +102,6 @@ public sealed class AuthorizeHandler<TApp>(
         var payload   = JsonSerializer.Serialize(authz.Request, json.Value);
 
         var interaction = new SchemataToken {
-            Name        = Guid.NewGuid().ToString("n"),
             Application = authz.Application.CanonicalName,
             Type        = TokenTypes.Interaction,
             Status      = TokenStatuses.Valid,

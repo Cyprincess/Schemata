@@ -38,7 +38,7 @@ public sealed class ReportGenerationJob<TReport, TSnapshot, TChunk>(
         await using var scope = scopes.CreateAsyncScope();
         var execution = scope.ServiceProvider.GetRequiredService<ReportExecutionContext>();
         execution.Kind      = kind;
-        execution.Operation = OperationName(context);
+        execution.Operation = context.Execution?.CanonicalName;
         if (context.ExecutionUid is { } uid) {
             execution.IsCancelled = token => IsCancelledAsync(uid, token);
         }
@@ -83,8 +83,4 @@ public sealed class ReportGenerationJob<TReport, TSnapshot, TChunk>(
         throw new JsonException("Report generation arguments are missing.");
     }
 
-    private static string? OperationName(JobContext context) {
-        return context.Execution?.CanonicalName
-               ?? (context.ExecutionUid is { } uid ? $"operations/{uid:n}" : null);
-    }
 }

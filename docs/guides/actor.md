@@ -168,6 +168,13 @@ same convention `Flow.Foundation`/`Scheduling.Foundation` use for their own enti
 persistence without registering that repository surfaces as a DI resolution failure the first
 time a persistent actor's turn runs, not at startup.
 
+The stored lookup identity is the unique `(SchemataActor.ActorType, SchemataActor.ActorKey)` pair,
+independent of resource `Name`. Register a consumer `IRepositoryAddAdvisor<SchemataActor>` through
+`TryAddEnumerable` before `AdviceAddCanonicalName.DefaultOrder` (120,000,000) to assign missing
+names. Existing stores require an identity-column migration; see the
+[persistence reference](../documents/actor/overview.md#persistence-is-opt-in-and-the-actor-never-holds-authoritative-state)
+for delimiter ambiguity and backfill requirements.
+
 Neither callback runs for an actor that does not implement `IPersistentActor`. The mailbox itself
 is never persisted: a message sitting in a stopped process's channel is gone on restart, with no
 recovery semantics.

@@ -74,7 +74,7 @@ public sealed class PairwiseSubjectTranslator<TApp> : IPairwiseSubjectTranslator
             return subject;
         }
 
-        var key = application.CanonicalName ?? application.Name;
+        var key = application.CanonicalName;
         var mapping = await _mappings.FirstOrDefaultAsync(
                           q => q.Where(m => m.Application == key && m.PairwiseSubject == subject),
                           ct);
@@ -144,7 +144,6 @@ public sealed class PairwiseSubjectTranslator<TApp> : IPairwiseSubjectTranslator
         }
 
         await _mappings.AddAsync(new() {
-            Name            = Guid.NewGuid().ToString("n"),
             Application     = key,
             Subject         = subject,
             PairwiseSubject = pairwise,

@@ -50,7 +50,11 @@ public class RegisterHandlerShould : IDisposable
 
         var apps = new Mock<IApplicationManager<SchemataApplication>>();
         apps.Setup(m => m.CreateAsync(It.IsAny<SchemataApplication>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((SchemataApplication a, CancellationToken _) => a);
+            .ReturnsAsync((SchemataApplication a, CancellationToken _) => {
+                a.Name = "registered-resource";
+                a.CanonicalName = "applications/registered-resource";
+                return a;
+            });
         var securities = new Mock<ISecurityStore<SchemataSecurity>>();
         securities
             .Setup(s => s.CreateAsync(It.IsAny<SchemataSecurity>(), It.IsAny<CancellationToken>()))
@@ -130,8 +134,9 @@ public class RegisterHandlerShould : IDisposable
         }, null, CancellationToken.None);
 
         var row = Assert.Single(_rows);
-        Assert.Equal($"applications/{response.ClientId}", row.Parent);
-        Assert.Equal(response.ClientId, row.Name);
+        Assert.Equal("applications/registered-resource", row.Parent);
+        Assert.Equal(response.ClientId, row.Key);
+        Assert.Null(row.Name);
         Assert.Equal(SecurityConstants.Kinds.Password, row.Kind);
         Assert.Equal(SecurityConstants.Usages.Authentication, row.Usage);
         Assert.Equal(SecurityConstants.Algorithms.Pbkdf2, row.Algorithm);
@@ -148,8 +153,9 @@ public class RegisterHandlerShould : IDisposable
         }, null, CancellationToken.None);
 
         var row = Assert.Single(_rows, value => value.Kind == SecurityConstants.Kinds.Jwks);
-        Assert.Equal($"applications/{response.ClientId}", row.Parent);
-        Assert.Equal(response.ClientId, row.Name);
+        Assert.Equal("applications/registered-resource", row.Parent);
+        Assert.Equal(response.ClientId, row.Key);
+        Assert.Null(row.Name);
         Assert.Equal(SecurityConstants.Usages.Authentication, row.Usage);
         Assert.Equal(SecurityConstants.Statuses.Valid, row.Status);
         Assert.Equal("""{"keys":[{"kty":"RSA","kid":"rp-1","use":"sig","n":"x","e":"AQAB"}]}""", row.Value);
@@ -164,8 +170,9 @@ public class RegisterHandlerShould : IDisposable
         }, null, CancellationToken.None);
 
         var row = Assert.Single(_rows, value => value.Kind == SecurityConstants.Kinds.JwksUri);
-        Assert.Equal($"applications/{response.ClientId}", row.Parent);
-        Assert.Equal(response.ClientId, row.Name);
+        Assert.Equal("applications/registered-resource", row.Parent);
+        Assert.Equal(response.ClientId, row.Key);
+        Assert.Null(row.Name);
         Assert.Equal(SecurityConstants.Usages.Authentication, row.Usage);
         Assert.Equal(SecurityConstants.Statuses.Valid, row.Status);
         Assert.Equal("https://rp.example/jwks.json", row.Value);
@@ -325,6 +332,8 @@ public class RegisterHandlerShould : IDisposable
         apps.Setup(m => m.FindByClientIdAsync(created.ClientId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new SchemataApplication {
                 ClientId     = created.ClientId,
+                Name         = "registered-resource",
+                CanonicalName = "applications/registered-resource",
                 ClientName   = "RP",
                 RedirectUris = ["https://rp.example/cb"],
             });
@@ -345,6 +354,8 @@ public class RegisterHandlerShould : IDisposable
         apps.Setup(m => m.FindByClientIdAsync(created.ClientId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new SchemataApplication {
                 ClientId     = created.ClientId,
+                Name         = "registered-resource",
+                CanonicalName = "applications/registered-resource",
                 ClientName   = "RP",
                 RedirectUris = ["https://rp.example/cb"],
             });

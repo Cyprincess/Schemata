@@ -11,7 +11,7 @@ The scheduler persists job definitions and execution history in two tables: `Sch
 
 ## SchemataJob
 
-`[Table("SchemataJobs")]`, `[CanonicalName("jobs/{job}")]`, `[PrimaryKey(nameof(Uid))]`, `[Index(nameof(Name), IsUnique = true)]`. Implements `IIdentifier`, `ICanonicalName`, `IConcurrency`, and `ITimestamp`.
+`[Table("SchemataJobs")]`, `[CanonicalName("jobs/{job}")]`, `[PrimaryKey(nameof(Uid))]`, with unique indexes on `Name` and `Key`. Implements `IIdentifier`, `ICanonicalName`, `IConcurrency`, and `ITimestamp`.
 
 | Column                      | Description                                                              |
 | --------------------------- | ------------------------------------------------------------------------ |
@@ -20,6 +20,7 @@ The scheduler persists job definitions and execution history in two tables: `Sch
 | `CanonicalName`             | Public job name in the `jobs/{job}` collection.                          |
 | `Timestamp`                 | Concurrency token.                                                       |
 | `CreateTime` / `UpdateTime` | Audit timestamps.                                                        |
+| `Key`                       | Optional producer-owned schedule slot, independent of resource `Name` and dispatch `JobKey`. |
 | `JobKey`                    | Stable job key resolved through `IScheduledJobRegistry`.                 |
 | `ScheduleType`              | Discriminator for `OneTime`, `Periodic`, or `Cron`.                      |
 | `NextRunTime`               | Next computed fire time; `null` for terminal one-time schedules.         |
@@ -59,7 +60,7 @@ public enum JobState { Active, Paused, Completed, Failed, Cancelled }
 | `Timestamp`                 | Concurrency token used for dispatcher row claims.                                                        |
 | `CreateTime` / `UpdateTime` | Audit timestamps.                                                                                        |
 | `DeleteTime` / `PurgeTime`  | Soft-delete timestamps for operation retention.                                                          |
-| `Job`                       | Canonical name of the originating `SchemataJob`, or a synthetic one-shot name.                           |
+| `Job`                       | Stored or caller-supplied canonical job name; `null` when the execution has no associated job resource. |
 | `Method`                    | Custom method verb that dispatched the operation; `null` for ordinary scheduled fires.                   |
 | `JobKey`                    | Stable key that resolves the job type after restart.                                                     |
 | `ArgsJson`                  | Serialized typed arguments replayed by the job body.                                                     |
@@ -99,6 +100,57 @@ State transitions are:
 
 `Blocked` and `Skipped` are advisor outcomes recorded on the execution row. The operation envelope sets `done` only for `Succeeded`, `Failed`, and `Cancelled`; `WaitOperationHandler` polls that envelope until `done` is true or its timeout elapses.
 
+## Resource naming
+
+Applications register `IRepositoryAddAdvisor<SchemataJob>` and
+`IRepositoryAddAdvisor<SchemataJobExecution>` implementations through `TryAddEnumerable` to assign
+missing names. Their order must precede `AdviceAddCanonicalName.DefaultOrder` (120,000,000).
+Explicit caller names remain valid; canonical-name derivation still runs afterward. The scheduler
+does not generate resource names or fall back to a UID when naming is absent.
+
+`DefaultScheduleJobHandler` looks up a supplied `Key` before considering a resource name. With no
+`Key`, it can match an explicit `Name` or `CanonicalName`. A matched row retains its stored identity;
+a new row runs repository add advisors before executions or timers reference it. Configured jobs
+use `registration:{JobKey}` slots. Report schedules, Flow timers, and actor reminders also use
+schedule-slot keys and resolve the stored canonical name when removing a schedule.
+
+`TriggerAsync` returns the added execution. `JobContext.ExecutionUid` reserves only its UID;
+callers must use the returned canonical name for polling. `OperationMapper.FromExecution` copies
+the stored `Name` and `CanonicalName` without synthesizing either from a UID.
+
+Implementation: `src/Schemata.Scheduling.Skeleton/Entities/SchemataJob.cs`,
+`src/Schemata.Scheduling.Foundation/Handlers/DefaultScheduleJobHandler.cs`,
+`src/Schemata.Scheduling.Foundation/Handlers/DefaultTriggerJobHandler.cs`, and
+`src/Schemata.Scheduling.Skeleton/OperationMapper.cs`.
+
+### Inline operations
+
+`IOperationService.ExecuteAsync(method, execute, ct)` accepts a
+`Func<Operation, CancellationToken, ValueTask<string?>>`. `DefaultOperationService` adds and commits
+a `Running` execution before invoking the callback with its persisted operation identity. The
+callback returns serialized output, and the service updates that same row to `Succeeded`. An
+ordinary callback exception produces a `Failed` operation containing its message. An
+`OperationCanceledException` records `Cancelled` on that row and is rethrown; cancellation observed
+immediately after the callback also takes this path. Terminal persistence uses a separate bounded
+cancellation token so cancellation of the work token does not prevent the terminal write.
+
+Callers put inline work inside the `ExecuteAsync` callback instead of creating a terminal operation
+after the work. The callback receives the supplied work token; it is not registered in the
+dispatcher's running-job cancellation dictionary.
+
+Implementation: `src/Schemata.Scheduling.Skeleton/IOperationService.cs` and
+`src/Schemata.Scheduling.Foundation/DefaultOperationService.cs`.
+
+### Existing data
+
+Consumers own the database migration for the `SchemataJob.Key` column and unique index. Backfill
+schedule slots from the producer's semantic identity before enabling registrations against existing
+data, or a keyed registration can create a second job instead of finding the old row. Preserve
+existing resource names and references independently of that backfill. Report slots use
+`report:{reportName}`; timer and reminder slots follow their bridge implementations. The framework
+does not infer missing slot keys from old generated resource names or provide a compatibility
+lookup for those names.
+
 ## Startup loading
 
 `SchedulingInitializer` is a hosted service that runs on startup:
@@ -107,7 +159,7 @@ State transitions are:
 2. `ExecuteAsync` calls `IScheduler.StartAsync(ct)`.
 3. It marks orphaned `Running` execution rows as `Failed` with the message `Execution was interrupted by a host restart.`.
 4. It materializes each configured registration that has a schedule as a `SchemataJob` and calls `IScheduler.ScheduleAsync`.
-5. It reloads persisted `SchemataJob` rows with `State == Active` and reschedules them. Persisted rows win when they share a name with a configured registration.
+5. It reloads persisted `SchemataJob` rows with `State == Active` and reschedules them. Configured registrations find existing rows through `Key`, preserving their names while updating schedule configuration.
 
 Known-only registrations, created by `WithJob<T>()` (or by the internal helper a feature uses to do the same), do not create `SchemataJob` rows during startup. They populate the registry so persisted `SchemataJobExecution.JobKey` values can resolve when the dispatcher drains pending rows.
 

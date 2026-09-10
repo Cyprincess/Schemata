@@ -45,6 +45,7 @@ public sealed class TransactionExecutor
         ArgumentNullException.ThrowIfNull(transaction);
 
         var parent = BpmnEngine.NewRootToken(process, new(transaction.Name, transaction.Name, false));
+        await execution.CreateTokenAsync(parent, CancellationToken.None);
         var parentTransition = BpmnEngine.NewTransition(
             process.Name!,
             parent.CanonicalName,
@@ -304,6 +305,7 @@ public sealed class TransactionExecutor
             process,
             parent);
         var child = BpmnEngine.NewChildToken(process, resolved, parent);
+        await execution.CreateTokenAsync(child, CancellationToken.None);
         working.Add(child);
 
         transitions.Add(BpmnEngine.NewTransition(

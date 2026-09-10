@@ -68,7 +68,7 @@ public class DefinitionRebuildShould
     }
 
     private static FlowExecutionContext Context() {
-        return new(Mock.Of<IUnitOfWork>(), new ServiceCollection().BuildServiceProvider());
+        return Schemata.Flow.Tests.FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), new ServiceCollection().BuildServiceProvider());
     }
 
     private sealed class ApprovalProcess : ProcessDefinition

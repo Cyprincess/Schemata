@@ -269,7 +269,7 @@ public class BpmnEngine_MultiInstanceShould
             }
         }
 
-        private FlowExecutionContext Context() { return new(new Mock<IUnitOfWork>(MockBehavior.Strict).Object, Services); }
+        private FlowExecutionContext Context() { return Schemata.Flow.Tests.FlowTestCreation.Context(new Mock<IUnitOfWork>(MockBehavior.Strict).Object, Services); }
 
         private static SchemataProcessToken NextSibling(ProcessSnapshot snapshot) {
             return snapshot.Tokens.Where(t => t.Spawner is not null && t.State == "Active")
@@ -283,6 +283,7 @@ public class BpmnEngine_MultiInstanceShould
             }
 
             foreach (var transition in snapshot.Transitions) {
+                Schemata.Flow.Tests.FlowTestCreation.Assign(transition);
                 if (Transitions.All(row => row.Name != transition.Name)) {
                     Transitions.Add(transition);
                 }

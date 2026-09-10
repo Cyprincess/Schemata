@@ -30,12 +30,16 @@ public abstract class CompensationPersistenceShould
         Assert.Equal(process.CanonicalName, binding.ScopeOwnerCanonicalName);
         Assert.Equal("host", binding.ActivityName);
         Assert.Equal(0, binding.RegistrationOrder);
+        Assert.StartsWith("consumer-", binding.Name);
+        Assert.Equal($"process-compensations/{binding.Name}", binding.CanonicalName);
 
         var compensated = await CompleteAsync(process);
 
         var transition = Assert.Single(compensated.Transitions, current => current.Kind == TransitionKind.Compensate);
         Assert.Equal("host", transition.Previous);
         Assert.Equal("undo-host", transition.Posterior);
+        Assert.StartsWith("consumer-", transition.Name);
+        Assert.Contains(compensated.Tokens, token => token.CanonicalName == transition.Token);
         Assert.Empty(await ReadBindingsAsync(process.CanonicalName!));
     }
 

@@ -65,23 +65,27 @@ public sealed class AdviceClaimsAudience(IOptions<SchemataAuthorizationOptions> 
         var config = options.Value;
         if (indicators is { Count: > 0 }) {
             foreach (var resource in indicators) {
-                var access = new Claim(Claims.Audience, resource);
-                access.Properties[ClaimDestinations.AccessToken] = Parameters.Token;
+                var access = new Claim(Claims.Audience, resource) { Properties = {
+                        [ClaimDestinations.AccessToken] = Parameters.Token,
+                    }
+                };
                 claims.Add(access);
             }
         } else {
             var audience = string.IsNullOrWhiteSpace(config.DefaultResource) ? config.Issuer : config.DefaultResource;
             if (!string.IsNullOrWhiteSpace(audience)) {
-                var access = new Claim(Claims.Audience, audience);
-                access.Properties[ClaimDestinations.AccessToken] = Parameters.Token;
+                var access = new Claim(Claims.Audience, audience) { Properties = {
+                        [ClaimDestinations.AccessToken] = Parameters.Token,
+                    }
+                };
                 claims.Add(access);
             }
         }
 
         var client = claims.FirstOrDefault(c => c.Type == Claims.ClientId)?.Value;
         if (!string.IsNullOrWhiteSpace(client)) {
-            var identity = new Claim(Claims.Audience, client);
-            identity.Properties[ClaimDestinations.IdentityToken] = Parameters.Token;
+            var identity = new Claim(Claims.Audience, client) { Properties = { [ClaimDestinations.IdentityToken] = Parameters.Token }
+            };
             claims.Add(identity);
         }
 

@@ -127,7 +127,7 @@ public sealed class FlowTimerBridgeShould : IClassFixture<TimerBridgeFixture>
         var leaf = processCanonical[(processCanonical.LastIndexOf('/') + 1)..];
         var jobs = new List<SchemataJob>();
         await foreach (var job in repository.ListAsync(
-                           query => query.Where(current => current.Name!.StartsWith($"flow-{leaf}-")))) {
+                           query => query.Where(current => current.Key!.StartsWith($"flow-{leaf}-")))) {
             jobs.Add(job);
         }
 

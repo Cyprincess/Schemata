@@ -32,8 +32,10 @@ public sealed class AdviceClaimsUserinfoRequest : IClaimsAdvisor
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        var claim = new Claim(Claims.UserinfoRequest, string.Join(' ', names.Keys));
-        claim.Properties[ClaimDestinations.AccessToken] = Parameters.Token;
+        var claim = new Claim(Claims.UserinfoRequest, string.Join(' ', names.Keys)) { Properties = {
+                [ClaimDestinations.AccessToken] = Parameters.Token,
+            }
+        };
         claims.Add(claim);
 
         return Task.FromResult(AdviseResult.Continue);

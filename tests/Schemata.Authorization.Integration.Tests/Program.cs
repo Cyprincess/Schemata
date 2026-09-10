@@ -10,6 +10,8 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Entity.Repository.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Advisors;
@@ -30,6 +32,13 @@ using var connection = new SqliteConnection("Data Source=:memory:");
 connection.Open();
 
 builder.UseSchemata(schema => {
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataApplication>, ResourceNameAdvisor<SchemataApplication>>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataAuthorization>, ResourceNameAdvisor<SchemataAuthorization>>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataScope>, ResourceNameAdvisor<SchemataScope>>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataToken>, ResourceNameAdvisor<SchemataToken>>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataSecurity>, ResourceNameAdvisor<SchemataSecurity>>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<TestSubject>, ResourceNameAdvisor<TestSubject>>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataSubjectMapping>, ResourceNameAdvisor<SchemataSubjectMapping>>());
     schema.UseMapster().Map<SchemataApplication, SchemataApplication>();
     schema.UseMapster().Map<SchemataScope, SchemataScope>();
     schema.UseMapster().Map<SchemataToken, SchemataToken>();
@@ -131,7 +140,7 @@ using (var scope = app.Services.CreateScope()) {
     async Task SeedPasswordAsync(SchemataApplication app, string secret) {
         await securities.CreateAsync(new() {
             Parent    = SecurityParents.Application(app),
-            Name      = app.ClientId,
+            Key       = app.ClientId,
             Kind      = SecurityConstants.Kinds.Password,
             Usage     = SecurityConstants.Usages.Authentication,
             Algorithm = SecurityConstants.Algorithms.Pbkdf2,
@@ -146,8 +155,8 @@ using (var scope = app.Services.CreateScope()) {
         ClientType  = "confidential",
         Permissions = new List<string> { "e:/Connect/Token", "g:client_credentials" },
     };
-    await SeedPasswordAsync(testApp, "test-secret");
     await applications.CreateAsync(testApp);
+    await SeedPasswordAsync(testApp, "test-secret");
 
     var dpopApp = new SchemataApplication {
         Name        = "dpop-client",
@@ -156,8 +165,8 @@ using (var scope = app.Services.CreateScope()) {
         Permissions = new List<string> { "e:/Connect/Token", "g:client_credentials" },
         DpopBoundAccessTokens = true,
     };
-    await SeedPasswordAsync(dpopApp, "dpop-secret");
     await applications.CreateAsync(dpopApp);
+    await SeedPasswordAsync(dpopApp, "dpop-secret");
 
     var codeApp = new SchemataApplication {
         Name         = "code-client",
@@ -166,8 +175,8 @@ using (var scope = app.Services.CreateScope()) {
         RedirectUris = new List<string> { "https://localhost/callback" },
         Permissions  = new List<string> { "e:/Connect/Authorize", "e:/Connect/Token", "g:authorization_code", "g:refresh_token", "s:openid" },
     };
-    await SeedPasswordAsync(codeApp, "code-secret");
     await applications.CreateAsync(codeApp);
+    await SeedPasswordAsync(codeApp, "code-secret");
 
     var jwtApp = new SchemataApplication {
         Name        = "jwt-client",
@@ -179,8 +188,8 @@ using (var scope = app.Services.CreateScope()) {
             "s:api:read",
         },
     };
-    await SeedPasswordAsync(jwtApp, "jwt-secret");
     await applications.CreateAsync(jwtApp);
+    await SeedPasswordAsync(jwtApp, "jwt-secret");
 
     var introspectApp = new SchemataApplication {
         Name        = "introspect-client",
@@ -188,8 +197,8 @@ using (var scope = app.Services.CreateScope()) {
         ClientType  = "confidential",
         Permissions = new List<string> { "e:/Connect/Introspect" },
     };
-    await SeedPasswordAsync(introspectApp, "introspect-secret");
     await applications.CreateAsync(introspectApp);
+    await SeedPasswordAsync(introspectApp, "introspect-secret");
 
     var browserApp = new SchemataApplication {
         Name         = "browser-client",

@@ -23,6 +23,7 @@ using var connection = new SqliteConnection(connectionString);
 connection.Open();
 
 builder.UseSchemata(schema => {
+    Schemata.Flow.Tests.FlowTestCreation.Register(schema.Services);
     schema.UseMapster().Map<Student, Student>();
     schema.UseMapster().Map<Trash, Trash>();
     schema.UseFlow().MapHttp().MapGrpc();

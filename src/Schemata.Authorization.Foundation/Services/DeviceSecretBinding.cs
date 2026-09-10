@@ -25,12 +25,6 @@ internal static class DeviceSecretBinding
                 || string.Equals(token.DeviceId, deviceId, StringComparison.Ordinal));
     }
 
-    public static string? ClientId(SchemataToken token) {
-        const string prefix = "applications/";
-        return token.Application?.StartsWith(prefix, StringComparison.Ordinal) == true
-            ? token.Application[prefix.Length..]
-            : null;
-    }
 }
 
 internal sealed record DeviceSecretIssuance(

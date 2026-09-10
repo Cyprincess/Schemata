@@ -14,8 +14,13 @@ namespace Schemata.Actor.Skeleton.Entities;
 [Table("SchemataActors")]
 [CanonicalName("actors/{actor}")]
 [PrimaryKey(nameof(Uid))]
+[Index(nameof(ActorType), nameof(ActorKey), IsUnique = true)]
 public class SchemataActor : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
+    public virtual string ActorType { get; set; } = null!;
+
+    public virtual string ActorKey { get; set; } = null!;
+
     /// <summary>
     ///     The serialized state last produced by <see cref="IPersistentActor.SaveStateAsync" />,
     ///     opaque to the framework. <see langword="null" /> until the actor's first successful turn.
@@ -24,11 +29,6 @@ public class SchemataActor : IIdentifier, ICanonicalName, IConcurrency, ITimesta
 
     #region ICanonicalName Members
 
-    /// <summary>
-    ///     The owning actor's <see cref="ActorId" /> rendered via <see cref="ActorId.ToString" />
-    ///     (<c>"{Type}/{Key}"</c>) rather than a framework-generated slug — an actor's identity
-    ///     already is its <see cref="ActorId" />.
-    /// </summary>
     public virtual string? Name { get; set; }
 
     public virtual string? CanonicalName { get; set; }

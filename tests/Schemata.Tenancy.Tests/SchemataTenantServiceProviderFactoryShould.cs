@@ -18,8 +18,7 @@ public class SchemataTenantServiceProviderFactoryShould
 {
     [Fact]
     public void Applies_Matching_TenantOverrides_To_Built_Container() {
-        var options = new SchemataTenancyOptions();
-        options.TenantOverrides[DeterministicGuid("alpha").ToString()] = [s => s.AddSingleton<IMarker, MarkerA>()];
+        var options = new SchemataTenancyOptions { TenantOverrides = { [DeterministicGuid("alpha").ToString()] = [s => s.AddSingleton<IMarker, MarkerA>()] } };
 
         var       factory = Build(options);
         using var lease   = factory.CreateServiceProvider(AccessorFor("alpha"));
@@ -29,8 +28,7 @@ public class SchemataTenantServiceProviderFactoryShould
 
     [Fact]
     public void Does_Not_Apply_TenantOverrides_For_Non_Matching_Id() {
-        var options = new SchemataTenancyOptions();
-        options.TenantOverrides[DeterministicGuid("alpha").ToString()] = [s => s.AddSingleton<IMarker, MarkerA>()];
+        var options = new SchemataTenancyOptions { TenantOverrides = { [DeterministicGuid("alpha").ToString()] = [s => s.AddSingleton<IMarker, MarkerA>()] } };
 
         var       factory = Build(options);
         using var lease   = factory.CreateServiceProvider(AccessorFor("beta"));
@@ -61,8 +59,7 @@ public class SchemataTenantServiceProviderFactoryShould
         var services = new ServiceCollection();
         services.AddSingleton<IMarker, MarkerA>();
 
-        var options = new SchemataTenancyOptions();
-        options.TenantOverrides[DeterministicGuid("alpha").ToString()] = [s => s.AddSingleton<IMarker, MarkerB>()];
+        var options = new SchemataTenancyOptions { TenantOverrides = { [DeterministicGuid("alpha").ToString()] = [s => s.AddSingleton<IMarker, MarkerB>()] } };
         options.DynamicOverrides.Add((_, s, _) => s.AddSingleton<IMarker, MarkerC>());
 
         var       factory = Build(options, services);
@@ -76,9 +73,7 @@ public class SchemataTenantServiceProviderFactoryShould
         var services = new ServiceCollection();
         services.AddSingleton<IDependency, RootDependency>();
 
-        var options = new SchemataTenancyOptions();
-        options.TenantOverrides[DeterministicGuid("alpha").ToString()]
-            = [s => s.AddSingleton<IConsumer, TenantConsumer>()];
+        var options = new SchemataTenancyOptions { TenantOverrides = { [DeterministicGuid("alpha").ToString()] = [s => s.AddSingleton<IConsumer, TenantConsumer>()] } };
 
         var       factory = Build(options, services);
         using var lease   = factory.CreateServiceProvider(AccessorFor("alpha"));
@@ -93,8 +88,7 @@ public class SchemataTenantServiceProviderFactoryShould
         var services = new ServiceCollection();
         services.AddSingleton<IMarker, MarkerA>();
 
-        var options = new SchemataTenancyOptions();
-        options.TenantOverrides[DeterministicGuid("alpha").ToString()] = [s => s.AddSingleton<IMarker, MarkerB>()];
+        var options = new SchemataTenancyOptions { TenantOverrides = { [DeterministicGuid("alpha").ToString()] = [s => s.AddSingleton<IMarker, MarkerB>()] } };
 
         var       factory = Build(options, services);
         using var lease   = factory.CreateServiceProvider(AccessorFor("alpha"));

@@ -41,9 +41,8 @@ internal sealed class IdentitySubjectProvider<TUser>(SchemataUserManager<TUser> 
             return [];
         }
 
-        var canonical = !string.IsNullOrWhiteSpace(user.CanonicalName)
-            ? user.CanonicalName!
-            : $"users/{user.Uid}";
+        var canonical = user.CanonicalName
+                     ?? throw new InvalidOperationException("The user must have a canonical resource name before issuing claims.");
 
         var claims = new List<Claim> {
             new(IdentityClaims.Subject, canonical),

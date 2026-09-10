@@ -128,7 +128,6 @@ public sealed class AdviceRefreshTokenDeviceSecret<TApp> : IRefreshTokenAdvisor<
             ts     = now,
         });
         await _tokens.CreateAsync(new SchemataToken {
-            Name        = Guid.NewGuid().ToString("n"),
             Type        = TokenTypes.DeviceSecret,
             Status      = TokenStatuses.Valid,
             Format      = TokenFormats.Reference,

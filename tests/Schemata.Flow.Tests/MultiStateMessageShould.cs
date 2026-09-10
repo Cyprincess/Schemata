@@ -96,7 +96,7 @@ public class MultiStateMessageShould
         var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1" };
         var token = Token("processes/p1/tokens/a", definition.Review.Name);
 
-        var snapshot = await engine.AdvanceAsync(definition, process, [token], new(Mock.Of<IUnitOfWork>(), services));
+        var snapshot = await engine.AdvanceAsync(definition, process, [token], Schemata.Flow.Tests.FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), services));
 
         Assert.Equal(definition.Paid.Name, snapshot.Tokens[0].StateName);
     }
@@ -138,7 +138,7 @@ public class MultiStateMessageShould
     }
 
     private static FlowExecutionContext ExecutionContext() {
-        return new(Mock.Of<IUnitOfWork>(), new ServiceCollection().BuildServiceProvider());
+        return Schemata.Flow.Tests.FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), new ServiceCollection().BuildServiceProvider());
     }
 
     private static Mock<IRepository<T>> Repository<T>(params T[] items)

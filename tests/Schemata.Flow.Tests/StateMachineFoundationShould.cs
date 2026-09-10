@@ -31,7 +31,7 @@ public class StateMachineFoundationShould
         var engine = new StateMachineEngine();
         var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1" };
 
-        var snapshot = await engine.StartAsync(definition, process, new(uow, services));
+        var snapshot = await engine.StartAsync(definition, process, Schemata.Flow.Tests.FlowTestCreation.Context(uow, services));
 
         Assert.Equal(definition.Reserve.Name, snapshot.Tokens[0].StateName);
         transactions.Verify(r => r.Join(uow), Times.Once);
@@ -75,6 +75,7 @@ public class StateMachineFoundationShould
         repository.Setup(r => r.Begin()).Returns(Mock.Of<IUnitOfWork>());
         repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>()))
                   .Returns((T entity, CancellationToken _) => {
+                      FlowTestCreation.Assign(entity);
                       data.Add(entity);
                       return Task.CompletedTask;
                   });

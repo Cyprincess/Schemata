@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Security.Claims;
+using System.Threading;
+using System.Threading.Tasks;
 using Schemata.Entity.Repository;
+using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Runtime;
@@ -25,6 +28,15 @@ public sealed class FlowExecutionContext
     /// <summary>The scoped service provider used to resolve repositories and advisors.</summary>
     public IServiceProvider Services { get; }
 
+    /// <summary>Stages a process through the joined repository before its name is referenced.</summary>
+    public required Func<SchemataProcess, CancellationToken, Task> CreateProcessAsync { get; init; }
+
+    /// <summary>Stages a token through the joined repository before its name is referenced.</summary>
+    public required Func<SchemataProcessToken, CancellationToken, Task> CreateTokenAsync { get; init; }
+
+    /// <summary>Persists a called process snapshot within the current unit of work.</summary>
+    public required Func<ProcessSnapshot, CancellationToken, Task> PersistSnapshotAsync { get; init; }
+
     /// <summary>
     ///     The principal that initiated this engine operation, or <see langword="null" /> for
     ///     system-initiated continuations (timer and event bridges).
@@ -45,5 +57,5 @@ public sealed class FlowExecutionContext
 
     internal bool CompensationBindingsLoaded { get; set; }
 
-    internal IDictionary<(Type SourceType, string CanonicalName), object> TouchedSources { get; } = new Dictionary<(Type SourceType, string CanonicalName), object>();
+    internal IDictionary<(Type SourceType, string CanonicalName), object> TouchedSources { get; init; } = new Dictionary<(Type SourceType, string CanonicalName), object>();
 }

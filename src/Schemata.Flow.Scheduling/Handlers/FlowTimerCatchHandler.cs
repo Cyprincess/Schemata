@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Common;
+using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
@@ -86,9 +87,17 @@ public sealed class FlowTimerCatchHandler : IFlowCatchHandler
                 new Dictionary<string, string?> { ["name"] = process.CanonicalName });
         }
 
-        var collection = ResourceNameDescriptor.ForType<SchemataJob>().Collection;
-        foreach (var previousTimerJob in previousTimerJobs.Distinct(StringComparer.Ordinal)) {
-            await scheduler.UnscheduleAsync($"{collection}/{previousTimerJob}", ct);
+        if (previousTimerJobs.Count > 0) {
+            var jobs = _services.GetRequiredService<IRepository<SchemataJob>>();
+            if (context.UnitOfWork is { } unitOfWork) {
+                jobs.Join(unitOfWork);
+            }
+            foreach (var previousTimerJob in previousTimerJobs.Distinct(StringComparer.Ordinal)) {
+                var job = await jobs.FirstOrDefaultAsync(query => query.Where(row => row.Key == previousTimerJob), ct);
+                if (job is not null) {
+                    await scheduler.UnscheduleAsync(job.CanonicalName!, ct);
+                }
+            }
         }
 
         var jobKey = _services.GetRequiredService<IScheduledJobRegistry>().ResolveKey(typeof(FlowTimerJob));
@@ -101,7 +110,6 @@ public sealed class FlowTimerCatchHandler : IFlowCatchHandler
     #endregion
 
     private static string JobName(SchemataProcess process, string elementName, string tokenCanonical) {
-        // Resource-name segments cannot contain '/'; the full canonical remains in Variables["processName"].
         var processLeaf = process.CanonicalName![(process.CanonicalName!.LastIndexOf('/') + 1)..];
         var token       = tokenCanonical[(tokenCanonical.LastIndexOf('/') + 1)..];
         return $"flow-{processLeaf}-{elementName}-{token}";
@@ -115,7 +123,7 @@ public sealed class FlowTimerCatchHandler : IFlowCatchHandler
         string?         jobKey
     ) {
         var job = new SchemataJob {
-            Name   = JobName(process, elementName, token),
+            Key    = JobName(process, elementName, token),
             JobKey = jobKey,
             State  = JobState.Active,
         };

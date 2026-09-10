@@ -133,7 +133,6 @@ public sealed class ParHandler<TApp>(
         var requestUri = RequestUriPrefixes.Par + random;
 
         var token = new SchemataToken {
-            Name           = Guid.NewGuid().ToString("n"),
             Application    = SecurityParents.Application(application),
             Provider       = TokenTypes.ParRequest,
             Type           = TokenTypes.ParRequest,

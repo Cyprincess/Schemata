@@ -78,10 +78,8 @@ public class DefaultSchedulerTriggerShould
         var execution = await harness.Scheduler.TriggerAsync<SampleJob>(
             new() { Job = "jobs/sample", ExecutionUid = uid }, CancellationToken.None);
 
-        // The caller owns the operation name when it supplies one, so a client that pre-computed
-        // operations/{uid} can address the row it is about to create.
         Assert.Equal(uid, execution.Uid);
-        Assert.Equal(uid.ToString("n"), execution.Name);
+        Assert.Equal("consumer-execution", execution.Name);
     }
 
     [Fact]
@@ -118,6 +116,8 @@ public class DefaultSchedulerTriggerShould
                   .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> _, CancellationToken _) => Empty());
         executions.Setup(r => r.AddAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
                   .Returns((SchemataJobExecution execution, CancellationToken _) => {
+                      execution.Name = "consumer-execution";
+                      execution.CanonicalName = "operations/consumer-execution";
                       harness.Persisted.Add(execution);
                       return Task.CompletedTask;
                   });

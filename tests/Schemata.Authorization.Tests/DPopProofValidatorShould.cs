@@ -158,7 +158,7 @@ public class DPopProofValidatorShould
         slots.Setup(value => value.GetOrCreateAsync(
                     It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(),
                     It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new SchemataToken { Provider = "dpop", Name = "client-1", Value = value });
+            .ReturnsAsync(new SchemataToken { Provider = "dpop", Key = "client-1", Value = value });
         return slots;
     }
 

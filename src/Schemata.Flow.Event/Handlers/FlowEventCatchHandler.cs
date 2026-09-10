@@ -141,8 +141,6 @@ public sealed class FlowEventCatchHandler : IFlowCatchHandler
 
         if (existing is null) {
             await _subscriptions.AddAsync(new() {
-                Name           = subscriptionId,
-                CanonicalName  = $"event-subscriptions/{subscriptionId}",
                 SubscriptionId = subscriptionId,
                 EventType      = eventType,
                 CorrelationKey = correlationKey,

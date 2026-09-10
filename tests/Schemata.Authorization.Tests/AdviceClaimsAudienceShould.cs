@@ -81,9 +81,11 @@ public class AdviceDestinationSubjectShould
 
     [Fact]
     public async Task Skip_Claims_Already_Tagged_With_A_Destination() {
-        var advisor     = new AdviceDestinationSubject();
-        var pretagged   = new Claim(Claims.Audience, "client-1");
-        pretagged.Properties[ClaimDestinations.IdentityToken] = Parameters.Token;
+        var advisor   = new AdviceDestinationSubject();
+        var pretagged = new Claim(Claims.Audience, "client-1") { Properties = {
+                [ClaimDestinations.IdentityToken] = Parameters.Token,
+            }
+        };
         var destinations = new HashSet<string>();
 
         var result = await advisor.AdviseAsync(Ctx(), pretagged, destinations, new(), CancellationToken.None);

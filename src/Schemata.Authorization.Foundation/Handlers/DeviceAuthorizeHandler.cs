@@ -84,7 +84,6 @@ public sealed class DeviceAuthorizeHandler<TApp>(
         var expiry = now + options.Value.DeviceCodeLifetime;
 
         var dc = new SchemataToken {
-            Name        = Guid.NewGuid().ToString("n"),
             Application = application.CanonicalName,
             Type            = TokenTypes.DeviceCode,
             Status          = TokenStatuses.Valid,
@@ -99,7 +98,6 @@ public sealed class DeviceAuthorizeHandler<TApp>(
         await tokens.CreateAsync(dc, ct);
 
         var uc = new SchemataToken {
-            Name        = Guid.NewGuid().ToString("n"),
             Application = application.CanonicalName,
             Type            = TokenTypes.UserCode,
             Status          = TokenStatuses.Valid,

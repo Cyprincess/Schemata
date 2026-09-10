@@ -57,9 +57,12 @@ public class ReportServiceIntegrationShould : IClassFixture<WebAppFactory>
         var operations  = scope.ServiceProvider.GetRequiredService<IOperationService>();
         var snapshots   = scope.ServiceProvider.GetRequiredService<IReportSnapshotStore>();
         var executions  = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
+        var jobs = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJob>>();
+        var job = await jobs.FirstOrDefaultAsync(query => query.Where(row => row.Key == "report:periodic-records"));
+        Assert.NotNull(job);
 
         var armed = await executions.FirstOrDefaultAsync(
-                        query => query.Where(execution => execution.Job == "jobs/report-periodic-records"
+                        query => query.Where(execution => execution.Job == job.CanonicalName
                                                        && execution.State == ExecutionState.Pending));
         Assert.NotNull(armed);
 

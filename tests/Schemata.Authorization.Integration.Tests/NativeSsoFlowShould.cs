@@ -82,7 +82,7 @@ public class NativeSsoFlowShould
         var tokens = scope.ServiceProvider.GetRequiredService<ITokenStore<SchemataToken>>();
         var rows = new List<SchemataToken>();
         await foreach (var token in tokens.ListBySessionAsync(Session)) {
-            if (token.Application == "applications/" + Target && token.Type == TokenTypes.AccessToken) rows.Add(token);
+            if (token.Application == "applications/resource-" + Target && token.Type == TokenTypes.AccessToken) rows.Add(token);
         }
         var persisted = Assert.Single(rows);
         Assert.Equal(Subject, persisted.Parent);
@@ -116,7 +116,7 @@ public class NativeSsoFlowShould
                                .FindByReferenceIdAsync(access);
         Assert.NotNull(token);
         Assert.Equal(Subject, token.Parent);
-        Assert.Equal("applications/" + Target, token.Application);
+        Assert.Equal("applications/resource-" + Target, token.Application);
         Assert.Equal(Session, token.SessionId);
     }
 
@@ -166,7 +166,7 @@ public class NativeSsoFlowShould
                                    .FindByReferenceIdAsync(secret);
             Assert.NotNull(token);
             Assert.Null(token.Parent);
-            Assert.Equal("applications/" + Source, token.Application);
+            Assert.Equal("applications/resource-" + Source, token.Application);
             Assert.Equal(Session, token.SessionId);
         }
         var before = await SecretCount(factory);
@@ -196,7 +196,7 @@ public class NativeSsoFlowShould
             var token = await tokens.FindByReferenceIdAsync(secret);
             Assert.NotNull(token);
             switch (mismatch) {
-                case "client": token.Application = "applications/" + Target; break;
+                case "client": token.Application = "applications/resource-" + Target; break;
                 case "session": token.SessionId = "other-session"; break;
                 case "device": token.DeviceId = "other-device"; break;
                 case "expired": token.ExpireTime = clock.GetUtcNow().UtcDateTime; break;
@@ -214,7 +214,7 @@ public class NativeSsoFlowShould
         var created = await verify.ServiceProvider.GetRequiredService<ITokenStore<SchemataToken>>()
                                   .FindByReferenceIdAsync(replacement);
         Assert.NotNull(created);
-        Assert.Equal("applications/" + Source, created.Application);
+        Assert.Equal("applications/resource-" + Source, created.Application);
         Assert.Equal(Session, created.SessionId);
         Assert.Equal("native-device", created.DeviceId);
     }
@@ -241,7 +241,7 @@ public class NativeSsoFlowShould
         var verifier = scope.ServiceProvider.GetRequiredService<ISecretVerifier>();
         foreach (var clientId in new[] { Source, Target }) {
             var app = new SchemataApplication {
-                Name = clientId,
+                Name = "resource-" + clientId,
                 ClientId = clientId,
                 ClientType = ClientTypes.Confidential,
                 RedirectUris = [Issuer + "/callback"],
@@ -253,7 +253,7 @@ public class NativeSsoFlowShould
             await apps.CreateAsync(app);
             await securities.CreateAsync(new() {
                 Parent = SecurityParents.Application(app),
-                Name = clientId,
+                Key = clientId,
                 Kind = SecurityConstants.Kinds.Password,
                 Usage = SecurityConstants.Usages.Authentication,
                 Algorithm = SecurityConstants.Algorithms.Pbkdf2,

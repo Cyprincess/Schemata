@@ -6,6 +6,7 @@ using Schemata.Entity.Repository.Advisors;
 using Schemata.Report.Scheduling.Runtime;
 using Schemata.Report.Skeleton.Entities;
 using Schemata.Scheduling.Skeleton;
+using Schemata.Scheduling.Skeleton.Entities;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Report.Scheduling.Advisors;
@@ -16,7 +17,7 @@ namespace Schemata.Report.Scheduling.Advisors;
 ///     A committed advisor runs after a successful commit; the host initializer re-arms persisted periodic
 ///     definitions on startup.
 /// </remarks>
-public sealed class AdviceReportScheduleSync<TReport>(IScheduler scheduler) : IRepositoryCommittedAdvisor<TReport>
+public sealed class AdviceReportScheduleSync<TReport>(IScheduler scheduler, IRepository<SchemataJob> jobs) : IRepositoryCommittedAdvisor<TReport>
     where TReport : SchemataReport
 {
     public int Order => Orders.Extension;
@@ -28,14 +29,14 @@ public sealed class AdviceReportScheduleSync<TReport>(IScheduler scheduler) : IR
         CancellationToken      ct = default
     ) {
         foreach (var report in changes.Updated) {
-            await scheduler.UnscheduleAsync(ReportSchedule.JobCanonicalName(report), ct);
+            await ReportSchedule.DisarmAsync(scheduler, jobs, report, ct);
             if (report.Periodic) {
                 await ReportSchedule.ArmAsync(scheduler, report, ct);
             }
         }
 
         foreach (var report in changes.Removed) {
-            await scheduler.UnscheduleAsync(ReportSchedule.JobCanonicalName(report), ct);
+            await ReportSchedule.DisarmAsync(scheduler, jobs, report, ct);
         }
 
         return AdviseResult.Continue;

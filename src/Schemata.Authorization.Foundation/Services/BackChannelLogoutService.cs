@@ -68,8 +68,8 @@ public sealed class BackChannelLogoutService<TApp>(
 
          await foreach (var app in apps.ListAsync(
                             q => q.Where(a => a.BackChannelLogoutUri != null
-                                           && a.Name != null
-                                           && clients.Contains(a.Name)), ct)) {
+                                           && a.CanonicalName != null
+                                           && clients.Contains(a.CanonicalName)), ct)) {
             if (app.BackChannelLogoutSessionRequired && string.IsNullOrWhiteSpace(session)) {
                 continue;
             }
@@ -105,9 +105,8 @@ public sealed class BackChannelLogoutService<TApp>(
             var uri = app.BackChannelLogoutUri;
             var jwt = await issuer.CreateToken(claims, TimeSpan.FromMinutes(2), typ: TokenMediaTypes.Logout);
 
-            // One-shot trigger with no persistent SchemataJob entry — the execution row is
-            // self-identifying via operations/{uid}, so JobContext.Job stays null and the
-            // SchemataJobExecution.Job foreign reference is empty.
+            // One-shot triggers have no persistent job entry; the execution resource is
+            // named by the consumer's repository advisor.
             await scheduler.TriggerAsync<BackChannelLogoutJob>(new() {
                 Variables = new Dictionary<string, string?> {
                     [BackChannelLogoutJob.VariableKeys.Uri]         = uri,

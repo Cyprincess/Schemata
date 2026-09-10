@@ -35,47 +35,47 @@ public class CacheTokenStore : ITokenStore<SchemataToken>
 
     #region ITokenStore<SchemataToken> Members
 
-    public async Task<SchemataToken?> GetAsync(string? parent, string provider, string name, CancellationToken ct = default) {
+    public async Task<SchemataToken?> GetAsync(string? parent, string provider, string key, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
-        var bytes = await _cache.GetAsync(CacheKey(parent, provider, name), ct);
+        var bytes = await _cache.GetAsync(CacheKey(parent, provider, key), ct);
 
-        return bytes is null ? null : Slot(parent, provider, name, Encoding.UTF8.GetString(bytes), null);
+        return bytes is null ? null : Slot(parent, provider, key, Encoding.UTF8.GetString(bytes), null);
     }
 
     public async Task<SchemataToken> GetOrCreateAsync(
         string?           parent,
         string            provider,
-        string            name,
+        string            key,
         string?           value,
         TimeSpan          ttl,
         CancellationToken ct = default
     ) {
         ct.ThrowIfCancellationRequested();
 
-        var key       = CacheKey(parent, provider, name);
+        var cacheKey  = CacheKey(parent, provider, key);
         var candidate = value ?? MintValue();
 
-        if (await _cache.TryAddAsync(key, Encoding.UTF8.GetBytes(candidate), new() {
+        if (await _cache.TryAddAsync(cacheKey, Encoding.UTF8.GetBytes(candidate), new() {
                 AbsoluteExpirationRelativeToNow = ttl,
             }, ct)) {
-            return Slot(parent, provider, name, candidate, ttl);
+            return Slot(parent, provider, key, candidate, ttl);
         }
 
         // Concurrent minting on a cold slot admits one winner through TryAdd; slot consumers
         // must observe one shared value, so the loser re-reads the winner. Should the winner
         // expire in the gap before the re-read, our own candidate is returned unstored.
-        var winner = await _cache.GetAsync(key, ct);
+        var winner = await _cache.GetAsync(cacheKey, ct);
 
         return winner is not null
-            ? Slot(parent, provider, name, Encoding.UTF8.GetString(winner), ttl)
-            : Slot(parent, provider, name, candidate, ttl);
+            ? Slot(parent, provider, key, Encoding.UTF8.GetString(winner), ttl)
+            : Slot(parent, provider, key, candidate, ttl);
     }
 
     public async Task SetAsync(
         string?           parent,
         string            provider,
-        string            name,
+        string            key,
         string?           value,
         TimeSpan?         ttl,
         CancellationToken ct = default
@@ -83,16 +83,16 @@ public class CacheTokenStore : ITokenStore<SchemataToken>
         ct.ThrowIfCancellationRequested();
 
         await _cache.SetAsync(
-            CacheKey(parent, provider, name),
+            CacheKey(parent, provider, key),
             Encoding.UTF8.GetBytes(value ?? string.Empty),
             new() { AbsoluteExpirationRelativeToNow = ttl },
             ct);
     }
 
-    public async Task RemoveAsync(string? parent, string provider, string name, CancellationToken ct = default) {
+    public async Task RemoveAsync(string? parent, string provider, string key, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
-        await _cache.RemoveAsync(CacheKey(parent, provider, name), ct);
+        await _cache.RemoveAsync(CacheKey(parent, provider, key), ct);
     }
 
     /// <exception cref="NotSupportedException">The cache store serves key-value slots only.</exception>
@@ -162,15 +162,15 @@ public class CacheTokenStore : ITokenStore<SchemataToken>
                    "use RepositoryTokenStore for queries, the token state machine, and row CRUD.");
     }
 
-    private string CacheKey(string? parent, string provider, string name) {
-        return $"{parent ?? string.Empty}\x1e{provider}\x1e{name}".ToCacheKey(Keys.Authorization);
+    private string CacheKey(string? parent, string provider, string key) {
+        return $"{parent ?? string.Empty}\x1e{provider}\x1e{key}".ToCacheKey(Keys.Authorization);
     }
 
-    private SchemataToken Slot(string? parent, string provider, string name, string value, TimeSpan? ttl) {
+    private SchemataToken Slot(string? parent, string provider, string key, string value, TimeSpan? ttl) {
         return new() {
             Parent     = parent,
             Provider   = provider,
-            Name       = name,
+            Key        = key,
             Value      = value,
             ExpireTime = ttl is null ? null : Now() + ttl.Value,
         };

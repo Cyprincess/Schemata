@@ -98,7 +98,7 @@ public class BpmnConformanceShould
             DefinitionName = definition.Name,
         };
 
-        var execution = new FlowExecutionContext(
+        var execution = Schemata.Flow.Tests.FlowTestCreation.Context(
             new Mock<IUnitOfWork>(MockBehavior.Strict).Object,
             new ServiceCollection().BuildServiceProvider());
         var snapshot = await engine.StartAsync(definition, process, execution, CancellationToken.None);

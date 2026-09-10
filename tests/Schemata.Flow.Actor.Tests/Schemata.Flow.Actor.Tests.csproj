@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Schemata.Flow.Tests\FlowTestCreation.cs" Link="FlowTestCreation.cs" />
     <ProjectReference Include="..\..\src\Schemata.Abstractions\Schemata.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Actor.Foundation\Schemata.Actor.Foundation.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Actor.Skeleton\Schemata.Actor.Skeleton.csproj" />

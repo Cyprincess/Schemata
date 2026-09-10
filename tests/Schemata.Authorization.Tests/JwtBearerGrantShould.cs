@@ -102,7 +102,7 @@ public class JwtBearerGrantShould
                     }
 
                     burned = true;
-                    return new() { Parent = parent, Provider = provider, Name = name, Value = marker };
+                    return new() { Parent = parent, Provider = provider, Key = name, Value = marker };
                 });
         var (handler, sp, _) = CreateHandler(
             application: CreateApplication(["s:api:read"]),
@@ -237,7 +237,7 @@ public class JwtBearerGrantShould
                          It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(),
                          It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((string? parent, string provider, string name, string? marker, TimeSpan _, CancellationToken _) =>
-                    new() { Parent = parent, Provider = provider, Name = name, Value = marker });
+                    new() { Parent = parent, Provider = provider, Key = name, Value = marker });
         }
 
         var options = new SchemataAuthorizationOptions { Issuer = Issuer };

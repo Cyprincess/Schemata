@@ -150,7 +150,7 @@ ValueTask<ProcessSnapshot> CancelTokenAsync(
 
 | Method             | Behavior                                                                                                                                                                                |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `StartAsync`       | Creates a `SchemataProcess`, optionally binds a source entity via `BindStartSourceAsync`, calls `engine.StartAsync`, runs advisors, persists the snapshot, and returns the process row. |
+| `StartAsync`       | Adds a `SchemataProcess` through the repository before binding sources or calling `engine.StartAsync`, runs advisors, persists the snapshot, and returns the process row. |
 | `CompleteAsync`    | Loads tokens, calls `engine.AdvanceAsync`, runs advisors, persists, and returns the snapshot.                                                                                           |
 | `CorrelateAsync`   | Resolves the `Message` definition by name, picks the target token (the supplied `token` argument, or `engine.FindTriggerTargetsAsync` when omitted), calls `engine.TriggerAsync` for that token, runs advisors, persists, and returns the snapshot.     |
 | `ThrowSignalAsync` | Snapshots every persisted process that has a waiting token and declares the signal, then delivers to each in its own scope and unit of work, bounded by `SchemataFlowOptions.SignalBroadcastConcurrency`. Returns one `SignalDeliveryResult` per candidate, ordered by canonical name; a failing target rolls back only itself and the broadcast continues. |
@@ -185,7 +185,7 @@ Every state-changing method follows the same pattern:
 7. Persist the snapshot through `ProcessPersistence.PersistSnapshotAsync`. `PersistSnapshotAsync`
    upserts the process and token rows and appends transition rows; source-binding rows are written
    separately via `BindStartSourceAsync` (start path) and via the source advisor (transition path).
-   All four repositories are joined to one unit of work inside `ProcessPersistence.ExecuteAsync`, so
+   All five repositories are joined to one unit of work inside `ProcessPersistence.ExecuteAsync`, so
    the writes commit or roll back together.
 
 After persistence commits, `ProcessLifecycleNotifier` publishes the lifecycle notifications
@@ -295,6 +295,45 @@ start path and through `FlowTaskContext.BindSourceAsync` for token-scoped rows; 
 stamps are refreshed by the source advisor pipeline on every transition. All five repositories commit or
 roll back together because they share the same unit of work. `ProcessPersistence` owns durability in
 the runtime commit path, and lifecycle observers are post-commit notifications.
+
+### Resource names and engine creation callbacks
+
+The application supplies `Name` for persisted runtime resources through an
+`IRepositoryAddAdvisor<TEntity>` registered with `TryAddEnumerable`. Run the naming advisor before
+`AdviceAddCanonicalName.DefaultOrder` (120,000,000), preserve an explicitly supplied `Name`, and
+cover processes, tokens, transitions, compensation rows, and event subscriptions when that bridge
+is enabled. Canonical-name derivation and validation remain in the repository pipeline; the
+framework provides no generated-name fallback.
+
+`DefaultStartProcessHandler` awaits repository creation of the process before source bindings or
+engine execution use its identity. Token factories return unnamed objects; engines await
+`FlowExecutionContext.CreateTokenAsync` before using a token's canonical name in transitions,
+spawner links, or called-process work. Repository creation stages the row and runs its add advisors;
+the surrounding unit of work still owns the commit.
+
+Custom engines and callers constructing `FlowExecutionContext` must initialize its three required
+callbacks: `CreateProcessAsync`, `CreateTokenAsync`, and `PersistSnapshotAsync`. The first two add
+rows through the joined repositories. The third persists a called process's snapshot within that
+same unit of work. Forward these callbacks into child contexts and await them at the same identity
+boundaries; an in-memory naming substitute bypasses the consumer's repository policy.
+
+BPMN graph node and graph-reference names remain engine/model identifiers and may retain internal
+generation. Persisted process, token, transition, compensation, and subscription resources are not
+graph nodes. Source-binding `Name` values remain the supplied binding labels used to match
+declarations within a process/token scope. Event subscriptions similarly retain `SubscriptionId`
+as their lookup identity, separate from resource `Name`.
+
+Flow timer jobs use `SchemataJob.Key` for their schedule slot. The timer bridge finds that row by
+`Key` and passes its stored `CanonicalName` to unscheduling, rather than constructing a job URI.
+Applications using the bridge also need naming advisors for scheduler jobs and executions.
+
+Implementation: `src/Schemata.Flow.Foundation/FlowPersistenceScope.cs`,
+`src/Schemata.Flow.Foundation/Handlers/DefaultStartProcessHandler.cs`,
+`src/Schemata.Flow.Skeleton/Runtime/FlowExecutionContext.cs`,
+`src/Schemata.Flow.Skeleton/Runtime/TokenFactory.cs`,
+`src/Schemata.Flow.Bpmn/Runtime/SubProcesses/CallActivityExecutor.cs`,
+`src/Schemata.Flow.Event/Handlers/FlowEventCatchHandler.cs`, and
+`src/Schemata.Flow.Scheduling/Handlers/FlowTimerCatchHandler.cs`.
 
 ### Persisted compensation bindings
 

@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Schemata.Flow.Tests\FlowTestCreation.cs" Link="FlowTestCreation.cs" />
     <ProjectReference Include="..\..\src\Schemata.Caching.Distributed\Schemata.Caching.Distributed.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Entity.EntityFrameworkCore\Schemata.Entity.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Entity.LinqToDB\Schemata.Entity.LinqToDB.csproj" />

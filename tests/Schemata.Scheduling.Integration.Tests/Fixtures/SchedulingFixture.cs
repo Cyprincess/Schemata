@@ -6,6 +6,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
@@ -16,7 +17,7 @@ using Xunit;
 
 namespace Schemata.Scheduling.Integration.Tests.Fixtures;
 
-public sealed class SchedulingFixture : IAsyncLifetime
+public sealed class SchedulingFixture(bool supplyNames = true) : IAsyncLifetime
 {
     private SqliteConnection? _connection;
     private ServiceProvider?   _root;
@@ -43,6 +44,10 @@ public sealed class SchedulingFixture : IAsyncLifetime
 
         services.AddRepository<SchemataJob, EfCoreRepository<SchedulingDbContext, SchemataJob>>();
         services.AddRepository<SchemataJobExecution, EfCoreRepository<SchedulingDbContext, SchemataJobExecution>>();
+        if (supplyNames) {
+            services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJob>, AdviceAddResourceName<SchemataJob>>());
+            services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJobExecution>, AdviceAddResourceName<SchemataJobExecution>>());
+        }
 
         services.AddScoped<IUnitOfWork<SchedulingDbContext>, EfCoreUnitOfWork<SchedulingDbContext>>();
 

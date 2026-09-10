@@ -93,4 +93,11 @@ public class OperationEnvelopeShould
         Assert.True(output.GetProperty("ok").GetBoolean());
     }
 
+    [Fact]
+    public void DoesNotInventAnOperationName_FromItsStorageIdentifier() {
+        var operation = OperationMapper.FromExecution(new() { Uid = Guid.NewGuid() });
+        Assert.Null(operation.Name);
+        Assert.Null(operation.CanonicalName);
+    }
+
 }

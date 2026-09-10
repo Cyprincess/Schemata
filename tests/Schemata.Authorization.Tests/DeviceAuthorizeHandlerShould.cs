@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,6 +16,7 @@ using Schemata.Security.Skeleton.Entities;
 using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 using Xunit;
 
 namespace Schemata.Authorization.Tests;
@@ -26,15 +28,17 @@ public class DeviceAuthorizeHandlerShould
     private static (DeviceAuthorizeHandler<SchemataApplication> handler,
         Mock<ITokenStore<SchemataToken>> tokens,
         IServiceProvider sp) CreateHandler(SchemataApplication? application = null) {
-        var opts = new SchemataAuthorizationOptions();
-        opts.Issuer                = "https://localhost";
-        opts.DeviceVerificationUri = "https://localhost/device";
-        opts.DeviceCodeLifetime    = TimeSpan.FromMinutes(15);
-        opts.DeviceCodeInterval    = 5;
+        var opts = new SchemataAuthorizationOptions {
+            Issuer             = "https://localhost", DeviceVerificationUri = "https://localhost/device", DeviceCodeLifetime = TimeSpan.FromMinutes(15),
+            DeviceCodeInterval = 5,
+        };
 
         var tokens = new Mock<ITokenStore<SchemataToken>>();
         tokens.Setup(t => t.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>()))
-              .ReturnsAsync((SchemataToken t, CancellationToken _) => t);
+              .ReturnsAsync((SchemataToken t, CancellationToken _) => {
+                  t.Name = "assigned-" + t.Type;
+                  return t;
+              });
 
         var jsonOpts = Options.Create(new JsonSerializerOptions());
 
@@ -101,12 +105,17 @@ public class DeviceAuthorizeHandlerShould
 
     [Fact]
     public async Task Creates_DeviceCodeAndUserCodeTokens() {
-        var app = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test-client" };
+        var app = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = "test-client", CanonicalName = "applications/test-resource" };
         var (handler, tokens, sp) = CreateHandler(app);
         using var ambient = AdviceContext.Establish(new(sp));
 
         await handler.DeviceAuthorizeAsync(CreateRequest("openid"), null, CancellationToken.None);
 
-        tokens.Verify(t => t.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        var stored = tokens.Invocations.Select(call => Assert.IsType<SchemataToken>(call.Arguments[0])).ToArray();
+        var device = Assert.Single(stored, token => token.Type == TokenTypes.DeviceCode);
+        var user = Assert.Single(stored, token => token.Type == TokenTypes.UserCode);
+        var payload = JsonSerializer.Deserialize<UserCodePayload>(user.Payload!);
+        Assert.Equal("assigned-" + TokenTypes.DeviceCode, payload!.DeviceCodeName);
+        Assert.NotEqual(device.ReferenceId, payload.DeviceCodeName);
     }
 }

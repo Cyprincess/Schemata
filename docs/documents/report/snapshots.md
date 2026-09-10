@@ -21,6 +21,20 @@ completes. `IReportSnapshotAdvisor` runs before that final header update.
 write. `DefaultReportSnapshotStore<TSnapshot, TChunk>` opens scoped repositories for list, header,
 chunk, and row-stream reads.
 
+The application assigns missing `Name` values through `IRepositoryAddAdvisor<TSnapshot>` and
+`IRepositoryAddAdvisor<TChunk>`, registered with `TryAddEnumerable` before
+`AdviceAddCanonicalName.DefaultOrder` (120,000,000). Preserve explicitly supplied names. The writer
+adds and commits the header before reading its assigned name into chunk parent references or its
+canonical name into the result. Each chunk runs its own repository add pipeline; its `Index` is
+ordering data, not a generated resource name. Missing naming policy fails through the normal
+canonical-name validation path rather than a framework fallback.
+
+The header's `Operation`, when supplied, is the persisted operation's canonical name. Consumers
+should retain stored names and references when migrating existing data, independently of any UID
+or chunk-index convention their earlier naming policy used.
+
+Implementation: `src/Schemata.Report.Foundation/Snapshots/ReportSnapshotWriter.cs`.
+
 ## Reading rows
 
 `ReadSnapshotHandler<TSnapshot>` reads pages through `ReadSnapshotRequest` and returns

@@ -14,7 +14,8 @@ namespace Schemata.Security.Skeleton.Entities;
 [Table("SchemataTokens")]
 [CanonicalName("tokens/{token}")]
 [PrimaryKey(nameof(Uid))]
-[Index(nameof(Parent), nameof(Provider), nameof(Name), IsUnique = true)]
+[Index(nameof(Parent), nameof(Provider), nameof(Key), IsUnique = true)]
+[Index(nameof(Name), IsUnique = true)]
 
 [Index(nameof(Type), nameof(Status))]
 [Index(nameof(DeviceId))]
@@ -35,6 +36,9 @@ public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimesta
 
     /// <summary>Issuing or managing subsystem (authorization, dpop, device, assertion…); the AspNet <c>LoginProvider</c> analogue.</summary>
     public virtual string? Provider { get; set; }
+
+    /// <summary>Provider-scoped slot identifier, such as a nonce scope or replay marker.</summary>
+    public virtual string? Key { get; set; }
 
     /// <summary>
     ///     OP session identifier (<c>sid</c>) linking this token to a login session.
@@ -73,7 +77,7 @@ public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimesta
 
     #region ICanonicalName Members
 
-    /// <summary>Slot name or type refinement (<c>nonce</c>, <c>jti:{id}</c>, <c>rate:{key}</c>); the AspNet <c>Name</c> analogue.</summary>
+    /// <inheritdoc cref="ICanonicalName.Name" />
     public string? Name { get; set; }
 
     public string? CanonicalName { get; set; }

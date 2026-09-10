@@ -53,7 +53,7 @@ public class JarLifetimeShould
             var securities = scope.ServiceProvider.GetRequiredService<ISecurityStore<SchemataSecurity>>();
             await securities.CreateAsync(new() {
                 Parent = SecurityParents.Application(application),
-                Name = keyId,
+                Key = keyId,
                 Kind = SecurityConstants.Kinds.Jwks,
                 Usage = SecurityConstants.Usages.Authentication,
                 Status = SecurityConstants.Statuses.Valid,

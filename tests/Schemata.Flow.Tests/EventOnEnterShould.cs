@@ -76,7 +76,7 @@ public class EventOnEnterShould
     }
 
     private static FlowExecutionContext Context() {
-        return new(Mock.Of<IUnitOfWork>(), new ServiceCollection().BuildServiceProvider());
+        return Schemata.Flow.Tests.FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), new ServiceCollection().BuildServiceProvider());
     }
 
     #region Nested type: EndEnterProcess

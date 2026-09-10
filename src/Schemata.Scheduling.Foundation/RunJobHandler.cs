@@ -20,7 +20,7 @@ namespace Schemata.Scheduling.Foundation;
 ///     persisted <see cref="SchemataJob.JobKey" /> to dispatch through
 ///     <see cref="IScheduler.TriggerAsync{TJob}" />; the scheduler persists the
 ///     <see cref="SchemataJobExecution" /> row synchronously so the response
-///     carries an addressable <c>operations/{uid}</c>.
+///     carries the persisted operation's canonical name.
 /// </summary>
 public sealed class RunJobHandler(
     IScheduler scheduler,

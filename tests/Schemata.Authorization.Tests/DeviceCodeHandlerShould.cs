@@ -40,7 +40,7 @@ public class DeviceCodeHandlerShould
             Name          = "device-1",
             Type          = TokenTypes.DeviceCode,
             Status        = TokenStatuses.Authorized,
-            Application   = app.Name,
+            Application   = app.CanonicalName,
             Parent        = "user-1",
             ReferenceId   = "dev-ref",
             Payload       = payload,

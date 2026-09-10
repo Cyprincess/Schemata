@@ -10,7 +10,7 @@ namespace Schemata.Authorization.Tests;
 
 /// <summary>
 ///     In-memory <see cref="ISecurityStore{TSecurity}" /> standing in for the host store in
-///     unit tests. Rows order by create time descending then name ascending, mirroring the
+///     unit tests. Rows order by create time descending then key ascending, mirroring the
 ///     store contract the token pipeline relies on for primary-key selection.
 /// </summary>
 public class TestSecurityStore : ISecurityStore<SchemataSecurity>
@@ -39,7 +39,7 @@ public class TestSecurityStore : ISecurityStore<SchemataSecurity>
                        && (usage is null || row.Usage == usage)
                        && (status is null || row.Status == status))
             .OrderByDescending(row => row.CreateTime)
-            .ThenBy(row => row.Name));
+            .ThenBy(row => row.Key));
     }
 
     /// <inheritdoc />

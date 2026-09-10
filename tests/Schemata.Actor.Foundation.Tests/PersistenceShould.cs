@@ -13,6 +13,7 @@ using Xunit;
 
 namespace Schemata.Actor.Foundation.Tests;
 
+[Trait("Category", "Unit")]
 public class PersistenceShould
 {
     [Fact]
@@ -35,7 +36,8 @@ public class PersistenceShould
 
         Assert.Equal(3, loaded);
         var row = Assert.Single(rows);
-        Assert.Equal(id.ToString(), row.Name);
+        Assert.Equal(id.Type, row.ActorType);
+        Assert.Equal(id.Key, row.ActorKey);
         Assert.Equal(3, BitConverter.ToInt32(row.State!, 0));
     }
 

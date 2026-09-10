@@ -37,7 +37,8 @@ public class CacheTokenStoreShould
         Assert.Equal("candidate",          row.Value);
         Assert.Equal("users/u-1",          row.Parent);
         Assert.Equal("dpop",               row.Provider);
-        Assert.Equal("as:client-1",        row.Name);
+        Assert.Equal("as:client-1",        row.Key);
+        Assert.Null(row.Name);
         Assert.Equal(Now.AddMinutes(5),    row.ExpireTime);
         var options = Assert.Single(entries);
         Assert.Equal(TimeSpan.FromMinutes(5), options.AbsoluteExpirationRelativeToNow);

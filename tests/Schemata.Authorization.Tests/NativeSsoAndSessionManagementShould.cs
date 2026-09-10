@@ -593,7 +593,7 @@ public class DeviceSsoShould
         return new() {
             Uid           = Guid.NewGuid(),
             ClientId      = clientId,
-            CanonicalName = $"applications/{clientId}",
+            CanonicalName = $"applications/resource-{clientId}",
             Permissions   = [
                 PermissionPrefixes.Scope + Scopes.DeviceSso,
                 PermissionPrefixes.Scope + Scopes.OpenId,

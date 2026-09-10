@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Scheduling.Foundation.Runtime;
 using Schemata.Scheduling.Skeleton;
@@ -102,11 +101,7 @@ internal sealed class SchedulingHandlerSupport(DefaultScheduler scheduler, Schem
         if (existing is not null) {
             return;
         }
-        var name       = Guid.NewGuid().ToString("n");
-        var descriptor = ResourceNameDescriptor.ForType<SchemataJobExecution>();
         var execution = new SchemataJobExecution {
-            Name          = name,
-            CanonicalName = $"{descriptor.Collection}/{name}",
             Job           = canonical,
             JobKey        = job.JobKey,
             ArgsJson      = job.ArgsJson,
@@ -131,8 +126,9 @@ internal sealed class SchedulingHandlerSupport(DefaultScheduler scheduler, Schem
     ///     replaced. The count keeps the <see cref="MissedFirePolicy.FireAll" /> missed-occurrence
     ///     walk capped across re-arms.
     /// </param>
-    internal async Task ArmOneShotTimerAsync(SchemataJob job, int replayedMisses = -1) {
-        var key = job.CanonicalName ?? job.Name;
+    /// <param name="timerKey">Persisted execution identity for one-shot fires without a job resource.</param>
+    internal async Task ArmOneShotTimerAsync(SchemataJob job, int replayedMisses = -1, string? timerKey = null) {
+        var key = timerKey ?? job.CanonicalName ?? job.Name;
         if (string.IsNullOrWhiteSpace(key)) {
             return;
         }

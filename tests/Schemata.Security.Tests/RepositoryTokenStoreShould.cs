@@ -190,8 +190,8 @@ public class RepositoryTokenStoreShould
 
     [Fact]
     public async Task Get_Returns_The_Row_Stored_Under_The_Slot_Key() {
-        var match = new SchemataToken { Name = "nonce-1", Parent = "users/u-1", Provider = "dpop" };
-        var other = new SchemataToken { Name = "nonce-2", Parent = "users/u-1", Provider = "dpop" };
+        var match = new SchemataToken { Name = "assigned-1", Key = "nonce-1", Parent = "users/u-1", Provider = "dpop" };
+        var other = new SchemataToken { Name = "nonce-1", Key = "nonce-2", Parent = "users/u-1", Provider = "dpop" };
         var (store, _) = NewStore(r => SetupSingle(r, match, other));
 
         Assert.Same(match, await store.GetAsync("users/u-1", "dpop", "nonce-1"));
@@ -199,7 +199,7 @@ public class RepositoryTokenStoreShould
 
     [Fact]
     public async Task GetOrCreate_Returns_The_Existing_Slot_Without_Recreating() {
-        var existing = new SchemataToken { Name = "nonce-1", Parent = "users/u-1", Provider = "dpop", Value = "stored" };
+        var existing = new SchemataToken { Name = "assigned-1", Key = "nonce-1", Parent = "users/u-1", Provider = "dpop", Value = "stored" };
         var (store, repository) = NewStore(r => SetupSingle(r, existing));
 
         var row = await store.GetOrCreateAsync("users/u-1", "dpop", "nonce-1", "candidate", TimeSpan.FromMinutes(5));
@@ -218,14 +218,15 @@ public class RepositoryTokenStoreShould
         Assert.Equal(Now.AddMinutes(5), row.ExpireTime);
         Assert.Equal("users/u-1", row.Parent);
         Assert.Equal("dpop",      row.Provider);
-        Assert.Equal("nonce-1",   row.Name);
+        Assert.Equal("nonce-1",   row.Key);
+        Assert.Null(row.Name);
         repository.Verify(r => r.AddAsync(row, It.IsAny<CancellationToken>()), Times.Once);
         repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task GetOrCreate_Returns_The_Winner_When_Slot_Creation_Hits_The_Unique_Index() {
-        var winner = new SchemataToken { Name = "nonce-1", Parent = "users/u-1", Provider = "dpop", Value = "winner" };
+        var winner = new SchemataToken { Name = "assigned-winner", Key = "nonce-1", Parent = "users/u-1", Provider = "dpop", Value = "winner" };
         var (store, repository) = NewStore(r => {
             var probe = 0;
             Func<Func<IQueryable<SchemataToken>, IQueryable<SchemataToken>>,
@@ -261,7 +262,7 @@ public class RepositoryTokenStoreShould
 
     [Fact]
     public async Task Set_Updates_The_Existing_Slot_Value_And_Ttl() {
-        var existing = new SchemataToken { Name = "rate:k-1", Parent = null, Provider = "device", Value = "1" };
+        var existing = new SchemataToken { Name = "assigned-rate", Key = "rate:k-1", Parent = null, Provider = "device", Value = "1" };
         var (store, repository) = NewStore(r => SetupSingle(r, existing), NewClock());
 
         await store.SetAsync(null, "device", "rate:k-1", "2", TimeSpan.FromSeconds(10));
@@ -281,7 +282,7 @@ public class RepositoryTokenStoreShould
 
         repository.Verify(
             r => r.AddAsync(
-                It.Is<SchemataToken>(t => t.Parent == "users/u-1" && t.Provider == "dpop" && t.Name == "nonce-1"
+                It.Is<SchemataToken>(t => t.Parent == "users/u-1" && t.Provider == "dpop" && t.Key == "nonce-1" && t.Name == null
                                        && t.Value == "value" && t.ExpireTime == null),
                 It.IsAny<CancellationToken>()),
             Times.Once);
@@ -290,7 +291,7 @@ public class RepositoryTokenStoreShould
 
     [Fact]
     public async Task Remove_Deletes_The_Slot_And_Commits() {
-        var existing = new SchemataToken { Name = "nonce-1", Parent = "users/u-1", Provider = "dpop" };
+        var existing = new SchemataToken { Name = "assigned-1", Key = "nonce-1", Parent = "users/u-1", Provider = "dpop" };
         var (store, repository) = NewStore(r => SetupSingle(r, existing));
 
         await store.RemoveAsync("users/u-1", "dpop", "nonce-1");

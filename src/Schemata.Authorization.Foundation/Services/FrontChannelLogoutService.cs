@@ -45,8 +45,8 @@ public sealed class FrontChannelLogoutService<TApp>(
 
         await foreach (var app in apps.ListAsync(
                            q => q.Where(a => a.FrontChannelLogoutUri != null
-                                          && a.Name != null
-                                          && clients.Contains(a.Name)), ct)) {
+                                          && a.CanonicalName != null
+                                          && clients.Contains(a.CanonicalName)), ct)) {
             var uri = app.FrontChannelLogoutUri;
             if (string.IsNullOrWhiteSpace(uri)) {
                 continue;

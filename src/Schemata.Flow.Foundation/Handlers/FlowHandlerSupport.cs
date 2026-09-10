@@ -338,7 +338,6 @@ internal sealed class FlowHandlerSupport(
         ClaimsPrincipal?     principal
     ) {
         return new() {
-            Name      = NewLeafId(),
             Process   = process.Name,
             Token     = token.CanonicalName,
             Kind      = TransitionKind.Cancel,
@@ -395,14 +394,14 @@ internal sealed class FlowHandlerSupport(
             LoadedCompensationBindings = bindings,
             Principal                  = principal,
             SourceReadGuard            = FlowSourceReadScope.Enter,
+            CreateProcessAsync         = (entity, _) => scope.CreateProcessAsync(entity, ct),
+            CreateTokenAsync           = (entity, _) => scope.CreateTokenAsync(entity, ct),
+            PersistSnapshotAsync       = (snapshot, token) => persistence.PersistSnapshotAsync(scope, snapshot, token),
         };
     }
 
     internal static SchemataProcess NewProcess(string definitionName, StartProcessOptions? startOptions) {
-        var leaf = NewLeafId();
         return new() {
-            Name           = leaf,
-            CanonicalName  = $"processes/{leaf}",
             DefinitionName = definitionName,
             DisplayName    = string.IsNullOrWhiteSpace(startOptions?.DisplayName) ? null : startOptions.DisplayName,
             Description    = string.IsNullOrWhiteSpace(startOptions?.Description) ? null : startOptions.Description,
@@ -430,9 +429,6 @@ internal sealed class FlowHandlerSupport(
         return principal.Identity?.Name;
     }
 
-    internal static string NewLeafId() {
-        return Guid.NewGuid().ToString("n");
-    }
 
     private static IEnumerable<FlowEvent> ResolveExternalCatches(
         ProcessDefinition    definition,

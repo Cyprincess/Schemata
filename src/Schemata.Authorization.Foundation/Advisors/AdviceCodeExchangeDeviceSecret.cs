@@ -104,7 +104,6 @@ public sealed class AdviceCodeExchangeDeviceSecret<TApp> : ICodeExchangeAdvisor<
             ts     = now,
         });
         await _tokens.CreateAsync(new SchemataToken {
-            Name        = Guid.NewGuid().ToString("n"),
             Type        = TokenTypes.DeviceSecret,
             Status      = TokenStatuses.Valid,
             Format      = TokenFormats.Reference,

@@ -28,18 +28,14 @@ public interface IOperationService
     /// <returns>The terminal cancelled operation snapshot.</returns>
     ValueTask<Operation> CancelAsync(string operation, CancellationToken ct = default);
 
-    /// <summary>Persists an already-completed operation for inline work.</summary>
-    /// <param name="method">The custom method that completed the operation.</param>
-    /// <param name="output">Serialized success output.</param>
-    /// <param name="error">Failure message; a non-null value marks the operation as failed.</param>
-    /// <param name="uid">Optional preallocated operation identifier.</param>
-    /// <param name="ct">Cancellation token for the write.</param>
+    /// <summary>Runs inline work after persisting its operation identity, then records the terminal outcome.</summary>
+    /// <param name="method">The custom method executing the operation.</param>
+    /// <param name="execute">Inline work receiving the persisted operation and returning serialized output.</param>
+    /// <param name="ct">Cancellation token controlling the work.</param>
     /// <returns>The persisted terminal operation.</returns>
-    ValueTask<Operation> CreateTerminalAsync(
+    ValueTask<Operation> ExecuteAsync(
         string method,
-        string? output,
-        string? error,
-        Guid? uid = null,
+        Func<Operation, CancellationToken, ValueTask<string?>> execute,
         CancellationToken ct = default
     );
 }

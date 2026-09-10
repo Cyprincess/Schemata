@@ -86,18 +86,26 @@ public sealed class ProcessPersistence
 
         ReleaseIdempotencyKey(process);
 
-        var existing = await scope.Processes.FirstOrDefaultAsync(q => q.Where(p => p.CanonicalName == process.CanonicalName), ct);
-        if (existing is null) {
-            await scope.Processes.AddAsync(process, ct);
+        if (scope.CreatedProcesses.Contains(process)) {
+            await scope.Processes.UpdateAsync(process, ct);
         } else {
-            CopyEntity(existing, process);
-            await scope.Processes.UpdateAsync(existing, ct);
+            var existing = await scope.Processes.FirstOrDefaultAsync(q => q.Where(p => p.CanonicalName == process.CanonicalName), ct);
+            if (existing is null) {
+                await scope.CreateProcessAsync(process, ct);
+            } else {
+                CopyEntity(existing, process);
+                await scope.Processes.UpdateAsync(existing, ct);
+            }
         }
 
         foreach (var token in snapshot.Tokens) {
+            if (scope.CreatedTokens.Contains(token)) {
+                await scope.Tokens.UpdateAsync(token, ct);
+                continue;
+            }
             var persisted = await scope.Tokens.FirstOrDefaultAsync(q => q.Where(t => t.CanonicalName == token.CanonicalName), ct);
             if (persisted is null) {
-                await scope.Tokens.AddAsync(token, ct);
+                await scope.CreateTokenAsync(token, ct);
             } else {
                 CopyEntity(persisted, token);
                 await scope.Tokens.UpdateAsync(persisted, ct);
@@ -132,7 +140,6 @@ public sealed class ProcessPersistence
         }
 
         var rows = bindings.Select(binding => new SchemataProcessCompensation {
-            Name                    = Guid.NewGuid().ToString("n"),
             Process                 = process.CanonicalName!,
             ScopeOwnerCanonicalName = binding.ScopeOwnerCanonicalName,
             ActivityName            = binding.ActivityName,

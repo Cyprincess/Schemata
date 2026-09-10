@@ -279,6 +279,7 @@ public class FlowTransportSourceBindingShould
                   .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => EnumerateAsync(predicate(data.AsQueryable())));
         repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>()))
                   .Returns((T entity, CancellationToken _) => {
+                      FlowTestCreation.Assign(entity);
                       data.Add(entity);
                       return Task.CompletedTask;
                   });
@@ -355,8 +356,8 @@ public class FlowTransportSourceBindingShould
                        Process = process,
                        Tokens = [token],
                        Transitions = [
-                           new() { Token = token.CanonicalName, Event = "Start" },
-                           new() { Token = token.CanonicalName, Event = "Start" },
+                           new() { Process = token.Process, Token = token.CanonicalName, Event = "Start" },
+                           new() { Process = token.Process, Token = token.CanonicalName, Event = "Start" },
                        ],
                    });
                });

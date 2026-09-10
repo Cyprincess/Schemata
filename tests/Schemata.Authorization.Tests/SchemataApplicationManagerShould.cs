@@ -59,6 +59,7 @@ public class SchemataApplicationManagerShould
 
         var app = new SchemataApplication {
             ClientId                  = "dcr-full",
+            Name                      = "client-resource",
             RedirectUris              = ["https://rp.example/cb"],
             Contacts                  = ["admin@rp.example", "tech@rp.example"],
             LogoUri                   = "https://rp.example/logo.png",
@@ -92,6 +93,8 @@ public class SchemataApplicationManagerShould
 
         Assert.NotNull(loaded);
         Assert.NotSame(app, loaded);
+        Assert.Equal("client-resource", loaded.Name);
+        Assert.Equal("dcr-full", loaded.ClientId);
         Assert.Equal(app.RedirectUris, loaded.RedirectUris);
         Assert.Equal(app.Contacts, loaded.Contacts);
         Assert.Equal(app.LogoUri, loaded.LogoUri);

@@ -41,6 +41,14 @@ Both take an optional `Action<SchemataAuthorizationOptions>`, store it, map the 
 endpoints into the well-known pipeline, add `SchemataAuthorizationFeature<...>`, and return a
 `SchemataAuthorizationBuilder<TApp, TAuth, TScope>` for chaining.
 
+The host also supplies resource names. Register a consumer-owned `IRepositoryAddAdvisor<TEntity>`
+before `AdviceAddCanonicalName.DefaultOrder` (120,000,000), as shown in
+[the mutation pipeline](repository/mutation-pipeline.md#consumer-owned-resource-names), or set an
+explicit `Name` before creation. Cover applications, scopes, authorizations, tokens, security rows,
+and subject mappings, including rows created internally during protocol handling. Canonical-name
+resolution fails with `ValidationException` when a required `Name` remains blank; the framework has
+no fallback name generator. Protocol identifiers and secrets remain separate from resource names.
+
 ## Resource management surface
 
 `SchemataAuthorizationBuilder<TApp,TAuth,TScope>` implements `IResourceBuilder`. Application, Scope, and Token management resources are exposed only after an explicit transport activation:
@@ -253,9 +261,22 @@ advisors use.
 
 ## Audience and application bindings
 
-`SchemataApplication.Name` aliases the OAuth `ClientId`; its canonical name is a distinct AIP-122
-reference such as `applications/test-client`. `AdviceClaimsAudience` preserves an explicit
-`aud` claim set. Otherwise, it mints two claims, each pre-tagged with a single destination so the
+`SchemataApplication.Name` is the consumer-owned resource identifier, independent of the OAuth
+`ClientId`. Its canonical name follows `applications/{application}` using `Name`, so a client with
+`ClientId = "test-client"` and `Name = "client-resource"` is referenced as
+`applications/client-resource`. Client lookup continues to use `ClientId`.
+
+Dynamic registration assigns a protocol `ClientId`, then creates the application through its
+repository pipeline. It uses the created application's `CanonicalName` for credential parents and
+registration-token bindings after the consumer naming advisor has run. It does not derive those
+references by interpolating `ClientId`.
+
+The implementations are `src/Schemata.Authorization.Skeleton/Entities/SchemataApplication.cs`,
+`src/Schemata.Authorization.Foundation/Managers/SchemataApplicationManager.cs`, and
+`src/Schemata.Authorization.Foundation/Handlers/RegisterHandler.cs`.
+
+`AdviceClaimsAudience` preserves an explicit `aud` claim set. Otherwise, it mints two claims, each
+pre-tagged with a single destination so the
 destination split routes them without further handling: the access token carries
 `aud = DefaultResource ?? Issuer` (RFC 8707 §2 default resource; RFC 9068 §2.2), and the ID token
 carries `aud = client_id` (OIDC Core §2), skipped when the claim set holds no client. A blank
@@ -287,13 +308,30 @@ method. Key lookups:
   slots resolve to the cache-backed store.
 
 Client credentials and assertion keys live in security rows addressed through `SecurityParents`
-(`Application(app)` builds `applications/{ClientId}`, `Issuer(issuer)` returns the issuer URI)
-and read through `ISecurityStore<TSecurity>`, which `UseSecurity()` registers. The shared
+(`Application(app)` returns the created application's `CanonicalName`; `Issuer(issuer)` returns the
+issuer URI) and read through `ISecurityStore<TSecurity>`, which `UseSecurity()` registers. The shared
 `ClientSecretValidator` verifies the presented secret against the client's newest valid
 `password` row (`usage=authentication`) with `ISecretVerifier`; `client_secret_jwt` reads
 `secret` rows; `private_key_jwt` loads JOSE material from `jwk`, `jwks`, and `jwks-uri` rows
 through `ToKeyMaterialAsync`, adapted by `SecurityKeyAdapter`.
 Rows persist verbatim, in plaintext at rest.
+
+`SchemataToken.Key` holds a semantic slot identifier. Repository slot operations address
+`(Parent, Provider, Key)`, backed by that composite unique index. `Name` has its own unique index and
+identifies the token resource; `FindByNameAsync` still queries that resource name. Cache-backed slot
+results carry `Key` and do not acquire a resource `Name` or pass through a repository naming advisor.
+Persisting a slot through the repository-backed store requires the consumer naming policy.
+
+`SchemataSecurity.Key` holds a parent-scoped credential label, distinct from its resource `Name`.
+The key separation does not introduce a credential-selection API or policy: `ISecurityStore`
+continues to list by parent with optional kind, usage, and status filters. The repository store
+orders those rows by descending creation time, then `Key`. Protocol consumers keep their existing
+credential-kind and status selection rules. See [Security](security.md#stored-resource-identity).
+
+The source paths are `src/Schemata.Security.Skeleton/Entities/SchemataToken.cs`,
+`src/Schemata.Security.Skeleton/Entities/SchemataSecurity.cs`,
+`src/Schemata.Security.Foundation/Stores/{RepositoryTokenStore,CacheTokenStore,SecurityStore}.cs`,
+and `src/Schemata.Authorization.Foundation/Services/SecurityParents.cs`.
 
 ## Background jobs
 
@@ -332,12 +370,37 @@ All entities use `Guid Uid` as the primary key and carry `[PrimaryKey(nameof(Uid
 
 | Entity                  | Table                    | Canonical name                   | Notable properties                                                                                                                                      |
 | ----------------------- | ------------------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SchemataApplication`   | `SchemataApplications`   | `applications/{application}`     | `ClientId` (`Name` alias), `ClientType`, `ConsentType`, `RequirePkce`, `RedirectUris`, `PostLogoutRedirectUris`, `Permissions`, `BackChannelLogoutUri` |
+| `SchemataApplication`   | `SchemataApplications`   | `applications/{application}`     | `Name` (resource identifier), `ClientId` (independent protocol identifier), `ClientType`, `ConsentType`, `RequirePkce`, `RedirectUris`, `PostLogoutRedirectUris`, `Permissions`, `BackChannelLogoutUri` |
 | `SchemataAuthorization` | `SchemataAuthorizations` | `authorizations/{authorization}` | `Application` (canonical reference), `Subject`, `Type`, `Status`, `Scopes`, `CodeChallengeMethod`                                                        |
 | `SchemataScope`         | `SchemataScopes`         | `scopes/{scope}`                 | `Name`, `Resources`                                                                                                                                     |
-| `SchemataToken`         | `SchemataTokens`         | `tokens/{token}`                 | `Parent` (subject reference), `Application` and `Authorization` (canonical references), `Provider`, `SessionId`, `Type`, `Status`, `Format`, `ReferenceId`, `Payload`, `Value` (slot payload), `ExpireTime`; defined in `Schemata.Security.Skeleton` |
+| `SchemataToken`         | `SchemataTokens`         | `tokens/{token}`                 | `Name` (resource identifier), `Key` (semantic slot identifier), `Parent` (subject reference), `Application` and `Authorization` (canonical references), `Provider`, `SessionId`, `Type`, `Status`, `Format`, `ReferenceId`, `Payload`, `Value` (slot payload), `ExpireTime`; defined in `Schemata.Security.Skeleton` |
 | `SchemataSubjectMapping` | `SchemataSubjectMappings` | `subjectMappings/{subjectMapping}` | `Application` (canonical reference), `CanonicalSubject`, `PairwiseSubject`, `SectorHost` |
-| `SchemataSecurity`      | `SchemataSecurities`     | `securities/{security}`          | `Parent` (host-resource canonical name or issuer URI), `Kind`, `Algorithm`, `Usage`, `Kid`, `Value` (plaintext material), `Status`; defined in `Schemata.Security.Skeleton` |
+| `SchemataSecurity`      | `SchemataSecurities`     | `securities/{security}`          | `Name` (resource identifier), `Key` (credential label), `Parent` (host-resource canonical name or issuer URI), `Kind`, `Algorithm`, `Usage`, `Kid`, `Value` (plaintext material), `Status`; defined in `Schemata.Security.Skeleton` |
+
+### Required schema and data migration
+
+Existing deployments must migrate storage and host registration before adopting the independent
+resource-name fields. This is a breaking storage and naming contract, not an automatic upgrade:
+
+- Add and populate `SchemataToken.Key` from the old `Name` values used as semantic slot identifiers.
+  Move the slot uniqueness constraint to `(Parent, Provider, Key)` and populate independent resource
+  names satisfying the unique `Name` index. OAuth token resource names are not slot keys.
+- Add and populate `SchemataSecurity.Key` from old `Name` values used as credential labels, and move
+  the parent-label index to `(Parent, Key)`. Supply independent resource names for security rows.
+- Populate the independent `SchemataApplication.Name` field while retaining every existing
+  `ClientId`. A host may deliberately retain the previous canonical path by using its existing leaf
+  as `Name`; this is a migration decision, not an alias or framework fallback.
+- Preserve canonical references when retaining names. When names change, migrate affected
+  `CanonicalName` values and all referring data together, including credential `Parent`, token and
+  authorization `Application`, subject-mapping `Application`, and token `Authorization` references.
+  Migrate host-owned references as well; changing the application name must not change OAuth
+  `client_id` values.
+- Register naming advisors for all resources created by enabled flows, including internally created
+  authorizations, tokens, security rows, and pairwise subject mappings. Application seed code may
+  instead supply explicit names.
+
+Schemata supplies neither an automatic data migration nor compatibility aliases or fallback naming
+paths. Adapt the schema migration to the selected persistence provider and the deployed data.
 
 ## SchemataAuthorizationOptions
 

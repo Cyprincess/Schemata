@@ -101,6 +101,7 @@ public sealed class EventSubProcessExecutor
             addressed,
             payload);
         var child = NewEventSubProcessToken(process, eventSubProcess, addressed, resolved);
+        await execution.CreateTokenAsync(child, System.Threading.CancellationToken.None);
         working.Add(child);
 
         transitions.Add(BpmnEngine.NewTransition(
@@ -121,12 +122,7 @@ public sealed class EventSubProcessExecutor
         SchemataProcessToken  addressed,
         TargetState resolved
     ) {
-        var leaf      = Guid.NewGuid().ToString("n");
-        var canonical = $"{process.CanonicalName}/tokens/{leaf}";
-
         return new() {
-            Name          = leaf,
-            CanonicalName = canonical,
             Process       = process.Name!,
             Spawner       = addressed.CanonicalName,
             ScopeName       = eventSubProcess.Name,

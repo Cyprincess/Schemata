@@ -66,7 +66,7 @@ public class ScheduledJobIdentityShould
     }
 
     [Fact]
-    public async Task ArmEveryPersistedJob_UnderItsRegistryKey() {
+    public async Task ArmConfiguredJobs_ByScheduleSlot_WithoutAssigningResourceNames() {
         var armed = new List<SchemataJob>();
 
         var scheduler = new Mock<IScheduler>();
@@ -88,9 +88,12 @@ public class ScheduledJobIdentityShould
         await initializer.StopAsync(CancellationToken.None);
 
         Assert.Equal(2, armed.Count);
-        Assert.All(armed, job => Assert.Equal(job.JobKey, job.Name));
+        Assert.All(armed, job => {
+            Assert.Null(job.Name);
+            Assert.Equal($"registration:{job.JobKey}", job.Key);
+        });
         Assert.Equal(["Schemata.Scheduling.Tests.Fixtures.ProbeJob.ProbePayload", DeclaredProbeJob.JobKey],
-                     armed.Select(job => job.Name));
+                     armed.Select(job => job.JobKey));
     }
 
     private static IServiceProvider EmptyRepositories() {

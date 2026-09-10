@@ -30,8 +30,7 @@ public class InteractRequestBindingShould
     }
 
     private static async Task<InteractRequest> BindAsync(Dictionary<string, StringValues> query) {
-        var context = new DefaultHttpContext();
-        context.Request.Query = new QueryCollection(query);
+        var context = new DefaultHttpContext { Request = { Query = new QueryCollection(query) } };
 
         var binding = new Mock<ModelBindingContext>();
         binding.SetupGet(b => b.HttpContext).Returns(context);

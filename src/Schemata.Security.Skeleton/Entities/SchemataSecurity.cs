@@ -14,11 +14,15 @@ namespace Schemata.Security.Skeleton.Entities;
 [CanonicalName("securities/{security}")]
 [PrimaryKey(nameof(Uid))]
 [Index(nameof(Parent), nameof(Kind), nameof(Usage))]
+[Index(nameof(Parent), nameof(Key))]
 public class SchemataSecurity : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
     /// <summary>Polymorphic parent reference: canonical name of any host resource (applications/{x}, users/{y}, issuer URI).</summary>
     [ResourceReference]
     public virtual string? Parent { get; set; }
+
+    /// <summary>Parent-scoped credential identifier.</summary>
+    public virtual string? Key { get; set; }
 
     /// <summary>Material category. See <see cref="SecurityConstants.Kinds" />.</summary>
     public virtual string? Kind { get; set; }

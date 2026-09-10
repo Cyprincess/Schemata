@@ -20,8 +20,7 @@ namespace Schemata.Authorization.Tests;
 public class EndSessionHandlerShould
 {
     private static EndSessionHandler<SchemataApplication> CreateHandler(ILogoutNotifier? notifier = null) {
-        var opts = new SchemataAuthorizationOptions();
-        opts.Issuer = "https://localhost";
+        var opts = new SchemataAuthorizationOptions { Issuer = "https://localhost" };
 
         var apps = new Mock<IApplicationManager<SchemataApplication>>();
         apps.Setup(a => a.ValidatePostLogoutRedirectUriAsync(It.IsAny<SchemataApplication?>(), It.IsAny<string?>(),

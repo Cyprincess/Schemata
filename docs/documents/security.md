@@ -57,6 +57,40 @@ A transport scheme populates the request principal. The authentication wrap advi
 
 Identity User and Role management resources and Authorization Application, Scope, and Token management resources require an explicit `MapHttp()` or `MapGrpc()` call. The IdentityCore endpoints and Authorization protocol endpoints retain their own transport paths.
 
+## Stored resource identity
+
+The host owns `SchemataSecurity.Name` and persisted `SchemataToken.Name`. Supply names explicitly or
+register a consumer `IRepositoryAddAdvisor<TEntity>` before `AdviceAddCanonicalName.DefaultOrder`
+(120,000,000), using [the repository naming pattern](repository/mutation-pipeline.md#consumer-owned-resource-names).
+Framework-created security rows and repository-backed token slots require that same policy. A blank
+required `Name` fails canonical-name resolution with `ValidationException`; the framework does not
+supply a fallback. `CanonicalName` derives from `Name` using `securities/{security}` or
+`tokens/{token}`.
+
+`SchemataSecurity.Key` is a parent-scoped credential label. The `(Parent, Key)` index is separate
+from resource identity. `ISecurityStore<TSecurity>` retains canonical-name lookup and parent listing
+with optional kind, usage, and status filters. `SecurityStore<TSecurity>` orders parent listings by
+descending `CreateTime`, then `Key`. Adding the label field does not add a select-by-key API or
+change which credential kinds and statuses an authentication consumer accepts. `Kid` remains a
+separate key-material identifier.
+
+`SchemataToken.Key` is the semantic slot identifier used by `GetAsync`, `GetOrCreateAsync`,
+`SetAsync`, and `RemoveAsync` with `Parent` and `Provider`. Repository slots have a unique
+`(Parent, Provider, Key)` index; token resource `Name` has an independent unique index.
+`FindByNameAsync` addresses the resource name, not the slot key. Cache-backed slots return `Key`
+without generating `Name` and do not run repository advisors.
+
+Existing deployments require a schema and data migration: copy old slot names and credential labels
+into their respective `Key` fields, update the associated indexes, and supply independent resource
+names while preserving or migrating canonical references. Authorization applications also require
+an independent `Name` while retaining their protocol `ClientId`. Schemata provides no automatic
+migration or compatibility alias. See the [migration requirements](authorization.md#required-schema-and-data-migration).
+
+The contracts and indexes are in `src/Schemata.Security.Skeleton/Entities/SchemataSecurity.cs`,
+`src/Schemata.Security.Skeleton/Entities/SchemataToken.cs`, and
+`src/Schemata.Security.Skeleton/Services/ISecurityStore.cs`. The executable store behavior is in
+`src/Schemata.Security.Foundation/Stores/{SecurityStore,RepositoryTokenStore,CacheTokenStore}.cs`.
+
 ## See also
 
 - [Resource overview](resource/overview.md)

@@ -93,8 +93,7 @@ public class ResourceBindingShould
     }
 
     private static async Task<AuthorizeRequest> BindQueryAsync(QueryCollection query) {
-        var context = new DefaultHttpContext();
-        context.Request.Query = query;
+        var context = new DefaultHttpContext { Request = { Query = query } };
 
         var binding = new Mock<ModelBindingContext>();
         binding.SetupGet(b => b.HttpContext).Returns(context);
@@ -106,9 +105,10 @@ public class ResourceBindingShould
     }
 
     private static async Task<TokenRequest> BindFormAsync(FormCollection form) {
-        var context = new DefaultHttpContext();
-        context.Request.ContentType = "application/x-www-form-urlencoded";
-        context.Request.Form = form;
+        var context = new DefaultHttpContext { Request = {
+                ContentType = "application/x-www-form-urlencoded", Form = form,
+            }
+        };
 
         var binding = new Mock<ModelBindingContext>();
         binding.SetupGet(b => b.HttpContext).Returns(context);

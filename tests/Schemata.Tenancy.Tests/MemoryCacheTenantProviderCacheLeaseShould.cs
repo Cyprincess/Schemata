@@ -156,8 +156,7 @@ public class MemoryCacheTenantProviderCacheLeaseShould
         const string id = "11111111-1111-1111-1111-111111111111";
         var singleton = new Mock<IAsyncDisposable>();
         singleton.Setup(disposable => disposable.DisposeAsync()).Returns(ValueTask.CompletedTask);
-        var overrides = new SchemataTenancyOptions();
-        overrides.TenantOverrides[id] = [s => s.AddSingleton<IAsyncDisposable>(_ => singleton.Object)];
+        var overrides = new SchemataTenancyOptions { TenantOverrides = { [id] = [s => s.AddSingleton<IAsyncDisposable>(_ => singleton.Object)] } };
 
         using var root = new ServiceCollection().BuildServiceProvider();
         await using var cache = BuildCache(1);

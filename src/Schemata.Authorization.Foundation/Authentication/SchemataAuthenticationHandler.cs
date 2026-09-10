@@ -177,7 +177,6 @@ public class SchemataAuthenticationHandler<TApp>(
 
         var now = time.GetUtcNow().UtcDateTime;
         var entity = new SchemataToken {
-            Name              = jti,
             Type              = type,
             Format            = format,
             Status            = TokenStatuses.Valid,

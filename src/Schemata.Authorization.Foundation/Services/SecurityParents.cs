@@ -10,8 +10,8 @@ namespace Schemata.Authorization.Foundation.Services;
 public static class SecurityParents
 {
     /// <summary>Parent of the security rows that belong to a registered client application.</summary>
-    public static string Application(SchemataApplication app) {
-        return $"applications/{app.ClientId}";
+    public static string? Application(SchemataApplication app) {
+        return app.CanonicalName;
     }
 
     /// <summary>Parent of the security rows that belong to an issuer (its URI).</summary>

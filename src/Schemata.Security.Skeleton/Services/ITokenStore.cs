@@ -17,29 +17,29 @@ namespace Schemata.Security.Skeleton.Services;
 /// <typeparam name="TToken">Concrete token entity type, must derive from <see cref="SchemataToken" />.</typeparam>
 public interface ITokenStore<TToken> where TToken : SchemataToken
 {
-    /// <summary>Returns the slot row stored under the (parent, provider, name) key, or <see langword="null" />.</summary>
-    Task<TToken?> GetAsync(string? parent, string provider, string name, CancellationToken ct = default);
+    /// <summary>Returns the slot row stored under (parent, provider, key), or <see langword="null" />.</summary>
+    Task<TToken?> GetAsync(string? parent, string provider, string key, CancellationToken ct = default);
 
     /// <summary>
-    ///     Returns the slot row under the (parent, provider, name) key, creating one carrying
+    ///     Returns the slot row under (parent, provider, key), creating one carrying
     ///     <paramref name="value" /> (or a store-minted random value when null) with the given TTL when
     ///     absent. Concurrent creation admits one winner through the unique
-    ///     (Parent, Provider, Name) index; losers re-read and return the winner's row.
+    ///     (Parent, Provider, Key) index; losers re-read and return the winner's row.
     /// </summary>
     Task<TToken> GetOrCreateAsync(
         string?           parent,
         string            provider,
-        string            name,
+        string            key,
         string?           value,
         TimeSpan          ttl,
         CancellationToken ct = default
     );
 
-    /// <summary>Stores <paramref name="value" /> under the (parent, provider, name) key, creating the row when absent.</summary>
-    Task SetAsync(string? parent, string provider, string name, string? value, TimeSpan? ttl, CancellationToken ct = default);
+    /// <summary>Stores <paramref name="value" /> under (parent, provider, key), creating the row when absent.</summary>
+    Task SetAsync(string? parent, string provider, string key, string? value, TimeSpan? ttl, CancellationToken ct = default);
 
-    /// <summary>Removes the slot row under the (parent, provider, name) key, when present.</summary>
-    Task RemoveAsync(string? parent, string provider, string name, CancellationToken ct = default);
+    /// <summary>Removes the slot row under (parent, provider, key), when present.</summary>
+    Task RemoveAsync(string? parent, string provider, string key, CancellationToken ct = default);
 
     /// <summary>Finds a token by its opaque reference identifier; only the reference persists for opaque tokens.</summary>
     Task<TToken?> FindByReferenceIdAsync(string? referenceId, CancellationToken ct = default);

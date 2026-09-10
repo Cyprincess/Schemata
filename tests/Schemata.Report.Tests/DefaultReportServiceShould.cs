@@ -72,9 +72,7 @@ public class DefaultReportServiceShould
         var expectedRowCounts = new[] { 2, 2, 1 };
         for (var index = 0; index < state.ChunkAddSequence.Count; index++) {
             var chunk = state.ChunkAddSequence[index];
-            Assert.Equal($"chunk-{index}", chunk.Name);
             Assert.Equal(index, chunk.Index);
-            Assert.Equal($"{snapshot.CanonicalName}/chunks/chunk-{index}", chunk.CanonicalName);
             Assert.Equal(snapshot.Report, chunk.Report);
             Assert.Equal(snapshot.Name, chunk.Snapshot);
             Assert.Equal(expectedRowCounts[index], chunk.RowCount);
@@ -103,9 +101,7 @@ public class DefaultReportServiceShould
             new[] { SnapshotState.Pending, SnapshotState.Running, SnapshotState.Failed },
             state.SnapshotStateSequence);
         var failedChunk = Assert.Single(state.ChunkAddSequence);
-        Assert.Equal("chunk-0", failedChunk.Name);
         Assert.Equal(0, failedChunk.Index);
-        Assert.Equal($"{snapshot.CanonicalName}/chunks/chunk-0", failedChunk.CanonicalName);
         Assert.Equal(snapshot.Report, failedChunk.Report);
         Assert.Equal(snapshot.Name, failedChunk.Snapshot);
         Assert.Equal(2, failedChunk.RowCount);

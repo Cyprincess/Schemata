@@ -31,6 +31,7 @@ public sealed class StateMachineEngine : IFlowRuntime
         var (start, outgoing) = definition.RequireStart();
 
         var token = TokenFactory.NewRootToken(process, new(start.Name, null, false));
+        await context.CreateTokenAsync(token, ct);
         var resolved = await ResolveTargetStateAsync(definition, process, token, context, outgoing.Target, null);
         TokenAggregator.ApplyAndAggregate(process, token, resolved, [token]);
 

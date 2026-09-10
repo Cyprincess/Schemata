@@ -193,6 +193,7 @@ public class FlowRunnerTerminationShould
         repository.Setup(r => r.Begin()).Returns(Mock.Of<IUnitOfWork>());
         repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>()))
                   .Returns((T entity, CancellationToken _) => {
+                      FlowTestCreation.Assign(entity);
                       data.Add(entity);
                       return Task.CompletedTask;
                   });

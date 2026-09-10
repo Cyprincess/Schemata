@@ -32,7 +32,7 @@ public class DslNamedBindingShould
         var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1" };
         var token   = Token("processes/p1/tokens/a", definition.Review.Name);
 
-        var snapshot = await engine.AdvanceAsync(definition, process, [token], new(Mock.Of<IUnitOfWork>(), services));
+        var snapshot = await engine.AdvanceAsync(definition, process, [token], Schemata.Flow.Tests.FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), services));
 
         Assert.Equal(definition.Paid.Name, snapshot.Tokens[0].StateName);
     }
@@ -60,7 +60,7 @@ public class DslNamedBindingShould
                       .BuildServiceProvider();
         var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1" };
 
-        await engine.StartAsync(definition, process, new(Mock.Of<IUnitOfWork>(), services));
+        await engine.StartAsync(definition, process, Schemata.Flow.Tests.FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), services));
 
         Assert.Equal(["orders/o1"], definition.Seen);
     }

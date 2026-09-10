@@ -61,7 +61,7 @@ public class SecurityStore<TSecurity> : ISecurityStore<TSecurity>
                 query = query.Where(s => s.Status == status);
             }
 
-            return query.OrderByDescending(s => s.CreateTime).ThenBy(s => s.Name);
+            return query.OrderByDescending(s => s.CreateTime).ThenBy(s => s.Key);
         }, ct)) {
             yield return security;
         }

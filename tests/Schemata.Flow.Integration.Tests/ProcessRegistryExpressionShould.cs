@@ -112,7 +112,7 @@ public class ProcessRegistryExpressionShould : IClassFixture<EfCoreFlowFixture>
             State         = "Active",
         };
 
-        return await engine.AdvanceAsync(definition, process, [token], new(unitOfWork, services));
+        return await engine.AdvanceAsync(definition, process, [token], Schemata.Flow.Tests.FlowTestCreation.Context(unitOfWork, services));
     }
 
     private async Task SeedAsync(Order order, string processName) {

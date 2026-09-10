@@ -64,17 +64,20 @@ public sealed class AdviceClaimsAuthenticationContext(IAuthenticationContextProv
 
         var minted = false;
         if (!string.IsNullOrWhiteSpace(context.Acr)) {
-            var acr = new Claim(Claims.Acr, context.Acr);
-            acr.Properties[ClaimDestinations.IdentityToken] = Parameters.Token;
-            acr.Properties[ClaimDestinations.AccessToken]   = Parameters.Token;
+            var acr = new Claim(Claims.Acr, context.Acr) { Properties = {
+                    [ClaimDestinations.IdentityToken] = Parameters.Token, [ClaimDestinations.AccessToken] = Parameters.Token,
+                }
+            };
             claims.Add(acr);
             minted = true;
         }
 
         if (context.Amr is { Count: > 0 }) {
-            var amr = new Claim(Claims.Amr, JsonSerializer.Serialize(context.Amr), JsonClaimValueTypes.Json);
-            amr.Properties[ClaimDestinations.IdentityToken] = Parameters.Token;
-            amr.Properties[ClaimDestinations.AccessToken]   = Parameters.Token;
+            var amr = new Claim(Claims.Amr, JsonSerializer.Serialize(context.Amr), JsonClaimValueTypes.Json) {
+                Properties = {
+                    [ClaimDestinations.IdentityToken] = Parameters.Token, [ClaimDestinations.AccessToken] = Parameters.Token,
+                },
+            };
             claims.Add(amr);
             minted = true;
         }
@@ -84,9 +87,10 @@ public sealed class AdviceClaimsAuthenticationContext(IAuthenticationContextProv
             var authTime = new Claim(
                 Claims.AuthTime,
                 context.AuthTime.Value.ToString(CultureInfo.InvariantCulture),
-                ClaimValueTypes.Integer64);
-            authTime.Properties[ClaimDestinations.IdentityToken] = Parameters.Token;
-            authTime.Properties[ClaimDestinations.AccessToken]   = Parameters.Token;
+                ClaimValueTypes.Integer64) { Properties = {
+                    [ClaimDestinations.IdentityToken] = Parameters.Token, [ClaimDestinations.AccessToken] = Parameters.Token,
+                }
+            };
             claims.Add(authTime);
             minted = true;
         }

@@ -101,34 +101,51 @@ public sealed class DefaultOperationService : IOperationService
         return OperationMapper.FromExecution(execution);
     }
 
-    public async ValueTask<Operation> CreateTerminalAsync(
+    public async ValueTask<Operation> ExecuteAsync(
         string method,
-        string? output,
-        string? error,
-        Guid? uid = null,
+        Func<Operation, CancellationToken, ValueTask<string?>> execute,
         CancellationToken ct = default
     ) {
         ArgumentNullException.ThrowIfNull(method);
+        ArgumentNullException.ThrowIfNull(execute);
 
-        var name = (uid ?? Guid.NewGuid()).ToString("n");
-        var now  = _time.GetUtcNow().UtcDateTime;
         var execution = new SchemataJobExecution {
-            Uid           = uid ?? Guid.Empty,
-            Name          = name,
-            CanonicalName = $"operations/{name}",
-            Method        = method,
-            State         = error is null ? ExecutionState.Succeeded : ExecutionState.Failed,
-            StartTime     = now,
-            EndTime       = now,
-            Output        = output,
-            RecentError   = error,
+            Method    = method,
+            State     = ExecutionState.Running,
+            StartTime = _time.GetUtcNow().UtcDateTime,
         };
+        await using (var scope = _scopes.CreateAsyncScope()) {
+            var executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
+            await executions.AddAsync(execution, ct);
+            await executions.CommitAsync(ct);
+        }
+
+        try {
+            execution.Output = await execute(OperationMapper.FromExecution(execution), ct);
+            ct.ThrowIfCancellationRequested();
+            execution.State = ExecutionState.Succeeded;
+        } catch (OperationCanceledException) {
+            execution.State = ExecutionState.Cancelled;
+            execution.EndTime = _time.GetUtcNow().UtcDateTime;
+            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await PersistTerminalAsync(execution, cleanup.Token);
+            throw;
+        } catch (Exception exception) {
+            execution.State = ExecutionState.Failed;
+            execution.RecentError = exception.Message;
+        }
+
+        execution.EndTime = _time.GetUtcNow().UtcDateTime;
+        using var completion = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await PersistTerminalAsync(execution, completion.Token);
+        return OperationMapper.FromExecution(execution);
+    }
+
+    private async Task PersistTerminalAsync(SchemataJobExecution execution, CancellationToken ct) {
         await using var scope = _scopes.CreateAsyncScope();
         var executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
-        await executions.AddAsync(execution, ct);
+        await executions.UpdateAsync(execution, ct);
         await executions.CommitAsync(ct);
-
-        return OperationMapper.FromExecution(execution);
     }
 
     private TimeSpan PollInterval {

@@ -235,6 +235,7 @@ public class ClientSecretJwtShould
         return new() {
             Uid        = Guid.NewGuid(),
             ClientId   = ClientId,
+            CanonicalName = "applications/client-resource",
             ClientType = ClientTypes.Confidential,
         };
     }
@@ -242,8 +243,8 @@ public class ClientSecretJwtShould
     private SchemataSecurity SecretRow(string? kid = null, string? value = null, string? status = null) {
         return new() {
             Uid    = Guid.NewGuid(),
-            Parent = SecurityParents.Application(new() { ClientId = ClientId }),
-            Name   = ClientId,
+            Parent = "applications/client-resource",
+            Key    = ClientId,
             Kind   = SecurityConstants.Kinds.Secret,
             Usage  = SecurityConstants.Usages.Authentication,
             Kid    = kid,
@@ -300,7 +301,7 @@ public class ClientSecretJwtShould
                      It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(),
                      It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string? parent, string provider, string name, string? marker, TimeSpan _, CancellationToken _) =>
-                new() { Parent = parent, Provider = provider, Name = name, Value = marker });
+                new() { Parent = parent, Provider = provider, Key = name, Value = marker });
 
         return new(slots.Object, new FakeTimeProvider(Now));
     }
@@ -318,7 +319,7 @@ public class ClientSecretJwtShould
                 }
 
                 burned = true;
-                return new() { Parent = parent, Provider = provider, Name = name, Value = marker };
+                return new() { Parent = parent, Provider = provider, Key = name, Value = marker };
             });
 
         return slots;

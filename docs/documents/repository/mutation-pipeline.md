@@ -68,6 +68,86 @@ After every advisor returns `Continue`, the entity is staged for the store: EF C
 registered them. `AdviceAddUniqueness` is optimistic — a concurrent insert between its lookup and
 the commit still surfaces as the provider's own constraint error.
 
+### Consumer-owned resource names
+
+The consuming application supplies each resource's `Name`, either explicitly before creation or
+through its own `IRepositoryAddAdvisor<TEntity>`. Framework producers leave missing resource names
+for that advisor; the framework provides no fallback name generator. This applies to persisted
+framework resources as well as application entities, including authorization tokens and grants,
+security material, subject mappings, Flow runtime records, jobs, and report records. BPMN graph node
+and graph reference names are internal graph identifiers; persisted Flow runtime resources are not
+exempt.
+
+Run the naming advisor before `AdviceAddCanonicalName.DefaultOrder` (120,000,000). The canonical
+advisor derives `CanonicalName` from the resource pattern and the supplied `Name`; a missing, empty,
+or whitespace-only required segment raises `ValidationException`. Setting `CanonicalName` alone
+does not bypass resolution. `AdviceAddIdentifier` generates a persistence `Uid`, not a resource
+`Name`.
+
+This consumer-defined policy assigns a GUID segment only when `Name` is absent and preserves an
+explicit name. The open-generic registration covers every repository entity implementing
+`ICanonicalName`:
+
+```csharp
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Entities;
+using Schemata.Entity.Repository;
+using Schemata.Entity.Repository.Advisors;
+
+var services = new ServiceCollection();
+services.TryAddEnumerable(ServiceDescriptor.Scoped(
+    typeof(IRepositoryAddAdvisor<>),
+    typeof(ResourceNameAdvisor<>)));
+
+public sealed class ResourceNameAdvisor<TEntity> : IRepositoryAddAdvisor<TEntity>
+    where TEntity : class
+{
+    public int Order => AdviceAddCanonicalName.DefaultOrder - 1;
+
+    public Task<AdviseResult> AdviseAsync(
+        AdviceContext context,
+        IRepository<TEntity> repository,
+        TEntity entity,
+        CancellationToken ct)
+    {
+        if (entity is ICanonicalName named && string.IsNullOrWhiteSpace(named.Name)) {
+            named.Name = Guid.NewGuid().ToString("N");
+        }
+
+        return Task.FromResult(AdviseResult.Continue);
+    }
+}
+```
+
+Use the host's service collection in an application. To restrict this policy to token resources,
+replace the open-generic registration above with this closed registration, using the same advisor
+class:
+
+```csharp
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Entity.Repository.Advisors;
+using Schemata.Security.Skeleton.Entities;
+
+services.TryAddEnumerable(
+    ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataToken>,
+        ResourceNameAdvisor<SchemataToken>>());
+```
+
+Register corresponding closed advisors for every other resource the host creates, or use one
+open-generic policy. Naming must complete before downstream code reads the created resource's
+`Name` or `CanonicalName` to form references.
+
+The execution paths are
+`src/Schemata.Entity.Repository/Advisors/AdviceAddCanonicalName.cs`,
+`src/Schemata.Common/ResourceNameDescriptor.cs` (`Resolve`), and the enumerable registrations in
+`src/Schemata.Entity.Repository/Extensions/ServiceCollectionExtensions.cs`.
+
 ## Update pipeline
 
 | Order       | Advisor                                             | Trait        | Behavior                                                                                                                                                     |
@@ -121,7 +201,9 @@ services.TryAddEnumerable(ServiceDescriptor.Scoped(
     typeof(MyAuditAdvisor<>)));
 ```
 
-Pick an `Order` outside the built-in `[100_000_000, 900_000_000]` window.
+Choose `Order` according to the invariant's prerequisites. A naming advisor must precede canonical
+resolution; unrelated extensions can use positions outside the built-in
+`[100_000_000, 900_000_000]` window.
 
 ## Extension points
 

@@ -16,7 +16,7 @@ namespace Schemata.Security.Foundation.Stores;
 /// <summary>
 ///     Default full-surface implementation of <see cref="ITokenStore{SchemataToken}" /> backed by an
 ///     <see cref="IRepository{TEntity}" />. Rows are stored verbatim, in plaintext at rest;
-///     transparent at-rest encryption is a documented non-goal. The (Parent, Provider, Name)
+///     transparent at-rest encryption is a documented non-goal. The (Parent, Provider, Key)
 ///     unique index is the concurrency backstop for slot creation, and the
 ///     [<see cref="System.ComponentModel.DataAnnotations.ConcurrencyCheckAttribute" />] Timestamp
 ///     is the CAS register for redemption.
@@ -33,24 +33,24 @@ public class RepositoryTokenStore : ITokenStore<SchemataToken>
 
     #region ITokenStore<SchemataToken> Members
 
-    public async Task<SchemataToken?> GetAsync(string? parent, string provider, string name, CancellationToken ct = default) {
+    public async Task<SchemataToken?> GetAsync(string? parent, string provider, string key, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
         return await _repository.SingleOrDefaultAsync(
-            q => q.Where(t => t.Parent == parent && t.Provider == provider && t.Name == name), ct);
+            q => q.Where(t => t.Parent == parent && t.Provider == provider && t.Key == key), ct);
     }
 
     public async Task<SchemataToken> GetOrCreateAsync(
         string?           parent,
         string            provider,
-        string            name,
+        string            key,
         string?           value,
         TimeSpan          ttl,
         CancellationToken ct = default
     ) {
         ct.ThrowIfCancellationRequested();
 
-        var existing = await GetAsync(parent, provider, name, ct);
+        var existing = await GetAsync(parent, provider, key, ct);
         if (existing is not null) {
             return existing;
         }
@@ -58,7 +58,7 @@ public class RepositoryTokenStore : ITokenStore<SchemataToken>
         var candidate = new SchemataToken {
             Parent     = parent,
             Provider   = provider,
-            Name       = name,
+            Key        = key,
             Value      = value ?? MintValue(),
             ExpireTime = Now() + ttl,
         };
@@ -69,17 +69,17 @@ public class RepositoryTokenStore : ITokenStore<SchemataToken>
             return candidate;
         }
         catch (AlreadyExistsException) {
-            // A concurrent creator won the (Parent, Provider, Name) unique index; slot consumers
+            // A concurrent creator won the (Parent, Provider, Key) unique index; slot consumers
             // must observe one shared value, so re-read the winner. Should it expire before the
             // re-read, fall back to our own candidate.
-            return await GetAsync(parent, provider, name, ct) ?? candidate;
+            return await GetAsync(parent, provider, key, ct) ?? candidate;
         }
     }
 
     public async Task SetAsync(
         string?           parent,
         string            provider,
-        string            name,
+        string            key,
         string?           value,
         TimeSpan?         ttl,
         CancellationToken ct = default
@@ -87,7 +87,7 @@ public class RepositoryTokenStore : ITokenStore<SchemataToken>
         ct.ThrowIfCancellationRequested();
 
         DateTime? expire = ttl is null ? null : Now() + ttl.Value;
-        var existing = await GetAsync(parent, provider, name, ct);
+        var existing = await GetAsync(parent, provider, key, ct);
 
         if (existing is not null) {
             existing.Value      = value;
@@ -98,7 +98,7 @@ public class RepositoryTokenStore : ITokenStore<SchemataToken>
                 new() {
                     Parent     = parent,
                     Provider   = provider,
-                    Name       = name,
+                    Key        = key,
                     Value      = value,
                     ExpireTime = expire,
                 }, ct);
@@ -107,10 +107,10 @@ public class RepositoryTokenStore : ITokenStore<SchemataToken>
         await _repository.CommitAsync(ct);
     }
 
-    public async Task RemoveAsync(string? parent, string provider, string name, CancellationToken ct = default) {
+    public async Task RemoveAsync(string? parent, string provider, string key, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
-        var existing = await GetAsync(parent, provider, name, ct);
+        var existing = await GetAsync(parent, provider, key, ct);
         if (existing is null) {
             return;
         }

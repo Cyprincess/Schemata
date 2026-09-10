@@ -24,6 +24,7 @@ internal static class FlowFixtureServices
     }
 
     internal static void AddFlowServices(IServiceCollection services) {
+        Schemata.Flow.Tests.FlowTestCreation.Register(services);
         services.AddLogging();
         services.AddSchemataFlow();
         services.TryAddKeyedSingleton<IFlowRuntime, StateMachineEngine>(FlowConstants.Engines.StateMachine);

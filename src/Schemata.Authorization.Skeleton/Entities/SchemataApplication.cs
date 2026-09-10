@@ -310,11 +310,7 @@ public class SchemataApplication : IIdentifier, ICanonicalName, IDescriptive, IC
 
     #region ICanonicalName Members
 
-    public virtual string? Name
-    {
-        get => ClientId;
-        set => ClientId = value;
-    }
+    public virtual string? Name { get; set; }
 
     public virtual string? CanonicalName { get; set; }
 

@@ -24,9 +24,7 @@ public class AuthorizeHandlerShould
 {
     private static (AuthorizeHandler<SchemataApplication> Handler, IServiceProvider Sp)
         CreateHandler() {
-        var opts = new SchemataAuthorizationOptions();
-        opts.Issuer         = "https://localhost";
-        opts.InteractionUri = "https://localhost/consent";
+        var opts = new SchemataAuthorizationOptions { Issuer = "https://localhost", InteractionUri = "https://localhost/consent" };
 
         var tokens = new Mock<ITokenStore<SchemataToken>>();
         tokens.Setup(t => t.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>()))

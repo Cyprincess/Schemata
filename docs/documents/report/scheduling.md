@@ -54,17 +54,26 @@ store lists configuration definitions before database definitions and suppresses
 | `Cron` | `CronExpression` | `CronSchedule` |
 | `Periodic` | Positive `IntervalTicks` | `PeriodicSchedule` |
 
-Each armed job has canonical name `jobs/report-{name}`, job key `schemata.report.generate`, and a
-`report` variable carrying the report name. `ReportGenerationJob<TReport, TSnapshot, TChunk>` turns
-that variable into `ReportRequest { Name = name, Persist = true }` and labels the result
-`ReportRunKind.Scheduled`.
+Each armed job has schedule-slot `Key = report:{name}`, dispatch `JobKey = schemata.report.generate`,
+and a `report` variable carrying the report name. Its resource `Name` is assigned by the
+application's repository add advisor before canonical-name derivation; the slot key does not
+determine its public URI. `ReportGenerationJob<TReport, TSnapshot, TChunk>` turns the variable into
+`ReportRequest { Name = name, Persist = true }` and labels the result `ReportRunKind.Scheduled`.
 
 ## Definition changes
 
 `AdviceReportScheduleSync<TReport>` runs after a successful persisted report-definition commit. For
-each updated definition it unschedules `jobs/report-{name}` and arms a new job when `Periodic` is
-true. For each removed definition it unschedules that job. `ReportSchedulingInitializer` re-arms
-persisted periodic definitions after a host restart.
+each updated definition it finds the job by `Key = report:{name}`, unschedules the row's stored
+`CanonicalName`, and arms a job when `Periodic` is true. Removed definitions disarm the same slot.
+`ReportSchedulingInitializer` re-arms persisted periodic definitions after a host restart.
+
+Consumers migrating existing schedules must add and backfill `SchemataJob.Key` and its unique index
+from report identities while preserving existing resource names. The bridge does not look up a
+legacy `jobs/report-{name}` URI when the slot key is missing. Register naming advisors for both
+`SchemataJob` and `SchemataJobExecution`; neither the report bridge nor the scheduler supplies a
+resource-name fallback. See [Scheduling persistence](../scheduling/persistence.md#resource-naming).
+
+Implementation: `src/Schemata.Report.Scheduling/Runtime/ReportSchedule.cs`.
 
 ## Retention
 

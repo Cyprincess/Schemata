@@ -20,7 +20,7 @@ namespace Schemata.Authorization.Tests;
 public class ClientSecretBasicHandlerShould
 {
     private static readonly SchemataApplication TestApp = new() {
-        Uid = Guid.NewGuid(), ClientId = "my-client", ClientType = "confidential",
+        Uid = Guid.NewGuid(), ClientId = "my-client", CanonicalName = "applications/my-client", ClientType = "confidential",
     };
 
     private static ClientSecretBasicAuthentication<SchemataApplication> CreateHandler(

@@ -51,9 +51,10 @@ public class LoginContinuationShould
         services.AddDataProtection();
         services.Configure<SchemataIdentityOptions>(o => o.LoginUri = loginUri);
 
-        var context = new DefaultHttpContext { RequestServices = services.BuildServiceProvider() };
-        context.Request.Path        = "/console/orders";
-        context.Request.QueryString = new("?page=2");
+        var context = new DefaultHttpContext { RequestServices = services.BuildServiceProvider(), Request = {
+                Path = "/console/orders", QueryString = new("?page=2"),
+            }
+        };
 
         return context;
     }

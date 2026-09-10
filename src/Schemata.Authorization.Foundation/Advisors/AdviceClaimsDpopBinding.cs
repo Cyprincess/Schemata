@@ -36,8 +36,9 @@ public sealed class AdviceClaimsDpopBinding : IClaimsAdvisor
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        var cnf = new Claim(Claims.Cnf, $"{{\"jkt\":\"{binding.Jkt}\"}}", JsonClaimValueTypes.Json);
-        cnf.Properties[ClaimDestinations.AccessToken] = Parameters.Token;
+        var cnf = new Claim(Claims.Cnf, $"{{\"jkt\":\"{binding.Jkt}\"}}", JsonClaimValueTypes.Json) {
+            Properties = { [ClaimDestinations.AccessToken] = Parameters.Token },
+        };
         claims.Add(cnf);
 
         return Task.FromResult(AdviseResult.Continue);

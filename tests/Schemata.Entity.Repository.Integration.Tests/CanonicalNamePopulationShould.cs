@@ -18,7 +18,6 @@ public class CanonicalNamePopulationShould : IAsyncLifetime
     public async Task Add_SchemataProcess_PopulatesCanonicalNameFromCollectionAndName() {
         var entity = new SchemataProcess {
             DefinitionName = "test",
-            Name          = "process-1",
         };
 
         var (repository, scope) = _fixture.CreateScope<SchemataProcess>();
@@ -27,6 +26,7 @@ public class CanonicalNamePopulationShould : IAsyncLifetime
             await repository.CommitAsync();
         }
 
-        Assert.Equal("processes/process-1", entity.CanonicalName);
+        Assert.StartsWith("consumer-", entity.Name);
+        Assert.Equal($"processes/{entity.Name}", entity.CanonicalName);
     }
 }

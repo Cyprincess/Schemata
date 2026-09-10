@@ -66,7 +66,7 @@ public sealed class SchedulingInitializer : BackgroundService
             }
 
             var job = new SchemataJob {
-                Name   = jobKey,
+                Key    = $"registration:{jobKey}",
                 JobKey = jobKey,
                 State  = JobState.Active,
             };

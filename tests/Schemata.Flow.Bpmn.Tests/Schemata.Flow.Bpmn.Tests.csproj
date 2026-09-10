@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Schemata.Flow.Tests\FlowTestCreation.cs" Link="FlowTestCreation.cs" />
     <ProjectReference Include="..\..\src\Schemata.Flow.Bpmn\Schemata.Flow.Bpmn.csproj" />
   </ItemGroup>
 

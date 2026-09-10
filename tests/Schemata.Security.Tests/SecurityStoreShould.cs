@@ -70,16 +70,16 @@ public class SecurityStoreShould
     }
 
     [Fact]
-    public async Task List_By_Parent_Orders_By_Create_Time_Descending_Then_Name() {
+    public async Task List_By_Parent_Orders_By_Create_Time_Descending_Then_Key() {
         var rows = new[] {
             new SchemataSecurity {
-                Parent = "applications/a-1", Name = "c", CreateTime = new DateTime(2026, 1, 1),
+                Parent = "applications/a-1", Name = "a", Key = "c", CreateTime = new DateTime(2026, 1, 1),
             },
             new SchemataSecurity {
-                Parent = "applications/a-1", Name = "a", CreateTime = new DateTime(2026, 3, 1),
+                Parent = "applications/a-1", Name = "c", Key = "a", CreateTime = new DateTime(2026, 3, 1),
             },
             new SchemataSecurity {
-                Parent = "applications/a-1", Name = "b", CreateTime = new DateTime(2026, 3, 1),
+                Parent = "applications/a-1", Name = "b", Key = "b", CreateTime = new DateTime(2026, 3, 1),
             },
         };
         var (store, _) = NewStore(r => SetupList(r, rows));

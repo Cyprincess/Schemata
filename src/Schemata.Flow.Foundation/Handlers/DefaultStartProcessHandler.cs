@@ -18,6 +18,7 @@ internal sealed class DefaultStartProcessHandler(FlowHandlerSupport support)
         ProcessSnapshot? snapshot = null;
 
         await support.ExecuteWithNotificationAsync(process, async (scope, current) => {
+            await scope.CreateProcessAsync(process, current);
             await support.BindStartSourceAsync(
                 scope,
                 registration,

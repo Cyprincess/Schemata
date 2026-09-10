@@ -241,21 +241,19 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope> : IInteract
         // Record consent so future requests for the same client/scope can skip interaction.
         // Application / AuthorizationName carry full AIP-122 canonical names per the
         // [ResourceReference] contracts on SchemataAuthorization / SchemataToken; the OAuth
-        // wire `client_id` keeps mapping to SchemataApplication.Name via FindByClientIdAsync.
+        // wire `client_id` is resolved independently through FindByClientIdAsync.
         var authorization = new TAuth {
-            Name                = Guid.NewGuid().ToString("n"),
-            Application         = application.CanonicalName,
-            Subject             = subject,
-            Type                = AuthorizationTypes.AdHoc,
-            Status              = TokenStatuses.Valid,
-            Scopes              = authorize.Scope,
-            RedirectUri         = authorize.RedirectUri,
-            ResponseType        = authorize.ResponseType,
-            CodeChallengeMethod = authorize.CodeChallengeMethod,
-            AcrValues           = authorize.AcrValues,
+            Application          = application.CanonicalName,
+            Subject              = subject,
+            Type                 = AuthorizationTypes.AdHoc,
+            Status               = TokenStatuses.Valid,
+            Scopes               = authorize.Scope,
+            RedirectUri          = authorize.RedirectUri,
+            ResponseType         = authorize.ResponseType,
+            CodeChallengeMethod  = authorize.CodeChallengeMethod,
+            AcrValues            = authorize.AcrValues,
+            AuthorizationDetails = details,
         };
-
-        authorization.AuthorizationDetails = details;
 
         await _auths.CreateAsync(authorization, ct);
 

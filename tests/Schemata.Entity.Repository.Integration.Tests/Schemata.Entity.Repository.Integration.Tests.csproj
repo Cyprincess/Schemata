@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Schemata.Flow.Tests\FlowTestCreation.cs" Link="FlowTestCreation.cs" />
     <ProjectReference Include="..\..\src\Schemata.Entity.EntityFrameworkCore\Schemata.Entity.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Common\Schemata.Common.csproj" />

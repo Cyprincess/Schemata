@@ -131,6 +131,21 @@ itself is stateless and never touches the table. `Actor.Foundation` only *resolv
 `IRepository<SchemataActor>`; the application registers it, the same convention `Flow.Foundation` and
 `Scheduling.Foundation` follow for their own entities.
 
+`ActorStateStore` finds state by the unique `(ActorType, ActorKey)` pair on `SchemataActor`, matching
+`ActorId.Type` and `ActorId.Key`. Resource `Name` is independent of that pair. The application
+registers an `IRepositoryAddAdvisor<SchemataActor>` through `TryAddEnumerable` to assign a missing
+name before `AdviceAddCanonicalName.DefaultOrder` (120,000,000), preserving explicit names. The
+store supplies the actor identity and state on insert; it supplies no resource-name fallback.
+
+Existing databases need a consumer migration for the `ActorType` and `ActorKey` columns and their
+unique composite index. Recover the pair from authoritative application identity data or a known,
+unambiguous legacy encoding. Blindly splitting an old `Name` at `/` is unsafe when a type or key
+contains that delimiter. Preserve resource names independently, and validate identity uniqueness
+before applying the index; reads do not fall back to the old concatenated name.
+
+Implementation: `src/Schemata.Actor.Skeleton/Entities/SchemataActor.cs` and
+`src/Schemata.Actor.Foundation/Runtime/ActorStateStore.cs`.
+
 This is deliberately narrow: `SchemataActor` never carries authoritative domain state. The real data
 lives in `SchemataProcess`, reloaded fresh inside the turn every time (see
 [Flow.Actor](#flowactor-per-instance-serialization) below); a persistent actor's
@@ -248,6 +263,15 @@ These two bridge *into* the actor system rather than serializing an existing wri
   rehydrates the target `ActorId` and the JSON-serialized payload from `JobContext.Variables` and
   delivers it with `TellAsync`. `IActorContext.ScheduleAsync` throws a clear exception when this
   bridge is not installed, rather than becoming a silent no-op.
+
+Reminder schedules store their semantic identity in `SchemataJob.Key`: `actor-reminder:` followed
+by the JSON array of actor type, actor key, and reminder name. `JobKey` selects `ActorReminderJob`;
+resource `Name` remains consumer-owned. Cancellation queries the slot key and passes the row's
+stored canonical name to `UnscheduleAsync`. Existing reminder jobs require a consumer slot-key
+backfill, and new jobs and executions require repository naming advisors. The bridge does not
+construct a resource URI from the reminder identity.
+
+Implementation: `src/Schemata.Actor.Scheduling/Runtime/ActorReminders.cs`.
 
 Both packages capture `MessageContext` from their own consumption/execution scope — the event
 handler's scope, the job's scope — not from whenever the event was originally published or the

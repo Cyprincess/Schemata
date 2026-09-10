@@ -53,6 +53,12 @@ builder.UseSchemata(schema => {
     // Auto-assign a unique Name to every new Student so that FindByNameAsync works.
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, AdviceAddStudentName>());
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Trash>, AdviceAddTrashName>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJob>, AdviceAddResourceName<SchemataJob>>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJobExecution>, AdviceAddResourceName<SchemataJobExecution>>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataProcess>, AdviceAddResourceName<SchemataProcess>>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataProcessToken>, AdviceAddResourceName<SchemataProcessToken>>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataProcessTransition>, AdviceAddResourceName<SchemataProcessTransition>>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataProcessCompensation>, AdviceAddResourceName<SchemataProcessCompensation>>());
 });
 
 var app = builder.Build();

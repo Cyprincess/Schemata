@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
 
@@ -25,4 +28,18 @@ public sealed class FlowPersistenceScope(
     public IRepository<SchemataProcessSource> Sources { get; } = sources;
 
     public IRepository<SchemataProcessCompensation> Compensations { get; } = compensations;
+
+    internal HashSet<SchemataProcess> CreatedProcesses { get; } = new(ReferenceEqualityComparer.Instance);
+
+    internal HashSet<SchemataProcessToken> CreatedTokens { get; } = new(ReferenceEqualityComparer.Instance);
+
+    internal async Task CreateProcessAsync(SchemataProcess process, CancellationToken ct) {
+        await Processes.AddAsync(process, ct);
+        CreatedProcesses.Add(process);
+    }
+
+    internal async Task CreateTokenAsync(SchemataProcessToken token, CancellationToken ct) {
+        await Tokens.AddAsync(token, ct);
+        CreatedTokens.Add(token);
+    }
 }

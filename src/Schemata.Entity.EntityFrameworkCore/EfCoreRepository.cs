@@ -74,6 +74,10 @@ public class EfCoreRepository<TContext, TEntity> : RepositoryBase<TEntity>
 
         EnsureWriteUnitOfWork();
 
+        if (Context.Entry(entity).State == EntityState.Added) {
+            return;
+        }
+
         TrackUpdate(entity);
 
         Context.Entry(entity).State = EntityState.Detached;

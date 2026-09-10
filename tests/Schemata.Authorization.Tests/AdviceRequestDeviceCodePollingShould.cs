@@ -20,7 +20,7 @@ namespace Schemata.Authorization.Tests;
 public class AdviceRequestDeviceCodePollingShould
 {
     private const string Provider = "device";
-    private const string Name     = "rate:device-code";
+    private const string Key     = "rate:device-code";
 
     [Fact]
     public async Task First_Poll_Stores_Configured_Interval() {
@@ -30,14 +30,14 @@ public class AdviceRequestDeviceCodePollingShould
         var result = await advisor.AdviseAsync(new(null!), new(), Request());
 
         Assert.Equal(AdviseResult.Continue, result);
-        Assert.Equal("5", rows[(null, Provider, Name)].Value);
+        Assert.Equal("5", rows[(null, Provider, Key)].Value);
         Assert.Equal(TimeSpan.FromSeconds(5), Assert.Single(ttls));
     }
 
     [Fact]
     public async Task Early_Poll_Returns_SlowDown_And_Grows_Interval_By_Five_Seconds() {
         var (slots, rows, ttls) = Slots(new() {
-            [(null, Provider, Name)] = new() { Parent = null, Provider = Provider, Name = Name, Value = "5" },
+            [(null, Provider, Key)] = new() { Parent = null, Provider = Provider, Key = Key, Value = "5" },
         });
         var advisor = Advisor(slots);
 
@@ -45,7 +45,7 @@ public class AdviceRequestDeviceCodePollingShould
             advisor.AdviseAsync(new(null!), new(), Request()));
 
         Assert.Equal(OAuthErrors.SlowDown, exception.Status);
-        Assert.Equal("10", rows[(null, Provider, Name)].Value);
+        Assert.Equal("10", rows[(null, Provider, Key)].Value);
         Assert.Equal(TimeSpan.FromSeconds(10), Assert.Single(ttls));
     }
 
@@ -75,7 +75,7 @@ public class AdviceRequestDeviceCodePollingShould
                 rows[(parent, provider, name)] = new() {
                     Parent     = parent,
                     Provider   = provider,
-                    Name       = name,
+                    Key       = name,
                     Value      = value,
                     ExpireTime = ttl is null ? null : DateTime.UtcNow + ttl.Value,
                 };
@@ -92,7 +92,7 @@ public class AdviceRequestDeviceCodePollingShould
                     row = new() {
                         Parent     = parent,
                         Provider   = provider,
-                        Name       = name,
+                        Key       = name,
                         Value      = value,
                         ExpireTime = DateTime.UtcNow + ttl,
                     };

@@ -18,7 +18,7 @@ public class ClientSecretValidatorShould
     private static SchemataSecurity PasswordRow(string clientId) {
         return new() {
             Uid       = Guid.NewGuid(),
-            Parent    = SecurityParents.Application(new() { ClientId = clientId }),
+            Parent    = $"applications/{clientId}",
             Kind      = SecurityConstants.Kinds.Password,
             Usage     = SecurityConstants.Usages.Authentication,
             Algorithm = SecurityConstants.Algorithms.Pbkdf2,
@@ -57,7 +57,7 @@ public class ClientSecretValidatorShould
         var ex = await Assert.ThrowsAsync<OAuthException>(
             () => ClientSecretValidator.ValidateAsync(
                 securities.Object, verifier.Object,
-                new() { ClientId = "my-client", ClientType = ClientTypes.Confidential }, "wrong", default));
+                new() { ClientId = "my-client", CanonicalName = "applications/my-client", ClientType = ClientTypes.Confidential }, "wrong", default));
 
         Assert.Equal(OAuthErrors.InvalidClient, ex.Status);
     }
@@ -71,7 +71,7 @@ public class ClientSecretValidatorShould
 
         await ClientSecretValidator.ValidateAsync(
             securities.Object, verifier.Object,
-            new() { ClientId = "my-client", ClientType = ClientTypes.Confidential }, "my-secret", default);
+            new() { ClientId = "my-client", CanonicalName = "applications/my-client", ClientType = ClientTypes.Confidential }, "my-secret", default);
 
         securities.Verify(
             s => s.ListByParentAsync(
@@ -91,7 +91,7 @@ public class ClientSecretValidatorShould
         var ex = await Assert.ThrowsAsync<OAuthException>(
             () => ClientSecretValidator.ValidateAsync(
                 securities.Object, verifier.Object,
-                new() { ClientId = "my-client", ClientType = ClientTypes.Confidential }, "my-secret", default));
+                new() { ClientId = "my-client", CanonicalName = "applications/my-client", ClientType = ClientTypes.Confidential }, "my-secret", default));
 
         Assert.Equal(OAuthErrors.InvalidClient, ex.Status);
     }

@@ -92,7 +92,7 @@ public static class TestSecurityKeys
 
         var row = new SchemataSecurity {
             Parent     = SecurityParents.Issuer(issuer),
-            Name       = $"eph-{Guid.NewGuid():n}",
+            Key        = $"eph-{Guid.NewGuid():n}",
             Kind       = SecurityConstants.Kinds.PrivateKey,
             Usage      = usage,
             Algorithm  = algorithm,

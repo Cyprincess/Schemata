@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Entity.Repository;
 using Schemata.Report.Foundation.Jobs;
 using Schemata.Report.Skeleton.Entities;
 using Schemata.Report.Skeleton.Enums;
@@ -19,14 +21,19 @@ internal static class ReportSchedule
         }, ct);
     }
 
-    internal static string JobCanonicalName(SchemataReport report) {
-        return $"jobs/report-{GetName(report)}";
+    internal static async Task DisarmAsync(
+        IScheduler scheduler, IRepository<SchemataJob> jobs, SchemataReport report, CancellationToken ct
+    ) {
+        var key = $"report:{GetName(report)}";
+        var job = await jobs.FirstOrDefaultAsync(query => query.Where(row => row.Key == key), ct);
+        if (job is not null) {
+            await scheduler.UnscheduleAsync(job.CanonicalName!, ct);
+        }
     }
 
     private static SchemataJob CreateJob(SchemataReport report, string name) {
         var job = new SchemataJob {
-            Name          = $"report-{name}",
-            CanonicalName = $"jobs/report-{name}",
+            Key           = $"report:{name}",
             JobKey        = ReportJobKeyResolver.Key,
             State         = JobState.Active,
         };

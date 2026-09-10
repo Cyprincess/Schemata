@@ -222,6 +222,7 @@ public sealed class EscalationBoundaryHandler
             }
 
             var routed = BpmnEngine.NewChildToken(process, resolved, hostToken);
+            await execution.CreateTokenAsync(routed, System.Threading.CancellationToken.None);
             working.Add(routed);
             transitions.Add(BpmnEngine.NewTransition(
                 process.Name!,
@@ -231,13 +232,13 @@ public sealed class EscalationBoundaryHandler
                 TransitionKind.Spawn,
                 eventName));
         } else {
-            transitions.Add(new NonInterruptingBoundaryHandler().Handle(
+            transitions.Add(await new NonInterruptingBoundaryHandler().HandleAsync(
                 process,
                 hostToken,
                 working,
                 boundary,
                 resolved,
-                trigger));
+                trigger, execution));
         }
 
         return transitions;
@@ -290,6 +291,7 @@ public sealed class EscalationBoundaryHandler
             process,
             throwing);
         var child = NewEventSubProcessToken(process, eventSubProcess, throwing, resolved);
+        await execution.CreateTokenAsync(child, System.Threading.CancellationToken.None);
         working.Add(child);
         transitions.Add(BpmnEngine.NewTransition(
             process.Name!,
@@ -376,12 +378,7 @@ public sealed class EscalationBoundaryHandler
         SchemataProcessToken   throwing,
         TargetState            resolved
     ) {
-        var leaf      = Guid.NewGuid().ToString("n");
-        var canonical = $"{process.CanonicalName}/tokens/{leaf}";
-
         return new() {
-            Name          = leaf,
-            CanonicalName = canonical,
             Process       = process.Name!,
             Spawner       = throwing.CanonicalName,
             ScopeName       = eventSubProcess.Name,

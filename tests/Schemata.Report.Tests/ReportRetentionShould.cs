@@ -161,13 +161,13 @@ public class ReportRetentionShould
 
         foreach (var snapshot in state.Snapshots) {
             var chunk = new SchemataReportSnapshotChunk {
-                Report   = snapshot.Report,
-                Snapshot = snapshot.Name,
-                Name     = "chunk-0",
-                Index    = 0,
+                Report        = snapshot.Report,
+                Snapshot      = snapshot.Name,
+                Name          = "chunk-0",
+                Index         = 0,
+                Uid           = Guid.NewGuid(),
+                CanonicalName = $"reports/{snapshot.Report}/snapshots/{snapshot.Name}/chunks/chunk-0",
             };
-            chunk.Uid          = Guid.NewGuid();
-            chunk.CanonicalName = $"reports/{snapshot.Report}/snapshots/{snapshot.Name}/chunks/chunk-0";
             state.Chunks.Add(chunk);
         }
         var report = Report(daily, new() { MaxCount = 3, MaxAgeDays = 2 });

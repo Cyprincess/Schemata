@@ -62,7 +62,7 @@ public class FlowTaskContextShould
             ScopeName     = "p1",
             StateName     = "s1",
         };
-        return new(new(), process, token, new(uow, services));
+        return new(new(), process, token, Schemata.Flow.Tests.FlowTestCreation.Context(uow, services));
     }
 
     private sealed record Widget(string Name);

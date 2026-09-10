@@ -63,11 +63,11 @@ public class AdviceDeviceCodeExchangeValidationShould
 
     private static DeviceCodeExchangeContext<SchemataApplication> Context(string status) {
         return new() {
-            Application = new() { Name = "client" },
+            Application = new() { Name = "resource-client", ClientId = "client", CanonicalName = "applications/resource-client" },
             Token = new() {
                 Type        = TokenTypes.DeviceCode,
                 Status      = status,
-                Application = "client",
+                Application = "applications/resource-client",
                 Parent      = "user",
                 ExpireTime  = Now.AddMinutes(5).UtcDateTime,
             },

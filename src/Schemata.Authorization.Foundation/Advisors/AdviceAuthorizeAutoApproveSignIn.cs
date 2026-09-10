@@ -89,41 +89,38 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
         // context, the request carries no authorization details.
         var json = ctx.TryGet<AuthorizationDetailsGrant>(out var details) ? details?.Json : null;
         var authorization = new TAuth {
-            Name                = Guid.NewGuid().ToString("n"),
-            Application         = authz.Application!.CanonicalName,
-            Subject             = subject,
-            Type                = AuthorizationTypes.AdHoc,
-            Status              = TokenStatuses.Valid,
-            Scopes              = authz.Request?.Scope,
-            RedirectUri         = authz.Request?.RedirectUri,
-            ResponseType        = authz.Request?.ResponseType,
-            CodeChallengeMethod = authz.Request?.CodeChallengeMethod,
-            AcrValues           = authz.Request?.AcrValues,
+            Application          = authz.Application!.CanonicalName,
+            Subject              = subject,
+            Type                 = AuthorizationTypes.AdHoc,
+            Status               = TokenStatuses.Valid,
+            Scopes               = authz.Request?.Scope,
+            RedirectUri          = authz.Request?.RedirectUri,
+            ResponseType         = authz.Request?.ResponseType,
+            CodeChallengeMethod  = authz.Request?.CodeChallengeMethod,
+            AcrValues            = authz.Request?.AcrValues,
+            AuthorizationDetails = json,
         };
-
-        authorization.AuthorizationDetails = json;
 
         await authorizations.CreateAsync(authorization, ct);
 
         var properties = new Dictionary<string, string?> {
-            [Properties.GrantType]           = GrantTypes.AuthorizationCode,
-            [Properties.Scope]               = authz.Request?.Scope,
-            [Properties.Resources]           = authz.Request?.Resource is { Count: > 0 } ? string.Join(" ", authz.Request.Resource) : null,
-            [Properties.ResponseType]        = authz.Request?.ResponseType,
-            [Properties.Nonce]               = authz.Request?.Nonce,
-            [Properties.RedirectUri]         = authz.Request?.RedirectUri,
-            [Properties.ResponseMode]        = authz.ResponseMode,
-            [Properties.State]               = authz.Request?.State,
-            [Properties.CodeChallenge]       = authz.Request?.CodeChallenge,
-            [Properties.CodeChallengeMethod] = authz.Request?.CodeChallengeMethod,
-            [Properties.DpopJkt]             = authz.Request?.DpopJkt,
-            [Properties.AuthorizationName]   = authorization.CanonicalName,
-            [Properties.SessionId]           = sid,
-            [Properties.MaxAge]              = authz.Request?.MaxAge,
-            [Properties.ClaimsRequest]       = authz.Request?.Claims,
+            [Properties.GrantType]            = GrantTypes.AuthorizationCode,
+            [Properties.Scope]                = authz.Request?.Scope,
+            [Properties.Resources]            = authz.Request?.Resource is { Count: > 0 } ? string.Join(" ", authz.Request.Resource) : null,
+            [Properties.ResponseType]         = authz.Request?.ResponseType,
+            [Properties.Nonce]                = authz.Request?.Nonce,
+            [Properties.RedirectUri]          = authz.Request?.RedirectUri,
+            [Properties.ResponseMode]         = authz.ResponseMode,
+            [Properties.State]                = authz.Request?.State,
+            [Properties.CodeChallenge]        = authz.Request?.CodeChallenge,
+            [Properties.CodeChallengeMethod]  = authz.Request?.CodeChallengeMethod,
+            [Properties.DpopJkt]              = authz.Request?.DpopJkt,
+            [Properties.AuthorizationName]    = authorization.CanonicalName,
+            [Properties.SessionId]            = sid,
+            [Properties.MaxAge]               = authz.Request?.MaxAge,
+            [Properties.ClaimsRequest]        = authz.Request?.Claims,
+            [Properties.AuthorizationDetails] = json,
         };
-
-        properties[Properties.AuthorizationDetails] = json;
 
         ctx.Set(AuthorizationResult.SignIn(response, properties));
 

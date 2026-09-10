@@ -171,9 +171,7 @@ public class ReportGenerationJobShould
         Assert.Equal(2, state.ChunkAddSequence.Count);
         for (var index = 0; index < state.ChunkAddSequence.Count; index++) {
             var chunk = state.ChunkAddSequence[index];
-            Assert.Equal($"chunk-{index}", chunk.Name);
             Assert.Equal(index, chunk.Index);
-            Assert.Equal($"{cancelledSnapshot.CanonicalName}/chunks/chunk-{index}", chunk.CanonicalName);
             Assert.Equal(cancelledSnapshot.Report, chunk.Report);
             Assert.Equal(cancelledSnapshot.Name, chunk.Snapshot);
             Assert.Equal(2, chunk.RowCount);

@@ -11,8 +11,12 @@ namespace Schemata.Scheduling.Skeleton.Entities;
 [CanonicalName("jobs/{job}")]
 [PrimaryKey(nameof(Uid))]
 [Index(nameof(Name), IsUnique = true)]
+[Index(nameof(Key), IsUnique = true)]
 public class SchemataJob : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
+    /// <summary>Producer-owned schedule slot used to recover an existing job across registrations.</summary>
+    public virtual string? Key { get; set; }
+
     /// <summary>Stable job identifier resolved through <see cref="IScheduledJobRegistry" />.</summary>
     public virtual string? JobKey { get; set; }
 

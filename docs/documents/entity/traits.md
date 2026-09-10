@@ -3,7 +3,8 @@
 Traits are marker interfaces that add cross-cutting behavior to entities. Each is delivered by an
 advisor registered with the repository pipeline: the advisor checks the entity with an `is`-test (or a
 constrained generic parameter) and runs its logic when the test matches. For the built-in traits below,
-`AddRepository` wires the matching advisors — implementing the interface is the only per-entity step.
+`AddRepository` wires the matching advisors. Resource naming still requires a consumer-supplied
+`Name` or naming advisor, and ownership requires `UseOwner()`.
 A custom trait needs both the interface and an advisor that performs the same kind of check.
 
 The traits live in `Schemata.Abstractions.Entities`. Their built-in advisors live in three packages:
@@ -133,6 +134,22 @@ public class Book : ICanonicalName { /* ... */ }
 
 The advisor has no suppress flag and runs whenever the entity implements `ICanonicalName` and its type
 carries a registered pattern.
+
+The consuming application owns `Name`. It may supply an explicit value before creation or register
+an `IRepositoryAddAdvisor<TEntity>` that assigns missing names before
+`AdviceAddCanonicalName.DefaultOrder` (120,000,000). The framework does not generate a fallback
+`Name`. Its generated `Uid` is a separate persistence identifier.
+
+For an addressable `ICanonicalName` pattern, the final placeholder binds to `Name` regardless of its
+spelling. `ResourceNameDescriptor.Resolve` rejects missing, empty, or whitespace-only segment values
+with `ValidationException`; a prefilled `CanonicalName` does not substitute for `Name`. These rules
+also apply to framework-created persisted resources. BPMN graph node and graph reference names are
+internal graph identifiers, not an exemption for persisted Flow runtime rows.
+
+See [consumer-owned resource names](../repository/mutation-pipeline.md#consumer-owned-resource-names)
+for an advisor implementation and open-generic or entity-specific registration. The implementation
+is in `src/Schemata.Entity.Repository/Advisors/AdviceAddCanonicalName.cs` and
+`src/Schemata.Common/ResourceNameDescriptor.cs`.
 
 ## ISoftDelete
 

@@ -16,8 +16,8 @@ public static class OperationMapper
     /// <summary>Creates an AIP-151 operation envelope from a scheduler execution row.</summary>
     public static Operation FromExecution(SchemataJobExecution execution) {
         var operation = new Operation {
-            Name          = execution.Name ?? execution.Uid.ToString("n"),
-            CanonicalName = execution.CanonicalName ?? $"operations/{execution.Uid:n}",
+            Name          = execution.Name,
+            CanonicalName = execution.CanonicalName,
             Done          = execution.State.IsTerminal(),
             Metadata = new() {
                 Method    = execution.Method,

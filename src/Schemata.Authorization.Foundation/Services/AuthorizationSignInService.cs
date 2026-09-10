@@ -93,8 +93,9 @@ public sealed class AuthorizationSignInService<TApp>(
         // JSON-array claim, tagged for the access token destination only.
         items.TryGetValue(Properties.AuthorizationDetails, out var authorizationDetails);
         if (!string.IsNullOrWhiteSpace(authorizationDetails)) {
-            var claim = new Claim(Claims.AuthorizationDetails, authorizationDetails, JsonClaimValueTypes.Json);
-            claim.Properties[ClaimDestinations.AccessToken] = Parameters.Token;
+            var claim = new Claim(Claims.AuthorizationDetails, authorizationDetails, JsonClaimValueTypes.Json) {
+                Properties = { [ClaimDestinations.AccessToken] = Parameters.Token },
+            };
             identity.AddClaim(claim);
         }
 
@@ -342,7 +343,6 @@ public sealed class AuthorizationSignInService<TApp>(
         var reference = issuer.CreateReference();
         var now       = _time.GetUtcNow().UtcDateTime;
         var entity = new SchemataToken {
-            Name              = Guid.NewGuid().ToString("n"),
             Type              = TokenTypes.AuthorizationCode,
             Status            = TokenStatuses.Valid,
             ReferenceId       = reference,

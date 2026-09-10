@@ -29,13 +29,18 @@ internal sealed class DefaultScheduleJobHandler(SchedulingHandlerSupport support
 
     private async Task ScheduleCoreAsync(SchemataJob job, CancellationToken ct) {
         var scheduler = support.Scheduler;
-        var key       = job.CanonicalName ?? job.Name;
-        if (string.IsNullOrWhiteSpace(key)) {
-            return;
-        }
-
         await support.WriteGate.Gate.WaitAsync(ct);
         try {
+            using var scope = scheduler.Services.CreateScope();
+            var jobs = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJob>>();
+            var name = job.CanonicalName ?? job.Name;
+            var persisted = job.Key is { } slot
+                ? await jobs.FirstOrDefaultAsync(query => query.Where(row => row.Key == slot), ct)
+                : string.IsNullOrWhiteSpace(name)
+                    ? null
+                    : await jobs.FirstOrDefaultAsync(
+                        query => query.Where(row => row.CanonicalName == name || row.Name == name), ct);
+            var key = persisted?.CanonicalName ?? name;
             var replayedMisses = 0;
             await scheduler.Gate.WaitAsync(ct);
             try {
@@ -43,7 +48,7 @@ internal sealed class DefaultScheduleJobHandler(SchedulingHandlerSupport support
                     return;
                 }
 
-                if (scheduler.Entries.TryRemove(key, out var existing)) {
+                if (key is not null && scheduler.Entries.TryRemove(key, out var existing)) {
                     replayedMisses = existing.ReplayedMisses;
                     await existing.Cts.CancelAsync();
                     existing.Cts.Dispose();
@@ -65,33 +70,30 @@ internal sealed class DefaultScheduleJobHandler(SchedulingHandlerSupport support
                 scheduler.Gate.Release();
             }
 
-            using (var scope = scheduler.Services.CreateScope()) {
-                var jobs = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJob>>();
-                var persisted = await jobs.FirstOrDefaultAsync(
-                    query => query.Where(row => row.CanonicalName == key || row.Name == key), ct);
-                if (persisted is null) {
-                    await jobs.AddAsync(job, ct);
-                } else {
-                    // A reschedule rewrites the scheduling configuration and the requested State; the result fields
-                    // (RecentRunTime/RecentError) belong to the staging handler.
-                    persisted.JobKey         = job.JobKey;
-                    persisted.ArgsJson       = job.ArgsJson;
-                    persisted.ScheduleType   = job.ScheduleType;
-                    persisted.NextRunTime    = job.NextRunTime;
-                    persisted.IntervalTicks  = job.IntervalTicks;
-                    persisted.AnchorTime     = job.AnchorTime;
-                    persisted.CronExpression = job.CronExpression;
-                    persisted.Variables      = job.Variables;
-                    persisted.Replay         = job.Replay;
-                    persisted.State          = job.State;
-                    await jobs.UpdateAsync(persisted, ct);
-                }
-
-                await jobs.CommitAsync(ct);
+            if (persisted is null) {
+                await jobs.AddAsync(job, ct);
+            } else {
+                // Execution result fields belong to the staging handler.
+                persisted.Key          ??= job.Key;
+                persisted.JobKey         = job.JobKey;
+                persisted.ArgsJson       = job.ArgsJson;
+                persisted.ScheduleType   = job.ScheduleType;
+                persisted.NextRunTime    = job.NextRunTime;
+                persisted.IntervalTicks  = job.IntervalTicks;
+                persisted.AnchorTime     = job.AnchorTime;
+                persisted.CronExpression = job.CronExpression;
+                persisted.Variables      = job.Variables;
+                persisted.Replay         = job.Replay;
+                persisted.State          = job.State;
+                await jobs.UpdateAsync(persisted, ct);
+                job.Uid           = persisted.Uid;
+                job.Name          = persisted.Name;
+                job.CanonicalName = persisted.CanonicalName;
+                job.Timestamp     = persisted.Timestamp;
             }
 
+            await jobs.CommitAsync(ct);
             await support.EnsurePendingExecutionAsync(job, ct);
-
             await support.ArmOneShotTimerAsync(job, replayedMisses);
         } finally {
             support.WriteGate.Gate.Release();

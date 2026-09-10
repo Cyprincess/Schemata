@@ -64,9 +64,9 @@ public sealed class RegisterHandler<TApp>(
                 OAuthErrors.InvalidToken,
                 "The initial access token is invalid or absent.",
                 (int)System.Net.HttpStatusCode.Unauthorized
-            );
-            unauthorized.Headers = new System.Collections.Generic.Dictionary<string, string> {
-                ["WWW-Authenticate"] = "Bearer",
+            ) { Headers = new System.Collections.Generic.Dictionary<string, string> {
+                    ["WWW-Authenticate"] = "Bearer",
+                }
             };
             throw unauthorized;
         }
@@ -88,7 +88,7 @@ public sealed class RegisterHandler<TApp>(
         }
 
         var application = await RegistrationMetadataMapper.ToApplicationAsync<TApp>(
-            request, options, http, securities, _time, ct);
+            request, options, http, ct);
 
         var ctx = AdviceContext.Require();
         if (await Advisor.For<IRegistrationRequestAdvisor<TApp>>()
@@ -100,12 +100,18 @@ public sealed class RegisterHandler<TApp>(
 
         await ValidateUserInfoResponseAlgorithmsAsync(application, ct);
 
-        if (RequiresClientSecret(application)) {
+        var created = await apps.CreateAsync(application, ct);
+        var clientId = created?.ClientId;
+        if (created is null || string.IsNullOrWhiteSpace(clientId)) {
+            throw new OAuthException(OAuthErrors.InvalidClientMetadata,
+                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS));
+        }
+        if (RequiresClientSecret(created)) {
             var secret = RegistrationMetadataMapper.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
             var hash   = await verifier.HashAsync(secret, ct: ct);
             await securities.CreateAsync(new() {
-                Parent    = SecurityParents.Application(application),
-                Name      = application.ClientId,
+                Parent    = SecurityParents.Application(created),
+                Key       = clientId,
                 Kind      = SecurityConstants.Kinds.Password,
                 Usage     = SecurityConstants.Usages.Authentication,
                 Algorithm = SecurityConstants.Algorithms.Pbkdf2,
@@ -115,11 +121,26 @@ public sealed class RegisterHandler<TApp>(
             _plainClientSecret = secret;
         }
 
-        var created = await apps.CreateAsync(application, ct);
-        var clientId = created?.ClientId;
-        if (created is null || string.IsNullOrWhiteSpace(clientId)) {
-            throw new OAuthException(OAuthErrors.InvalidClientMetadata,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS));
+        if (!string.IsNullOrWhiteSpace(request.Jwks)) {
+            await securities.CreateAsync(new() {
+                Parent = SecurityParents.Application(created),
+                Key    = clientId,
+                Kind   = SecurityConstants.Kinds.Jwks,
+                Usage  = SecurityConstants.Usages.Authentication,
+                Value  = request.Jwks,
+                Status = SecurityConstants.Statuses.Valid,
+            }, ct);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.JwksUri)) {
+            await securities.CreateAsync(new() {
+                Parent = SecurityParents.Application(created),
+                Key    = clientId,
+                Kind   = SecurityConstants.Kinds.JwksUri,
+                Usage  = SecurityConstants.Usages.Authentication,
+                Value  = request.JwksUri,
+                Status = SecurityConstants.Statuses.Valid,
+            }, ct);
         }
 
         var now     = _time.GetUtcNow().ToUnixTimeSeconds();
@@ -195,7 +216,7 @@ public sealed class RegisterHandler<TApp>(
         var token = new SchemataToken {
             // Non-user artifact: Parent stays null so logout fan-outs keyed by subject never see it (spec §3.3).
             Parent       = null,
-            Application  = application.CanonicalName ?? $"applications/{application.ClientId}",
+            Application  = application.CanonicalName,
             Type         = TokenTypes.Registration,
             Status       = TokenStatuses.Valid,
             Format       = TokenFormats.Reference,

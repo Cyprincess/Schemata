@@ -5,6 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Moq;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Entities;
+using Schemata.Common;
 using Schemata.Entity.Repository;
 
 namespace Schemata.Report.Tests.Fixtures;
@@ -64,6 +66,10 @@ internal static class ReportRepositoryMocks
         repository.Setup(value => value.AddAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
                   .Callback<TEntity, CancellationToken>((entity, _) => {
                       EnsureOpen();
+                      if (entity is ICanonicalName resource) {
+                          resource.Name ??= $"consumer-{Guid.NewGuid():n}";
+                          resource.CanonicalName = ResourceNameDescriptor.ForType<TEntity>().Resolve(entity);
+                      }
                       pending.Add(entity);
                   })
                   .Returns(Task.CompletedTask);

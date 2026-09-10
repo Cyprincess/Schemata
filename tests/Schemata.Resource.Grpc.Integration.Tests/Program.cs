@@ -56,6 +56,12 @@ builder.UseSchemata(schema => {
 
     // Supply the leaf name before canonical-name advice builds students/{slug}.
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, AdviceAddStudentName>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJob>, AdviceAddResourceName<SchemataJob>>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJobExecution>, AdviceAddResourceName<SchemataJobExecution>>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataProcess>, AdviceAddResourceName<SchemataProcess>>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataProcessToken>, AdviceAddResourceName<SchemataProcessToken>>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataProcessTransition>, AdviceAddResourceName<SchemataProcessTransition>>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataProcessCompensation>, AdviceAddResourceName<SchemataProcessCompensation>>());
 });
 
 var app = builder.Build();

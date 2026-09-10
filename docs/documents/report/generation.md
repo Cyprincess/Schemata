@@ -48,6 +48,22 @@ An inline result that reaches `MaxInlineRows` throws `ReportException` with reas
 into a `JobContext`, triggers `ReportGenerationJob<TReport, TSnapshot, TChunk>`, and returns the
 pending `Operation`. The job writes the eventual snapshot reference or inline response.
 
+For `Sync = true`, the handler calls `IOperationService.ExecuteAsync`. That service commits a
+`Running` execution before invoking inline work. The callback receives the persisted operation,
+sets `ReportExecutionContext.Operation` to its canonical name, and dispatches `RunReportRequest`.
+The snapshot can therefore reference the actual operation while materialization is running. The
+same execution row receives the terminal output or error; cancellation records `Cancelled` and
+rethrows. See [Inline operations](../scheduling/persistence.md#inline-operations).
+
+The application supplies execution names through an
+`IRepositoryAddAdvisor<SchemataJobExecution>` before `AdviceAddCanonicalName.DefaultOrder`
+(120,000,000). `ExecutionUid` is storage identity only. Both generation paths return the persisted
+operation name, rather than predicting `operations/{uid}`; `OperationMapper` has no UID fallback.
+The snapshot and chunk repositories also need consumer naming advisors when `Persist = true`.
+
+Implementation: `src/Schemata.Report.Foundation/Handlers/GenerateHandler.cs` and
+`src/Schemata.Scheduling.Foundation/DefaultOperationService.cs`.
+
 [AIP-151](https://google.aip.dev/151) directs methods that may take significant time to return a
 `google.longrunning.Operation` and use the shared Operations service. Report follows that operation
 model through the Scheduling domain.

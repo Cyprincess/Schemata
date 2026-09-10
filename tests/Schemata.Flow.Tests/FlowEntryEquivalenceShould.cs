@@ -162,13 +162,14 @@ public sealed class FlowEntryEquivalenceShould
     private static ProcessSnapshot Snapshot(SchemataProcess process) {
         var token = new SchemataProcessToken {
             Name          = "t1",
-            CanonicalName = "processes/p1/tokens/t1",
-            Process       = "p1",
+            CanonicalName = $"{process.CanonicalName}/tokens/t1",
+            Process       = process.Name!,
             State         = "Completed",
         };
         var transition = new SchemataProcessTransition {
+            Process       = token.Process,
             Name          = "tr1",
-            CanonicalName = "processes/p1/transitions/tr1",
+            CanonicalName = $"{process.CanonicalName}/transitions/tr1",
             Token         = token.CanonicalName,
         };
         return new() { Process = process, Tokens = [token], Transitions = [transition] };
@@ -182,6 +183,7 @@ public sealed class FlowEntryEquivalenceShould
         repository.Setup(r => r.Begin()).Returns(unitOfWork);
         repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>()))
                   .Returns((T entity, CancellationToken _) => {
+                      FlowTestCreation.Assign(entity);
                       data.Add(entity);
                       return Task.CompletedTask;
                   });

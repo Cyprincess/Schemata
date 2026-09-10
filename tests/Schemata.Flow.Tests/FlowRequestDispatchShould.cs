@@ -97,6 +97,7 @@ public sealed class FlowRequestDispatchShould
         repository.Setup(current => current.Begin()).Returns(Mock.Of<IUnitOfWork>());
         repository.Setup(current => current.AddAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
                   .Returns((TEntity entity, CancellationToken _) => {
+                      FlowTestCreation.Assign(entity);
                       data.Add(entity);
                       return Task.CompletedTask;
                   });

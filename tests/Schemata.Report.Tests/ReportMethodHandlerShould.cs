@@ -41,14 +41,12 @@ public class ReportMethodHandlerShould
         var driver     = ReportTestHost.CreateDriver(ReportTestRows.Create(1));
         var principal  = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity("test"));
         var operations = new Mock<IOperationService>();
-        Guid? uid      = null;
         string? output = null;
-        operations.Setup(service => service.CreateTerminalAsync(
-                      "generate", It.IsAny<string?>(), null, It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
-                  .Returns((string method, string? value, string? error, Guid? operationUid, CancellationToken ct) => {
-                      uid    = operationUid;
-                      output = value;
-                      return ValueTask.FromResult(new Operation { Done = true });
+        operations.Setup(service => service.ExecuteAsync(
+                      "generate", It.IsAny<Func<Operation, CancellationToken, ValueTask<string?>>>(), It.IsAny<CancellationToken>()))
+                  .Returns(async (string method, Func<Operation, CancellationToken, ValueTask<string?>> execute, CancellationToken ct) => {
+                      output = await execute(new() { Name = "consumer-inline", CanonicalName = "operations/consumer-inline" }, ct);
+                      return new Operation { Done = true };
                   });
 
         using var provider = ReportTestHost.Create(
@@ -66,14 +64,13 @@ public class ReportMethodHandlerShould
         await handler.HandleAsync(request, default);
 
         var snapshot = Assert.Single(state.Snapshots);
-        Assert.NotNull(uid);
-        Assert.Equal($"operations/{uid.Value:n}", snapshot.Operation);
+        Assert.Equal("operations/consumer-inline", snapshot.Operation);
         Assert.NotNull(output);
         var terminal = JsonSerializer.Deserialize<ReportOperationOutput>(output!, SchemataJson.Default);
         Assert.NotNull(terminal);
         Assert.Equal(snapshot.CanonicalName, terminal.Snapshot);
-        operations.Verify(service => service.CreateTerminalAsync(
-            "generate", output, null, uid, It.IsAny<CancellationToken>()), Times.Once);
+        operations.Verify(service => service.ExecuteAsync(
+            "generate", It.IsAny<Func<Operation, CancellationToken, ValueTask<string?>>>(), It.IsAny<CancellationToken>()), Times.Once);
         driver.Verify(value => value.ExecuteAsync(
                           It.IsAny<SubPlan>(),
                           It.IsAny<QueryInsightRequest>(),

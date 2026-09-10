@@ -166,7 +166,9 @@ public class BpmnEngine_CallActivityShould
                 DefinitionName = "parent",
             };
 
-            return await Engine.StartAsync(ParentDefinition, process, Context(), CancellationToken.None);
+            var snapshot = await Engine.StartAsync(ParentDefinition, process, Context(), CancellationToken.None);
+            await PersistAsync(snapshot, CancellationToken.None);
+            return snapshot;
         }
 
         public async Task CompleteChildAsync() {
@@ -211,7 +213,22 @@ public class BpmnEngine_CallActivityShould
             };
         }
 
-        private FlowExecutionContext Context() { return new(new Mock<IUnitOfWork>(MockBehavior.Strict).Object, Services); }
+        private FlowExecutionContext Context() {
+            return Schemata.Flow.Tests.FlowTestCreation.Context(
+                new Mock<IUnitOfWork>(MockBehavior.Strict).Object, Services, persist: PersistAsync);
+        }
+
+        private Task PersistAsync(ProcessSnapshot snapshot, CancellationToken ct) {
+            Upsert(Processes, snapshot.Process, p => p.CanonicalName);
+            foreach (var token in snapshot.Tokens) {
+                Upsert(Tokens, token, t => t.CanonicalName);
+            }
+            foreach (var transition in snapshot.Transitions) {
+                Schemata.Flow.Tests.FlowTestCreation.Assign(transition);
+                Transitions.Add(transition);
+            }
+            return Task.CompletedTask;
+        }
 
         private static Mock<IRepository<TEntity>> CreateRepository<TEntity>(List<TEntity> rows)
             where TEntity : class {

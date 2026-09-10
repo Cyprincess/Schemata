@@ -38,14 +38,14 @@ public class IdentitySubjectProviderShould
     [Fact]
     public async Task Resolve_Guid_Subject_Through_Id_Lookup() {
         var uid  = Guid.NewGuid();
-        var user = new SchemataUser { Uid = uid, UserName = "alice" };
+        var user = new SchemataUser { Uid = uid, UserName = "alice", Name = "assigned", CanonicalName = "users/assigned" };
         var store = NewStore();
         store.Setup(s => s.FindByIdAsync(uid.ToString(), It.IsAny<CancellationToken>()))
              .ReturnsAsync(user);
 
         var claims = await NewProvider(store).GetClaimsAsync($"users/{uid}");
 
-        Assert.Contains(claims, c => c.Type == "sub" && c.Value == $"users/{uid}");
+        Assert.Contains(claims, c => c.Type == "sub" && c.Value == "users/assigned");
         store.Verify(s => s.FindByCanonicalNameAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 

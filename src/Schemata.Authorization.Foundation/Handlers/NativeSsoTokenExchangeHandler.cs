@@ -105,10 +105,6 @@ public sealed class NativeSsoTokenExchangeHandler<TApp> : ITokenExchangeHandler<
                 SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT));
         }
 
-        var sourceClientId = DeviceSecretBinding.ClientId(deviceToken);
-        var source = string.IsNullOrWhiteSpace(sourceClientId)
-            ? null
-            : await _apps.FindByClientIdAsync(sourceClientId, ct);
         // §4.3 step 2: id_token signature verified; lifetime intentionally NOT checked.
         var idPrincipal = await _issuer.Validate(request.SubjectToken, audience: null, lifetime: false);
         if (idPrincipal is null) {
@@ -117,7 +113,9 @@ public sealed class NativeSsoTokenExchangeHandler<TApp> : ITokenExchangeHandler<
         }
 
         var aud = idPrincipal.FindFirstValue(Claims.Audience);
-        if (source is null || !string.Equals(aud, source.ClientId, StringComparison.Ordinal)) {
+        var source = string.IsNullOrWhiteSpace(aud) ? null : await _apps.FindByClientIdAsync(aud, ct);
+        if (source is null || string.IsNullOrWhiteSpace(source.CanonicalName)
+            || !string.Equals(deviceToken.Application, source.CanonicalName, StringComparison.Ordinal)) {
             throw new OAuthException(
                 OAuthErrors.InvalidGrant,
                 SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT));

@@ -58,7 +58,7 @@ public sealed class DPopProofValidator(
     /// <param name="htu">HTTP target URI of the current request; query and fragment are normalized away before comparison (§4.3 step 9).</param>
     /// <param name="accessToken">Access token presented with the request; <see langword="null" /> at the token endpoint. Present values enable the §4.3 step 12 <c>ath</c> check.</param>
     /// <param name="nonceProvider">DPoP nonce store provider (<c>dpop</c> at the authorization server, <c>dpop-rs</c> at a resource server); <see langword="null" /> skips the §4.3 step 10 nonce check.</param>
-    /// <param name="nonceName">Required client or application identifier naming the nonce slot; consulted only when <paramref name="nonceProvider" /> is supplied.</param>
+    /// <param name="key">Required client or application identifier naming the nonce slot; consulted only when <paramref name="nonceProvider" /> is supplied.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <exception cref="OAuthException">With <see cref="OAuthErrors.InvalidDpopProof" />, or <see cref="OAuthErrors.UseDpopNonce" /> for the nonce step.</exception>
     public async Task<string> ValidateAsync(
@@ -67,7 +67,7 @@ public sealed class DPopProofValidator(
         Uri               htu,
         string?           accessToken,
         string?           nonceProvider,
-        string            nonceName,
+        string            key,
         CancellationToken ct = default
     ) {
         // §4.3 step 2: a single and well-formed JWT.
@@ -129,11 +129,11 @@ public sealed class DPopProofValidator(
         }
 
         // §4.3 step 6: the signature must verify with the public key from the jwk.
-        var key = VerificationKey(jwk);
-        if (key is null
+        var verificationKey = VerificationKey(jwk);
+        if (verificationKey is null
          || !(await Handler.ValidateTokenAsync(proof, new() {
                 ValidAlgorithms       = [algorithm],
-                IssuerSigningKey      = key,
+                IssuerSigningKey      = verificationKey,
                 ValidateIssuer        = false,
                 ValidateAudience      = false,
                 ValidateLifetime      = false,
@@ -183,7 +183,7 @@ public sealed class DPopProofValidator(
         // §4.3 step 10 (§8): a required nonce must match the current server value.
         if (nonceProvider is not null) {
             var stored = await nonces.GetOrCreateAsync(
-                null, nonceProvider, nonceName, null, options.Value.NonceLifetime, ct);
+                null, nonceProvider, key, null, options.Value.NonceLifetime, ct);
             if (!token.TryGetPayloadValue<string>("nonce", out var nonce) || !string.Equals(nonce, stored.Value, StringComparison.Ordinal)) {
                 throw new OAuthException(
                     OAuthErrors.UseDpopNonce,

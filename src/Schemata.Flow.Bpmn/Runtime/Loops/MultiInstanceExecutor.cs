@@ -261,6 +261,7 @@ public sealed class MultiInstanceExecutor
             ct.ThrowIfCancellationRequested();
 
             var child = NewInstanceToken(process, parent, activity, i);
+            await context.CreateTokenAsync(child, ct);
             working.Add(child);
             transitions.Add(BpmnEngine.NewTransition(
                 process.Name!,

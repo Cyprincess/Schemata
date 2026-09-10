@@ -147,7 +147,7 @@ public class PrivateKeyJwtShould
                 }
 
                 burned = true;
-                return new() { Parent = parent, Provider = provider, Name = name, Value = marker };
+                return new() { Parent = parent, Provider = provider, Key = name, Value = marker };
             });
         var subject = CreateSubject(app, assertions: new(slots.Object, new FakeTimeProvider(Now)));
 
@@ -256,6 +256,7 @@ public class PrivateKeyJwtShould
         return new() {
             Uid        = Guid.NewGuid(),
             ClientId   = ClientId,
+            CanonicalName = "applications/client-resource",
             ClientType = ClientTypes.Confidential,
         };
     }
@@ -263,8 +264,8 @@ public class PrivateKeyJwtShould
     private SchemataSecurity JwksRow(string jwks, string? status = null) {
         return new() {
             Uid    = Guid.NewGuid(),
-            Parent = SecurityParents.Application(new() { ClientId = ClientId }),
-            Name   = ClientId,
+            Parent = "applications/client-resource",
+            Key    = ClientId,
             Kind   = SecurityConstants.Kinds.Jwks,
             Usage  = SecurityConstants.Usages.Authentication,
             Value  = jwks,
@@ -275,8 +276,8 @@ public class PrivateKeyJwtShould
     private SchemataSecurity JwksUriRow(string uri) {
         return new() {
             Uid    = Guid.NewGuid(),
-            Parent = SecurityParents.Application(new() { ClientId = ClientId }),
-            Name   = ClientId,
+            Parent = "applications/client-resource",
+            Key    = ClientId,
             Kind   = SecurityConstants.Kinds.JwksUri,
             Usage  = SecurityConstants.Usages.Authentication,
             Value  = uri,
@@ -344,7 +345,7 @@ public class PrivateKeyJwtShould
                      It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(),
                      It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string? parent, string provider, string name, string? marker, TimeSpan _, CancellationToken _) =>
-                new() { Parent = parent, Provider = provider, Name = name, Value = marker });
+                new() { Parent = parent, Provider = provider, Key = name, Value = marker });
 
         return new(slots.Object, new FakeTimeProvider(Now));
     }

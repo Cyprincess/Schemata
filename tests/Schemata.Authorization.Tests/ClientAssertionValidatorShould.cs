@@ -99,7 +99,7 @@ public class ClientAssertionValidatorShould
                     It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(),
                     It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
            .ReturnsAsync((string? parent, string provider, string name, string? marker, TimeSpan _, CancellationToken _) =>
-                new() { Parent = parent, Provider = provider, Name = name, Value = marker });
+                new() { Parent = parent, Provider = provider, Key = name, Value = marker });
     }
 
     [Fact]
@@ -298,7 +298,7 @@ public class ClientAssertionValidatorShould
                      It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
              .Callback((string? _, string _, string _, string? _, TimeSpan lifetime, CancellationToken _) => captured.Add(lifetime))
              .ReturnsAsync((string? parent, string provider, string name, string? marker, TimeSpan _, CancellationToken _) =>
-                new() { Parent = parent, Provider = provider, Name = name, Value = marker });
+                new() { Parent = parent, Provider = provider, Key = name, Value = marker });
         var validator = Validator(slots);
 
         var first = await Validate(validator, Mint(expires: Now.AddMinutes(2)));

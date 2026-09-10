@@ -205,7 +205,7 @@ public class AdviceRequestDpopShould
         var slots = new Mock<ITokenStore<SchemataToken>>();
         slots.Setup(value => value.GetOrCreateAsync(
                     null, "dpop", It.IsAny<string>(), null, It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new SchemataToken { Parent = null, Provider = "dpop", Name = "client-1", Value = ServerNonce });
+            .ReturnsAsync(new SchemataToken { Parent = null, Provider = "dpop", Key = "client-1", Value = ServerNonce });
         return slots;
     }
 

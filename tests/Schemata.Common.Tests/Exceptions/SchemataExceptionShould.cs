@@ -171,8 +171,7 @@ public class SchemataExceptionShould
 
     [Fact]
     public void CreateErrorResponse_MissingErrorInfo_LocalizesAutoInsertedInternal() {
-        var exception = new SchemataException(500, ErrorCodes.Internal);
-        exception.Details = [];
+        var exception = new SchemataException(500, ErrorCodes.Internal) { Details = [] };
 
         var details = GetDetails(exception.CreateErrorResponse(locale: "en-US"));
 

@@ -49,21 +49,13 @@ public sealed class GenerateHandler<TReport, TSnapshot, TChunk>(
             return OperationMapper.FromExecution(scheduled);
         }
 
-        var uid = Guid.NewGuid();
         try {
-            execution.Operation = $"operations/{uid:n}";
-            var result = await dispatcher.SendAsync<RunReportRequest, ReportResult>(
-                new(reportRequest, request.Principal), ct);
-            return await operationService.CreateTerminalAsync(
-                       Verbs.Generate,
-                       JsonSerializer.Serialize(Output(result), SchemataJson.Default),
-                       null,
-                       uid,
-                       ct);
-        } catch (OperationCanceledException) {
-            throw;
-        } catch (Exception exception) {
-            return await operationService.CreateTerminalAsync(Verbs.Generate, null, exception.Message, uid, ct);
+            return await operationService.ExecuteAsync(Verbs.Generate, async (operation, token) => {
+                execution.Operation = operation.CanonicalName;
+                var result = await dispatcher.SendAsync<RunReportRequest, ReportResult>(
+                    new(reportRequest, request.Principal), token);
+                return JsonSerializer.Serialize(Output(result), SchemataJson.Default);
+            }, ct);
         } finally {
             execution.Operation = null;
         }

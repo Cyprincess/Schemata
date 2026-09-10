@@ -194,9 +194,7 @@ public class CelCompilerShould
 
     [Fact]
     public void Compile_CustomFunction_BindsAtCompileTime() {
-        var options = new ExpressionCompileOptions();
-        options.Functions["startsWith"]
-            = new(args => Expression.Call(args[0], nameof(string.StartsWith), null, args[1]));
+        var options = new ExpressionCompileOptions { Functions = { ["startsWith"] = new(args => Expression.Call(args[0], nameof(string.StartsWith), null, args[1])) } };
 
         var tree       = _compiler.Parse("startsWith(full_name, 'Al')");
         var expression = _compiler.Compile<Student, bool>(tree, options);
@@ -208,10 +206,8 @@ public class CelCompilerShould
 
     [Fact]
     public void Compile_CustomFunctionCacheKey_UsesFunctionIdentity() {
-        var first = new ExpressionCompileOptions();
-        first.Functions["classify"] = new(args => Expression.Call(args[0], nameof(string.StartsWith), null, args[1]));
-        var second = new ExpressionCompileOptions();
-        second.Functions["classify"] = new(args => Expression.Call(args[0], nameof(string.EndsWith), null, args[1]));
+        var first  = new ExpressionCompileOptions { Functions = { ["classify"] = new(args => Expression.Call(args[0], nameof(string.StartsWith), null, args[1])) } };
+        var second = new ExpressionCompileOptions { Functions = { ["classify"] = new(args => Expression.Call(args[0], nameof(string.EndsWith), null, args[1])) } };
 
         var tree       = _compiler.Parse("classify(full_name, 'ice')");
         var startsWith = _compiler.Compile<Student, bool>(tree, first).Compile();
