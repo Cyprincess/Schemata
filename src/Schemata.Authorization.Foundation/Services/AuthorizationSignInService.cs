@@ -163,7 +163,7 @@ public sealed class AuthorizationSignInService<TApp>(
             ? new(null, await IssueCallbackAsync(
                 client, scope, subject, app, authorizationName, sid, items, access, id, ctx, ct))
             : new(await IssueTokenAsync(
-                subject, app, authorizationName, sid, scope, items, access, id, binding, ctx, ct), null);
+                subject, app, authorizationName, sid, scope, items, access, id, binding, ct), null);
     }
 
     private async Task<TokenResponse> IssueTokenAsync(
@@ -176,7 +176,6 @@ public sealed class AuthorizationSignInService<TApp>(
         List<Claim>                  access,
         List<Claim>                  id,
         DpopBinding?                 binding,
-        AdviceContext                ctx,
         CancellationToken            ct
     ) {
         var at = await SchemataAuthenticationHandler<TApp>.CreateTokenAsync(
@@ -200,13 +199,14 @@ public sealed class AuthorizationSignInService<TApp>(
         if (ScopeParser.Contains(scope, Scopes.OpenId)
          && SchemataAuthenticationHandler<TApp>.IsUserGrant(items)) {
             var idClaims = id;
-            if (ctx.TryGet<DeviceSecretIssuance>(out var foundDeviceSecret) && foundDeviceSecret is { } deviceSecret) {
-                response.DeviceSecret = deviceSecret.DeviceSecret;
+            if (items.TryGetValue(Properties.DeviceSecret, out var deviceSecret)
+             && !string.IsNullOrWhiteSpace(deviceSecret)) {
+                response.DeviceSecret = deviceSecret;
                 idClaims = [..id];
                 var signing = await issuer.ResolveSigningCredentials(ct);
-                idClaims.Add(new Claim(Claims.DsHash, TokenService.ComputeHash(deviceSecret.DeviceSecret, signing)));
-                if (!string.IsNullOrWhiteSpace(deviceSecret.SessionId)) {
-                    idClaims.Add(new Claim(Claims.SessionId, deviceSecret.SessionId));
+                idClaims.Add(new Claim(Claims.DsHash, TokenService.ComputeHash(deviceSecret, signing)));
+                if (!string.IsNullOrWhiteSpace(sid)) {
+                    idClaims.Add(new Claim(Claims.SessionId, sid));
                 }
             }
 

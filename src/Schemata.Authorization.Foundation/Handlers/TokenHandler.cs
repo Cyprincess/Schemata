@@ -7,6 +7,7 @@ using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Commands;
+using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Authorization.Skeleton.Models;
@@ -66,6 +67,18 @@ public sealed class TokenHandler(IServiceProvider sp) : TokenEndpoint
             }
 
             result.Properties[Properties.DpopJkt] = binding.Jkt;
+        }
+
+        if (result.Status == AuthorizationStatus.SignIn
+         && ctx.TryGet<DeviceSecretIssuance>(out var deviceSecret)
+         && deviceSecret is not null) {
+            if (result.Properties is null) {
+                throw new InvalidOperationException(
+                    "The sign-in result carries no properties to attach the device secret to.");
+            }
+
+            result.Properties[Properties.DeviceSecret] = deviceSecret.DeviceSecret;
+            result.Properties[Properties.SessionId] = deviceSecret.SessionId;
         }
 
         return result;

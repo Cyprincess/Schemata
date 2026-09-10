@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Moq;
@@ -35,6 +36,8 @@ public class RequestObjectReaderShould
     private const string ClientId = "client-1";
     private const string Issuer   = "https://as.example";
     private const string KeyId    = "jar-key";
+
+    private static readonly DateTimeOffset Now = new(2026, 9, 10, 12, 0, 0, TimeSpan.Zero);
 
     private const string PrivateKey = """
         -----BEGIN PRIVATE KEY-----
@@ -220,7 +223,136 @@ public class RequestObjectReaderShould
         Assert.Equal(OAuthErrors.InvalidRequest, exception.Status);
     }
 
-    private static RequestObjectReader<SchemataApplication> Reader(JwtSecuredAuthorizationRequestsOptions? options = null) {
+    [Theory]
+    [MemberData(nameof(LifetimeBoundaries))]
+    public async Task Enforce_Lifetime_Skew_Including_Fractional_Seconds(
+        bool signed, string claim, decimal offset, bool accepted
+    ) {
+        var claims = BaseClaims();
+        claims[claim] = Now.ToUnixTimeSeconds() + offset;
+        claims[Parameters.State] = "object-state";
+        var assertion = signed ? Mint(claims) : Unsigned(claims);
+        var target = Query();
+        target.State = "query-state";
+
+        if (accepted) {
+            await Reader().ReadAsync(assertion, Application(), target, true, CancellationToken.None);
+
+            Assert.Equal("object-state", target.State);
+        } else {
+            var exception = await Assert.ThrowsAsync<OAuthException>(() =>
+                Reader().ReadAsync(assertion, Application(), target, true, CancellationToken.None));
+
+            Assert.Equal(OAuthErrors.InvalidRequestObject, exception.Status);
+            Assert.Equal("query-state", target.State);
+            Assert.Equal("request-object", target.Request);
+        }
+    }
+
+    public static IEnumerable<object[]> LifetimeBoundaries() {
+        foreach (var signed in new[] { true, false }) {
+            yield return [signed, "exp", -61m, false];
+            yield return [signed, "exp", -60.5m, false];
+            yield return [signed, "exp", -60m, false];
+            yield return [signed, "exp", -59.5m, true];
+            yield return [signed, "nbf", 59.5m, true];
+            yield return [signed, "nbf", 60m, true];
+            yield return [signed, "nbf", 60.5m, false];
+            yield return [signed, "nbf", 61m, false];
+        }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Accept_An_Object_Without_Optional_Lifetime_Claims(bool signed) {
+        var claims = BaseClaims();
+        claims[Parameters.State] = "object-state";
+        var assertion = signed ? Mint(claims) : Unsigned(claims);
+        var target = Query();
+
+        await Reader().ReadAsync(assertion, Application(), target, true, CancellationToken.None);
+
+        Assert.Equal("object-state", target.State);
+        Assert.Equal("openid profile", target.Scope);
+    }
+
+    [Theory]
+    [MemberData(nameof(MalformedDates))]
+    public async Task Reject_Malformed_Present_Dates_Without_Merging(bool signed, string claim, string value) {
+        var claims = BaseClaims();
+        claims[claim] = JsonSerializer.Deserialize<JsonElement>(value);
+        claims[Parameters.State] = "object-state";
+        claims[Parameters.Scope] = "openid object-scope";
+        var assertion = signed ? Mint(claims) : Unsigned(claims);
+        var target = Query();
+        target.State = "query-state";
+        target.RedirectUri = "https://query.example/callback";
+
+        var exception = await Assert.ThrowsAsync<OAuthException>(() =>
+            Reader().ReadAsync(assertion, Application(), target, true, CancellationToken.None));
+
+        Assert.Equal(OAuthErrors.InvalidRequestObject, exception.Status);
+        Assert.Equal("query-state", target.State);
+        Assert.Equal("openid profile", target.Scope);
+        Assert.Equal("https://query.example/callback", target.RedirectUri);
+        Assert.Equal("request-object", target.Request);
+    }
+
+    public static IEnumerable<object[]> MalformedDates() {
+        foreach (var signed in new[] { true, false }) {
+            foreach (var claim in new[] { "exp", "nbf" }) {
+                foreach (var value in new[] {
+                             "\"1790000000\"", "null", "true", "[]", "{}",
+                             "1e400", "-1e400", "253402300800", "-62135596801",
+                         }) {
+                    yield return [signed, claim, value];
+                }
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Reject_Not_Before_After_Expiration_Even_Within_Clock_Skew(bool signed) {
+        var claims = BaseClaims();
+        claims["exp"] = Now.ToUnixTimeSeconds() + 0.25m;
+        claims["nbf"] = Now.ToUnixTimeSeconds() + 0.5m;
+        var assertion = signed ? Mint(claims) : Unsigned(claims);
+
+        var exception = await Assert.ThrowsAsync<OAuthException>(() =>
+            Reader().ReadAsync(assertion, Application(), Query(), true, CancellationToken.None));
+
+        Assert.Equal(OAuthErrors.InvalidRequestObject, exception.Status);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Treat_Negative_Numeric_Dates_As_Dates_Before_The_Epoch(bool signed) {
+        var claims = BaseClaims();
+        claims["nbf"] = -61.5m;
+        claims["exp"] = -0.5m;
+        claims[Parameters.State] = "object-state";
+        var assertion = signed ? Mint(claims) : Unsigned(claims);
+        var target = Query();
+        var clock = new FakeTimeProvider(DateTimeOffset.UnixEpoch);
+        var reader = Reader(time: clock);
+
+        await reader.ReadAsync(assertion, Application(), target, true, CancellationToken.None);
+        Assert.Equal("object-state", target.State);
+
+        clock.Advance(TimeSpan.FromSeconds(60));
+        var exception = await Assert.ThrowsAsync<OAuthException>(() =>
+            reader.ReadAsync(assertion, Application(), Query(), true, CancellationToken.None));
+
+        Assert.Equal(OAuthErrors.InvalidRequestObject, exception.Status);
+    }
+
+    private static RequestObjectReader<SchemataApplication> Reader(
+        JwtSecuredAuthorizationRequestsOptions? options = null, TimeProvider? time = null
+    ) {
         var row = new SchemataSecurity {
             Uid       = Guid.Parse("33333333-3333-3333-3333-333333333333"),
             Parent    = "applications/" + ClientId,
@@ -250,7 +382,8 @@ public class RequestObjectReaderShould
             http.Object,
             cache.Object,
             securities.Object,
-            new ClientAssertionChannel());
+            new ClientAssertionChannel(),
+            time ?? new FakeTimeProvider(Now));
     }
 
     private static JwtSecuredAuthorizationRequestsOptions Options() {
@@ -292,14 +425,12 @@ public class RequestObjectReaderShould
             KeyId = KeyId,
             CryptoProviderFactory = new CryptoProviderFactory { CacheSignatureProviders = false },
         };
-        return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor {
-            Claims             = claims,
-            SigningCredentials = new(key, SigningAlgorithms.RsaSha256),
-        });
+        return new JsonWebTokenHandler { SetDefaultTimesOnTokenCreation = false }.CreateToken(
+            JsonSerializer.Serialize(claims), new SigningCredentials(key, SigningAlgorithms.RsaSha256));
     }
 
     private static string Unsigned(Dictionary<string, object> claims) {
-        return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor { Claims = claims });
+        return new JsonWebTokenHandler { SetDefaultTimesOnTokenCreation = false }.CreateToken(JsonSerializer.Serialize(claims));
     }
 
     private static string Jwks() {

@@ -144,6 +144,7 @@ public sealed class PairwiseSubjectTranslator<TApp> : IPairwiseSubjectTranslator
         }
 
         await _mappings.AddAsync(new() {
+            Name            = Guid.NewGuid().ToString("n"),
             Application     = key,
             Subject         = subject,
             PairwiseSubject = pairwise,

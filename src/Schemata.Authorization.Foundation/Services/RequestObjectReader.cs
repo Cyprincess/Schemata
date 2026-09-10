@@ -36,9 +36,12 @@ public sealed class RequestObjectReader<TApp>(
     IHttpClientFactory                     http,
     ICacheProvider                         cache,
     ISecurityStore<SchemataSecurity>       securities,
-    ClientAssertionChannel                 channel
+    ClientAssertionChannel                 channel,
+    TimeProvider?                          time = null
 ) where TApp : SchemataApplication
 {
+
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
 
     /// <summary>
     ///     Verifies the signed request JWT and folds its claims into <paramref name="target" />,
@@ -108,6 +111,17 @@ public sealed class RequestObjectReader<TApp>(
             } catch (OperationCanceledException) when (ct.IsCancellationRequested) {
                 throw;
             } catch (Exception) {
+                throw InvalidRequestObject();
+            }
+        }
+
+        // IdentityModel coerces registered NumericDate claims to long; validate the original JSON.
+        using (var payload = JsonDocument.Parse(Base64UrlEncoder.DecodeBytes(jwt.EncodedPayload))) {
+            var exp = ReadNumericDate(payload.RootElement, JwtRegisteredClaimNames.Exp);
+            var nbf = ReadNumericDate(payload.RootElement, JwtRegisteredClaimNames.Nbf);
+            var now = (_time.GetUtcNow() - DateTimeOffset.UnixEpoch).Ticks / (decimal)TimeSpan.TicksPerSecond;
+            const decimal skew = 60;
+            if (exp <= now - skew || nbf > now + skew || nbf > exp) {
                 throw InvalidRequestObject();
             }
         }
@@ -249,6 +263,21 @@ public sealed class RequestObjectReader<TApp>(
         return server.Contains(application.RequestObjectSigningAlg)
             ? new HashSet<string>([application.RequestObjectSigningAlg], StringComparer.Ordinal)
             : [];
+    }
+
+    private static decimal? ReadNumericDate(JsonElement payload, string name) {
+        if (!payload.TryGetProperty(name, out var value)) {
+            return null;
+        }
+
+        if (value.ValueKind != JsonValueKind.Number
+            || !value.TryGetDecimal(out var seconds)
+            || seconds < (DateTimeOffset.MinValue - DateTimeOffset.UnixEpoch).Ticks / (decimal)TimeSpan.TicksPerSecond
+            || seconds > (DateTimeOffset.MaxValue - DateTimeOffset.UnixEpoch).Ticks / (decimal)TimeSpan.TicksPerSecond) {
+            throw InvalidRequestObject();
+        }
+
+        return seconds;
     }
 
     private static OAuthException InvalidRequestObject() {

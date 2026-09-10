@@ -189,6 +189,40 @@ grant runs, the `ITokenRequestAdvisor<TApp>` chain validates the request:
 | `AdviceRequestGrantPermission<TApp>`    | The client holds `g:{grant_type}`                           |
 | `AdviceRequestScopeValidation<TApp>`    | Requested scopes are within the client's `s:{scope}` grants |
 
+### Native SSO issuance
+
+`UseNativeSingleSignOn()` routes the ID-token/device-secret exchange through
+`NativeSsoTokenExchangeHandler` and the shared `AuthorizationSignInService`. The issuer applies
+the configured access-token format, claims advisors, destinations, and target-client subject
+projection. Reference access tokens persist a signed payload for authentication and introspection.
+
+The handler resolves the canonical subject from valid, unexpired tokens belonging to the source
+application and session. Their non-empty owner references must agree, and the source-client subject
+projection must match the presented ID token. A null token expiry represents an unbounded lifetime;
+an expiry at or before the current time cannot establish an active session. Session enumeration
+used by logout retains its existing status-based behavior.
+
+During refresh, `AdviceRefreshTokenDeviceSecret` searches by session and checks the secret's
+application, session, resolved device, status, and expiry. Existing records with a null `Parent`
+remain eligible. `TokenHandler` carries the selected secret and session in sign-in properties so
+the response issuer can return the secret together with an ID token containing `ds_hash` and `sid`.
+Native token exchange follows the shared ID/refresh-token grant and scope rules; it does not
+rotate or echo the device secret.
+
+### Request Object lifetime
+
+`RequestObjectReader` validates optional `exp` and `nbf` NumericDate claims before merging request
+parameters. The check applies to signed objects and to unsigned objects permitted by the signing
+policy. A one-minute clock tolerance applies: `exp <= now - 60 seconds`,
+`nbf > now + 60 seconds`, or `nbf > exp` produces `invalid_request_object`. Present values must
+be JSON numbers within the supported date range; malformed values are rejected rather than treated
+as absent. Fractional seconds are retained for comparison.
+
+PAR restores the original Request Object and runs the reader again during authorization, so a
+still-valid PAR handle does not extend the JWT's lifetime. These checks implement the optional
+claim semantics in [RFC 7519 §§4.1.4–4.1.5](https://www.rfc-editor.org/rfc/rfc7519.html#section-4.1.4);
+they do not require `exp`, `nbf`, or `jti` to be present.
+
 ## Advisor families
 
 Six advisor families extend the pipeline; all are registered via `TryAddEnumerable` and run as

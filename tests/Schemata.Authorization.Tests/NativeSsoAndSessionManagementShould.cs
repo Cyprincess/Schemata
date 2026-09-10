@@ -231,8 +231,7 @@ public class DeviceSsoShould
         var app      = NativeApplication("native-client");
         var existing = DeviceSecret("secret-1", app.CanonicalName!, "sid-1", "device-1");
         var tokens   = NewTokenStore();
-        tokens.Setup(t => t.ListByParentAsync(app.CanonicalName, TokenTypes.DeviceSecret,
-                                              It.IsAny<CancellationToken>()))
+        tokens.Setup(t => t.ListBySessionAsync("sid-1", It.IsAny<CancellationToken>()))
               .Returns(Enumerate(existing));
         var devices = new Mock<IDeviceIdResolver>();
         devices.Setup(d => d.ResolveAsync(null, null, It.IsAny<CancellationToken>())).ReturnsAsync("device-1");
@@ -252,8 +251,7 @@ public class DeviceSsoShould
     public async Task Issue_One_Bound_Device_Secret_When_Refresh_Has_None() {
         var app    = NativeApplication("native-client");
         var tokens = NewTokenStore();
-        tokens.Setup(t => t.ListByParentAsync(app.CanonicalName, TokenTypes.DeviceSecret,
-                                              It.IsAny<CancellationToken>()))
+        tokens.Setup(t => t.ListBySessionAsync("sid-1", It.IsAny<CancellationToken>()))
               .Returns(Enumerate<SchemataToken>());
         SchemataToken? created = null;
         tokens.Setup(t => t.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>()))
@@ -297,14 +295,12 @@ public class DeviceSsoShould
             new(IdentityClaims.Subject, "user-1"),
             new(Claims.ClientId, app.ClientId!),
         ], "grant"));
-        var ctx = new AdviceContext(provider);
-        ctx.Set(new DeviceSecretIssuance("device-secret-1", "device-1", app.CanonicalName, "sid-1"));
-        using var ambient = AdviceContext.Establish(ctx);
 
         var issued = await service.IssueAsync(principal, new Dictionary<string, string?> {
             [Properties.GrantType] = GrantTypes.AuthorizationCode,
             [Properties.Scope]     = $"{Scopes.OpenId} {Scopes.DeviceSso}",
             [Properties.SessionId] = "sid-1",
+            [Properties.DeviceSecret] = "device-secret-1",
         }, AuthorizationSignInResponseKind.Token);
 
         Assert.NotNull(issued.Token);
@@ -322,6 +318,8 @@ public class DeviceSsoShould
             new Dictionary<string, string?> {
                 [Properties.GrantType] = GrantTypes.AuthorizationCode,
                 [Properties.Scope]     = Scopes.DeviceSso,
+                [Properties.DeviceSecret] = "device-secret-1",
+                [Properties.SessionId] = "sid-1",
             },
             AuthorizationSignInResponseKind.Token);
         Assert.NotNull(withoutOpenId.Token);
@@ -330,26 +328,26 @@ public class DeviceSsoShould
     }
 
     [Fact]
-    public async Task Exchange_A_Valid_Native_Sso_Profile_For_A_Bearer_Access_Token() {
-        var fixture = await NativeExchangeFixture();
+    public async Task Return_A_Canonical_SignIn_For_A_Valid_Native_Sso_Profile() {
+        using var fixture = await NativeExchangeFixture();
+        fixture.Request.Resource = ["https://resource.example/api"];
 
         var result = await fixture.Handler.HandleAsync(fixture.Target, fixture.Request, null, CancellationToken.None);
 
-        var response = Assert.IsType<TokenResponse>(result.Data);
-        Assert.Equal(Schemes.Bearer, response.TokenType);
-        Assert.Equal(TokenTypeUris.AccessToken, response.IssuedTokenType);
-        Assert.False(string.IsNullOrWhiteSpace(response.AccessToken));
-        Assert.Equal("openid profile", response.Scope);
-        var created = Assert.Single(fixture.Created);
-        Assert.Equal(response.AccessToken, created.ReferenceId);
-        Assert.Equal(fixture.Target.CanonicalName, created.Application);
-        Assert.Equal("sid-1", created.SessionId);
-        Assert.Equal("user-1", created.Parent);
+        Assert.Equal(AuthorizationStatus.SignIn, result.Status);
+        Assert.Equal("user-1", result.Principal!.FindFirstValue(IdentityClaims.Subject));
+        Assert.Equal(fixture.Target.ClientId, result.Principal!.FindFirstValue(Claims.ClientId));
+        Assert.Equal(GrantTypes.TokenExchange, result.Properties![Properties.GrantType]);
+        Assert.Equal("openid profile", result.Properties[Properties.Scope]);
+        Assert.Equal("sid-1", result.Properties[Properties.SessionId]);
+        Assert.Equal("https://resource.example/api", result.Properties[Properties.Resources]);
+        Assert.Equal(TokenTypeUris.AccessToken, result.Properties[Properties.IssuedTokenType]);
+        Assert.Empty(fixture.Created);
     }
 
     [Fact]
     public async Task Reject_Native_Sso_Exchange_With_An_Unknown_Device_Secret() {
-        var fixture = await NativeExchangeFixture();
+        using var fixture = await NativeExchangeFixture();
         fixture.Tokens.Setup(t => t.FindByReferenceIdAsync("device-secret-1", It.IsAny<CancellationToken>()))
                .ReturnsAsync((SchemataToken?)null);
 
@@ -362,7 +360,7 @@ public class DeviceSsoShould
 
     [Fact]
     public async Task Reject_Native_Sso_Exchange_When_The_Id_Token_Signature_Is_Invalid() {
-        var fixture      = await NativeExchangeFixture();
+        using var fixture = await NativeExchangeFixture();
         var foreignIssuer = TestSecurityKeys.CreateTokenService(
             new SchemataAuthorizationOptions { Issuer = Issuer }, time: FixedTime());
         fixture.Request.SubjectToken = await foreignIssuer.CreateToken([
@@ -380,7 +378,7 @@ public class DeviceSsoShould
 
     [Fact]
     public async Task Reject_Native_Sso_Exchange_When_The_Device_Secret_Hash_Does_Not_Match() {
-        var fixture = await NativeExchangeFixture(dsHash: "wrong-hash");
+        using var fixture = await NativeExchangeFixture(dsHash: "wrong-hash");
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => fixture.Handler.HandleAsync(
             fixture.Target, fixture.Request, null, CancellationToken.None));
@@ -391,7 +389,7 @@ public class DeviceSsoShould
 
     [Fact]
     public async Task Reject_Native_Sso_Exchange_When_The_Session_Has_No_Live_Token() {
-        var fixture = await NativeExchangeFixture();
+        using var fixture = await NativeExchangeFixture();
         fixture.Tokens.Setup(t => t.ListBySessionAsync("sid-1", It.IsAny<CancellationToken>()))
                .Returns(Enumerate(new SchemataToken {
                    Type = TokenTypes.AccessToken, Status = TokenStatuses.Revoked, SessionId = "sid-1",
@@ -405,13 +403,96 @@ public class DeviceSsoShould
     }
 
     [Theory]
+    [InlineData("expired")]
+    [InlineData("exact-now")]
+    [InlineData("revoked")]
+    [InlineData("foreign-client")]
+    [InlineData("missing-parent")]
+    [InlineData("subject-mismatch")]
+    public async Task Reject_A_Session_Without_A_Live_Source_Subject_Binding(string reason) {
+        using var fixture = await NativeExchangeFixture();
+        var row = SessionToken(fixture.Source);
+        switch (reason) {
+            case "expired": row.ExpireTime = Now.UtcDateTime.AddSeconds(-1); break;
+            case "exact-now": row.ExpireTime = Now.UtcDateTime; break;
+            case "revoked": row.Status = TokenStatuses.Revoked; break;
+            case "foreign-client": row.Application = fixture.Target.CanonicalName; break;
+            case "missing-parent": row.Parent = null; break;
+            case "subject-mismatch": row.Parent = "another-user"; break;
+        }
+        fixture.Tokens.Setup(t => t.ListBySessionAsync("sid-1", It.IsAny<CancellationToken>()))
+               .Returns(Enumerate(row));
+
+        var exception = await Assert.ThrowsAsync<OAuthException>(() => fixture.Handler.HandleAsync(
+            fixture.Target, fixture.Request, null, CancellationToken.None));
+
+        Assert.Equal(OAuthErrors.InvalidGrant, exception.Status);
+        Assert.Empty(fixture.Created);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Reject_Conflicting_Source_Subjects_Regardless_Of_Enumeration_Order(bool reverse) {
+        using var fixture = await NativeExchangeFixture();
+        var first = SessionToken(fixture.Source);
+        var second = SessionToken(fixture.Source);
+        second.Parent = "another-user";
+        fixture.Tokens.Setup(t => t.ListBySessionAsync("sid-1", It.IsAny<CancellationToken>()))
+               .Returns(Enumerate<SchemataToken>(reverse ? [second, first] : [first, second]));
+
+        var exception = await Assert.ThrowsAsync<OAuthException>(() => fixture.Handler.HandleAsync(
+            fixture.Target, fixture.Request, null, CancellationToken.None));
+
+        Assert.Equal(OAuthErrors.InvalidGrant, exception.Status);
+    }
+
+    [Theory]
+    [InlineData("no-expiry")]
+    [InlineData("mixed")]
+    [InlineData("duplicates")]
+    public async Task Accept_A_Live_Consistent_Source_Session(string scenario) {
+        using var fixture = await NativeExchangeFixture();
+        var live = SessionToken(fixture.Source);
+        var other = SessionToken(fixture.Source);
+        if (scenario == "no-expiry") live.ExpireTime = null;
+        if (scenario == "mixed") other.ExpireTime = Now.UtcDateTime;
+        fixture.Tokens.Setup(t => t.ListBySessionAsync("sid-1", It.IsAny<CancellationToken>()))
+               .Returns(scenario == "no-expiry" ? Enumerate(live) : Enumerate(other, live));
+
+        var result = await fixture.Handler.HandleAsync(fixture.Target, fixture.Request, null, CancellationToken.None);
+
+        Assert.Equal(AuthorizationStatus.SignIn, result.Status);
+        Assert.Equal("user-1", result.Principal!.FindFirstValue(IdentityClaims.Subject));
+    }
+
+    [Fact]
+    public async Task Accept_An_Expired_Id_Hint_With_A_Live_Source_Session() {
+        using var fixture = await NativeExchangeFixture(expiredId: true);
+
+        var result = await fixture.Handler.HandleAsync(fixture.Target, fixture.Request, null, CancellationToken.None);
+
+        Assert.Equal(AuthorizationStatus.SignIn, result.Status);
+        Assert.Equal("user-1", result.Principal!.FindFirstValue(IdentityClaims.Subject));
+    }
+
+    private static SchemataToken SessionToken(SchemataApplication source) => new() {
+        Type = TokenTypes.AccessToken,
+        Status = TokenStatuses.Valid,
+        SessionId = "sid-1",
+        Parent = "user-1",
+        Application = source.CanonicalName,
+        ExpireTime = Now.UtcDateTime.AddHours(1),
+    };
+    [Theory]
     [InlineData(false, true)]
+
     [InlineData(true, false)]
     public async Task Reject_Native_Sso_Exchange_When_Either_Client_Lacks_Permission(
         bool sourcePermitted,
         bool targetPermitted
     ) {
-        var fixture = await NativeExchangeFixture(sourcePermitted: sourcePermitted, targetPermitted: targetPermitted);
+        using var fixture = await NativeExchangeFixture(sourcePermitted: sourcePermitted, targetPermitted: targetPermitted);
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => fixture.Handler.HandleAsync(
             fixture.Target, fixture.Request, null, CancellationToken.None));
@@ -422,7 +503,7 @@ public class DeviceSsoShould
 
     [Fact]
     public async Task Require_Interaction_For_A_Scope_Not_Granted_To_The_Source_Client() {
-        var fixture = await NativeExchangeFixture();
+        using var fixture = await NativeExchangeFixture();
         fixture.Request.Scope = "openid email";
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => fixture.Handler.HandleAsync(
@@ -439,11 +520,14 @@ public class DeviceSsoShould
         var tokens = NewTokenStore();
         tokens.Setup(t => t.FindByReferenceIdAsync("missing-secret", It.IsAny<CancellationToken>()))
               .ReturnsAsync((SchemataToken?)null);
+        using var nativeServices = new ServiceCollection().BuildServiceProvider();
         var native = new NativeSsoTokenExchangeHandler<SchemataApplication>(
             tokens.Object,
             TestSecurityKeys.CreateTokenService(new SchemataAuthorizationOptions { Issuer = Issuer }, time: FixedTime()),
             apps.Object,
             ServerOptions(),
+            new Mock<ISubjectIdentifierService>().Object,
+            nativeServices,
             FixedTime());
         var fallback = new Mock<ITokenExchangeHandler<SchemataApplication>>();
         fallback.Setup(f => f.HandleAsync(It.IsAny<SchemataApplication>(), It.IsAny<TokenRequest>(),
@@ -577,10 +661,13 @@ public class DeviceSsoShould
     private static async Task<NativeFixture> NativeExchangeFixture(
         string? dsHash = null,
         bool sourcePermitted = true,
-        bool targetPermitted = true
+        bool targetPermitted = true,
+        bool expiredId = false
     ) {
         var options = new SchemataAuthorizationOptions { Issuer = Issuer };
-        var issuer  = TestSecurityKeys.CreateTokenService(options, time: FixedTime());
+        var time = new Mock<TimeProvider>();
+        time.Setup(t => t.GetUtcNow()).Returns(expiredId ? Now.AddHours(-2) : Now);
+        var issuer  = TestSecurityKeys.CreateTokenService(options, time: time.Object);
         var source  = NativeApplication("source-client");
         var target  = NativeApplication("target-client");
         var secret  = DeviceSecret("device-secret-1", source.CanonicalName!, "sid-1", "device-1");
@@ -591,6 +678,7 @@ public class DeviceSsoShould
             new(Claims.DsHash, dsHash ?? TokenService.ComputeHash(secret.ReferenceId!, signing)),
             new(Claims.SessionId, "sid-1"),
         ], TimeSpan.FromHours(1));
+        time.Setup(t => t.GetUtcNow()).Returns(Now);
         var apps = new Mock<IApplicationManager<SchemataApplication>>();
         apps.Setup(a => a.FindByClientIdAsync(source.ClientId, It.IsAny<CancellationToken>())).ReturnsAsync(source);
         apps.Setup(a => a.HasPermissionAsync(source, PermissionPrefixes.Scope + Scopes.DeviceSso,
@@ -605,13 +693,17 @@ public class DeviceSsoShould
         tokens.Setup(t => t.ListBySessionAsync("sid-1", It.IsAny<CancellationToken>()))
               .Returns(Enumerate(new SchemataToken {
                   Type = TokenTypes.AccessToken, Status = TokenStatuses.Valid, SessionId = "sid-1",
+                  Application = source.CanonicalName, Parent = "user-1", ExpireTime = Now.UtcDateTime.AddHours(1),
               }));
         var created = new List<SchemataToken>();
         tokens.Setup(t => t.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>()))
               .Callback((SchemataToken token, CancellationToken _) => created.Add(token))
               .ReturnsAsync((SchemataToken token, CancellationToken _) => token);
+        var subjects = new Mock<ISubjectIdentifierService>();
+        subjects.Setup(s => s.Resolve("user-1", source)).Returns("user-1");
+        var services = new ServiceCollection().BuildServiceProvider();
         var handler = new NativeSsoTokenExchangeHandler<SchemataApplication>(
-            tokens.Object, issuer, apps.Object, Options.Create(options), FixedTime());
+            tokens.Object, issuer, apps.Object, Options.Create(options), subjects.Object, services, FixedTime());
         var request = new TokenRequest {
             SubjectToken      = idToken,
             SubjectTokenType  = TokenTypeUris.IdToken,
@@ -621,7 +713,7 @@ public class DeviceSsoShould
             Audience          = Issuer,
             Scope             = "openid profile",
         };
-        return new(handler, tokens, source, target, request, created);
+        return new(handler, tokens, source, target, request, created, services);
     }
 
     private sealed record NativeFixture(
@@ -630,8 +722,12 @@ public class DeviceSsoShould
         SchemataApplication Source,
         SchemataApplication Target,
         TokenRequest Request,
-        List<SchemataToken> Created
-    );
+        List<SchemataToken> Created,
+        ServiceProvider Services
+    ) : IDisposable
+    {
+        public void Dispose() => Services.Dispose();
+    }
 
     private static async IAsyncEnumerable<T> Enumerate<T>(params T[] values) {
         foreach (var value in values) {
@@ -643,6 +739,27 @@ public class DeviceSsoShould
 
 public class SessionStateShould
 {
+    [Fact]
+    public async Task Discover_Logout_Participants_From_Expired_Session_Tokens() {
+        var tokens = new Mock<ITokenStore<SchemataToken>>();
+        tokens.Setup(value => value.ListBySessionAsync("sid-1", It.IsAny<CancellationToken>()))
+              .Returns(Enumerate(new SchemataToken {
+                  Type = TokenTypes.AccessToken,
+                  Status = TokenStatuses.Valid,
+                  Application = "applications/expired-client",
+                  Parent = "users/user-1",
+                  SessionId = "sid-1",
+                  ExpireTime = DateTime.UnixEpoch,
+              }));
+
+        var clients = await LogoutSessionHelper.GetSessionClientsAsync(
+            tokens.Object, "users/user-1", "sid-1", CancellationToken.None);
+
+        Assert.Equal("applications/expired-client", Assert.Single(clients));
+        tokens.Verify(value => value.ListByParentAsync(
+            It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [Fact]
     public void Build_The_Exact_Sha256_Base64Url_Session_State_Without_Spaces() {
         const string client = "client-1";

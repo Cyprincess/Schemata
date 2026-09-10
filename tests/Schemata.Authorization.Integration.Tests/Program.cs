@@ -75,6 +75,14 @@ builder.UseSchemata(schema => {
         authorization.UseDemonstratingProofOfPossession(o => o.RequireForAllClients());
     }
 
+    if (builder.Environment.EnvironmentName == "Native") {
+        authorization.UsePairwiseSubjects();
+    }
+
+    if (builder.Environment.EnvironmentName == "Jar") {
+        authorization.UseJwtSecuredAuthorizationRequests();
+    }
+
     if (builder.Environment.EnvironmentName == "Rar") {
         authorization.UseRichAuthorizationRequests();
         schema.Services.AddSingleton<IAuthorizationDetailTypeDescriptor, Schemata.Authorization.Integration.Tests.PaymentInitiationDescriptor>();

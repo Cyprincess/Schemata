@@ -79,19 +79,20 @@ public sealed class AdviceRefreshTokenDeviceSecret<TApp> : IRefreshTokenAdvisor<
         }
         var source = SecurityParents.Application(client);
         var device = await _devices.ResolveAsync(exchange.Principal, exchange.Token?.Parent, ct);
+        var now = _time.GetUtcNow().UtcDateTime;
 
         // §3.4: invalid supplied secret is treated as absent. A valid bound secret is reused.
         if (!string.IsNullOrWhiteSpace(request.DeviceSecret)) {
             var existing = await _tokens.FindByReferenceIdAsync(request.DeviceSecret, ct);
             if (existing is not null
-                && DeviceSecretBinding.IsUsable(existing, client, sid, device, _time.GetUtcNow().UtcDateTime)) {
+                && DeviceSecretBinding.IsUsable(existing, client, sid, device, now)) {
                 ctx.Set(new DeviceSecretIssuance(
                     existing.ReferenceId!, existing.DeviceId, existing.Application, existing.SessionId));
                 return AdviseResult.Continue;
             }
         }
 
-        var live = await FindExistingAsync(client, sid, device, ct);
+        var live = await FindExistingAsync(client, sid, device, now, ct);
         if (live is not null) {
             ctx.Set(new DeviceSecretIssuance(live.ReferenceId!, live.DeviceId, live.Application, live.SessionId));
             return AdviseResult.Continue;
@@ -105,11 +106,11 @@ public sealed class AdviceRefreshTokenDeviceSecret<TApp> : IRefreshTokenAdvisor<
         TApp client,
         string? sid,
         string? device,
+        DateTime now,
         CancellationToken ct
     ) {
-        var source = SecurityParents.Application(client);
-        await foreach (var token in _tokens.ListByParentAsync(source, TokenTypes.DeviceSecret, ct)) {
-            if (DeviceSecretBinding.IsUsable(token, client, sid, device, _time.GetUtcNow().UtcDateTime)) {
+        await foreach (var token in _tokens.ListBySessionAsync(sid, ct)) {
+            if (DeviceSecretBinding.IsUsable(token, client, sid, device, now)) {
                 return token;
             }
         }
@@ -127,6 +128,7 @@ public sealed class AdviceRefreshTokenDeviceSecret<TApp> : IRefreshTokenAdvisor<
             ts     = now,
         });
         await _tokens.CreateAsync(new SchemataToken {
+            Name        = Guid.NewGuid().ToString("n"),
             Type        = TokenTypes.DeviceSecret,
             Status      = TokenStatuses.Valid,
             Format      = TokenFormats.Reference,

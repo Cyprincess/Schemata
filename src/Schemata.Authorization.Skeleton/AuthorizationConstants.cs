@@ -1712,6 +1712,9 @@ public static class AuthorizationConstants
         /// <summary>Serialized session identifier property key.</summary>
         public const string SessionId           = ".session_id";
 
+        /// <summary>Device secret approved for the token response.</summary>
+        public const string DeviceSecret        = ".device_secret";
+
         /// <summary>Serialized max_age property key.</summary>
         public const string MaxAge              = ".max_age";
 

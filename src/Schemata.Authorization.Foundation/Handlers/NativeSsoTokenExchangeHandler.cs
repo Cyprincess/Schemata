@@ -4,11 +4,10 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
-using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Advice;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
@@ -30,6 +29,8 @@ public sealed class NativeSsoTokenExchangeHandler<TApp> : ITokenExchangeHandler<
     private readonly TokenService _issuer;
     private readonly IApplicationManager<TApp> _apps;
     private readonly SchemataAuthorizationOptions _options;
+    private readonly ISubjectIdentifierService _subjects;
+    private readonly IServiceProvider _services;
     private readonly TimeProvider _time;
 
     public NativeSsoTokenExchangeHandler(
@@ -37,12 +38,16 @@ public sealed class NativeSsoTokenExchangeHandler<TApp> : ITokenExchangeHandler<
         TokenService                           issuer,
         IApplicationManager<TApp>              apps,
         IOptions<SchemataAuthorizationOptions> options,
+        ISubjectIdentifierService              subjects,
+        IServiceProvider                       services,
         TimeProvider?                          time = null
     ) {
         _tokens  = tokens;
         _issuer  = issuer;
         _apps    = apps;
         _options = options.Value;
+        _subjects = subjects;
+        _services = services;
         _time    = time ?? TimeProvider.System;
     }
 
@@ -90,11 +95,12 @@ public sealed class NativeSsoTokenExchangeHandler<TApp> : ITokenExchangeHandler<
         }
 
         // §4.3 step 1: device_secret valid.
+        var now = _time.GetUtcNow().UtcDateTime;
         var deviceToken = await _tokens.FindByReferenceIdAsync(request.ActorToken, ct);
         if (deviceToken is null
          || deviceToken.Type != TokenTypes.DeviceSecret
          || deviceToken.Status != TokenStatuses.Valid
-         || (deviceToken.ExpireTime is { } expires && expires <= _time.GetUtcNow().UtcDateTime)) {
+         || (deviceToken.ExpireTime is { } expires && expires <= now)) {
             throw new OAuthException(OAuthErrors.InvalidGrant,
                 SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT));
         }
@@ -130,8 +136,43 @@ public sealed class NativeSsoTokenExchangeHandler<TApp> : ITokenExchangeHandler<
         // §4.3 step 4: the ID token sid must match the device-secret session and remain active.
         var sid = idPrincipal.FindFirstValue(Claims.SessionId);
         if (string.IsNullOrWhiteSpace(sid)
-            || !string.Equals(sid, deviceToken.SessionId, StringComparison.Ordinal)
-            || !await HasValidSessionTokenAsync(sid, ct)) {
+            || !string.Equals(sid, deviceToken.SessionId, StringComparison.Ordinal)) {
+            throw new OAuthException(OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT));
+        }
+
+        string? subject = null;
+        var sourceApplication = SecurityParents.Application(source);
+        await foreach (var token in _tokens.ListBySessionAsync(sid, ct)) {
+            if (token.Status != TokenStatuses.Valid
+                || token.Type is not (TokenTypes.AccessToken
+                                   or TokenTypes.RefreshToken
+                                   or TokenTypes.AuthorizationCode
+                                   or TokenTypes.IdToken)
+                || (token.ExpireTime is { } expiration && expiration <= now)
+                || !string.Equals(token.SessionId, sid, StringComparison.Ordinal)
+                || !string.Equals(token.Application, sourceApplication, StringComparison.Ordinal)
+                || string.IsNullOrWhiteSpace(token.Parent)) {
+                continue;
+            }
+
+            if (subject is not null && !string.Equals(subject, token.Parent, StringComparison.Ordinal)) {
+                throw new OAuthException(OAuthErrors.InvalidGrant,
+                    SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT));
+            }
+
+            subject = token.Parent;
+        }
+
+        if (subject is null
+            || !string.Equals(_subjects.Resolve(subject, source),
+                idPrincipal.FindFirstValue(IdentityClaims.Subject), StringComparison.Ordinal)) {
+            throw new OAuthException(OAuthErrors.InvalidGrant,
+                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT));
+        }
+
+        var provider = _services.GetService<ISubjectProvider>();
+        if (provider is not null && !await provider.ValidateAsync(subject, ct)) {
             throw new OAuthException(OAuthErrors.InvalidGrant,
                 SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT));
         }
@@ -156,41 +197,17 @@ public sealed class NativeSsoTokenExchangeHandler<TApp> : ITokenExchangeHandler<
             }
         }
 
-        var accessToken = _issuer.CreateReference();
-        var now         = _time.GetUtcNow().UtcDateTime;
-        await _tokens.CreateAsync(new SchemataToken {
-            Type        = TokenTypes.AccessToken,
-            Status      = TokenStatuses.Valid,
-            Format      = TokenFormats.Reference,
-            ReferenceId = accessToken,
-            Application = SecurityParents.Application(application),
-            SessionId   = sid,
-            Parent      = idPrincipal.FindFirstValue(IdentityClaims.Subject),
-            ExpireTime  = now + _options.AccessTokenLifetime,
-        }, ct);
-
-        var response = new TokenResponse {
-            AccessToken     = accessToken,
-            TokenType       = Schemes.Bearer,
-            ExpiresIn       = (int)_options.AccessTokenLifetime.TotalSeconds,
-            IssuedTokenType = TokenTypeUris.AccessToken,
-            Scope           = request.Scope,
-        };
-
-        return AuthorizationResult.Content(response);
+        var identity = new ClaimsPrincipal(new ClaimsIdentity([
+            new Claim(IdentityClaims.Subject, subject),
+            new Claim(Claims.ClientId, application.ClientId!),
+        ], SchemataAuthorizationSchemes.Bearer));
+        return AuthorizationResult.SignIn(identity, new() {
+            [Properties.GrantType]      = GrantTypes.TokenExchange,
+            [Properties.Scope]          = request.Scope,
+            [Properties.Resources]      = request.Resource is { Count: > 0 } ? string.Join(" ", request.Resource) : null,
+            [Properties.SessionId]      = sid,
+            [Properties.IssuedTokenType] = TokenTypeUris.AccessToken,
+        });
     }
 
-    private async Task<bool> HasValidSessionTokenAsync(string sid, CancellationToken ct) {
-        await foreach (var token in _tokens.ListBySessionAsync(sid, ct)) {
-            if (token.Status == TokenStatuses.Valid
-                && token.Type is TokenTypes.AccessToken
-                              or TokenTypes.RefreshToken
-                              or TokenTypes.AuthorizationCode
-                              or TokenTypes.IdToken) {
-                return true;
-            }
-
-        }
-        return false;
-    }
 }
