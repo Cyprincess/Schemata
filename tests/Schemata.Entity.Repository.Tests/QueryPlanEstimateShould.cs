@@ -145,8 +145,10 @@ public class QueryPlanEstimateShould
     [Fact]
     public async Task Estimate_AlreadyCancelled_DoesNotExecuteCommand() {
         var command = new Mock<DbCommand>(MockBehavior.Strict);
+        command.Protected().Setup("Dispose", ItExpr.Is<bool>(disposing => disposing)).CallBase();
+        using var ownedCommand = command.Object;
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => QueryPlanEstimate.EstimateAsync(
-            command.Object, QueryEstimateProvider.PostgreSql, new CancellationToken(true)));
+            ownedCommand, QueryEstimateProvider.PostgreSql, new CancellationToken(true)));
         command.VerifyNoOtherCalls();
     }
 
