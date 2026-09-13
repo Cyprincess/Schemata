@@ -12,7 +12,7 @@ namespace Schemata.Resource.Foundation.Commands;
 /// <typeparam name="TEntity">The persistent entity type identifying the resource registration.</typeparam>
 /// <typeparam name="TSummary">The resource summary response type.</typeparam>
 public sealed record ListResourceQueryRequest<TEntity, TSummary>(ListRequest Request, ClaimsPrincipal? Principal)
-    : IQuery<ListResultBase<TSummary>>, IRequestPrincipal
+    : IQuery<ListResultBase<TEntity, TSummary>>, IRequestPrincipal
     where TEntity : class, ICanonicalName
     where TSummary : class, ICanonicalName
 {

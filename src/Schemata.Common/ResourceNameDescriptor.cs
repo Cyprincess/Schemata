@@ -43,6 +43,8 @@ public sealed class ResourceNameDescriptor
             CollectionPath  = "";
             _segments       = [];
             _parentSegments = [];
+            _singular       = type.Name;
+            _plural         = type.Name.Pluralize();
             return;
         }
 
@@ -109,17 +111,20 @@ public sealed class ResourceNameDescriptor
 
     /// <summary>
     ///     PascalCase singular form, taken from the pattern's leaf placeholder, e.g. <c>"Book"</c>.
-    ///     Available when <see cref="IsAddressable" /> holds; the pattern is the sole source of
-    ///     resource identity.
+    ///     Without a <see cref="CanonicalNameAttribute" /> the CLR type name serves as the
+    ///     singular/plural label pair; it grants no addressability —
+    ///     <see cref="IsAddressable" /> still requires a pattern.
     /// </summary>
-    /// <exception cref="InvalidOperationException">The type declares no addressable pattern.</exception>
+    /// <exception cref="InvalidOperationException">The type declares a non-addressable pattern.</exception>
     public string Singular => _singular ?? throw NotAddressable();
 
     /// <summary>
     ///     PascalCase plural form, taken from the pattern's collection segment as authored, so
-    ///     <c>people/{person}</c> yields <c>"People"</c>.
+    ///     <c>people/{person}</c> yields <c>"People"</c>; when the pattern is a bare placeholder
+    ///     the singular pluralizes, and without a <see cref="CanonicalNameAttribute" /> the
+    ///     pluralized CLR type name is the label.
     /// </summary>
-    /// <exception cref="InvalidOperationException">The type declares no addressable pattern.</exception>
+    /// <exception cref="InvalidOperationException">The type declares a non-addressable pattern.</exception>
     public string Plural => _plural ?? throw NotAddressable();
 
     /// <summary>

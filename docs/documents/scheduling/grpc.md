@@ -71,7 +71,7 @@ not exposed. `RunJob` returns an `Operation` representing the queued execution; 
 ## Request and response wire format
 
 `SchemataProtoModelConfigurator` (in the resource gRPC transport) adds each request, detail,
-summary, and `ListResultBase<TSummary>` to the shared `RuntimeTypeModel`. Wire names follow the
+summary, and `ListResultBase<TEntity, TSummary>` to the shared `RuntimeTypeModel`. Wire names follow the
 same `ResourceWireNameRules` aliases as HTTP (`Name` dropped, `CanonicalName` → `name`,
 `EntityTag` → `etag`, `Entities` → plural), then go through snake_case via Humanizer
 `Underscore()`. Payloads serialize with the same field names as the HTTP JSON. Scalar-keyed

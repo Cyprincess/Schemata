@@ -143,7 +143,7 @@ public static class ServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(updateRequest, updateResponse), typeof(ResourceUpdateValidationPipelineAdvisor<,,>).MakeGenericType(entity, request, detail)));
 
         var listRequest  = typeof(ListResourceQueryRequest<,>).MakeGenericType(entity, summary);
-        var listResponse = typeof(ListResultBase<>).MakeGenericType(summary);
+        var listResponse = typeof(ListResultBase<,>).MakeGenericType(entity, summary);
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(listRequest, listResponse), typeof(ResourceListResponsePipelineAdvisor<,>).MakeGenericType(entity, summary)));
         var getRequest  = typeof(GetResourceQueryRequest<,>).MakeGenericType(entity, detail);
         var getResponse = typeof(GetResultBase<>).MakeGenericType(detail);
@@ -243,7 +243,7 @@ public static class ServiceCollectionExtensions
             services,
             typeof(IRequestHandler<,>).MakeGenericType(
                 typeof(ListResourceQueryRequest<,>).MakeGenericType(entity, summary),
-                typeof(ListResultBase<>).MakeGenericType(summary)),
+                typeof(ListResultBase<,>).MakeGenericType(entity, summary)),
             typeof(DefaultListResourceHandler<,,,>).MakeGenericType(entity, request, detail, summary));
         AddHandler(
             services,

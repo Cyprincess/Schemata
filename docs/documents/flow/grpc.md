@@ -130,7 +130,7 @@ the no-source `StartAsync` overload.
 public interface IProcessDefinitionService
 {
     [Operation]
-    ValueTask<ListResultBase<ProcessDefinitionInfo>> ListProcessDefinitionsAsync(
+    ValueTask<ListResultBase<ProcessDefinitionInfo, ProcessDefinitionInfo>> ListProcessDefinitionsAsync(
         ListRequest request, CallContext context = default);
 }
 ```

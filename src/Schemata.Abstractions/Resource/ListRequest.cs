@@ -46,7 +46,7 @@ public class ListRequest
     public virtual int? Skip { get; set; }
 
     /// <summary>
-    ///     An opaque token returned from a previous <see cref="ListResultBase{TSummary}.NextPageToken" />
+    ///     An opaque token returned from a previous <see cref="ListResultBase{TEntity,TSummary}.NextPageToken" />
     ///     to continue pagination.
     /// </summary>
     public virtual string? PageToken { get; set; }

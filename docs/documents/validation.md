@@ -69,7 +69,8 @@ Each FluentValidation failure becomes an `ErrorFieldViolation`:
 - `Field` — `PropertyName` in `snake_case`.
 - `Reason` — the error code with the `Validator` suffix stripped and converted to AIP-193
   UPPER_SNAKE_CASE (e.g. `INCLUSIVE_BETWEEN`, `MAXIMUM_LENGTH`, `NOT_EMPTY`). Reasons stay literal
-  keys; comparison operands stay in `Description`.
+  keys; comparison operands stay in `Description`. Missing, blank, and suffix-only error codes
+  produce `VALIDATION_FAILED`, including custom failures added through `AddFailure`.
 - `Description` — the formatted FluentValidation message, including any operand values that the
   template renders (e.g. `"Age must be between 1 and 150."`).
 
@@ -87,6 +88,10 @@ The Create and Update validation wraps call `ValidationHelper.ValidateAsync` aft
 1. Collector advisors add violations to the list.
 2. A blocking result produces `ValidationException(errors)`, mapped to `INVALID_ARGUMENT` and HTTP 422.
 3. A request implementing `IValidation` with `ValidateOnly = true` produces `NoContentException` after successful validation.
+
+The gRPC error adapter preserves each violation's field, description, reason, and optional
+localized message in `google.rpc.BadRequest` details. HTTP validation failures retain the
+framework's 422 mapping; the canonical gRPC status is `INVALID_ARGUMENT`.
 
 `CreateRequestValidationSuppressed` and `UpdateRequestValidationSuppressed` are pipeline markers on the ambient `AdviceContext`. A request type with no registered validator leaves the violation list empty.
 

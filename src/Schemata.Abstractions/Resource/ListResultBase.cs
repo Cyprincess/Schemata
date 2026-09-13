@@ -7,8 +7,9 @@ namespace Schemata.Abstractions.Resource;
 ///     <seealso href="https://google.aip.dev/132">AIP-132: Standard methods: List</seealso>,
 ///     carrying matched items, total count, and a continuation token.
 /// </summary>
+/// <typeparam name="TEntity">The entity type carrying the resource identity.</typeparam>
 /// <typeparam name="TSummary">The type of each item in the list.</typeparam>
-public class ListResultBase<TSummary> : IEntitiesResult<TSummary>
+public class ListResultBase<TEntity, TSummary> : IEntitiesResult<TEntity, TSummary>
 {
     /// <summary>
     ///     The matched resource summaries for the current page.

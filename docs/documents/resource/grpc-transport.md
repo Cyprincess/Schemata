@@ -30,7 +30,7 @@ schema.UseResource()
 ```csharp
 public interface IResourceService<TEntity, TRequest, TDetail, TSummary>
 {
-    [Operation] ValueTask<ListResultBase<TSummary>> ListAsync(ListRequest request, CallContext context = default);
+    [Operation] ValueTask<ListResultBase<TEntity, TSummary>> ListAsync(ListRequest request, CallContext context = default);
     [Operation] ValueTask<TDetail>  GetAsync(GetRequest request, CallContext context = default);
     [Operation] ValueTask<TDetail>  CreateAsync(TRequest request, CallContext context = default);
     [Operation] ValueTask<TDetail>  UpdateAsync(TRequest request, CallContext context = default);
@@ -63,8 +63,8 @@ responds with the updated detail per AIP-164, a hard-deletable entity with `goog
 
 ## Request and response wire format
 
-`SchemataProtoModelConfigurator` adds each request, detail, summary, and `ListResultBase<TSummary>` type to the
-`RuntimeTypeModel`. For each writable property it resolves the wire name through
+`SchemataProtoModelConfigurator` adds each request, detail, summary, and `ListResultBase<TEntity, TSummary>` type
+to the `RuntimeTypeModel`. For each writable property it resolves the wire name through
 `ResourceWireNameRules.ResolveWireName` — the same `ResourceWireNameRules` aliases as HTTP (`Name` dropped,
 `CanonicalName` → `name`, `EntityTag` → `etag`, `Entities` → plural) — then applies snake_case via Humanizer
 `Underscore()`. `GrpcMarshallers.Create<T>` builds marshallers over the model, so payloads serialize with the

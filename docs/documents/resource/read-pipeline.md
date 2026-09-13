@@ -9,7 +9,7 @@ Handler stages retain data-dependent work. Entitlement advisors apply expression
 
 ## List
 
-The handler applies parent scoping, page-token validation, filters, ordering, and total-size selection to its container. It fetches one extra row to compute `next_page_token`, maps summaries, and returns `ListResultBase<TSummary>`.
+The handler applies parent scoping, page-token validation, filters, ordering, and total-size selection to its container. It fetches one extra row to compute `next_page_token`, maps summaries, and returns `ListResultBase<TEntity, TSummary>`.
 
 The list response wrap then derives `IChild.Parent` from each summary canonical name. Schemata returns complete summaries and has no partial-response trimming stage.
 

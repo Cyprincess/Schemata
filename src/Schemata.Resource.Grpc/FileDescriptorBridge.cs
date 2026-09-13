@@ -59,7 +59,7 @@ internal static class FileDescriptorBridge
         var requestType    = entityArgs[1];
         var detailType     = entityArgs[2];
         var summaryType    = entityArgs[3];
-        var listResultType = typeof(ListResultBase<>).MakeGenericType(summaryType);
+        var listResultType = typeof(ListResultBase<,>).MakeGenericType(entityArgs[0], summaryType);
 
         var proto = new FileDescriptorProto {
             Name = $"{descriptor.Singular.ToLowerInvariant()}_service.proto", Syntax = "proto3",

@@ -79,7 +79,7 @@ internal static class ResourceAuthorizationRegistration
         AddAuthentication<CreateResourceRequest<TEntity, TRequest, TDetail>, CreateResultBase<TDetail>>(services, static _ => (nameof(Operations.Create), typeof(TEntity)));
         AddAuthentication<UpdateResourceRequest<TEntity, TRequest, TDetail>, UpdateResultBase<TDetail>>(services, static _ => (nameof(Operations.Update), typeof(TEntity)));
         AddAuthentication<GetResourceQueryRequest<TEntity, TDetail>, GetResultBase<TDetail>>(services, static _ => (nameof(Operations.Get), typeof(TEntity)));
-        AddAuthentication<ListResourceQueryRequest<TEntity, TSummary>, ListResultBase<TSummary>>(services, static _ => (nameof(Operations.List), typeof(TEntity)));
+        AddAuthentication<ListResourceQueryRequest<TEntity, TSummary>, ListResultBase<TEntity, TSummary>>(services, static _ => (nameof(Operations.List), typeof(TEntity)));
         AddAuthentication<DeleteResourceRequest<TEntity, TDetail>, DeleteResultBase<TDetail>>(services, static _ => (nameof(Operations.Delete), typeof(TEntity)));
     }
 
@@ -91,7 +91,7 @@ internal static class ResourceAuthorizationRegistration
         AddAuthorization<CreateResourceRequest<TEntity, TRequest, TDetail>, CreateResultBase<TDetail>>(services, static _ => (nameof(Operations.Create), typeof(TEntity)));
         AddAuthorization<UpdateResourceRequest<TEntity, TRequest, TDetail>, UpdateResultBase<TDetail>>(services, static _ => (nameof(Operations.Update), typeof(TEntity)));
         AddAuthorization<GetResourceQueryRequest<TEntity, TDetail>, GetResultBase<TDetail>>(services, static _ => (nameof(Operations.Get), typeof(TEntity)));
-        AddAuthorization<ListResourceQueryRequest<TEntity, TSummary>, ListResultBase<TSummary>>(services, static _ => (nameof(Operations.List), typeof(TEntity)));
+        AddAuthorization<ListResourceQueryRequest<TEntity, TSummary>, ListResultBase<TEntity, TSummary>>(services, static _ => (nameof(Operations.List), typeof(TEntity)));
         AddAuthorization<DeleteResourceRequest<TEntity, TDetail>, DeleteResultBase<TDetail>>(services, static _ => (nameof(Operations.Delete), typeof(TEntity)));
     }
 

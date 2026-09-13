@@ -57,9 +57,9 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary>
 
     #region IResourceService<TEntity,TRequest,TDetail,TSummary> Members
 
-    public virtual async ValueTask<ListResultBase<TSummary>> ListAsync(ListRequest request, CallContext context = default) {
+    public virtual async ValueTask<ListResultBase<TEntity, TSummary>> ListAsync(ListRequest request, CallContext context = default) {
         var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
-        return await dispatcher.SendAsync<ListResourceQueryRequest<TEntity, TSummary>, ListResultBase<TSummary>>(
+        return await dispatcher.SendAsync<ListResourceQueryRequest<TEntity, TSummary>, ListResultBase<TEntity, TSummary>>(
             new(request, Http?.User), context.CancellationToken);
     }
 
