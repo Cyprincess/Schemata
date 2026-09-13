@@ -239,7 +239,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     ) {
         var query = await BuildQueryAsync(predicate, ct);
 
-        var context = new QueryContext<TEntity, TResult, TResult>(this, query);
+        var context = new QueryContext<TEntity, TResult, TResult>(this, QueryOperation.FirstOrDefault, query);
 
         switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, TResult>>()
                              .RunAsync(AdviceContext, context, ct)) {
@@ -273,7 +273,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     ) {
         var query = await BuildQueryAsync(predicate, ct);
 
-        var context = new QueryContext<TEntity, TResult, TResult>(this, query);
+        var context = new QueryContext<TEntity, TResult, TResult>(this, QueryOperation.SingleOrDefault, query);
 
         switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, TResult>>()
                              .RunAsync(AdviceContext, context, ct)) {
@@ -307,7 +307,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     ) {
         var query = await BuildQueryAsync(predicate, ct);
 
-        var context = new QueryContext<TEntity, TResult, bool>(this, query);
+        var context = new QueryContext<TEntity, TResult, bool>(this, QueryOperation.Any, query);
 
         switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, bool>>()
                              .RunAsync(AdviceContext, context, ct)) {
@@ -341,7 +341,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     ) {
         var query = await BuildQueryAsync(predicate, ct);
 
-        var context = new QueryContext<TEntity, TResult, int>(this, query);
+        var context = new QueryContext<TEntity, TResult, int>(this, QueryOperation.Count, query);
 
         switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, int>>()
                              .RunAsync(AdviceContext, context, ct)) {
@@ -375,7 +375,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     ) {
         var query = await BuildQueryAsync(predicate, ct);
 
-        var context = new QueryContext<TEntity, TResult, long>(this, query);
+        var context = new QueryContext<TEntity, TResult, long>(this, QueryOperation.LongCount, query);
 
         switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, long>>()
                              .RunAsync(AdviceContext, context, ct)) {
@@ -695,6 +695,22 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     /// </summary>
     /// <param name="entity">The updated entity.</param>
     protected void TrackUpdate(TEntity entity) { _updated.Add(entity); }
+
+    /// <summary>
+    ///     Returns whether the instance was already staged for update in the current unit of
+    ///     work, so a provider can distinguish a first staging from a repeated one.
+    /// </summary>
+    /// <param name="entity">The updated entity.</param>
+    /// <returns><see langword="true" /> when the instance is already staged for update.</returns>
+    protected bool HasPendingUpdate(TEntity entity) {
+        foreach (var staged in _updated) {
+            if (ReferenceEquals(staged, entity)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>
     ///     Stages a removed entity for the committed-advisor snapshot.

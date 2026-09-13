@@ -133,6 +133,96 @@ public class RepositoryTokenStoreShould
     }
 
     [Fact]
+    public async Task Revoke_By_Authorization_Drains_The_Stream_Before_The_First_Update() {
+        var spy     = new StreamSpy();
+        var live1   = new SchemataToken { Name = "live-1",  Authorization = "auth-1", Status = Statuses.Valid };
+        var live2   = new SchemataToken { Name = "live-2",  Authorization = "auth-1", Status = Statuses.Redeemed };
+        var already = new SchemataToken { Name = "already", Authorization = "auth-1", Status = Statuses.Revoked };
+        var away    = new SchemataToken { Name = "away",    Authorization = "auth-2", Status = Statuses.Valid };
+        var (store, repository) = NewStore(r => {
+            SetupList(r, spy, live1, live2, already, away);
+            r.Setup(x => x.UpdateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>()))
+             .Callback(spy.ObserveMutation);
+        });
+
+        var count = await store.RevokeByAuthorizationAsync("auth-1");
+
+        Assert.False(spy.MutatedWhileOpen);
+        Assert.Equal(2, count);
+        Assert.Equal(Statuses.Revoked, live1.Status);
+        Assert.Equal(Statuses.Revoked, live2.Status);
+        Assert.Equal(Statuses.Valid,   away.Status);
+        repository.Verify(r => r.UpdateAsync(already, It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Revoke_By_Session_Drains_The_Stream_Before_The_First_Update() {
+        var spy   = new StreamSpy();
+        var live1 = new SchemataToken { Name = "live-1", SessionId = "sid-1", Status = Statuses.Valid };
+        var live2 = new SchemataToken { Name = "live-2", SessionId = "sid-1", Status = Statuses.Redeemed };
+        var away  = new SchemataToken { Name = "away",   SessionId = "sid-2", Status = Statuses.Valid };
+        var (store, repository) = NewStore(r => {
+            SetupList(r, spy, live1, live2, away);
+            r.Setup(x => x.UpdateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>()))
+             .Callback(spy.ObserveMutation);
+        });
+
+        var count = await store.RevokeBySessionAsync("sid-1");
+
+        Assert.False(spy.MutatedWhileOpen);
+        Assert.Equal(2, count);
+        Assert.Equal(Statuses.Revoked, live1.Status);
+        Assert.Equal(Statuses.Revoked, live2.Status);
+        Assert.Equal(Statuses.Valid,   away.Status);
+        repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Revoke_By_Device_Drains_The_Stream_Before_The_First_Update() {
+        var spy   = new StreamSpy();
+        var live1 = new SchemataToken { Name = "live-1", DeviceId = "device-1", Status = Statuses.Valid };
+        var live2 = new SchemataToken { Name = "live-2", DeviceId = "device-1", Status = Statuses.Redeemed };
+        var away  = new SchemataToken { Name = "away",   DeviceId = "device-2", Status = Statuses.Valid };
+        var (store, repository) = NewStore(r => {
+            SetupList(r, spy, live1, live2, away);
+            r.Setup(x => x.UpdateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>()))
+             .Callback(spy.ObserveMutation);
+        });
+
+        var count = await store.RevokeByDeviceAsync("device-1");
+
+        Assert.False(spy.MutatedWhileOpen);
+        Assert.Equal(2, count);
+        Assert.Equal(Statuses.Revoked, live1.Status);
+        Assert.Equal(Statuses.Revoked, live2.Status);
+        Assert.Equal(Statuses.Valid,   away.Status);
+        repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Prune_Drains_The_Stream_Before_The_First_Removal() {
+        var spy     = new StreamSpy();
+        var expired = new SchemataToken { Name = "expired", Status = Statuses.Valid, ExpireTime = Now.AddSeconds(-1) };
+        var revoked = new SchemataToken { Name = "revoked", Status = Statuses.Revoked };
+        var live    = new SchemataToken { Name = "live",    Status = Statuses.Valid, ExpireTime = Now.AddMinutes(5) };
+        var (store, repository) = NewStore(r => {
+            SetupList(r, spy, expired, revoked, live);
+            r.Setup(x => x.RemoveAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>()))
+             .Callback(spy.ObserveMutation);
+        }, NewClock());
+
+        var count = await store.PruneAsync();
+
+        Assert.False(spy.MutatedWhileOpen);
+        Assert.Equal(2, count);
+        repository.Verify(r => r.RemoveAsync(expired, It.IsAny<CancellationToken>()), Times.Once);
+        repository.Verify(r => r.RemoveAsync(revoked, It.IsAny<CancellationToken>()), Times.Once);
+        repository.Verify(r => r.RemoveAsync(live, It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task Find_By_A_Blank_Name_Returns_Null() {
         var (store, _) = NewStore();
 
@@ -343,18 +433,45 @@ public class RepositoryTokenStoreShould
     }
 
     private static void SetupList(Mock<IRepository<SchemataToken>> repository, params SchemataToken[] rows) {
+        SetupList(repository, null, rows);
+    }
+
+    private static void SetupList(
+        Mock<IRepository<SchemataToken>> repository,
+        StreamSpy?                       spy,
+        params SchemataToken[]           rows
+    ) {
         repository.Setup(r => r.ListAsync(
                        It.IsAny<Func<IQueryable<SchemataToken>, IQueryable<SchemataToken>>>(),
                        It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<SchemataToken>, IQueryable<SchemataToken>> predicate,
-                            CancellationToken _) => EnumerateAsync(predicate(rows.AsQueryable())));
+                            CancellationToken _) => EnumerateAsync(predicate(rows.AsQueryable()), spy));
     }
 
-    private static async IAsyncEnumerable<T> EnumerateAsync<T>(IEnumerable<T> items) {
-        foreach (var item in items) {
-            yield return item;
+    private static async IAsyncEnumerable<T> EnumerateAsync<T>(IEnumerable<T> items, StreamSpy? spy = null) {
+        try {
+            foreach (var item in items) {
+                yield return item;
+            }
+        } finally {
+            spy?.MarkDisposed();
         }
 
         await Task.CompletedTask;
+    }
+
+    private sealed class StreamSpy {
+        public bool Disposed;
+        public bool MutatedWhileOpen;
+
+        public void MarkDisposed() {
+            Disposed = true;
+        }
+
+        public void ObserveMutation() {
+            if (!Disposed) {
+                MutatedWhileOpen = true;
+            }
+        }
     }
 }

@@ -93,18 +93,21 @@ so an existing custom registration is preserved.
 ### Mutation methods
 
 `AddAsync` runs the add advisors, then calls `Context.AddAsync(entity)`. `UpdateAsync` runs the update
-advisors, detaches any existing tracker entry for the entity, calls `Context.Update(entity)`, and — when
-the entity is concurrency-controlled — sets the current `Timestamp` to a fresh GUID. `RemoveAsync` runs
-the remove advisors, then calls `Context.Remove(entity)`. Each write first calls `EnsureWriteUnitOfWork`
-to open an implicit unit of work when the repository is not already enlisted; nothing reaches the
-database until commit flushes the change tracker.
+advisors and — when the entity is concurrency-controlled — sets the current `Timestamp` to a fresh
+GUID. The first staging of an instance in a unit of work re-snapshots the change tracker's baseline
+from the incoming values (detach plus `Context.Update`), so a caller-supplied stale `Timestamp`
+aborts the commit with `AbortedException`. Staging the same tracked instance again keeps the
+tracker's original token as the commit predicate, so repeated updates of one instance do not race
+their own rotation. `RemoveAsync` runs the remove advisors, then calls `Context.Remove(entity)`.
+Each write first calls `EnsureWriteUnitOfWork` to open an implicit unit of work when the repository
+is not already enlisted; nothing reaches the database until commit flushes the change tracker.
 
-### Detach before update
+### Staging and the concurrency baseline
 
-`UpdateAsync` sets the incoming entity's tracker state to `Detached` before `Context.Update`. EF Core
-allows one tracked instance per key in a `DbContext`; when other code in the same context has already
-materialized that row, `Context.Update(entity)` would otherwise throw "another instance with the same
-key value is already being tracked."
+The first staging of an instance detaches that instance before `Context.Update`, capturing its
+incoming values as the original-value baseline. Repeated staging of the same instance preserves
+that baseline. A successful repository-owned commit permits another write; that next write
+enlists a fresh unit-of-work context using the instance's committed token.
 
 ### Commit
 
@@ -126,7 +129,11 @@ owns it until enlistment. `UseLinqToDb` also registers a metadata reader
 translating `System.ComponentModel.DataAnnotations.Schema` attributes and Schemata's class-level
 `[PrimaryKey]` (`Schemata.Abstractions.Entities`) into LinqToDB mapping attributes so a single set of
 annotations keys both providers. `[Index]` is parsed but not emitted — LinqToDB mapping has no index
-concept, so create indexes through the application's schema-management path.
+concept, so create indexes through the application's schema-management path. Property discovery
+mirrors EF Core model defaults: a property maps when it has a public instance getter, a setter
+(private is sufficient), and no index parameters. Explicit interface implementations, private getters,
+and read-only properties are excluded unless `[Column]`, class-level `[PrimaryKey]` membership, or
+`[DatabaseGenerated(Identity)]` marks the member as an intended column.
 
 ### Table name resolution
 
@@ -138,8 +145,12 @@ pluralized through Humanizer.
 LinqToDB executes mutations immediately inside the open transaction. `AddAsync` runs the add advisors,
 calls `EnsureWriteUnitOfWork`, then `InsertAsync`. `AddRangeAsync` runs the add advisors per entity and
 persists the survivors with one bulk-copy round trip. `UpdateAsync` runs the update advisors, then calls
-`UpdateOptimisticAsync` for concurrency-controlled entities (raising `AbortedException` on a
-zero-row result) or `UpdateAsync` otherwise. `RemoveAsync` runs the remove advisors, then `DeleteAsync`.
+`UpdateOptimisticWithRefreshAsync` for concurrency-controlled entities and `UpdateAsync` otherwise.
+The guarded update regenerates the token inside the UPDATE statement and writes the regenerated value
+back onto the entity, so the instance's token equals the value this update wrote; a zero-row result
+raises `AbortedException`. `RemoveAsync` runs the remove advisors, then `DeleteOptimisticAsync` for
+concurrency-controlled entities — the delete predicates on the primary key and the instance's token,
+and a zero-row result raises `AbortedException` — or `DeleteAsync` otherwise.
 
 Because writes execute immediately, a query later in the same transaction observes the repository's own
 uncommitted writes — read-your-own-writes. The transaction opens lazily on the first access of the unit
@@ -181,6 +192,20 @@ Both repository providers share plan parsing in
 `null`; malformed plan data and invalid cardinalities fail explicitly. Database errors and cancellation
 propagate, and neither provider falls back to `CountAsync` or `LongCountAsync`.
 
+## Query cache keys
+
+Both providers implement `IQueryCacheKeyProvider`. `GetQueryCacheKey` derives the key from the command
+the provider would execute — `CreateDbCommand` for EF Core, `ToSqlQuery(InlineParameters: false)` for
+LinqToDB — together with the data source identity and the ordered typed parameters, composed through
+`QueryCacheKey.Create`, which hashes internally so connection identity, command text, and parameter
+values never survive into the key. EF Core hashes the full connection string next to the connection
+type, `DataSource`, and `Database`; LinqToDB hashes the full connection string. SQLite in-memory
+lifetimes (`Mode=Memory`, `Data Source=:memory:`, empty data source) and EF Core non-relational
+providers return `null`, which disables caching for the query. Translated query filters and
+parameters participate in the identity. `DbCommandInterceptor` callbacks do not run while an EF
+key is built: applications must suppress caching when session state or interceptors change query
+meaning outside that identity. The query cache adds projection structure and terminal operation.
+
 ## Provider comparison
 
 | Aspect                             | EF Core                                             | LinqToDB                                              |
@@ -189,8 +214,9 @@ propagate, and neither provider falls back to `CountAsync` or `LongCountAsync`.
 | Change tracking                    | Full EF Core tracker                                | None                                                  |
 | Write execution                    | Buffered in the tracker, flushed at commit          | Immediate, inside the open transaction                |
 | Read-your-own-writes before commit | No                                                  | Yes                                                   |
-| `UpdateAsync`                      | Detach, `Context.Update`, bump token                | `UpdateOptimisticAsync` or `UpdateAsync`              |
-| Concurrency on update              | `DbUpdateConcurrencyException` → `AbortedException` | zero-row `UpdateOptimisticAsync` → `AbortedException` |
+| `UpdateAsync`                      | First staging detaches and bumps token; restaging keeps the tracker token | `UpdateOptimisticWithRefreshAsync` or `UpdateAsync` |
+| Concurrency on update              | `DbUpdateConcurrencyException` → `AbortedException` | zero-row guarded update → `AbortedException`          |
+| Concurrency on delete              | guarded delete at commit → `AbortedException`       | zero-row `DeleteOptimisticAsync` → `AbortedException` |
 | Unique-constraint violation        | `AlreadyExistsException` with type + canonical name | bare `AlreadyExistsException`                         |
 | `EstimateCountAsync`               | opt-in plan estimate or custom estimator; otherwise `null` | per-backend plan/statistics estimate or `null` |
 
@@ -203,14 +229,18 @@ satisfies the non-generic `IRepository` surface that infrastructure code depends
 
 ## Caveats
 
-- **EF Core update detach** — required whenever the change tracker has already seen the same row in the
-  current context.
+- **Restaged instances retain the original concurrency baseline** — the first staging determines
+  the expected version for the pending update. Subsequent staging preserves that baseline and
+  generates a new current token; it does not establish a second concurrency precondition.
+- **Rollback does not restore instance state** — after a rollback the entity's properties keep the
+  values the caller set. Reload the instance from a fresh repository scope before reusing it; a
+  repository whose unit of work has completed must itself be resolved from a fresh scope.
 - **Uncommitted-read visibility differs** — EF Core buffers writes until commit; LinqToDB executes them
   immediately. Provider-agnostic code must not depend on reading its own uncommitted writes through the
   EF Core provider.
 - **LinqToDB metadata reader is process-wide** — `UseLinqToDb` mutates `MappingSchema.Default`, so the
-  attribute translation applies to every `DataConnection` in the process. Repeated calls append further
-  reader instances, which is harmless because LinqToDB resolves attributes through any registered reader.
+  attribute translation applies to every `DataConnection` in the process. Use a private mapping
+  schema for isolated tests or independently configured provider models.
 
 ## See also
 

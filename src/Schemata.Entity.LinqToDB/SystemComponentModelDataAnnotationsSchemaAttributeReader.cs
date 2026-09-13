@@ -5,6 +5,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Reflection;
 using LinqToDB;
@@ -31,14 +32,16 @@ namespace Schemata.Entity.LinqToDB;
 ///     <see cref="System.ComponentModel.DataAnnotations.Schema.NotMappedAttribute" />,
 ///     <see cref="System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedAttribute" />, and
     ///     <see cref="Abstractions.Entities.PrimaryKeyAttribute" /> and <see cref="IndexAttribute" /> into their LINQ to DB equivalents, and maps
-///     <see cref="ConcurrencyCheckAttribute" /> to
-///     <see cref="global::LinqToDB.Mapping.OptimisticLockPropertyAttribute" /> with
-///     <see cref="global::LinqToDB.Mapping.VersionBehavior.Guid" /> so EF Core's native
-///     concurrency token drives LINQ to DB's optimistic-update predicate.
-///     Key discovery uses class-level <c>[SchemataPrimaryKey]</c> declarations on the entity.
-///     Index declarations describe the model but are not emitted by LINQ to DB metadata because
-///     LINQ to DB has no index mapping attribute; applications create indexes through their schema
-///     management path.
+    ///     <see cref="ConcurrencyCheckAttribute" /> to
+    ///     <see cref="global::LinqToDB.Mapping.OptimisticLockPropertyAttribute" /> with
+    ///     <see cref="global::LinqToDB.Mapping.VersionBehavior.Guid" /> so EF Core's native
+    ///     concurrency token drives LINQ to DB's optimistic-update predicate.
+    ///     Property discovery follows EF Core model defaults: a property maps when it has a public
+    ///     instance getter, a setter (private is sufficient), and no index parameters. Explicit
+    ///     interface implementations, private getters, and read-only properties are excluded unless
+    ///     <c>[Column]</c>, class-level <c>[SchemataPrimaryKey]</c> membership, or
+    ///     <c>[DatabaseGenerated(Identity)]</c> marks the member as an intended column.
+    ///     Key discovery uses class-level <c>[SchemataPrimaryKey]</c> declarations on the entity.
 ///     Supported scalar dictionary and scalar collection properties receive a JSON
 ///     <see cref="LinqToDbJsonConverter{T}" />, mirroring the EF Core bridge.
 /// </remarks>
@@ -86,9 +89,23 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
             return [new NotColumnAttribute()];
         }
 
+        var classKey = type.GetCustomAttribute<PrimaryKeyAttribute>(true);
+        var g        = member.GetAttribute<DatabaseGeneratedAttribute>();
+        var c        = member.GetAttribute<ColumnAttribute>();
+
+        // The exclusion NotColumn carries the member name so an explicit column for the same member
+        // keeps its own attribute identity in the mapping and is not silently dropped by this
+        // default exclusion.
+        if (member is PropertyInfo property
+         && !IsCandidateProperty(property)
+         && c is null
+         && g is not { DatabaseGeneratedOption: DatabaseGeneratedOption.Identity }
+         && !InClassKey(classKey, member)) {
+            return [new NotColumnAttribute { MemberName = member.Name }];
+        }
+
         var attributes = new List<MappingAttribute>();
 
-        var classKey = type.GetCustomAttribute<PrimaryKeyAttribute>(true);
         if (classKey is not null) {
             var order = 0;
             foreach (var name in classKey.Properties) {
@@ -101,14 +118,12 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
             }
         }
 
-        var g = member.GetAttribute<DatabaseGeneratedAttribute>();
         if (g is {
             DatabaseGeneratedOption: DatabaseGeneratedOption.Identity,
         }) {
             attributes.Add(new IdentityAttribute());
         }
 
-        var c = member.GetAttribute<ColumnAttribute>();
         if (c is not null) {
             attributes.Add(new global::LinqToDB.Mapping.ColumnAttribute {
                 Name   = c.Name,
@@ -144,6 +159,16 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
         }
 
         return [.. attributes];
+    }
+
+    private static bool IsCandidateProperty(PropertyInfo property) {
+        return property.GetGetMethod(true) is { IsPublic: true, IsStatic: false }
+            && property.GetSetMethod(true) is not null
+            && property.GetIndexParameters().Length == 0;
+    }
+
+    private static bool InClassKey(PrimaryKeyAttribute? key, MemberInfo member) {
+        return key?.Properties.Any(name => string.Equals(name, member.Name, StringComparison.Ordinal)) == true;
     }
 
     private static Type? TryGetMemberType(MemberInfo member) {
