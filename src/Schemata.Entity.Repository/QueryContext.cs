@@ -20,11 +20,13 @@ public class QueryContext<TEntity, TResult, T>
     ///     Initializes a context for executing the given queryable.
     /// </summary>
     /// <param name="repository">The repository that initiated this query.</param>
+    /// <param name="operation">The terminal operation the repository will apply to the query.</param>
     /// <param name="query">
     ///     The queryable after all build-query advisors and the user predicate have been applied.
     /// </param>
-    public QueryContext(IRepository<TEntity> repository, IQueryable<TResult> query) {
+    public QueryContext(IRepository<TEntity> repository, QueryOperation operation, IQueryable<TResult> query) {
         Repository = repository;
+        Operation  = operation;
         Query      = query;
     }
 
@@ -32,6 +34,11 @@ public class QueryContext<TEntity, TResult, T>
     ///     The repository that initiated this query.
     /// </summary>
     public IRepository<TEntity> Repository { get; private set; }
+
+    /// <summary>
+    ///     The terminal operation the repository will apply to <see cref="Query" />.
+    /// </summary>
+    public QueryOperation Operation { get; }
 
     /// <summary>
     ///     Indicates whether the repository has pending mutations or an open implicit write unit of work.

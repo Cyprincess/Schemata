@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
+using System.Data.Common;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -33,7 +34,7 @@ namespace Schemata.Entity.LinqToDB;
 /// </remarks>
 /// <typeparam name="TContext">The <see cref="DataConnection" /> type.</typeparam>
 /// <typeparam name="TEntity">The entity type managed by this repository.</typeparam>
-public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
+public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQueryCacheKeyProvider
     where TContext : DataConnection
     where TEntity : class
 {
@@ -116,7 +117,7 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         EnsureWriteUnitOfWork();
 
         if (IsConcurrencyControlled) {
-            var rows = await Context.GetTable<TEntity>().TableName(TableName).UpdateOptimisticAsync(entity, ct);
+            var rows = await Context.GetTable<TEntity>().TableName(TableName).UpdateOptimisticWithRefreshAsync(entity, ct);
             if (rows == 0) {
                 throw new AbortedException();
             }
@@ -140,9 +141,16 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
 
         EnsureWriteUnitOfWork();
 
-        TrackRemove(entity);
+        if (IsConcurrencyControlled) {
+            var rows = await Context.GetTable<TEntity>().TableName(TableName).DeleteOptimisticAsync(entity, ct);
+            if (rows == 0) {
+                throw new AbortedException();
+            }
+        } else {
+            await Context.DeleteAsync(entity, TableName, token: ct);
+        }
 
-        await Context.DeleteAsync(entity, TableName, token: ct);
+        TrackRemove(entity);
     }
 
     protected override ConfiguredCancelableAsyncEnumerable<TResult> AsAsyncEnumerable<TResult>(
@@ -222,6 +230,54 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
             default:
                 throw new ArgumentOutOfRangeException(nameof(provider), provider, null);
         }
+    }
+
+    /// <summary>
+    ///     Builds a stable cache key for the query's translated SQL. Returns
+    ///     <see langword="null" /> for SQLite in-memory connections, whose connection string
+    ///     cannot identify a specific database across scopes.
+    /// </summary>
+    /// <param name="query">The translated query.</param>
+    /// <typeparam name="TResult">The query result element type.</typeparam>
+    /// <returns>The hashed cache key, or <see langword="null" /> when caching must be disabled.</returns>
+    public string? GetQueryCacheKey<TResult>(IQueryable<TResult> query) {
+        var source = Context.ConnectionString;
+        if (string.IsNullOrEmpty(source)
+         || (Context.DataProvider.Name.StartsWith("SQLite", StringComparison.OrdinalIgnoreCase) && IsEphemeralDataSource(source))) {
+            return null;
+        }
+
+        var sql = query.ToSqlQuery(new() { InlineParameters = false });
+
+        return QueryCacheKey.Create(
+            Context.DataProvider.Name,
+            source,
+            sql.Sql,
+            sql.Parameters.Select(p => (p.Name ?? string.Empty, $"{p.DataType}:{p.DbType}", (object?)p.Value)));
+    }
+
+    // SQLite named in-memory lifetimes (Mode=Memory, Data Source=:memory:) reuse one connection
+    // string for distinct databases, so their identity must not key a cross-scope cache.
+    private static bool IsEphemeralDataSource(string? source) {
+        if (string.IsNullOrEmpty(source)) {
+            return true;
+        }
+
+        var builder = new DbConnectionStringBuilder { ConnectionString = source };
+
+        if (builder.TryGetValue("Mode", out var mode)
+         && mode is string lifetime
+         && lifetime.Equals("Memory", StringComparison.OrdinalIgnoreCase)) {
+            return true;
+        }
+
+        if (!builder.TryGetValue("Data Source", out var database)
+         && !builder.TryGetValue("DataSource", out database)
+         && !builder.TryGetValue("Filename", out database)) {
+            return true;
+        }
+
+        return database is not string path || path.Length == 0 || path.Equals(":memory:", StringComparison.OrdinalIgnoreCase);
     }
 
     protected override IUnitOfWork CreateUnitOfWork() {

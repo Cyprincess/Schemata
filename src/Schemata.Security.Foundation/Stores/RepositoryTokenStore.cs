@@ -210,19 +210,18 @@ public class RepositoryTokenStore : ITokenStore<SchemataToken>
             return 0;
         }
 
-        long count = 0;
+        var matches = await _repository.ListAsync(
+                          q => q.Where(t => t.Authorization == authorization && t.Status != Statuses.Revoked),
+                          ct).ToListAsync(ct);
 
-        await foreach (var token in _repository.ListAsync(
-                           q => q.Where(t => t.Authorization == authorization && t.Status != Statuses.Revoked),
-                           ct)) {
+        foreach (var token in matches) {
             token.Status = Statuses.Revoked;
             await _repository.UpdateAsync(token, ct);
-            count++;
         }
 
         await _repository.CommitAsync(ct);
 
-        return count;
+        return matches.Count;
     }
 
     public async Task<long> RevokeBySessionAsync(string? sessionId, CancellationToken ct = default) {
@@ -232,19 +231,18 @@ public class RepositoryTokenStore : ITokenStore<SchemataToken>
             return 0;
         }
 
-        long count = 0;
+        var matches = await _repository.ListAsync(
+                          q => q.Where(t => t.SessionId == sessionId && t.Status != Statuses.Revoked),
+                          ct).ToListAsync(ct);
 
-        await foreach (var token in _repository.ListAsync(
-                           q => q.Where(t => t.SessionId == sessionId && t.Status != Statuses.Revoked),
-                           ct)) {
+        foreach (var token in matches) {
             token.Status = Statuses.Revoked;
             await _repository.UpdateAsync(token, ct);
-            count++;
         }
 
         await _repository.CommitAsync(ct);
 
-        return count;
+        return matches.Count;
     }
 
     public async Task<long> RevokeByDeviceAsync(string? deviceId, CancellationToken ct = default) {
@@ -254,37 +252,35 @@ public class RepositoryTokenStore : ITokenStore<SchemataToken>
             return 0;
         }
 
-        long count = 0;
+        var matches = await _repository.ListAsync(
+                          q => q.Where(t => t.DeviceId == deviceId && t.Status != Statuses.Revoked),
+                          ct).ToListAsync(ct);
 
-        await foreach (var token in _repository.ListAsync(
-                           q => q.Where(t => t.DeviceId == deviceId && t.Status != Statuses.Revoked),
-                           ct)) {
+        foreach (var token in matches) {
             token.Status = Statuses.Revoked;
             await _repository.UpdateAsync(token, ct);
-            count++;
         }
 
         await _repository.CommitAsync(ct);
 
-        return count;
+        return matches.Count;
     }
 
     public async Task<long> PruneAsync(CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
         var threshold = Now();
-        long count = 0;
+        var matches = await _repository.ListAsync(
+                          q => q.Where(t => (t.ExpireTime != null && t.ExpireTime < threshold)
+                                         || t.Status == Statuses.Revoked), ct).ToListAsync(ct);
 
-        await foreach (var token in _repository.ListAsync(
-                           q => q.Where(t => (t.ExpireTime != null && t.ExpireTime < threshold)
-                                          || t.Status == Statuses.Revoked), ct)) {
+        foreach (var token in matches) {
             await _repository.RemoveAsync(token, ct);
-            count++;
         }
 
         await _repository.CommitAsync(ct);
 
-        return count;
+        return matches.Count;
     }
 
     public async Task<SchemataToken?> CreateAsync(SchemataToken? token, CancellationToken ct = default) {

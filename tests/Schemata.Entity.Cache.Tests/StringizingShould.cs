@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
 using Schemata.Entity.Cache.Tests.Fixtures;
@@ -15,7 +16,9 @@ public class StringizingShould
 
         var result = Stringizing.ToString(expr);
 
-        Assert.Equal("(_p0) => (_p0.Age > 18)", result);
+        Assert.NotNull(result);
+        Assert.Contains("_p0:", result);
+        Assert.Contains(":Age > i4:18", result);
     }
 
     [Fact]
@@ -24,7 +27,8 @@ public class StringizingShould
 
         var result = Stringizing.ToString(expr);
 
-        Assert.Equal("(_p0) => (_p0.FullName == \"Alice\")", result);
+        Assert.NotNull(result);
+        Assert.Contains(":FullName == \"Alice\"", result);
     }
 
     [Fact]
@@ -33,7 +37,10 @@ public class StringizingShould
 
         var result = Stringizing.ToString(expr);
 
-        Assert.Equal("(_p0) => ((_p0.Age > 18) && (_p0.FullName == \"Bob\"))", result);
+        Assert.NotNull(result);
+        Assert.Contains(" && ", result);
+        Assert.Contains("\"Bob\"", result);
+        Assert.Contains("i4:18", result);
     }
 
     [Fact]
@@ -42,6 +49,7 @@ public class StringizingShould
 
         var result = Stringizing.ToString(expr);
 
+        Assert.NotNull(result);
         Assert.Contains("null", result);
     }
 
@@ -51,7 +59,8 @@ public class StringizingShould
 
         var result = Stringizing.ToString(expr);
 
-        Assert.Equal("(_p0) => !(_p0 > 5)", result);
+        Assert.NotNull(result);
+        Assert.Contains("!(", result);
     }
 
     [Fact]
@@ -59,10 +68,7 @@ public class StringizingShould
         Expression<Func<Student, bool>> expr1 = s => s.Age > 18;
         Expression<Func<Student, bool>> expr2 = s => s.Age > 18;
 
-        var result1 = Stringizing.ToString(expr1);
-        var result2 = Stringizing.ToString(expr2);
-
-        Assert.Equal(result1, result2);
+        Assert.Equal(Stringizing.ToString(expr1), Stringizing.ToString(expr2));
     }
 
     [Fact]
@@ -70,30 +76,16 @@ public class StringizingShould
         Expression<Func<Student, bool>> expr1 = s => s.Age > 18;
         Expression<Func<Student, bool>> expr2 = s => s.Age < 18;
 
-        var result1 = Stringizing.ToString(expr1);
-        var result2 = Stringizing.ToString(expr2);
-
-        Assert.NotEqual(result1, result2);
+        Assert.NotEqual(Stringizing.ToString(expr1), Stringizing.ToString(expr2));
     }
 
-    [Fact]
-    public void ToString_InstanceMethodCallWithOneArgument_RendersMethodWithAritySuffix() {
-        Expression<Func<Student, bool>> expr = s => s.FullName!.Contains("Al");
-
-        var result = Stringizing.ToString(expr);
-
-        Assert.Equal("(_p0) => _p0.FullName.Contains:1(\"Al\")", result);
-    }
 
     [Fact]
     public void ToString_DifferentlyNamedEquivalentLambdas_ProduceSameString() {
         Expression<Func<Student, bool>> alpha = student => student.Age > 18 && student.FullName == "Alice";
         Expression<Func<Student, bool>> beta  = x => x.Age > 18 && x.FullName == "Alice";
 
-        var alphaResult = Stringizing.ToString(alpha);
-        var betaResult  = Stringizing.ToString(beta);
-
-        Assert.Equal(alphaResult, betaResult);
+        Assert.Equal(Stringizing.ToString(alpha), Stringizing.ToString(beta));
     }
 
     [Fact]
@@ -102,7 +94,17 @@ public class StringizingShould
 
         var result = Stringizing.ToString(expr);
 
-        Assert.Equal("(_p0, _p1) => (_p0.Age > _p1.Age)", result);
+        Assert.NotNull(result);
+        Assert.Contains("_p0:", result);
+        Assert.Contains("_p1:", result);
+    }
+
+    [Fact]
+    public void ToString_DifferentParameterTypes_ProduceDistinctAliases() {
+        Expression<Func<Student, bool>> byStudent = s => s.Age > 18;
+        Expression<Func<Grade, bool>>   byGrade   = g => g.Level > 18;
+
+        Assert.NotEqual(Stringizing.ToString(byStudent), Stringizing.ToString(byGrade));
     }
 
     [Fact]
@@ -112,14 +114,15 @@ public class StringizingShould
 
         string en, de;
         using (new CultureSwitch("en-US")) {
-            en = Stringizing.ToString(expr);
+            en = Stringizing.ToString(expr)!;
         }
 
         using (new CultureSwitch("de-DE")) {
-            de = Stringizing.ToString(expr);
+            de = Stringizing.ToString(expr)!;
         }
 
         Assert.Equal(en, de);
+        Assert.StartsWith("dt", en);
     }
 
     [Fact]
@@ -128,14 +131,15 @@ public class StringizingShould
 
         string en, de;
         using (new CultureSwitch("en-US")) {
-            en = Stringizing.ToString(expr);
+            en = Stringizing.ToString(expr)!;
         }
 
         using (new CultureSwitch("de-DE")) {
-            de = Stringizing.ToString(expr);
+            de = Stringizing.ToString(expr)!;
         }
 
         Assert.Equal(en, de);
+        Assert.StartsWith("d:", en);
     }
 
     [Fact]
@@ -144,14 +148,15 @@ public class StringizingShould
 
         string en, de;
         using (new CultureSwitch("en-US")) {
-            en = Stringizing.ToString(expr);
+            en = Stringizing.ToString(expr)!;
         }
 
         using (new CultureSwitch("de-DE")) {
-            de = Stringizing.ToString(expr);
+            de = Stringizing.ToString(expr)!;
         }
 
         Assert.Equal(en, de);
+        Assert.StartsWith("f8:", en);
     }
 
     [Fact]
@@ -159,10 +164,7 @@ public class StringizingShould
         Expression<Func<Student, long>>   toLong   = s => s.Age;
         Expression<Func<Student, double>> toDouble = s => s.Age;
 
-        var left  = Stringizing.ToString(toLong);
-        var right = Stringizing.ToString(toDouble);
-
-        Assert.NotEqual(left, right);
+        Assert.NotEqual(Stringizing.ToString(toLong), Stringizing.ToString(toDouble));
     }
 
     [Fact]
@@ -171,20 +173,17 @@ public class StringizingShould
 
         var result = Stringizing.ToString(expr);
 
+        Assert.NotNull(result);
         Assert.Contains("IsNullOrEmpty", result);
-        Assert.Contains("String", result);
         Assert.DoesNotContain(".FullName.IsNullOrEmpty", result);
     }
 
     [Fact]
-    public void ToString_DifferentArityMethodCalls_ProduceDistinctStrings() {
+    public void ToString_DifferentParameterTypeLists_ProduceDistinctMethods() {
         Expression<Func<Student, bool>> one = s => s.FullName!.Contains("Al");
         Expression<Func<Student, bool>> two = s => s.FullName!.Contains("Al", StringComparison.Ordinal);
 
-        var left  = Stringizing.ToString(one);
-        var right = Stringizing.ToString(two);
-
-        Assert.NotEqual(left, right);
+        Assert.NotEqual(Stringizing.ToString(one), Stringizing.ToString(two));
     }
 
     [Fact]
@@ -193,6 +192,7 @@ public class StringizingShould
 
         var result = Stringizing.ToString(expr);
 
+        Assert.NotNull(result);
         Assert.Contains("?", result);
         Assert.Contains(":", result);
         Assert.Contains("adult", result);
@@ -240,6 +240,146 @@ public class StringizingShould
         var right = Stringizing.ToString(isGrade);
 
         Assert.NotEqual(left, right);
+    }
+
+    [Fact]
+    public void ToString_ControlCharacterAndLiteralEscape_ProduceDifferentKeys() {
+        Expression<Func<Student, bool>> control = s => s.FullName == "a\u001eb";
+        Expression<Func<Student, bool>> escaped = s => s.FullName == "a\\u001eb";
+
+        var controlKey = Stringizing.ToString(control);
+        var escapedKey = Stringizing.ToString(escaped);
+
+        Assert.NotNull(controlKey);
+        Assert.NotNull(escapedKey);
+        Assert.NotEqual(controlKey, escapedKey);
+    }
+
+    [Fact]
+    public void ToString_NumericConstantsOfDifferentTypes_AreTypeTagged() {
+        var intConstant    = (Expression)Expression.Constant(5);
+        var longConstant   = (Expression)Expression.Constant(5L);
+        var doubleConstant = (Expression)Expression.Constant(5d);
+
+        var intResult    = Stringizing.ToString(intConstant);
+        var longResult   = Stringizing.ToString(longConstant);
+        var doubleResult = Stringizing.ToString(doubleConstant);
+
+        Assert.NotEqual(intResult, longResult);
+        Assert.NotEqual(intResult, doubleResult);
+        Assert.Equal("i4:5", intResult);
+        Assert.Equal("i8:5", longResult);
+    }
+
+    [Fact]
+    public void ToString_CapturedArrayContents_ProduceDistinctStrings() {
+        var left  = (Expression)Expression.Constant(new[] { 1, 2 });
+        var right = (Expression)Expression.Constant(new[] { 1, 3 });
+        var again = (Expression)Expression.Constant(new[] { 1, 2 });
+
+        Assert.NotEqual(Stringizing.ToString(left), Stringizing.ToString(right));
+        Assert.Equal(Stringizing.ToString(left), Stringizing.ToString(again));
+    }
+
+    [Fact]
+    public void ToString_EmptyArraysOfDifferentElementTypes_ProduceDistinctStrings() {
+        var ints   = (Expression)Expression.Constant(Array.Empty<int>());
+        var strings = (Expression)Expression.Constant(Array.Empty<string>());
+
+        Assert.NotEqual(Stringizing.ToString(ints), Stringizing.ToString(strings));
+    }
+
+    [Fact]
+    public void ToString_UnknownReferenceConstant_ReturnsNull() {
+        var expr = (Expression)Expression.Constant(new object());
+
+        Assert.Null(Stringizing.ToString(expr));
+    }
+
+    [Fact]
+    public void ToString_QueryableConstant_ReturnsNullWithoutInstanceIdentity() {
+        var expr = (Expression)Expression.Constant(Array.Empty<Student>().AsQueryable());
+
+        Assert.Null(Stringizing.ToString(expr));
+    }
+
+    [Fact]
+    public void ToString_NewArrayExpression_ReturnsNullInsteadOfDroppingSemantics() {
+        var expr = Expression.NewArrayInit(typeof(int), Expression.Constant(1));
+
+        Assert.Null(Stringizing.ToString(expr));
+    }
+
+    [Fact]
+    public void ToString_ClosedMethodCall_RendersIdentityWithoutInvoking() {
+        Expression<Func<Student, bool>> expr = s => s.Age > BumpCounter();
+
+        var result = Stringizing.ToString(expr);
+
+        Assert.NotNull(result);
+        Assert.Equal(0, ClosedCallCount);
+        Assert.Contains("BumpCounter", result);
+    }
+
+
+    [Fact]
+    public void ToString_ClosureFieldValues_FoldToDistinctConstants() {
+        var low  = 10;
+        var high = 11;
+        Expression<Func<Student, bool>> l = s => s.Age > low;
+        Expression<Func<Student, bool>> h = s => s.Age > high;
+
+        var left  = Stringizing.ToString(l);
+        var right = Stringizing.ToString(h);
+
+        Assert.NotEqual(left, right);
+        Assert.Contains("i4:10", left);
+    }
+
+    [Fact]
+    public void ToStructure_QueryableConstants_AreOpaqueMarkersWithoutInstanceIdentity() {
+        var first  = (Expression)Expression.Constant(Array.Empty<Student>().AsQueryable());
+        var second = (Expression)Expression.Constant(Array.Empty<Student>().AsQueryable());
+
+        var left  = Stringizing.ToStructure(first);
+        var right = Stringizing.ToStructure(second);
+
+        Assert.NotNull(left);
+        Assert.Equal(left, right);
+        Assert.Contains("root:", left);
+    }
+
+    [Fact]
+    public void ToStructure_ProviderRootExtension_RendersSingleOpaqueMarker() {
+        var result = Stringizing.ToStructure(new ExtensionNode());
+
+        Assert.NotNull(result);
+        Assert.Contains("xroot:", result);
+    }
+
+    [Fact]
+    public void ToStructure_SecondExtensionNode_ReturnsNull() {
+        var tree = Expression.Equal(new ExtensionNode(), new ExtensionNode());
+
+        Assert.Null(Stringizing.ToStructure(tree));
+    }
+
+    [Fact]
+    public void ToString_ExtensionNode_ReturnsNullInsteadOfDroppingSemantics() {
+        Assert.Null(Stringizing.ToString(new ExtensionNode()));
+    }
+    private static int ClosedCallCount;
+
+    private static int BumpCounter() {
+        ClosedCallCount++;
+        return ClosedCallCount;
+    }
+
+    private sealed class ExtensionNode : Expression
+    {
+        public override ExpressionType NodeType => ExpressionType.Extension;
+
+        public override Type Type => typeof(object);
     }
 
     #region Nested type: CultureSwitch

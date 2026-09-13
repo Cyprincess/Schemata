@@ -78,14 +78,29 @@ Generation metadata stays unexpired. Losing or removing it causes a fresh random
 
 ## Cache key generation
 
-Cache keys for queries are derived from the LINQ expression tree:
+Cache keys combine provider command identity with the query's structural identity:
 
-1. `Evaluator.PartialEval` (from `Schemata.Common`, invoked by `Stringizing` with a cache-specific predicate that keeps composite nodes structural) folds captured local variables and other closed sub-expressions to constants, so different values of a captured variable produce different keys.
-2. `Stringizing.ToString(expression)` walks the evaluated expression tree and produces a deterministic string. Lambda parameters are renamed `_p0`, `_p1`, … in discovery order, and `IFormattable` values use the invariant culture, so equivalent queries stringize identically. Custom (`ExpressionType.Extension`) nodes are treated as opaque: the walk does not descend into them.
-3. The return type's `typeof(T).FullName` is appended, separated by `\x1e` (ASCII Record Separator).
-4. The combined string is hashed (CityHash128) and prefixed with the Schemata framework GUID and the `entity` domain marker via `ToCacheKey`.
+1. The repository implements `IQueryCacheKeyProvider`. EF Core translates the query with
+   `CreateDbCommand`; LinqToDB uses `ToSqlQuery` with parameter inlining disabled. The key includes
+   the provider, data-source identity, SQL, and ordered parameter names, database types, and values.
+2. `QueryCacheKey.Create` encodes supported scalar and scalar-array values with type and length
+   boundaries, then hashes the material with SHA-256. Connection strings and parameter values
+   stay out of the returned key. Unsupported parameter values disable caching for that query.
+3. `Stringizing.ToStructure` adds the LINQ structure, including client projection member/method
+   identities and captured field values. Partial evaluation preserves calls, property reads,
+   constructors, user operators, and byref-like expressions. One provider root is represented by
+   an opaque marker alongside the provider key; additional extension nodes and unsupported shapes
+   disable caching rather than using a debug-string fallback.
+4. `QueryContext.Operation` distinguishes `FirstOrDefault`, `SingleOrDefault`, `Any`, `Count`, and
+   `LongCount`. The result type is included, so a cached first result cannot bypass a later
+   single-result cardinality check.
+5. The combined identity is hashed through `ToCacheKey` and paired with the root entity generation.
 
-Two queries that produce the same LINQ expression tree and target the same return type share a result key within the same root entity type and generation.
+Repositories without `IQueryCacheKeyProvider`, non-relational EF providers, and ephemeral SQLite
+connections bypass both cache reads and fills. File-backed relational queries retain caching.
+Applications whose connection session or interceptors change query meaning independently of the
+captured identity must suppress caching for those operations. Cross-entity invalidation retains
+the root-entity limitation described below.
 
 ## Commit-time eviction
 

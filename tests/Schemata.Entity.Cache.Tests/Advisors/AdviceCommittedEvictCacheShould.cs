@@ -20,7 +20,7 @@ public class AdviceCommittedEvictCacheShould
         using var cache = new QueryCacheTestContext();
         var captured = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var old = cache.Query<int>();
+        var old = cache.Query<int>(QueryOperation.Count);
         async Task FinishOldRead() {
             await cache.Read(old);
             captured.SetResult();
@@ -31,7 +31,7 @@ public class AdviceCommittedEvictCacheShould
         try {
             await captured.Task.WaitAsync(TimeSpan.FromSeconds(10));
             await cache.Commit(new() { Updated = [new Student()] });
-            var current = cache.Query<int>();
+            var current = cache.Query<int>(QueryOperation.Count);
             Assert.Equal(AdviseResult.Continue, await cache.Read(current));
             await cache.Fill(current, 9);
         } finally {
@@ -39,56 +39,56 @@ public class AdviceCommittedEvictCacheShould
         }
         await pending;
 
-        var next = cache.Query<int>();
+        var next = cache.Query<int>(QueryOperation.Count);
         Assert.Equal(AdviseResult.Handle, await cache.Read(next));
         Assert.Equal(9, next.Result);
         await cache.Commit(new() { Updated = [new Student()] });
-        Assert.Equal(AdviseResult.Continue, await cache.Read(cache.Query<int>()));
+        Assert.Equal(AdviseResult.Continue, await cache.Read(cache.Query<int>(QueryOperation.Count)));
     }
 
     [Fact]
     public async Task Commit_WithAddedEntity_InvalidatesCountAndProjection() {
         using var cache = new QueryCacheTestContext();
-        var count = cache.Query<int>();
+        var count = cache.Query<int>(QueryOperation.Count);
         var data = Array.Empty<Student>().AsQueryable().Select(s => new StudentDto(s.Uid, s.FullName));
-        var projection = new QueryContext<Student, StudentDto, StudentDto>(cache.Repository, data);
+        var projection = new QueryContext<Student, StudentDto, StudentDto>(cache.Repository, QueryOperation.FirstOrDefault, data);
         await cache.Read(count);
         await cache.Fill(count, 7);
         await cache.Read(projection);
         await cache.Fill(projection, new StudentDto(Guid.NewGuid(), "Alice"));
-        Assert.Equal(AdviseResult.Handle, await cache.Read(cache.Query<int>()));
+        Assert.Equal(AdviseResult.Handle, await cache.Read(cache.Query<int>(QueryOperation.Count)));
         Assert.Equal(AdviseResult.Handle,
-            await cache.Read(new QueryContext<Student, StudentDto, StudentDto>(cache.Repository, data)));
+            await cache.Read(new QueryContext<Student, StudentDto, StudentDto>(cache.Repository, QueryOperation.FirstOrDefault, data)));
 
         await cache.Commit(new() { Added = [new Student()] });
 
-        Assert.Equal(AdviseResult.Continue, await cache.Read(cache.Query<int>()));
+        Assert.Equal(AdviseResult.Continue, await cache.Read(cache.Query<int>(QueryOperation.Count)));
         Assert.Equal(AdviseResult.Continue,
-            await cache.Read(new QueryContext<Student, StudentDto, StudentDto>(cache.Repository, data)));
+            await cache.Read(new QueryContext<Student, StudentDto, StudentDto>(cache.Repository, QueryOperation.FirstOrDefault, data)));
     }
 
     [Fact]
     public async Task Commit_WithRemovedEntity_InvalidatesPreviouslyCachedResult() {
         using var cache = new QueryCacheTestContext();
-        var query = cache.Query<Student>();
+        var query = cache.Query<Student>(QueryOperation.FirstOrDefault);
         await cache.Read(query);
         await cache.Fill(query, new Student { FullName = "Alice" });
         await cache.Commit(new() { Removed = [new Student()] });
-        Assert.Equal(AdviseResult.Continue, await cache.Read(cache.Query<Student>()));
+        Assert.Equal(AdviseResult.Continue, await cache.Read(cache.Query<Student>(QueryOperation.FirstOrDefault)));
     }
 
     [Fact]
     public async Task Commit_BetweenNestedQueries_PreservesEachQuerySnapshot() {
         using var cache = new QueryCacheTestContext();
-        var outer = cache.Query<int>();
+        var outer = cache.Query<int>(QueryOperation.Count);
         await cache.Read(outer);
         await cache.Commit(new() { Updated = [new Student()] });
-        var inner = cache.Query<int>();
+        var inner = cache.Query<int>(QueryOperation.Count);
         await cache.Read(inner);
         await cache.Fill(inner, 9);
         await cache.Fill(outer, 7);
 
-        var current = cache.Query<int>();
+        var current = cache.Query<int>(QueryOperation.Count);
         Assert.Equal(AdviseResult.Handle, await cache.Read(current));
         Assert.Equal(9, current.Result);
     }
@@ -96,7 +96,7 @@ public class AdviceCommittedEvictCacheShould
     [Fact]
     public async Task Commit_WithConcurrentInvalidations_DoesNotReuseIntermediateGeneration() {
         using var cache = new QueryCacheTestContext();
-        var old = cache.Query<int>();
+        var old = cache.Query<int>(QueryOperation.Count);
         await cache.Read(old);
         await cache.Fill(old, 7);
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -115,14 +115,14 @@ public class AdviceCommittedEvictCacheShould
         try {
             await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
             await cache.Commit(new() { Updated = [new Student()] });
-            var intermediate = cache.Query<int>();
+            var intermediate = cache.Query<int>(QueryOperation.Count);
             await cache.Read(intermediate);
             await cache.Fill(intermediate, 9);
         } finally {
             release.TrySetResult();
         }
         await first;
-        Assert.Equal(AdviseResult.Continue, await cache.Read(cache.Query<int>()));
+        Assert.Equal(AdviseResult.Continue, await cache.Read(cache.Query<int>(QueryOperation.Count)));
     }
 
     [Theory]
@@ -131,7 +131,7 @@ public class AdviceCommittedEvictCacheShould
     [InlineData("EvictionDisabled")]
     public async Task Commit_WhenEvictionDoesNotApply_PreservesCachedResult(string condition) {
         using var cache = new QueryCacheTestContext();
-        var query = cache.Query<int>();
+        var query = cache.Query<int>(QueryOperation.Count);
         await cache.Read(query);
         await cache.Fill(query, 7);
         cache.Options.EvictionEnabled = condition != "EvictionDisabled";
@@ -140,7 +140,7 @@ public class AdviceCommittedEvictCacheShould
         }
         await cache.Commit(condition == "NoChanges" ? new() : new() { Updated = [new Student()] });
 
-        var next = cache.Query<int>();
+        var next = cache.Query<int>(QueryOperation.Count);
         Assert.Equal(AdviseResult.Handle, await cache.Read(next));
         Assert.Equal(7, next.Result);
     }
@@ -148,12 +148,12 @@ public class AdviceCommittedEvictCacheShould
     [Fact]
     public async Task Commit_WhenQueryCacheSuppressed_StillInvalidatesCachedResult() {
         using var cache = new QueryCacheTestContext();
-        var query = cache.Query<int>();
+        var query = cache.Query<int>(QueryOperation.Count);
         await cache.Read(query);
         await cache.Fill(query, 7);
         using (cache.Advice.Use<QueryCacheSuppressed>()) {
             await cache.Commit(new() { Updated = [new Student()] });
         }
-        Assert.Equal(AdviseResult.Continue, await cache.Read(cache.Query<int>()));
+        Assert.Equal(AdviseResult.Continue, await cache.Read(cache.Query<int>(QueryOperation.Count)));
     }
 }
