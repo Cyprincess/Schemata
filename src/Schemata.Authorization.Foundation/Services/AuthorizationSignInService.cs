@@ -199,16 +199,14 @@ public sealed class AuthorizationSignInService<TApp>(
 
         if (ScopeParser.Contains(scope, Scopes.OpenId)
          && SchemataAuthenticationHandler<TApp>.IsUserGrant(items)) {
-            var idClaims = id;
+            var idClaims = WithSession(id, sid);
+
             if (items.TryGetValue(Properties.DeviceSecret, out var deviceSecret)
              && !string.IsNullOrWhiteSpace(deviceSecret)) {
                 response.DeviceSecret = deviceSecret;
-                idClaims = [..id];
+                idClaims = [..idClaims];
                 var signing = await issuer.ResolveSigningCredentials(ct);
                 idClaims.Add(new Claim(Claims.DsHash, TokenService.ComputeHash(deviceSecret, signing)));
-                if (!string.IsNullOrWhiteSpace(sid)) {
-                    idClaims.Add(new Claim(Claims.SessionId, sid));
-                }
             }
 
             response.IdToken = await SchemataAuthenticationHandler<TApp>.CreateIdToken(
@@ -279,7 +277,8 @@ public sealed class AuthorizationSignInService<TApp>(
          && ScopeParser.Contains(scope, Scopes.OpenId)
          && SchemataAuthenticationHandler<TApp>.IsUserGrant(items)) {
             parameters[Parameters.IdToken] = await SchemataAuthenticationHandler<TApp>.CreateIdToken(
-                issuer, items, id, config.Value.IdTokenLifetime, at, parameters.GetValueOrDefault(Parameters.Code));
+                issuer, items, WithSession(id, sid), config.Value.IdTokenLifetime, at,
+                parameters.GetValueOrDefault(Parameters.Code));
         }
 
         if (services.GetService(typeof(Microsoft.AspNetCore.Http.IHttpContextAccessor))
@@ -292,6 +291,13 @@ public sealed class AuthorizationSignInService<TApp>(
         }
 
         return new(redirectUri, parameters, ResponseModeService.ResolveMode(responseMode, responseType));
+    }
+
+    private static List<Claim> WithSession(List<Claim> claims, string? sid) {
+        return string.IsNullOrWhiteSpace(sid)
+               || claims.Any(claim => claim.Type == Claims.SessionId)
+            ? claims
+            : [..claims, new Claim(Claims.SessionId, sid)];
     }
 
     private async Task<string> CreateAuthorizationCodeAsync(

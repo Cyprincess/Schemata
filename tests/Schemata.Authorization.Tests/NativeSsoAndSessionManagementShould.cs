@@ -328,6 +328,41 @@ public class DeviceSsoShould
     }
 
     [Fact]
+    public async Task Include_The_Session_In_An_Id_Token_Without_Issuing_A_Device_Secret() {
+        var options = new SchemataAuthorizationOptions { Issuer = Issuer, AccessTokenFormat = TokenFormats.Jwt };
+        var issuer = TestSecurityKeys.CreateTokenService(options, time: FixedTime());
+        var app = NativeApplication("native-client");
+        var apps = new Mock<IApplicationManager<SchemataApplication>>();
+        apps.Setup(a => a.FindByClientIdAsync(app.ClientId, It.IsAny<CancellationToken>())).ReturnsAsync(app);
+        var tokens = NewTokenStore();
+        tokens.Setup(t => t.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>()))
+              .ReturnsAsync((SchemataToken token, CancellationToken _) => token);
+        using var provider = new ServiceCollection()
+                            .AddSingleton<IClaimsAdvisor>(new AdviceClaimsAudience(Options.Create(options)))
+                            .AddSingleton<IDestinationAdvisor>(new AdviceDestinationSubject())
+                            .BuildServiceProvider();
+        var service = new AuthorizationSignInService<SchemataApplication>(
+            Options.Create(options), Options.Create(new JsonSerializerOptions()), issuer,
+            apps.Object, tokens.Object, provider, FixedTime());
+        var principal = new ClaimsPrincipal(new ClaimsIdentity([
+            new(IdentityClaims.Subject, "user-1"),
+            new(Claims.ClientId, app.ClientId!),
+        ], "grant"));
+
+        var issued = await service.IssueAsync(principal, new Dictionary<string, string?> {
+            [Properties.GrantType] = GrantTypes.TokenExchange,
+            [Properties.Scope] = Scopes.OpenId,
+            [Properties.SessionId] = "sid-1",
+        }, AuthorizationSignInResponseKind.Token);
+
+        Assert.NotNull(issued.Token?.IdToken);
+        var idToken = new JsonWebTokenHandler().ReadJsonWebToken(issued.Token.IdToken);
+        Assert.Equal("sid-1", idToken.Claims.Single(claim => claim.Type == Claims.SessionId).Value);
+        Assert.Null(issued.Token.DeviceSecret);
+        Assert.DoesNotContain(idToken.Claims, claim => claim.Type == Claims.DsHash);
+    }
+
+    [Fact]
     public async Task Return_A_Canonical_SignIn_For_A_Valid_Native_Sso_Profile() {
         using var fixture = await NativeExchangeFixture();
         fixture.Request.Resource = ["https://resource.example/api"];

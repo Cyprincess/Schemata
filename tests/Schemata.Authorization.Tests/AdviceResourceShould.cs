@@ -52,6 +52,8 @@ public class AdviceResourceShould
         [Theory]
         [InlineData("https://cal.example.com/")]
         [InlineData("https://cal.example.com/app?q=scim")]
+        [InlineData("urn:example:api")]
+        [InlineData("foo:bar")]
         public async Task Accept_Well_Formed_Resource_Values(string resource) {
             var (advisor, ctx) = Create();
             var authz = new AuthorizeContext<SchemataApplication> { Request = new() { Resource = [resource] } };
@@ -64,8 +66,6 @@ public class AdviceResourceShould
         [Theory]
         [InlineData("cal.example.com")]
         [InlineData("https://cal.example.com/#row")]
-        [InlineData("urn:example:api")]
-        [InlineData("foo:bar")]
         public async Task Reject_Malformed_Resource_Values_With_InvalidTarget(string resource) {
             var (advisor, ctx) = Create();
             var authz = new AuthorizeContext<SchemataApplication> {
@@ -107,19 +107,22 @@ public class AdviceResourceShould
             return (advisor, new(sp));
         }
 
-        [Fact]
-        public async Task Adopt_The_Requested_Resources_For_Client_Credentials() {
+        [Theory]
+        [InlineData("https://cal.example.com/")]
+        [InlineData("urn:example:api")]
+        [InlineData("foo:bar")]
+        public async Task Adopt_The_Requested_Resource_For_Client_Credentials(string resource) {
             var (advisor, ctx) = Create();
             var request = new TokenRequest {
                 GrantType = GrantTypes.ClientCredentials,
-                Resource  = [ResourceA, ResourceB],
+                Resource  = [resource],
             };
 
             var result = await advisor.AdviseAsync(ctx, new(), request);
 
             Assert.Equal(AdviseResult.Continue, result);
             Assert.True(ctx.TryGet<ResourceIndicators>(out var adopted));
-            Assert.Equal([ResourceA, ResourceB], adopted!.Values);
+            Assert.Equal([resource], adopted!.Values);
         }
 
         [Theory]
@@ -139,8 +142,8 @@ public class AdviceResourceShould
         }
 
         [Theory]
-        [InlineData("urn:example:api")]
         [InlineData("https://cal.example.com/#row")]
+        [InlineData("cal.example.com")]
         public async Task Reject_Malformed_Resource_Values_With_InvalidTarget(string resource) {
             var (advisor, ctx) = Create();
             var request = new TokenRequest {

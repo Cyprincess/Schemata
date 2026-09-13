@@ -91,6 +91,35 @@ public class AuthorizationSignInServiceShould
     }
 
     [Fact]
+    public async Task Include_The_Session_In_A_Hybrid_Callback_Id_Token() {
+        using var provider = new ServiceCollection()
+                            .AddSingleton<IClaimsAdvisor>(new AdviceClaimsAudience(
+                                Options.Create(new SchemataAuthorizationOptions {
+                                    Issuer = "https://issuer.example",
+                                })))
+                            .BuildServiceProvider();
+        var (service, tokens) = Create(provider);
+        tokens.Setup(value => value.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>()))
+              .ReturnsAsync((SchemataToken? token, CancellationToken _) => token);
+        var principal = new ClaimsPrincipal(new ClaimsIdentity([
+            new(IdentityClaims.Subject, "user-1"),
+            new(Claims.ClientId, "client-1"),
+        ], "authorize"));
+
+        var result = await service.IssueAsync(principal, new Dictionary<string, string?> {
+            [Properties.GrantType] = GrantTypes.AuthorizationCode,
+            [Properties.ResponseType] = $"{ResponseTypes.Code} {ResponseTypes.IdToken}",
+            [Properties.RedirectUri] = "https://client.example/callback",
+            [Properties.Scope] = Scopes.OpenId,
+            [Properties.SessionId] = "sid-1",
+        }, AuthorizationSignInResponseKind.Callback);
+
+        var idToken = new JsonWebTokenHandler().ReadJsonWebToken(
+            result.Callback!.Parameters[Parameters.IdToken]);
+        Assert.Equal("sid-1", idToken.Claims.Single(claim => claim.Type == Claims.SessionId).Value);
+    }
+
+    [Fact]
     public async Task Establish_And_Restore_The_Ambient_Context_When_Standalone() {
         var observer = new ObservingClaimsAdvisor();
         using var provider = new ServiceCollection()

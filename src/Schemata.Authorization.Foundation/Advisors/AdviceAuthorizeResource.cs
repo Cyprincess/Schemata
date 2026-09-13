@@ -18,28 +18,16 @@ public static class AdviceAuthorizeResource
     public const int DefaultOrder = AdviceAuthorizeScopeValidation.DefaultOrder + 10_000_000;
 
     /// <summary>
-    ///     RFC 8707 §2 resource syntax: an absolute URI (scheme and host present) that carries no
-    ///     fragment component and does not use the <c>urn</c> scheme. A query component is allowed;
-    ///     the spec only discourages it.
+    ///     RFC 8707 §2 resource syntax: an absolute URI without a fragment component. A query
+    ///     component is allowed; the spec only discourages it.
     /// </summary>
     internal static bool IsValidTarget(string? resource) {
         if (string.IsNullOrWhiteSpace(resource)) {
             return false;
         }
 
-        if (!Uri.TryCreate(resource, UriKind.Absolute, out var uri)) {
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(uri.Host)) {
-            return false;
-        }
-
-        if (uri.Fragment.Length > 0) {
-            return false;
-        }
-
-        return !string.Equals(uri.Scheme, "urn", StringComparison.OrdinalIgnoreCase);
+        return Uri.TryCreate(resource, UriKind.Absolute, out var uri)
+               && uri.Fragment.Length == 0;
     }
 }
 
