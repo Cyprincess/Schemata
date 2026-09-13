@@ -56,7 +56,7 @@ public sealed class ProcessDefinitionQueryEntryEquivalenceShould
         };
         var action = await controller.ListProcessDefinitions();
         var json   = Assert.IsType<JsonResult>(action);
-        var http   = Assert.IsType<ListResultBase<ProcessDefinitionInfo>>(json.Value).Entities;
+        var http   = Assert.IsType<ListResultBase<ProcessDefinitionInfo, ProcessDefinitionInfo>>(json.Value).Entities;
         Assert.Equal(2, advisor.Count);
 
         var service = new ProcessDefinitionService(dispatcher);

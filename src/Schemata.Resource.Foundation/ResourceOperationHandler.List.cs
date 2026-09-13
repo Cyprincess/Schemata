@@ -36,8 +36,8 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     /// <param name="request">The list request with filter, order, paging, and parent parameters.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
     /// <param name="ct">A cancellation token.</param>
-    /// <returns>A <see cref="ListResultBase{TSummary}" /> with summaries and an optional next page token.</returns>
-    public async Task<ListResultBase<TSummary>> ListAsync(
+    /// <returns>A <see cref="ListResultBase{TEntity,TSummary}" /> with summaries and an optional next page token.</returns>
+    public async Task<ListResultBase<TEntity, TSummary>> ListAsync(
         ListRequest        request,
         ClaimsPrincipal?   principal,
         CancellationToken? ct
@@ -48,7 +48,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
 
         var container = new ResourceRequestContainer<TEntity>();
 
-        var requestResult = await RunPipelineAsync<ListResultBase<TSummary>>(
+        var requestResult = await RunPipelineAsync<ListResultBase<TEntity, TSummary>>(
             ctx,
             () => Advisor.For<IResourceListRequestAdvisor<TEntity>>()
                          .RunAsync(ctx, request, container, principal, ct.Value), CollectionNotFound);

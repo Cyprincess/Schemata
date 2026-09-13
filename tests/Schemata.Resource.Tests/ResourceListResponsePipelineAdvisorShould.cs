@@ -52,7 +52,7 @@ public class ResourceListResponsePipelineAdvisorShould
         using var services = BuildServices<Summary>(repository.Object, mapper.Object);
         var dispatcher = new InProcessRequestDispatcher(services);
 
-        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Summary>>(
+        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(
             new(new(), null), CancellationToken.None);
 
         Assert.NotNull(result.Entities);
@@ -76,7 +76,7 @@ public class ResourceListResponsePipelineAdvisorShould
         using var services = BuildServices<Summary>(repository.Object, mapper.Object);
         var dispatcher = new InProcessRequestDispatcher(services);
 
-        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Summary>>(
+        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(
             new(new(), null), CancellationToken.None);
 
         Assert.NotNull(result.Entities);
@@ -103,7 +103,7 @@ public class ResourceListResponsePipelineAdvisorShould
         using var services = BuildServices<PlainSummary>(repository.Object, mapper.Object);
         var dispatcher = new InProcessRequestDispatcher(services);
 
-        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, PlainSummary>, ListResultBase<PlainSummary>>(
+        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, PlainSummary>, ListResultBase<Entity, PlainSummary>>(
             new(new(), null), CancellationToken.None);
 
         Assert.NotNull(result.Entities);
@@ -115,7 +115,7 @@ public class ResourceListResponsePipelineAdvisorShould
         var advisor  = new ResourceListResponsePipelineAdvisor<Entity, Summary>();
         var ctx      = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var envelope = new ListResourceQueryRequest<Entity, Summary>(new(), null);
-        var response = new ListResultBase<Summary> { Entities = null, TotalSize = 5 };
+        var response = new ListResultBase<Entity, Summary> { Entities = null, TotalSize = 5 };
         var calls    = 0;
 
         var result = await advisor.AdviseAsync(ctx, envelope, _ => {
@@ -142,7 +142,7 @@ public class ResourceListResponsePipelineAdvisorShould
 
         Assert.Contains(services, service =>
             service.ServiceType
-         == typeof(IRequestPipelineAdvisor<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Summary>>)
+         == typeof(IRequestPipelineAdvisor<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>)
          && service.ImplementationType == typeof(ResourceListResponsePipelineAdvisor<Entity, Summary>)
          && service.Lifetime == ServiceLifetime.Scoped);
     }
@@ -167,12 +167,12 @@ public class ResourceListResponsePipelineAdvisorShould
             s => s.Configure<SchemataResourceOptions>(o => o.TotalSize = TotalSizeMode.Estimated));
         var dispatcher = new InProcessRequestDispatcher(services);
 
-        var first = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Summary>>(
+        var first = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(
             new(new() { PageSize = 1 }, null), CancellationToken.None);
         Assert.Equal(estimate is null ? null : (int?)0, first.TotalSize);
         Assert.Equal("e1", Assert.Single(first.Entities!).Name);
         Assert.NotNull(first.NextPageToken);
-        var second = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Summary>>(
+        var second = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(
             new(new() { PageSize = 1, PageToken = first.NextPageToken }, null), CancellationToken.None);
         Assert.Equal("e2", Assert.Single(second.Entities!).Name);
         Assert.Null(second.NextPageToken);
@@ -214,7 +214,7 @@ public class ResourceListResponsePipelineAdvisorShould
         });
 
         var dispatcher = new InProcessRequestDispatcher(services);
-        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Summary>>(
+        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(
             new(new() { Filter = "selected", PageSize = 1, Skip = 1 }, null), CancellationToken.None);
 
         Assert.Equal(20, result.TotalSize);
@@ -233,7 +233,7 @@ public class ResourceListResponsePipelineAdvisorShould
             s => s.Configure<SchemataResourceOptions>(o => o.TotalSize = TotalSizeMode.None));
 
         var dispatcher = new InProcessRequestDispatcher(services);
-        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Summary>>(
+        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(
             new(new(), null), CancellationToken.None);
 
         Assert.Null(result.TotalSize);
@@ -259,7 +259,7 @@ public class ResourceListResponsePipelineAdvisorShould
             s => s.Configure<SchemataResourceOptions>(o => o.TotalSize = TotalSizeMode.Estimated));
 
         var dispatcher = new InProcessRequestDispatcher(services);
-        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Summary>>(
+        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(
             new(new(), null), CancellationToken.None);
 
         Assert.Equal(int.MaxValue, result.TotalSize);
@@ -284,7 +284,7 @@ public class ResourceListResponsePipelineAdvisorShould
 
         var dispatcher = new InProcessRequestDispatcher(services);
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Summary>>(
+            dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(
                 new(new(), null), CancellationToken.None));
         Assert.True(estimated);
     }
@@ -319,7 +319,7 @@ public class ResourceListResponsePipelineAdvisorShould
         });
 
         var dispatcher = new InProcessRequestDispatcher(services);
-        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Summary>>(
+        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(
             new(new() { Filter = "selected", PageSize = 1 }, null), CancellationToken.None);
 
         Assert.Null(result.TotalSize);
@@ -361,10 +361,10 @@ public class ResourceListResponsePipelineAdvisorShould
         services.AddDataProtection();
         services.AddSingleton<ResourceOperationHandler<Entity, Request, Detail, TSummary>>();
         services.AddSingleton<
-            IRequestHandler<ListResourceQueryRequest<Entity, TSummary>, ListResultBase<TSummary>>,
+            IRequestHandler<ListResourceQueryRequest<Entity, TSummary>, ListResultBase<Entity, TSummary>>,
             DefaultListResourceHandler<Entity, Request, Detail, TSummary>>();
         services.AddSingleton<
-            IRequestPipelineAdvisor<ListResourceQueryRequest<Entity, TSummary>, ListResultBase<TSummary>>>(
+            IRequestPipelineAdvisor<ListResourceQueryRequest<Entity, TSummary>, ListResultBase<Entity, TSummary>>>(
             new ResourceListResponsePipelineAdvisor<Entity, TSummary>());
         configure?.Invoke(services);
 

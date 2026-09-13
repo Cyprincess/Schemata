@@ -24,6 +24,6 @@ public sealed class ProcessDefinitionsController(
     public async Task<IActionResult> ListProcessDefinitions() {
         var results = await dispatcher.SendAsync<ListProcessDefinitionsQuery, IReadOnlyList<ProcessDefinitionInfo>>(
             new(), HttpContext.RequestAborted);
-        return new JsonResult(new ListResultBase<ProcessDefinitionInfo> { Entities = results.ToList() }, json.Value);
+        return new JsonResult(new ListResultBase<ProcessDefinitionInfo, ProcessDefinitionInfo> { Entities = results.ToList() }, json.Value);
     }
 }

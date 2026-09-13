@@ -76,7 +76,7 @@ public sealed class ResourceAuthorizationRegistrationShould
         VerifyAuthorization<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>(services, new(new(), null), nameof(Operations.Create));
         VerifyAuthorization<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>(services, new("entities/e1", new(), null), nameof(Operations.Update));
         VerifyAuthorization<GetResourceQueryRequest<Entity, Detail>, GetResultBase<Detail>>(services, new(new(), null), nameof(Operations.Get));
-        VerifyAuthorization<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Summary>>(services, new(new(), null), nameof(Operations.List));
+        VerifyAuthorization<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(services, new(new(), null), nameof(Operations.List));
         VerifyAuthorization<DeleteResourceRequest<Entity, Detail>, DeleteResultBase<Detail>>(services, new("entities/e1", null, null), nameof(Operations.Delete));
         VerifyAuthorization<ResourceMethodRequest<Entity, MethodRequest, MethodResponse>, MethodResponse>(services, new("archive", "entities/e1", new(), null), "archive");
     }
@@ -340,9 +340,9 @@ public sealed class ResourceAuthorizationRegistrationShould
         using var scope = provider.CreateScope();
         var envelope = new ListResourceQueryRequest<AnonymousEntity, Summary>(request, null);
         var context = new AdviceContext(scope.ServiceProvider);
-        var advisors = scope.ServiceProvider.GetServices<IRequestPipelineAdvisor<ListResourceQueryRequest<AnonymousEntity, Summary>, ListResultBase<Summary>>>().ToArray();
-        var authentication = Assert.Single(advisors.OfType<AuthenticationPipelineAdvisor<ListResourceQueryRequest<AnonymousEntity, Summary>, ListResultBase<Summary>>>());
-        var authorization = Assert.Single(advisors.OfType<AuthorizationPipelineAdvisor<ListResourceQueryRequest<AnonymousEntity, Summary>, ListResultBase<Summary>>>());
+        var advisors = scope.ServiceProvider.GetServices<IRequestPipelineAdvisor<ListResourceQueryRequest<AnonymousEntity, Summary>, ListResultBase<AnonymousEntity, Summary>>>().ToArray();
+        var authentication = Assert.Single(advisors.OfType<AuthenticationPipelineAdvisor<ListResourceQueryRequest<AnonymousEntity, Summary>, ListResultBase<AnonymousEntity, Summary>>>());
+        var authorization = Assert.Single(advisors.OfType<AuthorizationPipelineAdvisor<ListResourceQueryRequest<AnonymousEntity, Summary>, ListResultBase<AnonymousEntity, Summary>>>());
         var listAdvisors = scope.ServiceProvider.GetServices<IResourceListRequestAdvisor<AnonymousEntity>>().OrderBy(advisor => advisor.Order).ToArray();
         var container = new ResourceRequestContainer<AnonymousEntity>();
         var calls = 0;

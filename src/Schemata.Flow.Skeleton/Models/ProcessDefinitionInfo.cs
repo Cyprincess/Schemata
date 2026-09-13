@@ -5,7 +5,7 @@ namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>
 ///     Wire-friendly summary of a registered <see cref="ProcessDefinition" />, used as
-///     the element type of <c>ListResultBase&lt;ProcessDefinitionInfo&gt;</c>. The BPMN
+///     the element type of <c>ListResultBase&lt;ProcessDefinitionInfo, ProcessDefinitionInfo&gt;</c>. The BPMN
 ///     definition name is embedded in <see cref="ICanonicalName.CanonicalName" />.
 /// </summary>
 [CanonicalName("definitions/{definition}")]

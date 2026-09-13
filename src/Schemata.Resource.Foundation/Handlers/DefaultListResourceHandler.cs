@@ -9,13 +9,13 @@ namespace Schemata.Resource.Foundation.Handlers;
 
 internal sealed class DefaultListResourceHandler<TEntity, TRequest, TDetail, TSummary>(
     ResourceOperationHandler<TEntity, TRequest, TDetail, TSummary> operation
-) : IRequestHandler<ListResourceQueryRequest<TEntity, TSummary>, ListResultBase<TSummary>>
+) : IRequestHandler<ListResourceQueryRequest<TEntity, TSummary>, ListResultBase<TEntity, TSummary>>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
     where TDetail : class, ICanonicalName
     where TSummary : class, ICanonicalName
 {
-    public Task<ListResultBase<TSummary>> HandleAsync(
+    public Task<ListResultBase<TEntity, TSummary>> HandleAsync(
         ListResourceQueryRequest<TEntity, TSummary> request,
         CancellationToken                  ct = default
     ) {

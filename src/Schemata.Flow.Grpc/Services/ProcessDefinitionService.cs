@@ -14,7 +14,7 @@ public sealed class ProcessDefinitionService(IQueryDispatcher dispatcher) : IPro
 {
     #region IProcessDefinitionService Members
 
-    public async ValueTask<ListResultBase<ProcessDefinitionInfo>> ListProcessDefinitionsAsync(
+    public async ValueTask<ListResultBase<ProcessDefinitionInfo, ProcessDefinitionInfo>> ListProcessDefinitionsAsync(
         ListRequest request,
         CallContext context = default
     ) {

@@ -79,7 +79,7 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
 
         if (IsAllowed(Operations.List)) {
             context.AddUnaryMethod(
-                new Method<ListRequest, ListResultBase<TSummary>>(MethodType.Unary, service, GrpcResourceNaming.MethodName(descriptor, Operations.List), GrpcMarshallers.Create<ListRequest>(model), GrpcMarshallers.Create<ListResultBase<TSummary>>(model)), metadata,
+                new Method<ListRequest, ListResultBase<TEntity, TSummary>>(MethodType.Unary, service, GrpcResourceNaming.MethodName(descriptor, Operations.List), GrpcMarshallers.Create<ListRequest>(model), GrpcMarshallers.Create<ListResultBase<TEntity, TSummary>>(model)), metadata,
                 async (svc, req, ctx) => {
                     var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
                     return await rs.ListAsync(req, new(svc, ctx));

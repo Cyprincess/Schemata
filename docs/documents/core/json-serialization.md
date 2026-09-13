@@ -40,6 +40,11 @@ The feature applies `Configure` to `JsonSerializerOptions` and
 `Microsoft.AspNetCore.Mvc.JsonOptions` when `SchemataControllersFeature` is registered. The user
 delegate runs after the defaults, so it can add converters or override any policy.
 
+Dictionary key conversion is a framework convention applied on serialization. Input dictionary
+keys retain their spelling. Applications should use stable snake_case keys: distinct input keys
+such as `FooBar` and `foo_bar` produce the same output member name. Human-readable labels belong
+in values or structured entries when their spelling must survive a round trip.
+
 ## JsonStringNumberConverter
 
 JavaScript's `Number` is an IEEE 754 double; its maximum safe integer is 2^53 − 1
@@ -100,7 +105,7 @@ wire:
 | `ICanonicalName`         | `Name`          | Hidden — the short identifier is server-managed                                                                                              |
 | `ICanonicalName`         | `CanonicalName` | Renamed to `name` (AIP-122)                                                                                                                  |
 | `IFreshness`             | `EntityTag`     | Renamed to `etag` (AIP-154)                                                                                                                  |
-| `IEntitiesResult<TItem>` | `Entities`      | Renamed to the entity plural from `ResourceNameDescriptor.ForType(...).Plural`, then run through the active `PropertyNamingPolicy` (AIP-132) |
+| `IEntitiesResult<TEntity, TItem>` | `Entities`      | Renamed to the entity plural resolved from `TEntity` through `ResourceNameDescriptor.ForType(...).Plural`, then run through the active `PropertyNamingPolicy` (AIP-132) |
 
 The traits layer is HTTP-only. The gRPC transport (`Schemata.Transport.Grpc`) applies equivalent
 renames at the protobuf-net level via `SchemataProtoModelConfigurator`.

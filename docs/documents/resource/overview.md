@@ -79,7 +79,7 @@ Authentication and coarse authorization are independently enabled. Authenticatio
 | Get | `GetResultBase<TDetail>` |
 | Update | `UpdateResultBase<TDetail>` |
 | Delete | `DeleteResultBase<TDetail>` |
-| List | `ListResultBase<TSummary>` |
+| List | `ListResultBase<TEntity, TSummary>` |
 
 ## See also
 
