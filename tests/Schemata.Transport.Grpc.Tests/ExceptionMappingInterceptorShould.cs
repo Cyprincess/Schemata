@@ -100,6 +100,62 @@ public sealed class ExceptionMappingInterceptorShould
         Assert.Null(violations[1].LocalizedMessage);
     }
 
+    [Fact]
+    public async Task Maps_Quota_Exception_Preserving_The_Complete_Violation_Payload() {
+        var logger      = new Mock<ILogger<ExceptionMappingInterceptor>>();
+        var interceptor = new ExceptionMappingInterceptor(logger.Object);
+        var exception   = new QuotaExceededException([
+            new() {
+                Subject          = "project:my-project",
+                Description      = "Quota 'CPUS-PER-VM-FAMILY' exceeded",
+                ApiService       = "compute.googleapis.com",
+                QuotaMetric      = "compute.googleapis.com/cpus_per_vm_family",
+                QuotaId          = "CPUS-PER-VM-FAMILY-per-project-region",
+                QuotaDimensions  = new() { ["region"] = "us-central1", ["vm_family"] = "n1" },
+                QuotaValue       = 24,
+                FutureQuotaValue = 48,
+            },
+            new() { Subject = "client:192.168.1.1", Description = "Requests per minute exceeded" },
+        ]);
+
+        var thrown = await Assert.ThrowsAsync<RpcException>(() => interceptor.UnaryServerHandler<object, object>(
+            new(),
+            Context(),
+            (_, _) => throw exception));
+
+        Assert.Equal(StatusCode.ResourceExhausted, thrown.StatusCode);
+
+        var status = Status.Parser.ParseFrom(thrown.Trailers.GetValueBytes("grpc-status-details-bin"));
+
+        var quota = status.Details
+                          .Single(d => d.TypeUrl.EndsWith("google.rpc.QuotaFailure", StringComparison.Ordinal))
+                          .Unpack<QuotaFailure>();
+
+        Assert.Equal(2, quota.Violations.Count);
+
+        var first = quota.Violations[0];
+        Assert.Equal("project:my-project", first.Subject);
+        Assert.Equal("Quota 'CPUS-PER-VM-FAMILY' exceeded", first.Description);
+        Assert.Equal("compute.googleapis.com", first.ApiService);
+        Assert.Equal("compute.googleapis.com/cpus_per_vm_family", first.QuotaMetric);
+        Assert.Equal("CPUS-PER-VM-FAMILY-per-project-region", first.QuotaId);
+        Assert.Equal(2, first.QuotaDimensions.Count);
+        Assert.Equal("us-central1", first.QuotaDimensions["region"]);
+        Assert.Equal("n1", first.QuotaDimensions["vm_family"]);
+        Assert.Equal(24, first.QuotaValue);
+        Assert.True(first.HasFutureQuotaValue);
+        Assert.Equal(48, first.FutureQuotaValue);
+
+        var second = quota.Violations[1];
+        Assert.Equal("client:192.168.1.1", second.Subject);
+        Assert.Equal("", second.ApiService);
+        Assert.Equal("", second.QuotaMetric);
+        Assert.Equal("", second.QuotaId);
+        Assert.Empty(second.QuotaDimensions);
+        Assert.Equal(0, second.QuotaValue);
+        Assert.False(second.HasFutureQuotaValue);
+    }
+
     private static ServerCallContext Context() {
         var context = TestServerCallContext.Create(
             "method",

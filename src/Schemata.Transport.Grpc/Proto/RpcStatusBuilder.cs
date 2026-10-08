@@ -85,8 +85,25 @@ internal static class RpcStatusBuilder
             }),
             QuotaFailureDetail d => Any.Pack(new QuotaFailure {
                 Violations = {
-                    (d.Violations ?? []).Select(v => new QuotaFailure.Types.Violation {
-                        Subject = v.Subject ?? "", Description = v.Description ?? "",
+                    (d.Violations ?? []).Select(v => {
+                        var violation = new QuotaFailure.Types.Violation {
+                            Subject         = v.Subject ?? "",
+                            Description     = v.Description ?? "",
+                            ApiService      = v.ApiService ?? "",
+                            QuotaMetric     = v.QuotaMetric ?? "",
+                            QuotaId         = v.QuotaId ?? "",
+                            QuotaDimensions = { v.QuotaDimensions ?? [] },
+                        };
+
+                        if (v.QuotaValue is { } quotaValue) {
+                            violation.QuotaValue = quotaValue;
+                        }
+
+                        if (v.FutureQuotaValue is { } futureQuotaValue) {
+                            violation.FutureQuotaValue = futureQuotaValue;
+                        }
+
+                        return violation;
                     }),
                 },
             }),
