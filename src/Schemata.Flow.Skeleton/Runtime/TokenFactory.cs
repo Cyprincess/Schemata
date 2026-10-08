@@ -7,8 +7,7 @@ namespace Schemata.Flow.Skeleton.Runtime;
 /// <summary>
 ///     Engine-neutral helpers that build and mutate <see cref="SchemataProcessToken" /> and
 ///     <see cref="SchemataProcess" /> rows from a resolved <see cref="TargetState" />. The state-machine
-///     engine and the BPMN engine share these helpers so token canonical names, scope wiring, and
-///     lifecycle state strings stay in one place.
+///     engine and the BPMN engine share scope wiring and lifecycle state strings.
 /// </summary>
 public static class TokenFactory
 {
@@ -18,17 +17,12 @@ public static class TokenFactory
     /// </summary>
     /// <param name="process">The owning process aggregate.</param>
     /// <param name="resolved">The target state the engine resolved for the first element.</param>
-    /// <returns>A new token with a fresh leaf id and root scope.</returns>
+    /// <returns>An unnamed token in the root scope, ready for repository creation.</returns>
     public static SchemataProcessToken NewRootToken(SchemataProcess process, TargetState resolved) {
         ArgumentNullException.ThrowIfNull(process);
         ArgumentNullException.ThrowIfNull(resolved);
 
-        var leaf      = Guid.NewGuid().ToString("n");
-        var canonical = $"{process.CanonicalName}/tokens/{leaf}";
-
         return new() {
-            Name          = leaf,
-            CanonicalName = canonical,
             Process       = process.Name!,
             Spawner       = null,
             ScopeName     = process.Name!,
@@ -52,12 +46,7 @@ public static class TokenFactory
         ArgumentNullException.ThrowIfNull(resolved);
         ArgumentNullException.ThrowIfNull(spawner);
 
-        var leaf      = Guid.NewGuid().ToString("n");
-        var canonical = $"{process.CanonicalName}/tokens/{leaf}";
-
         return new() {
-            Name          = leaf,
-            CanonicalName = canonical,
             Process       = process.Name!,
             Spawner       = spawner.CanonicalName,
             ScopeName     = spawner.ScopeName,

@@ -19,7 +19,7 @@ public class AdviceRemoveSoftDeleteShould
         var advisor = new AdviceRemoveSoftDelete<Student>(new FakeTimeProvider(now));
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var mock    = new Mock<IRepository<Student>>();
-        mock.Setup(r => r.UpdateAsync(It.IsAny<Student>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        mock.Setup(r => r.UpdateAsync(It.IsAny<Student>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
         var entity = new Student { DeleteTime = null };
 
         var result = await advisor.AdviseAsync(ctx, mock.Object, entity, CancellationToken.None);

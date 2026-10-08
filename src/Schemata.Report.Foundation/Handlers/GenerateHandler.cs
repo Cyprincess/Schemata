@@ -3,13 +3,16 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Runtime;
 using Schemata.Report.Foundation.Commands;
 using Schemata.Report.Foundation.Jobs;
 using Schemata.Report.Foundation.Runtime;
+using Schemata.Report.Skeleton;
 using Schemata.Report.Skeleton.Entities;
 using Schemata.Report.Skeleton.Models;
 using Schemata.Scheduling.Skeleton;
@@ -18,8 +21,12 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Report.Foundation.Handlers;
 
 /// <summary>Handles the AIP-136 report generation request through the Report command pipeline.</summary>
+/// <remarks>
+///     Synchronous materialization joins the current command scope through the keyed Run handler.
+///     Its local pipeline retains Run advisors while the Report actor owns the surrounding turn.
+/// </remarks>
 public sealed class GenerateHandler<TReport, TSnapshot, TChunk>(
-    IRequestDispatcher     dispatcher,
+    InProcessRequestDispatcher dispatcher,
     ReportExecutionContext execution,
     IServiceProvider       services
 ) : IRequestHandler<GenerateReportRequest, Operation>
@@ -31,7 +38,7 @@ public sealed class GenerateHandler<TReport, TSnapshot, TChunk>(
         ArgumentNullException.ThrowIfNull(request);
         Validate(request);
         var operationService = services.GetService<IOperationService>()
-                               ?? throw new FailedPreconditionException(message: "Report generation requires an operation service.");
+                               ?? throw new FailedPreconditionException(SchemataResources.REPORT_OPERATION_SERVICE_REQUIRED);
         var reportRequest = new ReportRequest {
             Name    = request.Name,
             Query   = request.Query,
@@ -39,7 +46,7 @@ public sealed class GenerateHandler<TReport, TSnapshot, TChunk>(
         };
         if (!request.Sync) {
             var scheduler = services.GetService<IScheduler>()
-                            ?? throw new FailedPreconditionException(message: "Report generation requires a scheduler.");
+                            ?? throw new FailedPreconditionException(SchemataResources.REPORT_SCHEDULER_REQUIRED);
             var context = new JobContext {
                 ExecutionUid = Guid.NewGuid(),
                 Method       = Verbs.Generate,
@@ -49,21 +56,13 @@ public sealed class GenerateHandler<TReport, TSnapshot, TChunk>(
             return OperationMapper.FromExecution(scheduled);
         }
 
-        var uid = Guid.NewGuid();
         try {
-            execution.Operation = $"operations/{uid:n}";
-            var result = await dispatcher.SendAsync<RunReportRequest, ReportResult>(
-                new(reportRequest, request.Principal), ct);
-            return await operationService.CreateTerminalAsync(
-                       Verbs.Generate,
-                       JsonSerializer.Serialize(Output(result), SchemataJson.Default),
-                       null,
-                       uid,
-                       ct);
-        } catch (OperationCanceledException) {
-            throw;
-        } catch (Exception exception) {
-            return await operationService.CreateTerminalAsync(Verbs.Generate, null, exception.Message, uid, ct);
+            return await operationService.ExecuteAsync(Verbs.Generate, async (operation, token) => {
+                execution.Operation = operation.CanonicalName;
+                var result = await dispatcher.SendAsync<RunReportRequest, ReportResult>(
+                    new(reportRequest, request.Principal), ReportConstants.Handlers.Default, token);
+                return JsonSerializer.Serialize(Output(result), SchemataJson.Default);
+            }, ct);
         } finally {
             execution.Operation = null;
         }
@@ -77,7 +76,7 @@ public sealed class GenerateHandler<TReport, TSnapshot, TChunk>(
 
     private static void Validate(GenerateReportRequest request) {
         if (string.IsNullOrWhiteSpace(request.Name) == (request.Query is null)) {
-            throw new InvalidArgumentException(message: "Specify exactly one report name or inline query.");
+            throw new InvalidArgumentException(SchemataResources.REPORT_NAME_OR_QUERY_REQUIRED);
         }
     }
 }

@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
+using Schemata.Entity.Repository.Estimation;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
@@ -50,6 +51,26 @@ public static class SchemataRepositoryBuilderExtensions
         where TContext : DbContext {
         builder.Services.TryAddScoped<IUnitOfWork<TContext>, EfCoreUnitOfWork<TContext>>();
 
+        return builder;
+    }
+
+    /// <summary>
+    ///     Opts this context into database-plan estimates for supported root entity queries.
+    /// </summary>
+    /// <remarks>
+    ///     Plan reads run through EF reader interception; SHOWPLAN mode commands use nonquery interception.
+    ///     Interceptors receive the actual plan SQL and may reject it. Security-sensitive rewrites must
+    ///     support that statement shape. Connection ownership and the current EF transaction are retained.
+    /// </remarks>
+    public static SchemataRepositoryBuilder WithCountEstimates<TContext>(
+        this SchemataRepositoryBuilder builder,
+        QueryEstimateProvider provider
+    ) where TContext : DbContext {
+        if (!Enum.IsDefined(provider)) {
+            throw new ArgumentOutOfRangeException(nameof(provider));
+        }
+
+        builder.Services.TryAddScoped<IEfCoreCountEstimator<TContext>>(_ => new EfCoreCountEstimator<TContext>(provider));
         return builder;
     }
 }

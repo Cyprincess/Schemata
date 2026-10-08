@@ -1,6 +1,6 @@
 using Schemata.Flow.Skeleton;
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -24,8 +24,11 @@ public sealed class ProcessRegistry : IProcessRegistry
     private static readonly MethodInfo CompileMethod =
         typeof(ProcessRegistry).GetMethod(nameof(CompilePredicate), BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    private readonly ConcurrentDictionary<string, ProcessRegistration> _registrations
+    private readonly object _gate = new();
+    private readonly Dictionary<string, Dictionary<string, ProcessRegistration>> _registrations
         = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _latest = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, HashSet<string>> _registeredVersions = new(StringComparer.OrdinalIgnoreCase);
 
     private readonly IServiceProvider _services;
 
@@ -53,20 +56,26 @@ public sealed class ProcessRegistry : IProcessRegistry
         return RegisterAsync(configuration, ct);
     }
 
-    public ValueTask UnregisterAsync(string processName, CancellationToken ct = default) {
-        _registrations.TryRemove(processName, out var _);
+    public ValueTask UnregisterAsync(string processName, string version, CancellationToken ct = default) {
+        lock (_gate) {
+            if (_registrations.TryGetValue(processName, out var versions)) versions.Remove(version);
+            if (_latest.TryGetValue(processName, out var latest) && latest == version) _latest.Remove(processName);
+        }
         return default;
     }
 
-    public IReadOnlyCollection<string> GetRegisteredProcesses() {
-        return [.. _registrations.Keys];
+    public IReadOnlyCollection<ProcessRegistration> GetRegisteredProcesses() {
+        lock (_gate) return _registrations.Values.SelectMany(versions => versions.Values).ToArray();
     }
 
-    public bool IsRegistered(string name) { return _registrations.ContainsKey(name); }
+    public bool IsRegistered(string name, string version = "1") => GetRegistration(name, version) is not null;
 
-    public ProcessRegistration? GetRegistration(string name) {
-        _registrations.TryGetValue(name, out var registration);
-        return registration;
+    public ProcessRegistration? GetRegistration(string name, string version = "1") {
+        lock (_gate) {
+            if (version == "latest" && !_latest.TryGetValue(name, out version!)) return null;
+            return _registrations.TryGetValue(name, out var versions) && versions.TryGetValue(version, out var registration)
+                ? registration : null;
+        }
     }
 
     public ValueTask RegisterAsync(ProcessConfiguration configuration, CancellationToken ct = default) {
@@ -81,12 +90,18 @@ public sealed class ProcessRegistry : IProcessRegistry
             throw new InvalidArgumentException(SchemataResources.PROCESS_NAME_REQUIRED);
         }
 
+        if (string.IsNullOrWhiteSpace(configuration.Version) || configuration.Version == "latest") {
+            throw new InvalidArgumentException(SchemataResources.FLOW_DEFINITION_VERSION_REQUIRED);
+        }
+        configuration = new ProcessConfiguration {
+            Name = configuration.Name, Version = configuration.Version, IsLatest = configuration.IsLatest,
+            Engine = configuration.Engine, DefinitionType = configuration.DefinitionType, Language = configuration.Language,
+        };
+
         var definition = LoadDefinition(configuration);
-        if (_services.GetKeyedService<IFlowRuntime>(configuration.Engine) is not { } runtime) {
+        if (_services.GetKeyedService<IFlowRuntime>(configuration.Engine) is null) {
             throw new InvalidOperationException($"Flow runtime '{configuration.Engine}' is not registered.");
         }
-
-        ValidateRegistrationCapabilities(definition, runtime);
 
         foreach (var validator in _services.GetServices<IFlowEngineValidator>()) {
             if (string.Equals(validator.EngineName, configuration.Engine, StringComparison.OrdinalIgnoreCase)) {
@@ -98,93 +113,35 @@ public sealed class ProcessRegistry : IProcessRegistry
 
         var registration = new ProcessRegistration {
             Name               = configuration.Name,
+            Version            = configuration.Version,
             Engine             = configuration.Engine,
             Definition         = definition,
-            Configuration      = configuration,
-            SourceTypes        = BuildSourceDescriptors(definition),
-            MessagePayloadTypes = CollectPayloadTypes(definition.Messages),
-            SignalPayloadTypes  = CollectPayloadTypes(definition.Signals),
+            SourceTypes        = BuildSourceDescriptors(definition).ToFrozenDictionary(StringComparer.Ordinal),
+            MessagePayloadTypes = CollectPayloadTypes(definition.Messages).ToFrozenDictionary(StringComparer.Ordinal),
+            SignalPayloadTypes  = CollectPayloadTypes(definition.Signals).ToFrozenDictionary(StringComparer.Ordinal),
         };
+        definition.Freeze();
 
-        if (!_registrations.TryAdd(configuration.Name, registration)) {
-            throw new AlreadyExistsException(
-                SchemataResources.PROCESS_ALREADY_REGISTERED,
-                new Dictionary<string, string?> { ["name"] = configuration.Name });
+        lock (_gate) {
+            if (!_registeredVersions.TryGetValue(configuration.Name, out var registered)) {
+                registered = new(StringComparer.Ordinal);
+                _registeredVersions.Add(configuration.Name, registered);
+            }
+            if (!registered.Add(configuration.Version)) {
+                throw new AlreadyExistsException(
+                    SchemataResources.PROCESS_ALREADY_REGISTERED,
+                    new Dictionary<string, string?> { ["name"] = $"{configuration.Name}@{configuration.Version}" });
+            }
+            if (!_registrations.TryGetValue(configuration.Name, out var versions)) {
+                versions = new(StringComparer.Ordinal);
+                _registrations.Add(configuration.Name, versions);
+            }
+            versions.Add(configuration.Version, registration);
+            if (configuration.IsLatest) _latest[configuration.Name] = configuration.Version;
         }
     }
 
     #endregion
-
-    private void ValidateRegistrationCapabilities(ProcessDefinition definition, IFlowRuntime runtime) {
-        foreach (var element in definition.AllElements) {
-            switch (element) {
-                case ProcedureTaskBase:
-                    RequireCapability(definition, runtime, element, FlowRuntimeCapabilities.ProcedureTasks);
-                    break;
-                case ParallelGateway or InclusiveGateway or ComplexGateway:
-                    RequireCapability(definition, runtime, element, FlowRuntimeCapabilities.MultiToken);
-                    break;
-                case EventBasedGateway { Parallel: true }:
-                    RequireCapability(definition, runtime, element, FlowRuntimeCapabilities.MultiToken);
-                    break;
-                case CallActivity or SubProcess:
-                    RequireCapability(definition, runtime, element, FlowRuntimeCapabilities.SubProcesses);
-                    break;
-                case Activity { LoopCharacteristics: not null }:
-                    RequireCapability(definition, runtime, element, FlowRuntimeCapabilities.Loops);
-                    break;
-                case FlowEvent { Position: EventPosition.Boundary, Interrupting: false }:
-                    RequireCapability(definition, runtime, element, FlowRuntimeCapabilities.NonInterruptingBoundaries);
-                    break;
-                case FlowEvent { Definition: CompensationDefinition }:
-                    RequireCapability(definition, runtime, element, FlowRuntimeCapabilities.Compensation);
-                    break;
-            }
-        }
-
-        foreach (var element in NestedElements(definition)) {
-            if (element is FlowEvent { Definition: Message or Signal }) {
-                RequireCapability(definition, runtime, element, FlowRuntimeCapabilities.NestedEvents);
-            }
-
-            if (element is FlowEvent { Definition: TimerDefinition }) {
-                RequireCapability(definition, runtime, element, FlowRuntimeCapabilities.NestedTimers);
-            }
-        }
-    }
-
-    private static void RequireCapability(
-        ProcessDefinition           definition,
-        IFlowRuntime                runtime,
-        FlowElement                 element,
-        FlowRuntimeCapabilities     capability
-    ) {
-        if ((runtime.Capabilities & capability) == capability) {
-            return;
-        }
-
-        throw new InvalidOperationException(
-            $"Process definition '{definition.Name}' contains shape '{element.GetType().Name}'; engine '{runtime.EngineName}' lacks capability '{capability}'.");
-    }
-
-    private static IEnumerable<FlowElement> NestedElements(ProcessDefinition definition) {
-        foreach (var subProcess in definition.Elements.OfType<SubProcess>()) {
-            foreach (var element in NestedElements(subProcess)) {
-                yield return element;
-            }
-        }
-    }
-
-    private static IEnumerable<FlowElement> NestedElements(SubProcess subProcess) {
-        foreach (var child in subProcess.Children) {
-            yield return child;
-            if (child is SubProcess nested) {
-                foreach (var element in NestedElements(nested)) {
-                    yield return element;
-                }
-            }
-        }
-    }
 
     private void CompileConditions(ProcessDefinition definition, ProcessConfiguration configuration) {
         IExpressionCompiler? compiler = null;
@@ -238,7 +195,8 @@ public sealed class ProcessRegistry : IProcessRegistry
         var created = ActivatorUtilities.CreateInstance(_services, configuration.DefinitionType);
         if (created is not ProcessDefinition instance) {
             throw new InvalidArgumentException(
-                message: $"Process definition type '{configuration.DefinitionType.FullName}' must derive from ProcessDefinition.");
+                SchemataResources.FLOW_PROCESS_DEFINITION_TYPE_INVALID,
+                new Dictionary<string, string?> { ["type"] = configuration.DefinitionType.FullName });
         }
 
         instance.Name = configuration.Name;

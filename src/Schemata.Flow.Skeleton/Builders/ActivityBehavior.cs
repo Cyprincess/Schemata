@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 using Schemata.Abstractions.Entities;
@@ -39,7 +40,7 @@ public sealed class ActivityBehavior
     ///     entered. The task name is synthesized from the activity name.
     /// </summary>
     /// <param name="body">The delegate executed by the procedure task.</param>
-    public ActivityBehavior OnEnter(Func<FlowTaskContext, ValueTask> body) {
+    public ActivityBehavior OnEnter(Func<FlowTaskContext, CancellationToken, ValueTask> body) {
         return EnterTask($"Enter_{Activity.Name}", body);
     }
 
@@ -50,7 +51,7 @@ public sealed class ActivityBehavior
     /// </summary>
     /// <typeparam name="TSource">The source entity type resolved from the flow task context.</typeparam>
     /// <param name="body">The delegate executed with the task context and the resolved source.</param>
-    public ActivityBehavior OnEnter<TSource>(Func<FlowTaskContext, TSource, ValueTask> body)
+    public ActivityBehavior OnEnter<TSource>(Func<FlowTaskContext, TSource, CancellationToken, ValueTask> body)
         where TSource : class, ICanonicalName {
         return OnEnter<TSource>(FlowSourceDescriptor.DefaultBindingName<TSource>(), body);
     }
@@ -62,7 +63,7 @@ public sealed class ActivityBehavior
     /// <typeparam name="TSource">The source entity type resolved from the flow task context.</typeparam>
     /// <param name="source">The source binding name; disambiguates multiple bindings of the same CLR type.</param>
     /// <param name="body">The delegate executed with the task context and the resolved source.</param>
-    public ActivityBehavior OnEnter<TSource>(string source, Func<FlowTaskContext, TSource, ValueTask> body)
+    public ActivityBehavior OnEnter<TSource>(string source, Func<FlowTaskContext, TSource, CancellationToken, ValueTask> body)
         where TSource : class, ICanonicalName {
         ArgumentException.ThrowIfNullOrEmpty(source);
         return EnterTask($"Enter_{Activity.Name}", FlowSourceBody.Bind(source, body));
@@ -73,7 +74,7 @@ public sealed class ActivityBehavior
     ///     The task name is synthesized from the current tail activity name.
     /// </summary>
     /// <param name="body">The delegate executed by the procedure task.</param>
-    public ActivityBehavior OnLeave(Func<FlowTaskContext, ValueTask> body) {
+    public ActivityBehavior OnLeave(Func<FlowTaskContext, CancellationToken, ValueTask> body) {
         return LeaveTask($"Leave_{LastTarget.Name}", body);
     }
 
@@ -83,7 +84,7 @@ public sealed class ActivityBehavior
     /// </summary>
     /// <typeparam name="TSource">The source entity type resolved from the flow task context.</typeparam>
     /// <param name="body">The delegate executed with the task context and the resolved source.</param>
-    public ActivityBehavior OnLeave<TSource>(Func<FlowTaskContext, TSource, ValueTask> body)
+    public ActivityBehavior OnLeave<TSource>(Func<FlowTaskContext, TSource, CancellationToken, ValueTask> body)
         where TSource : class, ICanonicalName {
         return OnLeave<TSource>(FlowSourceDescriptor.DefaultBindingName<TSource>(), body);
     }
@@ -95,7 +96,7 @@ public sealed class ActivityBehavior
     /// <typeparam name="TSource">The source entity type resolved from the flow task context.</typeparam>
     /// <param name="source">The source binding name; disambiguates multiple bindings of the same CLR type.</param>
     /// <param name="body">The delegate executed with the task context and the resolved source.</param>
-    public ActivityBehavior OnLeave<TSource>(string source, Func<FlowTaskContext, TSource, ValueTask> body)
+    public ActivityBehavior OnLeave<TSource>(string source, Func<FlowTaskContext, TSource, CancellationToken, ValueTask> body)
         where TSource : class, ICanonicalName {
         ArgumentException.ThrowIfNullOrEmpty(source);
         return LeaveTask($"Leave_{LastTarget.Name}", FlowSourceBody.Bind(source, body));
@@ -287,18 +288,18 @@ public sealed class ActivityBehavior
         }
     }
 
-    private static ProcedureTask Procedure(string name, Func<FlowTaskContext, ValueTask> body) {
+    private static ProcedureTask Procedure(string name, Func<FlowTaskContext, CancellationToken, ValueTask> body) {
         return new() { Name = name, Body = body };
     }
 
-    private ActivityBehavior EnterTask(string name, Func<FlowTaskContext, ValueTask> body) {
+    private ActivityBehavior EnterTask(string name, Func<FlowTaskContext, CancellationToken, ValueTask> body) {
         var task = Procedure(name, body);
         _definition.InsertEnterTask(Activity, task);
         _labelTarget = task;
         return this;
     }
 
-    private ActivityBehavior LeaveTask(string name, Func<FlowTaskContext, ValueTask> body) {
+    private ActivityBehavior LeaveTask(string name, Func<FlowTaskContext, CancellationToken, ValueTask> body) {
         var task = Procedure(name, body);
         _definition.Elements.Add(task);
         Go(task);

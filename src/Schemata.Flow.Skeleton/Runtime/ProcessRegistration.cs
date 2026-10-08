@@ -13,23 +13,21 @@ public sealed class ProcessRegistration
     /// <summary>
     ///     The registered name of the process definition.
     /// </summary>
-    public string Name { get; set; } = null!;
+    public string Name { get; init; } = null!;
+
+    public string Version { get; init; } = "1";
 
     /// <summary>
     ///     The engine name (<c>"StateMachine"</c> or <c>"Bpmn"</c>) that
     ///     should execute instances of this process.
     /// </summary>
-    public string Engine { get; set; } = null!;
+    public string Engine { get; init; } = null!;
 
     /// <summary>
     ///     The loaded process definition AST.
     /// </summary>
-    public ProcessDefinition Definition { get; set; } = null!;
+    public ProcessDefinition Definition { get; init; } = null!;
 
-    /// <summary>
-    ///     Registration options for this process.
-    /// </summary>
-    public ProcessConfiguration Configuration { get; set; } = null!;
 
     /// <summary>Source descriptors keyed by binding name.</summary>
     public IReadOnlyDictionary<string, FlowSourceDescriptor> SourceTypes { get; init; }

@@ -5,6 +5,8 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Identity.Skeleton.Entities;
@@ -22,11 +24,12 @@ public class SchemataRoleStore<TRole> : SchemataRoleStore<TRole, SchemataRoleCla
     ///     Initializes a role store with the default Schemata role claim and user-role entities.
     /// </summary>
     public SchemataRoleStore(
-        IRepository<TRole>             roles,
         IRepository<SchemataRoleClaim> roleClaims,
         IRepository<SchemataUserRole>  userRole,
+        IResourceMutation<TRole>       mutation,
+        IServiceProvider              services,
         IdentityErrorDescriber?        describer = null
-    ) : base(roles, roleClaims, userRole, describer) { }
+    ) : base(roleClaims, userRole, mutation, services, describer) { }
 }
 
 /// <summary>
@@ -43,9 +46,6 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<T
     /// <summary>Repository for role claims.</summary>
     protected readonly IRepository<TRoleClaim> RoleClaimsRepository;
 
-    /// <summary>Repository for roles.</summary>
-    protected readonly IRepository<TRole> RolesRepository;
-
     /// <summary>Repository for user-role links.</summary>
     protected readonly IRepository<TUserRole> UserRoleRepository;
 
@@ -55,16 +55,21 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<T
     ///     Initializes a role store with repositories for roles, role claims, and user-role links.
     /// </summary>
     public SchemataRoleStore(
-        IRepository<TRole>      roles,
-        IRepository<TRoleClaim> roleClaims,
-        IRepository<TUserRole>  userRole,
-        IdentityErrorDescriber? describer = null
+        IRepository<TRoleClaim>  roleClaims,
+        IRepository<TUserRole>   userRole,
+        IResourceMutation<TRole> mutation,
+        IServiceProvider        services,
+        IdentityErrorDescriber?  describer = null
     ) {
         RoleClaimsRepository = roleClaims;
-        RolesRepository      = roles;
         UserRoleRepository   = userRole;
+        _mutation            = mutation;
+        _services            = services;
         ErrorDescriber       = describer ?? new IdentityErrorDescriber();
     }
+
+    private readonly IResourceMutation<TRole> _mutation;
+    private readonly IServiceProvider _services;
 
     /// <summary>Provides localized error messages for identity operations.</summary>
     public IdentityErrorDescriber ErrorDescriber { get; set; }
@@ -78,8 +83,8 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<T
             throw new ArgumentNullException(nameof(role));
         }
 
-        await RolesRepository.AddAsync(role, ct);
-        await RolesRepository.CommitAsync(ct);
+        await _mutation.CreateAsync(role, null, ct);
+
         return IdentityResult.Success;
     }
 
@@ -90,9 +95,10 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<T
             throw new ArgumentNullException(nameof(role));
         }
 
-        await RolesRepository.UpdateAsync(role, ct);
+        // Providers signal optimistic concurrency at different boundaries: LinqToDB throws at the
+        // mutation, EF at commit. Translate both, let every other failure propagate.
         try {
-            await RolesRepository.CommitAsync(ct);
+            await _mutation.UpdateAsync(role, null, Operations.Update, ct);
         } catch (AbortedException) {
             return IdentityResult.Failed(ErrorDescriber.ConcurrencyFailure());
         }
@@ -107,26 +113,10 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<T
             throw new ArgumentNullException(nameof(role));
         }
 
-        // Remove the role and every dependent row (user links, claims) in one unit of work so a
-        // failure cannot delete the role while leaving orphaned child rows behind.
-        await using var uow = RolesRepository.Begin();
-        UserRoleRepository.Join(uow);
-        RoleClaimsRepository.Join(uow);
-
-        await foreach (var user in UserRoleRepository.ListAsync(q => q.Where(ur => ur.RoleId.Equals(role.Uid)))
-                                                     .WithCancellation(ct)) {
-            await UserRoleRepository.RemoveAsync(user, ct);
-        }
-
-        await foreach (var claim in RoleClaimsRepository.ListAsync(q => q.Where(rc => rc.RoleId.Equals(role.Uid)))
-                                                        .WithCancellation(ct)) {
-            await RoleClaimsRepository.RemoveAsync(claim, ct);
-        }
-
-        await RolesRepository.RemoveAsync(role, ct);
-
+        // The owner removes the role and every dependent row (user links, claims) in one unit of
+        // work so a failure cannot delete the role while leaving orphaned child rows behind.
         try {
-            await uow.CommitAsync(ct);
+            await _mutation.DeleteAsync(role, null, Operations.Delete, ct);
         } catch (AbortedException) {
             return IdentityResult.Failed(ErrorDescriber.ConcurrencyFailure());
         }
@@ -194,7 +184,8 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<T
             throw new ArgumentNullException(nameof(role));
         }
 
-        return await RoleClaimsRepository.ListAsync(q => q.Where(rc => rc.RoleId.Equals(role.Uid)), ct)
+        return await RoleClaimsRepository.ListAsync(q => q.Where(rc => rc.RoleId == role.CanonicalName
+                                                                    && rc.ClaimValue != null), ct)
                                          .Map(c => new Claim(c.ClaimType!, c.ClaimValue!), ct)
                                          .ToListAsync(ct);
     }
@@ -210,7 +201,7 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<T
         }
 
         await RoleClaimsRepository.AddAsync(new() {
-                                                RoleId = role.Uid, ClaimType = claim.Type, ClaimValue = claim.Value,
+                                                RoleId = role.CanonicalName!, ClaimType = claim.Type, ClaimValue = claim.Value,
                                             }, ct);
         await RoleClaimsRepository.CommitAsync(ct);
     }
@@ -225,15 +216,31 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<T
             throw new ArgumentNullException(nameof(claim));
         }
 
-        await foreach (var c in RoleClaimsRepository
-                               .ListAsync(q => q.Where(rc => rc.RoleId.Equals(role.Uid)
-                                                          && rc.ClaimValue == claim.Value
-                                                          && rc.ClaimType == claim.Type))
-                               .WithCancellation(ct)) {
-            await RoleClaimsRepository.RemoveAsync(c, ct);
+        await using var repository = _services.GetRequiredService<IRepository<TRoleClaim>>();
+        await using var unit = repository.Begin();
+        Guid? cursor = null;
+        while (true) {
+            ct.ThrowIfCancellationRequested();
+            var page = await repository.ListAsync(q => {
+                var query = q.Where(rc => rc.RoleId == role.CanonicalName
+                                       && rc.ClaimValue == claim.Value
+                                       && rc.ClaimType == claim.Type);
+                if (cursor is not null) {
+                    query = query.Where(rc => rc.Uid.CompareTo(cursor.Value) > 0);
+                }
+
+                return query.OrderBy(rc => rc.Uid).Take(100);
+            }, ct).ToListAsync(ct);
+            if (page.Count == 0) break;
+
+            cursor = page[^1].Uid;
+            foreach (var row in page) {
+                ct.ThrowIfCancellationRequested();
+                await repository.RemoveAsync(row, ct);
+            }
         }
 
-        await RoleClaimsRepository.CommitAsync(ct);
+        await unit.CommitAsync(ct);
     }
 
     #endregion
@@ -254,12 +261,14 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<T
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
         var roleId = Guid.Parse(id);
-        return await RolesRepository.SingleOrDefaultAsync(q => q.Where(r => r.Uid == roleId), ct);
+        await using var roles = _services.GetRequiredService<IRepository<TRole>>();
+        return await roles.SingleOrDefaultAsync(q => q.Where(r => r.Uid == roleId), ct);
     }
 
     public virtual async Task<TRole> FindByNameAsync(string normalizedName, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        return await RolesRepository.SingleOrDefaultAsync(q => q.Where(u => u.NormalizedName == normalizedName), ct);
+        await using var roles = _services.GetRequiredService<IRepository<TRole>>();
+        return await roles.SingleOrDefaultAsync(q => q.Where(u => u.NormalizedName == normalizedName), ct);
     }
 }

@@ -27,18 +27,20 @@ namespace Schemata.Report.Foundation.Jobs;
 [ScheduledJob("schemata.report.generate")]
 public sealed class ReportGenerationJob<TReport, TSnapshot, TChunk>(
     IServiceScopeFactory            scopes,
-    IOptions<SchemataReportOptions> options
+    IOptions<SchemataReportOptions> options,
+    ReportRegistration             registration
 ) : IScheduledJob
     where TReport : SchemataReport, new()
     where TSnapshot : SchemataReportSnapshot, new()
     where TChunk : SchemataReportSnapshotChunk, new()
 {
     public async Task ExecuteAsync(JobContext context, CancellationToken ct) {
+        registration.EnsureSingleTriple<TReport>();
         var (request, kind) = ReadRequest(context);
         await using var scope = scopes.CreateAsyncScope();
         var execution = scope.ServiceProvider.GetRequiredService<ReportExecutionContext>();
         execution.Kind      = kind;
-        execution.Operation = OperationName(context);
+        execution.Operation = context.Execution?.CanonicalName;
         if (context.ExecutionUid is { } uid) {
             execution.IsCancelled = token => IsCancelledAsync(uid, token);
         }
@@ -83,8 +85,4 @@ public sealed class ReportGenerationJob<TReport, TSnapshot, TChunk>(
         throw new JsonException("Report generation arguments are missing.");
     }
 
-    private static string? OperationName(JobContext context) {
-        return context.Execution?.CanonicalName
-               ?? (context.ExecutionUid is { } uid ? $"operations/{uid:n}" : null);
-    }
 }

@@ -12,7 +12,6 @@ using Schemata.Actor.Foundation;
 using Schemata.Actor.Skeleton;
 using Schemata.Core;
 using Schemata.Entity.Repository;
-using Schemata.Event.Foundation;
 using Schemata.Event.Skeleton;
 using Schemata.Event.Skeleton.Entities;
 using Schemata.Messaging.Skeleton;
@@ -22,13 +21,13 @@ namespace Schemata.Actor.Event.Tests;
 
 /// <summary>
 ///     Exercises the event-to-mailbox bridge through the real <see cref="IEventBus" /> pipeline - the
-///     same producer/observer/outbox/consumer path a production host wires - so a mistake in how
+///     same producer/observer/consumer path a production host wires - so wiring mistakes in how
 ///     <c>RouteEvent</c> registers the forwarder against that pipeline (wrong service type, wrong
-///     lifetime, the bus never resolving it) surfaces as a failed publish or an empty mailbox rather
-///     than being masked by invoking the handler directly. <see cref="IRepository{TEntity}" /> for the
-///     bus's own outbox/subscription audit rows is a functional in-memory double (the same style
-///     <c>Schemata.Event.Foundation.Tests</c> itself uses for these two types) - this suite verifies
-///     the bridge's wiring against the real bus, not Event.Foundation's own persistence layer.
+///     lifetime, the bus never resolving it) surface as a failed publish or an empty mailbox.
+///     <see cref="IRepository{TEntity}" /> for the bus's subscription and audit rows is a functional
+///     in-memory double (the same style <c>Schemata.Event.Foundation.Tests</c> itself uses for these
+///     two types) - this suite verifies the bridge's wiring against the real bus, not
+///     Event.Foundation's own persistence layer.
 /// </summary>
 public class EventToMailboxShould
 {
@@ -51,33 +50,93 @@ public class EventToMailboxShould
 
         await using var root = services.BuildServiceProvider();
 
-        // Real outbox delivery: the producer only records a Pending audit row; this background
-        // loop is what actually calls the consumer path (HandlerResolver -> IEventHandler<TEvent>).
-        var dispatcher = root.GetRequiredService<EventOutboxDispatcher>();
-        await dispatcher.StartAsync(CancellationToken.None);
+        var @event = new OrderPlaced("order-1");
+        await using (var scope = root.CreateAsyncScope()) {
+            var bus = scope.ServiceProvider.GetRequiredService<IEventBus>();
+            await bus.PublishAsync(@event);
+        }
 
-        try {
-            var @event = new OrderPlaced("order-1");
-            await using (var scope = root.CreateAsyncScope()) {
-                var bus = scope.ServiceProvider.GetRequiredService<IEventBus>();
-                await bus.PublishAsync(@event);
+        var system = root.GetRequiredService<IActorSystem>();
+        var actor  = await system.GetAsync(new("recorder", "order-1"));
+
+        IMessage? received = null;
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (received is null && DateTime.UtcNow < deadline) {
+            received = await actor.AskAsync<GetReceived, IMessage?>(new());
+            if (received is null) {
+                await Task.Delay(TimeSpan.FromMilliseconds(50));
             }
+        }
 
-            var system = root.GetRequiredService<IActorSystem>();
-            var actor  = await system.GetAsync(new ActorId("recorder", "order-1"));
+        Assert.Equal(@event, received);
+    }
 
-            IMessage? received = null;
-            var deadline = DateTime.UtcNow.AddSeconds(5);
-            while (received is null && DateTime.UtcNow < deadline) {
-                received = await actor.AskAsync<GetReceived, IMessage?>(new GetReceived());
-                if (received is null) {
-                    await Task.Delay(TimeSpan.FromMilliseconds(50));
-                }
+    [Trait("Layer", "Component")]
+    [Fact]
+    public async Task PublishAsync_WithTypedHandlerAndCatchAllAlongsideForwarder_DeliversToEachCandidateOnce() {
+        var typed    = new CountingOrderPlacedHandler();
+        var catchAll = new CountingCatchAllHandler();
+
+        var services = new ServiceCollection();
+        services.AddSingleton(CreateEventRepository());
+        services.AddSingleton(CreateSubscriptionRepository());
+        services.AddSingleton<IEventHandler<OrderPlaced>>(typed);
+        services.AddSingleton<IEventHandler<IEvent>>(catchAll);
+
+        var builder = new SchemataBuilder(new ConfigurationBuilder().Build(), null!);
+        builder.UseEvent()
+               .RegisterEvent<OrderPlaced>("orders/order-placed")
+               .UseProducer(p => p.UseInProcess())
+               .UseConsumer(c => c.UseInProcess());
+        builder.UseActor(actor => {
+            actor.Register<RecordingActor>("recorder");
+            actor.UseEvent().RouteEvent<OrderPlaced, OrderPlacedRoute>();
+        });
+        builder.Invoke(services);
+
+        await using var root = services.BuildServiceProvider();
+
+        var @event = new OrderPlaced("order-7");
+        await using (var scope = root.CreateAsyncScope()) {
+            var bus = scope.ServiceProvider.GetRequiredService<IEventBus>();
+            await bus.PublishAsync(@event);
+        }
+
+        Assert.Equal(1, typed.Calls);
+        Assert.Equal(1, catchAll.Calls);
+
+        var system = root.GetRequiredService<IActorSystem>();
+        var actor  = await system.GetAsync(new("recorder", "order-7"));
+
+        IMessage? received = null;
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (received is null && DateTime.UtcNow < deadline) {
+            received = await actor.AskAsync<GetReceived, IMessage?>(new());
+            if (received is null) {
+                await Task.Delay(TimeSpan.FromMilliseconds(50));
             }
+        }
 
-            Assert.Equal(@event, received);
-        } finally {
-            await dispatcher.StopAsync(CancellationToken.None);
+        Assert.Equal(@event, received);
+    }
+
+    private sealed class CountingOrderPlacedHandler : IEventHandler<OrderPlaced>
+    {
+        public int Calls;
+
+        public Task HandleAsync(OrderPlaced @event, CancellationToken ct = default) {
+            Calls++;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class CountingCatchAllHandler : IEventHandler<IEvent>
+    {
+        public int Calls;
+
+        public Task HandleAsync(IEvent @event, CancellationToken ct = default) {
+            Calls++;
+            return Task.CompletedTask;
         }
     }
 
@@ -86,7 +145,7 @@ public class EventToMailboxShould
         var services = new ServiceCollection();
         services.AddSchemataActor();
 
-        var actorBuilder = new SchemataActorBuilder(new SchemataOptions(), services);
+        var actorBuilder = new SchemataActorBuilder(new(), services);
         actorBuilder.Register<RecordingActor>("recorder");
         // Only OrderPlaced is routed; OrderCancelled is never registered through RouteEvent.
         actorBuilder.UseEvent().RouteEvent<OrderPlaced, OrderPlacedRoute>();
@@ -107,10 +166,10 @@ public class EventToMailboxShould
         repository.Setup(r => r.AddAsync(It.IsAny<SchemataEvent>(), It.IsAny<CancellationToken>()))
                   .Returns((SchemataEvent row, CancellationToken _) => {
                       storage.Add(row);
-                      return Task.CompletedTask;
+                      return Task.FromResult(MutationResult.Applied);
                   });
         repository.Setup(r => r.UpdateAsync(It.IsAny<SchemataEvent>(), It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
+                  .ReturnsAsync(MutationResult.Applied);
         repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>()))
                   .Returns(Task.CompletedTask);
         repository.Setup(r => r.ListAsync(

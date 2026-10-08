@@ -12,6 +12,7 @@
 | `Schemata.Expressions.Aip`      | `AipCompiler.cs`, `AipPushdownPlanner.cs`, `ExpressionLanguageBuilderExtensions.cs`                                                                                           |
 | `Schemata.Expressions.Cel`      | `CelCompiler.cs`, `CelPushdownPlanner.cs`, `ExpressionLanguageBuilderExtensions.cs`                                                                                           |
 | `Schemata.Expressions.Order`    | `OrderCompiler.cs`, `ServiceCollectionExtensions.cs`                                                                                                                          |
+| `Schemata.Resource.Http`        | `ListRequestBindingMetadataProvider.cs`, `Extensions/ServiceCollectionExtensions.cs` |
 
 ## Enabling languages
 
@@ -136,16 +137,42 @@ Core Data Protection purpose `Schemata.Resource.Foundation.PageToken`, and emitt
 `PageToken.FromStringAsync` rejects tampered or malformed tokens with `ValidationException`
 (`INVALID_PAGE_TOKEN`).
 
-| Parameter   | Default | Cap       |
-| ----------- | ------- | --------- |
-| `page_size` | 25      | 100       |
-| `skip`      | 0       | unbounded |
+| Parameter   | Default                  | Maximum                   |
+| ----------- | ------------------------ | ------------------------- |
+| `page_size` | effective default (25)   | effective maximum (100)   |
+| `skip`      | 0                        | unbounded                 |
 
-The token must match `Parent`, `Filter`, `Language`, `OrderBy`, and `ShowDeleted` from the current request. A mismatch throws `ValidationException` (`INVALID_PAGE_TOKEN`). A negative `page_size` throws `ValidationException` (`INVALID_PAGE_SIZE`).
+A negative `page_size` throws `ValidationException` (`INVALID_PAGE_SIZE`). The effective policy resolves
+per resource from `SchemataResourceOptions.DefaultPageSize` / `SchemataResourceOptions.MaxPageSize`,
+overridden by `ResourceAttribute.DefaultPageSize` / `ResourceAttribute.MaxPageSize` when set (zero means
+unset). An invalid combination (`0 < default <= maximum` violated) fails the request closed. An initial
+request that omits `page_size` (or sends zero) uses the effective default; a request above the effective
+maximum coerces to it. A continuation that omits `page_size` keeps the token's effective size, still
+subject to the current maximum; an explicit new `page_size` applies and paging resumes at the previous
+page's end, so shrinking a continuation page yields neither gaps nor duplicates.
+
+HTTP binds `ListRequest` query fields using snake_case names, including `page_size`, `page_token`,
+`order_by`, and `show_deleted`. This metadata is registered by the resource HTTP transport and applies
+only to `ListRequest`; custom request DTOs retain their own binding rules.
 
 Without a residual predicate, paging applies in the backend query with one look-ahead row. With a residual predicate, backend paging is delayed until `ResidualPage` has applied local filtering.
 
-`total_size` follows `TotalSizeMode`: `Exact` (default) counts exactly, `Estimated` calls `EstimateCountAsync`, and `None` omits the field. During residual evaluation, exact mode uses `ResidualPage`'s exact total; estimated mode estimates the pushed superset.
+`total_size` follows the global `SchemataResourceOptions.TotalSize` setting, overridden by a non-default
+`ResourceAttribute.TotalSize` for the resource:
+
+| Mode | Total computation |
+| --- | --- |
+| `Default` / `Exact` | Exact matching count before pagination; `Default` inherits the global setting and ultimately resolves to `Exact`. |
+| `Estimated` | Nullable repository estimate of the same scoped, filtered query before pagination. An unavailable estimate omits `total_size`; it never triggers an exact count. |
+| `None` | Omits `total_size` and skips both estimate and exact-count calls. |
+
+With a local residual predicate, `Exact` scans the pushed superset under `MaxResidualScanRows` to count
+only residual-passing rows. `Estimated` and `None` omit the total and stop once the requested page and
+one matching look-ahead row are found; neither estimates the superset nor scans it to compute a total.
+All modes determine `next_page_token` from actual look-ahead results, including when an estimate is zero
+or below the real count. Estimated totals above `int.MaxValue` are capped; negative estimates fail the request.
+
+EF Core estimation requires an explicit per-context opt-in; see [Repository Providers](../repository/providers.md).
 
 ## `ResourceRequestContainer`
 
@@ -184,7 +211,7 @@ HTTP surfaces these as `422`; gRPC surfaces them as `InvalidArgument`.
 
 - `field:*` is a presence check, not a glob pattern.
 - Residual mode can scan up to `MaxResidualScanRows` source rows per request before failing.
-- `CountAsync` runs before paging in strict mode; use `TotalSizeMode.Estimated` or `None` on large collections when exact totals are not needed.
+- `CountAsync` runs before paging in exact mode; use `TotalSizeMode.Estimated` or `None` when exact totals are not needed.
 
 ## See also
 

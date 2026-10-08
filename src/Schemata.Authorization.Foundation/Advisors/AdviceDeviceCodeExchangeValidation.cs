@@ -56,51 +56,30 @@ public sealed class AdviceDeviceCodeExchangeValidation<TApp, TToken>(TimeProvide
         CancellationToken                       ct = default
     ) {
         if (exchange.Token?.Type != TokenTypes.DeviceCode) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         if (exchange.Token.Application != exchange.Application?.Name) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         if (exchange.Token.ExpireTime.HasValue && exchange.Token.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime) {
-            throw new OAuthException(
-                OAuthErrors.ExpiredToken,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.ExpiredToken, SchemataResources.INVALID_GRANT);
         }
 
         switch (exchange.Token.Status) {
             case TokenStatuses.Denied:
-                throw new OAuthException(
-                    OAuthErrors.AccessDenied,
-                    SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED)
-                );
+                throw new OAuthException(OAuthErrors.AccessDenied, SchemataResources.ACCESS_DENIED);
             case TokenStatuses.Valid:
-                throw new OAuthException(
-                    OAuthErrors.AuthorizationPending,
-                    SchemataResources.GetResourceString(SchemataResources.AUTHORIZATION_PENDING)
-                );
+                throw new OAuthException(OAuthErrors.AuthorizationPending, SchemataResources.AUTHORIZATION_PENDING);
         }
 
         if (exchange.Token.Status != TokenStatuses.Authorized) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         if (string.IsNullOrWhiteSpace(exchange.Token.Subject)) {
-            throw new OAuthException(
-                OAuthErrors.AuthorizationPending,
-                SchemataResources.GetResourceString(SchemataResources.AUTHORIZATION_PENDING)
-            );
+            throw new OAuthException(OAuthErrors.AuthorizationPending, SchemataResources.AUTHORIZATION_PENDING);
         }
 
         return Task.FromResult(AdviseResult.Continue);

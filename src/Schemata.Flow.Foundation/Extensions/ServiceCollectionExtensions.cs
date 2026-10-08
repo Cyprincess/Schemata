@@ -11,7 +11,6 @@ using Schemata.Flow.Skeleton.Observers;
 using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Commands;
-using Schemata.Messaging.Skeleton.Runtime;
 using ProcessDefinitionInfo = Schemata.Flow.Skeleton.Models.ProcessDefinitionInfo;
 using ProcessSnapshot = Schemata.Flow.Skeleton.Models.ProcessSnapshot;
 
@@ -31,10 +30,7 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddSchemataFlow(this IServiceCollection services) {
-        services.TryAddScoped<InProcessRequestDispatcher>();
-        services.TryAddScoped<IRequestDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<ICommandDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<IQueryDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+        services.AddInProcessRequestDispatcher();
 
         services.TryAddSingleton<IProcessRegistry>(sp => {
             var registry = ActivatorUtilities.CreateInstance<ProcessRegistry>(sp);

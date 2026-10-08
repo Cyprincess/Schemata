@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
@@ -102,69 +103,7 @@ internal sealed partial class IdentityOperationHandler<TUser>
         }
 
         var claims = await _sign.CreateUserPrincipalAsync(user);
-
-        return IdentityResult<ClaimsPrincipal>.Success(claims);
-    }
-
-    /// <summary>Authenticates a user and builds the sign-in principal.</summary>
-    public async Task<IdentityResult<ClaimsPrincipal>> LoginAsync(
-        LoginRequest      request,
-        ClaimsPrincipal   principal,
-        CancellationToken ct = default
-    ) {
-        var ctx = AdviceContext.Require();
-
-        switch (await Advisor.For<IIdentityRequestAdvisor<LoginRequest>>()
-                             .RunAsync(ctx, request, IdentityOperation.Login, principal, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<ClaimsPrincipal>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
-        }
-
-        var found = await _users.FindByNameAsync(request.Username);
-        if (found is null) {
-            throw new UnauthenticatedException();
-        }
-
-        var check = await _sign.CheckPasswordSignInAsync(found, request.Password, true);
-
-        if (check.RequiresTwoFactor) {
-            if (!string.IsNullOrWhiteSpace(request.TwoFactorCode)) {
-                var valid = await _users.VerifyTwoFactorTokenAsync(
-                    found, _sign.Options.Tokens.AuthenticatorTokenProvider, request.TwoFactorCode);
-                if (!valid) {
-                    throw new UnauthenticatedException();
-                }
-            } else if (!string.IsNullOrWhiteSpace(request.TwoFactorRecoveryCode)) {
-                var redeem = await _users.RedeemTwoFactorRecoveryCodeAsync(found, request.TwoFactorRecoveryCode);
-                if (!redeem.Succeeded) {
-                    throw new UnauthenticatedException();
-                }
-            } else {
-                return IdentityResult<ClaimsPrincipal>.Challenge();
-            }
-
-            await _users.ResetAccessFailedCountAsync(found);
-        } else if (!check.Succeeded) {
-            throw new UnauthenticatedException();
-        }
-
-        switch (await Advisor.For<IIdentityLoginAdvisor>()
-                             .RunAsync(ctx, found, request, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<ClaimsPrincipal>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
-        }
-
-        var claims = await _sign.CreateUserPrincipalAsync(found);
+        AuthenticationClaims.Stamp(claims, null, false, _time);
 
         return IdentityResult<ClaimsPrincipal>.Success(claims);
     }
@@ -188,7 +127,11 @@ internal sealed partial class IdentityOperationHandler<TUser>
                 throw new PermissionDeniedException();
         }
 
-        if (ticket?.Principal is null || await _sign.ValidateSecurityStampAsync(ticket.Principal) is not { } found) {
+        // Ticket unprotection authenticates the payload; refresh admission enforces its expiry.
+        if (ticket?.Principal is null
+         || ticket.Properties?.ExpiresUtc is not { } expiresUtc
+         || _time.GetUtcNow() >= expiresUtc
+         || await _sign.ValidateSecurityStampAsync(ticket.Principal) is not { } found) {
             return IdentityResult<ClaimsPrincipal>.Challenge();
         }
 
@@ -204,6 +147,13 @@ internal sealed partial class IdentityOperationHandler<TUser>
         }
 
         var claims = await _sign.CreateUserPrincipalAsync(found);
+        AuthenticationClaims.Carry(ticket.Principal, claims);
+
+        // Ticket-bound session identity survives the rebuild through the observers; renewal
+        // never mints a fresh session.
+        foreach (var observer in _hostObservers) {
+            await observer.OnRenewingAsync(claims, ticket.Principal, ct);
+        }
 
         switch (await Advisor.For<IIdentityRefreshAdvisor>()
                              .RunAsync(ctx, claims, ct)) {

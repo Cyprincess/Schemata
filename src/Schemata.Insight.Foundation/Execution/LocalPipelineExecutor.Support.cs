@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Errors;
 using Schemata.Expressions.Skeleton;
 using Schemata.Insight.Foundation.Planning;
 using Schemata.Insight.Skeleton.Models;
@@ -15,21 +18,35 @@ namespace Schemata.Insight.Foundation.Execution;
 
 public sealed partial class LocalPipelineExecutor
 {
-    private async Task<List<IReadOnlyDictionary<string, object?>>> Buffer(
+    internal static async Task<List<IReadOnlyDictionary<string, object?>>> Buffer(
         IAsyncEnumerable<IReadOnlyDictionary<string, object?>> rows,
-        CancellationToken                                     ct
+        int cap,
+        CancellationToken ct
     ) {
-        var cap    = MaxScan();
         var buffer = new List<IReadOnlyDictionary<string, object?>>();
-        await foreach (var row in rows.WithCancellation(ct)) {
-            if (buffer.Count >= cap) {
-                throw new InvalidOperationException($"Join buffer exceeded the maximum of {cap} rows.");
-            }
-
+        await foreach (var row in Scan(rows, cap, ct)) {
             buffer.Add(row);
         }
 
         return buffer;
+    }
+
+    internal static async IAsyncEnumerable<T> Scan<T>(
+        IAsyncEnumerable<T> rows,
+        int cap,
+        [EnumeratorCancellation] CancellationToken ct
+    ) {
+        var scanned = 0;
+        await foreach (var row in rows.WithCancellation(ct)) {
+            if (scanned >= cap) {
+                throw new InsightValidationException(InsightReasons.InvalidArgument,
+                    SchemataResources.INSIGHT_SCAN_LIMIT_EXCEEDED,
+                    new Dictionary<string, string?> { ["cap"] = cap.ToString(CultureInfo.InvariantCulture) });
+            }
+
+            scanned++;
+            yield return row;
+        }
     }
 
     private static IReadOnlyDictionary<string, object?> Merge(
@@ -51,17 +68,18 @@ public sealed partial class LocalPipelineExecutor
     private IAsyncEnumerable<IReadOnlyDictionary<string, object?>> Apply(
         PlanNode                                              stage,
         IAsyncEnumerable<IReadOnlyDictionary<string, object?>> rows,
-        CancellationToken                                     ct
+        CancellationToken ct,
+        string? groupedAlias = null
     ) {
         return stage switch {
             FilterNode filter       => Filter(rows, filter, ct),
             ComputeNode compute     => Compute(rows, compute, ct),
-            GroupNode group         => Group(rows, group, ct),
+            GroupNode group         => Group(rows, group, ct, groupedAlias),
             OrderNode order         => Order(rows, order, ct),
             LimitNode limit         => Limit(rows, limit, ct),
             SelectionNode selection => Select(rows, selection, ct),
             var _ => throw new InsightValidationException(InsightReasons.Unimplemented,
-                                                         $"Plan node '{stage.GetType().Name}' is not a local stage."),
+                                                         SchemataResources.INSIGHT_LOCAL_STAGE_REQUIRED, new Dictionary<string, string?> { ["stage"] = stage.GetType().Name }),
         };
     }
 
@@ -95,8 +113,17 @@ public sealed partial class LocalPipelineExecutor
     }
 
     private static bool TryResolve(IReadOnlyDictionary<string, object?> row, string path, out object? value) {
+        var segments = path.Split('.', StringSplitOptions.RemoveEmptyEntries);
+        var first = 0;
         value = row;
-        foreach (var segment in path.Split('.', StringSplitOptions.RemoveEmptyEntries)) {
+        if (segments.Length > 1 && row is IQualifiedExpressionContext context
+            && context.TryGetQualifiedMember(segments[0], segments[1], out var qualifiedValue)) {
+            if (DynamicValues.IsMissing(qualifiedValue)) return false;
+            value = qualifiedValue;
+            first = 2;
+        }
+        for (var index = first; index < segments.Length; index++) {
+            var segment = segments[index];
             if (value is not IReadOnlyDictionary<string, object?> map || !map.TryGetValue(segment, out value)) {
                 value = null;
                 return false;
@@ -123,12 +150,12 @@ public sealed partial class LocalPipelineExecutor
             AggregationFunction.Min           => values.Length == 0 ? null : values.Min(RowComparer.Instance),
             AggregationFunction.Max           => values.Length == 0 ? null : values.Max(RowComparer.Instance),
             var _ => throw new InsightValidationException(InsightReasons.InvalidArgument,
-                                                         $"Unsupported aggregation '{aggregation.Function}'."),
+                                                         SchemataResources.INSIGHT_AGGREGATION_UNSUPPORTED, new Dictionary<string, string?> { ["function"] = aggregation.Function.ToString() }),
         };
     }
 
     private static double ToDouble(object? value) {
-        return Convert.ToDouble(value);
+        return Convert.ToDouble(value, CultureInfo.InvariantCulture);
     }
 
     private IExpressionCompiler Compiler(string language) {

@@ -210,7 +210,8 @@ internal sealed class AipCompileVisitor
     }
 
     private bool TryResolveIdentifier(string name, out Expression expression) {
-        if (string.Equals(name, Parameter.Name, StringComparison.Ordinal)) {
+        if (string.Equals(name, Parameter.Name, StringComparison.Ordinal)
+         || _options?.ContextAlias is { } alias && string.Equals(name, alias, StringComparison.Ordinal)) {
             expression = Parameter;
             return true;
         }
@@ -327,7 +328,11 @@ internal sealed class AipCompileVisitor
             return BuildEqual(left, right);
         }
 
-        return Expression.MakeBinary(op.Type!.Value, left, ConvertIfNeeded(right, left.Type));
+        if (op.Type is not { } type) {
+            throw new ParseException("Unsupported AIP comparator.", op.Position);
+        }
+
+        return Expression.MakeBinary(type, left, ConvertIfNeeded(right, left.Type));
     }
 
     private static Expression BuildEqual(Expression left, Expression right) {

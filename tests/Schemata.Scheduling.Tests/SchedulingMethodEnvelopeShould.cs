@@ -39,37 +39,17 @@ public sealed class SchedulingMethodEnvelopeShould
             services.AddSingleton<IRequestPipelineAdvisor<TriggerJobRequest, SchemataJobExecution>>(command);
         });
 
-        await harness.Scheduler.TriggerAsync<SampleJob>(
-            new JobContext { Job = "sample" }, CancellationToken.None);
-
-        var observed = Assert.Single(wrap.Observed);
-        Assert.Equal(SchedulingOperations.Trigger, observed.Verb);
-        Assert.Equal("sample", observed.Name);
-        Assert.Equal(typeof(SchemataJob), observed.Entity);
-        Assert.Equal(1, command.Count);
-    }
-
-    [Fact]
-    public async Task Trigger_Envelope_Dispatch_Runs_The_Trigger_Handler_And_Exposes_The_Verb_To_Wraps() {
-        var wrap    = new RecordingEnvelopeAdvisor();
-        var command = new RecordingCommandAdvisor();
-        var harness = await CreateStartedHarnessAsync(services => {
-            services.AddSingleton<IRequestPipelineAdvisor<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>>(wrap);
-            services.AddSingleton<IRequestPipelineAdvisor<TriggerJobRequest, SchemataJobExecution>>(command);
-        });
-        var dispatcher = harness.Services.GetRequiredService<IRequestDispatcher>();
-
-        var execution = await dispatcher.SendAsync<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>(
-            new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new JobContext { Job = "sample" }), null),
-            CancellationToken.None);
-
-        var observed = Assert.Single(wrap.Observed);
-        Assert.Equal(SchedulingOperations.Trigger, observed.Verb);
-        Assert.Equal("sample", observed.Name);
-        Assert.Equal(typeof(SchemataJob), observed.Entity);
+        var execution = await harness.Scheduler.TriggerAsync<SampleJob>(
+            new() { Job = "sample" }, CancellationToken.None);
         Assert.Equal("sample", execution.Job);
+
+        var observed = Assert.Single(wrap.Observed);
+        Assert.Equal(SchedulingOperations.Trigger, observed.Verb);
+        Assert.Equal("sample", observed.Name);
+        Assert.Equal(typeof(SchemataJob), observed.Entity);
         Assert.Equal(1, command.Count);
     }
+
 
     [Fact]
     public async Task Authorization_Only_Denies_And_Matching_Permission_Allows_Trigger() {
@@ -83,7 +63,7 @@ public sealed class SchedulingMethodEnvelopeShould
         var principal = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity("test"));
 
         await Assert.ThrowsAsync<PermissionDeniedException>(() => deniedDispatcher.SendAsync<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>(
-            new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new JobContext { Job = "sample" }), principal), CancellationToken.None));
+            new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new() { Job = "sample" }), principal), CancellationToken.None));
 
         var allowed = await CreateStartedHarnessAsync(services => {
             services.Configure<SchemataSecurityOptions>(_ => { });
@@ -91,10 +71,10 @@ public sealed class SchedulingMethodEnvelopeShould
             services.AddScoped<IPermissionMatcher, DefaultPermissionMatcher>();
             services.AddSchedulingAuthorization();
         });
-        var allowedPrincipal = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity([new System.Security.Claims.Claim("role", "schemata-job.trigger")], "test"));
+        var allowedPrincipal = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity([new("role", "schemata-job.trigger")], "test"));
 
         var execution = await allowed.Services.GetRequiredService<IRequestDispatcher>().SendAsync<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>(
-            new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new JobContext { Job = "sample" }), allowedPrincipal), CancellationToken.None);
+            new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new() { Job = "sample" }), allowedPrincipal), CancellationToken.None);
 
         Assert.Equal("sample", execution.Job);
     }
@@ -111,7 +91,7 @@ public sealed class SchedulingMethodEnvelopeShould
 
         await Assert.ThrowsAsync<UnauthenticatedException>(() => harness.Services.GetRequiredService<IRequestDispatcher>()
             .SendAsync<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>(
-                new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new JobContext { Job = "sample" }), null), CancellationToken.None));
+                new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new() { Job = "sample" }), null), CancellationToken.None));
     }
 
     private static async Task<Harness> CreateStartedHarnessAsync(Action<IServiceCollection>? advisors = null) {
@@ -123,18 +103,21 @@ public sealed class SchedulingMethodEnvelopeShould
         var jobs = new Mock<IRepository<SchemataJob>>();
         jobs.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(), It.IsAny<CancellationToken>()))
             .Returns(new ValueTask<SchemataJob?>((SchemataJob?)null));
-        jobs.Setup(r => r.AddAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        jobs.Setup(r => r.UpdateAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        jobs.Setup(r => r.AddAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
+        jobs.Setup(r => r.UpdateAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
         jobs.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        jobs.Setup(r => r.Begin()).Returns(CommittingUnit);
 
         var executions = new Mock<IRepository<SchemataJobExecution>>();
         executions.Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(), It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> _, CancellationToken _) => Empty());
-        executions.Setup(r => r.AddAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        executions.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        executions.Setup(r => r.AddAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
+        executions.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
         executions.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        executions.Setup(r => r.Begin()).Returns(CommittingUnit);
 
         var collection = new ServiceCollection()
+                        .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                         .AddSingleton(registry.Object)
                         .AddSingleton(jobs.Object)
                         .AddSingleton(executions.Object)
@@ -151,6 +134,13 @@ public sealed class SchedulingMethodEnvelopeShould
     private static async IAsyncEnumerable<SchemataJobExecution> Empty() {
         await Task.CompletedTask;
         yield break;
+    }
+
+    private static IUnitOfWork CommittingUnit() {
+        var unit = new Mock<IUnitOfWork>(MockBehavior.Strict);
+        unit.Setup(u => u.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        unit.Setup(u => u.DisposeAsync()).Returns(ValueTask.CompletedTask);
+        return unit.Object;
     }
 
     private sealed class RecordingEnvelopeAdvisor : IRequestPipelineAdvisor<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>

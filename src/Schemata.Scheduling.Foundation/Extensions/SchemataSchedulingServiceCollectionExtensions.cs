@@ -22,10 +22,8 @@ public static class SchemataSchedulingServiceCollectionExtensions
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddSchemataScheduling(this IServiceCollection services) {
-        services.TryAddScoped<InProcessRequestDispatcher>();
-        services.TryAddScoped<IRequestDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<ICommandDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<IQueryDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+        services.TryAddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>();
+        services.AddInProcessRequestDispatcher();
 
         services.AddOptions<SchemataSchedulingOptions>();
         services.TryAddSingleton<IScheduledJobRegistry, DefaultScheduledJobRegistry>();
@@ -36,9 +34,10 @@ public static class SchemataSchedulingServiceCollectionExtensions
         services.TryAddSingleton<IOperationService, DefaultOperationService>();
         services.TryAddSingleton<SchemataJobWriteGate>();
         services.TryAddTransient<SchedulingHandlerSupport>();
+        services.TryAddTransient<DefaultScheduleJobHandler>();
 
-        services.TryAddKeyedTransient<IRequestHandler<ScheduleJobRequest, Unit>, DefaultScheduleJobHandler>(
-            SchedulingConstants.Handlers.Default);
+        services.TryAddKeyedTransient<IRequestHandler<ScheduleJobRequest, Unit>>(
+            SchedulingConstants.Handlers.Default, (provider, _) => provider.GetRequiredService<DefaultScheduleJobHandler>());
         services.TryAddTransient<IRequestHandler<ScheduleJobRequest, Unit>>(provider =>
             provider.GetRequiredKeyedService<IRequestHandler<ScheduleJobRequest, Unit>>(
                 SchedulingConstants.Handlers.Default));

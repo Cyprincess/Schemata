@@ -24,6 +24,7 @@ public static class ServiceCollectionExtensions
 
         services.AddKeyedSingleton<IExpressionCompiler, CelCompiler>(CelLanguage.Name);
         services.AddKeyedSingleton<IExpressionPushdownPlanner, CelPushdownPlanner>(CelLanguage.Name);
+        services.AddKeyedSingleton<IExpressionReferenceProvider, CelReferenceProvider>(CelLanguage.Name);
         services.AddKeyedSingleton(CelLanguage.Name, new ExpressionLanguageDescriptor(CelLanguage.Name, options.Filtering, options.MaxResidualScanRows, true));
         return services;
     }

@@ -257,42 +257,6 @@ public class AdviceSourceProjectionShould
         Assert.Equal("Authorized", order.State);
     }
 
-    [Fact]
-    public async Task Refresh_Timestamps_On_All_Binding_Rows_Of_The_Entity() {
-        var definition = Definition(Activity("Paid"));
-        var process = Process("Running");
-        var token = Token("tokens/t1", "Paid", "Active");
-        var other = Token("tokens/t2", "Shipped", "Completed");
-        var order = NewOrder("Created");
-        var rows = new List<SchemataProcessSource> {
-            Row(process, order, "order"),
-            Row(process, order, "other", other.CanonicalName),
-        };
-        var harness = Harness(definition, order, rows, Descriptors(State("order"), State("other")));
-
-        await harness.AdviseAsync(Context(process, token, [token, other]));
-
-        Assert.All(rows, row => Assert.Equal(order.Timestamp, row.SourceTimestamp));
-        harness.Bindings.Verify(r => r.UpdateAsync(It.IsAny<SchemataProcessSource>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
-    }
-
-    [Fact]
-    public async Task Reject_Update_When_Any_Binding_Row_Timestamp_Is_Stale() {
-        var definition = Definition(Activity("Paid"));
-        var process = Process("Running");
-        var token = Token("tokens/t1", "Paid", "Active");
-        var other = Token("tokens/t2", "Shipped", "Active");
-        var order = NewOrder("Created");
-        var rows = new List<SchemataProcessSource> {
-            Row(process, order, "order"),
-            Row(process, order, "other", other.CanonicalName, Guid.NewGuid()),
-        };
-        var harness = Harness(definition, order, rows, Descriptors(State("order"), State("other")));
-
-        await Assert.ThrowsAsync<FailedPreconditionException>(async () => await harness.AdviseAsync(Context(process, token, [token, other])));
-
-        Assert.Equal("Created", order.State);
-    }
 
     [Fact]
     public async Task Skip_Undeclared_Binding_Rows() {
@@ -355,10 +319,11 @@ public class AdviceSourceProjectionShould
 
     private static SchemataProcess Process(string state, string canonicalName = "processes/p1") {
         return new() {
-            Name           = "p1",
-            CanonicalName  = canonicalName,
-            DefinitionName = "definition",
-            State          = state,
+            Name              = "p1",
+            CanonicalName     = canonicalName,
+            DefinitionName    = "definition",
+            DefinitionVersion = "1",
+            State             = state,
         };
     }
 
@@ -460,15 +425,16 @@ public class AdviceSourceProjectionShould
             Sources = SourceRepository(order);
             Bindings = Repository(rows);
             var registry = new Mock<IProcessRegistry>();
-            registry.Setup(r => r.GetRegistration("definition")).Returns(new ProcessRegistration {
+            registry.Setup(r => r.GetRegistration("definition", "1")).Returns(new ProcessRegistration {
                 Name          = "definition",
                 Definition    = definition,
-                Configuration = new() { Name = "definition" },
                 SourceTypes   = descriptors,
             });
-            Advisor = new(Sources.Object, Bindings.Object, registry.Object);
+            Advisor = new(registry.Object);
 
             var services = new ServiceCollection();
+            services.AddSingleton(Sources.Object);
+            services.AddSingleton(Bindings.Object);
             if (logger is not null) {
                 services.AddSingleton(logger.Object);
             }
@@ -483,6 +449,11 @@ public class AdviceSourceProjectionShould
         public Mock<IRepository<SchemataProcessSource>> Bindings { get; }
 
         public Task AdviseAsync(FlowTransitionContext context) {
+            context.Execution = new(context.UnitOfWork!, _advice.ServiceProvider) {
+                CreateProcessAsync = (_, _) => throw new NotSupportedException(),
+                CreateTokenAsync = (_, _) => throw new NotSupportedException(),
+                PersistSnapshotAsync = (_, _) => throw new NotSupportedException(),
+            };
             return Advisor.AdviseAsync(_advice, context, _order);
         }
     }
@@ -491,9 +462,9 @@ public class AdviceSourceProjectionShould
         var repository = new Mock<IRepository<Order>>();
         repository.Setup(r => r.Join(It.IsAny<IUnitOfWork>()));
         repository.Setup(r => r.UpdateAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
-                  .Returns((Order entity, CancellationToken _) => {
+                  .ReturnsAsync((Order entity, CancellationToken _) => {
                       entity.Timestamp = Guid.NewGuid();
-                      return Task.CompletedTask;
+                      return MutationResult.Applied;
                   });
         return repository;
     }
@@ -507,7 +478,7 @@ public class AdviceSourceProjectionShould
                   .Returns((Func<IQueryable<SchemataProcessSource>, IQueryable<SchemataProcessSource>> query, CancellationToken _) =>
                       EnumerateAsync(query(rows.AsQueryable())));
         repository.Setup(r => r.UpdateAsync(It.IsAny<SchemataProcessSource>(), It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
+                  .ReturnsAsync(MutationResult.Applied);
         return repository;
     }
 

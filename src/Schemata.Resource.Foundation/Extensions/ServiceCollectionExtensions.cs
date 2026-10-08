@@ -11,7 +11,6 @@ using Schemata.Common;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Commands;
 using Schemata.Messaging.Skeleton.Advisors;
-using Schemata.Messaging.Skeleton.Runtime;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Foundation.Commands;
@@ -34,10 +33,7 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddSchemataResources(this IServiceCollection services) {
-        services.TryAddScoped<InProcessRequestDispatcher>();
-        services.TryAddScoped<IRequestDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<ICommandDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<IQueryDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+        services.AddInProcessRequestDispatcher();
 
         services.TryAddScoped(typeof(ResourceOperationHandler<,,,>));
         services.TryAddScoped(typeof(ResourceMethodOperationHandler<,,>));
@@ -45,7 +41,6 @@ public static class ServiceCollectionExtensions
         services.AddHttpContextAccessor();
         services.AddDataProtection();
 
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceCreateAdvisor<,>), typeof(AdviceApplyChildParent<,>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateAdvisor<,>), typeof(AdviceApplyChildParent<,>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateAdvisor<,>), typeof(AdviceUpdateSoftDeleted<,>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceUpdateAdvisor<,>), typeof(AdviceUpdateFreshness<,>)));
@@ -79,56 +74,96 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddSchemataResources(this IServiceCollection services, SchemataOptions schemata) {
         AddSchemataResources(services);
 
-        var registry = GetOrAddRegistry(schemata, services);
-        registry.Attach(new(
-            (collection, resource, methods) => AddResource(collection, resource, registry),
-            ResourceAuthorizationRegistration.RegisterAuthentication,
-            ResourceAuthorizationRegistration.RegisterAuthorization,
-            ResourceAuthorizationRegistration.AddResourceAuthorizationAdvisors
-        ));
-
+        var registry = ResourceRegistry.GetOrAdd(schemata, services);
+        AttachWiring(services, registry);
         return services;
     }
 
-    private static ResourceRegistry GetOrAddRegistry(SchemataOptions schemata, IServiceCollection services) {
-        var registry = schemata.Get<ResourceRegistry>(RegistryKey);
-        if (registry is not null) {
-            return registry;
-        }
-
-        registry = new();
-        schemata.Set(RegistryKey, registry);
-        services.TryAddSingleton<ResourceRegistry>(registry);
-        return registry;
+    private static void AttachWiring(IServiceCollection services, ResourceRegistry registry) {
+        registry.Attach(services, new(
+            PrepareMethods,
+            (collection, resource) => InstallResource(collection, resource, registry),
+            (collection, resource, method) => InstallMethod(collection, resource, method, registry),
+            (resource, method) => {
+                var descriptor = ResourceMethodHandlerHelper.Describe(resource.Entity, method.Handler)!;
+                return (descriptor.Request, descriptor.Response);
+            },
+            ResourceAuthorizationRegistration.RegisterAuthentication,
+            ResourceAuthorizationRegistration.RegisterAuthorization,
+            collection => ApplyStageChoices(collection, registry)
+        ));
     }
 
-    internal const string RegistryKey = "Schemata.Resource.Registry";
 
     /// <summary>
-    ///     Registers a single resource: resolves endpoints, adds the idempotency advisor
-    ///     per <seealso href="https://google.aip.dev/155">AIP-155: Request identification</seealso>, scans
-    ///     AIP-136 custom methods declared via <see cref="ResourceMethodAttribute" />, and stores the
-    ///     <see cref="ResourceAttribute" /> in <paramref name="registry" />.
+    ///     Applies the registry's stage choices to descriptors already in the collection: prunes the
+    ///     validation stages and, when freshness is excluded, the freshness check advisors and the
+    ///     default response-ETag provider (a host-supplied <see cref="IEntityTagProvider" /> is left
+    ///     alone). Stages excluded before a resource registers are never installed for it.
     /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <param name="resource">The <see cref="ResourceAttribute" /> describing the resource.</param>
-    /// <param name="registry">The registry owned by the calling <see cref="SchemataResourceBuilder" />.</param>
-    /// <returns>The service collection for chaining.</returns>
-    internal static IServiceCollection AddResource(
-        this IServiceCollection services,
-        ResourceAttribute       resource,
-        ResourceRegistry        registry
-    ) {
-        EnsureAddressablePattern(resource.Entity);
+    private static void ApplyStageChoices(IServiceCollection services, ResourceRegistry registry) {
+        if (!registry.CreateValidation) {
+            RemoveKeyedAdvisors(services, typeof(ResourceCreateValidationPipelineAdvisor<,,>));
+        }
 
-        resource.Endpoints ??= resource.Entity.GetCustomAttributes<ResourceEndpointAttributeBase>()
-                                       .Select(a => a.Endpoint)
-                                       .ToArray();
+        if (!registry.UpdateValidation) {
+            RemoveKeyedAdvisors(services, typeof(ResourceUpdateValidationPipelineAdvisor<,,>));
+        }
+
+        if (registry.Freshness) {
+            return;
+        }
+
+        RemoveAdvisors(services, typeof(AdviceUpdateFreshness<,>));
+        RemoveAdvisors(services, typeof(AdviceDeleteFreshness<>));
+        RemoveAdvisors(services, typeof(AdviceMethodFreshness<,,>));
+        for (var i = services.Count - 1; i >= 0; i--) {
+            if (services[i].ServiceType == typeof(IEntityTagProvider)
+             && !services[i].IsKeyedService
+             && services[i].ImplementationType == typeof(DefaultEntityTagProvider)) {
+                services.RemoveAt(i);
+            }
+        }
+    }
+
+    private static void RemoveAdvisors(IServiceCollection services, Type implementationDefinition) {
+        for (var i = services.Count - 1; i >= 0; i--) {
+            if (!services[i].IsKeyedService
+             && services[i].ImplementationType is { IsGenericType: true } type
+             && type.GetGenericTypeDefinition() == implementationDefinition) {
+                services.RemoveAt(i);
+            }
+        }
+    }
+
+    private static void RemoveKeyedAdvisors(IServiceCollection services, Type implementationDefinition) {
+        for (var i = services.Count - 1; i >= 0; i--) {
+            var descriptor = services[i];
+            if (descriptor.IsKeyedService
+             && descriptor.ServiceKey is string key
+             && key == RequestPipelineStages.Validation
+             && descriptor.KeyedImplementationType is { IsGenericType: true } type
+             && type.GetGenericTypeDefinition() == implementationDefinition) {
+                services.RemoveAt(i);
+            }
+        }
+    }
+
+    internal static IServiceCollection AddResource(this IServiceCollection services, ResourceAttribute resource, ResourceRegistry registry) {
+        AddSchemataResources(services);
+        AttachWiring(services, registry);
+        var methods = resource.Entity.GetCustomAttributes<ResourceMethodAttribute>().ToList();
+        if (resource.Methods is not null) methods.AddRange(resource.Methods);
+        registry.Register(services, resource, methods);
+        return services;
+    }
+
+    private static void InstallResource(IServiceCollection services, ResourceRegistration resource, ResourceRegistry registry) {
 
         var entity  = resource.Entity;
-        var request = resource.Request!;
-        var detail  = resource.Detail!;
-        var summary = resource.Summary!;
+        var request = resource.Request;
+        var detail  = resource.Detail;
+        var summary = resource.Summary;
 
         AddStandardHandlers(services, entity, request, detail, summary);
 
@@ -138,12 +173,18 @@ public static class ServiceCollectionExtensions
         var updateResponse = typeof(UpdateResultBase<>).MakeGenericType(detail);
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(createRequest, createResponse), typeof(ResourceCreateSanitizePipelineAdvisor<,,>).MakeGenericType(entity, request, detail)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(createRequest, createResponse), typeof(ResourceCreateValidationPipelineAdvisor<,,>).MakeGenericType(entity, request, detail)));
+        if (registry.CreateValidation) {
+            services.Replace(ServiceDescriptor.KeyedScoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(createRequest, createResponse), RequestPipelineStages.Validation, typeof(ResourceCreateValidationPipelineAdvisor<,,>).MakeGenericType(entity, request, detail)));
+        }
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(createRequest, createResponse), typeof(ResourceCreateValidateOnlyPipelineAdvisor<,,>).MakeGenericType(entity, request, detail)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(updateRequest, updateResponse), typeof(ResourceUpdateSanitizePipelineAdvisor<,,>).MakeGenericType(entity, request, detail)));
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(updateRequest, updateResponse), typeof(ResourceUpdateValidationPipelineAdvisor<,,>).MakeGenericType(entity, request, detail)));
+        if (registry.UpdateValidation) {
+            services.Replace(ServiceDescriptor.KeyedScoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(updateRequest, updateResponse), RequestPipelineStages.Validation, typeof(ResourceUpdateValidationPipelineAdvisor<,,>).MakeGenericType(entity, request, detail)));
+        }
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(updateRequest, updateResponse), typeof(ResourceUpdateValidateOnlyPipelineAdvisor<,,>).MakeGenericType(entity, request, detail)));
 
         var listRequest  = typeof(ListResourceQueryRequest<,>).MakeGenericType(entity, summary);
-        var listResponse = typeof(ListResultBase<>).MakeGenericType(summary);
+        var listResponse = typeof(ListResultBase<,>).MakeGenericType(entity, summary);
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(listRequest, listResponse), typeof(ResourceListResponsePipelineAdvisor<,>).MakeGenericType(entity, summary)));
         var getRequest  = typeof(GetResourceQueryRequest<,>).MakeGenericType(entity, detail);
         var getResponse = typeof(GetResultBase<>).MakeGenericType(detail);
@@ -157,47 +198,64 @@ public static class ServiceCollectionExtensions
         var deleteResponse = typeof(DeleteResultBase<>).MakeGenericType(detail);
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<,>).MakeGenericType(deleteRequest, deleteResponse), typeof(ResourceDeleteResponsePipelineAdvisor<,>).MakeGenericType(entity, detail)));
 
-        var methods = entity.GetCustomAttributes<ResourceMethodAttribute>().ToList();
-        if (resource.Methods is not null) {
-            methods.AddRange(resource.Methods);
-        }
-        AddBuiltInMethods(resource, methods, entity, detail);
+    }
 
+    private static IReadOnlyList<ResourceMethodRegistration> PrepareMethods(ResourceRegistration resource) {
+        EnsureAddressablePattern(resource.Entity);
+        var methods = resource.Methods.ToList();
+        AddBuiltInMethods(resource, methods, resource.Entity, resource.Detail);
         foreach (var method in methods) {
-            var descriptor = ResourceMethodHandlerHelper.Describe(entity, method.Handler);
-            if (descriptor is null) {
+            if (ResourceMethodHandlerHelper.Describe(resource.Entity, method.Handler) is null) {
                 throw new InvalidOperationException(
                     $"Handler '{method.Handler.FullName}' for verb '{method.Verb}' on resource "
-                    + $"'{entity.FullName}' must implement IRequestHandler<TRequest, TResponse>, "
+                    + $"'{resource.Entity.FullName}' must implement IRequestHandler<TRequest, TResponse>, "
                     + "where TRequest implements IRequest<TResponse> and IRequestPrincipal.");
             }
+        }
+        return methods;
+    }
 
-            var handlerInterface = ResourceMethodHandlerHelper.FindHandlerInterface(descriptor.Handler)!;
-            services.TryAddScoped(handlerInterface, descriptor.Handler);
+    private static IReadOnlyList<ServiceDescriptor> InstallMethod(IServiceCollection services, ResourceRegistration resource,
+        ResourceMethodRegistration method, ResourceRegistry registry) {
+        var entity = resource.Entity;
+        var descriptor = ResourceMethodHandlerHelper.Describe(entity, method.Handler)!;
+        var handlerInterface = ResourceMethodHandlerHelper.FindHandlerInterface(descriptor.Handler)!;
+        var dependencies = new List<ServiceDescriptor>();
+        Add(ServiceDescriptor.Scoped(handlerInterface, descriptor.Handler));
 
-            var methodRequest  = descriptor.Request;
-            var methodResponse = descriptor.Response;
-            var envelope       = typeof(ResourceMethodRequest<,,>).MakeGenericType(entity, methodRequest, methodResponse);
+        var methodRequest  = descriptor.Request;
+        var methodResponse = descriptor.Response;
+        var envelope       = typeof(ResourceMethodRequest<,,>).MakeGenericType(entity, methodRequest, methodResponse);
 
-            // TryAdd keeps one envelope handler per closure: a domain foundation that forwards its
-            // own method command through the envelope registers its forwarder first.
-            services.TryAddScoped(typeof(IRequestHandler<,>).MakeGenericType(envelope, methodResponse),
-                                  typeof(ResourceMethodDispatchHandler<,,>).MakeGenericType(entity, methodRequest, methodResponse));
-            services.TryAddEnumerable(ServiceDescriptor.Scoped(
+        // Domain forwarders own the envelope slot when registered before the resource pipeline.
+        Add(ServiceDescriptor.Scoped(typeof(IRequestHandler<,>).MakeGenericType(envelope, methodResponse),
+                                    typeof(ResourceMethodDispatchHandler<,,>).MakeGenericType(entity, methodRequest, methodResponse)));
+        Add(ServiceDescriptor.Scoped(
+            typeof(IRequestPipelineAdvisor<,>).MakeGenericType(envelope, methodResponse),
+            typeof(ResourceMethodResponsePipelineAdvisor<,,>).MakeGenericType(entity, methodRequest, methodResponse)), true);
+
+        if (typeof(ICanonicalName).IsAssignableFrom(methodRequest)) {
+            Add(ServiceDescriptor.Scoped(
                 typeof(IRequestPipelineAdvisor<,>).MakeGenericType(envelope, methodResponse),
-                typeof(ResourceMethodResponsePipelineAdvisor<,,>).MakeGenericType(entity, methodRequest, methodResponse)));
-
-            if (typeof(ICanonicalName).IsAssignableFrom(methodRequest)) {
-                services.TryAddEnumerable(ServiceDescriptor.Scoped(
-                    typeof(IRequestPipelineAdvisor<,>).MakeGenericType(envelope, methodResponse),
-                    typeof(ResourceMethodIdempotencyPipelineAdvisor<,,>).MakeGenericType(entity, methodRequest, methodResponse)));
-                services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IResourceMethodAdvisor<,,>).MakeGenericType(entity, methodRequest, methodResponse), typeof(AdviceMethodFreshness<,,>).MakeGenericType(entity, methodRequest, methodResponse)));
+                typeof(ResourceMethodIdempotencyPipelineAdvisor<,,>).MakeGenericType(entity, methodRequest, methodResponse)), true);
+            if (registry.Freshness) {
+                Add(ServiceDescriptor.Scoped(typeof(IResourceMethodAdvisor<,,>).MakeGenericType(entity, methodRequest, methodResponse),
+                    typeof(AdviceMethodFreshness<,,>).MakeGenericType(entity, methodRequest, methodResponse)), true);
             }
         }
-        registry.Add(resource, methods);
+        return dependencies;
 
-
-        return services;
+        void Add(ServiceDescriptor candidate, bool enumerable = false) {
+            var installed = services.FirstOrDefault(item => !item.IsKeyedService && item.ServiceType == candidate.ServiceType
+                && (!enumerable || (item.ImplementationType ?? item.ImplementationInstance?.GetType()
+                    ?? item.ImplementationFactory?.Method.ReturnType) == candidate.ImplementationType));
+            if (installed is null) {
+                if (enumerable) services.TryAddEnumerable(candidate);
+                else services.TryAdd(candidate);
+                installed = candidate;
+            }
+            dependencies.Add(installed);
+        }
     }
 
     /// <summary>
@@ -243,7 +301,7 @@ public static class ServiceCollectionExtensions
             services,
             typeof(IRequestHandler<,>).MakeGenericType(
                 typeof(ListResourceQueryRequest<,>).MakeGenericType(entity, summary),
-                typeof(ListResultBase<>).MakeGenericType(summary)),
+                typeof(ListResultBase<,>).MakeGenericType(entity, summary)),
             typeof(DefaultListResourceHandler<,,,>).MakeGenericType(entity, request, detail, summary));
         AddHandler(
             services,
@@ -266,10 +324,10 @@ public static class ServiceCollectionExtensions
     }
 
     private static void AddBuiltInMethods(
-        ResourceAttribute             resource,
-        List<ResourceMethodAttribute> methods,
-        Type                          entity,
-        Type                          detail
+        ResourceRegistration             resource,
+        List<ResourceMethodRegistration> methods,
+        Type                             entity,
+        Type                             detail
     ) {
         if (!typeof(ISoftDelete).IsAssignableFrom(entity)) {
             return;
@@ -297,12 +355,12 @@ public static class ServiceCollectionExtensions
     }
 
     private static void AddSoftDeleteMethod(
-        List<ResourceMethodAttribute> methods,
-        string                        verb,
-        Operations                    operation,
-        Type                          handler,
-        Operations[]?                 allowed,
-        ResourceMethodScope           scope = ResourceMethodScope.Instance
+        List<ResourceMethodRegistration> methods,
+        string                           verb,
+        Operations                       operation,
+        Type                             handler,
+        IReadOnlyList<Operations>?        allowed,
+        ResourceMethodScope              scope = ResourceMethodScope.Instance
     ) {
         if (allowed is not null && !allowed.Contains(operation)) {
             return;

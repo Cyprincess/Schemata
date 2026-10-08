@@ -7,9 +7,17 @@ namespace Schemata.Flow.Skeleton.Models;
 /// </summary>
 public sealed class EventBasedGateway : Gateway
 {
+    private bool _parallel;
+
     /// <summary>
     ///     When <c>true</c>, the gateway waits for all events to fire (parallel event-based).
     ///     When <c>false</c> (default), the first event to fire determines the path.
     /// </summary>
-    public bool Parallel { get; set; }
+    public bool Parallel {
+        get => _parallel;
+        set {
+            EnsureMutable();
+            _parallel = value;
+        }
+    }
 }

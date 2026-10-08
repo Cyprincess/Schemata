@@ -88,7 +88,7 @@ public class ScheduledPushServiceShould
         var service = new ScheduledPushService(services.GetRequiredService<IRequestDispatcher>());
 
         await service.ScheduleSendAsync(
-            new PushContext("payload", new TopicTarget("alerts")),
+            new("payload", new TopicTarget("alerts")),
             null,
             CancellationToken.None);
 

@@ -31,7 +31,8 @@ public sealed class StateMachineEngine : IFlowRuntime
         var (start, outgoing) = definition.RequireStart();
 
         var token = TokenFactory.NewRootToken(process, new(start.Name, null, false));
-        var resolved = await ResolveTargetStateAsync(definition, process, token, context, outgoing.Target, null);
+        await context.CreateTokenAsync(token, ct);
+        var resolved = await ResolveTargetStateAsync(definition, process, token, context, outgoing.Target, null, ct);
         TokenAggregator.ApplyAndAggregate(process, token, resolved, [token]);
 
         return new() {
@@ -44,7 +45,7 @@ public sealed class StateMachineEngine : IFlowRuntime
                 null,
                 resolved.StateName,
                 TransitionKind.Move,
-                "Start")
+                "Start"),
             ],
         };
     }
@@ -73,7 +74,7 @@ public sealed class StateMachineEngine : IFlowRuntime
         var token = ResolveSingleToken(process, tokens, tokenName);
 
         var previousState = token.WaitingAtName ?? token.StateName;
-        var resolved      = await ResolveTriggerAsync(definition, process, token, context, trigger, payload);
+        var resolved      = await ResolveTriggerAsync(definition, process, token, context, trigger, payload, ct);
 
         if (resolved is null) {
             throw new InvalidArgumentException(
@@ -115,7 +116,7 @@ public sealed class StateMachineEngine : IFlowRuntime
             return new() { Process = process, Tokens = [token], Transitions = ImmutableArray<SchemataProcessTransition>.Empty };
         }
 
-        var resolved = await ResolveTargetStateAsync(definition, process, token, context, matched.Target, null);
+        var resolved = await ResolveTargetStateAsync(definition, process, token, context, matched.Target, null, ct);
 
         // Parking at an event-based gateway keeps the completed activity as the business state;
         // the gateway name only ever surfaces on WaitingAtName.
@@ -156,12 +157,13 @@ public sealed class StateMachineEngine : IFlowRuntime
         SchemataProcessToken        token,
         FlowExecutionContext        context,
         IEventDefinition            trigger,
-        object?                     payload
+        object?                     payload,
+        CancellationToken           ct
     ) {
         var flow = await ResolveTriggerFlowAsync(definition, token, trigger, payload, context, process);
         return flow is null
             ? null
-            : await ResolveTargetStateAsync(definition, process, token, context, flow.Target, payload);
+            : await ResolveTargetStateAsync(definition, process, token, context, flow.Target, payload, ct);
     }
 
     private static async ValueTask<SequenceFlow?> ResolveTriggerFlowAsync(
@@ -217,7 +219,7 @@ public sealed class StateMachineEngine : IFlowRuntime
                 previousState,
                 resolved.StateName,
                 TransitionKind.Move,
-                eventName)
+                eventName),
             ],
         };
     }
@@ -230,6 +232,7 @@ public sealed class StateMachineEngine : IFlowRuntime
         FlowExecutionContext   context,
         FlowElement            target,
         object?                payload,
+        CancellationToken      ct,
         HashSet<FlowElement>?  visited = null
     ) {
         visited ??= [];
@@ -241,19 +244,19 @@ public sealed class StateMachineEngine : IFlowRuntime
 
         if (target is ProcedureTaskBase procedure) {
             var task = new FlowTaskContext(definition, process, token, context, payload);
-            await procedure.InvokeAsync(task);
+            await procedure.InvokeAsync(task, ct);
             var flow = await ResolveAutoFlowAsync(definition, process, token, context, procedure, payload);
             if (flow is null) {
                 return new(procedure.Name, null, false);
             }
 
-            return await ResolveTargetStateAsync(definition, process, token, context, flow.Target, payload, visited);
+            return await ResolveTargetStateAsync(definition, process, token, context, flow.Target, payload, ct, visited);
         }
 
         if (target is Gateway gateway and not EventBasedGateway) {
             var flow = await ResolveGatewayFlowAsync(definition, process, token, context, gateway, payload);
             if (flow is not null) {
-                return await ResolveTargetStateAsync(definition, process, token, context, flow.Target, payload, visited);
+                return await ResolveTargetStateAsync(definition, process, token, context, flow.Target, payload, ct, visited);
             }
         }
 
@@ -267,7 +270,7 @@ public sealed class StateMachineEngine : IFlowRuntime
             case FlowEvent flowEvent: {
                 var outgoing = definition.Flows.Where(sf => sf.Source == flowEvent).ToList();
                 return outgoing.Count == 1
-                    ? await ResolveTargetStateAsync(definition, process, token, context, outgoing[0].Target, payload, visited)
+                    ? await ResolveTargetStateAsync(definition, process, token, context, outgoing[0].Target, payload, ct, visited)
                     : new(flowEvent.Name, null, false);
             }
             case EventBasedGateway eventBasedGateway:

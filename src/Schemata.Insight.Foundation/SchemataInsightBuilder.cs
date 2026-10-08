@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq.Expressions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions.Resource;
@@ -98,12 +99,24 @@ public sealed class SchemataInsightBuilder : IExpressionLanguageBuilder, IResour
         return this;
     }
 
-    /// <summary>Registers a repository-backed source over a resource collection.</summary>
+    /// <summary>
+    ///     Registers a repository-backed source with a closed projection. The projection binds the
+    ///     entity's row type to the public shape so the driver can lower against a closed generic
+    ///     surface and the row-level entitlement stays scoped to the entity query.
+    /// </summary>
+    /// <typeparam name="TEntity">The repository's row type.</typeparam>
+    /// <typeparam name="TPublic">The shape materialized into rows.</typeparam>
     /// <param name="name">The caller-facing source name.</param>
-    /// <param name="resource">The resource collection the repository driver reads.</param>
+    /// <param name="projection">The projection from entity to public shape.</param>
     /// <returns>This builder for chaining.</returns>
-    public SchemataInsightBuilder AddRepositorySource(string name, string resource) {
-        return AddSource(name, RepositoryDriver.DriverName, new Dictionary<string, object?> { ["resource"] = resource });
+    public SchemataInsightBuilder AddRepositorySource<TEntity, TPublic>(
+        string                          name,
+        Expression<Func<TEntity, TPublic>> projection
+    )
+        where TEntity : class
+        where TPublic : class {
+        Services.AddKeyedSingleton<RepositorySource>(name, new RepositorySource<TEntity, TPublic>(projection));
+        return AddSource(name, RepositoryDriver.DriverName, new Dictionary<string, object?> { ["binding"] = name });
     }
 
     /// <summary>Registers a source driver under its keyed name.</summary>

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
@@ -31,7 +32,8 @@ public sealed class EventSubProcessExecutor
         List<SchemataProcessToken>    working,
         IEventDefinition              trigger,
         object?                       payload,
-        FlowExecutionContext          execution
+        FlowExecutionContext          execution,
+        CancellationToken             ct = default
     ) {
         ArgumentNullException.ThrowIfNull(engine);
         ArgumentNullException.ThrowIfNull(definition);
@@ -45,7 +47,7 @@ public sealed class EventSubProcessExecutor
             foreach (var candidate in scopeMap.EventSubProcessesInScope(scopeName)) {
                 var start = candidate.FindMatchingStart(definition => FlowEventMatcher.Matches(definition, trigger));
                 if (start is not null) {
-                    return await FireAsync(engine, definition, process, addressed, working, candidate, start, scopeName, trigger, payload, scopeMap, execution);
+                    return await FireAsync(engine, definition, process, addressed, working, candidate, start, scopeName, trigger, payload, scopeMap, execution, ct);
                 }
             }
         }
@@ -65,7 +67,8 @@ public sealed class EventSubProcessExecutor
         IEventDefinition              trigger,
         object?                       payload,
         ProcessScopeMap               scopeMap,
-        FlowExecutionContext          execution
+        FlowExecutionContext          execution,
+        CancellationToken             ct
     ) {
         var outgoing = eventSubProcess.ChildFlows.Where(f => f.Source == start).ToList();
         if (outgoing.Count != 1) {
@@ -91,16 +94,18 @@ public sealed class EventSubProcessExecutor
         }
 
         var variables = new Dictionary<string, int>(addressed.Bookkeeping, StringComparer.Ordinal);
+        var child = NewEventSubProcessToken(process, eventSubProcess, addressed, new(outgoing[0].Target.Name, null, false));
+        await execution.CreateTokenAsync(child, ct);
         var resolved = await engine.ResolveTargetAsync(
             definition,
             outgoing[0].Target,
             variables,
-            BpmnEngine.TokenView(addressed),
+            BpmnEngine.TokenView(child),
             execution,
             process,
-            addressed,
-            payload);
-        var child = NewEventSubProcessToken(process, eventSubProcess, addressed, resolved);
+            child,
+            payload, ct: ct);
+        BpmnEngine.ApplyResolvedToToken(child, resolved);
         working.Add(child);
 
         transitions.Add(BpmnEngine.NewTransition(
@@ -121,12 +126,7 @@ public sealed class EventSubProcessExecutor
         SchemataProcessToken  addressed,
         TargetState resolved
     ) {
-        var leaf      = Guid.NewGuid().ToString("n");
-        var canonical = $"{process.CanonicalName}/tokens/{leaf}";
-
         return new() {
-            Name          = leaf,
-            CanonicalName = canonical,
             Process       = process.Name!,
             Spawner       = addressed.CanonicalName,
             ScopeName       = eventSubProcess.Name,

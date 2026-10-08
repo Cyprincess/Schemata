@@ -6,6 +6,7 @@ using Schemata.Core.Building;
 using Schemata.Core.Features;
 using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Flow.Skeleton.Entities;
 using Schemata.Security.Skeleton;
 
 namespace Schemata.Flow.Foundation.Builders;
@@ -26,7 +27,13 @@ public sealed class SchemataFlowBuilder : IResourceBuilder
         Schemata.Set(nameof(ResourceSecurityRegistration), registrations);
         registrations[this] = new(
             services => services.AddFlowAuthentication(),
-            services => services.AddFlowAuthorization(),
+            services => {
+                services.AddFlowAuthorization();
+                new SchemataResourceBuilder(Schemata, services)
+                    .WithAuthorization<SchemataProcess>()
+                    .WithAuthorization<SchemataProcessToken>()
+                    .WithAuthorization<SchemataProcessTransition>();
+            },
             scheme => Schemata.Set(FlowResourceRegistration.AuthenticationSchemeKey, scheme));
     }
 

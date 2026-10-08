@@ -15,7 +15,7 @@ namespace Schemata.Messaging.Skeleton.Runtime;
 ///     <see cref="IRequestPipelineAdvisor{TRequest,TResponse}" /> chain around the request's single
 ///     handler for a <see cref="ICommand" />, <see cref="ICommand{TResult}" /> or
 ///     <see cref="IQuery{TResult}" />, and invokes it. A plain <see cref="IRequest{TResponse}" />
-///     that is neither a command nor a query runs no chain and falls straight through to the handler.
+///     runs only its explicitly registered validation stage.
 /// </summary>
 /// <remarks>
 ///     Public and unifying: a single implementation answers <see cref="ICommandDispatcher" />,
@@ -30,12 +30,53 @@ namespace Schemata.Messaging.Skeleton.Runtime;
 public sealed class InProcessRequestDispatcher(IServiceProvider services) : ICommandDispatcher, IQueryDispatcher
 {
     /// <inheritdoc cref="IRequestDispatcher.SendAsync{TRequest,TResponse}" />
-    public async Task<TResponse> SendAsync<TRequest, TResponse>(TRequest request, CancellationToken ct = default)
+    public Task<TResponse> SendAsync<TRequest, TResponse>(TRequest request, CancellationToken ct = default)
+        where TRequest : IRequest<TResponse>
+        => ExecuteAsync<TRequest, TResponse>(request, null, false, ct);
+
+    /// <summary>
+    ///     Selects a keyed handler at the continuation tail while preserving the request's validation
+    ///     and command/query advisor chain.
+    /// </summary>
+    public Task<TResponse> SendAsync<TRequest, TResponse>(TRequest request, object serviceKey, CancellationToken ct = default)
+        where TRequest : IRequest<TResponse>
+        => ExecuteAsync<TRequest, TResponse>(request, serviceKey, true, ct);
+
+    private async Task<TResponse> ExecuteAsync<TRequest, TResponse>(
+        TRequest request, object? serviceKey, bool keyed, CancellationToken ct)
         where TRequest : IRequest<TResponse> {
         var ctx = new AdviceContext(services);
         using var _ = AdviceContext.Establish(ctx);
+        var validation = services.GetKeyedService<IRequestPipelineAdvisor<TRequest, TResponse>>(RequestPipelineStages.Validation);
+
+        if (request is not (ICommand or ICommand<TResponse> or IQuery<TResponse>)) {
+            return await (validation is null ? Handle(ct) : validation.AdviseAsync(ctx, request, Handle, ct));
+        }
+
+        var advisors = services.GetServices<IRequestPipelineAdvisor<TRequest, TResponse>>()
+                               .OrderBy(advisor => advisor.Order)
+                               .ToList();
+        if (validation is not null) {
+            var index = advisors.FindIndex(advisor => advisor.Order > validation.Order);
+            if (index < 0) advisors.Add(validation);
+            else advisors.Insert(index, validation);
+        }
+
+        RequestHandlerContinuation<TResponse> next = Handle;
+        for (var i = advisors.Count - 1; i >= 0; i--) {
+            var advisor    = advisors[i];
+            var downstream = next;
+            next = token => advisor.AdviseAsync(ctx, request, downstream, token);
+        }
+
+        return await next(ct);
 
         Task<TResponse> Handle(CancellationToken token) {
+            if (keyed) {
+                return services.GetRequiredKeyedService<IRequestHandler<TRequest, TResponse>>(serviceKey)
+                               .HandleAsync(request, token);
+            }
+
             var handlers = services.GetServices<IRequestHandler<TRequest, TResponse>>().ToList();
 
             return handlers.Count switch {
@@ -46,23 +87,6 @@ public sealed class InProcessRequestDispatcher(IServiceProvider services) : ICom
                     $"Multiple request handlers registered for request type '{typeof(TRequest).FullName}'. Expected exactly one."),
             };
         }
-
-        if (request is not (ICommand or ICommand<TResponse> or IQuery<TResponse>)) {
-            return await Handle(ct);
-        }
-
-        var advisors = services.GetServices<IRequestPipelineAdvisor<TRequest, TResponse>>()
-                               .OrderBy(advisor => advisor.Order)
-                               .ToList();
-
-        RequestHandlerContinuation<TResponse> next = Handle;
-        for (var i = advisors.Count - 1; i >= 0; i--) {
-            var advisor    = advisors[i];
-            var downstream = next;
-            next = token => advisor.AdviseAsync(ctx, request, downstream, token);
-        }
-
-        return await next(ct);
     }
 
     /// <inheritdoc cref="ICommandDispatcher.SendAsync{TCommand}" />

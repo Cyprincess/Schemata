@@ -31,22 +31,22 @@ public interface IProcessRegistry
     ValueTask RegisterAsync(ProcessConfiguration configuration, CancellationToken ct = default);
 
     /// <summary>
-    ///     Removes a registered process definition by name.
+    ///     Removes one exact registered version.
     /// </summary>
-    ValueTask UnregisterAsync(string processName, CancellationToken ct = default);
+    ValueTask UnregisterAsync(string processName, string version, CancellationToken ct = default);
 
     /// <summary>
-    ///     Returns the names of all currently registered process definitions.
+    ///     Returns all registered definition versions.
     /// </summary>
-    IReadOnlyCollection<string> GetRegisteredProcesses();
+    IReadOnlyCollection<ProcessRegistration> GetRegisteredProcesses();
 
     /// <summary>
-    ///     Checks whether a process definition with the given name is registered.
+    ///     Checks whether the selected version is registered.
     /// </summary>
-    bool IsRegistered(string processName);
+    bool IsRegistered(string processName, string version = "1");
 
     /// <summary>
-    ///     Retrieves the full registration for a process definition by name.
+    ///     Resolves an exact version, or the explicit "latest" selection for a new start.
     /// </summary>
-    ProcessRegistration? GetRegistration(string processName);
+    ProcessRegistration? GetRegistration(string processName, string version = "1");
 }

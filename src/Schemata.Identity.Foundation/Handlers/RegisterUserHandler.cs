@@ -15,5 +15,11 @@ internal sealed class RegisterUserHandler<TUser>(IdentityOperationHandler<TUser>
     public Task<IdentityResult<ClaimsPrincipal>> HandleAsync(
         RegisterUserRequest<TUser> request,
         CancellationToken          ct = default
-    ) => operations.RegisterAsync(IdentityRequestHandler.Require(request).Request, request.Principal!, ct);
+    ) {
+        if (request.Principal is null) {
+            return Task.FromResult(IdentityResult<ClaimsPrincipal>.Challenge());
+        }
+
+        return operations.RegisterAsync(IdentityRequestHandler.Require(request).Request, request.Principal, ct);
+    }
 }

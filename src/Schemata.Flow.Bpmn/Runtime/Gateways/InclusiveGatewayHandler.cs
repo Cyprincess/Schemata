@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
@@ -28,7 +29,8 @@ public static class InclusiveGatewayHandler
         SchemataProcess           process,
         InclusiveGateway          ig,
         Dictionary<string, int>     variables,
-        FlowExecutionContext      execution
+        FlowExecutionContext      execution,
+        CancellationToken         ct = default
     ) {
         var outgoing = definition.Outgoing(ig).ToList();
         var matched  = await engine.ResolveInclusiveBranchesAsync(definition, ig, outgoing, BpmnEngine.EmptyTokenView(process), variables, execution, process);
@@ -38,7 +40,7 @@ public static class InclusiveGatewayHandler
                 new Dictionary<string, string?> { ["name"] = ig.Name });
         }
 
-        return await engine.SpawnFromGatewayAsync(definition, process, ig, matched, variables, TransitionKind.Fork, execution);
+        return await engine.SpawnFromGatewayAsync(definition, process, ig, matched, variables, TransitionKind.Fork, execution, ct);
     }
 
     /// <summary>
@@ -54,7 +56,8 @@ public static class InclusiveGatewayHandler
         List<SchemataProcessToken> working,
         InclusiveGateway          ig,
         string?                   previousState,
-        FlowExecutionContext      execution
+        FlowExecutionContext      execution,
+        CancellationToken         ct = default
     ) {
         var outgoing  = definition.Outgoing(ig).ToList();
         var variables = new Dictionary<string, int>();
@@ -65,7 +68,7 @@ public static class InclusiveGatewayHandler
                 new Dictionary<string, string?> { ["name"] = ig.Name });
         }
 
-        return await engine.BranchFromTokenAsync(definition, process, token, working, ig, matched, previousState, TransitionKind.Fork, execution);
+        return await engine.BranchFromTokenAsync(definition, process, token, working, ig, matched, previousState, TransitionKind.Fork, execution, ct);
     }
 
     /// <summary>
@@ -81,7 +84,8 @@ public static class InclusiveGatewayHandler
         List<SchemataProcessToken> working,
         InclusiveGateway          ig,
         string?                   previousState,
-        FlowExecutionContext      execution
+        FlowExecutionContext      execution,
+        CancellationToken         ct = default
     ) {
         var waitingHere  = working
                          .Where(t => !ReferenceEquals(t, token)
@@ -96,6 +100,6 @@ public static class InclusiveGatewayHandler
             return engine.ParkAtGateway(process, token, working, ig, previousState, execution);
         }
 
-        return await engine.FireJoinAsync(definition, process, token, working, ig, waitingHere, previousState, execution);
+        return await engine.FireJoinAsync(definition, process, token, working, ig, waitingHere, previousState, execution, ct);
     }
 }

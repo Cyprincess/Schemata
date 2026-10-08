@@ -29,7 +29,7 @@ public class IdentityControllerDispatchShould
         var requests   = new List<object>();
         var dispatcher = new Mock<IRequestDispatcher>(MockBehavior.Strict);
         SetupChallenge<RegisterUserRequest<SchemataUser>, ClaimsPrincipal>(dispatcher, requests);
-        SetupChallenge<LoginUserRequest<SchemataUser>, ClaimsPrincipal>(dispatcher, requests);
+        SetupChallenge<LoginUserRequest<SchemataUser>, Unit>(dispatcher, requests);
         SetupChallenge<RefreshUserRequest<SchemataUser>, ClaimsPrincipal>(dispatcher, requests);
         SetupChallenge<GetUserProfileQuery<SchemataUser>, ClaimsStore>(dispatcher, requests);
         SetupChallenge<ChangeUserEmailRequest<SchemataUser>, Unit>(dispatcher, requests);
@@ -49,7 +49,7 @@ public class IdentityControllerDispatchShould
         var bearer = new Mock<IOptionsMonitor<BearerTokenOptions>>();
         bearer.Setup(value => value.Get(IdentityConstants.BearerScheme))
               .Returns(new BearerTokenOptions { RefreshTokenProtector = protector.Object });
-        var controller = new AuthenticateController<SchemataUser>(dispatcher.Object, bearer.Object) {
+        var controller = new AuthenticateController<SchemataUser>(dispatcher.Object, bearer.Object, []) {
             ControllerContext = new() {
                 HttpContext = new DefaultHttpContext { User = principal },
             },
@@ -65,7 +65,7 @@ public class IdentityControllerDispatchShould
         var results = new[] {
             await controller.Register(register, CancellationToken.None),
             await controller.Login(login, CancellationToken.None),
-            await controller.Refresh(new RefreshRequest { RefreshToken = "refresh-token" }, CancellationToken.None),
+            await controller.Refresh(new() { RefreshToken = "refresh-token" }, CancellationToken.None),
             await controller.Profile(CancellationToken.None),
             await controller.Email(profile, CancellationToken.None),
             await controller.Phone(profile, CancellationToken.None),
@@ -105,7 +105,7 @@ public class IdentityControllerDispatchShould
     ) where TRequest : IRequest<IdentityResult<TPayload>> {
         dispatcher.Setup(value => value.SendAsync<TRequest, IdentityResult<TPayload>>(
                              It.IsAny<TRequest>(), It.IsAny<CancellationToken>()))
-                  .Callback((TRequest request, CancellationToken _) => requests.Add(request!))
+                  .Callback((TRequest request, CancellationToken _) => requests.Add(request))
                   .ReturnsAsync(IdentityResult<TPayload>.Challenge());
     }
 }

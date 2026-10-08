@@ -97,7 +97,7 @@ public sealed class CompensationThrowHandler
             try {
                 await handler.InvokeAsync(context, ct);
             }
-            catch (Exception ex) {
+            catch (Exception ex) when (ex is not OperationCanceledException) {
                 return CompensationThrowResult.FromFailure([.. context.Transitions], handler, ex);
             }
 
@@ -145,7 +145,7 @@ public sealed class CompensationThrowHandler
         foreach (var observer in observers) {
             try {
                 await observer.OnCompensationStartedAsync(context.Process, context.Scope, ct);
-            } catch (Exception ex) {
+            } catch (Exception ex) when (ex is not OperationCanceledException) {
                 logger?.LogWarning(ex, "Compensation lifecycle observer failed while notifying compensation start.");
             }
         }
@@ -160,7 +160,7 @@ public sealed class CompensationThrowHandler
         foreach (var observer in observers) {
             try {
                 await observer.OnCompensationCompletedAsync(context.Process, context.Scope, ct);
-            } catch (Exception ex) {
+            } catch (Exception ex) when (ex is not OperationCanceledException) {
                 logger?.LogWarning(ex, "Compensation lifecycle observer failed while notifying compensation completion.");
             }
         }

@@ -1,5 +1,4 @@
 using System;
-using Schemata.Entity.Owner.Advisors;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 

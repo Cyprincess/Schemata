@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Foundation;
@@ -145,21 +146,21 @@ public class FlowRunnerTerminationShould
             Name          = "termination-process",
             Engine        = FlowConstants.Engines.StateMachine,
             Definition    = new TerminationProcess(),
-            Configuration = new ProcessConfiguration(),
         };
 
         var harness = new Harness { Tokens = tokens };
 
         var registry = new Mock<IProcessRegistry>();
-        registry.Setup(r => r.GetRegistration("termination-process")).Returns(registration);
+        registry.Setup(r => r.GetRegistration("termination-process", "1")).Returns(registration);
 
         var engine = new Mock<IFlowRuntime>();
 
         var process = new SchemataProcess {
-            Name           = "p1",
-            CanonicalName  = "processes/p1",
-            DefinitionName = "termination-process",
-            State          = "Running",
+            Name              = "p1",
+            CanonicalName     = "processes/p1",
+            DefinitionName    = "termination-process",
+            DefinitionVersion = "1",
+            State             = "Running",
         };
         harness.Process = process;
 
@@ -169,6 +170,7 @@ public class FlowRunnerTerminationShould
 
         var collection = new ServiceCollection()
                         .AddLogging()
+                        .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                         .AddSingleton(registry.Object)
                         .AddSingleton<IOptions<SchemataFlowOptions>>(Options.Create(new SchemataFlowOptions()))
                         .AddSingleton(processes.Object)
@@ -189,23 +191,25 @@ public class FlowRunnerTerminationShould
         where T : class {
         var data       = items.ToList();
         var repository = new Mock<IRepository<T>>();
+        repository.Setup(r => r.AdviceContext).Returns(new AdviceContext(new ServiceCollection().BuildServiceProvider()));
         repository.Setup(r => r.Join(It.IsAny<IUnitOfWork>()));
         repository.Setup(r => r.Begin()).Returns(Mock.Of<IUnitOfWork>());
         repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>()))
-                  .Returns((T entity, CancellationToken _) => {
+                  .ReturnsAsync((T entity, CancellationToken _) => {
+                      FlowTestCreation.Assign(entity);
                       data.Add(entity);
-                      return Task.CompletedTask;
+                      return MutationResult.Applied;
                   });
-        repository.Setup(r => r.UpdateAsync(It.IsAny<T>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        repository.Setup(r => r.UpdateAsync(It.IsAny<T>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
         repository.Setup(r => r.ListAsync<T>(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) =>
                                Async(predicate(data.AsQueryable()).ToList()));
         repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) =>
-                               new ValueTask<T?>(predicate(data.AsQueryable()).SingleOrDefault()));
+                               new(predicate(data.AsQueryable()).SingleOrDefault()));
         repository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) =>
-                               new ValueTask<T?>(predicate(data.AsQueryable()).FirstOrDefault()));
+                               new(predicate(data.AsQueryable()).FirstOrDefault()));
         return repository;
     }
 

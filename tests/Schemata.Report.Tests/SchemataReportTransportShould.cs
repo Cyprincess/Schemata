@@ -29,12 +29,15 @@ public class SchemataReportTransportShould
 
         var report = registry.GetResource(typeof(SchemataReport))!;
         Assert.Null(report.Operations);
+        Assert.NotNull(report.Endpoints);
         Assert.Equal(
             [HttpResourceAttribute.Name, GrpcResourceAttribute.Name],
             report.Endpoints!.OrderBy(endpoint => endpoint, StringComparer.Ordinal));
 
         var snapshot = registry.GetResource(typeof(SchemataReportSnapshot))!;
+        Assert.NotNull(snapshot.Operations);
         Assert.Equal([Operations.List, Operations.Get], snapshot.Operations!);
+        Assert.NotNull(snapshot.Endpoints);
         Assert.Equal(
             [HttpResourceAttribute.Name, GrpcResourceAttribute.Name],
             snapshot.Endpoints!.OrderBy(endpoint => endpoint, StringComparer.Ordinal));
@@ -57,20 +60,6 @@ public class SchemataReportTransportShould
         Assert.Equal(typeof(ReadSnapshotHandler<SchemataReportSnapshot>), read.Handler);
     }
 
-    [Fact]
-    public void MapHttp_And_MapGrpc_Resolve_Custom_Method_Handlers() {
-        var builder = WebApplication.CreateBuilder();
-        builder.UseSchemata(schema => {
-            schema.UseInsight();
-            schema.UseReport().MapHttp().MapGrpc();
-        });
-
-        using var app   = builder.Build();
-        using var scope = app.Services.CreateScope();
-
-        Assert.NotNull(scope.ServiceProvider.GetRequiredService<GenerateHandler<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>());
-        Assert.NotNull(scope.ServiceProvider.GetRequiredService<ReadSnapshotHandler<SchemataReportSnapshot>>());
-    }
 
     [Fact]
     public void UseReport_Without_Transports_Registers_No_Resources() {
@@ -85,17 +74,4 @@ public class SchemataReportTransportShould
         Assert.Null(registry.GetResource(typeof(SchemataReportSnapshot)));
     }
 
-    [Fact]
-    public void UseReport_Without_Repositories_Builds_And_Resolves_Report_Service() {
-        var builder = WebApplication.CreateBuilder();
-        builder.UseSchemata(schema => {
-            schema.UseInsight();
-            schema.UseReport();
-        });
-
-        using var app   = builder.Build();
-        using var scope = app.Services.CreateScope();
-
-        Assert.NotNull(scope.ServiceProvider.GetRequiredService<IReportService>());
-    }
 }

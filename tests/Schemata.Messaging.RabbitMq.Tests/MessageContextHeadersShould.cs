@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Text;
-using Schemata.Messaging.RabbitMq.Runtime;
+using Schemata.Transport.RabbitMq;
 using Schemata.Messaging.Skeleton;
 using Xunit;
 
@@ -15,7 +15,7 @@ public class MessageContextHeadersShould
             ["locale"]         = "zh-CN",
         });
 
-        var restored = MessageContextHeaders.Read(MessageContextHeaders.Write(context));
+        var restored = MessageContextHeaders.Read(MessageContextHeaders.Write(context.Items));
 
         Assert.Equal("acme", restored["tenancy.tenant"]);
         Assert.Equal("zh-CN", restored["locale"]);
@@ -48,7 +48,7 @@ public class MessageContextHeadersShould
     [Fact]
     public void Write_NoHeadersAtAll_ForAnEmptyContext() {
         // An application with no propagator registered must pay nothing on the wire.
-        Assert.Null(MessageContextHeaders.Write(new MessageContext(new Dictionary<string, string?>())));
+        Assert.Null(MessageContextHeaders.Write(new Dictionary<string, string?>()));
     }
 
     [Fact]
@@ -57,17 +57,17 @@ public class MessageContextHeadersShould
     }
 
     [Fact]
-    public void Carry_ANullItem_AsAnAbsentHeader() {
-        // Absent and empty-string must stay distinguishable on the far side.
+    public void Preserve_Explicit_Null_Separately_From_Absent_And_Empty() {
         var context = new MessageContext(new Dictionary<string, string?> {
             ["set"]   = string.Empty,
             ["unset"] = null,
         });
 
-        var restored = MessageContextHeaders.Read(MessageContextHeaders.Write(context));
+        var restored = MessageContextHeaders.Read(MessageContextHeaders.Write(context.Items));
 
         Assert.Equal(string.Empty, restored["set"]);
-        Assert.DoesNotContain("unset", restored.Keys);
+        Assert.True(restored.ContainsKey("unset"));
+        Assert.Null(restored["unset"]);
     }
 
     [Fact]

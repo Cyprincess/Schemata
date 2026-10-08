@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
@@ -26,7 +27,8 @@ public sealed class EscalationBoundaryHandler
         List<SchemataProcessToken> working,
         FlowEvent                 throwEvent,
         EscalationDefinition      escalation,
-        FlowExecutionContext      execution
+        FlowExecutionContext      execution,
+        CancellationToken         ct = default
     ) {
         ArgumentNullException.ThrowIfNull(engine);
         ArgumentNullException.ThrowIfNull(definition);
@@ -36,7 +38,7 @@ public sealed class EscalationBoundaryHandler
         ArgumentNullException.ThrowIfNull(throwEvent);
         ArgumentNullException.ThrowIfNull(escalation);
 
-        var transitions = await BubbleAsync(engine, definition, process, throwing, working, escalation, execution);
+        var transitions = await BubbleAsync(engine, definition, process, throwing, working, escalation, execution, ct);
         var outgoing    = definition.FirstOutgoing(throwEvent);
         if (outgoing is null) {
             BpmnEngine.ApplyAggregateState(process, working);
@@ -51,7 +53,7 @@ public sealed class EscalationBoundaryHandler
             BpmnEngine.TokenView(throwing),
             execution,
             process,
-            throwing);
+            throwing, ct: ct);
 
         ApplyThrowAdvance(throwing, resolved);
         transitions.Add(BpmnEngine.NewTransition(
@@ -75,7 +77,8 @@ public sealed class EscalationBoundaryHandler
         FlowElement               previous,
         FlowEvent                 endEvent,
         EscalationDefinition      escalation,
-        FlowExecutionContext      execution
+        FlowExecutionContext      execution,
+        CancellationToken         ct = default
     ) {
         ArgumentNullException.ThrowIfNull(engine);
         ArgumentNullException.ThrowIfNull(definition);
@@ -86,7 +89,7 @@ public sealed class EscalationBoundaryHandler
         ArgumentNullException.ThrowIfNull(endEvent);
         ArgumentNullException.ThrowIfNull(escalation);
 
-        var transitions = await BubbleAsync(engine, definition, process, throwing, working, escalation, execution);
+        var transitions = await BubbleAsync(engine, definition, process, throwing, working, escalation, execution, ct);
         throwing.StateName     = endEvent.Name;
         throwing.WaitingAtName = null;
         if (!string.Equals(throwing.State, "Cancelled", StringComparison.OrdinalIgnoreCase)) {
@@ -113,7 +116,8 @@ public sealed class EscalationBoundaryHandler
         List<SchemataProcessToken> working,
         Exception                 error,
         string                    eventName,
-        FlowExecutionContext      execution
+        FlowExecutionContext      execution,
+        CancellationToken         ct = default
     ) {
         ArgumentNullException.ThrowIfNull(engine);
         ArgumentNullException.ThrowIfNull(definition);
@@ -126,7 +130,13 @@ public sealed class EscalationBoundaryHandler
         foreach (var scopeName in scopeMap.ScopeChain(process, throwing.ScopeName)) {
             var boundary = FindMatchingErrorBoundary(scopeName, scopeMap, error);
             if (boundary is not null) {
-                return await FireBoundaryAsync(engine, definition, process, throwing, working, boundary, boundary.Definition!, eventName, scopeMap, execution);
+                if (boundary.Definition is not ErrorDefinition trigger) {
+                    throw new FailedPreconditionException(
+                        SchemataResources.STATE_MACHINE_UNKNOWN_TARGET,
+                        new Dictionary<string, string?> { ["name"] = boundary.Name });
+                }
+
+                return await FireBoundaryAsync(engine, definition, process, throwing, working, boundary, trigger, eventName, scopeMap, execution, ct);
             }
         }
 
@@ -140,20 +150,21 @@ public sealed class EscalationBoundaryHandler
         SchemataProcessToken      throwing,
         List<SchemataProcessToken> working,
         EscalationDefinition      escalation,
-        FlowExecutionContext      execution
+        FlowExecutionContext      execution,
+        CancellationToken         ct
     ) {
         var scopeMap = ProcessScopeMap.Build(definition, process);
         foreach (var scopeName in scopeMap.ScopeChain(process, throwing.ScopeName)) {
             var boundary = FindMatchingBoundary(scopeName, scopeMap, escalation);
             if (boundary is not null) {
-                return await FireBoundaryAsync(engine, definition, process, throwing, working, boundary, escalation, escalation.Name, scopeMap, execution);
+                return await FireBoundaryAsync(engine, definition, process, throwing, working, boundary, escalation, escalation.Name, scopeMap, execution, ct);
             }
 
             foreach (var candidate in scopeMap.EventSubProcessesInScope(scopeName)) {
                 var start = candidate.FindMatchingStart(definition => definition is EscalationDefinition startEscalation
                                                                    && FlowEventMatcher.Matches(startEscalation, escalation));
                 if (start is not null) {
-                    return await FireEventSubProcessAsync(engine, definition, process, throwing, working, candidate, start, scopeName, escalation, scopeMap, execution);
+                    return await FireEventSubProcessAsync(engine, definition, process, throwing, working, candidate, start, scopeName, escalation, scopeMap, execution, ct);
                 }
             }
         }
@@ -171,7 +182,8 @@ public sealed class EscalationBoundaryHandler
         IEventDefinition          trigger,
         string                    eventName,
         ProcessScopeMap           scopeMap,
-        FlowExecutionContext      execution
+        FlowExecutionContext      execution,
+        CancellationToken         ct
     ) {
         var outgoing = definition.FirstOutgoing(boundary);
         if (outgoing is null) {
@@ -190,14 +202,17 @@ public sealed class EscalationBoundaryHandler
 
         var hostToken = FindHostToken(process, working, host) ?? throwing;
         var variables = new Dictionary<string, int>(throwing.Bookkeeping, StringComparer.Ordinal);
+        var routed = BpmnEngine.NewChildToken(process, new(outgoing.Target.Name, null, false), hostToken);
+        await execution.CreateTokenAsync(routed, ct);
         var resolved = await engine.ResolveTargetAsync(
             definition,
             outgoing.Target,
             variables,
-            BpmnEngine.TokenView(throwing),
+            BpmnEngine.TokenView(routed),
             execution,
             process,
-            throwing);
+            routed, ct: ct);
+        BpmnEngine.ApplyResolvedToToken(routed, resolved);
         var transitions = new List<SchemataProcessTransition>();
 
         if (boundary.Interrupting) {
@@ -215,7 +230,6 @@ public sealed class EscalationBoundaryHandler
                     eventName));
             }
 
-            var routed = BpmnEngine.NewChildToken(process, resolved, hostToken);
             working.Add(routed);
             transitions.Add(BpmnEngine.NewTransition(
                 process.Name!,
@@ -225,9 +239,9 @@ public sealed class EscalationBoundaryHandler
                 TransitionKind.Spawn,
                 eventName));
         } else {
-            transitions.Add(new NonInterruptingBoundaryHandler().Handle(
+            transitions.Add(await new NonInterruptingBoundaryHandler().HandleAsync(
                 process,
-                hostToken,
+                routed,
                 working,
                 boundary,
                 resolved,
@@ -248,7 +262,8 @@ public sealed class EscalationBoundaryHandler
         string                    parentScopeName,
         EscalationDefinition      escalation,
         ProcessScopeMap           scopeMap,
-        FlowExecutionContext      execution
+        FlowExecutionContext      execution,
+        CancellationToken         ct
     ) {
         var outgoing = eventSubProcess.ChildFlows.Where(f => f.Source == start).ToList();
         if (outgoing.Count != 1) {
@@ -275,15 +290,17 @@ public sealed class EscalationBoundaryHandler
         }
 
         var variables = new Dictionary<string, int>(throwing.Bookkeeping, StringComparer.Ordinal);
+        var child = NewEventSubProcessToken(process, eventSubProcess, throwing, new(outgoing[0].Target.Name, null, false));
+        await execution.CreateTokenAsync(child, ct);
         var resolved = await engine.ResolveTargetAsync(
             definition,
             outgoing[0].Target,
             variables,
-            BpmnEngine.TokenView(throwing),
+            BpmnEngine.TokenView(child),
             execution,
             process,
-            throwing);
-        var child = NewEventSubProcessToken(process, eventSubProcess, throwing, resolved);
+            child, ct: ct);
+        BpmnEngine.ApplyResolvedToToken(child, resolved);
         working.Add(child);
         transitions.Add(BpmnEngine.NewTransition(
             process.Name!,
@@ -370,12 +387,7 @@ public sealed class EscalationBoundaryHandler
         SchemataProcessToken   throwing,
         TargetState            resolved
     ) {
-        var leaf      = Guid.NewGuid().ToString("n");
-        var canonical = $"{process.CanonicalName}/tokens/{leaf}";
-
         return new() {
-            Name          = leaf,
-            CanonicalName = canonical,
             Process       = process.Name!,
             Spawner       = throwing.CanonicalName,
             ScopeName       = eventSubProcess.Name,

@@ -9,10 +9,12 @@ using Schemata.Push.Skeleton.Entities;
 namespace Schemata.Push.Foundation.Handlers;
 
 /// <summary>Adds a push subscription, returning the existing row for an identical address.</summary>
-public sealed class AddPushSubscriptionHandler(IRepository<SchemataPushSubscription> subscriptions)
-    : IRequestHandler<AddPushSubscriptionRequest, PushSubscriptionResult>
+public sealed class AddPushSubscriptionHandler(
+    IRepository<SchemataPushSubscription> subscriptions,
+    IResourceMutation<SchemataPushSubscription> mutation)
+    : IRequestHandler<AddPushSubscriptionRequest, SchemataPushSubscription>
 {
-    public async Task<PushSubscriptionResult> HandleAsync(
+    public async Task<SchemataPushSubscription> HandleAsync(
         AddPushSubscriptionRequest request,
         CancellationToken          ct = default
     ) {
@@ -22,7 +24,7 @@ public sealed class AddPushSubscriptionHandler(IRepository<SchemataPushSubscript
                                               && subscription.ProviderKey == request.ProviderKey),
             ct);
         if (existing is not null) {
-            return PushSubscriptionResult.From(existing);
+            return existing;
         }
 
         var subscription = new SchemataPushSubscription {
@@ -31,8 +33,7 @@ public sealed class AddPushSubscriptionHandler(IRepository<SchemataPushSubscript
             ProviderKey = request.ProviderKey,
             Metadata    = request.Metadata,
         };
-        await subscriptions.AddAsync(subscription, ct);
-        await subscriptions.CommitAsync(ct);
-        return PushSubscriptionResult.From(subscription);
+        await mutation.CreateAsync(subscription, null, ct);
+        return subscription;
     }
 }

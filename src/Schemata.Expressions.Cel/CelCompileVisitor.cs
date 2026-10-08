@@ -78,7 +78,7 @@ internal sealed class CelCompileVisitor
             }
         }
 
-        if (string.Equals(node.Name, Parameter.Name, StringComparison.Ordinal)) {
+        if (string.Equals(node.Name, Parameter.Name, StringComparison.Ordinal) || IsContextAlias(node.Name)) {
             return Parameter;
         }
 
@@ -415,6 +415,10 @@ internal sealed class CelCompileVisitor
         return typeof(object);
     }
 
+    private bool IsContextAlias(string name) {
+        return _options?.ContextAlias is { } alias && string.Equals(name, alias, StringComparison.Ordinal);
+    }
+
     private static bool TryAccess(Expression source, string name, out Expression expression) {
         var member = source.Type.GetMember(name.Pascalize(), BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
         if (member is PropertyInfo property) {
@@ -457,6 +461,7 @@ internal sealed class CelCompileVisitor
             }
 
             if (!string.Equals(identifier.Name, Parameter.Name, StringComparison.Ordinal)
+             && !IsContextAlias(identifier.Name)
              && !TryAccess(Parameter, identifier.Name, out _)) {
                 throw new ParseException($"Undeclared identifier '{identifier.Name}' in has() macro.", default);
             }
@@ -523,6 +528,10 @@ internal sealed class CelCompileVisitor
             return Expression.Constant(type, typeof(object));
         }
 
+        if (member.Target is CelIdentifier identifier && !_scopes.Any(scope => scope.ContainsKey(identifier.Name))) {
+            return Expression.Call(ValueMethod(nameof(CelValues.QualifiedMember), 3), ToObject(Parameter),
+                Expression.Constant(identifier.Name), Expression.Constant(member.Member));
+        }
         return ValueMember(Visit(member.Target), member.Member);
     }
 

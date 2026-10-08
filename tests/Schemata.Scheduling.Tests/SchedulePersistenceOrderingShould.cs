@@ -20,7 +20,7 @@ public class SchedulePersistenceOrderingShould
 {
     [Fact]
     public async Task RepositoryWriteFailure_LeavesNoEntryOrFire() {
-        var clock = new MutableClock(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var clock = new MutableClock(new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         clock.Advance(TimeSpan.FromMinutes(1));
         var recording = new RecordingJob();
         var registry  = new DefaultScheduledJobRegistry();
@@ -33,6 +33,8 @@ public class SchedulePersistenceOrderingShould
                              It.IsAny<CancellationToken>()))
                   .Returns(ValueTask.FromResult<SchemataJobExecution?>(null));
         executions.Setup(r => r.Begin()).Returns(unitOfWork.Object);
+        unitOfWork.Setup(u => u.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        unitOfWork.Setup(u => u.DisposeAsync()).Returns(ValueTask.CompletedTask);
         executions.Setup(r => r.AddAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
                   .ThrowsAsync(new InvalidOperationException("execution write failed"));
         var jobs = new Mock<IRepository<SchemataJob>>();
@@ -41,7 +43,8 @@ public class SchedulePersistenceOrderingShould
                       It.IsAny<CancellationToken>()))
             .Returns(ValueTask.FromResult<SchemataJob?>(null));
         jobs.Setup(r => r.AddAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync(MutationResult.Applied);
+        jobs.Setup(r => r.Begin()).Returns(unitOfWork.Object);
         executions.Setup(r => r.ListAsync(
                              It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(),
                              It.IsAny<CancellationToken>()))
@@ -49,6 +52,7 @@ public class SchedulePersistenceOrderingShould
                                Empty());
 
         await using var services = new ServiceCollection()
+            .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
             .AddSingleton<IRepository<SchemataJob>>(jobs.Object)
             .AddSingleton<IRepository<SchemataJobExecution>>(executions.Object)
             .AddSingleton<IOptions<SchemataSchedulingOptions>>(Options.Create(new SchemataSchedulingOptions()))

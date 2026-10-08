@@ -11,7 +11,7 @@ public interface IProcessDefinitionService
 {
     /// <summary>Lists registered Flow process definitions.</summary>
     [Operation]
-    ValueTask<ListResultBase<ProcessDefinitionInfo>> ListProcessDefinitionsAsync(
+    ValueTask<ListResultBase<ProcessDefinitionInfo, ProcessDefinitionInfo>> ListProcessDefinitionsAsync(
         ListRequest request,
         CallContext context = default
     );

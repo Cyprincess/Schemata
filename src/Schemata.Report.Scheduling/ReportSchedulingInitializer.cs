@@ -8,11 +8,14 @@ using Schemata.Scheduling.Skeleton;
 namespace Schemata.Report.Scheduling;
 
 /// <summary>Arms every periodic report definition when the host starts.</summary>
-public sealed class ReportSchedulingInitializer(IReportDefinitionStore definitions, IScheduler scheduler) : IHostedService
+public sealed class ReportSchedulingInitializer(IReportDefinitionStore store, IScheduler scheduler) : IHostedService
 {
     public async Task StartAsync(CancellationToken ct) {
-        await foreach (var report in definitions.ListPeriodicAsync(ct)) {
-            await ReportSchedule.ArmAsync(scheduler, report, ct);
+        await foreach (var report in store.ListPeriodicAsync(ct)) {
+            var projection = ReportScheduleProjection.Capture(report);
+            if (projection.ActivePeriodic) {
+                await ReportSchedule.ArmAsync(scheduler, projection, ct);
+            }
         }
     }
 

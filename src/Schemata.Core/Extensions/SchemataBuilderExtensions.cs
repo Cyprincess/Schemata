@@ -361,6 +361,7 @@ public static class SchemataBuilderExtensions
         builder.Configure(authorize);
 
         builder.AddFeature<SchemataAuthenticationFeature>();
+        builder.AddFeature<SchemataAuthorizationFeature>();
 
         return builder;
     }

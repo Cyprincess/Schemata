@@ -1,7 +1,10 @@
 using System.Threading.Tasks;
 using Grpc.Core;
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Flow.Skeleton.Runtime;
 using ProtoBuf;
 using ProtoBuf.Meta;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Flow.Foundation.Commands;
@@ -23,6 +26,19 @@ public class FlowCustomMethodGrpcShould : IClassFixture<GrpcWebAppFactory>
     private readonly GrpcWebAppFactory _factory;
 
     public FlowCustomMethodGrpcShould(GrpcWebAppFactory factory) { _factory = factory; }
+
+    [Fact]
+    public async Task Start_Exact_Version_After_Latest_Changes() {
+        var registry = _factory.Services.GetRequiredService<IProcessRegistry>();
+        await registry.RegisterAsync<ProcessVersionShould.Original>(configure: c => { c.Name = "grpc-version"; c.Version = "one"; });
+        await registry.RegisterAsync<ProcessVersionShould.Replacement>(configure: c => { c.Name = "grpc-version"; c.Version = "two"; c.IsLatest = true; });
+        var process = await Call<SchemataProcess, StartProcessInstanceRequest, SchemataProcess>(
+            "start", new() { DefinitionName = "grpc-version", DefinitionVersion = "one" });
+        Assert.Equal("one", process.DefinitionVersion);
+        var completed = await Call<SchemataProcess, FlowModels.CompleteActivityRequest, ProcessSnapshot>(
+            "complete", new() { CanonicalName = process.CanonicalName });
+        Assert.Equal("Completed", completed.Process.State);
+    }
 
     [Fact]
     public async Task StartProcess_Unknown_Definition_Returns_NotFound() {
@@ -52,7 +68,12 @@ public class FlowCustomMethodGrpcShould : IClassFixture<GrpcWebAppFactory>
     public async Task SignalProcess_Empty_Broadcast_Returns_Response() {
         var response = await Call<SchemataProcess, FlowModels.ThrowSignalRequest, EmptyResourceResponse>(
             "signal", new() { SignalName = "approved" });
+
+        // The broadcast custom method always answers the AIP-136 empty envelope: the response
+        // materializes, but carries no resource state on the wire.
         Assert.NotNull(response);
+        Assert.Null(((ICanonicalName)response).Name);
+        Assert.Null(((ICanonicalName)response).CanonicalName);
     }
 
     [Fact]

@@ -14,8 +14,9 @@ internal sealed class DefaultCorrelateMessageHandler(FlowHandlerSupport support)
     : IRequestHandler<CorrelateProcessRequest, ProcessSnapshot>
 {
     public async Task<ProcessSnapshot> HandleAsync(CorrelateProcessRequest request, CancellationToken ct = default) {
+        support.Access?.RequirePermission(FlowOperations.Correlate, typeof(Schemata.Flow.Skeleton.Entities.SchemataProcess), request.ProcessCanonicalName, request.Principal);
         var process      = await support.LoadProcessAsync(request.ProcessCanonicalName, ct);
-        var registration = support.ResolveRegistration(process.DefinitionName);
+        var registration = support.ResolveRegistration(process);
         var message = registration.Definition.Messages.FirstOrDefault(current => current.Name == request.MessageName);
         if (message is null) {
             throw new InvalidArgumentException(

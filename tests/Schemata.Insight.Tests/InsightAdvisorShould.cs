@@ -296,11 +296,10 @@ public sealed class InsightAdvisorShould
 
         public async Task<AdviseResult> AdviseAsync(
             AdviceContext       ctx,
-            QueryInsightRequest request,
+            InsightPlanContext  rewrite,
             CancellationToken   ct = default
         ) {
-            var plan = ctx.Get<PlanNode>()!;
-            ctx.Set(await advise(plan, request, ct));
+            rewrite.Plan = await advise(rewrite.Plan, rewrite.Request, ct);
             return AdviseResult.Continue;
         }
     }

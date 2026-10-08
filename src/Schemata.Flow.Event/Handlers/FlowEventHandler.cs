@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Text.Json;
+using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Common;
 using Schemata.Event.Skeleton;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Skeleton.Models;
@@ -36,7 +36,10 @@ public sealed class FlowEventHandler : IEventHandler<IEvent>
         if (subs is null || subs.Count == 0) return;
 
         var signals = new HashSet<string>();
-        var payload = JsonSerializer.Serialize(@event, @event.GetType(), SchemataJson.Default);
+        // The consumer side already materialized the event, so hand the instance itself to the flow
+        // handlers: a serialized JSON string would fail payload binding for processes that declare no
+        // payload type for the catch.
+        object payload = @event;
         foreach (var sub in subs) {
             if (string.IsNullOrEmpty(sub.Target)) continue;
 
@@ -46,14 +49,23 @@ public sealed class FlowEventHandler : IEventHandler<IEvent>
 
                 var dispatcher = sp.GetRequiredService<IRequestDispatcher>();
                 await dispatcher.SendAsync<CorrelateProcessRequest, ProcessSnapshot>(
-                    new(sub.Target, sub.EventType, payload, sub.Token, Principal: null), ct);
+                    new(sub.Target, sub.EventType, payload, sub.Token, Principal: FlowSystemPrincipal.Instance), ct);
             } else if (signals.Add(sub.EventType)) {
                 using var scope = _services.CreateScope();
                 var       sp    = scope.ServiceProvider;
 
                 var dispatcher = sp.GetRequiredService<IRequestDispatcher>();
-                await dispatcher.SendAsync<ThrowProcessSignalRequest, IReadOnlyList<SignalDeliveryResult>>(
-                    new(sub.EventType, payload, Token: null, Principal: null), ct);
+                var results = await dispatcher.SendAsync<ThrowProcessSignalRequest, IReadOnlyList<SignalDeliveryResult>>(
+                    new(sub.EventType, payload, Token: null, Principal: FlowSystemPrincipal.Instance), ct);
+
+                // A broadcast reports per-target outcomes instead of throwing. The bridge must not
+                // let a faulted delivery look like a successful publish, so the first actual fault
+                // is rethrown with its original error identity; NoLongerWaiting is a legitimate
+                // race outcome and stays non-fatal.
+                var failure = results.FirstOrDefault(result => result.Status == SignalDeliveryStatus.Failed);
+                if (failure?.Error is { } error) {
+                    ExceptionDispatchInfo.Capture(error).Throw();
+                }
             }
         }
     }

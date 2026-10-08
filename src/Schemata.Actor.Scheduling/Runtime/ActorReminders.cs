@@ -1,10 +1,14 @@
+using Schemata.Abstractions.Tenancy;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Actor.Skeleton;
 using Schemata.Common;
+using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -22,6 +26,7 @@ namespace Schemata.Actor.Scheduling.Runtime;
 public sealed class ActorReminders(
     IScheduler            scheduler,
     IScheduledJobRegistry jobRegistry,
+    IServiceScopeFactory  scopeFactory,
     TimeProvider?         time = null
 ) : IActorReminders
 {
@@ -29,12 +34,14 @@ public sealed class ActorReminders(
 
     #region IActorReminders Members
 
-    public async Task ScheduleAsync(
+    public async Task<ActorReminder> ScheduleAsync(
         ActorId target, IMessage payload, TimeSpan delay, string reminderName, CancellationToken ct = default
     ) {
+        if (target.Tenant != TenantContext.Current) throw new InvalidOperationException("Reminder target belongs to a different tenant.");
+        ArgumentException.ThrowIfNullOrWhiteSpace(reminderName);
         var payloadType = payload.GetType();
         var job = new SchemataJob {
-            Name   = JobName(target, reminderName),
+            Key    = ReminderKey(target, reminderName),
             JobKey = jobRegistry.ResolveKey(typeof(ActorReminderJob)),
             State  = JobState.Active,
         };
@@ -48,15 +55,24 @@ public sealed class ActorReminders(
         };
 
         await scheduler.ScheduleAsync(job, variables, ct);
+        return new(target, reminderName);
     }
 
-    public async Task CancelAsync(ActorId target, string reminderName, CancellationToken ct = default) {
-        var collection = ResourceNameDescriptor.ForType<SchemataJob>().Collection;
-        await scheduler.UnscheduleAsync($"{collection}/{JobName(target, reminderName)}", ct);
+    public async Task CancelAsync(ActorReminder reminder, CancellationToken ct = default) {
+        var (target, reminderName) = reminder;
+        ArgumentException.ThrowIfNullOrWhiteSpace(reminderName);
+        if (target.Tenant != TenantContext.Current) throw new InvalidOperationException("Reminder target belongs to a different tenant.");
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJob>>();
+        var key = ReminderKey(target, reminderName);
+        var job = await repository.FirstOrDefaultAsync<SchemataJob>(q => q.Where(job => job.Key == key), ct);
+        if (job is not null) {
+            await scheduler.UnscheduleAsync(job.CanonicalName!, ct);
+        }
     }
 
     #endregion
 
-    private static string JobName(ActorId target, string reminderName) =>
-        $"actor-reminder-{target.Type}-{target.Key}-{reminderName}";
+    private static string ReminderKey(ActorId target, string reminderName) =>
+        "actor-reminder:" + JsonSerializer.Serialize(new[] { target.Tenant.Uid?.ToString("D") ?? "host", target.Type, target.Key, reminderName });
 }

@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
@@ -21,14 +22,15 @@ public static class ResourceDetailResponsePipelineAdvisor
     public const int DefaultOrder = SecurityOrders.ResponseFamily + 10_000_000;
 
     /// <summary>
-    ///     Shapes one detail in place: parent first, then the ETag unless freshness is suppressed.
+    ///     Shapes one detail in place: parent first, then the ETag. The ETag is emitted only when an
+    ///     <see cref="IEntityTagProvider" /> is installed — the same installation decision that
+    ///     governs the freshness check stages — and freshness is not suppressed for the dispatch.
     /// </summary>
     /// <typeparam name="TEntity">The entity type behind the response.</typeparam>
     /// <typeparam name="TDetail">The detail DTO type carrying the response.</typeparam>
-    /// <param name="entityTags">The provider computing the response ETag.</param>
     /// <param name="ctx">The ambient advisor context for the dispatch.</param>
     /// <param name="detail">The mapped detail, or <see langword="null" /> when the response carries none.</param>
-    public static void Shape<TEntity, TDetail>(IEntityTagProvider entityTags, AdviceContext ctx, TDetail? detail)
+    public static void Shape<TEntity, TDetail>(AdviceContext ctx, TDetail? detail)
         where TEntity : class, ICanonicalName
         where TDetail : class, ICanonicalName {
         if (detail is null) {
@@ -43,6 +45,11 @@ public static class ResourceDetailResponsePipelineAdvisor
         }
 
         if (ctx.Has<FreshnessSuppressed>() || detail is not IFreshness freshness) {
+            return;
+        }
+
+        var entityTags = ctx.ServiceProvider.GetService<IEntityTagProvider>();
+        if (entityTags is null) {
             return;
         }
 

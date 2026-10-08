@@ -20,7 +20,7 @@ schema.UseResource()
       .Use<Student>();
 ```
 
-`MapHttp()` activates `SchemataHttpResourceFeature` and returns the same `SchemataResourceBuilder`. A plain `Use<...>()` exposes a resource on every active transport; `Use<Student>(r => r.MapHttp())` restricts that resource to the HTTP endpoint.
+`MapHttp()` activates `SchemataHttpResourceFeature` and returns the same `SchemataResourceBuilder`. A plain `Use<...>()` uses the entity's `[HttpResource]`/`[GrpcResource]` declarations, or every active transport when neither is present. `Use<Student>(r => r.MapHttp())` restricts that registration to the HTTP endpoint.
 
 `SchemataHttpResourceFeature` depends on `SchemataResourceFeature` and `SchemataTransportHttpFeature`. The shared feature installs exception handling and JSON traits. The Resource feature supplies dynamic controller and custom-method controller discovery.
 
@@ -86,8 +86,9 @@ from the body to the query string and constrains the verb to `GET`. The verb is 
 `SchemataJsonTraits.Apply` is applied to `JsonSerializerOptions`, `Microsoft.AspNetCore.Http.Json.JsonOptions`,
 and `Microsoft.AspNetCore.Mvc.JsonOptions` by `SchemataTransportHttpFeature`. It adds a type-info modifier that
 runs each property through `ResourceWireNameRules.Resolve`: `ICanonicalName.Name` is dropped, `CanonicalName`
-serializes as `name`, `IFreshness.EntityTag` as `etag`, and `IEntitiesResult<T>.Entities` as the resource plural
-(e.g. `students`). The configured `PropertyNamingPolicy` (snake_case) then applies to the remaining names.
+serializes as `name`, `IFreshness.EntityTag` as `etag`, and `IEntitiesResult<TEntity, TItem>.Entities` as the
+resource plural resolved from `TEntity` (e.g. `students`). The configured `PropertyNamingPolicy` (snake_case)
+then applies to the remaining names.
 `ResourceController` serializes through MVC's `JsonResult`, which picks up these options.
 
 ## Error mapping

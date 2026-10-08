@@ -24,6 +24,7 @@ internal static class FlowFixtureServices
     }
 
     internal static void AddFlowServices(IServiceCollection services) {
+        Schemata.Flow.Tests.FlowTestCreation.Register(services);
         services.AddLogging();
         services.AddSchemataFlow();
         services.TryAddKeyedSingleton<IFlowRuntime, StateMachineEngine>(FlowConstants.Engines.StateMachine);
@@ -39,6 +40,7 @@ internal static class FlowFixtureServices
         await registry.RegisterAsync<ConditionProcess>();
         await registry.RegisterAsync<FailingTaskProcess>();
         await registry.RegisterAsync<BranchWriteProcess>();
+        await registry.RegisterAsync<FailingSavePreparationProcess>();
         await registry.RegisterAsync<IdempotencyProcess>();
         await registry.RegisterAsync<CompensationReloadProcess>(FlowConstants.Engines.Bpmn);
         await registry.RegisterAsync<CompensationTerminalProcess>(FlowConstants.Engines.Bpmn);

@@ -15,8 +15,6 @@ internal sealed class ReportPersistenceState
 
     internal List<SchemataReportSnapshotChunk> Chunks { get; } = [];
 
-    internal int ChunkRepositoryInstances { get; private set; }
-
     internal int CancelAfterChunks { get; set; }
 
     internal SchemataJobExecution? Execution { get; set; }
@@ -27,18 +25,13 @@ internal sealed class ReportPersistenceState
 
     internal Queue<DateTime> SuccessfulCaptureTimes { get; } = [];
 
-    internal List<SnapshotState> SnapshotStateSequence { get; } = [];
-
     internal List<ReportChunkMetadata> ChunkAddSequence { get; } = [];
 
     internal IRepository<SchemataReportSnapshot> CreateSnapshotRepository() {
-        return ReportRepositoryMocks.Create(Snapshots, _transactions,
-                                            onAdd:    CaptureSnapshotAdd,
-                                            onUpdate: CaptureSnapshotUpdate);
+        return ReportRepositoryMocks.Create(Snapshots, _transactions, onUpdate: SetSuccessfulCaptureTime);
     }
 
     internal IRepository<SchemataReportSnapshotChunk> CreateChunkRepository() {
-        ChunkRepositoryInstances++;
         return ReportRepositoryMocks.Create(Chunks, _transactions,
                                             onCommit: CancelAfterChunkCommit,
                                             onAdd:    CaptureChunkAdd);
@@ -67,17 +60,9 @@ internal sealed class ReportPersistenceState
         }
     }
 
-    private void CaptureSnapshotAdd(SchemataReportSnapshot snapshot) {
-        SnapshotStateSequence.Add(snapshot.State);
-    }
-
-    private void CaptureSnapshotUpdate(SchemataReportSnapshot snapshot) {
-        SnapshotStateSequence.Add(snapshot.State);
-        SetSuccessfulCaptureTime(snapshot);
-    }
 
     private void CaptureChunkAdd(SchemataReportSnapshotChunk chunk) {
-        ChunkAddSequence.Add(new ReportChunkMetadata(
+        ChunkAddSequence.Add(new(
                                  chunk.Name ?? string.Empty,
                                  chunk.Index,
                                  chunk.CanonicalName ?? string.Empty,

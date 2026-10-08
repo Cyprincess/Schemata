@@ -15,7 +15,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Schemata.Caching.Distributed\Schemata.Caching.Distributed.csproj" />
+    <Compile Include="..\Schemata.Flow.Tests\FlowTestCreation.cs" Link="FlowTestCreation.cs" />
+    <ProjectReference Include="..\..\src\Schemata.Actor.Event\Schemata.Actor.Event.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Caching.Memory\Schemata.Caching.Memory.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Entity.EntityFrameworkCore\Schemata.Entity.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Entity.LinqToDB\Schemata.Entity.LinqToDB.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Expressions.Cel\Schemata.Expressions.Cel.csproj" />

@@ -1,10 +1,12 @@
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Advice;
 using Schemata.Common;
+using Schemata.Security.Skeleton;
 using Schemata.Resource.Foundation.Advisors;
 
 namespace Schemata.Resource.Foundation;
@@ -67,6 +69,15 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         }
 
         if (entity is null) {
+            // The load produced nothing — entitlement filtering and physical absence are
+            // indistinguishable here, so the absence is disclosed only when the applicable
+            // authorization policy permits it; a denied or undecidable policy is a real
+            // PERMISSION_DENIED, never a leaked NOT_FOUND.
+            if (!AnonymousAccess.IsAnonymous<TEntity>(nameof(Operations.Get))
+             && _sp.GetKeyedService<ResourceAccessStage>(typeof(TEntity)) is { } access) {
+                await access.FinalizeMissingAsync<TEntity, GetRequest>(nameof(Operations.Get), request, name, principal, ct.Value);
+            }
+
             throw ResourceNotFound(name);
         }
         var entityResult = await RunPipelineAsync<GetResultBase<TDetail>>(
@@ -76,7 +87,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             return entityResult;
         }
 
-        var detail = _mapper.Map<TEntity, TDetail>(entity);
+        var detail = RequireDetail(_mapper.Map<TEntity, TDetail>(entity));
 
         return new() { Detail = detail };
     }

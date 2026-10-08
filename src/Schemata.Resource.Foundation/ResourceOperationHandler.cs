@@ -73,6 +73,16 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         return ResourceNotFound(ResourceNameDescriptor.ForType<TEntity>().Collection);
     }
 
+    private TDetail RequireDetail(TDetail? detail) {
+        if (detail is null) {
+            throw new InvalidOperationException(
+                $"Could not map '{typeof(TEntity).FullName}' to '{typeof(TDetail).FullName}'."
+            );
+        }
+
+        return detail;
+    }
+
     private TotalSizeMode ResolveTotalSizeMode() {
         var options = _sp.GetService<IOptions<SchemataResourceOptions>>()?.Value;
         if (options is null) {
@@ -87,7 +97,33 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         return options.TotalSize is TotalSizeMode.Default ? TotalSizeMode.Exact : options.TotalSize;
     }
 
-    private AdviceContext CreateAdviceContext() { return ResourceAdviceContext.Create(_sp); }
+    private (int DefaultPageSize, int MaxPageSize) ResolvePagingPolicy() {
+        var options  = _sp.GetService<IOptions<SchemataResourceOptions>>()?.Value;
+        var pageSize = options?.DefaultPageSize ?? 25;
+        var maxSize  = options?.MaxPageSize ?? 100;
+
+        var resource = _sp.GetService<ResourceRegistry>()?.GetResource(typeof(TEntity));
+        if (resource is not null) {
+            if (resource.DefaultPageSize != 0) {
+                pageSize = resource.DefaultPageSize;
+            }
+
+            if (resource.MaxPageSize != 0) {
+                maxSize = resource.MaxPageSize;
+            }
+        }
+
+        if (pageSize <= 0 || maxSize <= 0 || pageSize > maxSize || maxSize >= int.MaxValue) {
+            throw new InvalidOperationException(
+                $"The List paging policy for '{typeof(TEntity).FullName}' is invalid: default {pageSize}, "
+              + $"maximum {maxSize}. Require 0 < default <= maximum, and a maximum below int.MaxValue so the look-ahead row cannot overflow."
+            );
+        }
+
+        return (pageSize, maxSize);
+    }
+
+    private AdviceContext CreateAdviceContext() { return AdviceContext.Require(); }
 
     private static Task<TResult?> RunPipelineAsync<TResult>(
         AdviceContext            ctx,

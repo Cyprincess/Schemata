@@ -2,7 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Flow.Skeleton.Runtime;
 using Moq;
+using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository;
 using Schemata.Event.Skeleton.Entities;
 using Schemata.Flow.Event.Handlers;
@@ -16,14 +19,16 @@ namespace Schemata.Flow.Tests;
 
 public class FlowEventCatchHandlerShould
 {
+    [Trait("Layer", "Unit")]
     [Fact]
     public async SystemTask AddsSubscription_WhenEnteringMessageCatch() {
         var rows    = new List<SchemataEventSubscription>();
-        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
+        using var services = Provider(Repository(rows).Object, Mutation(rows).Object);
+        var advisor = new FlowEventCatchHandler();
 
         var (definition, process) = MessageCatchSetup();
 
-        await advisor.ArmAsync(Context(process, definition, "catch-msg"));
+        await advisor.ArmAsync(Context(services, process, definition, "catch-msg"));
 
         var row = Assert.Single(rows);
         Assert.Equal("flow:processes/p1:catch-msg:processes/p1/tokens/t1", row.SubscriptionId);
@@ -32,10 +37,12 @@ public class FlowEventCatchHandlerShould
         Assert.Equal("processes/p1", row.Target);
     }
 
+    [Trait("Layer", "Unit")]
     [Fact]
     public async SystemTask AddsSubscription_WithNullCorrelation_WhenEnteringSignalCatch() {
         var rows    = new List<SchemataEventSubscription>();
-        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
+        using var services = Provider(Repository(rows).Object, Mutation(rows).Object);
+        var advisor = new FlowEventCatchHandler();
 
         var definition = new ProcessDefinition();
         definition.Elements.Add(new FlowEvent {
@@ -45,13 +52,14 @@ public class FlowEventCatchHandlerShould
         });
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.ArmAsync(Context(process, definition, "catch-sig"));
+        await advisor.ArmAsync(Context(services, process, definition, "catch-sig"));
 
         var row = Assert.Single(rows);
         Assert.Null(row.CorrelationKey);
         Assert.Equal("shutdown", row.EventType);
     }
 
+    [Trait("Layer", "Unit")]
     [Fact]
     public async SystemTask RemovesOldSubscription_WhenProcessReachesTerminalState() {
         var rows = new List<SchemataEventSubscription> {
@@ -63,16 +71,18 @@ public class FlowEventCatchHandlerShould
                 Target         = "processes/p1",
             },
         };
-        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
+        using var services = Provider(Repository(rows).Object, Mutation(rows).Object);
+        var advisor = new FlowEventCatchHandler();
 
         var (definition, process) = MessageCatchSetup();
         process.State             = "Completed";
 
-        await advisor.ArmAsync(Context(process, definition, null, "catch-msg"));
+        await advisor.ArmAsync(Context(services, process, definition, null, "catch-msg"));
 
         Assert.Empty(rows);
     }
 
+    [Trait("Layer", "Unit")]
     [Fact]
     public async SystemTask UpsertsSubscription_WhenReenteringWithDifferentMetadata() {
         var rows = new List<SchemataEventSubscription> {
@@ -84,11 +94,12 @@ public class FlowEventCatchHandlerShould
                 Target         = "stale-target",
             },
         };
-        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
+        using var services = Provider(Repository(rows).Object, Mutation(rows).Object);
+        var advisor = new FlowEventCatchHandler();
 
         var (definition, process) = MessageCatchSetup();
 
-        await advisor.ArmAsync(Context(process, definition, "catch-msg"));
+        await advisor.ArmAsync(Context(services, process, definition, "catch-msg"));
 
         var row = Assert.Single(rows);
         Assert.Equal("payment", row.EventType);
@@ -96,10 +107,12 @@ public class FlowEventCatchHandlerShould
         Assert.Equal("processes/p1", row.Target);
     }
 
+    [Trait("Layer", "Unit")]
     [Fact]
     public async SystemTask AddsSubscription_ForMessageCatchNestedInSubProcess() {
         var rows    = new List<SchemataEventSubscription>();
-        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
+        using var services = Provider(Repository(rows).Object, Mutation(rows).Object);
+        var advisor = new FlowEventCatchHandler();
 
         var catchEvent = new FlowEvent {
             Name       = "payment-catch",
@@ -112,17 +125,19 @@ public class FlowEventCatchHandlerShould
         definition.Elements.Add(nested);
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.ArmAsync(Context(process, definition, "payment-catch"));
+        await advisor.ArmAsync(Context(services, process, definition, "payment-catch"));
 
         var row = Assert.Single(rows);
         Assert.Equal("processes/p1/tokens/t1", row.Token);
         Assert.Equal("flow:processes/p1:payment-catch:processes/p1/tokens/t1", row.SubscriptionId);
     }
 
+    [Trait("Layer", "Unit")]
     [Fact]
     public async SystemTask AddsSubscriptionPerBranch_WhenEnteringEventBasedGateway() {
         var rows    = new List<SchemataEventSubscription>();
-        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
+        using var services = Provider(Repository(rows).Object, Mutation(rows).Object);
+        var advisor = new FlowEventCatchHandler();
 
         var pay = new FlowEvent {
             Name       = "catch-pay",
@@ -145,39 +160,47 @@ public class FlowEventCatchHandlerShould
 
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.ArmAsync(Context(process, definition, "gw"));
+        await advisor.ArmAsync(Context(services, process, definition, "gw"));
 
         Assert.Equal(2, rows.Count);
         Assert.Contains(rows, r => r is { SubscriptionId: "flow:processes/p1:catch-pay:processes/p1/tokens/t1", CorrelationKey: "processes/p1" });
         Assert.Contains(rows, r => r is { SubscriptionId: "flow:processes/p1:catch-sig:broadcast", CorrelationKey: null });
     }
 
+    [Trait("Layer", "Unit")]
     [Fact]
-    public async SystemTask JoinsUnitOfWork_AndDoesNotCommit() {
+    public async SystemTask StagesWritesOnTheOuterUnitOfWork_AndDoesNotCommit() {
         var rows       = new List<SchemataEventSubscription>();
         var repository = Repository(rows);
+        var mutation   = Mutation(rows);
         var uow        = Mock.Of<IUnitOfWork>();
-        var advisor    = new FlowEventCatchHandler(repository.Object);
+        using var services = Provider(repository.Object, mutation.Object);
+        var advisor = new FlowEventCatchHandler();
 
         var (definition, process) = MessageCatchSetup();
-        var context               = Context(process, definition, "catch-msg");
+        var context               = Context(services, process, definition, "catch-msg");
         context.UnitOfWork        = uow;
 
         await advisor.ArmAsync(context);
 
         repository.Verify(r => r.Join(uow), Times.Once);
         repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+        mutation.Verify(
+            m => m.CreateAsync(It.IsAny<SchemataEventSubscription>(), uow, It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
+    [Trait("Layer", "Unit")]
     [Fact]
     public async SystemTask AddsBoundarySubscription_WhenActiveAtHostActivity() {
         var rows    = new List<SchemataEventSubscription>();
-        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
+        using var services = Provider(Repository(rows).Object, Mutation(rows).Object);
+        var advisor = new FlowEventCatchHandler();
 
         var (definition, host, boundary) = BoundarySetup(new Message { Name = "payment" });
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.ArmAsync(Context(process, definition, null, stateName: host.Name));
+        await advisor.ArmAsync(Context(services, process, definition, null, stateName: host.Name));
 
         var row = Assert.Single(rows);
         Assert.Equal($"flow:processes/p1:{boundary.Name}:processes/p1/tokens/t1", row.SubscriptionId);
@@ -186,21 +209,24 @@ public class FlowEventCatchHandlerShould
         Assert.Equal("processes/p1", row.Target);
     }
 
+    [Trait("Layer", "Unit")]
     [Fact]
     public async SystemTask AddsBoundarySubscription_WithNullCorrelation_ForSignalCatch() {
         var rows    = new List<SchemataEventSubscription>();
-        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
+        using var services = Provider(Repository(rows).Object, Mutation(rows).Object);
+        var advisor = new FlowEventCatchHandler();
 
         var (definition, host, boundary) = BoundarySetup(new Signal { Name = "shutdown" });
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.ArmAsync(Context(process, definition, null, stateName: host.Name));
+        await advisor.ArmAsync(Context(services, process, definition, null, stateName: host.Name));
 
         var row = Assert.Single(rows);
         Assert.Equal($"flow:processes/p1:{boundary.Name}:broadcast", row.SubscriptionId);
         Assert.Null(row.CorrelationKey);
     }
 
+    [Trait("Layer", "Unit")]
     [Fact]
     public async SystemTask RemovesBoundarySubscription_WhenTokenLeavesHostActivity() {
         var rows = new List<SchemataEventSubscription> {
@@ -212,45 +238,55 @@ public class FlowEventCatchHandlerShould
                 Target         = "processes/p1",
             },
         };
-        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
+        using var services = Provider(Repository(rows).Object, Mutation(rows).Object);
+        var advisor = new FlowEventCatchHandler();
 
         var (definition, host, _) = BoundarySetup(new Message { Name = "payment" });
         var next = new UserTask { Name = "next" };
         definition.Elements.Add(next);
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.ArmAsync(Context(process, definition, null, stateName: next.Name, previousStateName: host.Name));
+        await advisor.ArmAsync(Context(services, process, definition, null, stateName: next.Name, previousStateName: host.Name));
 
         Assert.Empty(rows);
     }
 
+    [Trait("Layer", "Unit")]
     [Fact]
     public async SystemTask DoesNotAddBoundarySubscription_WhenTokenNotActive() {
         var rows    = new List<SchemataEventSubscription>();
-        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
+        using var services = Provider(Repository(rows).Object, Mutation(rows).Object);
+        var advisor = new FlowEventCatchHandler();
 
         var (definition, host, _) = BoundarySetup(new Message { Name = "payment" });
         var process = new SchemataProcess { CanonicalName = "processes/p1", State = "Completed" };
 
-        await advisor.ArmAsync(Context(process, definition, null, stateName: host.Name, status: "Completed"));
+        await advisor.ArmAsync(Context(services, process, definition, null, stateName: host.Name, status: "Completed"));
 
         Assert.Empty(rows);
     }
 
+    [Trait("Layer", "Unit")]
     [Fact]
     public async SystemTask DoesNotAddBoundarySubscription_ForNonBusEventDefinitions() {
         var rows    = new List<SchemataEventSubscription>();
-        var advisor = new FlowEventCatchHandler(Repository(rows).Object);
+        using var services = Provider(Repository(rows).Object, Mutation(rows).Object);
+        var advisor = new FlowEventCatchHandler();
 
         var (definition, host, _) = BoundarySetup(new ErrorDefinition { Name = "Boom" });
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
 
-        await advisor.ArmAsync(Context(process, definition, null, stateName: host.Name));
+        await advisor.ArmAsync(Context(services, process, definition, null, stateName: host.Name));
 
         Assert.Empty(rows);
     }
 
+    private static ServiceProvider Provider(IRepository<SchemataEventSubscription> repository,
+        IResourceMutation<SchemataEventSubscription> mutation) => new ServiceCollection()
+        .AddSingleton(repository).AddSingleton(mutation).BuildServiceProvider();
+
     private static FlowTransitionContext Context(
+        IServiceProvider services,
         SchemataProcess   process,
         ProcessDefinition definition,
         string?           waitingAtName,
@@ -272,12 +308,19 @@ public class FlowEventCatchHandlerShould
             transitions = [new() { Token = token.CanonicalName, Previous = previousStateName }];
         }
 
+        var unit = Mock.Of<IUnitOfWork>();
+        var execution = new FlowExecutionContext(unit, services) {
+            CreateProcessAsync = (_, _) => throw new InvalidOperationException("Unexpected process creation."),
+            CreateTokenAsync = (_, _) => throw new InvalidOperationException("Unexpected token creation."),
+            PersistSnapshotAsync = (_, _) => throw new InvalidOperationException("Unexpected snapshot persistence."),
+        };
         return new() {
             Definition            = definition,
             Snapshot              = new() { Process = process, Tokens = [], Transitions = transitions },
             Token                 = token,
             PreviousWaitingAtName = previousWaitingAtName,
-            UnitOfWork            = Mock.Of<IUnitOfWork>(),
+            UnitOfWork            = unit,
+            Execution             = execution,
         };
     }
 
@@ -310,14 +353,6 @@ public class FlowEventCatchHandlerShould
 
     private static Mock<IRepository<SchemataEventSubscription>> Repository(List<SchemataEventSubscription> rows) {
         var records = new Mock<IRepository<SchemataEventSubscription>>();
-        records.Setup(r => r.AddAsync(It.IsAny<SchemataEventSubscription>(), It.IsAny<CancellationToken>()))
-               .Callback((SchemataEventSubscription row, CancellationToken _) => rows.Add(row))
-               .Returns(SystemTask.CompletedTask);
-        records.Setup(r => r.UpdateAsync(It.IsAny<SchemataEventSubscription>(), It.IsAny<CancellationToken>()))
-               .Returns(SystemTask.CompletedTask);
-        records.Setup(r => r.RemoveAsync(It.IsAny<SchemataEventSubscription>(), It.IsAny<CancellationToken>()))
-               .Callback((SchemataEventSubscription row, CancellationToken _) => rows.Remove(row))
-               .Returns(SystemTask.CompletedTask);
         records.Setup(r => r.FirstOrDefaultAsync(
                           It.IsAny<Func<IQueryable<SchemataEventSubscription>,
                               IQueryable<SchemataEventSubscription>>>(), It.IsAny<CancellationToken>()))
@@ -327,5 +362,23 @@ public class FlowEventCatchHandlerShould
                             CancellationToken _
                         ) => new(predicate(rows.AsQueryable()).FirstOrDefault()));
         return records;
+    }
+
+    private static Mock<IResourceMutation<SchemataEventSubscription>> Mutation(List<SchemataEventSubscription> rows) {
+        var mutation = new Mock<IResourceMutation<SchemataEventSubscription>>();
+        mutation.Setup(m => m.CreateAsync(
+                           It.IsAny<SchemataEventSubscription>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()))
+                .Callback((SchemataEventSubscription row, IUnitOfWork? _, CancellationToken _) => rows.Add(row))
+                .ReturnsAsync(MutationResult.Applied);
+        mutation.Setup(m => m.UpdateAsync(
+                           It.IsAny<SchemataEventSubscription>(), It.IsAny<IUnitOfWork?>(), It.IsAny<Operations>(),
+                           It.IsAny<CancellationToken>()))
+                .ReturnsAsync(MutationResult.Applied);
+        mutation.Setup(m => m.DeleteAsync(
+                           It.IsAny<SchemataEventSubscription>(), It.IsAny<IUnitOfWork?>(), It.IsAny<Operations>(),
+                           It.IsAny<CancellationToken>()))
+                .Callback((SchemataEventSubscription row, IUnitOfWork? _, Operations _, CancellationToken _) => rows.Remove(row))
+                .ReturnsAsync(MutationResult.Applied);
+        return mutation;
     }
 }

@@ -74,7 +74,8 @@ public class PredicateShould
         Expression<Func<int, bool>> original = x => x > 5;
 
         var cast     = Predicate.Cast<int, int>(original);
-        var compiled = cast!.Compile();
+        Assert.NotNull(cast);
+        var compiled = cast.Compile();
 
         Assert.True(compiled(10));
         Assert.False(compiled(3));

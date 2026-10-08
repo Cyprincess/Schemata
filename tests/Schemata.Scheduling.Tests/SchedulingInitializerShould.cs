@@ -41,6 +41,7 @@ public class SchedulingInitializerShould
         var initializer = new SchedulingInitializer(scheduler.Object, Options.Create(new SchemataSchedulingOptions()),
                                                     services, new DefaultScheduledJobRegistry());
         await initializer.StartAsync(CancellationToken.None);
+        Assert.NotNull(initializer.ExecuteTask);
         await initializer.ExecuteTask!;
 
         scheduler.Verify(s => s.StartAsync(It.IsAny<CancellationToken>()), Times.Once);
@@ -56,6 +57,12 @@ public class SchedulingInitializerShould
         var orphan = new SchemataJobExecution { State = ExecutionState.Running };
 
         var executions = new Mock<IRepository<SchemataJobExecution>>();
+        executions.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
+                  .ReturnsAsync(MutationResult.Applied);
+        var unit = new Mock<IUnitOfWork>(MockBehavior.Strict);
+        unit.Setup(u => u.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        unit.Setup(u => u.DisposeAsync()).Returns(ValueTask.CompletedTask);
+        executions.Setup(r => r.Begin()).Returns(unit.Object);
         executions.Setup(r => r.ListAsync(
                              It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(),
                              It.IsAny<CancellationToken>()))
@@ -68,6 +75,7 @@ public class SchedulingInitializerShould
             .Returns((Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>> _, CancellationToken __) => ToAsyncJobs([]));
 
         var services = new ServiceCollection().AddSingleton(jobs.Object).AddSingleton(executions.Object)
+                                              .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                                               .BuildServiceProvider();
 
         var scheduler = new Mock<IScheduler>();
@@ -76,13 +84,13 @@ public class SchedulingInitializerShould
         var initializer = new SchedulingInitializer(scheduler.Object, Options.Create(new SchemataSchedulingOptions()),
                                                     services, new DefaultScheduledJobRegistry());
         await initializer.StartAsync(CancellationToken.None);
+        Assert.NotNull(initializer.ExecuteTask);
         await initializer.ExecuteTask!;
 
         Assert.Equal(ExecutionState.Failed, orphan.State);
         Assert.NotNull(orphan.EndTime);
         Assert.False(string.IsNullOrWhiteSpace(orphan.RecentError));
         executions.Verify(r => r.UpdateAsync(orphan, It.IsAny<CancellationToken>()), Times.Once);
-        executions.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
 
         await initializer.StopAsync(CancellationToken.None);
     }

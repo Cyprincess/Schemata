@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
@@ -8,6 +9,7 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Advice;
 using Schemata.Common;
+using Schemata.Entity.Repository;
 using Schemata.Resource.Foundation.Advisors;
 
 namespace Schemata.Resource.Foundation;
@@ -34,7 +36,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     ) {
         ct ??= CancellationToken.None;
         var ctx = CreateAdviceContext();
-        return CreateCoreAsync(ctx, request, principal, ct.Value, true);
+        return CreateCoreAsync(ctx, request, principal, ct.Value);
     }
 
     /// <summary>
@@ -44,14 +46,12 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     /// <param name="request">The creation request DTO.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
     /// <param name="ct">A cancellation token.</param>
-    /// <param name="finalize">Whether to commit the repository and run response advisors.</param>
     /// <returns>A <see cref="CreateResultBase{TDetail}" /> containing the resource detail DTO.</returns>
     internal async Task<CreateResultBase<TDetail>> CreateCoreAsync(
         AdviceContext     ctx,
         TRequest          request,
         ClaimsPrincipal?  principal,
-        CancellationToken ct,
-        bool              finalize
+        CancellationToken ct
     ) {
         var container = new ResourceRequestContainer<TEntity>();
 
@@ -71,6 +71,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
                 Reason      = SchemataResources.INVALID_PAYLOAD,
             }]);
         }
+        AdviceApplyChildParent<TEntity, TRequest>.Apply(request, entity);
 
         var entityResult = await RunPipelineAsync<CreateResultBase<TDetail>>(
             ctx,
@@ -80,15 +81,10 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             return entityResult;
         }
 
-        await _repository.AddAsync(entity, ct);
-        await _repository.CommitAsync(ct);
+        var mutation = _sp.GetRequiredService<IResourceMutation<TEntity>>();
+        await mutation.CreateAsync(entity, null, ct);
 
-        if (!finalize) {
-            var staged = _mapper.Map<TEntity, TDetail>(entity);
-            return new() { Detail = staged };
-        }
-
-        var detail = _mapper.Map<TEntity, TDetail>(entity);
+        var detail = RequireDetail(_mapper.Map<TEntity, TDetail>(entity));
 
         return new() { Detail = detail };
     }

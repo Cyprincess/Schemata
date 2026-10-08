@@ -13,7 +13,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
-    <ProjectReference Include="..\..\src\Schemata.Entity.Owner\Schemata.Entity.Owner.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Flow.Skeleton.Entities;
@@ -31,7 +32,8 @@ public static class ComplexGatewayHandler
         List<SchemataProcessToken> working,
         ComplexGateway            cg,
         string?                   previousState,
-        FlowExecutionContext      execution
+        FlowExecutionContext      execution,
+        CancellationToken         ct = default
     ) {
         if (cg.ActivationCount is not null) {
             var bookkeeping = token.Bookkeeping;
@@ -61,6 +63,6 @@ public static class ComplexGatewayHandler
         }
 
         return await engine.BranchFromTokenAsync(
-            definition, process, token, working, cg, matched, previousState, TransitionKind.Fork, execution);
+            definition, process, token, working, cg, matched, previousState, TransitionKind.Fork, execution, ct);
     }
 }

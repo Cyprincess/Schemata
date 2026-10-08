@@ -1,8 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Errors;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
@@ -73,6 +77,13 @@ public sealed class FlowTaskContext
             throw new InvalidOperationException($"Source binding '{name}' was not found for process '{Process.CanonicalName}'.");
         }
 
+        if (_execution.TouchedSources.TryGetValue((typeof(TEntity), binding.Source), out var touched)) {
+            if (TrackSources && touched is IConcurrency trackedStamp) {
+                await _execution.TrackSourceStampAsync(ProcessCanonicalName(), typeof(TEntity), binding.Source, trackedStamp.Timestamp, ct);
+            }
+            return (TEntity)touched;
+        }
+
         var repository = Repository<TEntity>();
         TEntity? source;
         using (_execution.SourceReadGuard?.Invoke(repository)) {
@@ -83,6 +94,9 @@ public sealed class FlowTaskContext
             throw new InvalidOperationException($"Source entity '{binding.Source}' was not found for binding '{name}'.");
         }
 
+        if (TrackSources && source is IConcurrency concurrency) {
+            await _execution.TrackSourceStampAsync(ProcessCanonicalName(), typeof(TEntity), binding.Source, concurrency.Timestamp, ct);
+        }
         TrackSource(source);
         return source;
     }
@@ -110,6 +124,26 @@ public sealed class FlowTaskContext
         }
 
         return service;
+    }
+
+    /// <summary>
+    ///     Resolves every registration of a service from the scoped provider. A resolved
+    ///     <see cref="IRepository" /> is enlisted in the current unit of work before it is returned.
+    /// </summary>
+    /// <typeparam name="TService">The service type to resolve.</typeparam>
+    /// <param name="key">The service key for keyed registrations; <see langword="null" /> resolves the default registrations.</param>
+    public IEnumerable<TService> GetServices<TService>(object? key = null)
+        where TService : class {
+        var services = key is null
+            ? _execution.Services.GetServices<TService>()
+            : _execution.Services.GetKeyedServices<TService>(key);
+        foreach (var service in services) {
+            if (service is IRepository repository) {
+                repository.Join(UnitOfWork);
+            }
+        }
+
+        return services;
     }
 
     /// <summary>
@@ -146,22 +180,48 @@ public sealed class FlowTaskContext
     /// <param name="ct">A cancellation token.</param>
     public async ValueTask BindSourceAsync<TEntity>(string name, TEntity entity, CancellationToken ct = default)
         where TEntity : class, ICanonicalName {
+        ct.ThrowIfCancellationRequested();
         if (string.IsNullOrEmpty(entity.CanonicalName)) {
             throw new InvalidOperationException($"Source entity type '{typeof(TEntity).FullName}' has no canonical name.");
         }
 
+        if (_execution.TrackSourceBinding is not { } trackBinding || _execution.FindSourceBinding is not { } findBinding) {
+            throw new FailedPreconditionException(
+                [new PreconditionViolation { Type = "binding", Subject = Token.StateName, Description = "SourceBindingOwner" }],
+                SchemataResources.FLOW_TASK_BINDING_REQUIRED,
+                new Dictionary<string, string?> { ["name"] = Token.StateName, ["binding"] = "SourceBindingOwner" });
+        }
+        if (entity is IConcurrency concurrency) {
+            await _execution.TrackSourceStampAsync(ProcessCanonicalName(), typeof(TEntity), entity.CanonicalName, concurrency.Timestamp, ct);
+        }
+
         var repository = Repository<SchemataProcessSource>();
+        var mutation   = _execution.Services.GetRequiredService<IResourceMutation<SchemataProcessSource>>();
         var process    = ProcessCanonicalName();
         var token      = Token.CanonicalName;
-        var source     = await repository.SingleOrDefaultAsync(q => q.Where(s => s.Process == process && s.Token == token && s.Name == name), ct);
+        var source = findBinding(process, token, name)
+            ?? await repository.SingleOrDefaultAsync(q => q.Where(s => s.Process == process && s.Token == token && s.Name == name), ct);
         if (source is null) {
             source = new() { Process = process, Token = token, Name = name };
             AssignSource(source, entity);
-            await repository.AddAsync(source, ct);
+            if (await mutation.CreateAsync(source, UnitOfWork, ct) != MutationResult.Applied) {
+                return;
+            }
         } else {
+            var previous = (source.SourceType, source.Source, source.SourceTimestamp);
             AssignSource(source, entity);
-            await repository.UpdateAsync(source, ct);
+            try {
+                if (await mutation.UpdateAsync(source, UnitOfWork, ct: ct) != MutationResult.Applied) {
+                    (source.SourceType, source.Source, source.SourceTimestamp) = previous;
+                    return;
+                }
+            } catch {
+                (source.SourceType, source.Source, source.SourceTimestamp) = previous;
+                throw;
+            }
         }
+
+        trackBinding(source);
 
         TrackSource(entity);
     }
@@ -172,10 +232,41 @@ public sealed class FlowTaskContext
         var token      = Token.CanonicalName;
 
         if (!string.IsNullOrEmpty(token)) {
+            if (_execution.FindSourceBinding?.Invoke(process, token, name) is { } staged) {
+                return staged;
+            }
+
             var scoped = await repository.SingleOrDefaultAsync(q => q.Where(s => s.Process == process && s.Token == token && s.Name == name), ct);
             if (scoped is not null) {
                 return scoped;
             }
+        }
+
+        var spawner = Token.Spawner;
+        while (!string.IsNullOrEmpty(spawner)) {
+            var parent = _execution.FindTokenAsync is { } findToken
+                ? await findToken(Process.Name!, spawner, ct)
+                : await Repository<SchemataProcessToken>().SingleOrDefaultAsync(
+                    q => q.Where(t => t.Process == Process.Name && t.CanonicalName == spawner), ct);
+            if (parent is null || parent.Process != Process.Name) {
+                break;
+            }
+
+            if (_execution.FindSourceBinding?.Invoke(process, spawner, name) is { } staged) {
+                return staged;
+            }
+
+            var scoped = await repository.SingleOrDefaultAsync(
+                q => q.Where(s => s.Process == process && s.Token == spawner && s.Name == name), ct);
+            if (scoped is not null) {
+                return scoped;
+            }
+
+            spawner = parent.Spawner;
+        }
+
+        if (_execution.FindSourceBinding?.Invoke(process, null, name) is { } processBinding) {
+            return processBinding;
         }
 
         return await repository.SingleOrDefaultAsync(q => q.Where(s => s.Process == process && s.Token == null && s.Name == name), ct);

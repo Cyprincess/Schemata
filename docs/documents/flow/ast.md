@@ -10,6 +10,11 @@ complex gateways, sub-processes, multi-instance loops, and compensation are all 
 state machine rejects them at validation. They exist for alternate engines registered as keyed
 `IFlowRuntime` services.
 
+Graph construction is mutable until registry publication. `FlowGraphNode.Freeze()` then freezes
+framework-owned executable properties and nested `FlowGraphCollection<T>` collections; mutation throws
+`InvalidOperationException`. The API sketches below omit guarded setter bodies. Labels remain mutable;
+application-defined nodes must preserve the freeze contract in their own setters and `FreezeCore` overrides.
+
 ## Where the code lives
 
 | Package                  | Key files                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -21,7 +26,7 @@ state machine rejects them at validation. They exist for alternate engines regis
 Every graph node derives from `FlowElement`:
 
 ```csharp
-public abstract class FlowElement : IDescriptive
+public abstract class FlowElement : FlowGraphNode, IDescriptive
 {
     public string Name { get; set; } = null!;
 
@@ -74,25 +79,44 @@ public abstract class Activity : FlowElement
 {
     public LoopCharacteristics? LoopCharacteristics { get; set; }
     public SequenceFlow?        DefaultFlow         { get; set; }
-    public List<SequenceFlow>   Incoming            { get; } = [];
-    public List<SequenceFlow>   Outgoing            { get; } = [];
+    public FlowGraphCollection<SequenceFlow> Incoming { get; } = new();
+    public FlowGraphCollection<SequenceFlow> Outgoing { get; } = new();
 }
 ```
 
 ```
 Activity
-    NoneTask  ServiceTask  UserTask  SendTask  ReceiveTask  ScriptTask  ManualTask  BusinessRuleTask
+    NoneTask  ServiceTask  UserTask  SendTask  ReceiveTask  ManualTask
     ProcedureTaskBase (abstract, runtime-executable)
-        ProcedureTask                  (Func<FlowTaskContext, ValueTask> Body)
-        ProcedureTask<TPayload>        (Func<FlowTaskContext, TPayload, ValueTask> Body)
-    SubProcess (abstract, adds bool TriggeredByEvent, List<FlowElement> Children, List<SequenceFlow> ChildFlows)
+        ProcedureTask                  (Func<FlowTaskContext, CancellationToken, ValueTask> Body)
+        ProcedureTask<TPayload>        (Func<FlowTaskContext, TPayload, CancellationToken, ValueTask> Body)
+        ScriptTask (abstract AST kind)
+            ScriptTask<TInput, TResult>
+        BusinessRuleTask (abstract AST kind)
+            BusinessRuleTask<TInput, TResult>
+    SubProcess (abstract, adds TriggeredByEvent, FlowGraphCollection<FlowElement> Children, FlowGraphCollection<SequenceFlow> ChildFlows)
         EmbeddedSubProcess  EventSubProcess  TransactionSubProcess  AdHocSubProcess
-    CallActivity (adds string CalledElement)   // target process definition name
+    CallActivity (adds CalledElement and DefinitionVersion)
 ```
 
-All eight task types are bare subclasses; their type distinguishes the BPMN task kind. The state
-machine treats every `Activity` identically except for `ProcedureTask` and
-`ProcedureTask<TPayload>`, which carry an executable delegate.
+Both engines execute `ProcedureTaskBase` on token entry and follow its outgoing flow automatically.
+`ScriptTask<TInput, TResult>` supplies `Language`, `Script`, optional `ExpressionCompileOptions`, and
+explicit `Input` and `Output` delegates. It resolves the keyed `IExpressionCompiler` at execution and
+uses the existing expression cache, keyed by language, source, input/result types, and options.
+
+`BusinessRuleTask<TInput, TResult>` supplies `Key`, exact `Version`, and `RuleNoMatchPolicy`. It resolves
+`IFlowRuleHandler<TInput, TResult>` with the DI key `(Key, Version)` and applies its matched result.
+`NoMatch.Fail` throws `FailedPreconditionException`; `NoMatch.Continue` advances without applying output.
+
+Both typed tasks require `Func<FlowTaskContext, CancellationToken, ValueTask<TInput>> Input` and
+`Func<FlowTaskContext, TResult, CancellationToken, ValueTask> Output`. Their optional `Outputs` field
+table maps dictionary result fields to token annotation names using invariant conversion. A nonempty
+table requires an `IReadOnlyDictionary<string, object?>` result and validates every field before writing
+annotations. Missing bindings, unknown compiler/handler keys, and invalid types fail at operation use.
+
+Publication captures owned read-only field tables and compiler function entries and freezes task
+settings and delegate slots. Application-owned state captured by delegates remains application-owned.
+The implementation lives in `Models/{ScriptTask,BusinessRuleTask}.cs` and `Runtime/FlowTaskBinding.cs`.
 
 `ProcedureTask<TPayload>` carries a typed payload. The `ProcedureTaskPayloadValidator` enforces
 that a typed task is reachable only through matching typed message or signal catches; mismatches
@@ -103,8 +127,8 @@ raise `InvalidOperationException` at registration.
 ```csharp
 public abstract class Gateway : FlowElement
 {
-    public List<SequenceFlow> Incoming { get; } = [];
-    public List<SequenceFlow> Outgoing { get; } = [];
+    public FlowGraphCollection<SequenceFlow> Incoming { get; } = new();
+    public FlowGraphCollection<SequenceFlow> Outgoing { get; } = new();
 }
 ```
 
@@ -133,8 +157,8 @@ public class FlowEvent : FlowElement
     public bool               Interrupting { get; set; } = true;
     public Activity?          AttachedTo   { get; set; }    // set for boundary events
     public bool               IsTerminate  { get; set; }
-    public List<SequenceFlow> Incoming     { get; } = [];
-    public List<SequenceFlow> Outgoing     { get; } = [];
+    public FlowGraphCollection<SequenceFlow> Incoming { get; } = new();
+    public FlowGraphCollection<SequenceFlow> Outgoing { get; } = new();
 }
 ```
 
@@ -181,8 +205,8 @@ public interface IEventDefinition : IDescriptive
 | `CompensationDefinition` | `Activity? Activity`                            |
 | `CancelDefinition`       | (none)                                          |
 | `LinkDefinition`         | (none)                                          |
-| `MultipleDefinition`     | `List<IEventDefinition> Definitions`            |
-| `ParallelDefinition`     | `List<IEventDefinition> Definitions`            |
+| `MultipleDefinition`     | `FlowGraphCollection<IEventDefinition> Definitions` |
+| `ParallelDefinition`     | `FlowGraphCollection<IEventDefinition> Definitions` |
 
 ```csharp
 public enum TimerType { Date, Duration, Cycle }
@@ -296,18 +320,18 @@ work, so conditions, procedure tasks, and advisors resolve services from one sco
 ## ProcessDefinition
 
 ```csharp
-public class ProcessDefinition
+public class ProcessDefinition : FlowGraphNode
 {
     public string  Name        { get; set; } = null!;
     public string? DisplayName { get; set; }
     public string? Description { get; set; }
 
-    public List<FlowElement>          Elements    { get; } = [];
-    public List<SequenceFlow>         Flows       { get; } = [];
-    public List<Message>              Messages    { get; } = [];
-    public List<Signal>               Signals     { get; } = [];
-    public List<ErrorDefinition>      Errors      { get; } = [];
-    public List<EscalationDefinition> Escalations { get; } = [];
+    public FlowGraphCollection<FlowElement> Elements { get; } = new();
+    public FlowGraphCollection<SequenceFlow> Flows { get; } = new();
+    public FlowGraphCollection<Message> Messages { get; } = new();
+    public FlowGraphCollection<Signal> Signals { get; } = new();
+    public FlowGraphCollection<ErrorDefinition> Errors { get; } = new();
+    public FlowGraphCollection<EscalationDefinition> Escalations { get; } = new();
 }
 ```
 
@@ -387,15 +411,17 @@ using Schemata.Abstractions;
 public sealed class ProcessConfiguration
 {
     public string  Name           { get; set; } = null!;
+    public string  Version        { get; set; } = "1";
+    public bool    IsLatest       { get; set; }
     public string  Engine         { get; set; } = FlowConstants.Engines.StateMachine;
     public Type?   DefinitionType { get; set; }
     public string? Language       { get; set; }
 }
 ```
 
-`ProcessRegistration` extends this with `SourceTypes` (source bindings keyed by binding name, each
-a `FlowSourceDescriptor`), `MessagePayloadTypes` (message name → CLR type), and `SignalPayloadTypes`
-(signal name → CLR type).
+`ProcessRegistration` contains the resolved `Name`, `Version`, `Engine`, and frozen `Definition`, plus
+frozen `SourceTypes` (binding name → `FlowSourceDescriptor`), `MessagePayloadTypes`, and
+`SignalPayloadTypes` maps. Mutable registration configuration is consumed before publication.
 
 ## Extension points
 

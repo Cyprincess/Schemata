@@ -16,6 +16,8 @@ namespace Schemata.Tenancy.Foundation.Resolvers;
 /// </remarks>
 public class RequestPrincipalResolver : ITenantResolver
 {
+    public TenantResolutionStage Stage => TenantResolutionStage.Principal;
+
     private readonly IHttpContextAccessor _accessor;
 
     /// <summary>Creates a resolver that reads from the current authenticated principal.</summary>
@@ -24,12 +26,17 @@ public class RequestPrincipalResolver : ITenantResolver
     #region ITenantResolver Members
 
     public Task<Guid?> ResolveAsync(CancellationToken ct = default) {
-        var claim = _accessor.HttpContext?.User.FindFirst("Tenant");
-        if (claim is null) {
-            return Task.FromResult<Guid?>(null);
+        Guid? selected = null;
+        if (_accessor.HttpContext is not { } http) return Task.FromResult(selected);
+        foreach (var identity in http.User.Identities) {
+            if (!identity.IsAuthenticated) continue;
+            foreach (var claim in identity.FindAll("Tenant")) {
+                var candidate = TenantId.Parse(claim.Value);
+                if (selected is { } current && current != candidate) throw new TenantResolveException();
+                selected = candidate;
+            }
         }
-
-        return Task.FromResult<Guid?>(TenantId.Parse(claim.Value));
+        return Task.FromResult(selected);
     }
 
     #endregion

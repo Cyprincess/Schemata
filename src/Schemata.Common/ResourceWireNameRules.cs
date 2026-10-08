@@ -35,8 +35,8 @@ public static class ResourceWireNameRules
     /// <param name="propertyName">The CLR property name.</param>
     /// <returns>The wire field name, or <see langword="null" /> when the property is suppressed.</returns>
     public static string? ResolveWireName(Type owner, string propertyName) {
-        if (propertyName == nameof(IEntitiesResult<>.Entities)) {
-            var carrier = owner.GetInterfaces().FirstOrDefault(static i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEntitiesResult<>));
+        if (propertyName == nameof(IEntitiesResult<,>.Entities)) {
+            var carrier = FindEntitiesCarrier(owner);
             if (carrier is not null) {
                 return ResourceNameDescriptor.ForType(carrier.GetGenericArguments()[0]).Plural;
             }
@@ -78,13 +78,18 @@ public static class ResourceWireNameRules
             return nameof(IFreshness.EntityTag);
         }
 
-        var carrier = owner.GetInterfaces().FirstOrDefault(static i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEntitiesResult<>));
+        var carrier = FindEntitiesCarrier(owner);
         if (carrier is not null && wireSegment == ResourceNameDescriptor.ForType(carrier.GetGenericArguments()[0]).Plural) {
-            return nameof(IEntitiesResult<>.Entities);
+            return nameof(IEntitiesResult<,>.Entities);
         }
 
         return MemberAccess.Resolve(Expression.Parameter(owner), wireSegment) is MemberExpression member
                    ? member.Member.Name
                    : wireSegment.Pascalize();
+    }
+
+    private static Type? FindEntitiesCarrier(Type owner) {
+        return owner.GetInterfaces().FirstOrDefault(static i => i.IsGenericType
+                                                             && i.GetGenericTypeDefinition() == typeof(IEntitiesResult<,>));
     }
 }

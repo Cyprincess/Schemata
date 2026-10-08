@@ -68,10 +68,7 @@ public sealed class AuthorizeHandler<TApp, TToken>(
                 return endpoint!;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(
-                    OAuthErrors.AccessDenied,
-                    SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED)
-                ) {
+                throw new OAuthException(OAuthErrors.AccessDenied, SchemataResources.ACCESS_DENIED) {
                     RedirectUri  = authz.Request.RedirectUri,
                     State        = authz.Request.State,
                     ResponseMode = authz.ResponseMode,
@@ -79,10 +76,7 @@ public sealed class AuthorizeHandler<TApp, TToken>(
         }
 
         if (authz.Application is null) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-            ) {
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS) {
                 RedirectUri = authz.Request.RedirectUri, State = authz.Request.State, ResponseMode = authz.ResponseMode,
             };
         }

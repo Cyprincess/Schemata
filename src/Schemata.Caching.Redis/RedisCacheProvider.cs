@@ -23,11 +23,31 @@ public sealed class RedisCacheProvider : ICacheProvider
 {
     private const string MetaSuffix = ":__meta__";
 
+    private const string WriteScript = """
+        redis.call(ARGV[1], KEYS[1], ARGV[2])
+        redis.call('SET', KEYS[2], ARGV[4])
+        if tonumber(ARGV[3]) >= 0 then
+            redis.call('PEXPIRE', KEYS[1], ARGV[3])
+            redis.call('PEXPIRE', KEYS[2], ARGV[3])
+        else
+            redis.call('PERSIST', KEYS[1])
+        end
+        return 1
+        """;
+
+    private const string RefreshScript = """
+        if redis.call('EXISTS', KEYS[1]) == 1 and redis.call('GET', KEYS[2]) == ARGV[1] then
+            redis.call('PEXPIRE', KEYS[1], ARGV[2])
+            redis.call('PEXPIRE', KEYS[2], ARGV[2])
+        end
+        return 1
+        """;
+
     private const string ReplaceScript = """
                                          if redis.call('GET', KEYS[1]) == ARGV[1] then
                                              redis.call('SET', KEYS[1], ARGV[2])
                                              redis.call('SET', KEYS[2], ARGV[4])
-                                             if tonumber(ARGV[3]) > 0 then
+                                             if tonumber(ARGV[3]) >= 0 then
                                                  redis.call('PEXPIRE', KEYS[1], ARGV[3])
                                                  redis.call('PEXPIRE', KEYS[2], ARGV[3])
                                              end
@@ -45,6 +65,25 @@ public sealed class RedisCacheProvider : ICacheProvider
                                          return 0
                                          """;
 
+    private const string RemoveMembersScript = """
+        for first = 1, #ARGV, 512 do
+            redis.call('SREM', KEYS[1], unpack(ARGV, first, math.min(first + 511, #ARGV)))
+        end
+        if redis.call('EXISTS', KEYS[1]) == 0 then redis.call('DEL', KEYS[2]) end
+        return 1
+        """;
+
+    private const string AddScript = """
+        if redis.call('EXISTS', KEYS[1]) ~= 0 then return 0 end
+        redis.call('SET', KEYS[1], ARGV[1])
+        redis.call('SET', KEYS[2], ARGV[3])
+        if tonumber(ARGV[2]) >= 0 then
+            redis.call('PEXPIRE', KEYS[1], ARGV[2])
+            redis.call('PEXPIRE', KEYS[2], ARGV[2])
+        end
+        return 1
+        """;
+
     private readonly IDatabase    _db;
     private readonly TimeProvider _time;
 
@@ -59,6 +98,7 @@ public sealed class RedisCacheProvider : ICacheProvider
     #region ICacheProvider Members
 
     public async Task<byte[]?> GetAsync(string key, CancellationToken ct = default) {
+        ct.ThrowIfCancellationRequested();
         var result = await _db.StringGetAsync(key);
         if (!result.IsNull) {
             await RefreshAsync(key);
@@ -73,17 +113,13 @@ public sealed class RedisCacheProvider : ICacheProvider
         CacheEntryOptions options,
         CancellationToken ct = default
     ) {
+        ct.ThrowIfCancellationRequested();
+        options = NormalizeOptions(options);
         var expiry = GetExpirationTimeSpan(options);
 
-        var tx = _db.CreateTransaction();
-        _ = tx.StringSetAsync(key, value);
-        if (expiry.HasValue) {
-            _ = tx.KeyExpireAsync(key, expiry.Value);
-        }
-
-        StoreOptions(tx, key, options, expiry);
-
-        await tx.ExecuteAsync();
+        var ms = expiry.HasValue ? (long)Math.Ceiling(expiry.Value.TotalMilliseconds) : -1;
+        var meta = JsonSerializer.SerializeToUtf8Bytes(options);
+        await _db.ScriptEvaluateAsync(WriteScript, [key, GetMetaKey(key)], ["SET", value, ms, meta]);
     }
 
     public async Task<bool> TryAddAsync(
@@ -92,18 +128,14 @@ public sealed class RedisCacheProvider : ICacheProvider
         CacheEntryOptions options,
         CancellationToken ct = default
     ) {
+        ct.ThrowIfCancellationRequested();
+        options = NormalizeOptions(options);
         var expiry = GetExpirationTimeSpan(options);
 
-        // SET key value EX <expiry> NX — single-round-trip atomic insert-if-absent.
-        var added = await _db.StringSetAsync(key, value, expiry, When.NotExists);
-        if (!added) {
-            return false;
-        }
-
-        var tx = _db.CreateTransaction();
-        StoreOptions(tx, key, options, expiry);
-        await tx.ExecuteAsync();
-        return true;
+        var ms = expiry.HasValue ? (long)Math.Ceiling(expiry.Value.TotalMilliseconds) : -1;
+        var meta = JsonSerializer.SerializeToUtf8Bytes(options);
+        var result = await _db.ScriptEvaluateAsync(AddScript, [key, GetMetaKey(key)], [value, ms, meta]);
+        return (long)result == 1;
     }
 
     public async Task<bool> TryReplaceAsync(
@@ -113,9 +145,11 @@ public sealed class RedisCacheProvider : ICacheProvider
         CacheEntryOptions options,
         CancellationToken ct = default
     ) {
+        ct.ThrowIfCancellationRequested();
+        options = NormalizeOptions(options);
         var expiry = GetExpirationTimeSpan(options);
-        var ms     = expiry.HasValue ? (long)expiry.Value.TotalMilliseconds : 0;
-        var meta   = JsonSerializer.SerializeToUtf8Bytes(NormalizeOptions(options));
+        var ms     = expiry.HasValue ? (long)Math.Ceiling(expiry.Value.TotalMilliseconds) : -1;
+        var meta   = JsonSerializer.SerializeToUtf8Bytes(options);
 
         var result = await _db.ScriptEvaluateAsync(
             ReplaceScript,
@@ -126,6 +160,7 @@ public sealed class RedisCacheProvider : ICacheProvider
     }
 
     public async Task<bool> TryRemoveAsync(string key, byte[] expected, CancellationToken ct = default) {
+        ct.ThrowIfCancellationRequested();
         var result = await _db.ScriptEvaluateAsync(
             RemoveScript,
             [key, GetMetaKey(key)],
@@ -135,10 +170,8 @@ public sealed class RedisCacheProvider : ICacheProvider
     }
 
     public async Task RemoveAsync(string key, CancellationToken ct = default) {
-        var tx = _db.CreateTransaction();
-        await tx.KeyDeleteAsync(key);
-        await tx.KeyDeleteAsync(GetMetaKey(key));
-        await tx.ExecuteAsync();
+        ct.ThrowIfCancellationRequested();
+        await _db.KeyDeleteAsync([key, GetMetaKey(key)]);
     }
 
     public async Task CollectionAddAsync(
@@ -147,20 +180,17 @@ public sealed class RedisCacheProvider : ICacheProvider
         CacheEntryOptions options,
         CancellationToken ct = default
     ) {
+        ct.ThrowIfCancellationRequested();
+        options = NormalizeOptions(options);
         var expiry = GetExpirationTimeSpan(options);
 
-        var tx = _db.CreateTransaction();
-        _ = tx.SetAddAsync(key, member);
-        if (expiry.HasValue) {
-            _ = tx.KeyExpireAsync(key, expiry.Value);
-        }
-
-        StoreOptions(tx, key, options, expiry);
-
-        await tx.ExecuteAsync();
+        var ms = expiry.HasValue ? (long)Math.Ceiling(expiry.Value.TotalMilliseconds) : -1;
+        var meta = JsonSerializer.SerializeToUtf8Bytes(options);
+        await _db.ScriptEvaluateAsync(WriteScript, [key, GetMetaKey(key)], ["SADD", member, ms, meta]);
     }
 
     public async Task<IReadOnlyList<string>?> CollectionMembersAsync(string key, CancellationToken ct = default) {
+        ct.ThrowIfCancellationRequested();
         var members = await _db.SetMembersAsync(key);
         if (members.Length == 0) {
             return null;
@@ -172,23 +202,15 @@ public sealed class RedisCacheProvider : ICacheProvider
     }
 
     public async Task CollectionRemoveAsync(string key, ICollection<string> members, CancellationToken ct = default) {
-        await _db.SetRemoveAsync(key, members.Select(m => (RedisValue)m).ToArray());
-
-        var remaining = await _db.SetLengthAsync(key);
-        if (remaining == 0) {
-            await RemoveAsync(key, ct);
-        }
+        ct.ThrowIfCancellationRequested();
+        await _db.ScriptEvaluateAsync(RemoveMembersScript, [key, GetMetaKey(key)], members.Select(m => (RedisValue)m).ToArray());
 
         await RefreshAsync(key);
     }
 
     public async Task CollectionRemoveAsync(string key, string member, CancellationToken ct = default) {
-        await _db.SetRemoveAsync(key, member);
-
-        var remaining = await _db.SetLengthAsync(key);
-        if (remaining == 0) {
-            await RemoveAsync(key, ct);
-        }
+        ct.ThrowIfCancellationRequested();
+        await _db.ScriptEvaluateAsync(RemoveMembersScript, [key, GetMetaKey(key)], [(RedisValue)member]);
 
         await RefreshAsync(key);
     }
@@ -199,31 +221,13 @@ public sealed class RedisCacheProvider : ICacheProvider
 
     private static string GetMetaKey(string key) { return key + MetaSuffix; }
 
-    private void StoreOptions(
-        ITransaction      tx,
-        string            key,
-        CacheEntryOptions options,
-        TimeSpan?         expiry
-    ) {
-        var meta       = GetMetaKey(key);
-        var normalized = NormalizeOptions(options);
-        var json       = JsonSerializer.SerializeToUtf8Bytes(normalized);
-
-        _ = tx.StringSetAsync(meta, json);
-        if (expiry.HasValue) {
-            _ = tx.KeyExpireAsync(meta, expiry.Value);
-        }
-    }
-
     private CacheEntryOptions NormalizeOptions(CacheEntryOptions options) {
-        if (options.AbsoluteExpirationRelativeToNow.HasValue) {
-            return new() {
-                AbsoluteExpiration = _time.GetUtcNow() + options.AbsoluteExpirationRelativeToNow.Value,
-                SlidingExpiration  = options.SlidingExpiration,
-            };
+        var absolute = options.AbsoluteExpiration;
+        if (options.AbsoluteExpirationRelativeToNow is { } relative) {
+            var deadline = _time.GetUtcNow() + relative;
+            if (absolute is null || deadline < absolute) absolute = deadline;
         }
-
-        return options;
+        return new() { AbsoluteExpiration = absolute, SlidingExpiration = options.SlidingExpiration };
     }
 
     private async Task RefreshAsync(string key) {
@@ -233,15 +237,8 @@ public sealed class RedisCacheProvider : ICacheProvider
             return;
         }
 
-        CacheEntryOptions options;
-        try {
-            options = JsonSerializer.Deserialize<CacheEntryOptions>((byte[]?)bytes)!;
-        } catch (JsonException) {
-            // Corrupt metadata is unusable for sliding-expiration refresh; drop it so the next
-            // write creates a readable companion key.
-            await _db.KeyDeleteAsync(meta);
-            return;
-        }
+        var options = JsonSerializer.Deserialize<CacheEntryOptions>((byte[]?)bytes);
+        if (options is null) throw new JsonException("Cache expiration metadata must be an object.");
 
         if (!options.SlidingExpiration.HasValue) {
             return;
@@ -261,26 +258,16 @@ public sealed class RedisCacheProvider : ICacheProvider
             }
         }
 
-        var tx = _db.CreateTransaction();
-        _ = tx.KeyExpireAsync(key, expire);
-        _ = tx.KeyExpireAsync(meta, expire);
-        await tx.ExecuteAsync();
+        var ms = (long)Math.Ceiling(expire.TotalMilliseconds);
+        await _db.ScriptEvaluateAsync(RefreshScript, [key, meta], [bytes, ms]);
     }
 
     private TimeSpan? GetExpirationTimeSpan(CacheEntryOptions options) {
-        if (options.AbsoluteExpiration.HasValue) {
-            var remaining = options.AbsoluteExpiration.Value - _time.GetUtcNow();
-            return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
+        var expiry = options.SlidingExpiration;
+        if (options.AbsoluteExpiration is { } absolute) {
+            var remaining = absolute - _time.GetUtcNow();
+            if (expiry is null || remaining < expiry) expiry = remaining;
         }
-
-        if (options.AbsoluteExpirationRelativeToNow.HasValue) {
-            return options.AbsoluteExpirationRelativeToNow.Value;
-        }
-
-        if (options.SlidingExpiration.HasValue) {
-            return options.SlidingExpiration.Value;
-        }
-
-        return null;
+        return expiry < TimeSpan.Zero ? TimeSpan.Zero : expiry;
     }
 }

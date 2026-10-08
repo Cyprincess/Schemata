@@ -1,5 +1,9 @@
 using System;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.Configuration;
+using Schemata.Security.Foundation;
+using Schemata.Security.Skeleton;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -11,6 +15,7 @@ using Schemata.Entity.Repository.Advisors;
 using Schemata.Expressions.Aip;
 using Schemata.Expressions.Order;
 using Schemata.Flow.Skeleton.Entities;
+using Schemata.Flow.StateMachine.Extensions;
 using Schemata.Flow.Integration.Tests.Resource;
 using Schemata.Flow.Integration.Tests.Resource.Fixtures;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -23,9 +28,22 @@ using var connection = new SqliteConnection(connectionString);
 connection.Open();
 
 builder.UseSchemata(schema => {
+    Schemata.Flow.Tests.FlowTestCreation.Register(schema.Services);
     schema.UseMapster().Map<Student, Student>();
     schema.UseMapster().Map<Trash, Trash>();
-    schema.UseFlow().MapHttp().MapGrpc();
+    var flow = schema.UseFlow().UseStateMachine().MapHttp().MapGrpc();
+    if (builder.Configuration.GetValue<bool>("ParticipantSecurity")) {
+        flow.WithAuthentication(ParticipantAuthentication.SchemeName).WithAuthorization();
+        schema.UseAuthentication(
+            authentication => authentication.AddScheme<AuthenticationSchemeOptions, ParticipantAuthentication>(ParticipantAuthentication.SchemeName, _ => { }),
+            authentication => authentication.DefaultScheme = ParticipantAuthentication.SchemeName,
+            null);
+        schema.Services.AddScoped<IPermissionResolver, DefaultPermissionResolver>();
+        schema.Services.AddScoped<IPermissionMatcher, DefaultPermissionMatcher>();
+        schema.Services.Configure<SchemataSecurityOptions>(security => security.PermissionClaimType = "permission");
+        schema.Services.AddScoped(typeof(IAccessProvider<,>), typeof(DefaultAccessProvider<,>));
+        schema.Services.AddScoped(typeof(IEntitlementProvider<,>), typeof(DefaultEntitlementProvider<,>));
+    }
     schema.UseScheduling().MapHttp().MapGrpc();
 
     var resource = schema.UseResource();
@@ -36,8 +54,7 @@ builder.UseSchemata(schema => {
     resource.MapGrpc().Use<Trash, Trash, Trash, Trash>();
     resource.WithoutCreateValidation().WithoutUpdateValidation().WithoutFreshness();
 
-    schema.Services.AddDistributedMemoryCache();
-    schema.Services.AddDistributedCache();
+    schema.Services.AddMemoryCacheProvider();
 
     schema.Services.AddDbContextFactory<TestDbContext>(opts => opts.UseSqlite(connectionString)
                                                                    .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
@@ -49,12 +66,19 @@ builder.UseSchemata(schema => {
     schema.Services.AddRepository<SchemataProcessTransition, EfCoreRepository<TestDbContext, SchemataProcessTransition>>();
     schema.Services.AddRepository<SchemataProcessSource, EfCoreRepository<TestDbContext, SchemataProcessSource>>();
     schema.Services.AddRepository<SchemataProcessCompensation, EfCoreRepository<TestDbContext, SchemataProcessCompensation>>();
+    schema.Services.AddRepository<SchemataProcessParticipant, EfCoreRepository<TestDbContext, SchemataProcessParticipant>>();
     schema.Services.AddRepository<SchemataJobExecution, EfCoreRepository<TestDbContext, SchemataJobExecution>>();
     schema.Services.AddScoped<IUnitOfWork<TestDbContext>, EfCoreUnitOfWork<TestDbContext>>();
     schema.Services.AddScheduledJob<ProbeJob>();
 
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, AdviceAddStudentName>());
+    schema.Services.AddSingleton<StreamProbeState>();
+    schema.Services.AddScoped<StreamScopeProbe>();
+    schema.Services.AddScoped<Schemata.Messaging.Skeleton.IStreamRequestHandler<StreamProbeRequest, StreamProbeItem>, StreamProbeHandler>();
+    schema.Services.AddSchemataStreams();
+    schema.Services.AddSchemataGrpcStream<StreamProbeRequest, StreamProbeItem>("schemata.StreamService", "Probe");
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Trash>, AdviceAddTrashName>());
+    schema.Services.PostConfigure<System.Text.Json.JsonSerializerOptions>(options => options.WriteIndented = true);
 });
 
 var app = builder.Build();
@@ -64,6 +88,8 @@ using (var scope = app.Services.CreateScope()) {
     database.Database.EnsureCreated();
 }
 
+app.MapSchemataGrpcStream<StreamProbeRequest, StreamProbeItem>();
+app.MapSchemataStream<StreamProbeRequest, StreamProbeItem>("/v1/streams:probe");
 app.Run();
 
 namespace Schemata.Flow.Integration.Tests.Resource

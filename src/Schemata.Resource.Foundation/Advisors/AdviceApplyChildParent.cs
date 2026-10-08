@@ -48,7 +48,6 @@ public static class AdviceApplyChildParent
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type; reverse-parsing fires only when it implements <see cref="IChild" />.</typeparam>
 public sealed class AdviceApplyChildParent<TEntity, TRequest> :
-    IResourceCreateAdvisor<TEntity, TRequest>,
     IResourceUpdateAdvisor<TEntity, TRequest>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
@@ -56,7 +55,7 @@ public sealed class AdviceApplyChildParent<TEntity, TRequest> :
     /// <inheritdoc cref="AdviceApplyChildParent" />
     public int Order => AdviceApplyChildParent.DefaultOrder;
 
-    #region IResourceCreateAdvisor<TEntity,TRequest> Members
+    #region IResourceUpdateAdvisor<TEntity,TRequest> Members
 
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
@@ -71,7 +70,7 @@ public sealed class AdviceApplyChildParent<TEntity, TRequest> :
 
     #endregion
 
-    private static void Apply(TRequest request, TEntity entity) {
+    internal static void Apply(TRequest request, TEntity entity) {
         if (request is not IChild child) {
             return;
         }

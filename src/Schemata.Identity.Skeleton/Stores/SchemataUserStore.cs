@@ -5,7 +5,9 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Identity.Skeleton.Entities;
@@ -23,14 +25,14 @@ public class SchemataUserStore<TUser> : SchemataUserStore<TUser, SchemataRole>
     ///     Initializes a user store with the default Schemata role entity.
     /// </summary>
     public SchemataUserStore(
-        IRepository<TUser>             users,
-        IRepository<SchemataRole>      roles,
         IRepository<SchemataUserClaim> userClaims,
         IRepository<SchemataUserRole>  userRole,
         IRepository<SchemataUserLogin> userLogins,
         IRepository<SchemataUserToken> userTokens,
+        IResourceMutation<TUser>       mutation,
+        IServiceProvider              services,
         IdentityErrorDescriber?        describer = null
-    ) : base(users, roles, userClaims, userRole, userLogins, userTokens, describer) { }
+    ) : base(userClaims, userRole, userLogins, userTokens, mutation, services, describer) { }
 }
 
 /// <summary>
@@ -47,14 +49,14 @@ public class SchemataUserStore<TUser, TRole> : SchemataUserStore<TUser, TRole, S
     ///     Initializes a user store with the default Schemata user relation entities.
     /// </summary>
     public SchemataUserStore(
-        IRepository<TUser>             users,
-        IRepository<TRole>             roles,
         IRepository<SchemataUserClaim> userClaims,
         IRepository<SchemataUserRole>  userRole,
         IRepository<SchemataUserLogin> userLogins,
         IRepository<SchemataUserToken> userTokens,
+        IResourceMutation<TUser>       mutation,
+        IServiceProvider              services,
         IdentityErrorDescriber?        describer = null
-    ) : base(users, roles, userClaims, userRole, userLogins, userTokens, describer) { }
+    ) : base(userClaims, userRole, userLogins, userTokens, mutation, services, describer) { }
 }
 
 /// <summary>
@@ -86,9 +88,6 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     private const string AuthenticatorKeyTokenName = "AuthenticatorKey";
     private const string RecoveryCodeTokenName     = "RecoveryCodes";
 
-    /// <summary>Repository for roles.</summary>
-    protected readonly IRepository<TRole> RolesRepository;
-
     /// <summary>Repository for user claims.</summary>
     protected readonly IRepository<TUserClaim> UserClaimsRepository;
 
@@ -98,34 +97,35 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     /// <summary>Repository for user-role links.</summary>
     protected readonly IRepository<TUserRole> UserRoleRepository;
 
-    /// <summary>Repository for users.</summary>
-    protected readonly IRepository<TUser> UsersRepository;
-
     /// <summary>Repository for user tokens.</summary>
     protected readonly IRepository<TUserToken> UserTokensRepository;
 
     private bool _disposed;
 
     /// <summary>
-    ///     Initializes a user store with repositories for users, roles, and user relation entities.
+    ///     Initializes a user store with repositories for users, roles, and user relation entities,
+    ///     plus the user resource mutation owner that performs row writes.
     /// </summary>
     public SchemataUserStore(
-        IRepository<TUser>      users,
-        IRepository<TRole>      roles,
-        IRepository<TUserClaim> userClaims,
-        IRepository<TUserRole>  userRole,
-        IRepository<TUserLogin> userLogins,
-        IRepository<TUserToken> userTokens,
-        IdentityErrorDescriber? describer = null
+        IRepository<TUserClaim>  userClaims,
+        IRepository<TUserRole>   userRole,
+        IRepository<TUserLogin>  userLogins,
+        IRepository<TUserToken>  userTokens,
+        IResourceMutation<TUser> mutation,
+        IServiceProvider        services,
+        IdentityErrorDescriber?  describer = null
     ) {
-        RolesRepository      = roles;
         UserClaimsRepository = userClaims;
         UserLoginsRepository = userLogins;
         UserRoleRepository   = userRole;
-        UsersRepository      = users;
         UserTokensRepository = userTokens;
+        _mutation            = mutation;
+        _services            = services;
         ErrorDescriber       = describer ?? new IdentityErrorDescriber();
     }
+
+    private readonly IResourceMutation<TUser> _mutation;
+    private readonly IServiceProvider _services;
 
     /// <summary>Provides localized error messages for identity operations.</summary>
     public IdentityErrorDescriber ErrorDescriber { get; set; }
@@ -212,7 +212,8 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
 
-        return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.CanonicalName == canonicalName), ct);
+        await using var users = _services.GetRequiredService<IRepository<TUser>>();
+        return await users.SingleOrDefaultAsync(q => q.Where(u => u.CanonicalName == canonicalName), ct);
     }
 
     #endregion
@@ -225,7 +226,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             throw new ArgumentNullException(nameof(user));
         }
 
-        return await UserClaimsRepository.ListAsync(q => q.Where(uc => uc.UserId.Equals(user.Uid)), ct)
+        return await UserClaimsRepository.ListAsync(q => q.Where(uc => uc.UserId == user.CanonicalName), ct)
                                          .Map(c => c.ToClaim(), ct)
                                          .ToListAsync(ct);
     }
@@ -268,7 +269,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
         var claims = await UserClaimsRepository
                           .ListAsync(
-                               q => q.Where(uc => uc.UserId.Equals(user.Uid)
+                               q => q.Where(uc => uc.UserId == user.CanonicalName
                                                && uc.ClaimValue == claim.Value
                                                && uc.ClaimType == claim.Type), ct)
                           .ToListAsync(ct);
@@ -291,16 +292,33 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             throw new ArgumentNullException(nameof(claims));
         }
 
+        await using var repository = _services.GetRequiredService<IRepository<TUserClaim>>();
+        await using var unit = repository.Begin();
         foreach (var claim in claims) {
-            await foreach (var c in UserClaimsRepository.ListAsync(
-                               q => q.Where(uc => uc.UserId.Equals(user.Uid)
-                                               && uc.ClaimValue == claim.Value
-                                               && uc.ClaimType == claim.Type), ct)) {
-                await UserClaimsRepository.RemoveAsync(c, ct);
+            Guid? cursor = null;
+            while (true) {
+                ct.ThrowIfCancellationRequested();
+                var page = await repository.ListAsync(q => {
+                    var query = q.Where(uc => uc.UserId == user.CanonicalName
+                                           && uc.ClaimValue == claim.Value
+                                           && uc.ClaimType == claim.Type);
+                    if (cursor is not null) {
+                        query = query.Where(uc => uc.Uid.CompareTo(cursor.Value) > 0);
+                    }
+
+                    return query.OrderBy(uc => uc.Uid).Take(100);
+                }, ct).ToListAsync(ct);
+                if (page.Count == 0) break;
+
+                cursor = page[^1].Uid;
+                foreach (var row in page) {
+                    ct.ThrowIfCancellationRequested();
+                    await repository.RemoveAsync(row, ct);
+                }
             }
         }
 
-        await UserClaimsRepository.CommitAsync(ct);
+        await unit.CommitAsync(ct);
     }
 
     public virtual async Task<IList<TUser>> GetUsersForClaimAsync(Claim claim, CancellationToken ct = default) {
@@ -316,7 +334,8 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
                                     .Select(uc => uc.UserId), ct)
                          .ToListAsync(ct);
 
-        return await UsersRepository.ListAsync(q => q.Where(u => users.Contains(u.Uid)), ct).ToListAsync(ct);
+        await using var repository = _services.GetRequiredService<IRepository<TUser>>();
+        return await repository.ListAsync(q => q.Where(u => users.Contains(u.CanonicalName!)), ct).ToListAsync(ct);
     }
 
     #endregion
@@ -385,7 +404,8 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
 
-        return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.NormalizedEmail == normalizedEmail), ct);
+        await using var users = _services.GetRequiredService<IRepository<TUser>>();
+        return await users.SingleOrDefaultAsync(q => q.Where(u => u.NormalizedEmail == normalizedEmail), ct);
     }
 
     public virtual Task<string?> GetNormalizedEmailAsync(TUser user, CancellationToken ct = default) {
@@ -503,8 +523,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             throw new ArgumentNullException(nameof(user));
         }
 
-        await UsersRepository.AddAsync(user, ct);
-        await UsersRepository.CommitAsync(ct);
+        await _mutation.CreateAsync(user, null, ct);
 
         return IdentityResult.Success;
     }
@@ -516,9 +535,10 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             throw new ArgumentNullException(nameof(user));
         }
 
-        await UsersRepository.UpdateAsync(user, ct);
+        // Providers signal optimistic concurrency at different boundaries: LinqToDB throws at the
+        // mutation, EF at commit. Translate both, let every other failure propagate.
         try {
-            await UsersRepository.CommitAsync(ct);
+            await _mutation.UpdateAsync(user, null, Operations.Update, ct);
         } catch (AbortedException) {
             return IdentityResult.Failed(ErrorDescriber.ConcurrencyFailure());
         }
@@ -533,34 +553,11 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             throw new ArgumentNullException(nameof(user));
         }
 
-        // Remove the user and every dependent row (role links, claims, logins, tokens) in one unit
-        // of work so a failure cannot delete the user while leaving orphaned child rows behind.
-        await using var uow = UsersRepository.Begin();
-        UserRoleRepository.Join(uow);
-        UserClaimsRepository.Join(uow);
-        UserLoginsRepository.Join(uow);
-        UserTokensRepository.Join(uow);
-
-        await foreach (var role in UserRoleRepository.ListAsync(q => q.Where(ur => ur.UserId.Equals(user.Uid)), ct)) {
-            await UserRoleRepository.RemoveAsync(role, ct);
-        }
-
-        await foreach (var claim in UserClaimsRepository.ListAsync(q => q.Where(uc => uc.UserId.Equals(user.Uid)), ct)) {
-            await UserClaimsRepository.RemoveAsync(claim, ct);
-        }
-
-        await foreach (var login in UserLoginsRepository.ListAsync(q => q.Where(l => l.UserId.Equals(user.Uid)), ct)) {
-            await UserLoginsRepository.RemoveAsync(login, ct);
-        }
-
-        await foreach (var token in UserTokensRepository.ListAsync(q => q.Where(t => t.UserId.Equals(user.Uid)), ct)) {
-            await UserTokensRepository.RemoveAsync(token, ct);
-        }
-
-        await UsersRepository.RemoveAsync(user, ct);
-
+        // The owner removes the user and every dependent row (role links, claims, logins, tokens)
+        // in one unit of work so a failure cannot delete the user while leaving orphaned child
+        // rows behind.
         try {
-            await uow.CommitAsync(ct);
+            await _mutation.DeleteAsync(user, null, Operations.Delete, ct);
         } catch (AbortedException) {
             return IdentityResult.Failed(ErrorDescriber.ConcurrencyFailure());
         }
@@ -626,15 +623,16 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
         var id = Guid.Parse(userId);
-        return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.Uid == id), ct);
+        await using var users = _services.GetRequiredService<IRepository<TUser>>();
+        return await users.SingleOrDefaultAsync(q => q.Where(u => u.Uid == id), ct);
     }
 
     public virtual async Task<TUser?> FindByNameAsync(string normalizedUserName, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
 
-        return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.NormalizedUserName == normalizedUserName),
-                                                          ct);
+        await using var users = _services.GetRequiredService<IRepository<TUser>>();
+        return await users.SingleOrDefaultAsync(q => q.Where(u => u.NormalizedUserName == normalizedUserName), ct);
     }
 
     public virtual void Dispose() { _disposed = true; }
@@ -666,7 +664,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             throw new ArgumentNullException(nameof(user));
         }
 
-        var entry = await FindUserLoginAsync(user.Uid, loginProvider, providerKey, ct);
+        var entry = await FindUserLoginAsync(user.CanonicalName!, loginProvider, providerKey, ct);
         if (entry is null) {
             return;
         }
@@ -682,7 +680,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             throw new ArgumentNullException(nameof(user));
         }
 
-        return await UserLoginsRepository.ListAsync(q => q.Where(l => l.UserId.Equals(user.Uid)), ct)
+        return await UserLoginsRepository.ListAsync(q => q.Where(l => l.UserId == user.CanonicalName), ct)
                                          .Map(
                                               l => new UserLoginInfo(l.LoginProvider, l.ProviderKey,
                                                                      l.ProviderDisplayName), ct)
@@ -792,7 +790,8 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
 
-        return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.PhoneNumber == phone), ct);
+        await using var users = _services.GetRequiredService<IRepository<TUser>>();
+        return await users.SingleOrDefaultAsync(q => q.Where(u => u.PhoneNumber == phone), ct);
     }
 
     #endregion
@@ -849,7 +848,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             return;
         }
 
-        var userRole = await FindUserRoleAsync(user.Uid, roleEntity.Uid, ct);
+        var userRole = await FindUserRoleAsync(user.CanonicalName!, roleEntity.CanonicalName!, ct);
         if (userRole is null) {
             return;
         }
@@ -866,10 +865,13 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         }
 
         var roles = await UserRoleRepository
-                         .ListAsync(q => q.Where(r => r.UserId == user.Uid).Select(r => r.RoleId), ct)
+                         .ListAsync(q => q.Where(r => r.UserId == user.CanonicalName).Select(r => r.RoleId), ct)
                          .ToListAsync(ct);
 
-        return await RolesRepository.ListAsync(q => q.Where(r => roles.Contains(r.Uid)).Select(r => r.DisplayName!), ct)
+        await using var repository = _services.GetRequiredService<IRepository<TRole>>();
+        return await repository.ListAsync(q => q.Where(r => roles.Contains(r.CanonicalName!)
+                                                              && r.DisplayName != null)
+                                                    .Select(r => r.DisplayName!), ct)
                                     .ToListAsync(ct);
     }
 
@@ -893,7 +895,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
             return false;
         }
 
-        var userRole = await FindUserRoleAsync(user.Uid, role.Uid, ct);
+        var userRole = await FindUserRoleAsync(user.CanonicalName!, role.CanonicalName!, ct);
 
         return userRole is not null;
     }
@@ -915,10 +917,11 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         }
 
         var users = await UserRoleRepository
-                         .ListAsync(q => q.Where(ur => ur.RoleId == role.Uid).Select(ur => ur.UserId), ct)
+                         .ListAsync(q => q.Where(ur => ur.RoleId == role.CanonicalName).Select(ur => ur.UserId), ct)
                          .ToListAsync(ct);
 
-        return await UsersRepository.ListAsync(q => q.Where(u => users.Contains(u.Uid)), ct).ToListAsync(ct);
+        await using var repository = _services.GetRequiredService<IRepository<TUser>>();
+        return await repository.ListAsync(q => q.Where(u => users.Contains(u.CanonicalName!)), ct).ToListAsync(ct);
     }
 
     #endregion
@@ -1031,7 +1034,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     ///     Creates a user claim entity from a user and claim.
     /// </summary>
     protected virtual TUserClaim CreateUserClaim(TUser user, Claim claim) {
-        var userClaim = new TUserClaim { UserId = user.Uid };
+        var userClaim = new TUserClaim { UserId = user.CanonicalName! };
         userClaim.InitializeFromClaim(claim);
         return userClaim;
     }
@@ -1041,7 +1044,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     /// </summary>
     protected virtual TUserLogin CreateUserLogin(TUser user, UserLoginInfo login) {
         return new() {
-            UserId              = user.Uid,
+            UserId              = user.CanonicalName!,
             ProviderKey         = login.ProviderKey,
             LoginProvider       = login.LoginProvider,
             ProviderDisplayName = login.ProviderDisplayName,
@@ -1058,7 +1061,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         string? value
     ) {
         return new() {
-            UserId        = user.Uid,
+            UserId        = user.CanonicalName!,
             LoginProvider = loginProvider,
             Name          = name,
             Value         = value,
@@ -1069,36 +1072,37 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     ///     Creates a user-role link entity from a user and role.
     /// </summary>
     protected virtual TUserRole CreateUserRole(TUser user, TRole role) {
-        return new() { UserId = user.Uid, RoleId = role.Uid };
+        return new() { UserId = user.CanonicalName!, RoleId = role.CanonicalName! };
     }
 
     /// <summary>
     ///     Finds a role by normalized role name.
     /// </summary>
     protected virtual async Task<TRole?> FindRoleAsync(string normalizedRoleName, CancellationToken ct) {
-        return await RolesRepository.SingleOrDefaultAsync(q => q.Where(r => r.NormalizedName == normalizedRoleName),
-                                                          ct);
+        await using var roles = _services.GetRequiredService<IRepository<TRole>>();
+        return await roles.SingleOrDefaultAsync(q => q.Where(r => r.NormalizedName == normalizedRoleName), ct);
     }
 
     /// <summary>
     ///     Finds a user-role link by user and role identifiers.
     /// </summary>
-    protected virtual async Task<TUserRole?> FindUserRoleAsync(Guid userId, Guid roleId, CancellationToken ct) {
+    protected virtual async Task<TUserRole?> FindUserRoleAsync(string userId, string roleId, CancellationToken ct) {
         return await UserRoleRepository.FindAsync([userId, roleId], ct);
     }
 
     /// <summary>
     ///     Finds a user by identifier.
     /// </summary>
-    protected virtual async Task<TUser?> FindUserAsync(Guid userId, CancellationToken ct) {
-        return await UsersRepository.SingleOrDefaultAsync(q => q.Where(u => u.Uid == userId), ct);
+    protected virtual async Task<TUser?> FindUserAsync(string userId, CancellationToken ct) {
+        await using var users = _services.GetRequiredService<IRepository<TUser>>();
+        return await users.SingleOrDefaultAsync(q => q.Where(u => u.CanonicalName == userId), ct);
     }
 
     /// <summary>
     ///     Finds a user login by user identifier, login provider, and provider key.
     /// </summary>
     protected virtual async Task<TUserLogin?> FindUserLoginAsync(
-        Guid              userId,
+        string            userId,
         string            loginProvider,
         string            providerKey,
         CancellationToken ct
@@ -1129,7 +1133,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         string            name,
         CancellationToken ct
     ) {
-        return await UserTokensRepository.FindAsync([user.Uid, loginProvider, name], ct);
+        return await UserTokensRepository.FindAsync([user.CanonicalName!, loginProvider, name], ct);
     }
 
     /// <summary>

@@ -3,12 +3,13 @@ using System.Collections.Immutable;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions;
 using Schemata.Messaging.Skeleton;
-using Schemata.Messaging.Skeleton.Runtime;
 using Schemata.Push.Foundation;
 using Schemata.Push.Foundation.Commands;
 using Schemata.Push.Foundation.Handlers;
 using Schemata.Push.Skeleton;
 using Schemata.Push.Skeleton.Entities;
+using Schemata.Push.Skeleton.Control;
+using Schemata.Push.Skeleton.Models;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -18,16 +19,21 @@ public static class ServiceCollectionExtensions
 {
     /// <summary>Registers Push facades, dispatcher capability, and the five Foundation request handlers.</summary>
     public static IServiceCollection AddSchemataPush(this IServiceCollection services) {
-        services.TryAddScoped<InProcessRequestDispatcher>();
-        services.TryAddScoped<IRequestDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<ICommandDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<IQueryDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+        services.AddInProcessRequestDispatcher();
+        services.AddAuthorizationCore();
 
         AddHandler<SendPushRequest, ImmutableArray<TransportResult>, SendPushHandler>(services);
-        AddHandler<AddPushSubscriptionRequest, PushSubscriptionResult, AddPushSubscriptionHandler>(services);
+        AddHandler<AddPushSubscriptionRequest, SchemataPushSubscription, AddPushSubscriptionHandler>(services);
         AddHandler<RemovePushSubscriptionRequest, Unit, RemovePushSubscriptionHandler>(services);
         AddHandler<GetPushSubscriptionsQuery, IReadOnlyList<SchemataPushSubscription>, GetPushSubscriptionsHandler>(services);
         AddHandler<ExistsPushSubscriptionQuery, bool, ExistsPushSubscriptionHandler>(services);
+
+        services.TryAddScoped<PushControlHandler>();
+        services.TryAddScoped<IRequestHandler<CreatePushControlRequest, PushSubscriptionInfo>>(sp => sp.GetRequiredService<PushControlHandler>());
+        services.TryAddScoped<IRequestHandler<ListPushControlRequest, IReadOnlyList<PushSubscriptionInfo>>>(sp => sp.GetRequiredService<PushControlHandler>());
+        services.TryAddScoped<IRequestHandler<DeletePushControlRequest, Unit>>(sp => sp.GetRequiredService<PushControlHandler>());
+        services.TryAddScoped<IRequestHandler<SendPushControlRequest, ImmutableArray<TransportResult>>>(sp => sp.GetRequiredService<PushControlHandler>());
+        services.TryAddScoped<IPushOwnerResolver, DefaultPushOwnerResolver>();
 
         services.TryAddScoped<IPushService, DefaultPushService>();
         services.TryAddScoped<IPushSubscriptionManager, DefaultPushSubscriptionManager>();

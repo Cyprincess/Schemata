@@ -23,7 +23,7 @@ public class WaitOperationHandlerShould
         operations.Setup(s => s.WaitAsync(entity.CanonicalName, It.IsAny<CancellationToken>()))
                   .Returns(async (string _, CancellationToken ct) => {
                       await Task.Delay(Timeout.InfiniteTimeSpan, ct);
-                      return new Operation();
+                      return new();
                   });
         operations.Setup(s => s.GetAsync(entity.CanonicalName, It.IsAny<CancellationToken>()))
                   .Returns(new ValueTask<Operation>(OperationMapper.FromExecution(entity)));

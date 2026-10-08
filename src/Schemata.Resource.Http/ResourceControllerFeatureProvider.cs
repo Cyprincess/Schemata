@@ -47,7 +47,7 @@ public sealed class ResourceControllerFeatureProvider : IApplicationFeatureProvi
             }
 
             var controller = typeof(ResourceController<,,,>)
-                            .MakeGenericType(resource.Entity, resource.Request!, resource.Detail!, resource.Summary!)
+                            .MakeGenericType(resource.Entity, resource.Request, resource.Detail, resource.Summary)
                             .GetTypeInfo();
 
             feature.Controllers.Add(controller);

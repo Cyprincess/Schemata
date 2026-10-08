@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Exceptions;
@@ -31,6 +32,10 @@ public class ProcessRegistryExpressionShould : IClassFixture<EfCoreFlowFixture>
         var registration = await RegisterDecisionProcessAsync();
 
         Assert.True(registration.SourceTypes.ContainsKey("order"));
+        var guarded = registration.Definition.AllFlows.Single(flow => flow.Condition is SourceStringConditionExpression<Order>);
+        Assert.Throws<InvalidOperationException>(() => guarded.Condition = new LambdaConditionExpression {
+            Lambda = _ => new ValueTask<bool>(false),
+        });
 
         var snapshot = await AdvanceAsync(registration.Definition, order, "p1");
 
@@ -112,7 +117,7 @@ public class ProcessRegistryExpressionShould : IClassFixture<EfCoreFlowFixture>
             State         = "Active",
         };
 
-        return await engine.AdvanceAsync(definition, process, [token], new(unitOfWork, services));
+        return await engine.AdvanceAsync(definition, process, [token], Schemata.Flow.Tests.FlowTestCreation.Context(unitOfWork, services));
     }
 
     private async Task SeedAsync(Order order, string processName) {

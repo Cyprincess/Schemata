@@ -25,8 +25,7 @@ internal sealed class SchedulePushHandler(IScheduler scheduler) : IRequestHandle
         var argsJson = JsonSerializer.Serialize(request.Context, SchemataJson.Default);
         var uid      = Guid.NewGuid();
 
-        // One-shot push dispatch has no persistent SchemataJob; the resulting
-        // SchemataJobExecution is addressable as operations/{uid} on its own.
+        // One-shot push dispatch is represented by the execution resource without a persistent job.
         var jobContext = new JobContext {
             ExecutionUid = uid,
             Method       = SendMethod,

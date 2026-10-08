@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions.Exceptions;
+using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Flow.Foundation.Commands;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Messaging.Skeleton;
@@ -18,6 +20,7 @@ internal sealed class DefaultThrowSignalHandler(FlowHandlerSupport support)
         ThrowSignalRequest request,
         CancellationToken ct = default
     ) {
+        support.Access?.RequirePermission(FlowOperations.Signal, typeof(SchemataProcess), null, request.Principal);
         var candidates = await SnapshotSignalCandidatesAsync(request.SignalName, ct);
         if (candidates.Count == 0) {
             return [];
@@ -68,8 +71,14 @@ internal sealed class DefaultThrowSignalHandler(FlowHandlerSupport support)
                     continue;
                 }
 
-                var registration = support.FindRegistration(process.DefinitionName);
-                if (registration?.Definition.Signals.Any(signal => signal.Name == signalName) == true) {
+                ProcessRegistration? registration;
+                try {
+                    registration = support.ResolveRegistration(process);
+                } catch (FailedPreconditionException) {
+                    candidates.Add(process.CanonicalName);
+                    continue;
+                }
+                if (registration.Definition.Signals.Any(signal => signal.Name == signalName)) {
                     candidates.Add(process.CanonicalName);
                 }
             }

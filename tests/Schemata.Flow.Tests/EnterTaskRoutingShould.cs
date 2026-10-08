@@ -115,7 +115,7 @@ public class EnterTaskRoutingShould
     }
 
     private static FlowExecutionContext Context() {
-        return new(Mock.Of<IUnitOfWork>(), new ServiceCollection().BuildServiceProvider());
+        return FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), new ServiceCollection().BuildServiceProvider());
     }
 
     #region Nested type: LateAwaitEdgeProcess
@@ -124,7 +124,8 @@ public class EnterTaskRoutingShould
     {
         public LateAwaitEdgeProcess(List<string> log) {
             this.During(Target)
-                .OnEnter(_ => {
+                .OnEnter((_, ct) => {
+                    ct.ThrowIfCancellationRequested();
                     log.Add("enter");
                     return ValueTask.CompletedTask;
                 })
@@ -147,7 +148,8 @@ public class EnterTaskRoutingShould
         public EarlyAwaitEdgeProcess(List<string> log) {
             this.During(Waiting).Await(this.On(Go).Go(Target));
             this.During(Target)
-                .OnEnter(_ => {
+                .OnEnter((_, ct) => {
+                    ct.ThrowIfCancellationRequested();
                     log.Add("enter");
                     return ValueTask.CompletedTask;
                 })
@@ -167,7 +169,7 @@ public class EnterTaskRoutingShould
     private sealed class LateStartEdgeProcess : ProcessDefinition
     {
         public LateStartEdgeProcess() {
-            this.During(Only).OnEnter(_ => ValueTask.CompletedTask).End();
+            this.During(Only).OnEnter((_, ct) => { ct.ThrowIfCancellationRequested(); return ValueTask.CompletedTask; }).End();
             this.Start().Go(Only);
         }
 
@@ -181,7 +183,7 @@ public class EnterTaskRoutingShould
     private sealed class LateDecisionEdgeProcess : ProcessDefinition
     {
         public LateDecisionEdgeProcess() {
-            this.During(Target).OnEnter(_ => ValueTask.CompletedTask).End();
+            this.During(Target).OnEnter((_, ct) => { ct.ThrowIfCancellationRequested(); return ValueTask.CompletedTask; }).End();
             this.During(Review).Decide(
                 this.When<Order>(order => order.State == "paid").Go(Target),
                 this.Otherwise().Go(Rejected));
@@ -201,7 +203,7 @@ public class EnterTaskRoutingShould
     private sealed class LateBoundaryEdgeProcess : ProcessDefinition
     {
         public LateBoundaryEdgeProcess() {
-            this.During(Target).OnEnter(_ => ValueTask.CompletedTask).End();
+            this.During(Target).OnEnter((_, ct) => { ct.ThrowIfCancellationRequested(); return ValueTask.CompletedTask; }).End();
             this.During(Work).OnMessage(Cancel).Go(Target);
             this.During(Work).End();
             this.Start().Go(Work);

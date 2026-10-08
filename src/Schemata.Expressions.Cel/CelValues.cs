@@ -34,6 +34,12 @@ public static class CelValues
         }
     }
 
+    public static object? QualifiedMember(object? container, string qualifier, string member) {
+        if (container is IQualifiedExpressionContext context
+            && context.TryGetQualifiedMember(qualifier, member, out var value)) return Normalize(value);
+        return Member(Identifier(container, qualifier), member);
+    }
+
     public static object? Identifier(object? container, string name) {
         var value = Member(container, name);
         return DynamicValues.IsMissing(value) ? Error($"undeclared reference to '{name}' (in container '')") : value;
@@ -262,7 +268,11 @@ public static class CelValues
         }
 
         if (source is IReadOnlyDictionary<object, object?> map) {
-            return map.ContainsKey(value!);
+            if (value is null) {
+                return Error("no such key");
+            }
+
+            return map.ContainsKey(value);
         }
 
         return Error("no matching overload");
@@ -291,7 +301,11 @@ public static class CelValues
         }
 
         if (source is IReadOnlyDictionary<object, object?> map) {
-            return map.TryGetValue(index!, out var value) ? value : Error("no such key");
+            if (index is null) {
+                return Error("no such key");
+            }
+
+            return map.TryGetValue(index, out var value) ? value : Error("no such key");
         }
 
         return Error("no matching overload");
@@ -308,7 +322,12 @@ public static class CelValues
                 return error;
             }
 
-            map[entries[i]!] = entries[i + 1];
+            var key = entries[i];
+            if (key is null) {
+                return Error("invalid_argument");
+            }
+
+            map[key] = entries[i + 1];
         }
 
         return map;
@@ -640,12 +659,16 @@ public static class CelValues
 
         var result = new Dictionary<object, object?>(KeyComparer);
         foreach (var (key, value) in Iterate2(source)) {
+            if (key is null) {
+                return Error("invalid_argument");
+            }
+
             var transformed = transform(key, value);
             if (transformed is CelError) {
                 return transformed;
             }
 
-            result[key!] = transformed;
+            result[key] = transformed;
         }
 
         return result;
@@ -658,6 +681,10 @@ public static class CelValues
 
         var result = new Dictionary<object, object?>(KeyComparer);
         foreach (var (key, value) in Iterate2(source)) {
+            if (key is null) {
+                return Error("invalid_argument");
+            }
+
             var include = predicate(key, value);
             if (include is CelError) {
                 return include;
@@ -672,7 +699,7 @@ public static class CelValues
                 return transformed;
             }
 
-            result[key!] = transformed;
+            result[key] = transformed;
         }
 
         return result;

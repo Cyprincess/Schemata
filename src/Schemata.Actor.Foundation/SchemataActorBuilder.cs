@@ -55,12 +55,11 @@ public sealed class SchemataActorBuilder
     /// <summary>
     ///     Opens the opt-in state-persistence mechanism: an actor implementing
     ///     <see cref="IPersistentActor" /> has its state loaded before its first message and saved
-    ///     after every turn that completes without throwing. Registers the internal
-    ///     <see cref="ActorStateStore" /> - the only place this package adds it to the container
-    ///     (R8). <c>IRepository&lt;SchemataActor&gt;</c> is resolved from it, not registered by it:
-    ///     the application must register that repository itself.
+    ///     after every turn that completes without throwing. The runtime resolves the registered
+    ///     <see cref="ActorStateStore" /> from the final execution scope; a host needing
+    ///     tenant-specific constructor dependencies registers <see cref="ActorStateStore" /> in the
+    ///     tenant container explicitly.
     /// </summary>
-    /// <returns>This builder for chaining.</returns>
     public SchemataActorBuilder UsePersistence() {
         Services.TryAddScoped<ActorStateStore>();
 

@@ -102,20 +102,11 @@ public sealed class AdviceAuthorizeConsent<TApp, TAuth>(IAuthorizationManager<TA
         switch (authz.Application?.ConsentType) {
             case ConsentTypes.External:
                 if (consent) {
-                    throw new OAuthException(
-                        OAuthErrors.InvalidRequest,
-                        string.Format(
-                            SchemataResources.GetResourceString(SchemataResources.UNSUPPORTED_PROMPT),
-                            PromptValues.Consent
-                        )
-                    );
+                    throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.UNSUPPORTED_PROMPT, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = PromptValues.Consent });
                 }
 
                 if (!authorized) {
-                    throw new OAuthException(
-                        OAuthErrors.ConsentRequired,
-                        SchemataResources.GetResourceString(SchemataResources.USER_CONSENT_REQUIRED)
-                    );
+                    throw new OAuthException(OAuthErrors.ConsentRequired, SchemataResources.USER_CONSENT_REQUIRED);
                 }
 
                 authz.ConsentDecision = ConsentDecision.Granted;
@@ -143,10 +134,7 @@ public sealed class AdviceAuthorizeConsent<TApp, TAuth>(IAuthorizationManager<TA
                 }
 
                 if (none) {
-                    throw new OAuthException(
-                        OAuthErrors.ConsentRequired,
-                        SchemataResources.GetResourceString(SchemataResources.USER_CONSENT_REQUIRED)
-                    );
+                    throw new OAuthException(OAuthErrors.ConsentRequired, SchemataResources.USER_CONSENT_REQUIRED);
                 }
 
                 authz.ConsentDecision = ConsentDecision.Required;

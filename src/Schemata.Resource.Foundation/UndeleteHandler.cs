@@ -22,16 +22,19 @@ public sealed class UndeleteHandler<TEntity, TDetail>
     where TEntity : class, ICanonicalName, ISoftDelete
     where TDetail : class, ICanonicalName
 {
-    private readonly ISimpleMapper        _mapper;
-    private readonly IRepository<TEntity> _repository;
+    private readonly ISimpleMapper             _mapper;
+    private readonly IResourceMutation<TEntity> _mutation;
+    private readonly IRepository<TEntity>      _repository;
 
     /// <summary>
     ///     Initializes the built-in undelete handler.
     /// </summary>
     /// <param name="repository">The repository for the target resource.</param>
+    /// <param name="mutation">The resource mutation owner persisting the restore.</param>
     /// <param name="mapper">The mapper that creates the detail response.</param>
-    public UndeleteHandler(IRepository<TEntity> repository, ISimpleMapper mapper) {
+    public UndeleteHandler(IRepository<TEntity> repository, IResourceMutation<TEntity> mutation, ISimpleMapper mapper) {
         _repository = repository;
+        _mutation   = mutation;
         _mapper     = mapper;
     }
 
@@ -58,8 +61,7 @@ public sealed class UndeleteHandler<TEntity, TDetail>
         entity.DeleteTime = null;
         entity.PurgeTime  = null;
 
-        await _repository.UpdateAsync(entity, ct);
-        await _repository.CommitAsync(ct);
+        await _mutation.UpdateAsync(entity, null, Operations.Undelete, ct);
 
         var map = _mapper.Map<TEntity, TDetail>(entity);
         if (map is null) {

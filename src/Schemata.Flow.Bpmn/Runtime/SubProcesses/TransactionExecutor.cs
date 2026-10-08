@@ -31,13 +31,15 @@ public sealed class TransactionExecutor
     /// <param name="process">The process instance being started.</param>
     /// <param name="transaction">The transaction sub-process being entered.</param>
     /// <param name="execution">The scoped execution services for condition evaluation and observers.</param>
+    /// <param name="ct">Cancellation for token staging and transaction-child execution.</param>
     /// <returns>A snapshot with the parent token parked and the transaction child token spawned.</returns>
     public async ValueTask<ProcessSnapshot> EnterRootAsync(
         BpmnEngine            engine,
         ProcessDefinition     definition,
         SchemataProcess       process,
         TransactionSubProcess transaction,
-        FlowExecutionContext  execution
+        FlowExecutionContext  execution,
+        CancellationToken     ct = default
     ) {
         ArgumentNullException.ThrowIfNull(engine);
         ArgumentNullException.ThrowIfNull(definition);
@@ -45,6 +47,7 @@ public sealed class TransactionExecutor
         ArgumentNullException.ThrowIfNull(transaction);
 
         var parent = BpmnEngine.NewRootToken(process, new(transaction.Name, transaction.Name, false));
+        await execution.CreateTokenAsync(parent, ct);
         var parentTransition = BpmnEngine.NewTransition(
             process.Name!,
             parent.CanonicalName,
@@ -54,7 +57,7 @@ public sealed class TransactionExecutor
             "Start");
 
         var working = new List<SchemataProcessToken> { parent };
-        var spawned = await engine.SpawnSubProcessChildAsync(definition, process, transaction, parent, working, false, execution);
+        var spawned = await engine.SpawnSubProcessChildAsync(definition, process, transaction, parent, working, false, execution, ct);
         var transitions = new List<SchemataProcessTransition> { parentTransition, spawned.spawnTransition };
         if (spawned.parkTransition is not null) {
             transitions.Insert(1, spawned.parkTransition);
@@ -74,6 +77,7 @@ public sealed class TransactionExecutor
     /// <param name="transaction">The transaction sub-process being entered.</param>
     /// <param name="previousState">The previous element name used for the arrival transition.</param>
     /// <param name="execution">The scoped execution services for condition evaluation and observers.</param>
+    /// <param name="ct">Cancellation for token staging and transaction-child execution.</param>
     /// <returns>A snapshot with the parent token parked and the transaction child token spawned.</returns>
     public async ValueTask<ProcessSnapshot> EnterAsync(
         BpmnEngine                  engine,
@@ -83,7 +87,8 @@ public sealed class TransactionExecutor
         List<SchemataProcessToken>  working,
         TransactionSubProcess       transaction,
         string?                     previousState,
-        FlowExecutionContext        execution
+        FlowExecutionContext        execution,
+        CancellationToken           ct = default
     ) {
         ArgumentNullException.ThrowIfNull(engine);
         ArgumentNullException.ThrowIfNull(definition);
@@ -100,7 +105,7 @@ public sealed class TransactionExecutor
             TransitionKind.Move,
             "EnterTransaction");
 
-        var spawned = await engine.SpawnSubProcessChildAsync(definition, process, transaction, token, working, false, execution);
+        var spawned = await engine.SpawnSubProcessChildAsync(definition, process, transaction, token, working, false, execution, ct);
 
         BpmnEngine.ApplyAggregateState(process, working);
         return BpmnEngine.Snapshot(process, working, [arrivalTransition, spawned.spawnTransition], execution);
@@ -167,18 +172,18 @@ public sealed class TransactionExecutor
 
         var cancelBoundary = FindBoundary(definition, transaction, static e => e.Definition is CancelDefinition);
         if (cancelBoundary is not null) {
-            await FireBoundaryAsync(engine, definition, process, parent, working, cancelBoundary, transitions, cancelEnd.Definition?.Name ?? "Cancel", execution);
+            await FireBoundaryAsync(engine, definition, process, parent, working, cancelBoundary, transitions, cancelEnd.Definition?.Name ?? "Cancel", execution, ct);
             parent.State       = "Completed";
             parent.WaitingAtName = null;
         } else {
-            await ResumeParentAsync(engine, definition, process, parent, transaction, transitions, execution);
+            await ResumeParentAsync(engine, definition, process, parent, transaction, transitions, execution, ct);
         }
 
         var errorHandled = false;
         if (result.Failed is not null) {
             var errorBoundary = FindBoundary(definition, transaction, e => ErrorMatches(e.Definition, result.FailureReason));
             if (errorBoundary is not null) {
-                await FireBoundaryAsync(engine, definition, process, parent, working, errorBoundary, transitions, result.Failed.Activity.Name ?? "CompensationFailed", execution);
+                await FireBoundaryAsync(engine, definition, process, parent, working, errorBoundary, transitions, result.Failed.Activity.Name ?? "CompensationFailed", execution, ct);
                 errorHandled = true;
             }
         }
@@ -249,7 +254,8 @@ public sealed class TransactionExecutor
         SchemataProcessToken               parent,
         TransactionSubProcess              transaction,
         ICollection<SchemataProcessTransition> transitions,
-        FlowExecutionContext               execution
+        FlowExecutionContext               execution,
+        CancellationToken                  ct
     ) {
         var outFlow = definition.FirstOutgoing(transaction);
         if (outFlow is null) {
@@ -265,7 +271,7 @@ public sealed class TransactionExecutor
             BpmnEngine.TokenView(parent),
             execution,
             process,
-            parent);
+            parent, ct: ct);
         BpmnEngine.ApplyResolvedToToken(parent, resolved);
 
         transitions.Add(BpmnEngine.NewTransition(
@@ -286,7 +292,8 @@ public sealed class TransactionExecutor
         FlowEvent                          boundary,
         ICollection<SchemataProcessTransition> transitions,
         string                             eventName,
-        FlowExecutionContext               execution
+        FlowExecutionContext               execution,
+        CancellationToken                  ct
     ) {
         var outgoing = definition.FirstOutgoing(boundary);
         if (outgoing is null) {
@@ -295,15 +302,17 @@ public sealed class TransactionExecutor
                 new Dictionary<string, string?> { ["name"] = boundary.Name });
         }
 
+        var child = BpmnEngine.NewChildToken(process, new(outgoing.Target.Name, null, false), parent);
+        await execution.CreateTokenAsync(child, ct);
         var resolved = await engine.ResolveTargetAsync(
             definition,
             outgoing.Target,
             new(parent.Bookkeeping, StringComparer.Ordinal),
-            BpmnEngine.TokenView(parent),
+            BpmnEngine.TokenView(child),
             execution,
             process,
-            parent);
-        var child = BpmnEngine.NewChildToken(process, resolved, parent);
+            child, ct: ct);
+        BpmnEngine.ApplyResolvedToToken(child, resolved);
         working.Add(child);
 
         transitions.Add(BpmnEngine.NewTransition(

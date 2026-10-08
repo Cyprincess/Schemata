@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
@@ -24,10 +25,11 @@ public static class ParallelGatewayHandler
         SchemataProcess           process,
         ParallelGateway           pg,
         Dictionary<string, int>     variables,
-        FlowExecutionContext      execution
+        FlowExecutionContext      execution,
+        CancellationToken         ct = default
     ) {
         var outgoing = definition.Outgoing(pg).ToList();
-        return await engine.SpawnFromGatewayAsync(definition, process, pg, outgoing, variables, TransitionKind.Fork, execution);
+        return await engine.SpawnFromGatewayAsync(definition, process, pg, outgoing, variables, TransitionKind.Fork, execution, ct);
     }
 
     /// <summary>
@@ -42,10 +44,11 @@ public static class ParallelGatewayHandler
         List<SchemataProcessToken> working,
         ParallelGateway           pg,
         string?                   previousState,
-        FlowExecutionContext      execution
+        FlowExecutionContext      execution,
+        CancellationToken         ct = default
     ) {
         var outgoing = definition.Outgoing(pg).ToList();
-        return await engine.BranchFromTokenAsync(definition, process, token, working, pg, outgoing, previousState, TransitionKind.Fork, execution);
+        return await engine.BranchFromTokenAsync(definition, process, token, working, pg, outgoing, previousState, TransitionKind.Fork, execution, ct);
     }
 
     /// <summary>
@@ -60,7 +63,8 @@ public static class ParallelGatewayHandler
         List<SchemataProcessToken> working,
         ParallelGateway           pg,
         string?                   previousState,
-        FlowExecutionContext      execution
+        FlowExecutionContext      execution,
+        CancellationToken         ct = default
     ) {
         var incomingCount = definition.Incoming(pg).Count;
         var waitingHere   = working
@@ -74,6 +78,6 @@ public static class ParallelGatewayHandler
             return engine.ParkAtGateway(process, token, working, pg, previousState, execution);
         }
 
-        return await engine.FireJoinAsync(definition, process, token, working, pg, waitingHere, previousState, execution);
+        return await engine.FireJoinAsync(definition, process, token, working, pg, waitingHere, previousState, execution, ct);
     }
 }

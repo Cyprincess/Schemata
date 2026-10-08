@@ -29,9 +29,13 @@ public class JobExecutionCancellationShould
         executions.Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(), It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> query, CancellationToken _) => ToAsync(query(new[] { execution }.AsQueryable())));
         executions.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>?>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>? query, CancellationToken _) => new ValueTask<SchemataJobExecution?>(query!(new[] { execution }.AsQueryable()).SingleOrDefault()));
-        executions.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+                  .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>? query, CancellationToken _) => {
+                      Assert.NotNull(query);
+                      return new(query(new[] { execution }.AsQueryable()).SingleOrDefault());
+                  });
+        executions.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
         executions.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        executions.Setup(r => r.Begin()).Returns(CommittingUnit);
         var registry = new DefaultScheduledJobRegistry();
         registry.Register<BlockingJob>("jobs.blocking");
         var job = new BlockingJob();
@@ -42,7 +46,8 @@ public class JobExecutionCancellationShould
             .Returns(ValueTask.FromResult<SchemataJob?>(null));
         var running = new ConcurrentDictionary<string, CancellationTokenSource>();
         var scheduler = new Mock<IScheduler>();
-        var services = new ServiceCollection().AddSingleton(executions.Object).AddSingleton<IScheduledJobRegistry>(registry)
+        var services = new ServiceCollection().AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
+                                              .AddSingleton(executions.Object).AddSingleton<IScheduledJobRegistry>(registry)
                                               .AddSingleton(job).AddSingleton(running).AddSingleton(jobs.Object)
                                               .AddSingleton<IScheduler>(scheduler.Object).AddSchemataScheduling()
                                               .BuildServiceProvider();
@@ -63,6 +68,13 @@ public class JobExecutionCancellationShould
             yield return row;
             await Task.CompletedTask;
         }
+    }
+
+    private static IUnitOfWork CommittingUnit() {
+        var unit = new Mock<IUnitOfWork>(MockBehavior.Strict);
+        unit.Setup(u => u.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        unit.Setup(u => u.DisposeAsync()).Returns(ValueTask.CompletedTask);
+        return unit.Object;
     }
 
     private sealed class BlockingJob : IScheduledJob

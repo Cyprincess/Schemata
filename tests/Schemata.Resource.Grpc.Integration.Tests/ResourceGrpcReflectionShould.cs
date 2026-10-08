@@ -1,3 +1,9 @@
+using Grpc.Core;
+using ProtoBuf;
+using ProtoBuf.Meta;
+using Schemata.Abstractions.Resource;
+using Schemata.Transport.Grpc;
+using Schemata.Transport.Grpc.Proto;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,22 +22,6 @@ public class ResourceGrpcReflectionShould
 
     public ResourceGrpcReflectionShould(WebAppFactory factory) { _factory = factory; }
 
-    [Fact]
-    public async Task ListServices_IncludesStudentService() {
-        var channel = _factory.CreateGrpcChannel();
-        var client  = new ServerReflection.ServerReflectionClient(channel);
-
-        using var call = client.ServerReflectionInfo();
-        await call.RequestStream.WriteAsync(new() { ListServices = "" });
-        await call.RequestStream.CompleteAsync();
-
-        Assert.True(await call.ResponseStream.MoveNext(CancellationToken.None));
-        var response = call.ResponseStream.Current;
-
-        var services = response.ListServicesResponse.Service.Select(s => s.Name).ToList();
-
-        Assert.Contains(services, s => s.Contains("Student"));
-    }
 
     [Fact]
     public async Task FileDescriptor_HasCorrectFieldRenaming() {
@@ -66,6 +56,18 @@ public class ResourceGrpcReflectionShould
 
         Assert.Contains("students", allFields);
         Assert.DoesNotContain("entities", allFields);
+        var service = files.SelectMany(file => file.Service).Single(service => service.Name == "StudentService");
+        var get = service.Method.Single(method => method.Name == "GetStudent");
+        var package = files.Single(file => file.Service.Contains(service)).Package;
+        var model = RuntimeTypeModel.Create();
+        model.DefaultCompatibilityLevel = CompatibilityLevel.Level300;
+        SchemataProtoModelConfigurator.ConfigureType(model, typeof(GetRequest));
+        SchemataProtoModelConfigurator.ConfigureType(model, typeof(Student));
+        var method = new Method<GetRequest, Student>(MethodType.Unary, $"{package}.{service.Name}", get.Name,
+            GrpcMarshallers.Create<GetRequest>(model), GrpcMarshallers.Create<Student>(model));
+        using var missing = channel.CreateCallInvoker().AsyncUnaryCall(method, null, new(), new() { CanonicalName = "students/missing-reflection" });
+        var failure = await Assert.ThrowsAsync<RpcException>(async () => await missing.ResponseAsync);
+        Assert.Equal(StatusCode.NotFound, failure.StatusCode);
     }
 
     [Fact]

@@ -27,8 +27,8 @@ public class FlowTimerObserverShould
                                        It.IsAny<CancellationToken>()))
            .Callback<SchemataJob, IReadOnlyDictionary<string, string?>?,
                 CancellationToken>((job, vars, _) => {
-                    scheduled.Add(job.Name!);
-                    variables[job.Name!] = vars;
+                    scheduled.Add(job.Key!);
+                    variables[job.Key!] = vars;
                 })
            .Returns(SystemTask.CompletedTask);
         scheduler.Setup(s => s.UnscheduleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -97,7 +97,7 @@ public class FlowTimerObserverShould
         await handler.ArmAsync(Context(process, definition, null, "review"));
 
         var scheduled = Assert.Single(jobs);
-        Assert.Contains("review-timeout", scheduled.Name);
+        Assert.Contains("review-timeout", scheduled.Key);
     }
 
     [Fact]

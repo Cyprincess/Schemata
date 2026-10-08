@@ -1,43 +1,43 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Bpmn.Runtime.Boundary;
 
 /// <summary>
-///     Handles BPMN non-interrupting boundary events by spawning a sibling token on the boundary
-///     branch while leaving the attached host token unchanged.
+///     Records the staged sibling token for a non-interrupting boundary branch while preserving
+///     the attached host token.
 /// </summary>
 public sealed class NonInterruptingBoundaryHandler
 {
     /// <summary>
-    ///     Spawns a boundary-branch sibling token and returns the corresponding spawn transition.
+    ///     Records the boundary-branch sibling and its spawn transition.
     /// </summary>
-    internal SchemataProcessTransition Handle(
+    internal ValueTask<SchemataProcessTransition> HandleAsync(
         SchemataProcess            process,
-        SchemataProcessToken       hostToken,
+        SchemataProcessToken       spawned,
         List<SchemataProcessToken> working,
         FlowEvent                  boundary,
         TargetState     resolved,
         IEventDefinition           trigger
     ) {
         ArgumentNullException.ThrowIfNull(process);
-        ArgumentNullException.ThrowIfNull(hostToken);
+        ArgumentNullException.ThrowIfNull(spawned);
         ArgumentNullException.ThrowIfNull(working);
         ArgumentNullException.ThrowIfNull(boundary);
         ArgumentNullException.ThrowIfNull(resolved);
         ArgumentNullException.ThrowIfNull(trigger);
 
-        var spawned = BpmnEngine.NewChildToken(process, resolved, hostToken);
         working.Add(spawned);
 
-        return BpmnEngine.NewTransition(
+        return ValueTask.FromResult(BpmnEngine.NewTransition(
             process.Name!,
             spawned.CanonicalName,
             boundary.Name,
             resolved.StateName,
             TransitionKind.Spawn,
-            trigger.Name);
+            trigger.Name));
     }
 }

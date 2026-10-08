@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Entity.Repository;
+using Schemata.Abstractions.Entities;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
@@ -68,6 +70,27 @@ public class ProcessPersistenceCompensationShould
         Assert.Empty(rows);
     }
 
+    [Fact]
+    public async Task Preserve_Unchanged_Binding_Identity_And_Duplicate_Multiplicity() {
+        var retained = new SchemataProcessCompensation {
+            Uid = Guid.NewGuid(), Name = "consumer-binding", CanonicalName = "compensations/consumer-binding",
+            Process = "processes/p1", ScopeOwnerCanonicalName = "processes/p1", ActivityName = "activity", RegistrationOrder = 2,
+        };
+        var rows = new List<SchemataProcessCompensation> { retained };
+        var snapshot = new ProcessSnapshot {
+            Process = Process("Running"), Tokens = [], Transitions = [],
+            CompensationBindings = [new("processes/p1", "activity", 2), new("processes/p1", "activity", 2)],
+        };
+        var persistence = new ProcessPersistence();
+        await persistence.PersistSnapshotAsync(Scope(rows), snapshot, default);
+        Assert.Contains(rows, row => ReferenceEquals(row, retained));
+        Assert.Equal(2, rows.Count);
+        var uid = retained.Uid;
+        await persistence.PersistSnapshotAsync(Scope(rows), snapshot, default);
+        Assert.Equal(2, rows.Count);
+        Assert.Contains(rows, row => row.Uid == uid && row.Name == "consumer-binding");
+    }
+
     private static SchemataProcess Process(string state) {
         return new() {
             Name          = "p1",
@@ -83,7 +106,48 @@ public class ProcessPersistenceCompensationShould
             Repository<SchemataProcessToken>().Object,
             Repository<SchemataProcessTransition>().Object,
             Repository<SchemataProcessSource>().Object,
-            CompensationRepository(compensations).Object);
+            CompensationRepository(compensations).Object,
+            Services(compensations));
+    }
+
+    private static IServiceProvider Services(List<SchemataProcessCompensation> rows) {
+        var services = new ServiceCollection();
+        services.AddSingleton(Mutation<SchemataProcess>().Object);
+        services.AddSingleton(Mutation<SchemataProcessToken>().Object);
+        services.AddSingleton(Mutation<SchemataProcessTransition>().Object);
+        services.AddSingleton(Mutation<SchemataProcessSource>().Object);
+        services.AddSingleton(CompensationMutation(rows).Object);
+        return services.BuildServiceProvider();
+    }
+
+    private static Mock<IResourceMutation<SchemataProcessCompensation>> CompensationMutation(
+        List<SchemataProcessCompensation> rows
+    ) {
+        var mutation = Mutation<SchemataProcessCompensation>();
+        mutation.Setup(m => m.CreateAsync(
+                           It.IsAny<SchemataProcessCompensation>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()))
+                .Callback((SchemataProcessCompensation row, IUnitOfWork? _, CancellationToken _) => rows.Add(row))
+                .ReturnsAsync(MutationResult.Applied);
+        mutation.Setup(m => m.DeleteAsync(
+                           It.IsAny<SchemataProcessCompensation>(), It.IsAny<IUnitOfWork?>(), It.IsAny<Operations>(),
+                           It.IsAny<CancellationToken>()))
+                .Callback((SchemataProcessCompensation row, IUnitOfWork? _, Operations _, CancellationToken _) => rows.Remove(row))
+                .ReturnsAsync(MutationResult.Applied);
+        return mutation;
+    }
+
+    private static Mock<IResourceMutation<T>> Mutation<T>()
+        where T : class {
+        var mutation = new Mock<IResourceMutation<T>>();
+        mutation.Setup(m => m.CreateAsync(It.IsAny<T>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(MutationResult.Applied);
+        mutation.Setup(m => m.UpdateAsync(
+                       It.IsAny<T>(), It.IsAny<IUnitOfWork?>(), It.IsAny<Operations>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(MutationResult.Applied);
+        mutation.Setup(m => m.DeleteAsync(
+                       It.IsAny<T>(), It.IsAny<IUnitOfWork?>(), It.IsAny<Operations>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(MutationResult.Applied);
+        return mutation;
     }
 
     private static Mock<IRepository<T>> Repository<T>()
@@ -93,7 +157,7 @@ public class ProcessPersistenceCompensationShould
                              It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(),
                              It.IsAny<CancellationToken>()))
                   .Returns(new ValueTask<T?>((T?)null));
-        repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
         return repository;
     }
 
@@ -106,20 +170,6 @@ public class ProcessPersistenceCompensationShould
                              It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<SchemataProcessCompensation>, IQueryable<SchemataProcessCompensation>> query, CancellationToken _) =>
                       Async(query(rows.AsQueryable()).ToList()));
-        repository.Setup(r => r.RemoveRangeAsync(
-                             It.IsAny<IEnumerable<SchemataProcessCompensation>>(),
-                             It.IsAny<CancellationToken>()))
-                  .Returns((IEnumerable<SchemataProcessCompensation> values, CancellationToken _) => {
-                      rows.RemoveAll(row => values.Contains(row));
-                      return Task.CompletedTask;
-                  });
-        repository.Setup(r => r.AddRangeAsync(
-                             It.IsAny<IEnumerable<SchemataProcessCompensation>>(),
-                             It.IsAny<CancellationToken>()))
-                  .Returns((IEnumerable<SchemataProcessCompensation> values, CancellationToken _) => {
-                      rows.AddRange(values);
-                      return Task.CompletedTask;
-                  });
         return repository;
     }
 

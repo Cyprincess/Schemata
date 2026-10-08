@@ -46,7 +46,7 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
 
         services.TryAddSingleton(sp => {
             var registry   = sp.GetRequiredService<ResourceRegistry>();
-            var model      = RuntimeTypeModelConfigurator.Configure(registry);
+            var model      = RuntimeTypeModelConfigurator.Configure(registry, sp.GetServices<IGrpcRuntimeModelContributor>());
             var marshaller = ProtoBufMarshallerFactory.Create(model);
             var binder     = BinderConfiguration.Create([marshaller], new ResourceServiceBinder());
             return new ResourceBinderConfiguration(model, binder);

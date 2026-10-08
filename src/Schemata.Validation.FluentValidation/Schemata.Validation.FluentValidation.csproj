@@ -20,6 +20,8 @@
     <ProjectReference Include="..\Schemata.Abstractions\Schemata.Abstractions.csproj" />
     <ProjectReference Include="..\Schemata.Advice\Schemata.Advice.csproj" />
     <ProjectReference Include="..\Schemata.Validation.Skeleton\Schemata.Validation.Skeleton.csproj" />
+    <ProjectReference Include="..\Schemata.Messaging.Skeleton\Schemata.Messaging.Skeleton.csproj" />
+    <ProjectReference Include="..\Schemata.Security.Skeleton\Schemata.Security.Skeleton.csproj" />
   </ItemGroup>
 
 </Project>

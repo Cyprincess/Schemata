@@ -1,10 +1,14 @@
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Advice;
 using Schemata.Common;
+using Schemata.Entity.Repository;
+using Schemata.Security.Skeleton;
+using static Schemata.Security.Skeleton.AnonymousAccess;
 using Schemata.Resource.Foundation.Advisors;
 
 namespace Schemata.Resource.Foundation;
@@ -43,28 +47,6 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         CancellationToken? ct,
         bool               allowMissing = false
     ) {
-        var (result, _) = await DeleteAsync(name, etag, principal, ct, true, allowMissing);
-        return result;
-    }
-
-    /// <summary>
-    ///     Runs delete processing and returns both the wire result and the affected entity.
-    /// </summary>
-    /// <param name="name">The resource name.</param>
-    /// <param name="etag">The optional ETag for optimistic concurrency.</param>
-    /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
-    /// <param name="ct">A cancellation token.</param>
-    /// <param name="finalize">Whether to commit the repository and run response advisors.</param>
-    /// <param name="allowMissing">Whether a missing resource should produce an empty successful delete result.</param>
-    /// <returns>The delete result and the entity that was removed or soft-deleted.</returns>
-    internal async Task<(DeleteResultBase<TDetail> Result, TEntity? Entity)> DeleteAsync(
-        string             name,
-        string?            etag,
-        ClaimsPrincipal?   principal,
-        CancellationToken? ct,
-        bool               finalize,
-        bool               allowMissing = false
-    ) {
         ct ??= CancellationToken.None;
 
         var ctx = CreateAdviceContext();
@@ -82,7 +64,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
                          .RunAsync(ctx, req, container, principal, ct.Value), () => ResourceNotFound(name),
             () => new());
         if (requestResult is not null) {
-            return (requestResult, null);
+            return requestResult;
         }
 
         TEntity? entity;
@@ -91,9 +73,17 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         }
 
         if (entity is null) {
+            // Entitlement-filtered null and physical absence are indistinguishable; authorize
+            // the missing outcome before allow_missing's empty success or a NOT_FOUND — an
+            // unauthorized caller learns neither.
+            if (!IsAnonymous<TEntity>(nameof(Operations.Delete))
+             && _sp.GetKeyedService<ResourceAccessStage>(typeof(TEntity)) is { } access) {
+                await access.FinalizeMissingAsync<TEntity, DeleteRequest>(nameof(Operations.Delete), req, name, principal, ct.Value);
+            }
+
             // AIP-135 allow_missing treats deletion of an absent resource as a successful empty result.
             if (req.AllowMissing) {
-                return (new(), null);
+                return new();
             }
 
             throw ResourceNotFound(name);
@@ -103,16 +93,11 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             ctx, () => Advisor.For<IResourceDeleteAdvisor<TEntity>>().RunAsync(ctx, req, entity, principal, ct.Value),
             () => ResourceNotFound(name), () => new());
         if (entityResult is not null) {
-            return (entityResult, entity);
+            return entityResult;
         }
 
-        await _repository.RemoveAsync(entity, ct.Value);
-
-        if (!finalize) {
-            return (new(), entity);
-        }
-
-        await _repository.CommitAsync(ct.Value);
+        var mutation = _sp.GetRequiredService<IResourceMutation<TEntity>>();
+        await mutation.DeleteAsync(entity, null, Operations.Delete, ct.Value);
 
         // The remove advisors turn the removal into an update for ISoftDelete entities;
         // a populated DeleteTime after commit identifies the soft path, whose response
@@ -120,9 +105,9 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         if (entity is ISoftDelete { DeleteTime: not null }) {
             var detail = _mapper.Map<TEntity, TDetail>(entity);
 
-            return (new() { Detail = detail }, entity);
+            return new() { Detail = detail };
         }
 
-        return (new(), entity);
+        return new();
     }
 }

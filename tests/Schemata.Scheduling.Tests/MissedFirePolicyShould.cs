@@ -99,8 +99,11 @@ public class MissedFirePolicyShould
         var options = Options.Create(new SchemataSchedulingOptions {
             MissedFirePolicy = policy, MaxMissedWalk = maxMissedWalk,
         });
-        var services = new ServiceCollection().AddSingleton<IRepository<SchemataJob>>(CreateJobRepository(scheduled))
+        var jobRepository = CreateJobRepository(scheduled);
+        var services = new ServiceCollection().AddSingleton(jobRepository)
+                                              .AddSingleton(CreateJobMutation(jobRepository))
                                               .AddSingleton<IRepository<SchemataJobExecution>>(executions.Repository)
+                                              .AddSingleton(executions.Mutation)
                                               .AddSingleton<IOptions<SchemataSchedulingOptions>>(options)
                                               .AddSingleton<TimeProvider>(clock)
                                               .AddSingleton<IScheduledJobRegistry>(registry)
@@ -110,7 +113,7 @@ public class MissedFirePolicyShould
         var scheduler  = services.GetRequiredService<DefaultScheduler>();
         var dispatcher = new JobExecutionDispatcher(services, time: clock);
 
-        return new SchedulerFixture(services, scheduler, dispatcher, job);
+        return new(services, scheduler, dispatcher, job);
     }
 
     private static SchemataJob CreateCronJob(DateTime nextRunTime) {
@@ -134,13 +137,45 @@ public class MissedFirePolicyShould
 
     private static IRepository<SchemataJob> CreateJobRepository(SchemataJob job) {
         var repository = new Mock<IRepository<SchemataJob>>();
+        repository.Setup(r => r.Begin()).Returns(CommittingUnitOfWork());
         repository.Setup(r => r.FirstOrDefaultAsync(
                             It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(),
                             It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>> query, CancellationToken _) =>
                                ValueTask.FromResult<SchemataJob?>(query(new[] { job }.AsQueryable()).FirstOrDefault()));
 
+        repository.Setup(r => r.AddAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
+        repository.Setup(r => r.UpdateAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
         return repository.Object;
+    }
+
+    private static IResourceMutation<SchemataJob> CreateJobMutation(IRepository<SchemataJob> repository) {
+        var mutation = new Mock<IResourceMutation<SchemataJob>>();
+        mutation.Setup(m => m.CreateAsync(It.IsAny<SchemataJob>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()))
+                .Returns((SchemataJob entity, IUnitOfWork? _, CancellationToken c) => CreateAsync(repository, entity, c));
+        mutation.Setup(m => m.UpdateAsync(
+                       It.IsAny<SchemataJob>(), It.IsAny<IUnitOfWork?>(), It.IsAny<Schemata.Abstractions.Entities.Operations>(),
+                       It.IsAny<CancellationToken>()))
+                .Returns((SchemataJob entity, IUnitOfWork? _, Schemata.Abstractions.Entities.Operations _, CancellationToken c) =>
+                             UpdateAsync(repository, entity, c));
+        return mutation.Object;
+
+        static async Task<MutationResult> CreateAsync(IRepository<SchemataJob> inner, SchemataJob entity, CancellationToken c) {
+            await inner.AddAsync(entity, c);
+            return MutationResult.Applied;
+        }
+
+        static async Task<MutationResult> UpdateAsync(IRepository<SchemataJob> inner, SchemataJob entity, CancellationToken c) {
+            await inner.UpdateAsync(entity, c);
+            return MutationResult.Applied;
+        }
+    }
+
+    private static IUnitOfWork CommittingUnitOfWork() {
+        var unit = new Mock<IUnitOfWork>();
+        unit.Setup(work => work.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        unit.Setup(work => work.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        return unit.Object;
     }
 
     private static async IAsyncEnumerable<SchemataJobExecution> ToAsync(IEnumerable<SchemataJobExecution> rows) {
@@ -192,15 +227,33 @@ public class MissedFirePolicyShould
             repository.Setup(r => r.Begin()).Returns(unitOfWork.Object);
             repository.Setup(r => r.AddAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
                       .Callback<SchemataJobExecution, CancellationToken>((row, _) => _rows.Add(row))
-                      .Returns(Task.CompletedTask);
+                      .ReturnsAsync(MutationResult.Applied);
             repository.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
-                      .Returns(Task.CompletedTask);
+                      .ReturnsAsync(MutationResult.Applied);
             repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
             Repository = repository.Object;
+
+            var mutation = new Mock<IResourceMutation<SchemataJobExecution>>();
+            mutation.Setup(m => m.CreateAsync(
+                               It.IsAny<SchemataJobExecution>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()))
+                    .Returns(async (SchemataJobExecution entity, IUnitOfWork? _, CancellationToken c) => {
+                         await Repository.AddAsync(entity, c);
+                         return MutationResult.Applied;
+                     });
+            mutation.Setup(m => m.UpdateAsync(
+                               It.IsAny<SchemataJobExecution>(), It.IsAny<IUnitOfWork?>(),
+                               It.IsAny<Schemata.Abstractions.Entities.Operations>(), It.IsAny<CancellationToken>()))
+                    .Returns(async (SchemataJobExecution entity, IUnitOfWork? _, Schemata.Abstractions.Entities.Operations _, CancellationToken c) => {
+                         await Repository.UpdateAsync(entity, c);
+                         return MutationResult.Applied;
+                     });
+            Mutation = mutation.Object;
         }
 
         internal IRepository<SchemataJobExecution> Repository { get; }
+
+        internal IResourceMutation<SchemataJobExecution> Mutation { get; }
     }
 
     private sealed class MutableClock(DateTimeOffset start) : TimeProvider
@@ -217,6 +270,7 @@ public class MissedFirePolicyShould
         internal List<DateTime> Fires { get; } = [];
 
         public Task ExecuteAsync(JobContext context, CancellationToken ct) {
+            Assert.NotNull(context.StartTime);
             Fires.Add(context.StartTime!.Value);
             return Task.CompletedTask;
         }

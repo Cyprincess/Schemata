@@ -1,8 +1,8 @@
-using System.Linq;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
-using Schemata.Entity.Repository;
+using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Event.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
@@ -13,8 +13,10 @@ namespace Schemata.Entity.Event.Advisors;
 public static class AdviceCommittedPendingEvents
 {
     /// <summary>
-    ///     Default execution order: <see cref="Orders.Max" /> minus 1000, so pending events are
-    ///     published before the query cache is evicted at <see cref="Orders.Max" />.
+    ///     Default execution order within the resource segment: <see cref="Orders.Max" /> minus 1000.
+    ///     Query-cache eviction is structural instead: it runs in the repository segment
+    ///     (<see cref="Schemata.Entity.Repository.CommitOrders.Repository" />), which always precedes
+    ///     the resource segment this advisor's callbacks are enlisted in.
     /// </summary>
     public const int DefaultOrder = Orders.Max - 1_000;
 }
@@ -25,17 +27,18 @@ public static class AdviceCommittedPendingEvents
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Committed advisors run from the unit of work's commit sink only; the rollback sink runs a
-///         different path. A transaction that rolls back therefore never reaches this advisor, which
-///         is what makes buffering — rather than publishing at mutation time — the correct shape.
+///         <see cref="Prepare" /> retains the entity reference and returns the publishing callback;
+///         the callback runs from the unit of work's commit sinks only, so a rolled-back transaction
+///         never publishes. Buffering — rather than publishing at mutation time — is what keeps the
+///         event stream consistent with the committed state.
 ///     </para>
 ///     <para>
-///         All three change lists are walked. A removed aggregate can have raised events before it
-///         was deleted, and dropping those would lose exactly the facts a consumer needs most.
+///         When several mutations capture the same entity, only the first callback to run observes the
+///         buffered events: draining dequeues them.
 ///     </para>
 /// </remarks>
-/// <typeparam name="TEntity">The entity type whose committed changes may carry pending events.</typeparam>
-internal sealed class AdviceCommittedPendingEvents<TEntity> : IRepositoryCommittedAdvisor<TEntity>
+/// <typeparam name="TEntity">The entity type whose committed mutations may carry pending events.</typeparam>
+internal sealed class AdviceCommittedPendingEvents<TEntity> : IResourceMutationCommittedAdvisor<TEntity>
     where TEntity : class
 {
     private readonly IEventBus _bus;
@@ -52,27 +55,20 @@ internal sealed class AdviceCommittedPendingEvents<TEntity> : IRepositoryCommitt
     /// <param name="bus">The event bus.</param>
     public AdviceCommittedPendingEvents(IEventBus bus) { _bus = bus; }
 
-    #region IRepositoryCommittedAdvisor<TEntity> Members
+    #region IResourceMutationCommittedAdvisor<TEntity> Members
 
     public int Order => AdviceCommittedPendingEvents.DefaultOrder;
 
-    public async Task<AdviseResult> AdviseAsync(
-        AdviceContext          ctx,
-        IRepository<TEntity>   repository,
-        CommitChanges<TEntity> changes,
-        CancellationToken      ct = default
-    ) {
-        foreach (var entity in changes.Added.Concat(changes.Updated).Concat(changes.Removed)) {
-            if (entity is not IHasPendingEvents source) {
-                continue;
-            }
+    public Func<CancellationToken, Task>? Prepare(TEntity entity, Operations operation) {
+        if (entity is not IHasPendingEvents source) {
+            return null;
+        }
 
+        return async ct => {
             foreach (var @event in source.DequeuePendingEvents()) {
                 await _bus.PublishAsync(@event, ct);
             }
-        }
-
-        return AdviseResult.Continue;
+        };
     }
 
     #endregion

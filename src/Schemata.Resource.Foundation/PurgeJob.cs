@@ -25,15 +25,19 @@ public sealed class PurgeJob<TEntity> : IScheduledJob
     where TEntity : class, ICanonicalName, ISoftDelete
 {
     private const int SampleLimit = 100;
+    private const int PageSize = 100;
 
-    private readonly IRepository<TEntity> _repository;
-    private readonly IServiceProvider     _services;
+    private readonly IResourceMutation<TEntity> _mutation;
+    private readonly IRepository<TEntity>      _repository;
+    private readonly IServiceProvider          _services;
 
     /// <summary>Initializes the durable purge executor.</summary>
     /// <param name="repository">The repository of the purged resource.</param>
+    /// <param name="mutation">The resource mutation owner persisting each physical removal.</param>
     /// <param name="services">The service provider for resolving expression compilers.</param>
-    public PurgeJob(IRepository<TEntity> repository, IServiceProvider services) {
+    public PurgeJob(IRepository<TEntity> repository, IResourceMutation<TEntity> mutation, IServiceProvider services) {
         _repository = repository;
+        _mutation   = mutation;
         _services   = services;
     }
 
@@ -63,6 +67,7 @@ public sealed class PurgeJob<TEntity> : IScheduledJob
         var container  = new ResourceRequestContainer<TEntity>();
         ResourceIdentifiers.ApplyParent(container, parent);
 
+        await using var unit = force ? _repository.Begin() : null;
         var result = new PurgeResponse();
         using (_repository.SuppressQuerySoftDelete()) {
             result.PurgeCount = await _repository.LongCountAsync(Query, ct);
@@ -81,14 +86,29 @@ public sealed class PurgeJob<TEntity> : IScheduledJob
             return result;
         }
 
+        string? cursor = null;
         using (_repository.SuppressQuerySoftDelete()) {
-            await foreach (var row in _repository.ListAsync(Query, ct)) {
-                using var removeSuppression = _repository.SuppressSoftDelete();
-                await _repository.RemoveAsync(row, ct);
+            while (true) {
+                ct.ThrowIfCancellationRequested();
+                var page = await _repository.ListAsync(q => {
+                    var query = Query(q);
+                    if (cursor is not null) {
+                        query = query.Where(row => string.Compare(row.CanonicalName, cursor) > 0);
+                    }
+
+                    return query.OrderBy(row => row.CanonicalName).Take(PageSize);
+                }, ct).ToListAsync(ct);
+                if (page.Count == 0) break;
+
+                cursor = page[^1].CanonicalName;
+                foreach (var row in page) {
+                    ct.ThrowIfCancellationRequested();
+                    await _mutation.DeleteAsync(row, unit, Operations.Purge, ct);
+                }
             }
         }
 
-        await _repository.CommitAsync(ct);
+        await unit!.CommitAsync(ct);
 
         return result;
 

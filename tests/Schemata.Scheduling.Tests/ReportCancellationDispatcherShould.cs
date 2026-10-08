@@ -7,6 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
+using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Runtime;
 using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Foundation.Runtime;
 using Schemata.Scheduling.Skeleton;
@@ -27,11 +29,13 @@ public class ReportCancellationDispatcherShould
                        It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(),
                        It.IsAny<CancellationToken>()))
             .Returns(ValueTask.FromResult<SchemataJob?>(null));
-        var services = new ServiceCollection().AddScoped<IRepository<SchemataJobExecution>>(_ => CreateRepository(storage).Object)
+        var services = new ServiceCollection().AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
+                                              .AddScoped<IRepository<SchemataJobExecution>>(_ => CreateRepository(storage).Object)
                                                .AddSingleton<IScheduledJobRegistry>(registry)
                                                .AddSingleton(new CancellingJob(storage.Cancel))
                                                .AddSingleton(jobs.Object)
                                                .AddSingleton<IScheduler>(Mock.Of<IScheduler>())
+                                               .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
                                                .BuildServiceProvider();
         var dispatcher = new JobExecutionDispatcher(services);
 
@@ -51,8 +55,14 @@ public class ReportCancellationDispatcherShould
                   });
         repository.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
                   .Callback<SchemataJobExecution, CancellationToken>((row, _) => storage.Update(row))
-                  .Returns(Task.CompletedTask);
+                  .ReturnsAsync(MutationResult.Applied);
         repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        repository.Setup(r => r.Begin()).Returns(() => {
+            var unit = new Mock<IUnitOfWork>(MockBehavior.Strict);
+            unit.Setup(u => u.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+            unit.Setup(u => u.DisposeAsync()).Returns(ValueTask.CompletedTask);
+            return unit.Object;
+        });
         return repository;
     }
 

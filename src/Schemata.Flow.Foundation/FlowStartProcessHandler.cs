@@ -22,6 +22,7 @@ public sealed class FlowStartProcessHandler(
         var principal = request.Principal;
 
         var options = new StartProcessOptions {
+            DefinitionVersion = request.DefinitionVersion,
             DisplayName    = request.DisplayName,
             Description    = request.Description,
             IdempotencyKey = request.IdempotencyKey,

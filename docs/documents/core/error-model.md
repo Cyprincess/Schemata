@@ -13,8 +13,7 @@ exception becomes a generic 500 with a request trace identifier.
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Schemata.Abstractions`   | `Exceptions/SchemataException.cs` and one file per subclass                                                                                                                                                                      |
 | `Schemata.Abstractions`   | `Errors/ErrorResponse.cs`, `Errors/ErrorBody.cs`, `Errors/IErrorDetail.cs`                                                                                                                                                       |
-| `Schemata.Abstractions`   | `Errors/BadRequestDetail.cs`, `Errors/ErrorFieldViolation.cs`, `Errors/ErrorInfoDetail.cs`, `Errors/PreconditionFailureDetail.cs`, `Errors/QuotaFailureDetail.cs`, `Errors/RequestInfoDetail.cs`, `Errors/ResourceInfoDetail.cs` |
-| `Schemata.Abstractions`   | `SchemataConstants.cs` (`ErrorCodes` for `google.rpc.Code` names; `ErrorReasons` for framework-default `ErrorInfo.reason` identifiers)                                                                                           |
+| `Schemata.Abstractions`   | `SchemataConstants.cs` (`ErrorCodes` for `google.rpc.Code` names; `ErrorReasons` for framework-default `ErrorInfo.reason` identifiers; `ErrorDomains` for the per-exception-family `ErrorInfo.domain` namespaces)                                                                                  |
 | `Schemata.Transport.Http` | `Features/SchemataTransportHttpFeature.cs`                                                                                                                                                                                       |
 
 ## Envelope
@@ -99,33 +98,53 @@ distinguish two independent identifiers, and the framework keeps them strictly s
   **further-identifies** the error. Per the AIP, its existence is justified precisely because
   the ~20 top-level Codes cannot disambiguate errors across a real service surface.
 
-Reusing the Status name as Reason (`Status=NOT_FOUND` paired with `Reason="NOT_FOUND"`)
-contributes zero disambiguation and is forbidden. Named framework exceptions attach a
-domain-specific default from `SchemataConstants.ErrorReasons` (for example `RESOURCE_NOT_FOUND`
-for `NotFoundException`, `CONCURRENCY_MISMATCH` for `AbortedException`); throw sites with
-finer context override via the constructor's `reason:` argument or by appending an explicit
-`ErrorInfoDetail` to `Details`.
+Named framework exceptions use their `resourceKey` as `ErrorInfo.Reason`; that key identifies the
+business template and its arguments. Domain exceptions may keep a separate canonical reason and
+override `MessageResourceKey` for locale lookup. Caller-owned descriptions use an explicit factory
+such as `OAuthException.FromDescription` or the base `SchemataException` constructor, rather than a
+keyed constructor with a sentence as its key.
 
-`CreateErrorResponse(requestId, domain, locale)` builds the envelope:
+`CreateErrorResponse(requestId, locale)` builds the envelope. The `ErrorInfo.domain` value comes
+from the exception itself through the overridable `SchemataException.Domain` property
+(`SchemataConstants.ErrorDomains`); callers no longer pass a domain:
 
-1. `EnsureErrorInfo` inserts a fallback `ErrorInfoDetail` whose `Reason` mirrors the Status
-   only when the throw site supplied no `ErrorInfoDetail`. This is a safety net for raw
-   `SchemataException` throws, not a recommended shape — every named exception attaches its
-   own domain-specific reason and bypasses the fallback.
+1. `EnsureErrorInfo` inserts a fallback `ErrorInfoDetail` whose `Reason` mirrors the Status only
+   when the throw site supplied no `ErrorInfoDetail`, and assigns the exception's domain to every
+   existing `ErrorInfoDetail` that lacks one. Explicit domains set by throw sites stay untouched.
+   The insert path is a safety net for raw `SchemataException` throws, not a recommended shape —
+   every named exception attaches its own domain-specific reason and bypasses the fallback.
 2. `EnsureRequestInfo` appends a `RequestInfoDetail` when a request id is supplied.
-3. `EnsureLocalizedMessage` appends a `LocalizedMessageDetail` when a BCP-47 `locale` resolves
-   an entry in `SchemataResources`. The helper tries `ErrorInfoDetail.Reason` first; if that
-   key is absent from the resx, it falls back to the `Status` name. The template is formatted
-   against the values of `ErrorInfoDetail.Metadata` in insertion order, so a specific reason
-   (`RESOURCE_NOT_FOUND`) and the generic Status (`NOT_FOUND`) can share the same translated
-   text without duplicate resx entries. The helper silently skips on null locale, unresolvable
-   culture, both keys missing, format error, or when a `LocalizedMessageDetail` is already
-   attached.
+3. `EnsureLocalizedMessage` resolves the exception's `MessageResourceKey` when supplied, otherwise
+   `ErrorInfoDetail.Reason`, then the canonical status key. It substitutes named metadata into the
+   locale-specific template. An absent locale or unresolvable resource leaves the detail absent.
+
+Framework error producers construct exceptions from a resx template key plus named arguments
+(`new OAuthException(error, SchemataResources.NOT_EMPTY, args)`, `new NotFoundException(resourceKey, args)`):
+the developer-facing message renders once with the invariant culture and the localized detail
+re-renders the same template with the same arguments for the requested locale, so the two
+variants cannot drift apart.
+
+`InsightValidationException` in `Schemata.Insight.Foundation/Planning` derives from the common base.
+Its constructor accepts `(reason, resourceKey, metadata, innerException)`, attaches one `ErrorInfo`
+with domain `schemata.insight`, and owns the HTTP/canonical classification: unknown source is
+404/`NOT_FOUND`, unsupported plan is 501/`UNIMPLEMENTED`, and other request rejections are
+400/`INVALID_ARGUMENT`. Both transport boundaries preserve that exception directly.
+
+New framework templates are synchronized to every existing `Schemata.Abstractions/xlf` catalog.
+English entries marked `state="new"` remain pending translation; their presence is not evidence of
+a completed translation. Satellite production retains the framework's existing localization build
+configuration.
+
 
 Subclasses override `CreateErrorResponse` to produce protocol-specific envelopes — `OAuthException`
-returns an `OAuthErrorResponse` per RFC 6749 and propagates the uppercased OAuth `error` value
-into `ErrorInfoDetail.Reason` (e.g. `invalid_grant` → `INVALID_GRANT`), and `NoContentException`
-returns `null` so no body is written.
+returns an `OAuthErrorResponse` per RFC 6749, propagates the uppercased OAuth `error` value into a
+fallback `ErrorInfoDetail.Reason` (e.g. `invalid_grant` → `INVALID_GRANT`) when the exception
+carries no `ErrorInfoDetail` (the resx-keyed constructor always attaches one), and percent-encodes any character outside the RFC 6749
+`error_description` vocabulary (`%x20-21 / %x23-5B / %x5D-7E`) so the decoded description always
+satisfies the wire contract. Extension points that own their validation text
+(`IAuthorizationDetailTypeDescriptor.Validate`) build the exception through
+`OAuthException.FromDescription(error, description)`. `NoContentException` returns `null` so no
+body is written.
 
 ### SchemataResourceErrors factory
 
@@ -173,6 +192,12 @@ throw SchemataResourceErrors.PermissionDenied<Book>(
 | `TenantResolveException`      | 400       | `FAILED_PRECONDITION` | Unable to resolve tenant for the current request.             |
 | `QuotaExceededException`      | 429       | `RESOURCE_EXHAUSTED`  | Rate limit exceeded.                                          |
 | `NoContentException`          | 204       | `OK`                  | _(none)_                                                      |
+
+Rate-limit policies can expose `QuotaMetadata.Subject` on their rejected lease to identify the
+actual quota partition. Otherwise Core uses the authenticated `sub`, name identifier, or name,
+then client IP; the fallback includes the current tenant identity when present. Lease
+`MetadataName.RetryAfter` becomes `RetryInfoDetail` and the HTTP transport emits ceiling-seconds
+`Retry-After`. Application `OnRejected` runs first; a started response remains application-owned.
 
 `ValidationException` takes a set of `ErrorFieldViolation` values and wraps them in a
 `BadRequestDetail`. `NoContentException` signals a successful body-less response, used by

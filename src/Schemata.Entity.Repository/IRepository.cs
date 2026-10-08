@@ -23,9 +23,10 @@ public interface IRepository : IAsyncDisposable, IDisposable
     AdviceContext AdviceContext { get; }
 
     /// <summary>
-    ///     Begins a unit of work bound to this repository's data context. The first
-    ///     <see cref="Join" /> on the returned unit of work opens the underlying connection
-    ///     and transaction; subsequent enlistments share that context.
+    ///     Begins a caller-owned unit of work bound to this repository's data context and enlists
+    ///     this repository in it. The returned unit of work is one-shot and caller-owned: after
+    ///     <see cref="IUnitOfWork.CommitAsync" /> / <see cref="IUnitOfWork.RollbackAsync" /> /
+    ///     disposal it never reopens; resolve a fresh repository to start new work.
     /// </summary>
     /// <returns>A new unit of work that callers must commit, roll back, or dispose.</returns>
     IUnitOfWork Begin();
@@ -38,7 +39,10 @@ public interface IRepository : IAsyncDisposable, IDisposable
     void Join(IUnitOfWork uow);
 
     /// <summary>
-    ///     Persists all pending changes to the underlying data store.
+    ///     Persists all pending changes through the repository's implicit write unit of work and
+    ///     reopens the repository for subsequent work. Throws when the repository is enlisted in a
+    ///     caller-owned unit of work — commit that unit of work instead. A commit with no staged
+    ///     writes sends no committed notification.
     /// </summary>
     /// <param name="ct">A cancellation token.</param>
     Task CommitAsync(CancellationToken ct = default);
@@ -205,18 +209,18 @@ public interface IRepository<TEntity> : IRepository
     );
 
     /// <summary>
-    ///     Estimates the number of entities matching the predicate. Defaults to the exact
-    ///     <see cref="LongCountAsync{TResult}" />; providers with cheaper statistics
-    ///     (e.g. table cardinality estimates) can override.
+    ///     Estimates the number of results after query scoping. Returns <see langword="null" />
+    ///     when the provider or query shape cannot supply an estimate.
     /// </summary>
     /// <typeparam name="TResult">The projected result type.</typeparam>
     /// <param name="predicate">An optional query transformation.</param>
     /// <param name="ct">A cancellation token.</param>
-    ValueTask<long> EstimateCountAsync<TResult>(
+    ValueTask<long?> EstimateCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
     ) {
-        return LongCountAsync(predicate, ct);
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult<long?>(null);
     }
 
     /// <summary>
@@ -225,7 +229,7 @@ public interface IRepository<TEntity> : IRepository
     /// </summary>
     /// <param name="entity">The entity to persist.</param>
     /// <param name="ct">A cancellation token.</param>
-    Task AddAsync(TEntity entity, CancellationToken ct = default);
+    Task<MutationResult> AddAsync(TEntity entity, CancellationToken ct = default);
 
     /// <summary>
     ///     Drives each entity through the add advisor pipeline before persistence.
@@ -240,7 +244,7 @@ public interface IRepository<TEntity> : IRepository
     /// </summary>
     /// <param name="entity">The entity to persist with updated values.</param>
     /// <param name="ct">A cancellation token.</param>
-    Task UpdateAsync(TEntity entity, CancellationToken ct = default);
+    Task<MutationResult> UpdateAsync(TEntity entity, CancellationToken ct = default);
 
     /// <summary>
     ///     Drives the entity through the remove advisor pipeline
@@ -251,7 +255,7 @@ public interface IRepository<TEntity> : IRepository
     /// </summary>
     /// <param name="entity">The entity to remove.</param>
     /// <param name="ct">A cancellation token.</param>
-    Task RemoveAsync(TEntity entity, CancellationToken ct = default);
+    Task<MutationResult> RemoveAsync(TEntity entity, CancellationToken ct = default);
 
     /// <summary>
     ///     Drives each entity through the remove advisor pipeline.

@@ -169,6 +169,7 @@ public class FlowTransportSourceBindingShould
 
             var services = new ServiceCollection()
                           .AddLogging()
+                          .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                           .AddSingleton(Registry.Object)
                           .AddSingleton<IOptions<SchemataFlowOptions>>(Options.Create(new SchemataFlowOptions()));
             if (registerOrderRepository) {
@@ -237,12 +238,11 @@ public class FlowTransportSourceBindingShould
             Name          = "approval",
             Engine        = "StateMachine",
             Definition    = new() { Name = "approval" },
-            Configuration = new() { Name = "approval" },
             SourceTypes = sourceTypes ?? new Dictionary<string, FlowSourceDescriptor> { ["order"] = Descriptor("order") },
         };
 
         var registry = new Mock<IProcessRegistry>(MockBehavior.Strict);
-        registry.Setup(r => r.GetRegistration("approval")).Returns(registration);
+        registry.Setup(r => r.GetRegistration("approval", "1")).Returns(registration);
         return registry;
     }
 
@@ -278,11 +278,12 @@ public class FlowTransportSourceBindingShould
         repository.Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => EnumerateAsync(predicate(data.AsQueryable())));
         repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>()))
-                  .Returns((T entity, CancellationToken _) => {
+                  .ReturnsAsync((T entity, CancellationToken _) => {
+                      FlowTestCreation.Assign(entity);
                       data.Add(entity);
-                      return Task.CompletedTask;
+                      return MutationResult.Applied;
                   });
-        repository.Setup(r => r.UpdateAsync(It.IsAny<T>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        repository.Setup(r => r.UpdateAsync(It.IsAny<T>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
         return repository;
     }
 
@@ -327,7 +328,7 @@ public class FlowTransportSourceBindingShould
                        WaitingAtName = "review",
                        State         = "Waiting",
                    };
-                   return new ValueTask<ProcessSnapshot>(new ProcessSnapshot { Process = process, Tokens = [token], Transitions = [] });
+                   return new(new ProcessSnapshot { Process = process, Tokens = [token], Transitions = [] });
                });
         return runtime.Object;
     }
@@ -351,12 +352,12 @@ public class FlowTransportSourceBindingShould
                        StateName     = "review",
                        State         = "Active",
                    };
-                   return new ValueTask<ProcessSnapshot>(new ProcessSnapshot {
+                   return new(new ProcessSnapshot {
                        Process = process,
                        Tokens = [token],
                        Transitions = [
-                           new() { Token = token.CanonicalName, Event = "Start" },
-                           new() { Token = token.CanonicalName, Event = "Start" },
+                           new() { Process = token.Process, Token = token.CanonicalName, Event = "Start" },
+                           new() { Process = token.Process, Token = token.CanonicalName, Event = "Start" },
                        ],
                    });
                });

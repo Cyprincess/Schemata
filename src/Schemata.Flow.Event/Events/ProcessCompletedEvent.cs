@@ -11,4 +11,6 @@ public sealed class ProcessCompletedEvent : IEvent
     /// <summary>Registered process definition name.</summary>
     public string DefinitionName { get; init; } = null!;
 
+    public string DefinitionVersion { get; init; } = null!;
+
 }

@@ -32,7 +32,7 @@ public class DslNamedBindingShould
         var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1" };
         var token   = Token("processes/p1/tokens/a", definition.Review.Name);
 
-        var snapshot = await engine.AdvanceAsync(definition, process, [token], new(Mock.Of<IUnitOfWork>(), services));
+        var snapshot = await engine.AdvanceAsync(definition, process, [token], FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), services));
 
         Assert.Equal(definition.Paid.Name, snapshot.Tokens[0].StateName);
     }
@@ -60,7 +60,7 @@ public class DslNamedBindingShould
                       .BuildServiceProvider();
         var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1" };
 
-        await engine.StartAsync(definition, process, new(Mock.Of<IUnitOfWork>(), services));
+        await engine.StartAsync(definition, process, FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), services));
 
         Assert.Equal(["orders/o1"], definition.Seen);
     }
@@ -117,8 +117,8 @@ public class DslNamedBindingShould
         public AnonymousProcedureProcess() {
             this.Start().Go(Current);
             this.During(Current)
-                .OnEnter(_ => ValueTask.CompletedTask)
-                .OnLeave(_ => ValueTask.CompletedTask)
+                .OnEnter((_, ct) => { ct.ThrowIfCancellationRequested(); return ValueTask.CompletedTask; })
+                .OnLeave((_, ct) => { ct.ThrowIfCancellationRequested(); return ValueTask.CompletedTask; })
                 .Go(Next);
             this.During(Next).End();
         }
@@ -136,7 +136,8 @@ public class DslNamedBindingShould
     {
         public TypedEnterProcess() {
             this.Start().Go(Current);
-            this.During(Current).OnEnter<Order>((_, order) => {
+            this.During(Current).OnEnter<Order>((_, order, ct) => {
+                ct.ThrowIfCancellationRequested();
                 Seen.Add(order.CanonicalName!);
                 return ValueTask.CompletedTask;
             }).End();

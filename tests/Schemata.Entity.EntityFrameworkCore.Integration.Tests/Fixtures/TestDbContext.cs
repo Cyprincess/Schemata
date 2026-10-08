@@ -9,4 +9,8 @@ public class TestDbContext : DbContext
     public DbSet<Student> Students { get; set; } = null!;
 
     public DbSet<Course> Courses { get; set; } = null!;
+
+    public DbSet<NestedThing> NestedThings { get; set; } = null!;
+
+    public DbSet<StampedNestedThing> StampedNestedThings { get; set; } = null!;
 }

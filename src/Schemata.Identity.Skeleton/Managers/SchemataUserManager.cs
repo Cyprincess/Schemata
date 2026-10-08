@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Schemata.Common;
 using Schemata.Identity.Skeleton.Stores;
 
 namespace Schemata.Identity.Skeleton.Managers;
@@ -33,6 +35,17 @@ public class SchemataUserManager<TUser> : UserManager<TUser>
         ILogger<SchemataUserManager<TUser>>    logger
     ) : base(store, options, passwordHasher, userValidators, passwordValidators, keyNormalizer, errors, sp, logger) {
         _sp = sp;
+    }
+
+    /// <summary>Resolves canonical resource subjects independently of database user identifiers.</summary>
+    public override async Task<TUser?> GetUserAsync(ClaimsPrincipal principal) {
+        var id = GetUserId(principal);
+        if (!string.IsNullOrEmpty(id)
+         && ResourceNameDescriptor.ForType<TUser>().ParseCanonicalName(id) is not null) {
+            return await FindByCanonicalNameAsync(id);
+        }
+
+        return await base.GetUserAsync(principal);
     }
 
     /// <summary>

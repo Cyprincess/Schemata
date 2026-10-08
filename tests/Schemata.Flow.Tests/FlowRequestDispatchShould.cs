@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
-using Schemata.Core;
+using Schemata.Abstractions.Advisors;
 using Schemata.Core.Features;
 using Schemata.Entity.Repository;
 using Schemata.Event.Skeleton;
@@ -59,6 +59,7 @@ public sealed class FlowRequestDispatchShould
 
         var services = new ServiceCollection()
                       .AddLogging()
+                      .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                       .AddSingleton(processes.Object)
                       .AddSingleton(tokens.Object)
                       .AddSingleton(transitions.Object)
@@ -83,8 +84,8 @@ public sealed class FlowRequestDispatchShould
     private static void Configure(FeatureBase feature, IServiceCollection services) {
         feature.ConfigureServices(
             services,
-            new SchemataOptions(),
-            new Configurators(),
+            new(),
+            new(),
             new ConfigurationBuilder().Build(),
             Mock.Of<IWebHostEnvironment>()
         );
@@ -94,15 +95,17 @@ public sealed class FlowRequestDispatchShould
         where TEntity : class {
         var data       = new List<TEntity>();
         var repository = new Mock<IRepository<TEntity>>();
+        repository.Setup(current => current.AdviceContext).Returns(new AdviceContext(new ServiceCollection().BuildServiceProvider()));
         repository.Setup(current => current.Join(It.IsAny<IUnitOfWork>()));
         repository.Setup(current => current.Begin()).Returns(Mock.Of<IUnitOfWork>());
         repository.Setup(current => current.AddAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
-                  .Returns((TEntity entity, CancellationToken _) => {
+                  .ReturnsAsync((TEntity entity, CancellationToken _) => {
+                      FlowTestCreation.Assign(entity);
                       data.Add(entity);
-                      return Task.CompletedTask;
+                      return MutationResult.Applied;
                   });
         repository.Setup(current => current.UpdateAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
+                  .ReturnsAsync(MutationResult.Applied);
         repository.Setup(current => current.ListAsync<TEntity>(
                              It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
                              It.IsAny<CancellationToken>()))
@@ -112,12 +115,12 @@ public sealed class FlowRequestDispatchShould
                              It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
                              It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>> query, CancellationToken _) =>
-                               new ValueTask<TEntity?>(query(data.AsQueryable()).SingleOrDefault()));
+                               new(query(data.AsQueryable()).SingleOrDefault()));
         repository.Setup(current => current.FirstOrDefaultAsync(
                              It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
                              It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>> query, CancellationToken _) =>
-                               new ValueTask<TEntity?>(query(data.AsQueryable()).FirstOrDefault()));
+                               new(query(data.AsQueryable()).FirstOrDefault()));
         return repository;
     }
 

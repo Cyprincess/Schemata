@@ -21,7 +21,7 @@ builder.UseSchemata(schema => {
     schema.UseMapster().Map<SchemataScope, SchemataScope>();
     schema.UseMapster().Map<SchemataToken, SchemataToken>();
     schema.Services.AddDistributedMemoryCache();
-    schema.Services.AddDistributedCache();
+    schema.Services.AddMemoryCacheProvider();
     schema.Services
           .AddRepository<SchemataApplication, EfCoreRepository<AuthorizationDbContext, SchemataApplication>>()
           .UseEntityFrameworkCore<AuthorizationDbContext>((_, db) => {

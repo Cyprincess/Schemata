@@ -24,6 +24,7 @@ public static class ServiceCollectionExtensions
 
         services.AddKeyedSingleton<IExpressionCompiler, AipCompiler>(AipLanguage.Name);
         services.AddKeyedSingleton<IExpressionPushdownPlanner, AipPushdownPlanner>(AipLanguage.Name);
+        services.AddKeyedSingleton<IExpressionReferenceProvider, AipReferenceProvider>(AipLanguage.Name);
         services.AddKeyedSingleton(AipLanguage.Name, new ExpressionLanguageDescriptor(AipLanguage.Name, options.Filtering, options.MaxResidualScanRows));
         return services;
     }

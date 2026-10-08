@@ -9,6 +9,8 @@ using Schemata.Core.Features;
 using Schemata.Event.Foundation.Runtime;
 using Schemata.Event.Foundation.Observers;
 using Schemata.Event.Skeleton;
+using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Runtime;
 
 namespace Schemata.Event.Foundation.Features;
 
@@ -28,11 +30,9 @@ public sealed class SchemataEventFeature : FeatureBase
         IWebHostEnvironment environment
     ) {
         services.AddOptions<EventTypeRegistryConfiguration>();
+        services.TryAddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>();
         services.TryAddSingleton<IEventTypeRegistry>(sp => EventTypeRegistryActivator.Build(sp.GetRequiredService<IOptions<EventTypeRegistryConfiguration>>()));
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IEventLifecycleObserver, SchemataEventAuditObserver>());
-        services.TryAddSingleton<IEventOutboxPublisher, InProcessEventOutboxPublisher>();
-        services.TryAddSingleton<EventOutboxDispatcher>();
-        services.AddHostedService(sp => sp.GetRequiredService<EventOutboxDispatcher>());
     }
 }

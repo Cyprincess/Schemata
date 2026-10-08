@@ -50,10 +50,7 @@ public sealed class AdviceAuthorizeScopeValidation<TApp>(
         if (!string.IsNullOrWhiteSpace(authz.Request?.ResponseType)
          && authz.Request.ResponseType.Contains(ResponseTypes.IdToken)
          && !requested.Contains(Scopes.OpenId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidScope,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_SCOPE)
-            ) {
+            throw new OAuthException(OAuthErrors.InvalidScope, SchemataResources.INVALID_SCOPE) {
                 RedirectUri  = authz.Request?.RedirectUri,
                 State        = authz.Request?.State,
                 ResponseMode = authz.ResponseMode,

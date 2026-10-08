@@ -64,9 +64,9 @@ boundary events, event-based branches, and intermediate catches.
 
 `FlowEventCatchHandler` is an `IFlowCatchHandler`: it claims the `Message` and `Signal` catch kinds,
 and its `ArmAsync` runs inside the transition's unit of work, before the process row is persisted,
-reconciling `IRepository<SchemataEventSubscription>` against the new waiting state. It enlists the
-subscription repository in `context.UnitOfWork` via `IRepository.Join`, so subscription writes commit
-atomically with the process row and roll back together on any failure.
+reconciling `IRepository<SchemataEventSubscription>` against the new waiting state. Subscription
+writes stage through `IResourceMutation<SchemataEventSubscription>` on `context.UnitOfWork`, so
+subscription rows commit atomically with the process row and roll back together on any failure.
 
 ### Subscription lifecycle
 
@@ -129,19 +129,19 @@ processes by invoking the engine-neutral resource method handlers in `Schemata.F
 within a fresh DI scope per call. The handlers in turn call `FlowRunner.CorrelateAsync` or
 `FlowRunner.ThrowSignalAsync`.
 
-The bridge serializes the inbound `IEvent` to JSON (`JsonSerializer.Serialize(@event,
-@event.GetType(), SchemataJson.Default)`) and forwards it as the request `Payload`; the matched
-`EventType` becomes the message or signal name. The handler-internal request types
-(`CorrelateMessageRequest`, `ThrowSignalRequest`) live in
+The bridge forwards the materialized event instance as the request `Payload`; the matched
+`EventType` becomes the message or signal name. Passing the instance (rather than a serialized JSON
+string) keeps delivery working for processes that declare no payload type for the catch, since the
+flow handlers bind only string payloads against the declared payload type. The handler-internal
+request types (`CorrelateMessageRequest`, `ThrowSignalRequest`) live in
 `Schemata.Flow.Skeleton.Models`.
 
-- `CorrelationKey` set — open a scope, resolve `ProcessPersistence`, load the process via
-  `persistence.FindAsync`, resolve `CorrelateMessageHandler` from the scope, and invoke it with
-  `MessageName = sub.EventType`, `Payload = <serialized event>`, `Token = sub.Token`, the loaded
-  process as entity, and `null` principal.
-- `CorrelationKey` null — open a scope, resolve `ThrowSignalHandler` from the scope, and invoke it
-  with `SignalName = sub.EventType`, `Payload = <serialized event>`, `Token = null`, `null` entity,
-  and `null` principal.
+- `CorrelationKey` set — open a scope, resolve `IRequestDispatcher` from it, and send
+  `CorrelateMessageRequest` with `MessageName = sub.EventType`, the event instance as payload,
+  `Token = sub.Token`, and the flow system principal.
+- `CorrelationKey` null — open a scope, resolve `IRequestDispatcher` from it, and send
+  `ThrowSignalRequest` with `SignalName = sub.EventType`, the event instance as payload,
+  `Token = null`, and the flow system principal.
 
 Signal throws are de-duplicated by event type within one handler call. If one dispatched event
 matches several signal subscriptions with the same `EventType`, `FlowEventHandler` invokes the
@@ -150,6 +150,12 @@ process that declares the signal, each in its own unit of work, and returns one 
 per target. Message subscriptions are handled one by one because each message subscription targets one
 process instance.
 
+Signal broadcasts report per-target `SignalDeliveryResult` outcomes instead of throwing; the bridge
+inspects them and rethrows the first faulted delivery's original exception, so a failed delivery
+never reads as a successful publish. `NoLongerWaiting` — the target stopped waiting between
+subscription match and delivery — is a legitimate race outcome and stays non-fatal. Message
+deliveries propagate handler exceptions directly.
+
 ## ProcessEventLifecycleObserver
 
 `ProcessEventLifecycleObserver` implements `IProcessLifecycleObserver`. It publishes Flow lifecycle
@@ -157,10 +163,10 @@ notifications to `IEventBus` when the bus is available:
 
 | Observer method         | Interface                   | Published event         | Payload                                                                         |
 | ----------------------- | --------------------------- | ----------------------- | ------------------------------------------------------------------------------- |
-| `OnStartedAsync`        | `IProcessLifecycleObserver` | `ProcessStartedEvent`   | `ProcessCanonicalName`, `DefinitionName`                                        |
+| `OnStartedAsync`        | `IProcessLifecycleObserver` | `ProcessStartedEvent`   | `ProcessCanonicalName`, `DefinitionName`, `DefinitionVersion` |
 | `OnTransitionedAsync`   | `IProcessLifecycleObserver` | `TransitionMadeEvent`   | `ProcessCanonicalName`, `FromStateName`, `ToStateName`                              |
-| `OnTerminatedAsync`     | `IProcessLifecycleObserver` | `ProcessCompletedEvent` | `ProcessCanonicalName`, `DefinitionName`                                            |
-| `OnFailedAsync`         | `IProcessLifecycleObserver` | `ProcessFailedEvent`    | `ProcessCanonicalName`, `DefinitionName`, `ErrorMessage`                            |
+| `OnTerminatedAsync`     | `IProcessLifecycleObserver` | `ProcessCompletedEvent` | `ProcessCanonicalName`, `DefinitionName`, `DefinitionVersion` |
+| `OnFailedAsync`         | `IProcessLifecycleObserver` | `ProcessFailedEvent`    | `ProcessCanonicalName`, `DefinitionName`, `DefinitionVersion`, `ErrorMessage` |
 
 The Flow runtime calls lifecycle observers after commits and logs observer exceptions. A failed
 observer does not roll back a transition that already committed.
@@ -178,9 +184,12 @@ observer does not roll back a transition that already committed.
 - Subscription reconciliation joins the transition's unit of work. Subscription writes commit
   atomically with the process row; a transition rollback rolls subscription writes back together,
   so no orphan rows are left behind.
-- `IEventHandler<IEvent>` is the generic handler. The bus dispatches by CLR type, and the order in
-  which handlers see a given event depends on the bus implementation and any registered
-  `IEventHandler<TEvent>` for a more specific CLR type.
+- `IEventHandler<IEvent>` is the catch-all handler; the Flow bridge registers `FlowEventHandler`
+  behind it. One publish composes the typed `IEventHandler<TEvent>` set for the event's runtime CLR
+  type with the catch-all set into one candidate collection, deduplicated by instance reference, so
+  an event with both an armed Flow subscription and a typed handler reaches both exactly once.
+  Typed candidates run first in their own DI registration order, then catch-all candidates in
+  theirs.
 - Subscription ids use the `flow:{processCanonicalName}:{elementName}:{token|broadcast}` format.
   Reserve the `flow:` prefix for this integration.
 - Persisted or manually seeded processes must carry `StateName`; display `State` is not a resume key.

@@ -5,6 +5,8 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Report.Skeleton;
@@ -23,7 +25,12 @@ public sealed class DefaultReportSnapshotStore<TSnapshot, TChunk>(IServiceScopeF
         string reportName,
         [EnumeratorCancellation] CancellationToken ct = default
     ) {
-        var report = Leaf(reportName);
+        var parsed = ResourceNameDescriptor.ForType<SchemataReport>().ParseCanonicalName(reportName);
+        if (parsed is not { } target || string.IsNullOrWhiteSpace(target.LeafName) || target.LeafName == "-") {
+            throw new InvalidArgumentException(SchemataResources.INVALID_NAME, new Dictionary<string, string?> { ["name"] = reportName });
+        }
+
+        var report = target.LeafName;
         await using var scope = scopes.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IRepository<TSnapshot>>();
         await foreach (var snapshot in repository.ListAsync(query => query.Where(candidate => candidate.Report == report), ct)) {
@@ -32,9 +39,12 @@ public sealed class DefaultReportSnapshotStore<TSnapshot, TChunk>(IServiceScopeF
     }
 
     public async ValueTask<SchemataReportSnapshot?> GetAsync(string snapshotName, CancellationToken ct = default) {
+        var (report, snapshot) = ParseSnapshotName(snapshotName);
         await using var scope = scopes.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IRepository<TSnapshot>>();
-        return await repository.FirstOrDefaultAsync(query => query.Where(candidate => candidate.CanonicalName == snapshotName), ct);
+        return await repository.FirstOrDefaultAsync(
+                   query => query.Where(candidate => candidate.CanonicalName == snapshotName
+                                                  && candidate.Report == report && candidate.Name == snapshot), ct);
     }
 
     public async ValueTask<SchemataReportSnapshotChunk?> GetChunkAsync(
@@ -42,22 +52,23 @@ public sealed class DefaultReportSnapshotStore<TSnapshot, TChunk>(IServiceScopeF
         int               index,
         CancellationToken ct = default
     ) {
+        var (report, snapshot) = ParseSnapshotName(snapshotName);
         await using var scope = scopes.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IRepository<TChunk>>();
-        var snapshot   = Leaf(snapshotName);
         return await repository.FirstOrDefaultAsync(
-                   query => query.Where(candidate => candidate.Snapshot == snapshot && candidate.Index == index), ct);
+                   query => query.Where(candidate => candidate.Report == report
+                                                  && candidate.Snapshot == snapshot && candidate.Index == index), ct);
     }
 
     public async IAsyncEnumerable<IReadOnlyDictionary<string, object?>> ReadRowsAsync(
         string snapshotName,
         [EnumeratorCancellation] CancellationToken ct = default
     ) {
+        var (report, snapshot) = ParseSnapshotName(snapshotName);
         await using var scope = scopes.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IRepository<TChunk>>();
-        var snapshot = Leaf(snapshotName);
         await foreach (var chunk in repository.ListAsync(
-                           query => query.Where(candidate => candidate.Snapshot == snapshot)
+                           query => query.Where(candidate => candidate.Report == report && candidate.Snapshot == snapshot)
                                          .OrderBy(candidate => candidate.Index), ct)) {
             var rows = JsonSerializer.Deserialize<List<Dictionary<string, object?>>>(chunk.Rows ?? "[]", SchemataJson.Default)
                        ?? [];
@@ -68,8 +79,16 @@ public sealed class DefaultReportSnapshotStore<TSnapshot, TChunk>(IServiceScopeF
         }
     }
 
-    private static string Leaf(string canonicalName) {
-        var index = canonicalName.LastIndexOf('/');
-        return index < 0 ? canonicalName : canonicalName[(index + 1)..];
+    private static (string Report, string Snapshot) ParseSnapshotName(string name) {
+        var parsed = ResourceNameDescriptor.ForType<SchemataReportSnapshot>().ParseCanonicalName(name);
+        if (parsed is not { } target
+            || string.IsNullOrWhiteSpace(target.LeafName) || target.LeafName == "-"
+            || !target.ParentValues.TryGetValue("report", out var report)
+            || string.IsNullOrWhiteSpace(report) || report == "-") {
+            throw new InvalidArgumentException(SchemataResources.INVALID_NAME, new Dictionary<string, string?> { ["name"] = name });
+        }
+
+        return (report, target.LeafName);
     }
+
 }

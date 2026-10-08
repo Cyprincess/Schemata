@@ -29,8 +29,8 @@ public static class AdviceValidation
 /// </summary>
 /// <typeparam name="T">The type being validated.</typeparam>
 /// <remarks>
-///     Resolves <see cref="IValidator{T}" /> from the service provider and runs validation,
-///     translating FluentValidation failures into <see cref="ErrorFieldViolation" /> entries.
+///     Resolves every registered <see cref="IValidator{T}" /> from the service provider, runs each
+///     once, and aggregates all failures into <see cref="ErrorFieldViolation" /> entries.
 ///     Auto-registered when <see cref="ServiceCollectionExtensions.AddValidator{TValidator}" /> is called.
 /// </remarks>
 public sealed class AdviceValidation<T> : IValidationAdvisor<T>
@@ -54,39 +54,37 @@ public sealed class AdviceValidation<T> : IValidationAdvisor<T>
         IList<ErrorFieldViolation> errors,
         CancellationToken          ct = default
     ) {
-        var validator = _sp.GetService<IValidator<T>>();
-        if (validator is null) {
-            return AdviseResult.Continue;
-        }
+        var validators = _sp.GetServices<IValidator<T>>();
 
-        var context = new ValidationContext<T>(request, null,
-                                               ValidatorOptions.Global.ValidatorSelectors
-                                                               .DefaultValidatorSelectorFactory()) {
-            RootContextData = { [nameof(Operations)] = operation },
-        };
+        foreach (var validator in validators) {
+            var context = new ValidationContext<T>(request, null,
+                                                   ValidatorOptions.Global.ValidatorSelectors
+                                                                   .DefaultValidatorSelectorFactory()) {
+                RootContextData = { [nameof(Operations)] = operation },
+            };
 
-        var results = await validator.ValidateAsync(context, ct);
-        if (results.IsValid || results.Errors.Count == 0) {
-            return AdviseResult.Continue;
-        }
+            var results = await validator.ValidateAsync(context, ct);
+            foreach (var error in results.Errors) {
+                var field = error.PropertyName.Underscore();
 
-        foreach (var error in results.Errors) {
-            var field = error.PropertyName.Underscore();
+                var raw = error.ErrorCode;
+                if (raw is not null && raw.EndsWith("Validator", StringComparison.Ordinal)) {
+                    raw = raw[..^"Validator".Length];
+                }
 
-            var raw = error.ErrorCode.EndsWith("Validator")
-                ? error.ErrorCode[..^9]
-                : error.ErrorCode;
+                // AIP-193 requires machine-readable reason codes in UPPER_SNAKE_CASE; operand
+                // values belong in ErrorFieldViolation.Description via the FluentValidation
+                // message template.
+                var reason = string.IsNullOrWhiteSpace(raw)
+                    ? ErrorReasons.ValidationFailed
+                    : raw.Underscore().ToUpperInvariant();
 
-            // AIP-193 requires machine-readable reason codes in UPPER_SNAKE_CASE; operand
-            // values belong in ErrorFieldViolation.Description via the FluentValidation
-            // message template.
-            var reason = raw.Underscore().ToUpperInvariant();
-
-            errors.Add(new() {
-                Field       = field,
-                Reason      = reason,
-                Description = error.ErrorMessage,
-            });
+                errors.Add(new() {
+                    Field       = field,
+                    Reason      = reason,
+                    Description = error.ErrorMessage,
+                });
+            }
         }
 
         return AdviseResult.Continue;

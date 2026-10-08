@@ -24,10 +24,10 @@ public class FlowRunnerTransitionAdvisorShould
     public async Task Advise_On_The_Transition_Carrying_Its_Token_And_Unit_Of_Work() {
         var harness = CreateHarness([Advisor("only", AdviseResult.Continue)]);
 
-        await harness.Runner.StartAsync("advisor-process", null, null, CancellationToken.None);
+        var process = await harness.Runner.StartAsync("advisor-process", null, null, CancellationToken.None);
 
         var context = Assert.Single(harness.Advised);
-        Assert.Equal("processes/p1/tokens/t1", context.Token.CanonicalName);
+        Assert.Equal($"{process.CanonicalName}/tokens/t1", context.Token.CanonicalName);
         Assert.NotNull(context.UnitOfWork);
     }
 
@@ -59,9 +59,9 @@ public class FlowRunnerTransitionAdvisorShould
     public async Task Arm_Catch_Handlers_Even_When_An_Advisor_Blocks() {
         var harness = CreateHarness([Advisor("blocking", AdviseResult.Block)]);
 
-        await harness.Runner.StartAsync("advisor-process", null, null, CancellationToken.None);
+        var process = await harness.Runner.StartAsync("advisor-process", null, null, CancellationToken.None);
 
-        Assert.Equal("processes/p1/tokens/t1", Assert.Single(harness.Armed).Token.CanonicalName);
+        Assert.Equal($"{process.CanonicalName}/tokens/t1", Assert.Single(harness.Armed).Token.CanonicalName);
     }
 
     [Fact]
@@ -114,7 +114,6 @@ public class FlowRunnerTransitionAdvisorShould
             Name          = "advisor-process",
             Engine        = FlowConstants.Engines.StateMachine,
             Definition    = new AdvisorProcess(),
-            Configuration = new ProcessConfiguration(),
         };
 
         var harness = new Harness();
@@ -124,10 +123,10 @@ public class FlowRunnerTransitionAdvisorShould
                   It.IsAny<ProcessDefinition>(), It.IsAny<SchemataProcess>(),
                   It.IsAny<FlowExecutionContext>(), It.IsAny<CancellationToken>()))
               .Returns((ProcessDefinition _, SchemataProcess p, FlowExecutionContext _, CancellationToken _) =>
-                           new ValueTask<ProcessSnapshot>(Snapshot(p)));
+                           new(Snapshot(p)));
 
         var registry = new Mock<IProcessRegistry>();
-        registry.Setup(r => r.GetRegistration("advisor-process")).Returns(registration);
+        registry.Setup(r => r.GetRegistration("advisor-process", "1")).Returns(registration);
 
         var handler = new Mock<IFlowCatchHandler>();
         handler.Setup(h => h.ArmAsync(It.IsAny<FlowTransitionContext>(), It.IsAny<CancellationToken>()))
@@ -137,13 +136,15 @@ public class FlowRunnerTransitionAdvisorShould
                });
 
         var processes = Repository(harness.UnitOfWork.Object, new SchemataProcess {
-            Name           = "p1",
-            CanonicalName  = "processes/p1",
-            DefinitionName = "advisor-process",
+            Name              = "p1",
+            CanonicalName     = "processes/p1",
+            DefinitionName    = "advisor-process",
+            DefinitionVersion = "1",
         });
 
         var collection = new ServiceCollection()
                         .AddLogging()
+                        .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                         .AddSingleton(registry.Object)
                         .AddSingleton<IOptions<SchemataFlowOptions>>(Options.Create(new SchemataFlowOptions()))
                         .AddSingleton(processes.Object)
@@ -168,13 +169,14 @@ public class FlowRunnerTransitionAdvisorShould
     private static ProcessSnapshot Snapshot(SchemataProcess process) {
         var token = new SchemataProcessToken {
             Name          = "t1",
-            CanonicalName = "processes/p1/tokens/t1",
-            Process       = "p1",
+            CanonicalName = $"{process.CanonicalName}/tokens/t1",
+            Process       = process.Name!,
             State         = "Completed",
         };
         var transition = new SchemataProcessTransition {
+            Process       = token.Process,
             Name          = "tr1",
-            CanonicalName = "processes/p1/transitions/tr1",
+            CanonicalName = $"{process.CanonicalName}/transitions/tr1",
             Token         = token.CanonicalName,
         };
         return new() { Process = process, Tokens = [token], Transitions = [transition] };
@@ -184,20 +186,22 @@ public class FlowRunnerTransitionAdvisorShould
         where T : class {
         var data       = items.ToList();
         var repository = new Mock<IRepository<T>>();
+        repository.Setup(r => r.AdviceContext).Returns(new AdviceContext(new ServiceCollection().BuildServiceProvider()));
         repository.Setup(r => r.Join(It.IsAny<IUnitOfWork>()));
         repository.Setup(r => r.Begin()).Returns(unitOfWork);
         repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>()))
-                  .Returns((T entity, CancellationToken _) => {
+                  .ReturnsAsync((T entity, CancellationToken _) => {
+                      FlowTestCreation.Assign(entity);
                       data.Add(entity);
-                      return Task.CompletedTask;
+                      return MutationResult.Applied;
                   });
-        repository.Setup(r => r.UpdateAsync(It.IsAny<T>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        repository.Setup(r => r.UpdateAsync(It.IsAny<T>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
         repository.Setup(r => r.ListAsync<T>(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => Async(predicate(data.AsQueryable()).ToList()));
         repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new ValueTask<T?>(predicate(data.AsQueryable()).SingleOrDefault()));
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new(predicate(data.AsQueryable()).SingleOrDefault()));
         repository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new ValueTask<T?>(predicate(data.AsQueryable()).FirstOrDefault()));
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new(predicate(data.AsQueryable()).FirstOrDefault()));
         return repository;
     }
 

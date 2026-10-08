@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Entity.Repository;
@@ -20,7 +21,7 @@ namespace Schemata.Scheduling.Foundation;
 ///     persisted <see cref="SchemataJob.JobKey" /> to dispatch through
 ///     <see cref="IScheduler.TriggerAsync{TJob}" />; the scheduler persists the
 ///     <see cref="SchemataJobExecution" /> row synchronously so the response
-///     carries an addressable <c>operations/{uid}</c>.
+///     carries the persisted operation's canonical name.
 /// </summary>
 public sealed class RunJobHandler(
     IScheduler scheduler,
@@ -44,20 +45,28 @@ public sealed class RunJobHandler(
         }
 
         if (entity is null) {
-            throw new NotFoundException(message: $"Job '{canonicalName}' was not found.");
+            throw new NotFoundException(
+                SchemataResources.JOB_NOT_FOUND,
+                new Dictionary<string, string?> { ["name"] = canonicalName });
         }
 
         if (string.IsNullOrEmpty(entity.JobKey)) {
-            throw new FailedPreconditionException(message: $"Job '{entity.CanonicalName}' cannot be run.");
+            throw new FailedPreconditionException(
+                SchemataResources.JOB_NOT_RUNNABLE,
+                new Dictionary<string, string?> { ["name"] = entity.CanonicalName });
         }
 
         var jobType = registry.Resolve(entity.JobKey);
         if (jobType is null) {
-            throw new FailedPreconditionException(message: $"Job '{entity.CanonicalName}' cannot be run.");
+            throw new FailedPreconditionException(
+                SchemataResources.JOB_NOT_RUNNABLE,
+                new Dictionary<string, string?> { ["name"] = entity.CanonicalName });
         }
 
         if (services.GetService(jobType) is null) {
-            throw new FailedPreconditionException(message: $"Job '{entity.CanonicalName}' cannot be run.");
+            throw new FailedPreconditionException(
+                SchemataResources.JOB_NOT_RUNNABLE,
+                new Dictionary<string, string?> { ["name"] = entity.CanonicalName });
         }
 
         var context = new JobContext {

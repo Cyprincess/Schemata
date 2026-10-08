@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 
 namespace Schemata.Push.Skeleton;
 
@@ -27,5 +28,5 @@ public class PushContext
     public PushOptions Options { get; init; } = PushOptions.Default;
 
     /// <summary>Transport-specific metadata keyed by transport-defined names.</summary>
-    public IReadOnlyDictionary<string, string?> Metadata { get; init; } = new Dictionary<string, string?>();
+    public IReadOnlyDictionary<string, string?> Metadata { get; init; } = ImmutableDictionary<string, string?>.Empty;
 }

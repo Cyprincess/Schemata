@@ -80,9 +80,7 @@ public sealed class AuthorizationSignInService<TApp, TToken>(
                 break;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(
-                    OAuthErrors.AccessDenied,
-                    SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED));
+                throw new OAuthException(OAuthErrors.AccessDenied, SchemataResources.ACCESS_DENIED);
         }
 
         foreach (var claim in claims) {

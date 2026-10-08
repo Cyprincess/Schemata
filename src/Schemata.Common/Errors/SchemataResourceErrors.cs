@@ -69,16 +69,16 @@ public static class SchemataResourceErrors
         string?     name        = null,
         string?     description = null,
         string      reason      = ErrorReasons.ResourceNotFound) {
-        var resource = ResourceType(type);
-        var exception  = new NotFoundException(reason: null);
-        exception.Details = [
-            new ErrorInfoDetail { Reason = reason },
-            new ResourceInfoDetail {
-                ResourceType = resource,
-                ResourceName = name,
-                Description  = description,
-            },
-        ];
+        var resource  = ResourceType(type);
+        var exception = new NotFoundException { Details = [
+                new ErrorInfoDetail { Reason = reason },
+                new ResourceInfoDetail {
+                    ResourceType = resource,
+                    ResourceName = name,
+                    Description  = description,
+                },
+            ],
+        };
         return exception;
     }
 
@@ -90,11 +90,13 @@ public static class SchemataResourceErrors
     /// <param name="name">The canonical resource name of the conflicting resource.</param>
     /// <param name="description">Optional human-readable context.</param>
     /// <param name="reason">Domain-specific reason; defaults to <see cref="ErrorReasons.ResourceAlreadyExists" />.</param>
+    /// <param name="innerException">Internal diagnostic cause, excluded from wire details.</param>
     public static AlreadyExistsException AlreadyExists<T>(
         string? name        = null,
         string? description = null,
-        string  reason      = ErrorReasons.ResourceAlreadyExists) {
-        return AlreadyExists(typeof(T), name, description, reason);
+        string  reason      = ErrorReasons.ResourceAlreadyExists,
+        Exception? innerException = null) {
+        return AlreadyExists(typeof(T), name, description, reason, innerException);
     }
 
     /// <summary>
@@ -104,22 +106,24 @@ public static class SchemataResourceErrors
     /// <param name="name">The canonical resource name of the conflicting resource.</param>
     /// <param name="description">Optional human-readable context.</param>
     /// <param name="reason">Domain-specific reason; defaults to <see cref="ErrorReasons.ResourceAlreadyExists" />.</param>
+    /// <param name="innerException">Internal diagnostic cause, excluded from wire details.</param>
     /// <returns>The constructed exception, ready to <c>throw</c>.</returns>
     public static AlreadyExistsException AlreadyExists(
         Type type,
         string?     name        = null,
         string?     description = null,
-        string      reason      = ErrorReasons.ResourceAlreadyExists) {
-        var resource = ResourceType(type);
-        var exception  = new AlreadyExistsException(reason: null);
-        exception.Details = [
-            new ErrorInfoDetail { Reason = reason },
-            new ResourceInfoDetail {
-                ResourceType = resource,
-                ResourceName = name,
-                Description  = description,
-            },
-        ];
+        string      reason      = ErrorReasons.ResourceAlreadyExists,
+        Exception? innerException = null) {
+        var resource  = ResourceType(type);
+        var exception = new AlreadyExistsException(innerException: innerException) { Details = [
+                new ErrorInfoDetail { Reason = reason },
+                new ResourceInfoDetail {
+                    ResourceType = resource,
+                    ResourceName = name,
+                    Description  = description,
+                },
+            ],
+        };
         return exception;
     }
 
@@ -140,27 +144,33 @@ public static class SchemataResourceErrors
         string? subject     = null,
         string? description = null,
         string  reason      = ErrorReasons.PreconditionNotSatisfied) {
-        var resource = ResourceType(typeof(T));
-        var exception  = new FailedPreconditionException(reason: null);
-        exception.Details = [
-            new ErrorInfoDetail { Reason = reason },
-            new ResourceInfoDetail {
-                ResourceType = resource,
-                ResourceName = name,
-                Description  = description,
-            },
-            new PreconditionFailureDetail {
-                Violations = [
-                    new() {
-                        Type        = resource,
-                        Subject     = subject,
-                        Description = description,
-                    },
-                ],
-            },
-        ];
+        var resource  = ResourceType(typeof(T));
+        var exception = new FailedPreconditionException { Details = [
+                new ErrorInfoDetail { Reason = reason },
+                new ResourceInfoDetail {
+                    ResourceType = resource,
+                    ResourceName = name,
+                    Description  = description,
+                },
+                new PreconditionFailureDetail {
+                    Violations = [
+                        new() {
+                            Type        = resource,
+                            Subject     = subject,
+                            Description = description,
+                        },
+                    ],
+                },
+            ],
+        };
         return exception;
     }
+
+    /// <summary>
+    ///     Standard PERMISSION_DENIED message template from AIP-211: the caller learns which
+    ///     permission they lack while the message leaves existence ambiguous.
+    /// </summary>
+    public const string PermissionDeniedTemplate = "Permission '{0}' denied on resource '{1}' (or it might not exist).";
 
     /// <summary>
     ///     Builds a <see cref="PermissionDeniedException" /> for a named resource of type
@@ -179,17 +189,35 @@ public static class SchemataResourceErrors
         string? owner       = null,
         string? description = null,
         string  reason      = ErrorReasons.InsufficientPermission) {
-        var resource = ResourceType(typeof(T));
-        var exception  = new PermissionDeniedException(reason: null);
-        exception.Details = [
-            new ErrorInfoDetail { Reason = reason },
-            new ResourceInfoDetail {
-                ResourceType = resource,
-                ResourceName = name,
-                Owner        = owner,
-                Description  = description,
-            },
-        ];
+        return PermissionDenied(typeof(T), name, owner, description, reason);
+    }
+
+    /// <summary>
+    ///     Builds a <see cref="PermissionDeniedException" /> when the resource type is only known at
+    ///     runtime, carrying the same error details as the generic overload.
+    /// </summary>
+    /// <param name="type">The resource entity type.</param>
+    /// <param name="name">The canonical resource name, when available.</param>
+    /// <param name="owner">Optional canonical name of the resource owner.</param>
+    /// <param name="description">Optional human-readable context.</param>
+    /// <param name="reason">Domain-specific reason; defaults to <see cref="ErrorReasons.InsufficientPermission" />.</param>
+    public static PermissionDeniedException PermissionDenied(
+        Type    type,
+        string? name        = null,
+        string? owner       = null,
+        string? description = null,
+        string  reason      = ErrorReasons.InsufficientPermission) {
+        var resource  = ResourceType(type);
+        var exception = new PermissionDeniedException { Details = [
+                new ErrorInfoDetail { Reason = reason },
+                new ResourceInfoDetail {
+                    ResourceType = resource,
+                    ResourceName = name,
+                    Owner        = owner,
+                    Description  = description,
+                },
+            ],
+        };
         return exception;
     }
 
@@ -208,16 +236,25 @@ public static class SchemataResourceErrors
         string? name        = null,
         string? description = null,
         string  reason      = ErrorReasons.ConcurrencyMismatch) {
-        var resource = ResourceType(typeof(T));
-        var exception  = new AbortedException(reason: null);
-        exception.Details = [
-            new ErrorInfoDetail { Reason = reason },
-            new ResourceInfoDetail {
-                ResourceType = resource,
-                ResourceName = name,
-                Description  = description,
-            },
-        ];
+        return Aborted(typeof(T), name, description, reason);
+    }
+
+    /// <summary>Builds a concurrency error for the resource identified by the persistence provider.</summary>
+    public static AbortedException Aborted(
+        Type type,
+        string? name = null,
+        string? description = null,
+        string reason = ErrorReasons.ConcurrencyMismatch) {
+        var resource = ResourceType(type);
+        var exception = new AbortedException { Details = [
+                new ErrorInfoDetail { Reason = reason },
+                new ResourceInfoDetail {
+                    ResourceType = resource,
+                    ResourceName = name,
+                    Description  = description,
+                },
+            ],
+        };
         return exception;
     }
 

@@ -15,5 +15,11 @@ internal sealed class ForgotUserPasswordHandler<TUser>(IdentityOperationHandler<
     public Task<IdentityResult<Unit>> HandleAsync(
         ForgotUserPasswordRequest<TUser> request,
         CancellationToken                ct = default
-    ) => operations.ForgotAsync(IdentityRequestHandler.Require(request).Request, request.Principal!, ct);
+    ) {
+        if (request.Principal is null) {
+            return Task.FromResult(IdentityResult<Unit>.Challenge());
+        }
+
+        return operations.ForgotAsync(IdentityRequestHandler.Require(request).Request, request.Principal, ct);
+    }
 }

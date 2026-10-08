@@ -26,6 +26,8 @@ public sealed class EfCoreFlowFixture : IAsyncLifetime, IFlowIntegrationFixture
 
     public SchemataFlowOptions FlowOptions { get; } = new();
 
+    public Action<IServiceCollection>? ConfigureServices { get; init; }
+
     /// <summary>
     ///     The catch kinds the fixture's registered <see cref="IFlowCatchHandler" /> answers for. A test
     ///     mutates this to simulate activating or omitting a bridge, which DI registration alone cannot
@@ -74,11 +76,15 @@ public sealed class EfCoreFlowFixture : IAsyncLifetime, IFlowIntegrationFixture
         services.AddRepository<SchemataProcessTransition, EfCoreRepository<TestDbContext, SchemataProcessTransition>>();
         services.AddRepository<SchemataProcessSource, EfCoreRepository<TestDbContext, SchemataProcessSource>>();
         services.AddRepository<SchemataProcessCompensation, EfCoreRepository<TestDbContext, SchemataProcessCompensation>>();
+        services.AddRepository<SchemataProcessParticipant, EfCoreRepository<TestDbContext, SchemataProcessParticipant>>();
         services.AddScoped<IUnitOfWork<TestDbContext>, EfCoreUnitOfWork<TestDbContext>>();
         FlowFixtureServices.AddResourceTypeResolver(
             services, typeof(Order), typeof(SchemataProcess), typeof(SchemataProcessToken));
         FlowFixtureServices.AddFlowServices(services);
+        services.AddSingleton<StampCaptureObserver>();
+        services.AddSingleton<IProcessLifecycleObserver>(provider => provider.GetRequiredService<StampCaptureObserver>());
         services.AddSingleton<IOptions<SchemataFlowOptions>>(Options.Create(FlowOptions));
+        ConfigureServices?.Invoke(services);
 
         var catches = new Mock<IFlowCatchHandler>();
         catches.Setup(handler => handler.Handles(It.IsAny<FlowCatchKind>()))

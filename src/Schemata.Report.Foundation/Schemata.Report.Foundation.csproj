@@ -30,6 +30,7 @@
     <ProjectReference Include="..\Schemata.Report.Skeleton\Schemata.Report.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Scheduling.Skeleton\Schemata.Scheduling.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Security.Skeleton\Schemata.Security.Skeleton.csproj" />
+    <ProjectReference Include="..\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
     <ProjectReference Include="..\Schemata.Security.Foundation\Schemata.Security.Foundation.csproj" />
   </ItemGroup>
 

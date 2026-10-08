@@ -2,6 +2,8 @@ using System;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
@@ -13,6 +15,8 @@ using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Commands;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Foundation.Runtime;
+using Schemata.Security.Skeleton;
+using static Schemata.Security.Skeleton.AnonymousAccess;
 
 namespace Schemata.Resource.Foundation;
 
@@ -98,7 +102,7 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
         ClaimsPrincipal?  principal,
         CancellationToken ct
     ) {
-        var ctx = ResourceAdviceContext.Create(_sp);
+        var ctx = AdviceContext.Require();
         ctx.Set(new ResourceMethodVerb(verb));
 
         var container = new ResourceRequestContainer<TEntity>();
@@ -127,6 +131,13 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
             }
 
             if (entity is null) {
+                // Entitlement-filtered null and physical absence are indistinguishable; authorize
+                // the missing outcome before a NOT_FOUND, same matrix as the standard handlers.
+                if (!IsAnonymous<TEntity>(verb)
+                 && _sp.GetKeyedService<ResourceAccessStage>(typeof(TEntity)) is { } access) {
+                    await access.FinalizeMissingAsync<TEntity, TRequest>(verb, request, name, principal, ct);
+                }
+
                 throw ResourceNotFound(name);
             }
 

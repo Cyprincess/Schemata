@@ -24,7 +24,7 @@ public sealed class ResourceListAccessAdvisor<TEntity>(IAccessProvider<TEntity, 
     ) {
         if (!AnonymousAccess.IsAnonymous<TEntity>(nameof(Operations.List))) {
             await AuthorizeHelper.EnsureAsync(access,
-                                              new() { Operation = nameof(Operations.List), Request = request },
+                                              new() { Operation = nameof(Operations.List), Request = request, Stage = AccessStage.Target, Parent = request.Parent },
                                               request.Parent ?? string.Empty, principal, ct);
         }
 

@@ -6,10 +6,11 @@ using Schemata.Scheduling.Foundation.Commands;
 
 namespace Schemata.Scheduling.Foundation.Handlers;
 
-internal sealed class DefaultRescheduleJobHandler(IRequestHandler<ScheduleJobRequest, Unit> schedule)
+internal sealed class DefaultRescheduleJobHandler(DefaultScheduleJobHandler schedule)
     : IRequestHandler<RescheduleJobRequest, Unit>
 {
-    public Task<Unit> HandleAsync(RescheduleJobRequest request, CancellationToken ct = default) {
-        return schedule.HandleAsync(new(request.Job, null), ct);
+    public async Task<Unit> HandleAsync(RescheduleJobRequest request, CancellationToken ct = default) {
+        await schedule.ScheduleCoreAsync(request.Job, ct, request.Job.ScheduleVersion);
+        return Unit.Value;
     }
 }

@@ -31,9 +31,10 @@ public class OAuthExceptionFilterShould
     [Fact]
     public void AddsIssToQueryRedirect_WhenIssuerConfigured() {
         var filter = CreateFilter("https://auth.example.com");
-        var exception = new OAuthException(OAuthErrors.InvalidScope, "scope denied") {
-            RedirectUri = "https://client.example.com/callback", State = "xyz", ResponseMode = ResponseModes.Query,
-        };
+        var exception = OAuthException.FromDescription(OAuthErrors.InvalidScope, "scope denied");
+        exception.RedirectUri = "https://client.example.com/callback";
+        exception.State = "xyz";
+        exception.ResponseMode = ResponseModes.Query;
         var ctx = CreateContext(exception);
 
         filter.OnException(ctx);
@@ -48,9 +49,9 @@ public class OAuthExceptionFilterShould
     [Fact]
     public void AddsIssToFragmentRedirect_WhenIssuerConfigured() {
         var filter = CreateFilter("https://auth.example.com");
-        var exception = new OAuthException(OAuthErrors.AccessDenied, "denied") {
-            RedirectUri = "https://client.example.com/callback", ResponseMode = ResponseModes.Fragment,
-        };
+        var exception = OAuthException.FromDescription(OAuthErrors.AccessDenied, "denied");
+        exception.RedirectUri = "https://client.example.com/callback";
+        exception.ResponseMode = ResponseModes.Fragment;
         var ctx = CreateContext(exception);
 
         filter.OnException(ctx);
@@ -63,9 +64,9 @@ public class OAuthExceptionFilterShould
     [Fact]
     public void OmitsIss_WhenIssuerNotConfigured() {
         var filter = CreateFilter(null);
-        var exception = new OAuthException(OAuthErrors.InvalidScope, "scope denied") {
-            RedirectUri = "https://client.example.com/callback", ResponseMode = ResponseModes.Query,
-        };
+        var exception = OAuthException.FromDescription(OAuthErrors.InvalidScope, "scope denied");
+        exception.RedirectUri = "https://client.example.com/callback";
+        exception.ResponseMode = ResponseModes.Query;
         var ctx = CreateContext(exception);
 
         filter.OnException(ctx);
@@ -77,7 +78,7 @@ public class OAuthExceptionFilterShould
     [Fact]
     public void KeepsJsonResponse_WhenNoRedirectUri() {
         var filter    = CreateFilter("https://auth.example.com");
-        var exception = new OAuthException(OAuthErrors.InvalidClient, "bad client");
+        var exception = OAuthException.FromDescription(OAuthErrors.InvalidClient, "bad client");
         var ctx       = CreateContext(exception);
 
         filter.OnException(ctx);

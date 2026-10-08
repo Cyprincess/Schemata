@@ -5,6 +5,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Builder;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
@@ -12,6 +13,14 @@ using Schemata.Messaging.Skeleton;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Handlers;
 using Xunit;
+using Moq;
+using Schemata.Entity.Repository;
+using Schemata.Resource.Foundation.Commands;
+using Schemata.Caching.Skeleton;
+using Schemata.Messaging.Skeleton.Commands;
+using Schemata.Messaging.Skeleton.Runtime;
+using Schemata.Messaging.Skeleton.Advisors;
+using Schemata.Resource.Foundation.Advisors;
 
 namespace Schemata.Resource.Tests.Features;
 
@@ -208,6 +217,9 @@ public class SchemataResourceFeatureRegisterMethodShould
 
         Assert.Contains("IRequest", ex.Message, StringComparison.Ordinal);
         Assert.Contains("badVerb", ex.Message, StringComparison.Ordinal);
+        using var provider = services.BuildServiceProvider();
+        Assert.Null(registry.GetResource(typeof(InvalidHandlerEntity)));
+        Assert.Null(provider.GetService<IRequestHandler<CreateResourceRequest<InvalidHandlerEntity, InvalidHandlerEntity, InvalidHandlerEntity>, CreateResultBase<InvalidHandlerEntity>>>());
     }
 
     [Fact]
@@ -241,8 +253,7 @@ public class SchemataResourceFeatureRegisterMethodShould
     public void Share_One_Registry_Across_Builders_Over_The_Same_Options() {
         var schemata = new SchemataOptions();
         var services = new ServiceCollection();
-        var options = new SchemataOptions();
-        services.AddSchemataResources(options);
+        services.AddSchemataResources(schemata);
 
         new SchemataResourceBuilder(schemata, services).AddResource<ScanResource>();
         new SchemataResourceBuilder(schemata, services).Use<PlainEntity, PlainEntity, PlainEntity, PlainEntity>();
@@ -253,6 +264,174 @@ public class SchemataResourceFeatureRegisterMethodShould
         Assert.NotNull(registry.GetResource(typeof(ScanResource)));
         Assert.NotNull(registry.GetResource(typeof(PlainEntity)));
     }
+
+    [Fact]
+    [Trait("Layer", "Integration")]
+    public async Task SupplementedOperations_RemoveOnlyOwnedBuiltInMethodClosures() {
+        var services = new ServiceCollection();
+        var options = new SchemataOptions();
+        var builder = new SchemataResourceBuilder(options, services);
+        builder.Use<SoftEntity, SoftEntity, SoftEntity, SoftEntity>();
+        builder.Use<SoftEntity, SoftEntity, SoftEntity, SoftEntity>(null, resource => {
+            resource.Methods = [new("run", typeof(PlainRunHandler), ResourceMethodScope.Collection)];
+        });
+        services.AddSchemataResources(options);
+        AddRunDependencies(services);
+        builder.Use<SoftEntity, SoftEntity, SoftEntity, SoftEntity>(null, resource => resource.Operations = []);
+        using var provider = services.BuildServiceProvider();
+        var dispatcher = new InProcessRequestDispatcher(provider);
+        Assert.Equal("run", Assert.Single(provider.GetRequiredService<ResourceRegistry>().GetMethods(typeof(SoftEntity))).Verb);
+        var response = await dispatcher.SendAsync<ResourceMethodRequest<SoftEntity, PlainRunRequest, RunResponse>, RunResponse>(
+            new("run", null, new() { Amount = 7 }, null));
+        Assert.Equal(12, response.Value);
+        Assert.Equal("accounts/one", response.Parent);
+        var expunge = await Assert.ThrowsAsync<InvalidOperationException>(() => dispatcher.SendAsync<
+            ResourceMethodRequest<SoftEntity, ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>, EmptyResourceResponse>(
+                new("expunge", null, new(), null)));
+        Assert.Contains(typeof(ResourceMethodRequest<SoftEntity, ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>).FullName!, expunge.Message, StringComparison.Ordinal);
+        var purge = await Assert.ThrowsAsync<InvalidOperationException>(() => dispatcher.SendAsync<PurgeResourceRequest<SoftEntity>, Operation>(new()));
+        Assert.Contains(typeof(PurgeResourceRequest<SoftEntity>).FullName!, purge.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Layer", "Integration")]
+    public async Task ConflictingMethod_DoesNotReplaceTheInstalledConsumerHandler() {
+        var services = new ServiceCollection();
+        var options = new SchemataOptions();
+        services.AddSchemataResources(options);
+        var builder = new SchemataResourceBuilder(options, services);
+        builder.Use<PlainEntity, PlainEntity, PlainEntity, PlainEntity>(null, resource => {
+            resource.Methods = [new("run", typeof(PlainRunHandler), ResourceMethodScope.Collection)];
+        });
+        Assert.Throws<InvalidOperationException>(() => builder.Use<PlainEntity, PlainEntity, PlainEntity, PlainEntity>(null,
+            resource => resource.Methods = [new("run", typeof(RunHandler), ResourceMethodScope.Collection)]));
+        AddRunDependencies(services);
+        using var provider = services.BuildServiceProvider();
+        var response = await new InProcessRequestDispatcher(provider).SendAsync<
+            ResourceMethodRequest<PlainEntity, PlainRunRequest, RunResponse>, RunResponse>(
+                new("run", null, new() { Amount = 9 }, null));
+        Assert.Equal(14, response.Value);
+        Assert.Equal("accounts/one", response.Parent);
+        Assert.Equal(typeof(PlainRunHandler), Assert.Single(provider.GetRequiredService<ResourceRegistry>().GetMethods(typeof(PlainEntity))).Handler);
+        Assert.Null(provider.GetService<IRequestHandler<RunRequest, RunResponse>>());
+    }
+
+    [Fact]
+    [Trait("Layer", "Integration")]
+    public void LateBuiltInOverride_RejectsBeforeChangingTheInstalledMethod() {
+        var services = new ServiceCollection();
+        var options = new SchemataOptions();
+        services.AddSchemataResources(options);
+        var builder = new SchemataResourceBuilder(options, services);
+        builder.Use<SoftEntity, SoftEntity, SoftEntity, SoftEntity>();
+        Assert.Throws<InvalidOperationException>(() => builder.Use<SoftEntity, SoftEntity, SoftEntity, SoftEntity>(null,
+            resource => resource.Methods = [new("purge", typeof(SoftPurgeHandler), ResourceMethodScope.Collection)]));
+        using var provider = services.BuildServiceProvider();
+        Assert.Null(provider.GetService<IRequestHandler<SoftPurgeOverrideRequest, SoftPurgeResponse>>());
+        Assert.Equal(typeof(PurgeHandler<SoftEntity>), provider.GetRequiredService<ResourceRegistry>()
+            .GetMethods(typeof(SoftEntity)).Single(method => method.Verb == "purge").Handler);
+    }
+
+    [Fact]
+    [Trait("Layer", "Integration")]
+    public async Task SupplementedOperations_PreserveDerivedHandlerSharedByAnotherResource() {
+        var host = WebApplication.CreateBuilder();
+        SchemataOptions? options = null;
+        host.UseSchemata(schema => {
+            options = schema.Options;
+            var resource = schema.UseResource();
+            resource.Use<SoftEntity, SoftEntity, SoftEntity, SoftEntity>();
+            resource.Use<PlainEntity, PlainEntity, PlainEntity, PlainEntity>(null, descriptor => {
+                descriptor.Methods = [new("removeArchived", typeof(ExpungeHandler<SoftEntity>), ResourceMethodScope.Collection)];
+            });
+        });
+        var services = host.Services;
+        var archived = new SoftEntity { Name = "archived", CanonicalName = "softEntities/archived", DeleteTime = new DateTime(2026, 1, 1) };
+        var repository = new Mock<IRepository<SoftEntity>>();
+        repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Mock.Of<IDisposable>());
+        repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<SoftEntity>, IQueryable<SoftEntity>>>(), It.IsAny<CancellationToken>()))
+            .Returns((Func<IQueryable<SoftEntity>, IQueryable<SoftEntity>> query, CancellationToken _) =>
+                new ValueTask<SoftEntity?>(query(new[] { archived }.AsQueryable()).SingleOrDefault()));
+        var mutation = new Mock<IResourceMutation<SoftEntity>>();
+        mutation.Setup(m => m.DeleteAsync(archived, null, Operations.Expunge, It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
+        services.AddSingleton(repository.Object);
+        services.AddSingleton(mutation.Object);
+        services.AddSingleton(Mock.Of<IRepository<PlainEntity>>());
+        services.AddSingleton(Mock.Of<ICacheProvider>());
+        new SchemataResourceBuilder(options!, services).Use<SoftEntity, SoftEntity, SoftEntity, SoftEntity>(null,
+            resource => resource.Operations = []);
+        await using var app = host.Build();
+        using var scope = app.Services.CreateScope();
+        var provider = scope.ServiceProvider;
+        var registry = provider.GetRequiredService<ResourceRegistry>();
+        Assert.Empty(registry.GetMethods(typeof(SoftEntity)));
+        Assert.Equal("removeArchived", Assert.Single(registry.GetMethods(typeof(PlainEntity))).Verb);
+        var dispatcher = new InProcessRequestDispatcher(provider);
+        await dispatcher.SendAsync<ResourceMethodRequest<PlainEntity, ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>, EmptyResourceResponse>(
+            new("removeArchived", null, new() { CanonicalName = "softEntities/archived" }, null));
+        mutation.Verify(m => m.DeleteAsync(archived, null, Operations.Expunge, It.IsAny<CancellationToken>()), Times.Once);
+        var expunge = await Assert.ThrowsAsync<InvalidOperationException>(() => dispatcher.SendAsync<
+            ResourceMethodRequest<SoftEntity, ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>, EmptyResourceResponse>(
+                new("expunge", null, new(), null)));
+        Assert.Contains(typeof(ResourceMethodRequest<SoftEntity, ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>).FullName!, expunge.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Layer", "Integration")]
+    public async Task SupplementedOperations_AfterPublicHostFlush_PruneOwnedMethodsAndPreserveApplicationHandler() {
+        var host = WebApplication.CreateBuilder();
+        SchemataOptions? options = null;
+        host.UseSchemata(schema => {
+            options = schema.Options;
+            schema.UseResource().Use<SoftEntity, SoftEntity, SoftEntity, SoftEntity>(null, resource => {
+                resource.Methods = [new("run", typeof(PlainRunHandler), ResourceMethodScope.Collection)];
+            });
+            AddRunDependencies(schema.Services);
+        });
+        var archived = new SoftEntity { CanonicalName = "softEntities/application", DeleteTime = new DateTime(2026, 1, 1) };
+        var repository = new Mock<IRepository<SoftEntity>>();
+        repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Mock.Of<IDisposable>());
+        repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<SoftEntity>, IQueryable<SoftEntity>>>(), It.IsAny<CancellationToken>()))
+            .Returns((Func<IQueryable<SoftEntity>, IQueryable<SoftEntity>> query, CancellationToken _) =>
+                new ValueTask<SoftEntity?>(query(new[] { archived }.AsQueryable()).SingleOrDefault()));
+        var mutation = new Mock<IResourceMutation<SoftEntity>>();
+        mutation.Setup(m => m.DeleteAsync(archived, null, Operations.Expunge, It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
+        var application = new ExpungeHandler<SoftEntity>(repository.Object, mutation.Object);
+        host.Services.AddSingleton<IRequestHandler<ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>>(application);
+        new SchemataResourceBuilder(options!, host.Services).Use<SoftEntity, SoftEntity, SoftEntity, SoftEntity>(null,
+            resource => resource.Operations = []);
+        await using var app = host.Build();
+        using var scope = app.Services.CreateScope();
+        var provider = scope.ServiceProvider;
+        var dispatcher = new InProcessRequestDispatcher(provider);
+        Assert.Equal("run", Assert.Single(provider.GetRequiredService<ResourceRegistry>().GetMethods(typeof(SoftEntity))).Verb);
+        var response = await dispatcher.SendAsync<ResourceMethodRequest<SoftEntity, PlainRunRequest, RunResponse>, RunResponse>(
+            new("run", null, new() { Amount = 11 }, null));
+        Assert.Equal(16, response.Value);
+        Assert.Equal("accounts/one", response.Parent);
+        var expunge = await Assert.ThrowsAsync<InvalidOperationException>(() => dispatcher.SendAsync<
+            ResourceMethodRequest<SoftEntity, ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>, EmptyResourceResponse>(
+                new("expunge", null, new(), null)));
+        Assert.Contains(typeof(ResourceMethodRequest<SoftEntity, ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>).FullName!, expunge.Message, StringComparison.Ordinal);
+        var purge = await Assert.ThrowsAsync<InvalidOperationException>(() => dispatcher.SendAsync<PurgeResourceRequest<SoftEntity>, Operation>(new()));
+        Assert.Contains(typeof(PurgeResourceRequest<SoftEntity>).FullName!, purge.Message, StringComparison.Ordinal);
+        var undelete = await Assert.ThrowsAsync<InvalidOperationException>(() => dispatcher.SendAsync<UndeleteResourceRequest<SoftEntity, SoftEntity>, SoftEntity>(new()));
+        Assert.Contains(typeof(UndeleteResourceRequest<SoftEntity, SoftEntity>).FullName!, undelete.Message, StringComparison.Ordinal);
+        Assert.Empty(provider.GetServices<IRequestPipelineAdvisor<ResourceMethodRequest<SoftEntity, ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>, EmptyResourceResponse>>());
+        Assert.Empty(provider.GetServices<IResourceMethodAdvisor<SoftEntity, ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>>());
+        await dispatcher.SendAsync<ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>(new() { CanonicalName = "softEntities/application" });
+        mutation.Verify(m => m.DeleteAsync(archived, null, Operations.Expunge, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    private static void AddRunDependencies(IServiceCollection services) {
+        var repository = new Mock<IRepository<PlainEntity>>();
+        repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<PlainEntity>, IQueryable<PlainEntity>>>(), It.IsAny<CancellationToken>()))
+            .Returns(new ValueTask<PlainEntity?>(new PlainEntity { Value = 5 }));
+        services.AddSingleton(repository.Object);
+        services.AddSingleton(Mock.Of<IRepository<SoftEntity>>());
+        services.AddSingleton(Mock.Of<ICacheProvider>());
+    }
+
 
     #region Nested type: InvalidHandlerEntity
 
@@ -302,6 +481,7 @@ public class SchemataResourceFeatureRegisterMethodShould
 
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
+        public int Value { get; set; }
 
         #endregion
     }
@@ -310,15 +490,16 @@ public class SchemataResourceFeatureRegisterMethodShould
 
     #region Nested type: PlainRunHandler
 
-    public sealed class PlainRunHandler : IRequestHandler<PlainRunRequest, RunResponse>
+    public sealed class PlainRunHandler(IRepository<PlainEntity> repository) : IRequestHandler<PlainRunRequest, RunResponse>
     {
         #region IRequestHandler<PlainRunRequest,RunResponse> Members
 
-        public Task<RunResponse> HandleAsync(
-            PlainRunRequest       request,
+        public async Task<RunResponse> HandleAsync(
+            PlainRunRequest request,
             CancellationToken ct = default
         ) {
-            return Task.FromResult(new RunResponse());
+            var entity = await repository.SingleOrDefaultAsync(q => q, ct);
+            return new RunResponse { Value = entity!.Value + request.Amount, CanonicalName = "accounts/one/results/total" };
         }
 
         #endregion
@@ -333,6 +514,7 @@ public class SchemataResourceFeatureRegisterMethodShould
         public string?          Name          { get; set; }
         public string?          CanonicalName { get; set; }
         public ClaimsPrincipal? Principal     { get; set; }
+        public int Amount { get; set; }
     }
 
     #endregion
@@ -368,12 +550,14 @@ public class SchemataResourceFeatureRegisterMethodShould
 
     #region Nested type: RunResponse
 
-    public sealed class RunResponse : ICanonicalName
+    public sealed class RunResponse : ICanonicalName, IChild
     {
         #region ICanonicalName Members
 
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
+        public int Value { get; set; }
+        public string? Parent { get; set; }
 
         #endregion
     }

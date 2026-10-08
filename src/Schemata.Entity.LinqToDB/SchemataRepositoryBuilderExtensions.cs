@@ -68,13 +68,6 @@ public static class SchemataRepositoryBuilderExtensions
     )
         where TContextImplementation : TContext
         where TContext : DataConnection {
-        // Register the metadata reader that maps System.ComponentModel.DataAnnotations.Schema attributes
-        // to LINQ to DB mapping attributes so [Table], [Column], etc. are recognized. This mutates the
-        // process-wide MappingSchema.Default, making the reader affect
-        // every DataConnection in the process, and repeated UseLinqToDb calls append additional reader
-        // instances. LINQ to DB resolves attributes through any registered reader, so the duplication is
-        // harmless, but the global reach is intentional and shared.
-        MappingSchema.Default.AddMetadataReader(new SystemComponentModelDataAnnotationsSchemaAttributeReader());
 
         var constructor = HasTypedContextConstructor<TContextImplementation, TContext>();
 
@@ -82,17 +75,27 @@ public static class SchemataRepositoryBuilderExtensions
 
         switch (constructor) {
             case OptionsParameterType.DataOptionsTImpl:
-                builder.Services.TryAddSingleton(typeof(DataOptions<TContextImplementation>), sp => new DataOptions<TContextImplementation>(configure(sp, new())));
+                builder.Services.TryAddSingleton(typeof(DataOptions<TContextImplementation>), sp => new DataOptions<TContextImplementation>(Configure(sp)));
                 break;
             case OptionsParameterType.DataOptionsTContext:
-                builder.Services.TryAddSingleton(typeof(DataOptions<TContext>), sp => new DataOptions<TContext>(configure(sp, new())));
+                builder.Services.TryAddSingleton(typeof(DataOptions<TContext>), sp => new DataOptions<TContext>(Configure(sp)));
                 break;
             case OptionsParameterType.DataOptions:
-                builder.Services.TryAddSingleton(typeof(DataOptions), sp => configure(sp, new()));
+                builder.Services.TryAddSingleton(typeof(DataOptions), sp => Configure(sp));
                 break;
         }
 
         return builder;
+
+        DataOptions Configure(IServiceProvider services) {
+            var options = configure(services, new());
+            var metadata = new MappingSchema();
+            metadata.AddMetadataReader(new SystemComponentModelDataAnnotationsSchemaAttributeReader());
+            var mapping = options.ConnectionOptions.MappingSchema is { } application
+                ? new MappingSchema(application, metadata)
+                : metadata;
+            return options.UseMappingSchema(mapping);
+        }
     }
 
     /// <summary>

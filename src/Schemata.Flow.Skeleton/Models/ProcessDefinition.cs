@@ -17,13 +17,13 @@ namespace Schemata.Flow.Skeleton.Models;
 /// </summary>
 /// <remarks>
 ///     Magic-property discovery is adapted from Automatonymous: auto-properties of known types
-///     (<see cref="Activity"/>, <see cref="StartEvent"/>, <see cref="EndEvent"/>, <see cref="FlowEvent"/>,
-///     <see cref="Message"/>, <see cref="Message{TPayload}"/>, <see cref="Signal"/>,
-///     <see cref="Signal{TPayload}"/>, <see cref="ErrorDefinition"/>,
-///     <see cref="EscalationDefinition"/>) are instantiated (when null) and registered on the
+///     (<see cref="Activity" />, <see cref="StartEvent" />, <see cref="EndEvent" />, <see cref="FlowEvent" />,
+///     <see cref="Message" />, <see cref="Message{TPayload}" />, <see cref="Signal" />,
+///     <see cref="Signal{TPayload}" />, <see cref="ErrorDefinition" />,
+///     <see cref="EscalationDefinition" />) are instantiated (when null) and registered on the
 ///     definition collections by the base constructor. An element's name is always its property
 ///     name, which makes it deterministic across definition rebuilds — property names define the
-///     persisted element identity. Labels populate <see cref="IDescriptive"/> members through a
+///     persisted element identity. Labels populate <see cref="IDescriptive" /> members through a
 ///     separate channel: <c>[DisplayName]</c>, <c>[Description]</c> and repeatable
 ///     <c>[Localized]</c> declarations land on the element, and the same declarations on the
 ///     definition class label the process itself.
@@ -32,24 +32,38 @@ namespace Schemata.Flow.Skeleton.Models;
 ///     that scope's children before the base constructor runs, or not be exposed as a
 ///     magic property at all.
 ///     <para>
-    ///         The <see cref="AllElements" />, <see cref="AllFlows" />, <see cref="ByName" />,
-    ///         <see cref="OutgoingBySource" />, and <see cref="IncomingByTarget" /> properties
-    ///         rebuild graph views from the mutable definition collections on each access.
+///         The <see cref="AllElements" />, <see cref="AllFlows" />, <see cref="ByName" />,
+///         <see cref="OutgoingBySource" />, and <see cref="IncomingByTarget" /> properties
+///         rebuild graph views from the frozen graph collections on each access.
+///     </para>
+///     <para>
+///         Once the owning process registry finishes compiling and registering a definition, it
+///         calls <see cref="FlowGraphNode.Freeze" />; subsequent attempts to mutate executable
+///         graph state — element names, edges, conditions, source declarations, event-definition
+///         payload types, etc. — throw <see cref="InvalidOperationException" />. Display labels
+///         stay mutable so tooling can rename presentation strings without un-freezing the graph.
 ///     </para>
 /// </remarks>
-public class ProcessDefinition : IDescriptive
+public class ProcessDefinition : FlowGraphNode, IDescriptive
 {
     /// <summary>
     ///     Initializes a new <see cref="ProcessDefinition" />, applies the labels declared on the
     ///     definition type itself, and seeds known auto-properties via reflection.
     /// </summary>
     public ProcessDefinition() {
+        _sourceDeclarations = _sources.AsReadOnly();
         GetType().ApplyLabels(this);
         InitializeProperties();
     }
 
     /// <summary>Stable identifier of the process definition; serves as the lookup key in the registry.</summary>
-    public string Name { get; set; } = null!;
+    public string Name {
+        get;
+        set {
+            EnsureMutable();
+            field = value;
+        }
+    } = null!;
 
     /// <summary>Human-readable label surfaced in tooling and audit rows.</summary>
     public string? DisplayName { get; set; }
@@ -64,10 +78,10 @@ public class ProcessDefinition : IDescriptive
     public Dictionary<string, string?>? Descriptions { get; set; }
 
     /// <summary>Every BPMN element discovered on the definition (activities, events, gateways).</summary>
-    public List<FlowElement> Elements { get; } = [];
+    public FlowGraphCollection<FlowElement> Elements { get; } = new();
 
     /// <summary>Sequence flows connecting <see cref="Elements" />.</summary>
-    public List<SequenceFlow> Flows { get; } = [];
+    public FlowGraphCollection<SequenceFlow> Flows { get; } = new();
 
     /// <summary>Activities that already have outgoing sequence flows during graph construction.</summary>
     internal HashSet<Activity> ActivitiesWithOutgoing { get; } = [];
@@ -99,7 +113,7 @@ public class ProcessDefinition : IDescriptive
         EnterTasks.TryAdd(target, task);
     }
 
-    private (List<FlowElement> Elements, List<SequenceFlow> Flows) ScopeFor(FlowElement element) {
+    private (FlowGraphCollection<FlowElement> Elements, FlowGraphCollection<SequenceFlow> Flows) ScopeFor(FlowElement element) {
         foreach (var scope in Elements.OfType<SubProcess>()) {
             if (ScopeFor(scope, element) is { } nested) {
                 return nested;
@@ -109,7 +123,7 @@ public class ProcessDefinition : IDescriptive
         return (Elements, Flows);
     }
 
-    private static (List<FlowElement> Elements, List<SequenceFlow> Flows)? ScopeFor(SubProcess scope, FlowElement element) {
+    private static (FlowGraphCollection<FlowElement> Elements, FlowGraphCollection<SequenceFlow> Flows)? ScopeFor(SubProcess scope, FlowElement element) {
         if (scope.Children.Contains(element)) {
             return (scope.Children, scope.ChildFlows);
         }
@@ -124,25 +138,27 @@ public class ProcessDefinition : IDescriptive
     }
 
     /// <summary>Message definitions referenced by message events and tasks.</summary>
-    public List<Message> Messages { get; } = [];
+    public FlowGraphCollection<Message> Messages { get; } = new();
 
     /// <summary>Signal definitions referenced by signal events.</summary>
-    public List<Signal> Signals { get; } = [];
+    public FlowGraphCollection<Signal> Signals { get; } = new();
 
     /// <summary>Error definitions referenced by error boundary events and end events.</summary>
-    public List<ErrorDefinition> Errors { get; } = [];
+    public FlowGraphCollection<ErrorDefinition> Errors { get; } = new();
 
     /// <summary>Escalation definitions referenced by escalation events.</summary>
-    public List<EscalationDefinition> Escalations { get; } = [];
+    public FlowGraphCollection<EscalationDefinition> Escalations { get; } = new();
 
     private readonly List<FlowSourceDeclaration> _sources = [];
+
+    private readonly IReadOnlyList<FlowSourceDeclaration> _sourceDeclarations;
 
     /// <summary>
     ///     Source entity bindings declared on this definition. The registry merges
     ///     these into its source descriptor map so source-aware advisors run for message-driven
     ///     definitions that carry no source-typed guard condition.
     /// </summary>
-    public IReadOnlyList<FlowSourceDeclaration> SourceDeclarations => _sources;
+    public IReadOnlyList<FlowSourceDeclaration> SourceDeclarations => _sourceDeclarations;
 
     /// <summary>
     ///     Declares a source entity type bound to this definition. The binding name defaults to
@@ -154,6 +170,7 @@ public class ProcessDefinition : IDescriptive
     /// <param name="projection">The projection mode applied to the binding.</param>
     protected void BindSource<T>(string? name = null, FlowSourceProjection? projection = null)
         where T : class, ICanonicalName {
+        EnsureMutable();
         var binding = string.IsNullOrEmpty(name) ? FlowSourceDescriptor.DefaultBindingName<T>() : name;
         _sources.Add(new(binding, typeof(T), projection));
     }
@@ -163,6 +180,7 @@ public class ProcessDefinition : IDescriptive
     /// <param name="state">The source member receiving the projected state.</param>
     protected void BindSource<T>(Expression<Func<T, string?>> state)
         where T : class, ICanonicalName {
+        EnsureMutable();
         var binding = FlowSourceDescriptor.DefaultBindingName<T>();
         _sources.Add(new(binding, typeof(T), StateMember: state));
     }
@@ -173,6 +191,7 @@ public class ProcessDefinition : IDescriptive
     /// <param name="state">The source member receiving the projected state.</param>
     protected void BindSource<T>(string name, Expression<Func<T, string?>> state)
         where T : class, ICanonicalName {
+        EnsureMutable();
         var binding = string.IsNullOrEmpty(name) ? FlowSourceDescriptor.DefaultBindingName<T>() : name;
         _sources.Add(new(binding, typeof(T), StateMember: state));
     }
@@ -183,6 +202,7 @@ public class ProcessDefinition : IDescriptive
     /// <param name="configure">Configures the binding members and projection mode.</param>
     protected void BindSource<T>(string name, Action<FlowSourceBindingBuilder<T>> configure)
         where T : class, ICanonicalName {
+        EnsureMutable();
         var builder = new FlowSourceBindingBuilder<T>();
         configure(builder);
 
@@ -195,6 +215,7 @@ public class ProcessDefinition : IDescriptive
     /// <param name="configure">Configures the binding members and projection mode.</param>
     protected void BindSource<T>(Action<FlowSourceBindingBuilder<T>> configure)
         where T : class, ICanonicalName {
+        EnsureMutable();
         var builder = new FlowSourceBindingBuilder<T>();
         configure(builder);
 
@@ -299,6 +320,16 @@ public class ProcessDefinition : IDescriptive
         if (backingField is not null) {
             backingField.SetValue(target, value);
         }
+    }
+
+    /// <inheritdoc />
+    protected internal override void FreezeCore() {
+        Elements.Freeze();
+        Flows.Freeze();
+        Messages.Freeze();
+        Signals.Freeze();
+        Errors.Freeze();
+        Escalations.Freeze();
     }
 
     private void InitializeProperties() {

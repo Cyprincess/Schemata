@@ -1,6 +1,5 @@
 using Moq;
 using Schemata.Abstractions.Advisors;
-using Schemata.Entity.Owner.Advisors;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Flow.Foundation;

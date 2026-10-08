@@ -71,10 +71,7 @@ public sealed class AdviceRequestDeviceCodePolling<TApp>(ICacheProvider cache, I
                 AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(next),
             }, ct);
 
-            throw new OAuthException(
-                OAuthErrors.SlowDown,
-                SchemataResources.GetResourceString(SchemataResources.SLOW_DOWN)
-            );
+            throw new OAuthException(OAuthErrors.SlowDown, SchemataResources.SLOW_DOWN);
         }
 
         await cache.SetAsync(key, BitConverter.GetBytes(options.Value.DeviceCodeInterval), new() {

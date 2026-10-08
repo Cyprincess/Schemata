@@ -5,8 +5,9 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions.Tenancy;
 using Schemata.Common;
-using Schemata.Entity.Owner.Advisors;
+using Schemata.Entity.Repository.Advisors;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
@@ -24,7 +25,8 @@ public sealed class ProcessPersistence
         CancellationToken ct
     ) {
         var processes = services.GetRequiredService<IRepository<SchemataProcess>>();
-        return await processes.FirstOrDefaultAsync(q => q.Where(p => p.CanonicalName == canonicalName), ct);
+        var tenant = TenantContext.Current.Uid;
+        return await processes.FirstOrDefaultAsync(q => q.Where(p => p.CanonicalName == canonicalName && p.TenantUid == tenant), ct);
     }
 
     /// <summary>Lists persisted processes that currently have at least one waiting token.</summary>
@@ -34,14 +36,15 @@ public sealed class ProcessPersistence
     ) {
         var processes = services.GetRequiredService<IRepository<SchemataProcess>>();
         var tokens    = services.GetRequiredService<IRepository<SchemataProcessToken>>();
+        var tenant = TenantContext.Current.Uid;
 
         var waitingProcesses = new HashSet<string>(StringComparer.Ordinal);
-        await foreach (var token in tokens.ListAsync<SchemataProcessToken>(q => q.Where(t => t.WaitingAtName != null), ct)) {
+        await foreach (var token in tokens.ListAsync<SchemataProcessToken>(q => q.Where(t => t.WaitingAtName != null && t.TenantUid == tenant), ct)) {
             waitingProcesses.Add(token.Process);
         }
 
         foreach (var processName in waitingProcesses) {
-            var match = await processes.FirstOrDefaultAsync(q => q.Where(p => p.Name == processName), ct);
+            var match = await processes.FirstOrDefaultAsync(q => q.Where(p => p.Name == processName && p.TenantUid == tenant), ct);
             if (match is not null) {
                 yield return match;
             }
@@ -65,9 +68,10 @@ public sealed class ProcessPersistence
         transitions.Join(uow);
         sources.Join(uow);
         compensations.Join(uow);
-        SuppressOwnerQueries(processes, tokens, transitions, sources, compensations);
 
-        var scope = new FlowPersistenceScope(uow, processes, tokens, transitions, sources, compensations);
+        var scope = new FlowPersistenceScope(uow, processes, tokens, transitions, sources, compensations, services);
+        // The suppression scope covers the work and the commit; disposal restores the prior state.
+        using var suppression = SuppressOwnerQueries(processes, tokens, transitions, sources, compensations);
         try {
             await work(scope, ct);
             await uow.CommitAsync(ct);
@@ -86,26 +90,49 @@ public sealed class ProcessPersistence
 
         ReleaseIdempotencyKey(process);
 
-        var existing = await scope.Processes.FirstOrDefaultAsync(q => q.Where(p => p.CanonicalName == process.CanonicalName), ct);
-        if (existing is null) {
-            await scope.Processes.AddAsync(process, ct);
+        if (scope.CreatedProcesses.Contains(process)) {
+            await scope.Mutation<SchemataProcess>().UpdateAsync(process, scope.UnitOfWork, ct: ct);
         } else {
-            CopyEntity(existing, process);
-            await scope.Processes.UpdateAsync(existing, ct);
+            var existing = await scope.Processes.FirstOrDefaultAsync(q => q.Where(p => p.CanonicalName == process.CanonicalName), ct);
+            if (existing is null) {
+                await scope.CreateProcessAsync(process, ct);
+            } else {
+                if (!ReferenceEquals(existing, process)) CopyEntity(existing, process);
+                await scope.Mutation<SchemataProcess>().UpdateAsync(existing, scope.UnitOfWork, ct: ct);
+                // The rotated stamp is final only at the provider's write boundary; the preparation
+                // projects it onto the runtime process after rotation, and rollback restores the
+                // staged value so a failed commit never surfaces an unpersisted stamp.
+                var staged = process.Timestamp;
+                scope.UnitOfWork.AddSavePreparation(() => process.Timestamp = existing.Timestamp);
+                scope.UnitOfWork.AddRollbackSink(() => process.Timestamp = staged);
+                process.UpdateTime = existing.UpdateTime;
+            }
         }
 
+        Dictionary<string, SchemataProcessToken>? tokenIndex = null;
         foreach (var token in snapshot.Tokens) {
-            var persisted = await scope.Tokens.FirstOrDefaultAsync(q => q.Where(t => t.CanonicalName == token.CanonicalName), ct);
+            token.TenantUid = process.TenantUid;
+            if (scope.CreatedTokens.Contains(token)) {
+                await scope.Mutation<SchemataProcessToken>().UpdateAsync(token, scope.UnitOfWork, ct: ct);
+                continue;
+            }
+            tokenIndex ??= await scope.GetTokenIndexAsync(process.Name!, ct);
+            var persisted = token.CanonicalName is { } name && tokenIndex.TryGetValue(name, out var loaded) ? loaded : null;
             if (persisted is null) {
-                await scope.Tokens.AddAsync(token, ct);
+                await scope.CreateTokenAsync(token, ct);
             } else {
-                CopyEntity(persisted, token);
-                await scope.Tokens.UpdateAsync(persisted, ct);
+                if (!ReferenceEquals(persisted, token)) CopyEntity(persisted, token);
+                await scope.Mutation<SchemataProcessToken>().UpdateAsync(persisted, scope.UnitOfWork, ct: ct);
+                var staged = token.Timestamp;
+                scope.UnitOfWork.AddSavePreparation(() => token.Timestamp = persisted.Timestamp);
+                scope.UnitOfWork.AddRollbackSink(() => token.Timestamp = staged);
+                token.UpdateTime = persisted.UpdateTime;
             }
         }
 
         foreach (var transition in snapshot.Transitions) {
-            await scope.Transitions.AddAsync(transition, ct);
+            transition.TenantUid = process.TenantUid;
+            await scope.Mutation<SchemataProcessTransition>().CreateAsync(transition, scope.UnitOfWork, ct);
         }
 
         await ReplaceCompensationBindingsAsync(scope, process, snapshot.CompensationBindings, ct);
@@ -117,28 +144,47 @@ public sealed class ProcessPersistence
         IReadOnlyList<ProcessCompensationBinding> bindings,
         CancellationToken                        ct
     ) {
-        var persisted = new List<SchemataProcessCompensation>();
-        await foreach (var binding in scope.Compensations.ListAsync<SchemataProcessCompensation>(
-                           q => q.Where(row => row.Process == process.CanonicalName), ct)) {
-            persisted.Add(binding);
+        var remaining = new Dictionary<(string Scope, string Activity, int Order), int>();
+        if (!ProcessStates.IsTerminal(process.State)) {
+            foreach (var binding in bindings) {
+                var key = (binding.ScopeOwnerCanonicalName, binding.ActivityName, binding.RegistrationOrder);
+                remaining.TryGetValue(key, out var count);
+                remaining[key] = count + 1;
+            }
         }
-
-        if (persisted.Count > 0) {
-            await scope.Compensations.RemoveRangeAsync(persisted, ct);
+        var removed = new List<SchemataProcessCompensation>();
+        var effective = await scope.GetCompensationsAsync(process.CanonicalName!, ct);
+        foreach (var row in effective) {
+            var key = (row.ScopeOwnerCanonicalName, row.ActivityName, row.RegistrationOrder);
+            if (remaining.TryGetValue(key, out var count) && count > 0) remaining[key] = count - 1;
+            else removed.Add(row);
         }
+        if (removed.Count > 0) {
+            var mutation = scope.Mutation<SchemataProcessCompensation>();
+            foreach (var row in removed) {
+                await mutation.DeleteAsync(row, scope.UnitOfWork, ct: ct);
+            }
 
-        if (ProcessStates.IsTerminal(process.State) || bindings.Count == 0) {
-            return;
+            var removedSet = new HashSet<SchemataProcessCompensation>(removed, ReferenceEqualityComparer.Instance);
+            effective.RemoveAll(removedSet.Contains);
         }
+        var added = new List<SchemataProcessCompensation>();
+        foreach (var (key, count) in remaining) {
+            for (var i = 0; i < count; i++) {
+                added.Add(new() {
+                    Process = process.CanonicalName!, ScopeOwnerCanonicalName = key.Scope,
+                    ActivityName = key.Activity, RegistrationOrder = key.Order,
+                });
+            }
+        }
+        if (added.Count > 0) {
+            var mutation = scope.Mutation<SchemataProcessCompensation>();
+            foreach (var row in added) {
+                await mutation.CreateAsync(row, scope.UnitOfWork, ct);
+            }
 
-        var rows = bindings.Select(binding => new SchemataProcessCompensation {
-            Name                    = Guid.NewGuid().ToString("n"),
-            Process                 = process.CanonicalName!,
-            ScopeOwnerCanonicalName = binding.ScopeOwnerCanonicalName,
-            ActivityName            = binding.ActivityName,
-            RegistrationOrder       = binding.RegistrationOrder,
-        });
-        await scope.Compensations.AddRangeAsync(rows, ct);
+            effective.AddRange(added);
+        }
     }
 
     private static void CopyEntity(object target, object source) {
@@ -148,6 +194,8 @@ public sealed class ProcessPersistence
                 dst.Name           = src.Name;
                 dst.CanonicalName  = src.CanonicalName;
                 dst.DefinitionName = src.DefinitionName;
+                dst.DefinitionVersion = src.DefinitionVersion;
+                dst.TenantUid = src.TenantUid;
                 dst.IdempotencyKey = src.IdempotencyKey;
                 dst.State          = src.State;
                 dst.Annotations    = new(src.Annotations);
@@ -163,6 +211,7 @@ public sealed class ProcessPersistence
                 dst.Name          = src.Name;
                 dst.CanonicalName = src.CanonicalName;
                 dst.Process       = src.Process;
+                dst.TenantUid = src.TenantUid;
                 dst.Spawner       = src.Spawner;
                 dst.ScopeName     = src.ScopeName;
                 dst.StateName     = src.StateName;
@@ -188,9 +237,23 @@ public sealed class ProcessPersistence
         process.IdempotencyKey = null;
     }
 
-    private static void SuppressOwnerQueries(params IRepository[] repositories) {
-        foreach (var repository in repositories) {
-            repository.AdviceContext?.Set(new QueryOwnerSuppressed());
+    private static IDisposable SuppressOwnerQueries(params IRepository[] repositories) {
+        return new SuppressionScope(repositories.Select(repository => repository.AdviceContext.Use<QueryOwnerSuppressed>()).ToArray());
+    }
+
+    private sealed class SuppressionScope(IDisposable[] scopes) : IDisposable
+    {
+        private bool _disposed;
+
+        public void Dispose() {
+            if (_disposed) {
+                return;
+            }
+
+            _disposed = true;
+            for (var i = scopes.Length - 1; i >= 0; i--) {
+                scopes[i].Dispose();
+            }
         }
     }
 }

@@ -13,6 +13,8 @@ public sealed class StartProcessInstanceRequest : ICanonicalName, IRequestIdenti
     /// <summary>The <see cref="Models.ProcessDefinition.Name" /> of the definition to instantiate.</summary>
     public string DefinitionName { get; set; } = null!;
 
+    public string DefinitionVersion { get; set; } = "1";
+
     /// <summary>Optional display name for the new process instance.</summary>
     public string? DisplayName { get; set; }
 

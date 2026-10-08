@@ -14,22 +14,13 @@ namespace Schemata.Resource.Http;
 ///     for generic <see cref="ResourceController{TEntity,TRequest,TDetail,TSummary}" /> instances
 ///     per <seealso href="https://google.aip.dev/127">AIP-127: HTTP and gRPC Transcoding</seealso>.
 ///     Also drops controller actions for verbs that the entity's
-///     <see cref="ResourceAttribute.Operations" /> whitelist excludes.
+///     <see cref="ResourceRegistration.Operations" /> whitelist excludes.
 /// </summary>
 public sealed class ResourceControllerConvention(
     ResourceRegistry registry,
     string?           scheme = null
 ) : IControllerModelConvention
 {
-    // Custom methods are handled by ResourceMethodControllerConvention and are unaffected.
-    private static readonly IReadOnlyDictionary<string, Operations> VerbByAction =
-        new Dictionary<string, Operations>(StringComparer.Ordinal) {
-            [nameof(ResourceController<,,,>.ListAsync)]   = Operations.List,
-            [nameof(ResourceController<,,,>.GetAsync)]    = Operations.Get,
-            [nameof(ResourceController<,,,>.CreateAsync)] = Operations.Create,
-            [nameof(ResourceController<,,,>.UpdateAsync)] = Operations.Update,
-            [nameof(ResourceController<,,,>.DeleteAsync)] = Operations.Delete,
-        };
 
     #region IControllerModelConvention Members
 
@@ -57,7 +48,11 @@ public sealed class ResourceControllerConvention(
         if (resource is { Operations: { } allowed }) {
             var allowedSet = new HashSet<Operations>(allowed);
             for (var i = controller.Actions.Count - 1; i >= 0; i--) {
-                if (VerbByAction.TryGetValue(controller.Actions[i].ActionName, out var verb)
+                // Same registered-identity fact the anonymous projection uses: a standard CLR
+                // method name resolves to its operation; anything else is not a standard
+                // operation and the whitelist never drops it.
+                if (ResourceHttpConventionHelper.TryResolveOperation(controller.Actions[i], out var operation)
+                 && Enum.TryParse<Operations>(operation, out var verb)
                  && !allowedSet.Contains(verb)) {
                     controller.Actions.RemoveAt(i);
                 }
@@ -65,7 +60,7 @@ public sealed class ResourceControllerConvention(
         }
 
         ResourceHttpConventionHelper.ApplyRateLimit(controller, entityType);
-        ResourceHttpConventionHelper.ApplyAuthorization(controller, resource?.AuthenticationScheme ?? scheme);
+        ResourceHttpConventionHelper.ApplyAuthorization(controller, entityType, resource?.AuthenticationScheme ?? scheme);
     }
 
     #endregion

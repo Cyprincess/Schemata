@@ -110,23 +110,23 @@ returns 200 and the student reappears in `GET /v1/students`.
 
 On the HTTP surface, `POST /v1/students/{name}:expunge` physically removes an
 already-tombstoned row — it is registered automatically alongside `:undelete`.
-For application code that needs to permanently remove a row, bypass the
-soft-delete advisor by scoping `SuppressSoftDelete()` around the remove:
+For application code that needs to permanently remove a row, call the
+resource mutation owner with the `Expunge` intent:
 
 ```csharp
 public async Task PurgeAsync(Student student, CancellationToken ct)
 {
-    using (repository.SuppressSoftDelete())
-    {
-        await repository.RemoveAsync(student, ct);
-    }
-    await repository.CommitAsync(ct);
+    await mutation.DeleteAsync(student, null, Operations.Expunge, ct);
 }
 ```
 
-`SuppressSoftDelete()` sets `SoftDeleteSuppressed` in the `AdviceContext`.
-`AdviceRemoveSoftDelete` checks `ctx.Has<SoftDeleteSuppressed>()` at the top
-of `AdviseAsync` and returns `Continue`, letting the physical delete proceed.
+`mutation` is an `IResourceMutation<Student>` constructor-injected into the
+calling service. Physical-delete intents (`Expunge`, `Purge`, `Delete` on a
+non-`ISoftDelete` row) scope `SuppressSoftDelete()` inside the mutation, run
+the domain delete pipeline, and commit; the caller never opens a suppression
+scope or calls `CommitAsync` itself.
+
+
 
 **Verify:** After calling `PurgeAsync`, the row is gone from the database
 entirely.

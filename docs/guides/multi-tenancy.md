@@ -27,15 +27,28 @@ schema.UseTenancy()
 
 Five built-in resolver strategies ship with the foundation:
 
-| Method                   | Source                                          | Header / Parameter |
-| ------------------------ | ----------------------------------------------- | ------------------ |
-| `UseHeaderResolver()`    | HTTP request header                             | `x-tenant-id`      |
-| `UseHostResolver()`      | `Host` header matched against tenant host names | (none)             |
-| `UsePathResolver()`      | Route parameter                                 | `{Tenant}`         |
-| `UsePrincipalResolver()` | Authenticated user claim                        | `Tenant`           |
-| `UseQueryResolver()`     | Query string parameter                          | `Tenant`           |
+| Method                   | Stage     | Source                                          | Header / Parameter |
+| ------------------------ | --------- | ----------------------------------------------- | ------------------ |
+| `UseHeaderResolver()`    | Request   | HTTP request header                             | `x-tenant-id`      |
+| `UseHostResolver()`      | Request   | `Host` header matched against tenant host names | (none)             |
+| `UsePathResolver()`      | Request   | Route parameter                                 | `{Tenant}`         |
+| `UsePrincipalResolver()` | Principal | Authenticated user claim                        | `Tenant`           |
+| `UseQueryResolver()`     | Request   | Query string parameter                          | `Tenant`           |
 
-Only the first `UseXxxResolver()` call wins — later calls are ignored, and the accessor asks a single `ITenantResolver` once per request. For "header overrides path" semantics, implement a composite `ITenantResolver` and register it directly.
+Each `UseXxxResolver()` registers its resolver into the same `IEnumerable<ITenantResolver>`
+collection. Request-stage resolvers run during `SchemataTenancyMiddleware`; Principal-stage
+resolvers run once after `SchemataTenantPrincipalMiddleware` (post-default authentication) and
+again from `TenantPolicyEvaluator.AuthenticateAsync` after each authorization policy's
+authentication scheme resolves, so custom Principal-stage resolvers must be idempotent across
+these calls. Multiple sources compose — a header, a path, and a query resolver can all be
+installed and contribute to the resolved identity. When two Request-stage resolvers return
+different non-null ids the accessor raises `TenantResolveException`; a Principal-stage
+resolver disagrees with a non-null request-stage tenant also throws. When the request stage
+produced no tenant and the principal carries a `Tenant` claim, the principal resolver promotes
+the request to a tenant scope (the standard "header-or-claim" pattern). Use
+`RequestPrincipalResolver` together with a Request-stage resolver only when both sources are
+expected to agree (the principal's `Tenant` claim is typically derived from the same header
+that the request-stage resolver reads).
 
 ## Custom tenant entity
 
@@ -81,10 +94,17 @@ these repositories. Replace `Tenant` with `SchemataTenant` when you use the non-
 | Method                                         | Where the registrations land                                                                        | Allowed lifetimes                                                                                                                              |
 | ---------------------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ForAll(configure)`                            | Root `IServiceCollection`                                                                           | Any (Singleton / Scoped / Transient) — these become normal host services that every tenant sees through the composite provider's root fallback |
-| `ForTenant(tenantId, configure)`               | Per-tenant override container, applied at provider build time                                       | **Singleton only**                                                                                                                             |
-| `ForTenant((tenantId, services, root) => ...)` | Same as above but applied to every tenant container, with the tenant id and root provider available | **Singleton only**                                                                                                                             |
+| `ForTenant(tenantId, configure)`               | Per-tenant override container, applied at provider build time                                       | Singleton / Scoped / Transient; open-generic descriptors raise `InvalidOperationException`                                                     |
+| `ForTenant((tenantId, services, root) => ...)` | Same as above but applied to every tenant container, with the tenant id and root provider available | Singleton / Scoped / Transient; open-generic descriptors raise `InvalidOperationException`                                                     |
 
-Scoped or transient registrations in either `ForTenant` overload throw `InvalidOperationException` at provider-build time. `ForAll` adds host registrations visible to every tenant; a host service's constructor still resolves from the host container, so tenant-aware host services must consult `ITenantContextAccessor<TTenant>` while performing their work.
+`ForAll` adds host registrations visible to every tenant. Inside the per-tenant composite provider,
+`TenantCompositeServiceProvider.GetService` falls back to the host scope's provider when the
+tenant overrides do not register the type — so a host service receives the host scope's
+`SchemataTenantContextAccessor`, which is never initialized for the current request and reads
+`null` from `accessor.Tenant`. Host services resolve the request's tenant identity through the
+ambient `TenantContext.Current` (set by `SchemataTenancyMiddleware` and refreshed by the
+principal and execution middlewares); services that need tenant-side dependencies must be
+registered explicitly with `ForTenant(...)`.
 
 ```csharp
 public interface IFeatureGate

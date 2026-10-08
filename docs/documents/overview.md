@@ -47,7 +47,7 @@ The data-access layer.
 | [Query Pipeline](repository/query-pipeline.md)       | Build-query, query, and result advisor chains                         |
 | [Unit of Work](repository/unit-of-work.md)           | Explicit enlistment and commit                                        |
 | [Caching](repository/caching.md)                     | Query-result caching from the repository's side                       |
-| [Ownership](repository/ownership.md)                 | `Schemata.Entity.Owner` and `IOwnable`                                |
+| [Ownership](repository/ownership.md)                 | `UseOwner()` and `IOwnable`                                           |
 | [Providers](repository/providers.md)                 | EF Core and LinqToDB setup and caveats                                |
 
 ## Caching
@@ -57,9 +57,8 @@ The distributed cache layer.
 | Document                              | Covers                                                           |
 | ------------------------------------- | ---------------------------------------------------------------- |
 | [Overview](caching/overview.md)       | `ICacheProvider`, the key format, provider stack                 |
-| [Distributed](caching/distributed.md) | `DistributedCacheProvider` over `IDistributedCache`              |
 | [Redis](caching/redis.md)             | `RedisCacheProvider` and its compare-and-set scripts             |
-| [Query Cache](entity/query-cache.md)  | Query and result advisors, the reverse index, committed eviction |
+| [Query Cache](entity/query-cache.md)  | Query and result advisors, type generations, committed eviction |
 
 ## Resource
 
@@ -96,7 +95,7 @@ The event bus and dispatch pipeline.
 | Document                                        | Covers                                      |
 | ----------------------------------------------- | ------------------------------------------- |
 | [Overview](event/overview.md)                   | Contracts, wire names, `IEventTypeRegistry` |
-| [Dispatch Pipeline](event/dispatch-pipeline.md) | Publish to the outbox, drain, consume       |
+| [Dispatch Pipeline](event/dispatch-pipeline.md) | Inline dispatch, broker confirmation, audit |
 | [Providers](event/providers.md)                 | In-process and RabbitMQ transports          |
 
 ## Scheduling

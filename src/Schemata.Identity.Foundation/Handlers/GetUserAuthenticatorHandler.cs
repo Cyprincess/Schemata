@@ -15,5 +15,11 @@ internal sealed class GetUserAuthenticatorHandler<TUser>(IdentityOperationHandle
     public Task<IdentityResult<AuthenticatorResponse>> HandleAsync(
         GetUserAuthenticatorRequest<TUser> request,
         CancellationToken                  ct = default
-    ) => operations.AuthenticatorAsync(IdentityRequestHandler.Require(request).Principal!, ct);
+    ) {
+        if (request.Principal is null) {
+            return Task.FromResult(IdentityResult<AuthenticatorResponse>.Challenge());
+        }
+
+        return operations.AuthenticatorAsync(request.Principal, ct);
+    }
 }

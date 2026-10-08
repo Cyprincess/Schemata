@@ -65,6 +65,6 @@ public sealed class CelCompiler : IExpressionCompiler
     #endregion
 
     private static string Fingerprint(ExpressionCompileOptions? options) {
-        return ExpressionCompileOptions.Fingerprint(options);
+        return ExpressionCompileOptions.Fingerprint(options, "qualified-members-v2");
     }
 }

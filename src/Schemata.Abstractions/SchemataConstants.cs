@@ -46,6 +46,8 @@ public static class SchemataConstants
 
         /// <summary>An internal server error occurred.</summary>
         public const string Internal = "INTERNAL";
+
+        public const string Unimplemented = "UNIMPLEMENTED";
     }
 
     #endregion
@@ -97,6 +99,9 @@ public static class SchemataConstants
         /// <summary>Optimistic-concurrency conflict (Status ABORTED).</summary>
         public const string ConcurrencyMismatch = "CONCURRENCY_MISMATCH";
 
+        /// <summary>A replayed request_id carries a payload different from the original request (Status INVALID_ARGUMENT).</summary>
+        public const string RequestIdPayloadMismatch = "REQUEST_ID_PAYLOAD_MISMATCH";
+
         /// <summary>The named token does not exist on the addressed process (Status NOT_FOUND).</summary>
         public const string ProcessTokenNotFound = "PROCESS_TOKEN_NOT_FOUND";
 
@@ -108,9 +113,41 @@ public static class SchemataConstants
 
         /// <summary>A registered process references a BPMN-only AST node that the state-machine engine cannot run (Status FAILED_PRECONDITION).</summary>
         public const string StateMachineRequiresBpmnEngine = "STATE_MACHINE_REQUIRES_BPMN_ENGINE";
+
+        /// <summary>The outcome of a recorded external effect is indeterminate and the receiver supports neither query nor dedupe (Status INTERNAL).</summary>
+        public const string FlowEffectOutcomeUnknown = "FLOW_EFFECT_OUTCOME_UNKNOWN";
     }
 
     #endregion
+
+    #region Nested type: ErrorDomains
+
+    /// <summary>
+    ///     Logical service domains that namespace <see cref="Errors.ErrorInfoDetail.Reason" />
+    /// codes, per <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>. Exception
+    /// families own their domain through <see cref="Exceptions.SchemataException.Domain" />; the
+    /// response conversion assigns it to every <c>ErrorInfo</c> detail that lacks one.
+    /// </summary>
+    public static class ErrorDomains
+    {
+        /// <summary>Framework-wide default namespace for reasons without a finer owner.</summary>
+        public const string Schemata = "schemata";
+
+        /// <summary>Resource pipeline (CRUD handlers, advisors, and resource-themed factories).</summary>
+        public const string Resource = "schemata.resource";
+
+        /// <summary>OAuth 2.0 / OpenID Connect protocol server errors.</summary>
+        public const string OAuth = "schemata.oauth";
+
+        /// <summary>Tenant resolution failures.</summary>
+        public const string Tenancy = "schemata.tenancy";
+
+        /// <summary>Request validation failures reported as field violations.</summary>
+        public const string Validation = "schemata.validation";
+    }
+
+    #endregion
+
 
     #region Nested type: IdentityClaims
 

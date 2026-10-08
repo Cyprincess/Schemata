@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions.Tenancy;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
 
@@ -16,36 +17,26 @@ namespace Schemata.Tenancy.Foundation.Services;
 public class SchemataTenantServiceScopeFactory<TTenant> : ITenantServiceScopeFactory<TTenant>
     where TTenant : SchemataTenant
 {
-    private readonly ITenantContextAccessor<TTenant>        _accessor;
     private readonly ITenantServiceProviderFactory<TTenant> _factory;
     private readonly IServiceProvider                       _root;
 
     /// <summary>Creates a scope factory that switches between root and tenant providers.</summary>
     public SchemataTenantServiceScopeFactory(
         IServiceProvider                       root,
-        ITenantContextAccessor<TTenant>        accessor,
         ITenantServiceProviderFactory<TTenant> factory
     ) {
         _root     = root;
-        _accessor = accessor;
         _factory  = factory;
     }
 
     #region ITenantServiceScopeFactory<TTenant> Members
 
-    public IServiceScope CreateScope() {
-        if (_accessor.Tenant is null) {
-            if (_root is IServiceScope scope) {
-                return scope;
-            }
-
-            return _root.CreateScope();
-        }
-
-        var lease = _factory.CreateServiceProvider(_accessor);
+    public async ValueTask<AsyncServiceScope> CreateAsync(TenantIdentity identity, CancellationToken ct = default) {
+        if (identity.Uid is not { } uid) return _root.CreateAsyncScope();
+        var lease = await _factory.CreateServiceProviderAsync(uid, ct);
         try {
             var inner = lease.Provider.CreateScope();
-            return new LeasedTenantScope(inner, lease);
+            return new(new LeasedTenantScope(inner, lease));
         } catch {
             lease.Dispose();
             throw;

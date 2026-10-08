@@ -36,6 +36,13 @@ public sealed class BridgeBehaviorShould : IClassFixture<EfCoreFlowFixture>
         var token   = await ReadTokenAsync(process.Name!);
         Assert.Equal("Await_Review", token.WaitingAtName);
 
+        using (var scope = _fixture.CreateScope()) {
+            await scope.ServiceProvider.GetRequiredService<IProcessRegistry>()
+                .RegisterAsync<ProcessVersionShould.Original>(configure: c => {
+                    c.Name = nameof(ApprovalProcess); c.Version = "replacement"; c.IsLatest = true;
+                });
+        }
+
         var dispatch = new EventDispatchContext();
         dispatch.SetSubscriptions([
             new() {
@@ -92,6 +99,6 @@ public sealed class BridgeBehaviorShould : IClassFixture<EfCoreFlowFixture>
         var       repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataProcessToken>>();
         var token = await repository.FirstOrDefaultAsync(query => query.Where(current => current.Process == process));
         Assert.NotNull(token);
-        return token!;
+        return token;
     }
 }

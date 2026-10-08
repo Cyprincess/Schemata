@@ -48,6 +48,7 @@ public sealed class ActorConcurrencyHarness : IAsyncDisposable
         connection.Open();
 
         var services = new ServiceCollection();
+        Schemata.Flow.Tests.FlowTestCreation.Register(services);
         services.AddLogging();
         services.AddDbContextFactory<TestDbContext>(options => options
                      .UseSqlite(connectionString)

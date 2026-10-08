@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
@@ -47,21 +48,31 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
 
     public async ValueTask DisposeAsync() {
         var orphaned = RetireAll();
+        List<Exception>? failures = null;
         foreach (var entry in orphaned) {
-            await DisposeProviderAsync(entry.Provider);
+            try { await DisposeProviderAsync(entry.Provider); }
+            catch (Exception error) { (failures ??= []).Add(error); }
         }
+        if (failures is { Count: 1 }) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures is { Count: > 1 }) throw new AggregateException(failures);
     }
 
     #endregion
 
     #region ITenantProviderCache Members
 
-    public ITenantProviderLease Lease(string id, Func<IServiceProvider> factory) {
+    public ITenantProviderLease Lease(string id, Guid version, Func<IServiceProvider> factory) {
+        return LeaseVersion($"{id.Length}:{id}:{version:N}", factory);
+    }
+
+    private ITenantProviderLease LeaseVersion(string id, Func<IServiceProvider> factory) {
         while (true) {
             Entry?       entry   = null;
             Pending?     pending = null;
             List<Entry>? retired = null;
             var          build   = false;
+            ITenantProviderLease? lease = null;
+            Exception? failure = null;
 
             try {
                 lock (_gate) {
@@ -86,46 +97,49 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
                 }
 
                 if (entry is not null) {
-                    return new LeaseHandle(this, entry);
+                    lease = new LeaseHandle(this, entry);
+                } else if (build) {
+                    lease = BuildLease(id, factory, pending!);
                 }
+            } catch (Exception error) { failure = error; }
 
-                if (pending is null) {
-                    continue;
-                }
-
-                if (build) {
-                    return BuildLease(id, factory, pending);
-                }
-            } finally {
-                DisposeRetired(retired);
+            try { DisposeRetired(retired); }
+            catch (Exception error) {
+                failure = failure is null ? error : new AggregateException(failure, error);
             }
+            if (failure is not null) {
+                try { lease?.Dispose(); }
+                catch (Exception error) { throw new AggregateException(failure, error); }
+                ExceptionDispatchInfo.Capture(failure).Throw();
+            }
+            if (lease is not null) return lease;
+            if (pending is null) continue;
 
             pending.Wait();
         }
     }
 
     public void Remove(string id) {
-        Entry? entry = null;
+        var prefix = $"{id.Length}:{id}:";
+        List<Entry>? retired = null;
         lock (_gate) {
-            if (_disposed) {
-                return;
+            if (_disposed) return;
+            foreach (var pair in _pending) {
+                if (pair.Key.StartsWith(prefix, StringComparison.Ordinal)) pair.Value.Cancelled = true;
             }
-
-            if (_pending.TryGetValue(id, out var pending)) {
-                pending.Cancelled = true;
-            }
-
-            if (_index.TryGetValue(id, out var node)) {
-                _index.Remove(id);
-                _order.Remove(node);
-                node.Value.Retired = true;
-                entry              = node.Value;
+            var node = _order.First;
+            while (node is not null) {
+                var next = node.Next;
+                if (node.Value.Id.StartsWith(prefix, StringComparison.Ordinal)) {
+                    _index.Remove(node.Value.Id);
+                    _order.Remove(node);
+                    node.Value.Retired = true;
+                    (retired ??= []).Add(node.Value);
+                }
+                node = next;
             }
         }
-
-        if (entry is not null) {
-            DisposeIfZero(entry);
-        }
+        DisposeRetired(retired);
     }
 
     #endregion
@@ -173,7 +187,12 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
             pending.Complete();
         }
 
-        DisposeRetired(evicted);
+        try { DisposeRetired(evicted); }
+        catch (Exception error) {
+            try { Release(entry!); }
+            catch (Exception cleanup) { throw new AggregateException(error, cleanup); }
+            throw;
+        }
 
         if (entry is not null) {
             return new LeaseHandle(this, entry);
@@ -184,7 +203,7 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
             throw new ObjectDisposedException(nameof(MemoryCacheTenantProviderCache));
         }
 
-        return Lease(id, factory);
+        return LeaseVersion(id, factory);
     }
 
     private void CompletePending(string id, Pending pending) {
@@ -293,9 +312,13 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
             return;
         }
 
+        List<Exception>? failures = null;
         foreach (var entry in entries) {
-            DisposeIfZero(entry);
+            try { DisposeIfZero(entry); }
+            catch (Exception error) { (failures ??= []).Add(error); }
         }
+        if (failures is { Count: 1 }) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures is { Count: > 1 }) throw new AggregateException(failures);
     }
 
     private static void DisposeProviders(List<Entry>? entries) {
@@ -303,9 +326,13 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
             return;
         }
 
+        List<Exception>? failures = null;
         foreach (var entry in entries) {
-            DisposeProvider(entry.Provider);
+            try { DisposeProvider(entry.Provider); }
+            catch (Exception error) { (failures ??= []).Add(error); }
         }
+        if (failures is { Count: 1 }) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures is { Count: > 1 }) throw new AggregateException(failures);
     }
 
     private static void DisposeProvider(IServiceProvider provider) {

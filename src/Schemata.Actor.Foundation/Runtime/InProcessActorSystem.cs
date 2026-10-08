@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Schemata.Actor.Skeleton;
+using Schemata.Messaging.Skeleton;
+using Schemata.Abstractions.Tenancy;
 
 namespace Schemata.Actor.Foundation.Runtime;
 
@@ -17,12 +21,19 @@ public sealed class InProcessActorSystem : IActorSystem
     private readonly ConcurrentDictionary<ActorId, Lazy<ActorInstance>> _instances = new();
     private readonly IServiceProvider                                  _services;
     private readonly IActorRegistry                                     _registry;
-    private readonly IActorTurnScopeFactory                             _turnScopeFactory;
+    private readonly IMessageExecutionScopeFactory _turnScopeFactory;
     private readonly int                                                _mailboxCapacity;
+    private readonly object _admission = new();
+    private bool _stopping;
+    private bool _aborting;
+    private Task? _shutdown;
+    private readonly TimeProvider _clock;
+    private readonly TimeSpan _idleTimeout;
+    private readonly TimeSpan _idleScanInterval;
 
     public InProcessActorSystem(
         IServiceProvider services, IActorRegistry registry,
-        IActorTurnScopeFactory turnScopeFactory, IOptions<SchemataActorOptions> options
+        IMessageExecutionScopeFactory turnScopeFactory, IOptions<SchemataActorOptions> options, TimeProvider? clock = null
     ) {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(registry);
@@ -33,28 +44,40 @@ public sealed class InProcessActorSystem : IActorSystem
         _registry         = registry;
         _turnScopeFactory = turnScopeFactory;
         _mailboxCapacity  = options.Value.MailboxCapacity;
+        _clock = clock ?? TimeProvider.System;
+        _idleTimeout = options.Value.IdleTimeout;
+        _idleScanInterval = options.Value.IdleScanInterval;
     }
 
     #region IActorSystem Members
 
     public Task<IActorRef> SpawnAsync(ActorId id, Props props) {
-        return Task.FromResult<IActorRef>(GetOrCreate(id, props));
+        var activation = GetOrCreate(id, props);
+        return Task.FromResult<IActorRef>(new LogicalActorRef(this, id, activation.Props));
     }
 
     public Task<IActorRef> GetAsync(ActorId id) {
+        ThrowIfStopping();
+        EnsureIdentity(id);
         if (_instances.TryGetValue(id, out var existing)) {
-            return Task.FromResult<IActorRef>(Resolve(id, existing));
+            var activation = Resolve(id, existing);
+            return Task.FromResult<IActorRef>(new LogicalActorRef(this, id, activation.Props));
         }
 
         if (!_registry.TryResolve(id.Type, out var props)) {
             throw new InvalidOperationException($"No actor type is registered for '{id.Type}'.");
         }
 
-        return Task.FromResult<IActorRef>(GetOrCreate(id, props));
+        var created = GetOrCreate(id, props);
+        return Task.FromResult<IActorRef>(new LogicalActorRef(this, id, created.Props));
     }
 
     public async Task StopAsync(ActorId id) {
-        if (_instances.TryRemove(id, out var lazy)) {
+        EnsureIdentity(id);
+        if (_instances.TryGetValue(id, out var lazy)) {
+            // Await the full retirement protocol - drain of accepted turns, OnStoppedAsync, slot
+            // release - instead of removing the slot up front, so a concurrent GetAsync for the
+            // same identity can never create a second activation that overlaps this one's turns.
             await lazy.Value.StopAsync();
         }
     }
@@ -79,9 +102,10 @@ public sealed class InProcessActorSystem : IActorSystem
     ///     wrapper before construction ever runs, closing that window, and gets the eviction-on-failure
     ///     behavior in <see cref="Resolve" /> for free.
     /// </remarks>
-    internal ActorInstance SpawnUnregistered(Props props) {
+    internal IActorRef SpawnUnregistered(Props props) {
         var id = new ActorId($"$anonymous+{props.ActorType.Name}", Guid.NewGuid().ToString("N"));
-        return GetOrCreate(id, props);
+        GetOrCreate(id, props);
+        return new LogicalActorRef(this, id, props);
     }
 
     /// <summary>
@@ -107,7 +131,7 @@ public sealed class InProcessActorSystem : IActorSystem
     ///     equality) match.
     /// </remarks>
     internal void Remove(ActorId id, Lazy<ActorInstance> cell) {
-        _instances.TryRemove(new KeyValuePair<ActorId, Lazy<ActorInstance>>(id, cell));
+        _instances.TryRemove(new(id, cell));
     }
 
     /// <summary>
@@ -119,10 +143,25 @@ public sealed class InProcessActorSystem : IActorSystem
     ///     remarks).
     /// </summary>
     private ActorInstance GetOrCreate(ActorId id, Props props) {
-        Lazy<ActorInstance>? cell = null;
-        cell = new Lazy<ActorInstance>(() => CreateInstance(id, props, cell!));
-        var lazy = _instances.GetOrAdd(id, cell);
+        EnsureIdentity(id);
+        Lazy<ActorInstance> lazy;
+        lock (_admission) {
+            ThrowIfStopping();
+            Lazy<ActorInstance>? cell = null;
+            cell = new(() => CreateInstance(id, props, cell!));
+            lazy = _instances.GetOrAdd(id, cell);
+        }
         return Resolve(id, lazy);
+    }
+
+    internal async ValueTask<ActorInstance> ResolveForSendAsync(ActorId id, Props props, CancellationToken ct) {
+        while (true) {
+            ct.ThrowIfCancellationRequested();
+            var activation = GetOrCreate(id, props);
+            if (activation.Accepting) return activation;
+            if (ActorTurnIdentity.IsCurrent(id)) throw new InvalidOperationException($"Actor '{id}' cannot send to itself while retiring.");
+            await activation.Completion.WaitAsync(ct);
+        }
     }
 
     /// <summary>
@@ -136,11 +175,67 @@ public sealed class InProcessActorSystem : IActorSystem
         try {
             return lazy.Value;
         } catch {
-            _instances.TryRemove(new KeyValuePair<ActorId, Lazy<ActorInstance>>(id, lazy));
+            _instances.TryRemove(new(id, lazy));
             throw;
         }
     }
 
+    private static void EnsureIdentity(ActorId id) {
+        if (id.Tenant != TenantContext.Current) throw new InvalidOperationException("Actor identity does not match the current tenant.");
+    }
+
+    internal void ThrowIfStopping() {
+        if (Volatile.Read(ref _stopping)) throw new InvalidOperationException("The actor system is stopping.");
+    }
+
+    internal Task BeginShutdown() {
+        lock (_admission) {
+            _stopping = true;
+            if (_shutdown is not null) return _shutdown;
+            var cells = _instances.Values.ToArray();
+            foreach (var cell in cells) {
+                if (cell.IsValueCreated) cell.Value.RequestStop(graceful: true);
+            }
+            return _shutdown = Task.WhenAll(cells.Select(cell => Task.Run(async () => {
+                var actor = cell.Value;
+                lock (_admission) actor.RequestStop(graceful: !_aborting);
+                await actor.Completion;
+            })));
+        }
+    }
+
+    internal async Task ShutdownAsync(CancellationToken cancellationToken) {
+        var shutdown = BeginShutdown();
+        using var abort = cancellationToken.Register(AbortShutdown);
+        try {
+            await shutdown.WaitAsync(cancellationToken);
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            AbortShutdown();
+            throw;
+        } catch when (shutdown.Exception is { InnerExceptions.Count: > 1 }) {
+            throw shutdown.Exception;
+        }
+    }
+
+    internal async Task CollectIdleAsync(CancellationToken ct) {
+        using var timer = new PeriodicTimer(_idleScanInterval, _clock);
+        while (await timer.WaitForNextTickAsync(ct)) {
+            if (Volatile.Read(ref _stopping)) return;
+            foreach (var cell in _instances.Values) {
+                if (cell.IsValueCreated) cell.Value.TryRetireIdle(_idleTimeout);
+            }
+        }
+    }
+
+    private void AbortShutdown() {
+        lock (_admission) {
+            _aborting = true;
+            foreach (var cell in _instances.Values) {
+                if (cell.IsValueCreated) cell.Value.RequestStop();
+            }
+        }
+    }
+
     private ActorInstance CreateInstance(ActorId id, Props props, Lazy<ActorInstance> cell)
-        => new(id, props, _services, this, _turnScopeFactory, _mailboxCapacity, cell);
+        => new(id, props, _services, this, _turnScopeFactory, _mailboxCapacity, cell, _clock);
 }

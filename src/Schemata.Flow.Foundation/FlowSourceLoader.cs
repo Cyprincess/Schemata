@@ -36,7 +36,8 @@ public sealed class FlowSourceLoader(
         ClaimsPrincipal?    principal,
         CancellationToken   ct
     ) {
-        var reg = registry.GetRegistration(definitionName);
+        if (string.IsNullOrWhiteSpace(options.DefinitionVersion)) throw new InvalidArgumentException(SchemataResources.FLOW_DEFINITION_VERSION_REQUIRED);
+        var reg = registry.GetRegistration(definitionName, options.DefinitionVersion);
         if (reg is null) {
             throw new NotFoundException(
                 SchemataResources.PROCESS_NOT_REGISTERED,
@@ -57,7 +58,10 @@ public sealed class FlowSourceLoader(
         }
 
         var strategy = _strategies.GetOrAdd(type, CreateStrategy);
-        return strategy.CreateRequestAsync(services, definitionName, source, options, principal, ct);
+        return strategy.CreateRequestAsync(services, reg.Name, source, new StartProcessOptions {
+            DefinitionVersion = reg.Version, DisplayName = options.DisplayName,
+            Description = options.Description, IdempotencyKey = options.IdempotencyKey,
+        }, principal, ct);
     }
 
     private static ISourceLoadStrategy CreateStrategy(Type type) {

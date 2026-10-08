@@ -6,23 +6,26 @@ using Microsoft.AspNetCore.Http.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions;
+using Schemata.Entity.Repository;
 using Schemata.Identity.Foundation;
 using Schemata.Identity.Foundation.Advisors;
 using Schemata.Identity.Foundation.Commands;
 using Schemata.Identity.Foundation.Controllers;
 using Schemata.Identity.Foundation.Handlers;
-using Schemata.Identity.Foundation.Runtime;
 using Schemata.Identity.Foundation.Queries;
+using Schemata.Identity.Foundation.Runtime;
+using Schemata.Identity.Foundation.Services;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Advisors;
 using Schemata.Identity.Skeleton.Claims;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Json;
 using Schemata.Identity.Skeleton.Managers;
+using Schemata.Identity.Skeleton.Mutations;
 using Schemata.Identity.Skeleton.Models;
 using Schemata.Identity.Skeleton.Services;
+using Schemata.Identity.Skeleton.Stores;
 using Schemata.Messaging.Skeleton;
-using Schemata.Messaging.Skeleton.Runtime;
 using static Schemata.Abstractions.SchemataConstants;
 
 // ReSharper disable once CheckNamespace
@@ -71,15 +74,13 @@ public static class ServiceCollectionExtensions
                 .ConfigureApplicationPartManager(manager => {
                      manager.FeatureProviders.Add(new IdentityControllerFeatureProvider(typeof(AuthenticateController<TUser>)));
                  });
+        services.AddOptions<Microsoft.AspNetCore.Mvc.MvcOptions>()
+            .Configure<IServiceProviderIsService>((mvc, installed) => mvc.Conventions.Add(new IdentityControllerConvention<TUser>(installed)));
 
-        services.TryAddScoped<InProcessRequestDispatcher>();
-        services.TryAddScoped<IRequestDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<ICommandDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<IQueryDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+        services.AddInProcessRequestDispatcher();
         services.TryAddScoped<IdentityOperationHandler<TUser>>();
         AddIdentityHandlers<TUser>(services);
         services.TryAddScoped<IdentityHandler<TUser>>();
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IIdentityRequestAdvisor<>), typeof(AdviceRequestFeature<>)));
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<ConfirmRequest>, AdviceRequestConfirmValidation>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityRequestAdvisor<ProfileRequest>, AdviceRequestEmailValidation<TUser>>());
@@ -93,6 +94,8 @@ public static class ServiceCollectionExtensions
 
         services.TryAddScoped<IUserStore<TUser>, TUserStore>();
         services.TryAddScoped<IRoleStore<TRole>, TRoleStore>();
+        AddUserMutationOwner<TUser, TUserStore>(services);
+        AddRoleMutationOwner<TRole, TRoleStore>(services);
 
         services.Configure<IdentityOptions>(o => {
             o.ClaimsIdentity.UserIdClaimType        = IdentityClaims.Subject;
@@ -105,6 +108,8 @@ public static class ServiceCollectionExtensions
         var builder = services.AddIdentityApiEndpoints<TUser>(configure)
                               .AddRoles<TRole>()
                               .AddUserManager<SchemataUserManager<TUser>>()
+                              .AddErrorDescriber<SchemataErrorDescriber>()
+                              .AddSignInManager<SchemataSignInManager<TUser>>()
                               .AddClaimsPrincipalFactory<SchemataUserClaimsPrincipalFactory<TUser, TRole>>();
 
         // Registered after AddIdentityApiEndpoints so this assignment is the last one applied to the
@@ -123,8 +128,7 @@ public static class ServiceCollectionExtensions
         var user = typeof(TUser);
         var principalResult = typeof(IdentityResult<ClaimsPrincipal>);
         var unitResult      = typeof(IdentityResult<Unit>);
-        AddHandler(services, typeof(RegisterUserRequest<>), principalResult, typeof(RegisterUserHandler<>), user);
-        AddHandler(services, typeof(LoginUserRequest<>), principalResult, typeof(LoginUserHandler<>), user);
+        AddHandler(services, typeof(LoginUserRequest<>), unitResult, typeof(LoginUserHandler<>), user);
         AddHandler(services, typeof(RefreshUserRequest<>), principalResult, typeof(RefreshUserHandler<>), user);
         AddHandler(
             services,
@@ -132,36 +136,45 @@ public static class ServiceCollectionExtensions
             typeof(IdentityResult<ClaimsStore>),
             typeof(GetUserProfileHandler<>),
             user);
-        AddHandler(services, typeof(ChangeUserEmailRequest<>), unitResult, typeof(ChangeUserEmailHandler<>), user);
-        AddHandler(services, typeof(ChangeUserPhoneRequest<>), unitResult, typeof(ChangeUserPhoneHandler<>), user);
-        AddHandler(services, typeof(ChangeUserPasswordRequest<>), unitResult, typeof(ChangeUserPasswordHandler<>), user);
-        AddHandler(services, typeof(ForgotUserPasswordRequest<>), unitResult, typeof(ForgotUserPasswordHandler<>), user);
-        AddHandler(services, typeof(ResetUserPasswordRequest<>), unitResult, typeof(ResetUserPasswordHandler<>), user);
-        AddHandler(services, typeof(ConfirmUserRequest<>), unitResult, typeof(ConfirmUserHandler<>), user);
-        AddHandler(
-            services,
-            typeof(SendUserConfirmationCodeRequest<>),
-            unitResult,
-            typeof(SendUserConfirmationCodeHandler<>),
-            user);
-        AddHandler(
-            services,
-            typeof(GetUserAuthenticatorRequest<>),
-            typeof(IdentityResult<AuthenticatorResponse>),
-            typeof(GetUserAuthenticatorHandler<>),
-            user);
-        AddHandler(
-            services,
-            typeof(EnrollUserAuthenticatorRequest<>),
-            unitResult,
-            typeof(EnrollUserAuthenticatorHandler<>),
-            user);
-        AddHandler(
-            services,
-            typeof(DowngradeUserAuthenticatorRequest<>),
-            unitResult,
-            typeof(DowngradeUserAuthenticatorHandler<>),
-            user);
+    }
+
+    // The owner cascades dependent rows on delete, so it closes over the relation entity types,
+    // which only the configured store's generic definition carries. Stores outside the Schemata
+    // store family keep the open-generic default owner from AddRepository.
+    private static void AddUserMutationOwner<TUser, TUserStore>(IServiceCollection services)
+        where TUser : SchemataUser {
+        var store = FindGenericBase(typeof(TUserStore), typeof(SchemataUserStore<,,,,,,>));
+        if (store is null) {
+            return;
+        }
+
+        var args = store.GetGenericArguments();
+        services.TryAddScoped(
+            typeof(IResourceMutation<TUser>),
+            typeof(UserResourceMutation<,,,,>).MakeGenericType(args[0], args[2], args[3], args[4], args[5]));
+    }
+
+    private static void AddRoleMutationOwner<TRole, TRoleStore>(IServiceCollection services)
+        where TRole : SchemataRole {
+        var store = FindGenericBase(typeof(TRoleStore), typeof(SchemataRoleStore<,,>));
+        if (store is null) {
+            return;
+        }
+
+        var args = store.GetGenericArguments();
+        services.TryAddScoped(
+            typeof(IResourceMutation<TRole>),
+            typeof(RoleResourceMutation<,,>).MakeGenericType(args[0], args[1], args[2]));
+    }
+
+    private static Type? FindGenericBase(Type type, Type definition) {
+        for (var current = type; current is not null; current = current.BaseType) {
+            if (current.IsGenericType && current.GetGenericTypeDefinition() == definition) {
+                return current;
+            }
+        }
+
+        return null;
     }
 
     private static void AddHandler(

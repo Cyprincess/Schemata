@@ -36,8 +36,8 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     /// <param name="request">The list request with filter, order, paging, and parent parameters.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
     /// <param name="ct">A cancellation token.</param>
-    /// <returns>A <see cref="ListResultBase{TSummary}" /> with summaries and an optional next page token.</returns>
-    public async Task<ListResultBase<TSummary>> ListAsync(
+    /// <returns>A <see cref="ListResultBase{TEntity,TSummary}" /> with summaries and an optional next page token.</returns>
+    public async Task<ListResultBase<TEntity, TSummary>> ListAsync(
         ListRequest        request,
         ClaimsPrincipal?   principal,
         CancellationToken? ct
@@ -48,7 +48,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
 
         var container = new ResourceRequestContainer<TEntity>();
 
-        var requestResult = await RunPipelineAsync<ListResultBase<TSummary>>(
+        var requestResult = await RunPipelineAsync<ListResultBase<TEntity, TSummary>>(
             ctx,
             () => Advisor.For<IResourceListRequestAdvisor<TEntity>>()
                          .RunAsync(ctx, request, container, principal, ct.Value), CollectionNotFound);
@@ -78,6 +78,8 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             }]);
         }
 
+        var (defaultPageSize, maxPageSize) = ResolvePagingPolicy();
+
         if (request.PageSize is < 0) {
             throw new ValidationException([new() {
                 Field       = nameof(request.PageSize).Underscore(),
@@ -90,14 +92,26 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             token.PageSize = request.PageSize.Value;
         }
 
-        token.PageSize = token.PageSize switch {
-            <= 0  => 25,
-            > 100 => 100,
-            var _ => token.PageSize,
-        };
+        // A continuation that omits page_size keeps the token's effective size, still subject
+        // to the current maximum; an explicit zero adopts the effective default. The skip
+        // offset is unaffected, so a shrunk continuation page resumes exactly where the
+        // previous page ended.
+        if (token.PageSize <= 0) {
+            token.PageSize = defaultPageSize;
+        } else if (token.PageSize > maxPageSize) {
+            token.PageSize = maxPageSize;
+        }
 
         if (request.Skip.HasValue) {
-            token.Skip += request.Skip.Value;
+            try {
+                token.Skip = checked(token.Skip + request.Skip.Value);
+            } catch (OverflowException) {
+                throw new ValidationException([new() {
+                    Field       = nameof(request.PageToken).Underscore(),
+                    Description = SchemataResources.GetResourceString(SchemataResources.INVALID_PAGE_TOKEN),
+                    Reason      = SchemataResources.INVALID_PAGE_TOKEN,
+                }]);
+            }
         }
 
         if (token.Skip < 0) {
@@ -158,8 +172,11 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         if (residual is null) {
             totalSize = ResolveTotalSizeMode() switch {
                 TotalSizeMode.None => null,
-                TotalSizeMode.Estimated => (int)Math.Min(
-                    await _repository.EstimateCountAsync(q => container.Query(q), ct.Value), int.MaxValue),
+                TotalSizeMode.Estimated => await _repository.EstimateCountAsync(q => container.Query(q), ct.Value) switch {
+                    null => null,
+                    < 0 => throw new InvalidOperationException("A count estimate cannot be negative."),
+                    var estimate => (int)Math.Min(estimate.Value, int.MaxValue),
+                },
                 var _ => await _repository.CountAsync(q => container.Query(q), ct.Value),
             };
 
@@ -185,12 +202,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
                 superset, residual, token.Skip, token.PageSize, resolved!.MaxResidualScanRows,
                 mode is TotalSizeMode.Exact, ct.Value);
 
-            totalSize = mode switch {
-                TotalSizeMode.None => null,
-                TotalSizeMode.Estimated => (int)Math.Min(
-                    await _repository.EstimateCountAsync(q => container.Query(q), ct.Value), int.MaxValue),
-                var _ => scan.Total,
-            };
+            totalSize = scan.Total;
 
             summaries = new(scan.Page.Count);
             foreach (var entity in scan.Page) {
@@ -203,9 +215,20 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             hasMore = scan.HasMore;
         }
 
-        token.Skip += token.PageSize;
+        string? nextPageToken = null;
+        if (hasMore) {
+            try {
+                token.Skip = checked(token.Skip + token.PageSize);
+            } catch (OverflowException) {
+                throw new ValidationException([new() {
+                    Field       = nameof(request.PageToken).Underscore(),
+                    Description = SchemataResources.GetResourceString(SchemataResources.INVALID_PAGE_TOKEN),
+                    Reason      = SchemataResources.INVALID_PAGE_TOKEN,
+                }]);
+            }
 
-        string? nextPageToken = hasMore ? await token.ToStringAsync(Protector) : null;
+            nextPageToken = await token.ToStringAsync(Protector);
+        }
 
         return new() {
             TotalSize = totalSize, Entities = summaries.ToImmutableArray(), NextPageToken = nextPageToken,

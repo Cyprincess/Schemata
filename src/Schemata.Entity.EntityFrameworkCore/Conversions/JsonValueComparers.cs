@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -132,6 +131,9 @@ public static class JsonValueComparers
             v => JsonClone(v));
     }
 
+    // Equality, hashing and the snapshot share one content contract: the canonical JSON
+    // representation. Nested lists, dictionaries and POCO values therefore compare by value,
+    // so a deep-cloned snapshot of an unchanged value never reads as a change.
     private static bool JsonEqual<T>(T? a, T? b) {
         if (ReferenceEquals(a, b)) {
             return true;
@@ -141,41 +143,11 @@ public static class JsonValueComparers
             return false;
         }
 
-        if (a is IDictionary leftDictionary && b is IDictionary rightDictionary) {
-            return DictionaryEqual(leftDictionary, rightDictionary);
-        }
-
-        if (a is IEnumerable left && b is IEnumerable right && a is not string) {
-            return left.Cast<object?>().SequenceEqual(right.Cast<object?>());
-        }
-
-        return EqualityComparer<T>.Default.Equals(a, b);
+        return string.Equals(JsonValueConverter.ToProvider(a), JsonValueConverter.ToProvider(b), StringComparison.Ordinal);
     }
 
     private static int JsonHash<T>(T? value) {
-        if (value is null) {
-            return 0;
-        }
-
-        if (value is IDictionary dictionary) {
-            var hash = 0;
-            foreach (DictionaryEntry entry in dictionary) {
-                hash ^= HashCode.Combine(entry.Key, entry.Value);
-            }
-
-            return hash;
-        }
-
-        if (value is IEnumerable enumerable && value is not string) {
-            var hash = new HashCode();
-            foreach (var item in enumerable) {
-                hash.Add(item);
-            }
-
-            return hash.ToHashCode();
-        }
-
-        return EqualityComparer<T>.Default.GetHashCode(value);
+        return value is null ? 0 : JsonValueConverter.ToProvider(value).GetHashCode();
     }
 
     private static T? JsonClone<T>(T? value) {
@@ -184,21 +156,4 @@ public static class JsonValueComparers
             : JsonValueConverter.FromProvider<T>(JsonValueConverter.ToProvider(value));
     }
 
-    private static bool DictionaryEqual(IDictionary a, IDictionary b) {
-        if (a.Count != b.Count) {
-            return false;
-        }
-
-        foreach (DictionaryEntry entry in a) {
-            if (!b.Contains(entry.Key)) {
-                return false;
-            }
-
-            if (!Equals(entry.Value, b[entry.Key])) {
-                return false;
-            }
-        }
-
-        return true;
-    }
 }

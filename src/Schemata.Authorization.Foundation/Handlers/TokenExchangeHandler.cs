@@ -46,45 +46,27 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
         CancellationToken                  ct
     ) {
         if (string.IsNullOrWhiteSpace(request.SubjectToken)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.SubjectToken)
-            );
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_EMPTY, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.SubjectToken });
         }
 
         if (string.IsNullOrWhiteSpace(request.SubjectTokenType)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidRequest,
-                string.Format(
-                    SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY),
-                    Parameters.SubjectTokenType
-                )
-            );
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_EMPTY, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.SubjectTokenType });
         }
 
         // RFC 8693 §2.1: actor_token and actor_token_type are paired — one present without the other
         // is malformed.
         if (!string.IsNullOrWhiteSpace(request.ActorToken) && string.IsNullOrWhiteSpace(request.ActorTokenType)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.ActorTokenType)
-            );
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_EMPTY, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.ActorTokenType });
         }
 
         if (!string.IsNullOrWhiteSpace(request.ActorTokenType) && string.IsNullOrWhiteSpace(request.ActorToken)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.ActorToken)
-            );
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_EMPTY, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.ActorToken });
         }
 
         // RFC 8693 §2.1 / §3: when requested_token_type is supplied it must name a standard exchange
         // token type the server can issue; an unrecognized URI is rejected before routing.
         if (!string.IsNullOrWhiteSpace(request.RequestedTokenType) && !TokenTypeUris.IsStandard(request.RequestedTokenType)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), Parameters.RequestedTokenType)
-            );
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.RequestedTokenType });
         }
 
         var application = await client.AuthenticateAsync(null, new(){
@@ -92,10 +74,7 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
             [Parameters.ClientSecret] = [request.ClientSecret],
         }, headers, ct);
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
         var ctx = AdviceContext.Require();
@@ -108,21 +87,12 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
                 return result!;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(
-                    OAuthErrors.InvalidClient,
-                    SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-                );
+                throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
         var handler = sp.GetKeyedService<ITokenExchangeHandler<TApp>>(request.SubjectTokenType);
         if (handler is null) {
-            throw new OAuthException(
-                OAuthErrors.InvalidRequest,
-                string.Format(
-                    SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED),
-                    Parameters.SubjectTokenType
-                )
-            );
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.SubjectTokenType });
         }
 
         return await handler.HandleAsync(application, request, null, ct);

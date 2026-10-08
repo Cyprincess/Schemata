@@ -24,6 +24,7 @@ using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Commands;
 using Schemata.Resource.Foundation.Handlers;
 using Schemata.Resource.Http;
+using Schemata.Resource.Tests.Fixtures;
 using Xunit;
 
 namespace Schemata.Resource.Tests;
@@ -52,7 +53,7 @@ public sealed class ResourceEntryEquivalenceShould
         var principal = new ClaimsPrincipal(new ClaimsIdentity());
         var controller = BuildController(controllerScope.ServiceProvider, principal);
 
-        var controllerResult = await controller.CreateAsync(new Request { Name = "e1" });
+        var controllerResult = await controller.CreateAsync(new() { Name = "e1" });
         var controllerDetail = Assert.IsType<Detail>(Assert.IsType<JsonResult>(controllerResult).Value);
 
         var dispatcherSpy = new RecordingCommandAdvisor();
@@ -60,10 +61,11 @@ public sealed class ResourceEntryEquivalenceShould
         using var dispatcherScope = dispatcherServices.CreateScope();
         var dispatcher = dispatcherScope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
         var dispatcherResult = await dispatcher.SendAsync<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>(
-            new(new Request { Name = "e1" }, principal), CancellationToken.None);
+            new(new() { Name = "e1" }, principal), CancellationToken.None);
 
-        Assert.Equal(controllerDetail.Name, dispatcherResult.Detail!.Name);
-        Assert.Equal(controllerDetail.CanonicalName, dispatcherResult.Detail!.CanonicalName);
+        Assert.NotNull(dispatcherResult.Detail);
+        Assert.Equal(controllerDetail.Name, dispatcherResult.Detail.Name);
+        Assert.Equal(controllerDetail.CanonicalName, dispatcherResult.Detail.CanonicalName);
         Assert.Equal(1, controllerSpy.Count);
         Assert.Equal(1, dispatcherSpy.Count);
     }
@@ -84,10 +86,11 @@ public sealed class ResourceEntryEquivalenceShould
         using var dispatcherScope = dispatcherServices.CreateScope();
         var dispatcher = dispatcherScope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
         var dispatcherResult = await dispatcher.SendAsync<GetResourceQueryRequest<Entity, Detail>, GetResultBase<Detail>>(
-            new(new GetRequest { CanonicalName = "entities/e1" }, principal), CancellationToken.None);
+            new(new() { CanonicalName = "entities/e1" }, principal), CancellationToken.None);
 
-        Assert.Equal(controllerDetail.Name, dispatcherResult.Detail!.Name);
-        Assert.Equal(controllerDetail.CanonicalName, dispatcherResult.Detail!.CanonicalName);
+        Assert.NotNull(dispatcherResult.Detail);
+        Assert.Equal(controllerDetail.Name, dispatcherResult.Detail.Name);
+        Assert.Equal(controllerDetail.CanonicalName, dispatcherResult.Detail.CanonicalName);
         Assert.Equal(1, controllerSpy.Count);
         Assert.Equal(1, dispatcherSpy.Count);
     }
@@ -104,7 +107,7 @@ public sealed class ResourceEntryEquivalenceShould
         using var dispatcherScope = dispatcherServices.CreateScope();
         var dispatcher = dispatcherScope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
         var dispatcherException = await Record.ExceptionAsync(() => dispatcher.SendAsync<GetResourceQueryRequest<Entity, Detail>, GetResultBase<Detail>>(
-            new(new GetRequest { CanonicalName = "entities/missing" }, principal), CancellationToken.None));
+            new(new() { CanonicalName = "entities/missing" }, principal), CancellationToken.None));
 
         var controllerNotFound = Assert.IsType<NotFoundException>(controllerException);
         var dispatcherNotFound = Assert.IsType<NotFoundException>(dispatcherException);
@@ -117,7 +120,8 @@ public sealed class ResourceEntryEquivalenceShould
     }
 
     private static ErrorInfoDetail ErrorInfo(SchemataException exception) {
-        return exception.Details!.OfType<ErrorInfoDetail>().Single();
+        Assert.NotNull(exception.Details);
+        return exception.Details.OfType<ErrorInfoDetail>().Single();
     }
 
     /// <summary>Builds a controller wired exactly as ASP.NET Core would: a fabricated per-request
@@ -131,7 +135,7 @@ public sealed class ResourceEntryEquivalenceShould
     ) {
         var httpContext = new DefaultHttpContext { RequestServices = services, User = principal };
         var controller = new ResourceController<Entity, Request, Detail, Summary>(services, Options.Create(new JsonSerializerOptions())) {
-            ControllerContext = new ControllerContext { HttpContext = httpContext },
+            ControllerContext = new() { HttpContext = httpContext },
         };
 
         var urlHelper = new Mock<IUrlHelper>();
@@ -146,8 +150,6 @@ public sealed class ResourceEntryEquivalenceShould
         var detail = new Detail { Name = name, CanonicalName = $"entities/{name}" };
 
         var repository = new Mock<IRepository<Entity>>();
-        repository.Setup(r => r.AddAsync(It.IsAny<Entity>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         var mapper = new Mock<ISimpleMapper>();
         mapper.Setup(m => m.Map<Request, Entity>(It.IsAny<Request>())).Returns(entity);
@@ -167,7 +169,8 @@ public sealed class ResourceEntryEquivalenceShould
 
         var mapper = new Mock<ISimpleMapper>();
         if (entity is not null) {
-            mapper.Setup(m => m.Map<Entity, Detail>(entity)).Returns(detail!);
+            Assert.NotNull(detail);
+            mapper.Setup(m => m.Map<Entity, Detail>(entity)).Returns(detail);
         }
 
         return (repository, mapper);
@@ -183,6 +186,7 @@ public sealed class ResourceEntryEquivalenceShould
         services.AddSingleton(Mock.Of<ICacheProvider>());
         services.AddSingleton(doubles.Repository.Object);
         services.AddSingleton(doubles.Mapper.Object);
+        services.AddSingleton(ResourceMutationMock.Create<Entity>().Object);
         services.AddScoped<
             IRequestHandler<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>,
             DefaultCreateResourceHandler<Entity, Request, Detail, Summary>>();

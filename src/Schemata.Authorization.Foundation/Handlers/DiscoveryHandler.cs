@@ -80,10 +80,7 @@ public sealed class DiscoveryHandler<TScope>(
                 return AuthorizationResult.Content(discovery.Document);
             case AdviseResult.Block:
             default:
-                throw new OAuthException(
-                    OAuthErrors.ServerError,
-                    SchemataResources.GetResourceString(SchemataResources.INTERNAL)
-                );
+                throw new OAuthException(OAuthErrors.ServerError, SchemataResources.INTERNAL);
         }
 
         var names = await scopes.ListAsync(ct: ct).Map(s => s.Name!, ct).ToListAsync(ct);

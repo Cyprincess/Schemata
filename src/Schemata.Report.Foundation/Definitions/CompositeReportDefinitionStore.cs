@@ -15,14 +15,21 @@ namespace Schemata.Report.Foundation.Definitions;
 ///     Every <see cref="IReportDefinitionSource" /> is a singleton that scopes internally, so the composite
 ///     resolves them once at construction.
 /// </remarks>
-public sealed class CompositeReportDefinitionStore(IServiceProvider services) : IReportDefinitionStore
+public sealed class CompositeReportDefinitionStore(
+    IServiceProvider     services,
+    ReportRegistration   registration
+) : IReportDefinitionStore
 {
     private readonly IReadOnlyList<IReportDefinitionSource> _sources = [.. services.GetServices<IReportDefinitionSource>()];
+
+    private readonly ReportRegistration _registration = registration;
 
     public async ValueTask<(SchemataReport Report, QueryInsightRequest Query)?> ResolveAsync(
         string            name,
         CancellationToken ct = default
     ) {
+        _registration.EnsureSingleTriple<SchemataReport>();
+
         foreach (var source in _sources) {
             var definition = await source.ResolveAsync(name, ct);
             if (definition is not null) {
@@ -36,6 +43,8 @@ public sealed class CompositeReportDefinitionStore(IServiceProvider services) : 
     public async IAsyncEnumerable<SchemataReport> ListPeriodicAsync(
         [EnumeratorCancellation] CancellationToken ct = default
     ) {
+        _registration.EnsureSingleTriple<SchemataReport>();
+
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var source in _sources) {
             await foreach (var report in source.ListPeriodicAsync(ct)) {

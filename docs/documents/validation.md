@@ -59,17 +59,33 @@ three registrations:
 added. `TryAdd` registers one `IValidator<T>` per request type; a second `AddValidator` call for the
 same type is ignored.
 
+### Selected dispatched requests
+
+`AddRequestValidation<TRequest,TResponse>(Operations operation)` explicitly installs validation at
+`SecurityOrders.Validation` for a plain request, command, or query. `AddStreamValidation<TRequest,TItem>`
+installs the same collector/final-block admission before a stream handler starts. Both are extensions in
+`Microsoft.Extensions.DependencyInjection` from `Schemata.Validation.FluentValidation`; the operation is
+passed to the existing `IValidationAdvisor<TRequest>` chain. Installing a validator alone leaves an
+unselected non-resource request unchanged.
+
+The dispatcher consumes one executable keyed validation slot. Resource Create/Update own that slot and
+validate their inner payload exactly once in either registration order, retaining suppression and
+`ValidateOnly` behavior. Generic request validation does not replace the Resource owner. Stream validation
+runs inside each enumeration's execution scope; rejection disposes that scope before returning the error.
+
 ## Advisor behavior
 
 `Schemata.Validation.FluentValidation.Advisors.AdviceValidation<T>`
-(`Order = Orders.Base`, 100,000,000) resolves `IValidator<T>` from DI, builds a
-`ValidationContext<T>` carrying the `Operations` kind in `RootContextData`, and runs `ValidateAsync`.
+(`Order = Orders.Base`, 100,000,000) resolves every registered `IValidator<T>` implementation from
+DI, runs each exactly once with a `ValidationContext<T>` carrying the `Operations` kind in
+`RootContextData`, and aggregates the failures into one list.
 Each FluentValidation failure becomes an `ErrorFieldViolation`:
 
 - `Field` — `PropertyName` in `snake_case`.
 - `Reason` — the error code with the `Validator` suffix stripped and converted to AIP-193
   UPPER_SNAKE_CASE (e.g. `INCLUSIVE_BETWEEN`, `MAXIMUM_LENGTH`, `NOT_EMPTY`). Reasons stay literal
-  keys; comparison operands stay in `Description`.
+  keys; comparison operands stay in `Description`. Missing, blank, and suffix-only error codes
+  produce `VALIDATION_FAILED`, including custom failures added through `AddFailure`.
 - `Description` — the formatted FluentValidation message, including any operand values that the
   template renders (e.g. `"Age must be between 1 and 150."`).
 
@@ -86,9 +102,15 @@ The Create and Update validation wraps call `ValidationHelper.ValidateAsync` aft
 
 1. Collector advisors add violations to the list.
 2. A blocking result produces `ValidationException(errors)`, mapped to `INVALID_ARGUMENT` and HTTP 422.
-3. A request implementing `IValidation` with `ValidateOnly = true` produces `NoContentException` after successful validation.
+3. A request implementing `IValidation` with `ValidateOnly = true` produces `NoContentException` after successful validation. The dry-run termination is an independently installed pipeline stage, so it still applies when the validation wrap was excluded.
+
+The gRPC error adapter preserves each violation's field, description, reason, and optional
+localized message in `google.rpc.BadRequest` details. HTTP validation failures retain the
+framework's 422 mapping; the canonical gRPC status is `INVALID_ARGUMENT`.
 
 `CreateRequestValidationSuppressed` and `UpdateRequestValidationSuppressed` are pipeline markers on the ambient `AdviceContext`. A request type with no registered validator leaves the violation list empty.
+
+`WithoutCreateValidation()`, `WithoutUpdateValidation()`, and `WithoutFreshness()` on the resource builder are registration-time installation choices: the corresponding wraps are never added to the service collection (or are removed when the call follows resource registration), in either ordering. They write no runtime flag; request-scoped opt-out remains the markers above.
 
 ## Validator implementation
 

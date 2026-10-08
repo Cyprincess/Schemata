@@ -9,12 +9,7 @@ namespace Schemata.Actor.Foundation.Runtime;
 
 /// <summary>
 ///     Reads and writes the opaque <see cref="SchemataActor.State" /> row for an
-///     <see cref="IPersistentActor" />, keyed by <see cref="ActorId.ToString" />. Registered only
-///     by <see cref="SchemataActorBuilder.UsePersistence" /> - the sole channel that adds this
-///     type to the container (R8). Its constructor resolves
-///     <see cref="IRepository{TEntity}" /> directly, so dependency injection raises the resolution
-///     failure itself when an application enables persistence without registering
-///     <c>IRepository&lt;SchemataActor&gt;</c>.
+///     <see cref="IPersistentActor" />, partitioned by tenant, type and instance key.
 /// </summary>
 internal sealed class ActorStateStore(IRepository<SchemataActor> repository)
 {
@@ -34,7 +29,7 @@ internal sealed class ActorStateStore(IRepository<SchemataActor> repository)
     public async Task SaveAsync(ActorId id, byte[] state, CancellationToken ct) {
         var existing = await FindAsync(id, ct);
         if (existing is null) {
-            await repository.AddAsync(new() { Name = id.ToString(), State = state }, ct);
+            await repository.AddAsync(new() { Tenant = id.Tenant.Uid.HasValue ? id.Tenant.Uid.Value.ToString("D") : "host", ActorType = id.Type, ActorKey = id.Key, State = state }, ct);
         } else {
             existing.State = state;
             await repository.UpdateAsync(existing, ct);
@@ -44,8 +39,8 @@ internal sealed class ActorStateStore(IRepository<SchemataActor> repository)
     }
 
     private ValueTask<SchemataActor?> FindAsync(ActorId id, CancellationToken ct) {
-        var name = id.ToString();
-
-        return repository.FirstOrDefaultAsync<SchemataActor>(q => q.Where(actor => actor.Name == name), ct);
+        var tenant = id.Tenant.Uid?.ToString("D") ?? "host";
+        return repository.FirstOrDefaultAsync<SchemataActor>(
+            q => q.Where(actor => actor.Tenant == tenant && actor.ActorType == id.Type && actor.ActorKey == id.Key), ct);
     }
 }

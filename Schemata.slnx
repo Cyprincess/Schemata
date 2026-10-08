@@ -23,7 +23,7 @@
     <Project Path="src/Schemata.Authorization.Grpc/Schemata.Authorization.Grpc.csproj" />
     <Project Path="src/Schemata.Authorization.Http/Schemata.Authorization.Http.csproj" />
     <Project Path="src/Schemata.Authorization.Skeleton/Schemata.Authorization.Skeleton.csproj" />
-    <Project Path="src/Schemata.Caching.Distributed/Schemata.Caching.Distributed.csproj" />
+    <Project Path="src/Schemata.Caching.Memory/Schemata.Caching.Memory.csproj" />
     <Project Path="src/Schemata.Caching.Redis/Schemata.Caching.Redis.csproj" />
     <Project Path="src/Schemata.Caching.Skeleton/Schemata.Caching.Skeleton.csproj" />
     <Project Path="src/Schemata.Common/Schemata.Common.csproj" />
@@ -33,7 +33,6 @@
     <Project Path="src/Schemata.Entity.EntityFrameworkCore/Schemata.Entity.EntityFrameworkCore.csproj" />
     <Project Path="src/Schemata.Entity.Event/Schemata.Entity.Event.csproj" />
     <Project Path="src/Schemata.Entity.LinqToDB/Schemata.Entity.LinqToDB.csproj" />
-    <Project Path="src/Schemata.Entity.Owner/Schemata.Entity.Owner.csproj" />
     <Project Path="src/Schemata.Entity.Repository/Schemata.Entity.Repository.csproj" />
     <Project Path="src/Schemata.Event.Foundation/Schemata.Event.Foundation.csproj" />
     <Project Path="src/Schemata.Event.RabbitMq/Schemata.Event.RabbitMq.csproj" />
@@ -87,6 +86,8 @@
     <Project Path="src/Schemata.Security.Foundation/Schemata.Security.Foundation.csproj" />
     <Project Path="src/Schemata.Security.Skeleton/Schemata.Security.Skeleton.csproj" />
     <Project Path="src/Schemata.Tenancy.Foundation/Schemata.Tenancy.Foundation.csproj" />
+    <Project Path="src/Schemata.Tenancy.Caching/Schemata.Tenancy.Caching.csproj" />
+    <Project Path="src/Schemata.Tenancy.Messaging/Schemata.Tenancy.Messaging.csproj" />
     <Project Path="src/Schemata.Tenancy.Skeleton/Schemata.Tenancy.Skeleton.csproj" />
     <Project Path="src/Schemata.Transport.Grpc/Schemata.Transport.Grpc.csproj" />
     <Project Path="src/Schemata.Transport.Http/Schemata.Transport.Http.csproj" />
@@ -114,7 +115,8 @@
     <Project Path="tests/Schemata.Advice.Generator.Tests/Schemata.Advice.Generator.Tests.csproj" />
     <Project Path="tests/Schemata.Authorization.Integration.Tests/Schemata.Authorization.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Authorization.Tests/Schemata.Authorization.Tests.csproj" />
-    <Project Path="tests/Schemata.Caching.Distributed.Tests/Schemata.Caching.Distributed.Tests.csproj" />
+    <Project Path="tests/Schemata.Caching.Memory.Integration.Tests/Schemata.Caching.Memory.Integration.Tests.csproj" />
+    <Project Path="tests/Schemata.Caching.Redis.Tests/Schemata.Caching.Redis.Tests.csproj" />
     <Project Path="tests/Schemata.Common.Tests/Schemata.Common.Tests.csproj" />
     <Project Path="tests/Schemata.Core.Tests/Schemata.Core.Tests.csproj" />
     <Project Path="tests/Schemata.Domain.Skeleton.Tests/Schemata.Domain.Skeleton.Tests.csproj" />
@@ -122,7 +124,6 @@
     <Project Path="tests/Schemata.Entity.EntityFrameworkCore.Integration.Tests/Schemata.Entity.EntityFrameworkCore.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Entity.Event.Tests/Schemata.Entity.Event.Tests.csproj" />
     <Project Path="tests/Schemata.Entity.LinqToDB.Integration.Tests/Schemata.Entity.LinqToDB.Integration.Tests.csproj" />
-    <Project Path="tests/Schemata.Entity.Owner.Tests/Schemata.Entity.Owner.Tests.csproj" />
     <Project Path="tests/Schemata.Entity.Repository.Integration.Tests/Schemata.Entity.Repository.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Entity.Repository.Tests/Schemata.Entity.Repository.Tests.csproj" />
     <Project Path="tests/Schemata.Event.Foundation.Tests/Schemata.Event.Foundation.Tests.csproj" />
@@ -156,8 +157,11 @@
     <Project Path="tests/Schemata.Resource.Tests/Schemata.Resource.Tests.csproj" />
     <Project Path="tests/Schemata.Scheduling.Integration.Tests/Schemata.Scheduling.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Scheduling.Tests/Schemata.Scheduling.Tests.csproj" />
+    <Project Path="tests/Schemata.Modular.Tests/Schemata.Modular.Tests.csproj" />
     <Project Path="tests/Schemata.Security.Tests/Schemata.Security.Tests.csproj" />
+    <Project Path="tests/Schemata.Tenancy.Caching.Integration.Tests/Schemata.Tenancy.Caching.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Tenancy.Tests/Schemata.Tenancy.Tests.csproj" />
+    <Project Path="tests/Schemata.Tenancy.Integration.Tests/Schemata.Tenancy.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Transport.Grpc.Tests/Schemata.Transport.Grpc.Tests.csproj" />
     <Project Path="tests/Schemata.Transport.RabbitMq.Tests/Schemata.Transport.RabbitMq.Tests.csproj" />
   </Folder>

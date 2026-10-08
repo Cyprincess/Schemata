@@ -38,10 +38,12 @@ public class JsonStringNumberConverter : JsonConverter<long>
             }
         }
 
+        // Unsupported token kinds (true, objects, null) fail with the intended conversion
+        // error instead of a secondary InvalidOperationException from GetString.
         throw new JsonException(
             string.Format(
                 SchemataResources.GetResourceString(SchemataResources.CONVERSION_FAILED),
-                reader.GetString(),
+                reader.TokenType == JsonTokenType.String ? reader.GetString() : reader.TokenType.ToString(),
                 typeToConvert
             )
         );

@@ -33,21 +33,30 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Resource;
 using Schemata.Insight.Foundation;
+using Schemata.Insight.Foundation.Drivers;
 
 var insight = schema.UseInsight(i => {
     i.WithTotalSize(TotalSizeMode.Exact);
-    i.AddRepositorySource("students", "students")
+    i.AddRepositorySource<Student, StudentRow>("students",
+            s => new StudentRow { FullName = s.FullName, Age = s.Age })
      .AddSourceDriver<RepositoryDriver>(RepositoryDriver.DriverName);
 });
 
 insight.UseAip().UseCel().UseOrdering();
 insight.MapHttp();
+
+public sealed class StudentRow
+{
+    public string? FullName { get; set; }
+    public int     Age      { get; set; }
+}
 ```
 
-`AddRepositorySource("students", "students")` stores a source named `students` whose repository
-resource collection is also `students`. `MapHttp()` exposes `POST /v1/insight:query`. The guide
-reuses the existing `AppDbContext` factory and `IRepository<Student>` registration; do not register
-them a second time.
+`AddRepositorySource<Student, StudentRow>("students", projection)` registers a binding named
+`students` whose entity is `Student` and whose projected public row is `StudentRow`. The driver
+resolves the binding through DI; it does not scan `ICanonicalName` types or match resource
+collections by name. `MapHttp()` exposes `POST /v1/insight:query`. The guide reuses the existing
+`AppDbContext` factory and `IRepository<Student>` registration; do not register them a second time.
 
 ## Run a filter and order query
 
@@ -139,31 +148,51 @@ The compute stage runs after source rows are loaded. The response row includes t
 
 ## Add a nested selection
 
-Add a child collection to the existing `Student` model:
+Add `public List<Enrollment> Enrollments { get; set; } = [];` to the existing `Student` entity,
+then add the navigation entity and its `DbSet<Enrollment>` to `AppDbContext`:
+
+```csharp
+public sealed class Enrollment
+{
+    public int Id { get; set; }
+    public string? Course { get; set; }
+    public int Score { get; set; }
+}
+```
+
+Project the navigation collection into the public row and add a child row type that the local
+pipeline can consume:
 
 ```csharp
 using System.Collections.Generic;
-using Microsoft.EntityFrameworkCore;
 
-// Add this member inside the existing Student class.
-public List<Enrollment> Enrollments { get; set; } = [];
-
-[PrimaryKey(nameof(Uid))]
-public class Enrollment
+public sealed class StudentRow
 {
-    public Guid    Uid    { get; set; }
+    public string?             FullName    { get; set; }
+    public int                 Age         { get; set; }
+    public List<EnrollmentRow> Enrollments { get; set; } = [];
+}
+
+public sealed class EnrollmentRow
+{
     public string? Course { get; set; }
     public int     Score  { get; set; }
 }
 ```
 
-Add the DbSet if your context does not discover it through the navigation:
+Update the `AddRepositorySource` projection so it populates the child collection:
 
 ```csharp
-using Microsoft.EntityFrameworkCore;
+using System.Linq;
 
-// Add this member inside AppDbContext.
-public DbSet<Enrollment> Enrollments { get; set; } = null!;
+insight.AddRepositorySource<Student, StudentRow>("students",
+        s => new StudentRow {
+            FullName = s.FullName,
+            Age = s.Age,
+            Enrollments = s.Enrollments
+                .Select(e => new EnrollmentRow { Course = e.Course, Score = e.Score })
+                .ToList(),
+        });
 ```
 
 Query the nested list with its own filter, order, and projection:
@@ -189,7 +218,7 @@ Query the nested list with its own filter, order, and projection:
 }
 ```
 
-`RepositoryDriver` eager-loads the `Enrollments` navigation when EF Core is available. The child
+`RepositoryDriver` materializes the `Enrollments` collection through the projection. The child
 pipeline then filters and orders the materialized child rows.
 
 ## Verify

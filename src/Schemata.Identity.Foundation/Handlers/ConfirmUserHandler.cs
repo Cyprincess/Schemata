@@ -15,5 +15,11 @@ internal sealed class ConfirmUserHandler<TUser>(IdentityOperationHandler<TUser> 
     public Task<IdentityResult<Unit>> HandleAsync(
         ConfirmUserRequest<TUser> request,
         CancellationToken         ct = default
-    ) => operations.ConfirmAsync(IdentityRequestHandler.Require(request).Request, request.Principal!, ct);
+    ) {
+        if (request.Principal is null) {
+            return Task.FromResult(IdentityResult<Unit>.Challenge());
+        }
+
+        return operations.ConfirmAsync(IdentityRequestHandler.Require(request).Request, request.Principal, ct);
+    }
 }

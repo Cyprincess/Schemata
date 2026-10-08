@@ -36,7 +36,7 @@ internal static class LoginContinuation
         var target  = $"{request.PathBase}{request.Path}{request.QueryString}";
 
         context.Response.Redirect(
-            QueryHelpers.AddQueryString(login!, Parameter, Protector(services).Protect(target)));
+            QueryHelpers.AddQueryString(login, Parameter, Protector(services).Protect(target)));
 
         return Task.CompletedTask;
     }

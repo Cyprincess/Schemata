@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Data.Sqlite;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
 using Schemata.Entity.Repository.Advisors;
 using Xunit;
@@ -29,9 +29,10 @@ public class CommitFailureShould : IAsyncLifetime
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 // LinqToDB executes inserts immediately, so the suppressed-pre-check duplicate fails
-                // against the database during AddAsync.
+                // against the database during AddAsync; the actual SQL boundary classifies the
+                // provider's unique violation as a consumer-facing ALREADY_EXISTS error.
                 using (repository.AdviceContext.Use<UniquenessSuppressed>()) {
-                    await Assert.ThrowsAsync<SqliteException>(() => repository.AddAsync(new() {
+                    await Assert.ThrowsAsync<AlreadyExistsException>(() => repository.AddAsync(new() {
                         Uid      = existing,
                         FullName = "duplicate",
                         Name     = "duplicate",

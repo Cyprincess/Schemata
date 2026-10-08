@@ -77,7 +77,9 @@ internal sealed class TenantCompositeServiceProvider :
 
     public IServiceScope CreateScope() {
         var hostFactory = _root.GetRequiredService<IServiceScopeFactory>();
-        return new CompositeScope(this, hostFactory.CreateScope());
+        var host = hostFactory.CreateScope();
+        try { return new CompositeScope(this, host); }
+        catch { host.Dispose(); throw; }
     }
 
     #endregion

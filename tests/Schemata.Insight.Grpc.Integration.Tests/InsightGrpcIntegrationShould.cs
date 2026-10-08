@@ -25,6 +25,22 @@ public class InsightGrpcIntegrationShould : IClassFixture<WebAppFactory>
     public InsightGrpcIntegrationShould(WebAppFactory factory) { _factory = factory; }
 
     [Fact]
+    public async Task Query_RejectsIgnoredField_BeforeFilteringOrProjection() {
+        var selection = await Assert.ThrowsAsync<RpcException>(() => Query(_factory, new() {
+            Sources = { new() { Alias = "b", Name = "buyers" } },
+            Selections = { new() { Field = "b.secret" } },
+        }));
+        Assert.Equal(StatusCode.InvalidArgument, selection.StatusCode);
+        var filter = await Assert.ThrowsAsync<RpcException>(() => Query(_factory, new() {
+            Sources = { new() { Alias = "b", Name = "buyers" } },
+            Transformations = { new() { Filter = new() { Source = "has(secret)", Language = "cel" } } },
+        }));
+        Assert.Equal(StatusCode.InvalidArgument, filter.StatusCode);
+        var rows = await Query(_factory, new() { Sources = { new() { Alias = "b", Name = "buyers" } } });
+        Assert.All(rows.Rows, row => Assert.False(row.Fields.ContainsKey("secret")));
+    }
+
+    [Fact]
     public async Task Query_ConfiguredScheme_FailsUnauthenticatedWithoutCredentials() {
         using var factory = _factory.WithAuthentication().WithServices(ConfigureAuthentication);
 
@@ -46,7 +62,7 @@ public class InsightGrpcIntegrationShould : IClassFixture<WebAppFactory>
         using var call = invoker.AsyncUnaryCall(
             InsightGrpcMethods.Query,
             null,
-            new CallOptions(headers: new() { { "authorization", TestAuthenticationHandler.TestScheme } }),
+            new(headers: new() { { "authorization", TestAuthenticationHandler.TestScheme } }),
             new() { Sources = { new() { Alias = "b", Name = "buyers" } } });
 
         var response = await call.ResponseAsync;

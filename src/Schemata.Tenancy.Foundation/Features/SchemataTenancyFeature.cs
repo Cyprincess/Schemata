@@ -1,22 +1,16 @@
+using Microsoft.AspNetCore.Mvc.Controllers;
 using System;
-using System.Collections.Immutable;
+using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Schemata.Abstractions;
-using Schemata.Actor.Skeleton;
 using Schemata.Core;
 using Schemata.Core.Features;
-using Schemata.Messaging.Skeleton;
-using Schemata.Messaging.Skeleton.Runtime;
-using Schemata.Tenancy.Foundation.Commands;
 using Schemata.Tenancy.Foundation.Handlers;
-using Schemata.Tenancy.Foundation.Messaging;
 using Schemata.Tenancy.Foundation.Middlewares;
-using Schemata.Tenancy.Foundation.Queries;
 using Schemata.Tenancy.Foundation.Services;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
@@ -33,8 +27,13 @@ public sealed class SchemataTenancyFeature<TManager, TTenant> : FeatureBase
     where TManager : class, ITenantManager<TTenant>
     where TTenant : SchemataTenant
 {
-    /// <summary>Default middleware ordering priority for the tenancy feature.</summary>
-    public const int DefaultPriority = SchemataHttpsFeature.DefaultPriority + 10_000_000;
+    /// <summary>
+    ///     Default middleware ordering priority for the tenancy feature. Tenant resolution runs
+    ///     after routing (so path-based resolvers can read matched route values) and CORS, but
+    ///     before authentication, so authentication services resolve from the tenant scope once a
+    ///     tenant is known.
+    /// </summary>
+    public const int DefaultPriority = SchemataCorsFeature.DefaultPriority + 5_000_000;
 
     /// <summary>Default service-registration order for the tenancy feature.</summary>
     public const int DefaultOrder    = Orders.Max;
@@ -51,11 +50,18 @@ public sealed class SchemataTenancyFeature<TManager, TTenant> : FeatureBase
         IWebHostEnvironment environment
     ) {
         services.AddOptions<SchemataTenancyOptions>();
-        services.TryAddScoped<InProcessRequestDispatcher>();
-        services.TryAddScoped<IRequestDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<ICommandDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<IQueryDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        AddHandlers(services);
+        services.Configure<Microsoft.AspNetCore.Mvc.MvcOptions>(options => options.Filters.Add(new TenantExecutionFilter()));
+        Decorate<IPolicyEvaluator>(services, static inner => new TenantPolicyEvaluator(inner));
+        Decorate<IControllerFactory>(services, static inner => new TenantControllerFactory(inner));
+        services.TryAddScoped<CreateTenantHandler<TTenant>>();
+        services.TryAddScoped<UpdateTenantHandler<TTenant>>();
+        services.TryAddScoped<DeleteTenantHandler<TTenant>>();
+        services.TryAddScoped<SetTenantDisplayNameHandler<TTenant>>();
+        services.TryAddScoped<SetTenantLocalizedDisplayNamesHandler<TTenant>>();
+        services.TryAddScoped<SetTenantHostsHandler<TTenant>>();
+        services.TryAddScoped<FindTenantByIdHandler<TTenant>>();
+        services.TryAddScoped<FindTenantByHostHandler<TTenant>>();
+        services.TryAddScoped<GetTenantHostsHandler<TTenant>>();
 
         services.TryAddScoped<ITenantManager<TTenant>, TManager>();
 
@@ -63,83 +69,29 @@ public sealed class SchemataTenancyFeature<TManager, TTenant> : FeatureBase
         services.TryAddTransient<ITenantContextAccessor<TTenant>>(sp => sp.GetRequiredService<SchemataTenantContextAccessor<TTenant>>());
         services.TryAddTransient<ITenantContextInitializer<TTenant>>(sp => sp.GetRequiredService<SchemataTenantContextAccessor<TTenant>>());
 
-        services.TryAddScoped<SchemataTenantServiceScopeFactory<TTenant>>();
-        services.TryAddTransient<ITenantServiceScopeFactory<TTenant>>(sp => sp.GetRequiredService<SchemataTenantServiceScopeFactory<TTenant>>());
+        services.TryAddSingleton<ITenantServiceScopeFactory<TTenant>, SchemataTenantServiceScopeFactory<TTenant>>();
 
         services.TryAddSingleton<ITenantProviderCache, MemoryCacheTenantProviderCache>();
 
         services.TryAddSingleton<ITenantServiceProviderFactory<TTenant>>(sp => new SchemataTenantServiceProviderFactory<TTenant>(sp, sp.GetRequiredService<ITenantProviderCache>(), sp.GetRequiredService<IOptions<SchemataTenancyOptions>>()));
 
-        // Actor-turn tenancy hook (§5.1/§5.6): the propagator lets any boundary crossing —
-        // actor turn, RabbitMQ consumer — rebuild the caller's tenant context, and the two-phase
-        // turn-scope factory resolves that tenant *before* the actor turn's real scope is built,
-        // since a scope cannot be retargeted to another provider after creation. The concrete type
-        // is registered directly (mirroring the accessor/scope-factory pattern above) so
-        // TenantActorTurnScopeFactory<TTenant> can resolve it from DI in the bootstrap scope
-        // instead of constructing it itself.
-        services.TryAddScoped<TenantMessageContextPropagator<TTenant>>();
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IMessageContextPropagator, TenantMessageContextPropagator<TTenant>>(
-            sp => sp.GetRequiredService<TenantMessageContextPropagator<TTenant>>()));
-        services.Replace(ServiceDescriptor.Singleton<IActorTurnScopeFactory, TenantActorTurnScopeFactory<TTenant>>());
     }
 
-    private static void AddHandlers(IServiceCollection services) {
-        var tenant = typeof(TTenant);
-        AddHandler(
-            services,
-            typeof(CreateTenantRequest<>).MakeGenericType(tenant),
-            typeof(Unit),
-            typeof(CreateTenantHandler<>).MakeGenericType(tenant));
-        AddHandler(
-            services,
-            typeof(UpdateTenantRequest<>).MakeGenericType(tenant),
-            typeof(Unit),
-            typeof(UpdateTenantHandler<>).MakeGenericType(tenant));
-        AddHandler(
-            services,
-            typeof(DeleteTenantRequest<>).MakeGenericType(tenant),
-            typeof(Unit),
-            typeof(DeleteTenantHandler<>).MakeGenericType(tenant));
-        AddHandler(
-            services,
-            typeof(SetTenantDisplayNameRequest<>).MakeGenericType(tenant),
-            typeof(Unit),
-            typeof(SetTenantDisplayNameHandler<>).MakeGenericType(tenant));
-        AddHandler(
-            services,
-            typeof(SetTenantLocalizedDisplayNamesRequest<>).MakeGenericType(tenant),
-            typeof(Unit),
-            typeof(SetTenantLocalizedDisplayNamesHandler<>).MakeGenericType(tenant));
-        AddHandler(
-            services,
-            typeof(SetTenantHostsRequest<>).MakeGenericType(tenant),
-            typeof(Unit),
-            typeof(SetTenantHostsHandler<>).MakeGenericType(tenant));
-        AddHandler(
-            services,
-            typeof(FindTenantByIdQuery<>).MakeGenericType(tenant),
-            tenant,
-            typeof(FindTenantByIdHandler<>).MakeGenericType(tenant));
-        AddHandler(
-            services,
-            typeof(FindTenantByHostQuery<>).MakeGenericType(tenant),
-            tenant,
-            typeof(FindTenantByHostHandler<>).MakeGenericType(tenant));
-        AddHandler(
-            services,
-            typeof(GetTenantHostsQuery<>).MakeGenericType(tenant),
-            typeof(ImmutableArray<string>),
-            typeof(GetTenantHostsHandler<>).MakeGenericType(tenant));
+    private static void Decorate<T>(IServiceCollection services, Func<T, T> wrap) where T : class {
+        for (var i = services.Count - 1; i >= 0; i--) {
+            var descriptor = services[i];
+            if (descriptor.IsKeyedService || descriptor.ServiceType != typeof(T)) continue;
+            var key = new object();
+            services[i] = descriptor.ImplementationType is { } type
+                ? new ServiceDescriptor(typeof(T), key, type, descriptor.Lifetime)
+                : descriptor.ImplementationInstance is { } instance
+                    ? ServiceDescriptor.KeyedSingleton(typeof(T), key, instance)
+                    : new ServiceDescriptor(typeof(T), key, (provider, _) => descriptor.ImplementationFactory!(provider), descriptor.Lifetime);
+            services.Add(new ServiceDescriptor(typeof(T), provider => wrap(provider.GetRequiredKeyedService<T>(key)), descriptor.Lifetime));
+            break;
+        }
     }
 
-    private static void AddHandler(
-        IServiceCollection services,
-        Type               request,
-        Type               response,
-        Type               handler
-    ) {
-        services.TryAddScoped(typeof(IRequestHandler<,>).MakeGenericType(request, response), handler);
-    }
 
     public override void ConfigureApplication(
         IApplicationBuilder app,

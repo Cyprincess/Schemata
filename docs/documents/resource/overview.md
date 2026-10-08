@@ -31,6 +31,16 @@ builder.UseSchemata(schema => {
 
 `WithAuthentication` and `WithAuthorization` are the shared generic Security extensions. Their resource registration supplies the domain-specific advisor closures. `MapHttp()` and `MapGrpc()` are concrete Resource transport extensions that activate one Resource transport feature. The feature dependencies activate shared HTTP or gRPC behavior.
 
+`ResourceAttribute` and `ResourceMethodAttribute` are mutable configuration inputs. `ResourceRegistry` copies them during registration and publishes get-only `ResourceRegistration` and `ResourceMethodRegistration` snapshots when first read. `Resources`, `GetResource`, and `GetMethods` share that sealed result; register every resource before reading the registry. Later changes to the input attributes, endpoint arrays, operation arrays, and custom-method lists leave the installed routes and policies unchanged.
+
+When input `Endpoints` is null, the registration input-copy boundary resolves `[HttpResource]` and `[GrpcResource]` declarations from the entity. Without endpoint declarations, the resource uses every enabled adapter. An explicit empty endpoint list selects every enabled adapter even on a transport-decorated entity. The resulting snapshot supplies HTTP discovery, gRPC routes, and reflection; these runtime consumers read the copied policy. Source: `src/Schemata.Core/Building/ResourceRegistration.cs`.
+
+Repeated registration of one entity requires the same entity/request/detail/summary tuple. An unset authentication scheme, page size, total-size policy, or operation whitelist can be supplied by a later registration. Conflicting explicit values fail at the registration call before installing that registration's services. Explicit empty operations suppress every standard method; custom methods remain available. Endpoint restrictions are copied and unioned, with an unrestricted registration exposing the resource on every enabled transport. Equivalent custom methods deduplicate by verb; a conflicting handler, scope, or HTTP method fails.
+
+The builder and `AddResource` use the same registry. Its merged snapshots supply handler wiring, paging, authentication, HTTP conventions, gRPC model configuration, and reflection. Resource naming remains owned by the entity's `ResourceNameMetadata`, independently of request/detail/summary DTOs. Source: `src/Schemata.Core/Building/ResourceRegistry.cs`, `ResourceRegistration.cs`, and the Resource Foundation registration extensions.
+
+`WithoutCreateValidation()`, `WithoutUpdateValidation()`, and `WithoutFreshness()` select the stages installed for the host. The shared registry applies these choices when resources register and when feature configuration installs the shared pipeline into the host collection. Choices can precede resource registration or follow it; repeated `UseResource()` retains them. `WithoutFreshness()` removes built-in freshness checks and the default response ETag provider while preserving host-supplied providers. The `ValidateOnly` terminator and per-request suppression markers retain their own behavior.
+
 ## Dispatcher-wrap pipeline
 
 Resource registration adds the following wraps for the closed request envelopes. The dispatcher runs before segments in ascending `SecurityOrders` order and runs after segments in reverse order.
@@ -79,7 +89,7 @@ Authentication and coarse authorization are independently enabled. Authenticatio
 | Get | `GetResultBase<TDetail>` |
 | Update | `UpdateResultBase<TDetail>` |
 | Delete | `DeleteResultBase<TDetail>` |
-| List | `ListResultBase<TSummary>` |
+| List | `ListResultBase<TEntity, TSummary>` |
 
 ## See also
 

@@ -8,9 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Schemata.Core.Features;
 
 /// <summary>
-///     Configures authentication and authorization services and inserts
-///     <c>UseAuthentication</c> / <c>UseAuthorization</c> into the middleware
-///     pipeline. Consumes deferred configurators for
+///     Configures authentication and authorization services and inserts authentication
+///     before final tenant binding and authorization. Consumes deferred configurators for
 ///     <see cref="AuthenticationOptions" />,
 ///     <see cref="AuthenticationBuilder" />, and
 ///     <see cref="AuthorizationOptions" />.
@@ -47,6 +46,5 @@ public sealed class SchemataAuthenticationFeature : FeatureBase
         IWebHostEnvironment environment
     ) {
         app.UseAuthentication();
-        app.UseAuthorization();
     }
 }

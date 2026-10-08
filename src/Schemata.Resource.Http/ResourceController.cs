@@ -63,7 +63,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
         request.Parent ??= ResourceNameDescriptor.ForType<TEntity>().ResolveParent(HttpContext.Request.RouteValues);
 
         var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
-        var result = await dispatcher.SendAsync<ListResourceQueryRequest<TEntity, TSummary>, ListResultBase<TSummary>>(
+        var result = await dispatcher.SendAsync<ListResourceQueryRequest<TEntity, TSummary>, ListResultBase<TEntity, TSummary>>(
             new(request, HttpContext.User), HttpContext.RequestAborted);
 
         return new JsonResult(result, JsonOptions);

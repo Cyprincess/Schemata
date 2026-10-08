@@ -45,14 +45,13 @@ public sealed class SchedulingInitializer : BackgroundService
         _time      = time ?? TimeProvider.System;
     }
 
-    public override Task StartAsync(CancellationToken ct) {
+    public override async Task StartAsync(CancellationToken ct) {
         _registry.RegisterAll(_options.Value.Jobs.Select(j => j.JobType));
-        return base.StartAsync(ct);
+        await _scheduler.StartAsync(ct);
+        await base.StartAsync(ct);
     }
 
     protected override async Task ExecuteAsync(CancellationToken st) {
-        await _scheduler.StartAsync(st);
-
         await FailOrphanedRunningAsync(st);
 
         foreach (var registration in _options.Value.Jobs) {
@@ -67,7 +66,7 @@ public sealed class SchedulingInitializer : BackgroundService
             }
 
             var job = new SchemataJob {
-                Name   = jobKey,
+                Key    = $"registration:{jobKey}",
                 JobKey = jobKey,
                 State  = JobState.Active,
             };
@@ -94,17 +93,21 @@ public sealed class SchedulingInitializer : BackgroundService
             orphaned.Add(row);
         }
 
+        if (orphaned.Count == 0) {
+            return;
+        }
+
         var now = _time.GetUtcNow().UtcDateTime;
+        var mutation = scope.ServiceProvider.GetRequiredService<IResourceMutation<SchemataJobExecution>>();
+        await using var unit = executions.Begin();
         foreach (var row in orphaned) {
             row.State       = ExecutionState.Failed;
             row.EndTime     = now;
             row.RecentError = "Execution was interrupted by a host restart.";
-            await executions.UpdateAsync(row, ct);
+            await mutation.UpdateAsync(row, unit, ct: ct);
         }
 
-        if (orphaned.Count > 0) {
-            await executions.CommitAsync(ct);
-        }
+        await unit.CommitAsync(ct);
     }
 
     public override async Task StopAsync(CancellationToken ct) {

@@ -1,10 +1,11 @@
 using System;
-using System.Collections.Generic;
+using System.Linq;
+using Schemata.Entity.Repository;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Common;
 using Schemata.Messaging.Skeleton;
+using Schemata.Abstractions.Tenancy;
 using Schemata.Scheduling.Foundation.Commands;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -24,7 +25,7 @@ internal sealed class DefaultTriggerJobHandler(SchedulingHandlerSupport support)
         var jobKey   = registry.ResolveKey(request.JobType);
         var context  = request.Context;
         var job = new SchemataJob {
-            Name          = context.Job,
+            Tenant        = TenantContext.Current.Uid?.ToString("D") ?? "host",
             CanonicalName = context.Job,
             JobKey        = jobKey,
             ArgsJson      = context.ArgsJson,
@@ -34,6 +35,14 @@ internal sealed class DefaultTriggerJobHandler(SchedulingHandlerSupport support)
             State         = JobState.Active,
             Variables     = new(context.Variables),
         };
+
+        if (!string.IsNullOrWhiteSpace(context.Job)) {
+            using var scope = scheduler.Services.CreateScope();
+            var jobs = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJob>>();
+            var persisted = await jobs.FirstOrDefaultAsync(query => query.Where(row => row.Tenant == job.Tenant
+                && (row.CanonicalName == context.Job || row.Name == context.Job)), ct);
+            if (persisted is not null) job.ScheduleVersion = persisted.ScheduleVersion;
+        }
 
         context.StartTime    ??= scheduler.Time.GetUtcNow().UtcDateTime;
         context.JobKey       ??= jobKey;
@@ -47,25 +56,22 @@ internal sealed class DefaultTriggerJobHandler(SchedulingHandlerSupport support)
         if (context.StartTime.GetValueOrDefault() <= scheduler.Time.GetUtcNow().UtcDateTime) {
             scheduler.SignalDispatcher();
         } else {
-            await support.ArmOneShotTimerAsync(job);
+            await support.ArmOneShotTimerAsync(job, timerKey: context.Execution.CanonicalName);
         }
 
         return context.Execution;
     }
 
     private static SchemataJobExecution BuildExecution(SchemataJob job, JobContext context) {
-        var name       = (context.ExecutionUid ?? Guid.NewGuid()).ToString("n");
-        var descriptor = ResourceNameDescriptor.ForType<SchemataJobExecution>();
-
         return new() {
+            Tenant        = job.Tenant,
             Uid           = context.ExecutionUid.GetValueOrDefault(),
-            Name          = name,
-            CanonicalName = $"{descriptor.Collection}/{name}",
             Job           = job.CanonicalName,
+            ScheduleVersion = job.ScheduleVersion,
             Method        = context.Method,
             JobKey        = context.JobKey ?? job.JobKey,
             ArgsJson      = context.ArgsJson ?? job.ArgsJson,
-            Variables     = new Dictionary<string, string?>(context.Variables),
+            Variables     = new(context.Variables),
             State         = ExecutionState.Pending,
             StartTime     = context.StartTime.GetValueOrDefault(),
         };

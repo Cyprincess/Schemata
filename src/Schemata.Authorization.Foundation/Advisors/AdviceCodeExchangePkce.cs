@@ -57,27 +57,18 @@ public sealed class AdviceCodeExchangePkce<TApp, TToken>(IOptions<CodeFlowOption
         if (string.IsNullOrWhiteSpace(exchange.Payload?.CodeChallenge)) {
             if (!string.IsNullOrWhiteSpace(exchange.Request?.CodeVerifier)
              && options.Value.RequirePkceDowngradeProtection) {
-                throw new OAuthException(
-                    OAuthErrors.InvalidGrant,
-                    SchemataResources.GetResourceString(SchemataResources.PKCE_VERIFIER_MISMATCH)
-                );
+                throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.PKCE_VERIFIER_MISMATCH);
             }
 
             return Task.FromResult(AdviseResult.Continue);
         }
 
         if (string.IsNullOrWhiteSpace(exchange.Request?.CodeVerifier)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.PKCE_VERIFIER_MISMATCH)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.PKCE_VERIFIER_MISMATCH);
         }
 
         if (!PkceValidation.IsValid(exchange.Request.CodeVerifier)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.PKCE_VERIFIER_MISMATCH)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.PKCE_VERIFIER_MISMATCH);
         }
 
         // Use CryptographicOperations.FixedTimeEquals to compare verifier-derived values so
@@ -97,10 +88,7 @@ public sealed class AdviceCodeExchangePkce<TApp, TToken>(IOptions<CodeFlowOption
         };
 
         if (!valid) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.PKCE_VERIFIER_MISMATCH)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.PKCE_VERIFIER_MISMATCH);
         }
 
         return Task.FromResult(AdviseResult.Continue);

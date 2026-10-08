@@ -1,209 +1,342 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 
 namespace Schemata.Core.Building;
 
-/// <summary>
-///     Default <see cref="ResourceRegistry" />. Written through <see cref="Add" /> while services are
-///     being registered; the first read seals it, so a resource cannot appear after the container is
-///     built and every consumer observes the same set. Security activations recorded before the
-///     resource package attaches its wiring are replayed when it does, so activation and registration
-///     produce the same outcome in any order.
-/// </summary>
 public sealed class ResourceRegistry
 {
-    private readonly Dictionary<RuntimeTypeHandle, List<ResourceMethodAttribute>> _methods = [];
-    private readonly List<ResourceAttribute>                                      _ordered = [];
-    private readonly Dictionary<RuntimeTypeHandle, ResourceAttribute>             _resources = [];
-
-    private readonly List<(IServiceCollection Services, ResourceAttribute Resource, IReadOnlyList<ResourceMethodAttribute> Methods)> _pending = [];
-
-    private IServiceCollection? _services;
-
+    private const string RegistryKey = "Schemata.Resource.Registry";
+    private static readonly IReadOnlyList<ResourceMethodRegistration> EmptyMethods = Array.AsReadOnly(Array.Empty<ResourceMethodRegistration>());
+    private readonly Dictionary<RuntimeTypeHandle, Entry> _resources = [];
+    private readonly List<Entry> _ordered = [];
+    private readonly HashSet<Type> _authorizedEntities = [];
     private ResourcePipelineWiring? _wiring;
-
+    private IReadOnlyList<ResourceRegistration>? _snapshot;
     private bool _authentication;
     private bool _authorization;
+    private bool _createValidation = true;
+    private bool _updateValidation = true;
+    private bool _freshness = true;
 
-    private bool _sealed;
+    public static ResourceRegistry GetOrAdd(SchemataOptions schemata, IServiceCollection services) {
+        var registry = schemata.Get<ResourceRegistry>(RegistryKey);
+        if (registry is null) {
+            registry = new();
+            schemata.Set(RegistryKey, registry);
+        }
+        services.TryAddSingleton(registry);
+        return registry;
+    }
 
-    public IReadOnlyList<ResourceAttribute> Resources {
+    public IReadOnlyList<ResourceRegistration> Resources {
         get {
-            _sealed = true;
-            return _ordered;
+            Seal();
+            return _snapshot!;
         }
     }
 
-    public ResourceAttribute? GetResource(Type entity) {
-        _sealed = true;
-        return _resources.GetValueOrDefault(entity.TypeHandle);
+    public ResourceRegistration? GetResource(Type entity) {
+        Seal();
+        return _resources.GetValueOrDefault(entity.TypeHandle)?.Registration;
     }
 
-    public IReadOnlyList<ResourceMethodAttribute> GetMethods(Type entity) {
-        _sealed = true;
-        return _methods.TryGetValue(entity.TypeHandle, out var methods) ? methods : [];
-    }
+    public IReadOnlyList<ResourceMethodRegistration> GetMethods(Type entity) => GetResource(entity)?.Methods
+        ?? EmptyMethods;
 
+    public bool CreateValidation => _createValidation;
+    public bool UpdateValidation => _updateValidation;
+    public bool Freshness => _freshness;
 
-
-    /// <summary>
-    ///     Attaches the resource package's wiring and hands it everything recorded before it existed.
-    ///     Called once, from the resource package's registration entry points.
-    /// </summary>
-    /// <param name="wiring">The callbacks the resource package supplies.</param>
-    public void Attach(ResourcePipelineWiring wiring) {
-        if (_wiring is not null) {
-            return;
-        }
-
-        _wiring = wiring;
-
-        foreach (var (services, resource, methods) in _pending) {
-            wiring.RegisterResource(services, resource, methods);
-            ApplySecurity(services, resource, methods);
-        }
-
-        _pending.Clear();
-
-        if (_authentication) {
-            ReplayAuthentication(wiring, _services!);
-        }
-
-        if (_authorization) {
-            ReplayAuthorization(wiring, _services!);
-        }
-    }
-
-    /// <summary>
-    ///     Registers <paramref name="resource" /> and its custom methods. Registering the same entity
-    ///     again merges instead of replacing: a <see langword="null" /> endpoint list on either side
-    ///     means "every endpoint" and wins, otherwise the lists union; methods merge by verb.
-    /// </summary>
-    public void Add(ResourceAttribute resource, IReadOnlyList<ResourceMethodAttribute> methods) {
-        if (_sealed) {
-            throw new InvalidOperationException(
-                $"Resource '{resource.Entity.FullName}' cannot be registered after the registry has been read. "
-                + "Register every resource while configuring services.");
-        }
-
-        var handle = resource.Entity.TypeHandle;
-        if (!_resources.TryGetValue(handle, out var existing)) {
-            _resources[handle] = resource;
-            _ordered.Add(resource);
-        } else if (existing.Endpoints is null || resource.Endpoints is null) {
-            existing.Endpoints = null;
-        } else {
-            foreach (var endpoint in resource.Endpoints) {
-                if (!existing.Endpoints.Contains(endpoint)) {
-                    existing.Endpoints.Add(endpoint);
+    public void Attach(IServiceCollection services, ResourcePipelineWiring wiring) {
+        EnsureMutable();
+        if (_wiring is null) {
+            var prepared = _ordered.Select(entry => Prepare(entry.Input, wiring)).ToArray();
+            _wiring = wiring;
+            for (var i = 0; i < _ordered.Count; i++) {
+                _ordered[i].Registration = prepared[i];
+                foreach (var installation in _ordered[i].Installations) {
+                    Install(_ordered[i], installation);
                 }
             }
         }
-
-        if (methods.Count == 0) {
-            return;
-        }
-
-        if (!_methods.TryGetValue(handle, out var declared)) {
-            _methods[handle] = [..methods];
-            return;
-        }
-
-        var byVerb = new Dictionary<string, ResourceMethodAttribute>(StringComparer.Ordinal);
-        foreach (var method in declared) {
-            byVerb[method.Verb] = method;
-        }
-
-        foreach (var method in methods) {
-            byVerb[method.Verb] = method;
-        }
-
-        declared.Clear();
-        declared.AddRange(byVerb.Values);
+        ReplaySecurity(services);
+        _wiring.ApplyStageChoices(services);
     }
 
-    /// <summary>
-    ///     Registers one resource and its custom methods, applying the resource package's wiring for
-    ///     it: the handler and advisor registration, and the activated security stages. Resources
-    ///     registered before the wiring attaches are held and applied when it does.
-    /// </summary>
-    /// <param name="services">The service collection receiving the registrations.</param>
-    /// <param name="resource">The resource descriptor.</param>
-    /// <param name="methods">The custom methods declared for the resource.</param>
-    public void Register(IServiceCollection services, ResourceAttribute resource, IReadOnlyList<ResourceMethodAttribute> methods) {
-        _services = services;
-        Add(resource, methods);
+    public void Add(ResourceAttribute resource, IReadOnlyList<ResourceMethodAttribute> methods) => Merge(resource, methods, null);
 
+    public void Register(IServiceCollection services, ResourceAttribute resource, IReadOnlyList<ResourceMethodAttribute> methods)
+        => Merge(resource, methods, services);
+
+    private void Merge(ResourceAttribute resource, IReadOnlyList<ResourceMethodAttribute> methods, IServiceCollection? services) {
+        EnsureMutable(resource.Entity);
+        var input = new ResourceRegistration(resource, methods);
+        var handle = input.Entity.TypeHandle;
+        var existing = _resources.GetValueOrDefault(handle);
+        if (existing is not null) input = Merge(existing.Input, input);
+        else input = input.WithMethods(MergeMethods([], input.Methods, input.Entity));
+        var prepared = _wiring is null ? input : Prepare(input, _wiring);
+        if (existing is not null) {
+            foreach (var method in prepared.Methods) {
+                var installed = existing.Registration.Methods.FirstOrDefault(candidate => candidate.Verb == method.Verb);
+                if (installed is not null && (installed.Handler != method.Handler || installed.Scope != method.Scope
+                    || installed.Method != method.Method)) throw Conflict(input.Entity, $"method '{method.Verb}'");
+            }
+        }
+        var entry = existing ?? new Entry(input, prepared);
+        entry.Input = input;
+        entry.Registration = prepared;
+        if (existing is null) {
+            _resources.Add(handle, entry);
+            _ordered.Add(entry);
+        }
+        if (services is not null) {
+            var installation = entry.Installations.FirstOrDefault(item => ReferenceEquals(item.Services, services));
+            if (installation is null) {
+                installation = new(services);
+                entry.Installations.Add(installation);
+            }
+            installation.Resource = true;
+        }
         if (_wiring is not null) {
-            _wiring.RegisterResource(services, resource, methods);
-        } else {
-            _pending.Add((services, resource, methods));
+            foreach (var installation in entry.Installations) Install(entry, installation);
         }
-
-        ApplySecurity(services, resource, methods);
     }
 
-    /// <summary>
-    ///     Activates the authentication security stage for every resource, registered before or after
-    ///     this call.
-    /// </summary>
-    /// <param name="services">The service collection receiving the advisor registrations.</param>
+    private static ResourceRegistration Prepare(ResourceRegistration input, ResourcePipelineWiring wiring) =>
+        input.WithMethods(MergeMethods([], wiring.PrepareMethods(input), input.Entity));
+
+    private static ResourceRegistration Merge(ResourceRegistration current, ResourceRegistration incoming) {
+        if (current.Request != incoming.Request || current.Detail != incoming.Detail || current.Summary != incoming.Summary) {
+            throw Conflict(current.Entity, "type roles");
+        }
+        var scheme = MergeValue(current.AuthenticationScheme, incoming.AuthenticationScheme, current.Entity, "authentication scheme");
+        var defaultPage = MergeValue(current.DefaultPageSize == 0 ? null : (int?)current.DefaultPageSize,
+            incoming.DefaultPageSize == 0 ? null : (int?)incoming.DefaultPageSize, current.Entity, "default page size") ?? 0;
+        var maxPage = MergeValue(current.MaxPageSize == 0 ? null : (int?)current.MaxPageSize,
+            incoming.MaxPageSize == 0 ? null : (int?)incoming.MaxPageSize, current.Entity, "maximum page size") ?? 0;
+        var total = MergeValue(current.ConfiguredTotalSize, incoming.ConfiguredTotalSize, current.Entity, "total size policy");
+        var operations = current.Operations ?? incoming.Operations;
+        if (current.Operations is not null && incoming.Operations is not null
+            && !current.Operations.ToHashSet().SetEquals(incoming.Operations)) {
+            throw Conflict(current.Entity, "operations");
+        }
+        IReadOnlyList<string>? endpoints = current.Endpoints is null || incoming.Endpoints is null ? null
+            : Array.AsReadOnly(current.Endpoints.Concat(incoming.Endpoints).Distinct(StringComparer.Ordinal).ToArray());
+        return new(current, scheme, defaultPage, maxPage, total, endpoints, operations,
+            MergeMethods(current.Methods, incoming.Methods, current.Entity));
+    }
+
+    private static T? MergeValue<T>(T? current, T? incoming, Type entity, string field) where T : struct {
+        if (current is not null && incoming is not null && !EqualityComparer<T>.Default.Equals(current.Value, incoming.Value)) {
+            throw Conflict(entity, field);
+        }
+        return current ?? incoming;
+    }
+
+    private static string? MergeValue(string? current, string? incoming, Type entity, string field) {
+        if (current is not null && incoming is not null && !string.Equals(current, incoming, StringComparison.Ordinal)) {
+            throw Conflict(entity, field);
+        }
+        return current ?? incoming;
+    }
+
+    private static IReadOnlyList<ResourceMethodRegistration> MergeMethods(IReadOnlyList<ResourceMethodRegistration> current,
+        IReadOnlyList<ResourceMethodRegistration> incoming, Type entity) {
+        var methods = new Dictionary<string, ResourceMethodRegistration>(StringComparer.Ordinal);
+        foreach (var method in current.Concat(incoming)) {
+            if (methods.TryGetValue(method.Verb, out var existing)) {
+                if (existing.Handler != method.Handler || existing.Scope != method.Scope || existing.Method != method.Method) {
+                    throw Conflict(entity, $"method '{method.Verb}'");
+                }
+            } else methods.Add(method.Verb, method);
+        }
+        return Array.AsReadOnly(methods.Values.ToArray());
+    }
+
+    private static InvalidOperationException Conflict(Type entity, string field) =>
+        new($"Resource '{entity.FullName}' has conflicting {field} registrations.");
+
+    private void Install(Entry entry, Installation installation) {
+        var resource = entry.Registration;
+        if (installation.Resource && !installation.Standard) {
+            _wiring!.RegisterResource(installation.Services, resource);
+            installation.Standard = true;
+        }
+        if (!ReferenceEquals(installation.Registration, resource)) {
+            var closures = resource.Methods.Select(method => _wiring!.MethodClosure(resource, method)).ToHashSet();
+            foreach (var closure in installation.Methods.Keys.ToArray()) {
+                if (closures.Contains(closure)) continue;
+                var removed = installation.Methods[closure];
+                installation.Methods.Remove(closure);
+                foreach (var descriptor in removed.Descriptors) {
+                    var remaining = _ordered.SelectMany(item => item.Installations)
+                        .Where(item => ReferenceEquals(item.Services, installation.Services))
+                        .SelectMany(item => item.Methods.Values)
+                        .FirstOrDefault(item => item.Dependencies.Contains(descriptor));
+                    if (remaining is null) installation.Services.Remove(descriptor);
+                    else remaining.Descriptors.Add(descriptor);
+                }
+            }
+            installation.Registration = resource;
+        }
+        foreach (var method in resource.Methods) {
+            var closure = _wiring!.MethodClosure(resource, method);
+            if (!installation.Methods.TryGetValue(closure, out var owned)) {
+                owned = new();
+                installation.Methods.Add(closure, owned);
+            }
+            if (!installation.Resource || owned.Installed) continue;
+            Capture(installation.Services, owned.Descriptors, () => owned.Dependencies.AddRange(
+                _wiring.RegisterMethod(installation.Services, resource, method)));
+            owned.Installed = true;
+        }
+        ApplySecurity(entry, installation);
+        _wiring!.ApplyStageChoices(installation.Services);
+    }
+
+    private void ApplySecurity(Entry entry, Installation installation) {
+        var resource = entry.Registration;
+        var authentication = _authentication || resource.AuthenticationScheme is not null;
+        var authorization = _authorization || _authorizedEntities.Contains(resource.Entity);
+        if (authentication) _wiring!.RegisterAuthentication(installation.Services, resource, []);
+        if (authorization) _wiring!.RegisterAuthorization(installation.Services, resource, []);
+        foreach (var method in resource.Methods) {
+            var closure = _wiring!.MethodClosure(resource, method);
+            if (!installation.Methods.TryGetValue(closure, out var owned)) {
+                owned = new();
+                installation.Methods.Add(closure, owned);
+            }
+            if (authentication && !owned.Authentication) {
+                Capture(installation.Services, owned.Descriptors, () => _wiring.RegisterAuthentication(installation.Services, resource, [method]));
+                owned.Authentication = true;
+            }
+            if (authorization && !owned.Authorization) {
+                Capture(installation.Services, owned.Descriptors, () => _wiring.RegisterAuthorization(installation.Services, resource, [method]));
+                owned.Authorization = true;
+            }
+        }
+    }
+
+    // Added descriptors are owned; reused descriptors remain dependencies of every method binding.
+    private static void Capture(IServiceCollection services, List<ServiceDescriptor> owned, Action register) {
+        var start = services.Count;
+        register();
+        for (var i = start; i < services.Count; i++) owned.Add(services[i]);
+    }
+
     public void ActivateAuthentication(IServiceCollection services) {
-        if (_authentication) {
-            return;
-        }
-
+        EnsureMutable();
         _authentication = true;
-        _services = services;
-        if (_wiring is not null) {
-            ReplayAuthentication(_wiring, services);
-        }
+        ReplaySecurity(services);
     }
 
-    /// <summary>
-    ///     Activates the authorization security stage for every resource, registered before or after
-    ///     this call.
-    /// </summary>
-    /// <param name="services">The service collection receiving the advisor registrations.</param>
     public void ActivateAuthorization(IServiceCollection services) {
-        if (_authorization) {
-            return;
-        }
-
+        EnsureMutable();
         _authorization = true;
-        _services = services;
-        if (_wiring is not null) {
-            ReplayAuthorization(_wiring, services);
+        ReplaySecurity(services);
+    }
+
+    public void ActivateAuthorization(IServiceCollection services, Type entity) {
+        EnsureMutable(entity);
+        _authorizedEntities.Add(entity);
+        ReplaySecurity(services);
+    }
+
+    private void ReplaySecurity(IServiceCollection services) {
+        if (_wiring is null) return;
+        foreach (var entry in _ordered) {
+            var installation = entry.Installations.FirstOrDefault(item => ReferenceEquals(item.Services, services));
+            if (installation is null) {
+                installation = new(services);
+                entry.Installations.Add(installation);
+            }
+            Adopt(entry, installation);
+            ApplySecurity(entry, installation);
         }
     }
 
-    private void ApplySecurity(IServiceCollection services, ResourceAttribute resource, IReadOnlyList<ResourceMethodAttribute> methods) {
-        if (_wiring is null) {
-            return;
-        }
-
-        if (_authentication) {
-            _wiring.RegisterAuthentication(services, resource, methods);
-        }
-
-        if (_authorization) {
-            _wiring.RegisterAuthorization(services, resource, methods);
+    private static void Adopt(Entry entry, Installation target) {
+        foreach (var source in entry.Installations) {
+            if (ReferenceEquals(source, target)) continue;
+            foreach (var (closure, method) in source.Methods) {
+                var descriptors = method.Descriptors.Where(target.Services.Contains).ToList();
+                var dependencies = method.Dependencies.Where(target.Services.Contains).ToList();
+                if (descriptors.Count == 0 && dependencies.Count == 0) continue;
+                if (!target.Methods.TryGetValue(closure, out var adopted)) {
+                    adopted = new();
+                    target.Methods.Add(closure, adopted);
+                }
+                adopted.Installed |= method.Installed;
+                adopted.Authentication |= method.Authentication;
+                adopted.Authorization |= method.Authorization;
+                foreach (var descriptor in descriptors) {
+                    if (!adopted.Descriptors.Contains(descriptor)) adopted.Descriptors.Add(descriptor);
+                }
+                foreach (var dependency in dependencies) {
+                    if (!adopted.Dependencies.Contains(dependency)) adopted.Dependencies.Add(dependency);
+                }
+                target.Resource |= source.Resource;
+                target.Standard |= source.Standard;
+                target.Registration = source.Registration;
+            }
         }
     }
 
-    private void ReplayAuthentication(ResourcePipelineWiring wiring, IServiceCollection services) {
-        foreach (var resource in _ordered) {
-            wiring.RegisterAuthentication(services, resource, _methods.GetValueOrDefault(resource.Entity.TypeHandle, []));
-        }
+    public void WithoutCreateValidation(IServiceCollection services) {
+        EnsureMutable();
+        _createValidation = false;
+        _wiring?.ApplyStageChoices(services);
     }
 
-    private void ReplayAuthorization(ResourcePipelineWiring wiring, IServiceCollection services) {
-        foreach (var resource in _ordered) {
-            wiring.RegisterAuthorization(services, resource, _methods.GetValueOrDefault(resource.Entity.TypeHandle, []));
-        }
+    public void WithoutUpdateValidation(IServiceCollection services) {
+        EnsureMutable();
+        _updateValidation = false;
+        _wiring?.ApplyStageChoices(services);
+    }
 
-        wiring.RegisterAuthorizationAdvisors(services);
+    public void WithoutFreshness(IServiceCollection services) {
+        EnsureMutable();
+        _freshness = false;
+        _wiring?.ApplyStageChoices(services);
+    }
+
+    private void EnsureMutable(Type? entity = null) {
+        if (_snapshot is not null) throw new InvalidOperationException(
+            $"Resource '{entity?.FullName ?? "registry"}' cannot be configured after the registry has been read. Register every resource while configuring services.");
+    }
+
+    private void Seal() {
+        _snapshot ??= Array.AsReadOnly(_ordered.Select(entry => entry.Registration).ToArray());
+    }
+
+    private sealed class Entry(ResourceRegistration input, ResourceRegistration registration)
+    {
+        public ResourceRegistration Input = input;
+        public ResourceRegistration Registration = registration;
+        public List<Installation> Installations { get; } = [];
+    }
+
+    private sealed class Installation(IServiceCollection services)
+    {
+        public IServiceCollection Services { get; } = services;
+        public bool Standard;
+        public bool Resource;
+        public ResourceRegistration? Registration;
+        public Dictionary<(Type Request, Type Response), MethodInstallation> Methods { get; } = [];
+    }
+
+    private sealed class MethodInstallation
+    {
+        public List<ServiceDescriptor> Descriptors { get; } = [];
+        public List<ServiceDescriptor> Dependencies { get; } = [];
+        public bool Installed;
+        public bool Authentication;
+        public bool Authorization;
     }
 }

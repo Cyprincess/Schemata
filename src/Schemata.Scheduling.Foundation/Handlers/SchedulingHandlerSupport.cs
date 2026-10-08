@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Scheduling.Foundation.Runtime;
 using Schemata.Scheduling.Skeleton;
@@ -20,32 +19,56 @@ internal sealed class SchedulingHandlerSupport(DefaultScheduler scheduler, Schem
 
     internal SchemataJobWriteGate WriteGate => writeGate;
 
-    internal async Task CancelFuturePendingAsync(string jobCanonical, CancellationToken ct) {
-        using var scope      = scheduler.Services.CreateScope();
-        var       executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
+    internal async Task ReplacePendingExecutionAsync(
+        SchemataJob                        job,
+        IRepository<SchemataJobExecution>  executions,
+        IServiceProvider                   services,
+        IUnitOfWork                        transaction,
+        CancellationToken                  ct
+    ) {
+        var pending = await executions.ListAsync(query => query.Where(execution => execution.Job == job.CanonicalName
+            && execution.State == ExecutionState.Pending), ct).ToListAsync(ct);
+        if (pending.Count == 1 && pending[0].ScheduleVersion == job.ScheduleVersion
+            && pending[0].StartTime == job.NextRunTime) return;
+        var mutation = services.GetRequiredService<IResourceMutation<SchemataJobExecution>>();
+        foreach (var execution in pending) {
+            execution.State = ExecutionState.Cancelled;
+            execution.EndTime = scheduler.Time.GetUtcNow().UtcDateTime;
+            await mutation.UpdateAsync(execution, transaction, ct: ct);
+        }
+        if (job.NextRunTime is { } due) {
+            await mutation.CreateAsync(new SchemataJobExecution {
+                Tenant = job.Tenant, Job = job.CanonicalName, JobKey = job.JobKey, ArgsJson = job.ArgsJson,
+                ScheduleVersion = job.ScheduleVersion,
+                Variables = job.Variables is null ? null : new Dictionary<string, string?>(job.Variables),
+                State = ExecutionState.Pending, StartTime = due,
+            }, transaction, ct);
+        }
+    }
+
+    internal async Task CancelPendingAsync(
+        string                            jobCanonical,
+        IRepository<SchemataJobExecution> executions,
+        IServiceProvider                  services,
+        IUnitOfWork                       transaction,
+        CancellationToken                 ct
+    ) {
 
         var now    = scheduler.Time.GetUtcNow().UtcDateTime;
         var future = new List<SchemataJobExecution>();
         await foreach (var row in executions.ListAsync(
                            query => query.Where(execution => execution.Job == jobCanonical
-                                                          && execution.State == ExecutionState.Pending
-                                                          && execution.StartTime > now), ct)) {
+                                                          && execution.State == ExecutionState.Pending), ct)) {
             future.Add(row);
         }
 
+        var mutation = services.GetRequiredService<IResourceMutation<SchemataJobExecution>>();
         foreach (var row in future) {
             row.State   = ExecutionState.Cancelled;
             row.EndTime = now;
-            try {
-                await executions.UpdateAsync(row, ct);
-            } catch (AbortedException) {
-                // A competing handler already moved the row.
-            }
+            await mutation.UpdateAsync(row, transaction, ct: ct);
         }
 
-        if (future.Count > 0) {
-            await executions.CommitAsync(ct);
-        }
     }
 
     internal async Task NotifyScheduledAsync(SchemataJob job, CancellationToken ct) {
@@ -78,47 +101,11 @@ internal sealed class SchedulingHandlerSupport(DefaultScheduler scheduler, Schem
 
     internal async Task PersistExecutionAsync(SchemataJobExecution execution, CancellationToken ct) {
         using var scope      = scheduler.Services.CreateScope();
-        var       executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
+        var       mutation   = scope.ServiceProvider.GetRequiredService<IResourceMutation<SchemataJobExecution>>();
 
-        await executions.AddAsync(execution, ct);
-        await executions.CommitAsync(ct);
+        await mutation.CreateAsync(execution, null, ct);
     }
 
-    internal async Task EnsurePendingExecutionAsync(SchemataJob job, CancellationToken ct) {
-        if (job.NextRunTime is not { } due) {
-            return;
-        }
-
-        using var scope = scheduler.Services.CreateScope();
-        var executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
-        var canonical  = job.CanonicalName;
-        if (string.IsNullOrWhiteSpace(canonical)) {
-            return;
-        }
-
-        var existing = await executions.FirstOrDefaultAsync(
-            query => query.Where(execution => execution.Job == canonical
-                                           && execution.State == ExecutionState.Pending), ct);
-        if (existing is not null) {
-            return;
-        }
-        var name       = Guid.NewGuid().ToString("n");
-        var descriptor = ResourceNameDescriptor.ForType<SchemataJobExecution>();
-        var execution = new SchemataJobExecution {
-            Name          = name,
-            CanonicalName = $"{descriptor.Collection}/{name}",
-            Job           = canonical,
-            JobKey        = job.JobKey,
-            ArgsJson      = job.ArgsJson,
-            Variables     = job.Variables is null ? null : new Dictionary<string, string?>(job.Variables),
-            State         = ExecutionState.Pending,
-            StartTime     = due,
-        };
-
-        await using var uow = executions.Begin();
-        await executions.AddAsync(execution, ct);
-        await uow.CommitAsync(ct);
-    }
 
     /// <summary>
     ///     Installs a fresh timer entry for <paramref name="job" /> under the scheduler gate. Callers
@@ -131,8 +118,9 @@ internal sealed class SchedulingHandlerSupport(DefaultScheduler scheduler, Schem
     ///     replaced. The count keeps the <see cref="MissedFirePolicy.FireAll" /> missed-occurrence
     ///     walk capped across re-arms.
     /// </param>
-    internal async Task ArmOneShotTimerAsync(SchemataJob job, int replayedMisses = -1) {
-        var key = job.CanonicalName ?? job.Name;
+    /// <param name="timerKey">Persisted execution identity for one-shot fires without a job resource.</param>
+    internal async Task ArmOneShotTimerAsync(SchemataJob job, int replayedMisses = -1, string? timerKey = null) {
+        var key = timerKey ?? job.CanonicalName ?? job.Name;
         if (string.IsNullOrWhiteSpace(key)) {
             return;
         }
@@ -178,7 +166,7 @@ internal sealed class SchedulingHandlerSupport(DefaultScheduler scheduler, Schem
 
         _ = Task.Run(async () => {
             try {
-                await Task.Delay(delay, entry.Cts.Token);
+                await Task.Delay(delay, scheduler.Time, entry.Cts.Token);
                 if (!entry.Cts.Token.IsCancellationRequested) {
                     scheduler.SignalDispatcher();
                 }

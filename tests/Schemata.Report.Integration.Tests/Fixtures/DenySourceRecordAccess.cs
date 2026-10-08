@@ -8,12 +8,12 @@ namespace Schemata.Report.Integration.Tests.Fixtures;
 
 internal sealed class DenySourceRecordAccess : IAccessProvider<SourceRecord, QueryInsightRequest>
 {
-    public Task<bool> HasAccessAsync(
+    public Task<AccessDecision> HasAccessAsync(
         SourceRecord?                entity,
         AccessContext<QueryInsightRequest> context,
         ClaimsPrincipal?             principal,
         CancellationToken            ct = default
     ) {
-        return Task.FromResult(false);
+        return Task.FromResult(AccessDecision.Denied);
     }
 }

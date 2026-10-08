@@ -47,7 +47,7 @@ public sealed class StandardLoopExecutor
         var counter     = ReadCounter(token);
 
         if (loop.TestBefore && !await CanEnterAsync(engine, definition, process, token, activity, loop, counter, execution)) {
-            return await ExitAsync(engine, definition, process, token, working, activity, previousState, arrivalEvent, transitions, execution);
+            return await ExitAsync(engine, definition, process, token, working, activity, previousState, arrivalEvent, transitions, execution, ct);
         }
 
         if (includeArrival) {
@@ -118,7 +118,7 @@ public sealed class StandardLoopExecutor
             return BpmnEngine.Snapshot(process, working, transitions, execution);
         }
 
-        return await ExitAsync(engine, definition, process, token, working, activity, activity.Name, "ExitStandardLoop", transitions, execution);
+        return await ExitAsync(engine, definition, process, token, working, activity, activity.Name, "ExitStandardLoop", transitions, execution, ct);
     }
 
     private static async ValueTask<ProcessSnapshot> ExitAsync(
@@ -131,7 +131,8 @@ public sealed class StandardLoopExecutor
         string?                            previousState,
         string                             eventName,
         List<SchemataProcessTransition>    transitions,
-        FlowExecutionContext               execution
+        FlowExecutionContext               execution,
+        CancellationToken                  ct
     ) {
         var outgoing = definition.FirstOutgoing(activity);
         if (outgoing is null) {
@@ -142,7 +143,7 @@ public sealed class StandardLoopExecutor
         }
 
         var bookkeeping = token.Bookkeeping;
-        var resolved    = await engine.ResolveTargetAsync(definition, outgoing.Target, bookkeeping, BpmnEngine.TokenView(token), execution, process, token);
+        var resolved    = await engine.ResolveTargetAsync(definition, outgoing.Target, bookkeeping, BpmnEngine.TokenView(token), execution, process, token, ct: ct);
 
         BpmnEngine.ApplyResolvedToToken(token, resolved);
         transitions.Add(BpmnEngine.NewTransition(

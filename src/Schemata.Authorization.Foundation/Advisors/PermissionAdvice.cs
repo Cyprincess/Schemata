@@ -43,10 +43,7 @@ public static class PermissionAdvice
             return;
         }
 
-        var exception = new OAuthException(
-            error ?? OAuthErrors.UnauthorizedClient,
-            SchemataResources.GetResourceString(resource ?? SchemataResources.UNAUTHORIZED_GRANT_TYPE),
-            code);
+        var exception = new OAuthException(error ?? OAuthErrors.UnauthorizedClient, resource ?? SchemataResources.UNAUTHORIZED_GRANT_TYPE, code: code);
         configure?.Invoke(exception);
         throw exception;
     }

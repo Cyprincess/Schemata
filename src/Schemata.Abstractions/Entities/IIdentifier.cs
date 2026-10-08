@@ -3,12 +3,12 @@ using System;
 namespace Schemata.Abstractions.Entities;
 
 /// <summary>
-///     Provides a unique identifier suitable for use as a primary key.
+///     Provides the strictly unique system-internal identity of an entity instance.
 /// </summary>
 public interface IIdentifier
 {
     /// <summary>
-    ///     The unique identifier.
+    ///     Identifies this instance independently of its resource name and lifecycle.
     /// </summary>
     Guid Uid { get; set; }
 }

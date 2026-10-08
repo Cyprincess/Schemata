@@ -92,15 +92,28 @@ Joins are local nested-loop joins over compiled predicates. The buffered side is
 name `RepositoryDriver.DriverName`, whose value is `"repository"`:
 
 ```csharp
+using Schemata.Insight.Foundation.Drivers;
+
 schema.UseInsight(i => {
-    i.AddRepositorySource("students", "students")
+    i.AddRepositorySource<Student, StudentRow>("students",
+            s => new StudentRow { FullName = s.FullName, Age = s.Age })
      .AddSourceDriver<RepositoryDriver>(RepositoryDriver.DriverName);
 });
+
+public sealed class StudentRow
+{
+    public string? FullName { get; set; }
+    public int     Age      { get; set; }
+}
 ```
 
-`AddRepositorySource(name, resource)` stores `Params["resource"] = resource`. At execution time the
-driver resolves the resource collection back to an entity type by scanning `ICanonicalName` types and
-comparing `ResourceNameDescriptor.ForType(type).Collection`.
+`AddRepositorySource<TEntity, TPublic>(name, projection)` registers a keyed
+`RepositorySource<TEntity, TPublic>` under `name` and stores `Params["binding"] = name`. At execution
+time the driver resolves the binding back to the closed `RepositorySource<TEntity, TPublic>` through
+`GetKeyedService<RepositorySource>(binding)` rather than scanning `ICanonicalName` types or matching
+`ResourceNameDescriptor.ForType(type).Collection` against a string. Each source's `TPublic`
+properties are the field set the public-shape validator, filter pushdown, ordering, and row
+materializer see. `TEntity` still backs the repository query and entitlement check.
 
 ### Capabilities
 
@@ -112,49 +125,54 @@ comparing `ResourceNameDescriptor.ForType(type).Collection`.
 - `Nested`
 
 It does not report `Compute`, `Group`, `Limit`, or `Join`; those stages can span heterogeneous
-providers or need local execution. Its `Nested` capability eager-loads navigation collections and
-passes child rows into the local nested selection pipeline.
+providers or need local execution. The supplied projection selects navigation collections into
+declared public child models for the local nested selection pipeline.
 
 ### Query lowering
 
-For each source, `RepositoryDriver` builds an `IQueryable<TEntity>` callback for
-`IRepository<TEntity>.ListAsync`:
+For each source, the closed repository binding supplies a projected query to
+`IRepository<TEntity>.ListAsync<TPublic>`:
 
-1. `InsightSecurityGate.AuthorizeAsync` returns a row entitlement expression, when one is registered.
-2. The entitlement expression is applied with `Where`.
-3. Each pushed `FilterNode` is planned through the keyed `IExpressionPushdownPlanner`.
-4. The pushed part is compiled through the keyed `IExpressionCompiler` and applied to the query.
-5. The residual part is compiled to `Func<TEntity, bool>` and stored for post-query filtering.
-6. `OrderNode` is compiled through `IOrderCompiler.CompileOrder<TEntity>`.
-7. Nested selections are converted to PascalCase navigation names and passed through EF Core `Include`
-   by reflection when the extension method is available.
+1. `InsightSecurityGate.AuthorizeAsync<TEntity>` obtains entity row entitlement.
+2. The entity query applies entitlement with `Where`, then the registered `Select` projection.
+3. Pushed filters compile against `TPublic` and remain in the backend query.
+4. Residual filters compile against the validated public model and run on projected rows.
+5. Ordering compiles against `TPublic`; the projection supplies nested navigation data.
+6. `RowMaterializer` recursively converts only declared public members into rows.
 
-The driver then streams repository entities, applies every residual predicate, and calls
-`RowMaterializer.ToRow`.
+### Nested selections
 
-### Nested selections and EF Include
+A nested `SelectionSpec` produces child rows from the public shape, not from the entity navigation
+graph. The projection supplies the child collection: the `TPublic` row must project navigation
+properties into a collection of public-shaped children (or another `TPublic`-shaped value):
 
-Nested selections need the parent navigation collection loaded before the local child pipeline runs.
-`RepositoryDriver` receives the nested-only push selection, and `RepositoryDriver.NavigationNames`
-strips the parent alias and Pascalizes each segment:
+```csharp
+public sealed class CustomerRow
+{
+    public string?             FullName { get; set; }
+    public List<OrderRow>?     Orders   { get; set; }
+}
 
-```text
-c.orders -> Orders
-c.orders.items -> Orders.Items
+public sealed class OrderRow
+{
+    public int     Number { get; set; }
+    public string? Status { get; set; }
+    public int     Amount { get; set; }
+    public int     Placed { get; set; }
+}
 ```
 
-`Include(query, navigation)` binds `Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions`
-reflectively. EF Core providers receive the string include. Providers without that extension continue
-without include support, so navigation loading follows the provider's own behavior.
-
-`RowMaterializer` converts each child object in the navigation collection into a snake_case dictionary.
-The local fallback anchors a nested path to its owning source dictionary, accepts dictionary or CLR
-child values, and applies the child pipeline. A missing child collection raises `UNIMPLEMENTED`; a
-non-collection value raises `INVALID_ARGUMENT`.
+`RepositorySource<TEntity, TPublic>` supplies the registered projection to
+`IRepository<TEntity>.ListAsync<TPublic>`. `RowMaterializer` converts the declared public child
+collection into snake_case dictionaries before local evaluation. A present null collection becomes
+an empty list; an absent collection is an error, and a non-collection value raises `INVALID_ARGUMENT`.
+Ordinary map-valued fields support key access, but a map is not itself a nested collection selection.
+Custom drivers may supply CLR child values; repository-backed rows remain restricted to their
+registered declared public types throughout nested evaluation.
 
 ### Schema materialization
 
-`SchemaBuilder.For` maps selected entity properties to `FieldDescriptor` values:
+`SchemaBuilder.For` maps selected public properties to `FieldDescriptor` values:
 
 | CLR type                     | FieldType   |
 | ---------------------------- | ----------- |
@@ -174,6 +192,77 @@ Computed selections currently report `FieldType.Object` because the expression r
 Multi-source plans run their joins and terminal selection locally. `PlanExecutor` rebuilds the response
 schema from that local selection output rather than returning a driver schema, preserving selected
 field aliases, computed fields, and nested descriptors.
+
+## Public shape contract
+
+`PublicModel` reads the public type once per CLR type and caches the field map under the property's
+snake_case name. The constructor walks `BindingFlags.Instance | BindingFlags.Public` properties and
+keeps every property whose public getter is present, that has no index parameters, and that does not
+carry a `JsonIgnoreAttribute`:
+
+```csharp
+_properties = properties.Where(p => p.GetMethod?.IsPublic == true && p.GetIndexParameters().Length == 0
+        && p.GetCustomAttribute<JsonIgnoreAttribute>() is null)
+    .ToDictionary(p => p.Name.Underscore(), StringComparer.Ordinal);
+```
+
+Properties outside that set — `[JsonIgnore]` members, write-only properties, properties whose getter
+is not public, and indexers — are not declared as fields and cannot be referenced by `Field`,
+`Filter`, `Order`, `Group`, or `Selection` paths. The declared-name set still comes from every public
+property and field so the validator can recognise both the property's PascalCase name and the
+underscored wire name.
+
+The public type appears as the row type in every query path that the driver exposes:
+
+| Path | Public-type member used |
+| --- | --- |
+| Filter pushdown | `IExpressionCompiler.Compile<TPublic, bool>` against the projected row |
+| Filter residual | `Func<TPublic, bool>` evaluated after materialization |
+| Order compiler | `IOrderCompiler.CompileOrder<TPublic>` against the projected row |
+| Nested push | `SchemaBuilder.For(typeof(TPublic), …)` and `RowMaterializer.ToRow` over projected rows |
+| Public-shape validation | `PublicModel.For(typeof(TPublic)).Declares(name)` for every referenced path |
+| Schema output | `SchemaBuilder.For(typeof(TPublic), …)` selecting properties from `TPublic` |
+
+A reference to a property that exists on `TEntity` but is not projected into `TPublic` fails
+validation with reason `INVALID_ARGUMENT`. Reference a property on `TPublic` (or extend the
+projection) instead of switching back to the entity type.
+
+### Expression reference providers
+
+`PublicPlanValidator` resolves the public shape of every source in the plan and walks each
+expression node to confirm every referenced path is declared on a public type. The walker delegates
+to the keyed `IExpressionReferenceProvider`:
+
+```csharp
+public interface IExpressionReferenceProvider
+{
+    ExpressionReferences Analyze(IExpressionTree tree);
+}
+
+public sealed record ExpressionReferences(IReadOnlyList<ExpressionReference> References, ExpressionShape Result);
+```
+
+`References` enumerates the source-rooted accesses the expression reads; each `ExpressionReference`
+carries the dotted path, whether it is dynamic, whether it may be a literal, and whether the path is
+repeated. `Result` carries the structural provenance of the expression's value through the
+`ExpressionShape` hierarchy (`Scalar`, `Null`, `MapValues`, `Reference`, `Sequence`, `Map`,
+`Alternatives`).
+
+`PublicPlanValidator.Analyze` resolves the provider through
+`GetKeyedService<IExpressionReferenceProvider>(expression.Language)` and rejects languages that do
+not provide one. The validator then walks `analysis.References` to confirm every path resolves
+against the source's public shape, and binds `analysis.Result` to the plan environment so the
+computed selection can use the expression's structural shape.
+
+Built-in reference providers:
+
+| Language | Type | Returns |
+| --- | --- | --- |
+| `aip` | `AipReferenceProvider` | `ExpressionReferences(references, Scalar)` |
+| `cel` | `CelReferenceProvider` | `ExpressionReferences(references, result)` where `result` is the structural provenance computed by visiting the CEL node |
+
+A custom language registers a reference provider alongside its compiler and pushdown planner so the
+public-shape validator can run against the language's expressions.
 
 ## Source-level security
 

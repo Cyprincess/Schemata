@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Abstractions.Tenancy;
 using Schemata.Advice;
 using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
@@ -65,6 +66,7 @@ public sealed class JobExecutionDispatcher(
 
     /// <summary>Claims and runs every due pending execution row in a scoped dispatch pass.</summary>
     public async Task DispatchPendingAsync(CancellationToken ct) {
+        using var host = TenantContext.Enter(TenantIdentity.Host);
         using var scope      = services.CreateScope();
         var       executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
         var       now        = _time.GetUtcNow().UtcDateTime;
@@ -104,7 +106,23 @@ public sealed class JobExecutionDispatcher(
             return;
         }
 
-        await RunPipelineAsync(serviceProvider, execution, ct);
+        MessageExecutionScope prepared;
+        var message = new MessageContext(new Dictionary<string, string?> { [MessageContexts.TenantIdKey] = execution.Tenant });
+        try {
+            prepared = await services.GetRequiredService<IMessageExecutionScopeFactory>().CreateAsync(message, ct);
+        } catch (Exception error) {
+            await MarkFailedAsync(serviceProvider, execution, error.Message, CancellationToken.None);
+            throw;
+        }
+        using var identity = prepared.Enter();
+        await using var owned = prepared;
+        try {
+            await prepared.RestoreAsync(message, ct);
+        } catch (Exception error) {
+            await MarkFailedAsync(serviceProvider, execution, error.Message, CancellationToken.None);
+            throw;
+        }
+        await RunPipelineAsync(prepared.Services, execution, ct);
     }
 
     /// <summary>
@@ -237,15 +255,15 @@ public sealed class JobExecutionDispatcher(
         if (!string.IsNullOrWhiteSpace(identity)) {
             var dispatcher = serviceProvider.GetRequiredService<IRequestDispatcher>();
             await dispatcher.SendAsync<StageJobExecutionResultRequest, Unit>(
-                new(identity, job.State, job.RecentRunTime, job.RecentError, job.NextRunTime), ct);
+                new(identity, job.State, job.RecentRunTime, job.RecentError, job.NextRunTime, execution.ScheduleVersion), ct);
         }
 
         foreach (var observer in observers) {
             try {
                 if (notifySucceeded) {
                     await observer.OnSucceededAsync(job, context, ct);
-                } else if (notifyFailed) {
-                    await observer.OnFailedAsync(job, context, exception!, ct);
+                } else if (notifyFailed && exception is { } failure) {
+                    await observer.OnFailedAsync(job, context, failure, ct);
                 } else if (notifyBlocked) {
                     await observer.OnBlockedAsync(job, context, ct);
                 } else if (notifySkipped) {
@@ -276,6 +294,7 @@ public sealed class JobExecutionDispatcher(
         // transient shell so the advisor / observer pipeline has a job to reason about. CanonicalName
         // mirrors execution.Job so downstream lookups stay consistent.
         return new() {
+            Tenant        = execution.Tenant,
             CanonicalName = canonical,
             JobKey        = execution.JobKey,
             ArgsJson      = execution.ArgsJson,

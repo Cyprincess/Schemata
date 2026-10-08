@@ -168,6 +168,13 @@ same convention `Flow.Foundation`/`Scheduling.Foundation` use for their own enti
 persistence without registering that repository surfaces as a DI resolution failure the first
 time a persistent actor's turn runs, not at startup.
 
+The stored lookup identity is the unique `(SchemataActor.ActorType, SchemataActor.ActorKey)` pair,
+independent of resource `Name`. Register a consumer `IRepositoryAddAdvisor<SchemataActor>` through
+`TryAddEnumerable` before `AdviceAddCanonicalName.DefaultOrder` (120,000,000) to assign missing
+names. Existing stores require an identity-column migration; see the
+[persistence reference](../documents/actor/overview.md#persistence-is-opt-in-and-the-actor-never-holds-authoritative-state)
+for delimiter ambiguity and backfill requirements.
+
 Neither callback runs for an actor that does not implement `IPersistentActor`. The mailbox itself
 is never persisted: a message sitting in a stopped process's channel is gone on restart, with no
 recovery semantics.
@@ -202,9 +209,9 @@ schema.UseActor(a => a
 for that event. Multiple routes for one event type each get their own delivery attempt.
 
 `Schemata.Actor.Scheduling`'s `UseScheduling()` implements `IActorReminders` on top of the
-scheduler: `IActorContext.ScheduleAsync(message, delay)` schedules durable, delayed delivery to
-the same actor, surviving a process restart. Calling it without `UseScheduling()` installed
-throws, naming the missing capability, rather than becoming a silent no-op.
+scheduler: `IActorContext.ScheduleAsync(message, delay, reminderName)` returns an `ActorReminder`
+bound to the tenant and actor. Pass it to `IActorReminders.CancelAsync` to suppress pending delivery.
+Scheduling without the Actor.Scheduling capability throws at use. Already executing delivery may finish.
 
 `Schemata.Flow.Actor` bridges the opposite direction: it replaces the Flow module's own write-path
 handler registration so concurrent writers to the same `SchemataProcess` serialize through a
@@ -244,11 +251,14 @@ runtime constructs a fresh `AdviceContext` and calls `AdviceContext.Establish` i
 the turn's scope is built, before `OnReceiveAsync` runs — an actor turn never continues whatever
 `AdviceContext` happened to be ambient on the sender's side.
 
-Multi-tenancy resolves the tenant through the propagator and a two-phase turn scope:
-`IActorTurnScopeFactory`'s default builds a scope from the host root, but a tenant-isolated
-provider has to be resolved before that scope exists, so `Tenancy.Foundation`'s override runs a
-short bootstrap scope first, resolves the tenant, and only then builds the real turn scope from
-the tenant's own provider.
+Multi-tenancy resolves the tenant through a two-phase turn scope: `IMessageExecutionScopeFactory`'s
+default builds a scope from the host root, but a tenant-isolated provider has to be resolved
+before that scope exists, so `Schemata.Tenancy.Messaging`'s
+`TenantMessageExecutionScopeFactory<TTenant>` runs a short bootstrap scope first, resolves the
+tenant, and only then builds the real turn scope from the tenant's own provider. Activate the
+bridge with `tenancy.UseMessaging()` on the tenancy builder after `UseTenancy<TTenant>()`.
+Tenant identity crosses the mailbox via `MessageContexts.Capture` regardless of whether any
+`IMessageContextPropagator` is registered — `Capture` always inserts `tenancy.tenant-id`.
 
 The in-process actor system removes the race between two callers in the same process. A
 multi-instance deployment still relies on the entity's own `IConcurrency` optimistic-concurrency
@@ -260,8 +270,8 @@ token — the actor mailbox is not a distributed lock.
   the faulted instance and constructs a fresh one from `Props` — only `IPersistentActor`'s durable
   state, with `UsePersistence()` on, survives a restart.
 - **Calling `IServiceScopeFactory.CreateAsyncScope()` directly instead of injecting
-  `IActorTurnScopeFactory`.** Multi-tenancy, and any capability that needs a turn to descend from
-  a different provider, overrides that seam with `Replace`; bypassing it skips the override.
+  `IMessageExecutionScopeFactory`.** Multi-tenancy, and any capability that needs a turn to descend
+  from a different provider, overrides that seam with `Replace`; bypassing it skips the override.
 - **Expecting `IActorContext.ScheduleAsync` to become a no-op without `Actor.Scheduling`
   installed.** It throws instead.
 - **Resolving a business module's keyed default handler outside a turn.** The keyed registration

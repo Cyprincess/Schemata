@@ -8,8 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
-using Schemata.Entity.Owner;
-using Schemata.Entity.Owner.Advisors;
+using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Xunit;
 
@@ -76,11 +75,14 @@ public class AdvisorOrderShould
 
     private sealed class TestRepository(System.IServiceProvider serviceProvider) : RepositoryBase<AdvisorEntity>(serviceProvider)
     {
-        public override Task AddAsync(AdvisorEntity entity, CancellationToken ct = default) => Task.CompletedTask;
+        public override Task<MutationResult> AddAsync(AdvisorEntity entity, CancellationToken ct = default)
+            => Task.FromResult(MutationResult.Applied);
 
-        public override Task UpdateAsync(AdvisorEntity entity, CancellationToken ct = default) => Task.CompletedTask;
+        public override Task<MutationResult> UpdateAsync(AdvisorEntity entity, CancellationToken ct = default)
+            => Task.FromResult(MutationResult.Applied);
 
-        public override Task RemoveAsync(AdvisorEntity entity, CancellationToken ct = default) => Task.CompletedTask;
+        public override Task<MutationResult> RemoveAsync(AdvisorEntity entity, CancellationToken ct = default)
+            => Task.FromResult(MutationResult.Applied);
 
         protected override ConfiguredCancelableAsyncEnumerable<TResult> AsAsyncEnumerable<TResult>(
             IQueryable<TResult> query,

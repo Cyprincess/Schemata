@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
@@ -18,6 +17,7 @@ using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Foundation.Commands;
 using Schemata.Resource.Foundation.Handlers;
+using Schemata.Resource.Tests.Fixtures;
 using Schemata.Security.Skeleton;
 using Xunit;
 
@@ -40,7 +40,8 @@ public class ResourceDetailResponsePipelineAdvisorShould
         using var services = BuildServices<Detail>(CreateRepository(), CreateMapper(detail));
         var result = await DispatchCreateAsync(services);
 
-        Assert.Equal("tenants/t1", result.Detail!.Parent);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1", result.Detail.Parent);
         Assert.Equal(WeakTag(Timestamp), result.Detail.EntityTag);
     }
 
@@ -53,7 +54,8 @@ public class ResourceDetailResponsePipelineAdvisorShould
         var result = await DispatchGetAsync<Detail>(services);
 
         // Derivation overrides whatever the mapping left behind.
-        Assert.Equal("tenants/t1", result.Detail!.Parent);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1", result.Detail.Parent);
         Assert.Equal(WeakTag(Timestamp), result.Detail.EntityTag);
     }
 
@@ -64,7 +66,8 @@ public class ResourceDetailResponsePipelineAdvisorShould
         using var services = BuildServices<Detail>(CreateRepository(), CreateMapper(detail));
         var result = await DispatchUpdateAsync(services);
 
-        Assert.Equal("tenants/t1", result.Detail!.Parent);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1", result.Detail.Parent);
         Assert.Equal(WeakTag(Timestamp), result.Detail.EntityTag);
     }
 
@@ -76,19 +79,27 @@ public class ResourceDetailResponsePipelineAdvisorShould
         using var services = BuildServices<Detail>(CreateRepository(), CreateMapper(detail));
         var result = await DispatchGetAsync<Detail>(services);
 
-        Assert.Equal("tenants/t1", result.Detail!.Parent);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1", result.Detail.Parent);
         Assert.Null(result.Detail.EntityTag);
     }
 
+    [Trait("Layer", "Component")]
     [Fact]
-    public async Task Get_SuppressedFreshness_LeavesEntityTag_Unset() {
+    public async Task Get_SuppressedFreshnessMarker_LeavesEntityTag_Unset() {
         var detail = MappedDetail();
 
-        using var services = BuildServices<Detail>(CreateRepository(), CreateMapper(detail),
-            options: new SchemataResourceOptions { SuppressFreshness = true });
+        using var services = BuildServices<Detail>(CreateRepository(), CreateMapper(detail), services => {
+            // The per-request suppression marker still governs ETag emission for its dispatch;
+            // the global options flag is gone.
+            services.AddSingleton<
+                IRequestPipelineAdvisor<GetResourceQueryRequest<Entity, Detail>, GetResultBase<Detail>>,
+                SuppressFreshnessCommandAdvisor>();
+        });
         var result = await DispatchGetAsync<Detail>(services);
 
-        Assert.Equal("tenants/t1", result.Detail!.Parent);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1", result.Detail.Parent);
         Assert.Null(result.Detail.EntityTag);
     }
 
@@ -102,7 +113,8 @@ public class ResourceDetailResponsePipelineAdvisorShould
         });
         var result = await DispatchGetAsync<Detail>(services);
 
-        Assert.Equal("tenants/t1", result.Detail!.Parent);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1", result.Detail.Parent);
         Assert.Equal("W/\"custom\"", result.Detail.EntityTag);
     }
 
@@ -118,13 +130,13 @@ public class ResourceDetailResponsePipelineAdvisorShould
 
     [Fact]
     public async Task Get_NullDetail_ReturnsContinuationResponse() {
-        var advisor  = new ResourceGetResponsePipelineAdvisor<Entity, Detail>(new DefaultEntityTagProvider());
-        var ctx      = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var advisor  = new ResourceGetResponsePipelineAdvisor<Entity, Detail>();
+        var ctx      = new AdviceContext(BuildTagServices());
         var response = new GetResultBase<Detail> { Detail = null };
         var calls    = 0;
 
         var result = await advisor.AdviseAsync(
-            ctx, new(new GetRequest(), null), _ => {
+            ctx, new(new(), null), _ => {
                 calls++;
                 return Task.FromResult(response);
             }, CancellationToken.None);
@@ -144,11 +156,11 @@ public class ResourceDetailResponsePipelineAdvisorShould
     public async Task DerivedParent_Matches_StripLastTwoSegments(string? canonical, string? expected) {
         var detail = new Detail { CanonicalName = canonical };
 
-        var advisor  = new ResourceGetResponsePipelineAdvisor<Entity, Detail>(new DefaultEntityTagProvider());
-        var ctx      = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var advisor  = new ResourceGetResponsePipelineAdvisor<Entity, Detail>();
+        var ctx      = new AdviceContext(BuildTagServices());
         var response = new GetResultBase<Detail> { Detail = detail };
 
-        await advisor.AdviseAsync(ctx, new(new GetRequest(), null), _ => Task.FromResult(response), CancellationToken.None);
+        await advisor.AdviseAsync(ctx, new(new(), null), _ => Task.FromResult(response), CancellationToken.None);
 
         Assert.Equal(expected, detail.Parent);
     }
@@ -156,7 +168,7 @@ public class ResourceDetailResponsePipelineAdvisorShould
     [Fact]
     public void Orders_Anchor_Above_ListWrap_And_Idempotency() {
         Assert.Equal(SecurityOrders.ResponseFamily + 10_000_000,
-            new ResourceGetResponsePipelineAdvisor<Entity, Detail>(new DefaultEntityTagProvider()).Order);
+            new ResourceGetResponsePipelineAdvisor<Entity, Detail>().Order);
 
         // The dispatcher composes the wrap in ascending Order, so after segments run in reverse:
         // staying above SecurityOrders.Idempotency keeps an idempotency wrap's commit behind the
@@ -214,24 +226,24 @@ public class ResourceDetailResponsePipelineAdvisorShould
     private static Task<CreateResultBase<Detail>> DispatchCreateAsync(ServiceProvider services) {
         var dispatcher = new InProcessRequestDispatcher(services);
         return dispatcher.SendAsync<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>(
-            new(new Request(), null), CancellationToken.None);
+            new(new(), null), CancellationToken.None);
     }
 
     private static Task<GetResultBase<TGetDetail>> DispatchGetAsync<TGetDetail>(ServiceProvider services)
         where TGetDetail : class, ICanonicalName {
         var dispatcher = new InProcessRequestDispatcher(services);
         return dispatcher.SendAsync<GetResourceQueryRequest<Entity, TGetDetail>, GetResultBase<TGetDetail>>(
-            new(new GetRequest { CanonicalName = "entities/e1" }, null), CancellationToken.None);
+            new(new() { CanonicalName = "entities/e1" }, null), CancellationToken.None);
     }
 
     private static Task<UpdateResultBase<Detail>> DispatchUpdateAsync(ServiceProvider services) {
         var dispatcher = new InProcessRequestDispatcher(services);
         return dispatcher.SendAsync<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>(
-            new("entities/e1", new Request(), null), CancellationToken.None);
+            new("entities/e1", new(), null), CancellationToken.None);
     }
 
     private static Detail MappedDetail() {
-        return new Detail {
+        return new() {
             CanonicalName = "tenants/t1/hosts/h1",
             Timestamp     = Timestamp,
         };
@@ -239,12 +251,6 @@ public class ResourceDetailResponsePipelineAdvisorShould
 
     private static Mock<IRepository<Entity>> CreateRepository() {
         var repository = new Mock<IRepository<Entity>>();
-        repository.Setup(r => r.AddAsync(It.IsAny<Entity>(), It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
-        repository.Setup(r => r.UpdateAsync(It.IsAny<Entity>(), It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
-        repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
         repository.Setup(r => r.SuppressQuerySoftDelete())
                   .Returns(Mock.Of<IDisposable>());
         repository.Setup(r => r.SingleOrDefaultAsync(
@@ -273,16 +279,23 @@ public class ResourceDetailResponsePipelineAdvisorShould
         return mapper;
     }
 
+    private static ServiceProvider BuildTagServices() {
+        var services = new ServiceCollection();
+        services.AddSingleton<IEntityTagProvider, DefaultEntityTagProvider>();
+
+        return services.BuildServiceProvider();
+    }
+
     private static ServiceProvider BuildServices<TDetailView>(
-        Mock<IRepository<Entity>>     repository,
-        Mock<ISimpleMapper>           mapper,
-        Action<ServiceCollection>?    configure = null,
-        SchemataResourceOptions?      options   = null
+        Mock<IRepository<Entity>>  repository,
+        Mock<ISimpleMapper>        mapper,
+        Action<ServiceCollection>? configure = null
     )
         where TDetailView : class, ICanonicalName {
         var services = new ServiceCollection();
         services.AddSingleton(repository.Object);
         services.AddSingleton(mapper.Object);
+        services.AddSingleton(ResourceMutationMock.Create<Entity>().Object);
         services.AddSingleton<
             IRequestHandler<GetResourceQueryRequest<Entity, TDetailView>, GetResultBase<TDetailView>>,
             DefaultGetResourceHandler<Entity, Request, TDetailView, Summary>>();
@@ -305,10 +318,6 @@ public class ResourceDetailResponsePipelineAdvisorShould
             ResourceUpdateResponsePipelineAdvisor<Entity, Request, TDetailView>>();
         configure?.Invoke(services);
 
-        if (options is not null) {
-            services.AddSingleton<IOptions<SchemataResourceOptions>>(Options.Create(options));
-        }
-
         return services.BuildServiceProvider();
     }
 
@@ -325,6 +334,23 @@ public class ResourceDetailResponsePipelineAdvisorShould
         }
 
         #endregion
+    }
+
+    /// <summary>Command advisor that plants the per-request freshness suppression marker on the ambient context.</summary>
+    private sealed class SuppressFreshnessCommandAdvisor
+        : IRequestPipelineAdvisor<GetResourceQueryRequest<Entity, Detail>, GetResultBase<Detail>>
+    {
+        public int Order => 0;
+
+        public Task<GetResultBase<Detail>> AdviseAsync(
+            AdviceContext                                   ctx,
+            GetResourceQueryRequest<Entity, Detail>         a1,
+            RequestHandlerContinuation<GetResultBase<Detail>> next,
+            CancellationToken                               ct = default
+        ) {
+            ctx.Set(new FreshnessSuppressed());
+            return next(ct);
+        }
     }
 
     #region Fixtures

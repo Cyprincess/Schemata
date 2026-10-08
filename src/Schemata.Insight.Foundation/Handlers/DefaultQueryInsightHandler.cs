@@ -23,12 +23,10 @@ internal sealed class DefaultQueryInsightHandler(
     ) {
         var ctx = AdviceContext.Require();
 
-        var plan = await planner.BuildAsync(request, ct);
-        ctx.Set(plan);
-        await Advisor.For<IInsightPlanAdvisor>().RunAsync(ctx, request, ct);
-        plan = ctx.Get<PlanNode>()!;
+        var rewrite = new InsightPlanContext(request, await planner.BuildAsync(request, ct));
+        await Advisor.For<IInsightPlanAdvisor>().RunAsync(ctx, rewrite, ct);
 
-        var response = await executor.ExecuteAsync(plan, request, request.Principal, ct);
+        var response = await executor.ExecuteAsync(rewrite.Plan, request, request.Principal, ct);
 
         return response;
     }

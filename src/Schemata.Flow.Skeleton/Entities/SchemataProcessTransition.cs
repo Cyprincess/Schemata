@@ -16,6 +16,8 @@ public class SchemataProcessTransition : IIdentifier, ICanonicalName, IConcurren
     /// <summary>The parent process's <see cref="ICanonicalName.Name" />.</summary>
     public virtual string? Process { get; set; }
 
+    public virtual Guid? TenantUid { get; set; }
+
     /// <summary>
     ///     Full canonical name of the <see cref="SchemataProcessToken" /> this transition belongs to.
     ///     Equals the single token canonical under the state-machine engine; identifies the specific

@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Actor.Skeleton;
 using Schemata.Common;
@@ -55,11 +57,15 @@ public sealed class ActorReminderJob(IActorSystem actors, IServiceProvider servi
     private static IMessage DeserializePayload(JobContext context) {
         var typeName = RequireVariable(context, PayloadTypeVariable);
         var payloadType = AppDomainTypeCache.GetType(typeName)
-            ?? throw new FailedPreconditionException(message: $"Actor reminder payload type '{typeName}' could not be resolved.");
+            ?? throw new FailedPreconditionException(
+                SchemataResources.ACTOR_REMINDER_PAYLOAD_TYPE_UNRESOLVED,
+                new Dictionary<string, string?> { ["type"] = typeName });
 
         var json = RequireVariable(context, PayloadJsonVariable);
         return JsonSerializer.Deserialize(json, payloadType, SchemataJson.Default) as IMessage
-            ?? throw new FailedPreconditionException(message: $"Actor reminder payload of type '{typeName}' could not be deserialized.");
+            ?? throw new FailedPreconditionException(
+                SchemataResources.ACTOR_REMINDER_PAYLOAD_DESERIALIZE_FAILED,
+                new Dictionary<string, string?> { ["type"] = typeName });
     }
 
     private static string RequireVariable(JobContext context, string name) {
@@ -67,6 +73,8 @@ public sealed class ActorReminderJob(IActorSystem actors, IServiceProvider servi
             return value;
         }
 
-        throw new FailedPreconditionException(message: $"Actor reminder job execution is missing required variable '{name}'.");
+        throw new FailedPreconditionException(
+            SchemataResources.ACTOR_REMINDER_VARIABLE_REQUIRED,
+            new Dictionary<string, string?> { ["variable"] = name });
     }
 }

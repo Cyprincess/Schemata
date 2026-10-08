@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -31,19 +32,23 @@ internal sealed class DefaultUnscheduleJobHandler(SchedulingHandlerSupport suppo
                 scheduler.Gate.Release();
             }
 
-            await support.CancelFuturePendingAsync(request.JobCanonicalName, ct);
 
             using var scope = scheduler.Services.CreateScope();
             var jobs = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJob>>();
+            var executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
+            await using var transaction = jobs.Begin();
+            executions.Join(transaction);
+            await support.CancelPendingAsync(request.JobCanonicalName, executions, scope.ServiceProvider, transaction, ct);
             var persisted = await jobs.FirstOrDefaultAsync(
                 query => query.Where(job => job.CanonicalName == request.JobCanonicalName
                                           || job.Name == request.JobCanonicalName), ct);
             if (persisted is not null) {
                 persisted.State = JobState.Paused;
-                await jobs.UpdateAsync(persisted, ct);
-                await jobs.CommitAsync(ct);
+                persisted.ScheduleVersion = Guid.NewGuid();
+                await scope.ServiceProvider.GetRequiredService<IResourceMutation<SchemataJob>>().UpdateAsync(persisted, transaction, ct: ct);
                 notified ??= persisted;
             }
+            await transaction.CommitAsync(ct);
         } finally {
             support.WriteGate.Gate.Release();
         }

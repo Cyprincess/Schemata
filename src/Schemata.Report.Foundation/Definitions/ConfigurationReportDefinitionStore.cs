@@ -80,7 +80,6 @@ public sealed class ConfigurationReportDefinitionStore : IReportDefinitionSource
     private static SchemataReport ToReport(ReportDefinitionRegistration registration) {
         return new() {
             Name           = registration.Name,
-            CanonicalName  = $"reports/{registration.Name}",
             SourceKind     = registration.SourceKind,
             Provider       = registration.Provider,
             Periodic       = registration.Periodic,

@@ -84,7 +84,8 @@ public class BpmnEngine_CompensationShould
     [Fact]
     public async Task Throw_ProcedureCompensationTarget_RunsTargetBodyOnce() {
         var log = new List<string>();
-        var (engine, definition, process) = ProcedureScenario(_ => {
+        var (engine, definition, process) = ProcedureScenario((_, ct) => {
+            ct.ThrowIfCancellationRequested();
             log.Add("undo");
             return ValueTask.CompletedTask;
         });
@@ -105,7 +106,8 @@ public class BpmnEngine_CompensationShould
     [Fact]
     public async Task Throw_FailingCompensationTarget_PropagatesFailureWithoutRecordingCompensation() {
         var attempts = 0;
-        var (engine, definition, process) = ProcedureScenario(_ => {
+        var (engine, definition, process) = ProcedureScenario((_, ct) => {
+            ct.ThrowIfCancellationRequested();
             attempts++;
             throw new InvalidOperationException("boom");
         });
@@ -121,8 +123,28 @@ public class BpmnEngine_CompensationShould
         Assert.Equal("Failed", snapshot.Tokens.Single().State);
     }
 
+    [Trait("Layer", "Unit")]
+    [Fact]
+    [Trait("Category", "Unit")]
+    public async Task Compensation_Procedure_Cancellation_Stops_Target_Progression() {
+        using var cancellation = new CancellationTokenSource();
+        var invoked = false;
+        var (engine, definition, process) = ProcedureScenario((_, ct) => {
+            invoked = true;
+            cancellation.Cancel();
+            ct.ThrowIfCancellationRequested();
+            return ValueTask.CompletedTask;
+        });
+        var started = await engine.StartAsync(definition, process, CancellationToken.None);
+        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => engine.AdvanceAsync(
+            definition, process, started.Tokens, started.Tokens.Single().CanonicalName, cancellation.Token).AsTask());
+        Assert.True(invoked);
+        Assert.Equal(cancellation.Token, error.CancellationToken);
+        Assert.DoesNotContain(started.Tokens, token => token.StateName == "after");
+    }
+
     private static (BpmnEngine Engine, ProcessDefinition Definition, SchemataProcess Process) ProcedureScenario(
-        Func<FlowTaskContext, ValueTask> undoBody) {
+        Func<FlowTaskContext, CancellationToken, ValueTask> undoBody) {
         var start = new FlowEvent { Name = "start", Position = EventPosition.Start };
         var a     = new NoneTask { Name = "a" };
         var throwEvent = new FlowEvent {

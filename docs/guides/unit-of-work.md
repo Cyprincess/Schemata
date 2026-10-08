@@ -118,7 +118,14 @@ public sealed class EnrollmentService(
 
 ## Committed advisors
 
-After a successful commit — standalone or through a unit of work — Schemata notifies registered committed advisors with a snapshot of the added, updated, and removed entities. Query cache eviction rides on this hook. The advisor contract and snapshot shape are in [Unit of Work](../documents/repository/unit-of-work.md).
+After a successful raw repository commit, Schemata sends a type-level notification to
+`IRepositoryCommittedAdvisor<TEntity>` for each enlisted repository that wrote data. Query cache
+eviction uses that notification. Resource writes use `IResourceMutation<TEntity>`: its optional
+`transaction` argument joins an outer unit of work; omitting it gives the mutation its own transaction.
+Entity-specific actions, including pending-event publication and Report schedule synchronization,
+run through `IResourceMutationCommittedAdvisor<TEntity>` after durable commit. Raw repository writes
+do not invoke those domain actions. See [Unit of Work](../documents/repository/unit-of-work.md) and
+[Mutation Pipeline](../documents/repository/mutation-pipeline.md) for the separate contracts.
 
 ## Next steps
 

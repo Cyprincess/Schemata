@@ -1,20 +1,19 @@
 # Repository Ownership
 
-The `Schemata.Entity.Owner` package adds automatic owner assignment and owner-scoped query filtering to the repository layer. Entities implementing `IOwnable` are automatically stamped with the current principal's canonical name on create, and queries are automatically filtered to include only entities owned by that principal.
+The repository layer adds automatic owner assignment and owner-scoped query filtering. Entities implementing `IOwnable` are automatically stamped with the current principal's canonical name on create, and queries are automatically filtered to include only entities owned by that principal. The ownership contracts and advisors ship in `Schemata.Entity.Repository`.
 
 Ownership is opt-in. Call `UseOwner()` on the repository builder to enable the advisors.
 
 ## Where the code lives
 
-| Item                                            | Path                                                                                     |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `IOwnerResolver<TEntity>`                       | `src/Schemata.Entity.Owner/IOwnerResolver.cs`                                            |
-| `SchemataOwnerOptions`                          | `src/Schemata.Entity.Owner/SchemataOwnerOptions.cs`                                      |
-| `AdviceAddOwner<TEntity>`                       | `src/Schemata.Entity.Owner/Advisors/AdviceAddOwner.cs`                                   |
-| `AdviceBuildQueryOwner<TEntity>`                | `src/Schemata.Entity.Owner/Advisors/AdviceBuildQueryOwner.cs`                            |
-| `AdviceValidateResourceReferenceExistence<TEntity>` | `src/Schemata.Entity.Owner/Advisors/AdviceValidateResourceReferenceExistence.cs`     |
-| `UseOwner` extension                            | `src/Schemata.Entity.Owner/Extensions/SchemataRepositoryBuilderExtensions.cs`            |
-| Resource query-container extensions             | `src/Schemata.Entity.Owner/Extensions/OwnerResourceRequestContainerExtensions.cs`         |
+| Item                                              | Path                                                                                       |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `IOwnerResolver<TEntity>`                         | `src/Schemata.Entity.Repository/IOwnerResolver.cs`                                         |
+| `SchemataOwnerOptions`                            | `src/Schemata.Entity.Repository/SchemataOwnerOptions.cs`                                   |
+| `AdviceAddOwner<TEntity>`                         | `src/Schemata.Entity.Repository/Advisors/AdviceAddOwner.cs`                                |
+| `AdviceBuildQueryOwner<TEntity>`                  | `src/Schemata.Entity.Repository/Advisors/AdviceBuildQueryOwner.cs`                         |
+| `AdviceValidateResourceReferenceExistence<TEntity>` | `src/Schemata.Entity.Repository/Advisors/AdviceValidateResourceReferenceExistence.cs`    |
+| `UseOwner` extension                              | `src/Schemata.Entity.Repository/Extensions/SchemataRepositoryBuilderOwnerExtensions.cs`    |
 
 ## IOwnerResolver
 
@@ -61,10 +60,11 @@ public interface IOwnerResolver<TEntity>
 
 ### AdviceValidateResourceReferenceExistence
 
-`AdviceValidateResourceReferenceExistence<TEntity>` implements both `IRepositoryAddAdvisor<TEntity>` and
-`IRepositoryUpdateAdvisor<TEntity>`. It lives in the ownership package because its existence queries
-must suppress the owner filter (`QueryOwnerSuppressed`), which `Schemata.Entity.Repository` cannot
-reference without a dependency cycle.
+`AdviceValidateResourceReferenceExistence<TEntity>` belongs to Repository and is registered by
+`AddRepository` for add/update operations. Each property opts in with `ValidateExistence = true`.
+Its target query suppresses owner filtering through the shared repository marker; ownership
+installation is independent. The validation creates no database foreign keys or cascades and
+cannot prevent a target from being deleted after the check.
 
 **Order:** `AdviceValidateResourceReferences.DefaultOrder + 10_000_000` = 150,000,000, on both the add
 and update pipelines. Type resolvability is established before any existence query executes.
@@ -88,7 +88,7 @@ services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
         .UseOwner();
 ```
 
-`UseOwner()` registers `SchemataOwnerOptions`, `AdviceBuildQueryOwner<>` as `IRepositoryBuildQueryAdvisor<>`, `AdviceAddOwner<>` as `IRepositoryAddAdvisor<>`, and `AdviceValidateResourceReferenceExistence<>` as both `IRepositoryAddAdvisor<>` and `IRepositoryUpdateAdvisor<>`. All registrations use `TryAddEnumerable` so they don't displace custom advisors.
+`UseOwner()` registers `SchemataOwnerOptions`, `AdviceBuildQueryOwner<>` and `AdviceAddOwner<>`. Registrations use `TryAddEnumerable`; logical reference existence validation is registered independently by Repository.
 
 You must also register a concrete `IOwnerResolver<TEntity>`. A typical implementation reads the current principal from `IHttpContextAccessor`:
 

@@ -63,10 +63,7 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
         CancellationToken                  ct
     ) {
         if (string.IsNullOrWhiteSpace(request.Code)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.Code)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.NOT_EMPTY, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.Code });
         }
 
         var application = await client.AuthenticateAsync(null, new(){
@@ -74,10 +71,7 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
             [Parameters.ClientSecret] = [request.ClientSecret],
         }, headers, ct);
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
         var ctx = AdviceContext.Require();
@@ -90,26 +84,17 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
                 return result!;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(
-                    OAuthErrors.InvalidClient,
-                    SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-                );
+                throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
         var token = await tokens.FindByReferenceIdAsync(request.Code, ct);
         if (string.IsNullOrWhiteSpace(token?.Payload) || string.IsNullOrWhiteSpace(token.Subject)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         var payload = JsonSerializer.Deserialize<AuthorizeRequest>(token.Payload, json.Value);
         if (payload is null) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         var exchange = new CodeExchangeContext<TApp, TToken> {
@@ -128,19 +113,13 @@ public sealed class AuthorizationCodeHandler<TApp, TToken>(
                 return result!;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(
-                    OAuthErrors.AccessDenied,
-                    SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED)
-                );
+                throw new OAuthException(OAuthErrors.AccessDenied, SchemataResources.ACCESS_DENIED);
         }
 
         var granted = payload.Scope;
         if (!string.IsNullOrWhiteSpace(request.Scope)) {
             if (!ScopeParser.IsSubset(request.Scope, payload.Scope)) {
-                throw new OAuthException(
-                    OAuthErrors.InvalidScope,
-                    SchemataResources.GetResourceString(SchemataResources.INVALID_SCOPE)
-                );
+                throw new OAuthException(OAuthErrors.InvalidScope, SchemataResources.INVALID_SCOPE);
             }
 
             granted = request.Scope;

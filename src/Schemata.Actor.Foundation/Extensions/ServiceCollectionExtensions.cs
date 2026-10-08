@@ -3,6 +3,8 @@ using Microsoft.Extensions.Options;
 using Schemata.Actor.Foundation;
 using Schemata.Actor.Foundation.Runtime;
 using Schemata.Actor.Skeleton;
+using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Runtime;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -23,6 +25,7 @@ public static class ServiceCollectionExtensions
         services.AddOptions<SchemataActorOptions>();
 
         services.TryAddSingleton<IActorSystem, InProcessActorSystem>();
+        services.AddHostedService<ActorHostedService>();
 
         services.TryAddSingleton<IActorRegistry>(sp => {
             var registry      = new ActorRegistry();
@@ -34,9 +37,7 @@ public static class ServiceCollectionExtensions
             return registry;
         });
 
-        // Default (host-root) turn-scope factory: registered with TryAdd so a capability such as
-        // multi-tenancy can override it with Replace (see IActorTurnScopeFactory's own remarks).
-        services.TryAddSingleton<IActorTurnScopeFactory, InProcessActorTurnScopeFactory>();
+        services.TryAddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>();
 
         return services;
     }

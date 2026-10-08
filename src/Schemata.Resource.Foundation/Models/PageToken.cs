@@ -1,13 +1,10 @@
 using System;
 using System.IO;
-using System.IO.Compression;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Humanizer;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.WebUtilities;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
@@ -56,7 +53,7 @@ public class PageToken : IPagination
     public virtual bool? ShowDeleted { get; set; }
 
     /// <summary>
-    ///     Gets or sets the number of items per page (clamped to 1–100, default 25).
+    ///     Effective page size after applying the resource's default and maximum paging policy.
     /// </summary>
     public virtual int PageSize { get; set; }
 
@@ -70,17 +67,8 @@ public class PageToken : IPagination
     /// </summary>
     /// <param name="protector">The <see cref="IDataProtector" /> sealing the token.</param>
     /// <returns>The encoded page token.</returns>
-    public async Task<string> ToStringAsync(IDataProtector protector) {
-        var json  = JsonSerializer.Serialize(this);
-        var bytes = Encoding.UTF8.GetBytes(json);
-
-        using var       ms = new MemoryStream();
-        await using var gz = new BrotliStream(ms, CompressionLevel.Optimal);
-        gz.Write(bytes, 0, bytes.Length);
-        gz.Close();
-
-        return WebEncoders.Base64UrlEncode(protector.Protect(ms.ToArray()));
-    }
+    public Task<string> ToStringAsync(IDataProtector protector) =>
+        Task.FromResult(ProtectedContinuation.Encode(protector, this));
 
     /// <summary>
     ///     Decodes a page token from its protected representation.
@@ -90,23 +78,18 @@ public class PageToken : IPagination
     /// <param name="protector">The <see cref="IDataProtector" /> that sealed the token.</param>
     /// <returns>The decoded token, or <see langword="null" /> for empty input.</returns>
     /// <exception cref="ValidationException">The token cannot be decoded.</exception>
-    public static async Task<PageToken?> FromStringAsync(string? token, IDataProtector protector) {
+    public static Task<PageToken?> FromStringAsync(string? token, IDataProtector protector) {
         if (string.IsNullOrWhiteSpace(token)) {
-            return null;
+            return Task.FromResult<PageToken?>(null);
         }
 
         try {
-            var bytes = protector.Unprotect(WebEncoders.Base64UrlDecode(token));
-
-            using var       ms = new MemoryStream(bytes);
-            await using var gz = new BrotliStream(ms, CompressionMode.Decompress);
-
-            var parsed = await JsonSerializer.DeserializeAsync<PageToken>(gz);
-            if (parsed is null) {
-                throw new JsonException("Page token payload deserialized to null.");
+            var parsed = ProtectedContinuation.Decode<PageToken>(protector, token);
+            if (parsed.Skip < 0) {
+                throw new JsonException("Page token offset cannot be negative.");
             }
 
-            return parsed;
+            return Task.FromResult<PageToken?>(parsed);
         } catch (Exception ex) when (ex is FormatException
                                         or CryptographicException
                                         or JsonException

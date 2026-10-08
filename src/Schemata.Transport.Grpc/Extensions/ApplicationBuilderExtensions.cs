@@ -30,9 +30,9 @@ public static class ApplicationBuilderExtensions
             return app;
         }
 
-        var summaries = contributors.SelectMany(c => c.GetSummaryTypes(sp)).Distinct().ToList();
-        if (summaries.Count > 0) {
-            SchemataProtoModelConfigurator.ConfigureSummaryTypes(RuntimeTypeModel.Default, summaries);
+        var listTypes = contributors.SelectMany(c => c.GetListTypes(sp)).Distinct().ToList();
+        if (listTypes.Count > 0) {
+            SchemataProtoModelConfigurator.ConfigureListTypes(RuntimeTypeModel.Default, listTypes);
         }
 
         var messages = contributors.SelectMany(c => c.GetMessageTypes(sp)).Distinct().ToList();

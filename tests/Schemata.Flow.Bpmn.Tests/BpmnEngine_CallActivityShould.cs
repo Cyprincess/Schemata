@@ -129,10 +129,10 @@ public class BpmnEngine_CallActivityShould
                 Registration("called", CalledDefinition),
             };
             var processRegistry = new Mock<IProcessRegistry>();
-            processRegistry.Setup(r => r.GetRegistration(It.IsAny<string>()))
-                           .Returns((string name) => registry.FirstOrDefault(r => r.Name == name));
-            processRegistry.Setup(r => r.IsRegistered(It.IsAny<string>()))
-                           .Returns((string name) => registry.Any(r => r.Name == name));
+            processRegistry.Setup(r => r.GetRegistration(It.IsAny<string>(), "1"))
+                           .Returns((string name, string version) => registry.FirstOrDefault(r => r.Name == name && r.Version == version));
+            processRegistry.Setup(r => r.IsRegistered(It.IsAny<string>(), "1"))
+                           .Returns((string name, string version) => registry.Any(r => r.Name == name && r.Version == version));
 
             var services = new ServiceCollection();
             services.AddSingleton<IProcessRegistry>(processRegistry.Object);
@@ -166,7 +166,9 @@ public class BpmnEngine_CallActivityShould
                 DefinitionName = "parent",
             };
 
-            return await Engine.StartAsync(ParentDefinition, process, Context(), CancellationToken.None);
+            var snapshot = await Engine.StartAsync(ParentDefinition, process, Context(), CancellationToken.None);
+            await PersistAsync(snapshot, CancellationToken.None);
+            return snapshot;
         }
 
         public async Task CompleteChildAsync() {
@@ -207,11 +209,25 @@ public class BpmnEngine_CallActivityShould
                 Name          = name,
                 Engine        = FlowConstants.Engines.Bpmn,
                 Definition    = definition,
-                Configuration = new() { Name = name, Engine = FlowConstants.Engines.Bpmn },
             };
         }
 
-        private FlowExecutionContext Context() { return new(new Mock<IUnitOfWork>(MockBehavior.Strict).Object, Services); }
+        private FlowExecutionContext Context() {
+            return Schemata.Flow.Tests.FlowTestCreation.Context(
+                new Mock<IUnitOfWork>(MockBehavior.Strict).Object, Services, persist: PersistAsync);
+        }
+
+        private Task PersistAsync(ProcessSnapshot snapshot, CancellationToken ct) {
+            Upsert(Processes, snapshot.Process, p => p.CanonicalName);
+            foreach (var token in snapshot.Tokens) {
+                Upsert(Tokens, token, t => t.CanonicalName);
+            }
+            foreach (var transition in snapshot.Transitions) {
+                Schemata.Flow.Tests.FlowTestCreation.Assign(transition);
+                Transitions.Add(transition);
+            }
+            return Task.CompletedTask;
+        }
 
         private static Mock<IRepository<TEntity>> CreateRepository<TEntity>(List<TEntity> rows)
             where TEntity : class {
@@ -230,9 +246,9 @@ public class BpmnEngine_CallActivityShould
                           ToAsync<TEntity>(predicate is null ? rows : predicate(rows.AsQueryable()), ct));
             repository.Setup(value => value.AddAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
                       .Callback<TEntity, CancellationToken>((entity, _) => rows.Add(entity))
-                      .Returns(Task.CompletedTask);
+                      .ReturnsAsync(MutationResult.Applied);
             repository.Setup(value => value.UpdateAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
-                      .Returns(Task.CompletedTask);
+                      .ReturnsAsync(MutationResult.Applied);
             return repository;
         }
 

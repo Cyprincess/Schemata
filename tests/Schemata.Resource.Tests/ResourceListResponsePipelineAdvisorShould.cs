@@ -2,14 +2,19 @@ using Schemata.Core.Building;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.DataProtection;
+using Schemata.Abstractions.Exceptions;
+using Schemata.Resource.Foundation.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Entity.Repository;
+using Schemata.Expressions.Skeleton;
 using Schemata.Mapping.Skeleton;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Advisors;
@@ -50,8 +55,8 @@ public class ResourceListResponsePipelineAdvisorShould
         using var services = BuildServices<Summary>(repository.Object, mapper.Object);
         var dispatcher = new InProcessRequestDispatcher(services);
 
-        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Summary>>(
-            new(new ListRequest(), null), CancellationToken.None);
+        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(
+            new(new(), null), CancellationToken.None);
 
         Assert.NotNull(result.Entities);
         Assert.Equal(3, result.Entities!.Count);
@@ -74,8 +79,8 @@ public class ResourceListResponsePipelineAdvisorShould
         using var services = BuildServices<Summary>(repository.Object, mapper.Object);
         var dispatcher = new InProcessRequestDispatcher(services);
 
-        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Summary>>(
-            new(new ListRequest(), null), CancellationToken.None);
+        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(
+            new(new(), null), CancellationToken.None);
 
         Assert.NotNull(result.Entities);
         Assert.Empty(result.Entities!);
@@ -101,8 +106,8 @@ public class ResourceListResponsePipelineAdvisorShould
         using var services = BuildServices<PlainSummary>(repository.Object, mapper.Object);
         var dispatcher = new InProcessRequestDispatcher(services);
 
-        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, PlainSummary>, ListResultBase<PlainSummary>>(
-            new(new ListRequest(), null), CancellationToken.None);
+        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, PlainSummary>, ListResultBase<Entity, PlainSummary>>(
+            new(new(), null), CancellationToken.None);
 
         Assert.NotNull(result.Entities);
         Assert.Equal(mapped, result.Entities!);
@@ -112,8 +117,8 @@ public class ResourceListResponsePipelineAdvisorShould
     public async Task NullEntities_ReturnsContinuationResponse() {
         var advisor  = new ResourceListResponsePipelineAdvisor<Entity, Summary>();
         var ctx      = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        var envelope = new ListResourceQueryRequest<Entity, Summary>(new ListRequest(), null);
-        var response = new ListResultBase<Summary> { Entities = null, TotalSize = 5 };
+        var envelope = new ListResourceQueryRequest<Entity, Summary>(new(), null);
+        var response = new ListResultBase<Entity, Summary> { Entities = null, TotalSize = 5 };
         var calls    = 0;
 
         var result = await advisor.AdviseAsync(ctx, envelope, _ => {
@@ -140,9 +145,269 @@ public class ResourceListResponsePipelineAdvisorShould
 
         Assert.Contains(services, service =>
             service.ServiceType
-         == typeof(IRequestPipelineAdvisor<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Summary>>)
+         == typeof(IRequestPipelineAdvisor<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>)
          && service.ImplementationType == typeof(ResourceListResponsePipelineAdvisor<Entity, Summary>)
          && service.Lifetime == ServiceLifetime.Scoped);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0L)]
+    [Trait("Category", "Integration")]
+    public async Task List_UnavailableOrZeroEstimate_PaginatesWithoutExactFallback(long? estimate) {
+        var rows = new[] {
+            new Entity { Name = "e1", CanonicalName = "entities/e1" },
+            new Entity { Name = "e2", CanonicalName = "entities/e2" },
+        };
+        var (repository, mapper) = CreateDoubles(rows);
+        repository.Setup(r => r.EstimateCountAsync(
+                              It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
+                              It.IsAny<CancellationToken>()))
+                  .Returns(new ValueTask<long?>(estimate));
+        mapper.Setup(m => m.Map<Entity, Summary>(It.IsAny<Entity>()))
+              .Returns((Entity e) => new() { Name = e.Name, CanonicalName = e.CanonicalName });
+        using var services = BuildServices<Summary>(repository.Object, mapper.Object,
+            s => s.Configure<SchemataResourceOptions>(o => o.TotalSize = TotalSizeMode.Estimated));
+        var dispatcher = new InProcessRequestDispatcher(services);
+
+        var first = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(
+            new(new() { PageSize = 1 }, null), CancellationToken.None);
+        Assert.Equal(estimate is null ? null : (int?)0, first.TotalSize);
+        Assert.Equal("e1", Assert.Single(first.Entities!).Name);
+        Assert.NotNull(first.NextPageToken);
+        var second = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(
+            new(new() { PageSize = 1, PageToken = first.NextPageToken }, null), CancellationToken.None);
+        Assert.Equal("e2", Assert.Single(second.Entities!).Name);
+        Assert.Null(second.NextPageToken);
+        repository.Verify(r => r.CountAsync(It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
+                                            It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(r => r.LongCountAsync(It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
+                                                It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task List_Estimated_UsesFilteredScopeBeforePagination() {
+        var rows = new[] {
+            new Entity { Name = "e1", CanonicalName = "entities/e1" },
+            new Entity { Name = "e2", CanonicalName = "entities/e2" },
+            new Entity { Name = "e3", CanonicalName = "entities/e3" },
+        };
+        var (repository, mapper) = CreateDoubles(rows);
+        repository.Setup(r => r.EstimateCountAsync(
+                              It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
+                              It.IsAny<CancellationToken>()))
+                  .Returns((Func<IQueryable<Entity>, IQueryable<Entity>> query, CancellationToken _) => {
+                      Assert.Equal(new[] { "e2", "e3" }, query(rows.AsQueryable()).Select(e => e.Name));
+                      return new(20L);
+                  });
+        mapper.Setup(m => m.Map<Entity, Summary>(It.IsAny<Entity>()))
+              .Returns((Entity e) => new() { Name = e.Name, CanonicalName = e.CanonicalName });
+        var tree = Mock.Of<IExpressionTree>();
+        var compiler = new Mock<IExpressionCompiler>();
+        compiler.Setup(c => c.Parse("selected")).Returns(tree);
+        compiler.Setup(c => c.Compile<Entity, bool>(tree, null))
+                .Returns((Expression<Func<Entity, bool>>)(e => e.Name != "e1"));
+        using var services = BuildServices<Summary>(repository.Object, mapper.Object, s => {
+            s.Configure<SchemataResourceOptions>(o => {
+                o.TotalSize = TotalSizeMode.Estimated;
+                o.Expressions.Enable("test");
+            });
+            s.AddKeyedSingleton<IExpressionCompiler>("test", compiler.Object);
+        });
+
+        var dispatcher = new InProcessRequestDispatcher(services);
+        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(
+            new(new() { Filter = "selected", PageSize = 1, Skip = 1 }, null), CancellationToken.None);
+
+        Assert.Equal(20, result.TotalSize);
+        Assert.Equal("e3", Assert.Single(result.Entities!).Name);
+        Assert.Null(result.NextPageToken);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task List_None_PagesWithoutInvokingEitherCount() {
+        var rows = new[] { new Entity { Name = "e1", CanonicalName = "entities/e1" } };
+        var (repository, mapper) = CreateDoubles(rows);
+        mapper.Setup(m => m.Map<Entity, Summary>(It.IsAny<Entity>()))
+              .Returns((Entity e) => new() { Name = e.Name, CanonicalName = e.CanonicalName });
+        using var services = BuildServices<Summary>(repository.Object, mapper.Object,
+            s => s.Configure<SchemataResourceOptions>(o => o.TotalSize = TotalSizeMode.None));
+
+        var dispatcher = new InProcessRequestDispatcher(services);
+        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(
+            new(new(), null), CancellationToken.None);
+
+        Assert.Null(result.TotalSize);
+        Assert.Equal("e1", Assert.Single(result.Entities!).Name);
+        Assert.Null(result.NextPageToken);
+        repository.Verify(r => r.EstimateCountAsync(It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
+                                                    It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(r => r.CountAsync(It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
+                                            It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(r => r.LongCountAsync(It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
+                                                It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task List_EstimateExceedsWireRange_ClampsTotal() {
+        var (repository, mapper) = CreateDoubles([]);
+        repository.Setup(r => r.EstimateCountAsync(
+                              It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
+                              It.IsAny<CancellationToken>()))
+                  .Returns(new ValueTask<long?>(long.MaxValue));
+        using var services = BuildServices<Summary>(repository.Object, mapper.Object,
+            s => s.Configure<SchemataResourceOptions>(o => o.TotalSize = TotalSizeMode.Estimated));
+
+        var dispatcher = new InProcessRequestDispatcher(services);
+        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(
+            new(new(), null), CancellationToken.None);
+
+        Assert.Equal(int.MaxValue, result.TotalSize);
+        Assert.Empty(result.Entities!);
+        Assert.Null(result.NextPageToken);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task List_NegativeEstimate_RejectsInvalidTotal() {
+        var (repository, mapper) = CreateDoubles([]);
+        var estimated = false;
+        repository.Setup(r => r.EstimateCountAsync(
+                              It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
+                              It.IsAny<CancellationToken>()))
+                  .Returns(() => {
+                      estimated = true;
+                      return new(-1L);
+                  });
+        using var services = BuildServices<Summary>(repository.Object, mapper.Object,
+            s => s.Configure<SchemataResourceOptions>(o => o.TotalSize = TotalSizeMode.Estimated));
+
+        var dispatcher = new InProcessRequestDispatcher(services);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(
+                new(new(), null), CancellationToken.None));
+        Assert.True(estimated);
+    }
+
+    [Theory]
+    [InlineData(TotalSizeMode.Estimated)]
+    [InlineData(TotalSizeMode.None)]
+    [Trait("Category", "Integration")]
+    public async Task List_ResidualWithoutExactTotal_StopsAtMatchingLookahead(TotalSizeMode mode) {
+        var rows = Enumerable.Range(0, 100)
+                             .Select(i => new Entity { Name = i.ToString("D3"), CanonicalName = $"entities/{i:D3}" })
+                             .ToArray();
+        var (repository, mapper) = CreateDoubles(rows);
+        mapper.Setup(m => m.Map<Entity, Summary>(It.IsAny<Entity>()))
+              .Returns((Entity e) => new() { Name = e.Name, CanonicalName = e.CanonicalName });
+        var tree = Mock.Of<IExpressionTree>();
+        var compiler = new Mock<IExpressionCompiler>();
+        compiler.Setup(c => c.Parse("selected")).Returns(tree);
+        compiler.Setup(c => c.Compile<Entity, bool>(tree, null))
+                .Returns((Expression<Func<Entity, bool>>)(e => e.Name != "000"));
+        var planner = new Mock<IExpressionPushdownPlanner>();
+        planner.Setup(p => p.Plan(tree, It.IsAny<ExpressionCapabilities>()))
+               .Returns(new ExpressionPushdownPlan(null, tree));
+        using var services = BuildServices<Summary>(repository.Object, mapper.Object, s => {
+            s.Configure<SchemataResourceOptions>(o => {
+                o.TotalSize = mode;
+                o.Expressions.Enable("test");
+            });
+            s.AddKeyedSingleton<IExpressionCompiler>("test", compiler.Object);
+            s.AddKeyedSingleton<IExpressionPushdownPlanner>("test", planner.Object);
+            s.AddKeyedSingleton("test", new ExpressionLanguageDescriptor("test", FilteringMode.Residual, 3));
+        });
+
+        var dispatcher = new InProcessRequestDispatcher(services);
+        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(
+            new(new() { Filter = "selected", PageSize = 1 }, null), CancellationToken.None);
+
+        Assert.Null(result.TotalSize);
+        Assert.Equal("001", Assert.Single(result.Entities!).Name);
+        Assert.NotNull(result.NextPageToken);
+        repository.Verify(r => r.EstimateCountAsync(It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
+                                                    It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(r => r.CountAsync(It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
+                                            It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(r => r.LongCountAsync(It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
+                                                It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    [Trait("Layer", "Integration")]
+    public async Task List_UsesSupplementedRegistrationPolicyAfterCallerMutationAndRejectedConflict() {
+        var rows = Enumerable.Range(1, 4).Select(i => new Entity {
+            Name = $"e{i}", CanonicalName = $"entities/e{i}",
+        }).ToArray();
+        var (repository, mapper) = CreateDoubles(rows);
+        mapper.Setup(m => m.Map<Entity, PlainSummary>(It.IsAny<Entity>()))
+              .Returns((Entity entity) => new PlainSummary { Name = entity.Name, CanonicalName = entity.CanonicalName });
+        var schemata = new Core.SchemataOptions();
+        var registrations = new ServiceCollection();
+        var builder = new SchemataResourceBuilder(schemata, registrations);
+        builder.Use<Entity, Request, Detail, PlainSummary>();
+        ResourceAttribute? input = null;
+        new SchemataResourceBuilder(schemata, registrations).Use<Entity, Request, Detail, PlainSummary>(null, resource => {
+            input = resource;
+            resource.DefaultPageSize = 2;
+            resource.MaxPageSize = 3;
+            resource.TotalSize = TotalSizeMode.None;
+        });
+        Assert.Throws<InvalidOperationException>(() => builder.Use<Entity, Request, Detail, PlainSummary>(null,
+            resource => resource.DefaultPageSize = 9));
+        input!.DefaultPageSize = 99;
+        input.MaxPageSize = 99;
+        input.TotalSize = TotalSizeMode.Exact;
+        using var services = BuildServices<PlainSummary>(repository.Object, mapper.Object,
+            collection => collection.AddSingleton(ResourceRegistry.GetOrAdd(schemata, registrations)));
+        var dispatcher = new InProcessRequestDispatcher(services);
+        var first = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, PlainSummary>, ListResultBase<Entity, PlainSummary>>(
+            new(new(), null), CancellationToken.None);
+        Assert.Equal(new[] { "e1", "e2" }, first.Entities!.Select(entity => entity.Name));
+        Assert.Null(first.TotalSize);
+        Assert.NotNull(first.NextPageToken);
+        var capped = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, PlainSummary>, ListResultBase<Entity, PlainSummary>>(
+            new(new() { PageSize = 99 }, null), CancellationToken.None);
+        Assert.Equal(new[] { "e1", "e2", "e3" }, capped.Entities!.Select(entity => entity.Name));
+        Assert.Null(capped.TotalSize);
+    }
+
+    [Fact]
+    [Trait("Layer", "Integration")]
+    public async Task List_Rejects_Continuation_Offset_Overflow_Before_Repository_IO() {
+        var repository = new Mock<IRepository<Entity>>(MockBehavior.Strict);
+        using var services = BuildServices<PlainSummary>(repository.Object, Mock.Of<ISimpleMapper>());
+        var protector = services.GetRequiredService<IDataProtectionProvider>().CreateProtector(PageToken.ProtectionPurpose);
+        var token = await new PageToken { Skip = int.MaxValue, PageSize = 1 }.ToStringAsync(protector);
+        var dispatcher = new InProcessRequestDispatcher(services);
+        await Assert.ThrowsAsync<ValidationException>(() => dispatcher.SendAsync<ListResourceQueryRequest<Entity, PlainSummary>, ListResultBase<Entity, PlainSummary>>(
+            new(new() { PageToken = token, Skip = 1 }, null), CancellationToken.None));
+        repository.VerifyNoOtherCalls();
+    }
+
+    [Theory]
+    [Trait("Layer", "Integration")]
+    [InlineData("filter")]
+    [InlineData("language")]
+    [InlineData("order")]
+    [InlineData("deleted")]
+    public async Task List_Rejects_Changed_Protected_Parameters_Before_Repository_IO(string changed) {
+        var repository = new Mock<IRepository<Entity>>(MockBehavior.Strict);
+        using var services = BuildServices<PlainSummary>(repository.Object, Mock.Of<ISimpleMapper>());
+        var protector = services.GetRequiredService<IDataProtectionProvider>().CreateProtector(PageToken.ProtectionPurpose);
+        var token = await new PageToken().ToStringAsync(protector);
+        var request = new ListRequest { PageToken = token };
+        if (changed == "filter") request.Filter = "changed";
+        if (changed == "language") request.Language = "other";
+        if (changed == "order") request.OrderBy = "name";
+        if (changed == "deleted") request.ShowDeleted = true;
+        var dispatcher = new InProcessRequestDispatcher(services);
+        await Assert.ThrowsAsync<ValidationException>(() => dispatcher.SendAsync<ListResourceQueryRequest<Entity, PlainSummary>, ListResultBase<Entity, PlainSummary>>(
+            new(request, null), CancellationToken.None));
+        repository.VerifyNoOtherCalls();
     }
 
     private static (Mock<IRepository<Entity>> Repository, Mock<ISimpleMapper> Mapper) CreateDoubles(Entity[] rows) {
@@ -156,14 +421,15 @@ public class ResourceListResponsePipelineAdvisorShould
                               It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
                               It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<Entity>, IQueryable<Entity>> query, CancellationToken _) =>
-                      new ValueTask<int>(query(rows.AsQueryable()).Count()));
+                      new(query(rows.AsQueryable()).Count()));
 
-        return (repository, new Mock<ISimpleMapper>());
+        return (repository, new());
     }
 
     private static ServiceProvider BuildServices<TSummary>(
         IRepository<Entity> repository,
-        ISimpleMapper       mapper
+        ISimpleMapper       mapper,
+        Action<IServiceCollection>? configure = null
     )
         where TSummary : class, ICanonicalName {
         var services = new ServiceCollection();
@@ -172,11 +438,12 @@ public class ResourceListResponsePipelineAdvisorShould
         services.AddDataProtection();
         services.AddSingleton<ResourceOperationHandler<Entity, Request, Detail, TSummary>>();
         services.AddSingleton<
-            IRequestHandler<ListResourceQueryRequest<Entity, TSummary>, ListResultBase<TSummary>>,
+            IRequestHandler<ListResourceQueryRequest<Entity, TSummary>, ListResultBase<Entity, TSummary>>,
             DefaultListResourceHandler<Entity, Request, Detail, TSummary>>();
         services.AddSingleton<
-            IRequestPipelineAdvisor<ListResourceQueryRequest<Entity, TSummary>, ListResultBase<TSummary>>>(
+            IRequestPipelineAdvisor<ListResourceQueryRequest<Entity, TSummary>, ListResultBase<Entity, TSummary>>>(
             new ResourceListResponsePipelineAdvisor<Entity, TSummary>());
+        configure?.Invoke(services);
 
         return services.BuildServiceProvider();
     }

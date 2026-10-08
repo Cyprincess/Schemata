@@ -28,7 +28,7 @@ internal sealed class ActorSerializingHandler<TRequest, TResult>(
 {
     public async Task<TResult> HandleAsync(TRequest request, CancellationToken ct = default) {
         var context = MessageContexts.Capture(caller);
-        var actor   = await actors.GetAsync(new ActorId("push", request.SubscriptionKey));
+        var actor   = await actors.GetAsync(new("push", request.SubscriptionKey));
         return await actor.AskAsync<TRequest, TResult>(request, context, ct: ct);
     }
 }

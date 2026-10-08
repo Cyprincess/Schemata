@@ -17,7 +17,7 @@ dotnet add package --prerelease Schemata.Identity.Foundation
 Add `UseIdentity()` inside the `UseSchemata` block in `Program.cs`:
 
 ```csharp
-schema.UseIdentity();
+schema.UseIdentity().UseRegistration().UseAccountConfirmation().UsePasswordReset();
 ```
 
 `UseIdentity()` registers ASP.NET Core Identity with bearer-token authentication using `SchemataUser` and `SchemataRole` as the default types. The authentication and HTTP transport features it depends on are pulled in automatically.
@@ -26,16 +26,17 @@ All four parameters are optional:
 
 ```csharp
 schema.UseIdentity(
-    identify:  opts => { opts.AllowRegistration = true; },
+    identify:  opts => { opts.LoginUri = "/login"; },
     configure: opts => { opts.Password.RequiredLength = 8; },
     build:     ib   => { /* IdentityBuilder customizations */ },
     bearer:    opts => { opts.BearerTokenExpiration = TimeSpan.FromHours(1); }
-);
+).UseRegistration().UseAccountConfirmation().UsePasswordReset()
+ .UsePasswordChange().UseEmailChange().UsePhoneNumberChange().UseTwoFactorAuthentication();
 ```
 
 | Parameter   | Type                              | Purpose                                                        |
 | ----------- | --------------------------------- | -------------------------------------------------------------- |
-| `identify`  | `Action<SchemataIdentityOptions>` | Enable/disable registration, account confirmation, password reset, password change, email change, phone-number change, 2FA; set `LoginUri` |
+| `identify` | `Action<SchemataIdentityOptions>` | Set the login redirect URI; operation installation uses the returned builder |
 | `configure` | `Action<IdentityOptions>`         | Password policy, lockout, sign-in requirements                 |
 | `build`     | `Action<IdentityBuilder>`         | Add token providers or custom stores                           |
 | `bearer`    | `Action<BearerTokenOptions>`      | Token expiration, refresh behavior                             |
@@ -66,23 +67,27 @@ local URL, and redirects back to where the user started.
 
 ## Update the DbContext
 
-Change `AppDbContext` to extend `IdentityDbContext`:
+Use a regular EF Core `DbContext` with the Schemata identity entity sets:
 
 ```csharp
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Schemata.Identity.Skeleton.Entities;
 
 public class AppDbContext(DbContextOptions<AppDbContext> options)
-    : IdentityDbContext<SchemataUser, SchemataRole, Guid,
-        SchemataUserClaim, SchemataUserRole, SchemataUserLogin,
-        SchemataRoleClaim, SchemataUserToken>(options)
+    : DbContext(options)
 {
     public DbSet<Student> Students => Set<Student>();
+    public DbSet<SchemataUser> Users => Set<SchemataUser>();
+    public DbSet<SchemataRole> Roles => Set<SchemataRole>();
+    public DbSet<SchemataUserClaim> UserClaims => Set<SchemataUserClaim>();
+    public DbSet<SchemataRoleClaim> RoleClaims => Set<SchemataRoleClaim>();
+    public DbSet<SchemataUserRole> UserRoles => Set<SchemataUserRole>();
+    public DbSet<SchemataUserLogin> UserLogins => Set<SchemataUserLogin>();
+    public DbSet<SchemataUserToken> UserTokens => Set<SchemataUserToken>();
 }
 ```
 
-The Identity entity set (`SchemataUser`, `SchemataRole`, the join tables) ships with class-level `[PrimaryKey(...)]` attributes already in place.
+The entities declare their primary keys. Users and roles keep `Guid Uid` system identities; relationship `UserId` and `RoleId` columns store canonical resource names. ASP.NET Core's generic `IdentityDbContext` requires one shared key type for principals and relationships and is not the model used by Schemata's repository stores.
 
 ## Verify
 

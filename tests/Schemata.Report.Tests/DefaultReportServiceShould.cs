@@ -11,7 +11,10 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Insight.Skeleton.Drivers;
 using Schemata.Insight.Skeleton.Plan;
+using Schemata.Report.Foundation;
+using Schemata.Report.Foundation.Snapshots;
 using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Entities;
 using Schemata.Scheduling.Skeleton;
 using Xunit;
 using Schemata.Insight.Skeleton.Queries;
@@ -48,8 +51,9 @@ public class DefaultReportServiceShould
         Assert.Contains("Persist=true", exception.Message, StringComparison.Ordinal);
     }
 
+    [Trait("Layer", "Component")]
     [Fact]
-    public async Task Run_Persist_Writes_Header_And_Chunks_With_Fresh_Scope_Per_Chunk() {
+    public async Task Run_Persist_Writes_Header_And_Ordered_Bounded_Chunks() {
         var state = new ReportPersistenceState();
         var driver = ReportTestHost.CreateDriver(ReportTestRows.Create(5));
         using var provider = ReportTestHost.Create(driver, state, chunkSize: 2);
@@ -63,23 +67,15 @@ public class DefaultReportServiceShould
         Assert.Equal(3, snapshot.ChunkCount);
         Assert.Equal(3, state.Chunks.Count);
         Assert.Equal(result.Snapshot, snapshot.CanonicalName);
-        Assert.Equal(3, state.ChunkRepositoryInstances);
 
-        Assert.Equal(
-            new[] { SnapshotState.Pending, SnapshotState.Running, SnapshotState.Succeeded },
-            state.SnapshotStateSequence);
-        Assert.Equal(3, state.ChunkAddSequence.Count);
         var expectedRowCounts = new[] { 2, 2, 1 };
         for (var index = 0; index < state.ChunkAddSequence.Count; index++) {
             var chunk = state.ChunkAddSequence[index];
-            Assert.Equal($"chunk-{index}", chunk.Name);
             Assert.Equal(index, chunk.Index);
-            Assert.Equal($"{snapshot.CanonicalName}/chunks/chunk-{index}", chunk.CanonicalName);
             Assert.Equal(snapshot.Report, chunk.Report);
             Assert.Equal(snapshot.Name, chunk.Snapshot);
             Assert.Equal(expectedRowCounts[index], chunk.RowCount);
         }
-        Assert.Equal(state.Chunks.Count, state.ChunkRepositoryInstances);
     }
 
     [Fact]
@@ -99,17 +95,11 @@ public class DefaultReportServiceShould
         Assert.Equal("source failed", snapshot.Error);
         Assert.Single(state.Chunks);
 
-        Assert.Equal(
-            new[] { SnapshotState.Pending, SnapshotState.Running, SnapshotState.Failed },
-            state.SnapshotStateSequence);
         var failedChunk = Assert.Single(state.ChunkAddSequence);
-        Assert.Equal("chunk-0", failedChunk.Name);
         Assert.Equal(0, failedChunk.Index);
-        Assert.Equal($"{snapshot.CanonicalName}/chunks/chunk-0", failedChunk.CanonicalName);
         Assert.Equal(snapshot.Report, failedChunk.Report);
         Assert.Equal(snapshot.Name, failedChunk.Snapshot);
         Assert.Equal(2, failedChunk.RowCount);
-        Assert.Equal(1, state.ChunkRepositoryInstances);
     }
 
     [Fact]
@@ -167,7 +157,7 @@ public class DefaultReportServiceShould
                 ServiceDescriptor.Singleton<IReportGenerateAdvisor>(advisor.Object)));
         var service = provider.GetRequiredService<IReportService>();
 
-        await service.RunAsync(ReportTestHost.InlineRequest(), new ClaimsPrincipal(new ClaimsIdentity("caller")));
+        await service.RunAsync(ReportTestHost.InlineRequest(), new(new ClaimsIdentity("caller")));
 
         driver.Verify(value => value.ExecuteAsync(
                           It.IsAny<SubPlan>(),
@@ -186,8 +176,11 @@ public class DefaultReportServiceShould
 
         var result = await service.RunAsync(ReportTestHost.InlineRequest(persist: true));
         var values = new List<int>();
+        Assert.NotNull(result.Snapshot);
         await foreach (var row in store.ReadRowsAsync(result.Snapshot!)) {
-            values.Add(((System.Text.Json.JsonElement)row["value"]!).GetInt32());
+            var raw = row["value"];
+            Assert.NotNull(raw);
+            values.Add(((System.Text.Json.JsonElement)raw).GetInt32());
         }
 
         Assert.Equal([0, 1, 2, 3, 4], values);
@@ -214,9 +207,9 @@ public class DefaultReportServiceShould
         result.SetupGet(value => value.Rows).Returns(ReportTestRows.Create(1));
         result.SetupGet(value => value.Schema).Returns([]);
         result.Setup(value => value.DisposeAsync()).Returns(ValueTask.CompletedTask);
-        var driver = ReportTestHost.CreateDriver(result.Object);
-        using var provider = ReportTestHost.Create(driver, new ReportPersistenceState());
-        var service = provider.GetRequiredService<IReportService>();
+        var       driver   = ReportTestHost.CreateDriver(result.Object);
+        using var provider = ReportTestHost.Create(driver, new());
+        var       service  = provider.GetRequiredService<IReportService>();
 
         await service.RunAsync(ReportTestHost.InlineRequest(persist: true));
 

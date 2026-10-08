@@ -76,6 +76,9 @@
     </data>
   <data name="NOT_SUPPORTED" xml:space="preserve">
         <value>'{0}' is not supported.</value>
+  </data>
+  <data name="NOT_SINGLE" xml:space="preserve">
+        <value>The parameter '{0}' MUST NOT be included more than once.</value>
     </data>
   <data name="NOT_CONFIGURED" xml:space="preserve">
         <value>'{0}' is not configured.</value>
@@ -155,14 +158,129 @@
   <data name="MULTIPLE_CLIENT_AUTH_METHODS" xml:space="preserve">
         <value>The request uses more than one client authentication method.</value>
     </data>
+  <data name="UNAUTHORIZED_CLIENT_AUTH_METHOD" xml:space="preserve">
+        <value>The client is registered for a different client authentication method.</value>
+    </data>
+  <data name="INVALID_CLIENT_ASSERTION" xml:space="preserve">
+        <value>The client assertion is not a well-formed JWT.</value>
+    </data>
+  <data name="ASSERTION_ISSUER_MISMATCH" xml:space="preserve">
+        <value>The client assertion issuer does not match the expected issuer.</value>
+    </data>
+  <data name="ASSERTION_SUBJECT_MISMATCH" xml:space="preserve">
+        <value>The client assertion subject must be the client identifier.</value>
+    </data>
+  <data name="ASSERTION_AUDIENCE_MISMATCH" xml:space="preserve">
+        <value>The client assertion audience does not identify the authorization server.</value>
+    </data>
+  <data name="ASSERTION_EXPIRED" xml:space="preserve">
+        <value>The client assertion is expired or has no expiration time.</value>
+    </data>
+  <data name="ASSERTION_NOT_YET_VALID" xml:space="preserve">
+        <value>The client assertion is not yet valid.</value>
+    </data>
+  <data name="ASSERTION_JTI_REQUIRED" xml:space="preserve">
+        <value>The client assertion must contain a non-empty jti claim.</value>
+    </data>
+  <data name="ASSERTION_REPLAYED" xml:space="preserve">
+        <value>The client assertion has already been used.</value>
+    </data>
+  <data name="ASSERTION_ALGORITHM_REJECTED" xml:space="preserve">
+        <value>The client assertion algorithm is missing, unsecured, or not allowed.</value>
+    </data>
+  <data name="ASSERTION_CLIENT_ID_REQUIRED" xml:space="preserve">
+        <value>The client identity must be provided by the client_id parameter or the client assertion subject.</value>
+    </data>
+  <data name="ASSERTION_KEY_NOT_FOUND" xml:space="preserve">
+        <value>No signing key registered for the client can verify the client assertion.</value>
+    </data>
+  <data name="ASSERTION_ISSUER_UNTRUSTED" xml:space="preserve">
+        <value>The assertion issuer is not a trusted jwt-bearer issuer.</value>
+    </data>
+  <data name="ASSERTION_SIGNATURE_INVALID" xml:space="preserve">
+        <value>The assertion signature could not be verified.</value>
+    </data>
+  <data name="DPOP_PROOF_MALFORMED" xml:space="preserve">
+        <value>The DPoP proof is not a single well-formed JWT.</value>
+    </data>
+  <data name="DPOP_PROOF_CLAIMS_REQUIRED" xml:space="preserve">
+        <value>The DPoP proof must contain the jti, htm, htu, and iat claims.</value>
+    </data>
+  <data name="DPOP_PROOF_TYPE_MISMATCH" xml:space="preserve">
+        <value>The DPoP proof typ header must be dpop+jwt.</value>
+    </data>
+  <data name="DPOP_PROOF_ALGORITHM_REJECTED" xml:space="preserve">
+        <value>The DPoP proof algorithm is missing, unsecured, or not allowed.</value>
+    </data>
+  <data name="DPOP_PROOF_JWK_REQUIRED" xml:space="preserve">
+        <value>The DPoP proof must contain a jwk header parameter with the signing public key.</value>
+    </data>
+  <data name="DPOP_PROOF_PRIVATE_KEY" xml:space="preserve">
+        <value>The DPoP proof jwk header parameter must not contain private key material.</value>
+    </data>
+  <data name="DPOP_PROOF_SIGNATURE_INVALID" xml:space="preserve">
+        <value>The DPoP proof signature does not verify with the public key in the jwk header parameter.</value>
+    </data>
+  <data name="DPOP_PROOF_HTM_MISMATCH" xml:space="preserve">
+        <value>The DPoP proof htm claim does not match the HTTP request method.</value>
+    </data>
+  <data name="DPOP_PROOF_HTU_MISMATCH" xml:space="preserve">
+        <value>The DPoP proof htu claim does not match the HTTP request URI.</value>
+    </data>
+  <data name="DPOP_PROOF_NONCE_MISMATCH" xml:space="preserve">
+        <value>The DPoP proof must carry the current server-provided nonce.</value>
+    </data>
+  <data name="DPOP_PROOF_TIME_WINDOW" xml:space="preserve">
+        <value>The DPoP proof creation time is outside the acceptable window.</value>
+    </data>
+  <data name="DPOP_PROOF_REQUIRED" xml:space="preserve">
+        <value>The client is registered to always use DPoP and must send a DPoP proof header.</value>
+    </data>
+  <data name="DPOP_PROOF_REPLAYED" xml:space="preserve">
+        <value>The DPoP proof has already been used.</value>
+    </data>
+  <data name="DPOP_PROOF_ATH_MISMATCH" xml:space="preserve">
+        <value>The DPoP proof ath claim does not match the presented access token.</value>
+    </data>
+  <data name="DPOP_JKT_MALFORMED" xml:space="preserve">
+        <value>The dpop_jkt parameter is not a base64url-encoded SHA-256 JWK thumbprint.</value>
+    </data>
+  <data name="DPOP_JKT_MISMATCH" xml:space="preserve">
+        <value>The DPoP proof key does not match the key bound to the authorization code.</value>
+    </data>
+  <data name="DPOP_REFRESH_PROOF_REQUIRED" xml:space="preserve">
+        <value>The refresh token is bound to a DPoP key and must be presented with a matching DPoP proof.</value>
+    </data>
   <data name="INVALID_GRANT" xml:space="preserve">
         <value>The provided grant is invalid, expired, or revoked.</value>
+    </data>
+  <data name="INVALID_TOKEN" xml:space="preserve">
+        <value>Invalid token</value>
     </data>
   <data name="PKCE_VERIFIER_MISMATCH" xml:space="preserve">
         <value>The code_verifier does not match the code_challenge.</value>
     </data>
+    <data name="PKCE_VERIFIER_REQUIRED" xml:space="preserve">
+        <value>A code_verifier is required for this authorization code.</value>
+    </data>
+    <data name="PKCE_VERIFIER_INVALID" xml:space="preserve">
+        <value>The code_verifier must be 43 to 128 unreserved ASCII characters (ALPHA / DIGIT / '-' / '.' / '_' / '~').</value>
+    </data>
+    <data name="PKCE_VERIFIER_UNEXPECTED" xml:space="preserve">
+        <value>A code_verifier was sent but the authorization request carried no code_challenge.</value>
+    </data>
+    <data name="CODE_CHALLENGE_INVALID" xml:space="preserve">
+        <value>The code_challenge must be 43 to 128 unreserved ASCII characters (ALPHA / DIGIT / '-' / '.' / '_' / '~').</value>
+    </data>
+    <data name="CODE_CHALLENGE_METHOD_NOT_ALLOWED" xml:space="preserve">
+        <value>The code_challenge_method '{value}' is not allowed; use 'S256'.</value>
+    </data>
+
   <data name="INVALID_SCOPE" xml:space="preserve">
         <value>The requested scope is not allowed for this client.</value>
+    </data>
+  <data name="INVALID_TARGET" xml:space="preserve">
+        <value>The requested resource is invalid, missing, unknown, or malformed.</value>
     </data>
   <data name="UNAUTHORIZED_GRANT_TYPE" xml:space="preserve">
         <value>The client is not authorized to use this grant type.</value>
@@ -196,6 +314,24 @@
     </data>
   <data name="USER_IDENTITY_REQUIRED" xml:space="preserve">
         <value>A valid user identity is required for this request.</value>
+    </data>
+  <data name="INVALID_AUTHORIZATION_DETAILS_JSON" xml:space="preserve">
+        <value>The authorization_details parameter is not a valid JSON document.</value>
+    </data>
+  <data name="INVALID_AUTHORIZATION_DETAILS_ARRAY" xml:space="preserve">
+        <value>The authorization_details parameter must be a JSON array.</value>
+    </data>
+  <data name="INVALID_AUTHORIZATION_DETAILS_OBJECT" xml:space="preserve">
+        <value>Every authorization_details element must be a JSON object.</value>
+    </data>
+  <data name="INVALID_AUTHORIZATION_DETAILS_TYPE_MEMBER" xml:space="preserve">
+        <value>Every authorization_details object must carry a string type member.</value>
+    </data>
+  <data name="INVALID_AUTHORIZATION_DETAILS_TYPE_UNSUPPORTED" xml:space="preserve">
+        <value>The authorization details type '{0}' is not supported.</value>
+    </data>
+  <data name="INVALID_AUTHORIZATION_DETAILS_NARROWING" xml:space="preserve">
+        <value>The requested authorization details exceed the granted authorization details.</value>
     </data>
   <data name="REQUIRED_SETTING_MISSING" xml:space="preserve">
         <value>{0} is enabled but {1} is not set.</value>
@@ -238,6 +374,9 @@
     </data>
   <data name="PROCESS_NOT_REGISTERED" xml:space="preserve">
         <value>Process definition '{name}' is not registered.</value>
+    </data>
+  <data name="FLOW_EFFECT_OUTCOME_UNKNOWN" xml:space="preserve">
+        <value>The outcome of external effect '{request}' recorded by task '{task}' in process '{name}' is unknown: the external system supports neither result query nor idempotent re-issue, so the effect may or may not have happened.</value>
     </data>
   <data name="FLOW_EXPRESSION_INVALID" xml:space="preserve">
         <value>Condition expression '{expression}' is invalid.</value>
@@ -286,6 +425,9 @@
     </data>
   <data name="FLOW_TIMER_REQUIRES_SCHEDULING" xml:space="preserve">
         <value>Process '{name}' reached a timer catch, which requires Scheduling.</value>
+    </data>
+  <data name="FLOW_TIMER_STALE_FIRING" xml:space="preserve">
+        <value>Timer firing for '{element}' in process '{name}' is stale: its registration was cancelled or replaced by a newer generation.</value>
     </data>
   <data name="INSIGHT_ACCESS_DENIED" xml:space="preserve">
         <value>Access to source '{name}' is denied.</value>
@@ -431,10 +573,486 @@
   <data name="BPMN_LOOP_NOT_IMPLEMENTED" xml:space="preserve">
         <value>BPMN activity '{name}' has loop characteristics of type '{type}' which are not yet implemented in this engine version.</value>
     </data>
+  <data name="FLOW_TASK_LANGUAGE_REQUIRED" xml:space="preserve">
+        <value>Flow task '{name}' declares no {kind} language; set the task language before execution.</value>
+    </data>
+  <data name="FLOW_TASK_COMPILER_NOT_FOUND" xml:space="preserve">
+        <value>No expression compiler is registered for language '{language}' used by flow task '{name}'.</value>
+    </data>
+  <data name="FLOW_TASK_BINDING_REQUIRED" xml:space="preserve">
+        <value>Flow task '{name}' requires binding '{binding}' before execution.</value>
+    </data>
+  <data name="FLOW_TASK_HANDLER_NOT_FOUND" xml:space="preserve">
+        <value>No business rule handler is registered for key '{binding}' and version '{version}' used by flow task '{name}'.</value>
+    </data>
+  <data name="FLOW_TASK_INPUT_INVALID" xml:space="preserve">
+        <value>Flow task '{name}' received an invalid input for binding '{binding}'.</value>
+    </data>
+  <data name="FLOW_TASK_OUTPUT_INVALID" xml:space="preserve">
+        <value>Flow task '{name}' produced an invalid output for binding '{binding}'.</value>
+    </data>
+  <data name="FLOW_TASK_EXPRESSION_INVALID" xml:space="preserve">
+        <value>Flow task '{name}' could not compile or evaluate its '{language}' expression for binding '{binding}'.</value>
+    </data>
+  <data name="FLOW_RULE_NO_MATCH" xml:space="preserve">
+        <value>Business rule task '{name}' matched no rule for decision '{decision}'.</value>
+    </data>
   <data name="BPMN_TRANSPARENT_GATEWAY_NOT_SUPPORTED" xml:space="preserve">
         <value>BPMN gateway '{type}' cannot be transparently resolved; route through AdvanceAsync to dispatch it.</value>
     </data>
   <data name="BPMN_INVALID_TRIGGER" xml:space="preserve">
         <value>Trigger '{trigger}' is not valid from state '{state}'.</value>
     </data>
+  <data name="INVALID_REQUEST" xml:space="preserve">
+        <value>The request is malformed or missing a required parameter.</value>
+    </data>
+  <data name="INVALID_CLIENT" xml:space="preserve">
+        <value>Client authentication failed.</value>
+    </data>
+  <data name="CONSENT_REQUIRED" xml:space="preserve">
+        <value>The authorization server requires end-user consent.</value>
+    </data>
+  <data name="LOGIN_REQUIRED" xml:space="preserve">
+        <value>The authorization server requires end-user authentication.</value>
+    </data>
+  <data name="EXPIRED_TOKEN" xml:space="preserve">
+        <value>The provided token has expired.</value>
+    </data>
+  <data name="INTERACTION_REQUIRED" xml:space="preserve">
+        <value>The end-user must interact with the authorization server to continue.</value>
+    </data>
+  <data name="ACCOUNT_SELECTION_REQUIRED" xml:space="preserve">
+        <value>The end-user must select an account to continue.</value>
+    </data>
+  <data name="INVALID_AUTHORIZATION_DETAILS" xml:space="preserve">
+        <value>The authorization_details parameter is invalid.</value>
+    </data>
+  <data name="INVALID_CLIENT_METADATA" xml:space="preserve">
+        <value>The client registration metadata is invalid.</value>
+    </data>
+  <data name="INVALID_DPOP_PROOF" xml:space="preserve">
+        <value>The DPoP proof JWT is invalid.</value>
+    </data>
+  <data name="INVALID_REQUEST_OBJECT" xml:space="preserve">
+        <value>The request object is invalid.</value>
+    </data>
+  <data name="INVALID_REQUEST_URI" xml:space="preserve">
+        <value>The request_uri does not resolve to a valid request object.</value>
+    </data>
+  <data name="INVALID_SOFTWARE_STATEMENT" xml:space="preserve">
+        <value>The software statement is invalid.</value>
+    </data>
+  <data name="UNAPPROVED_SOFTWARE_STATEMENT" xml:space="preserve">
+        <value>The software statement is not approved for use.</value>
+    </data>
+  <data name="REGISTRATION_NOT_SUPPORTED" xml:space="preserve">
+        <value>The authorization server does not support dynamic client registration.</value>
+    </data>
+  <data name="REQUEST_NOT_SUPPORTED" xml:space="preserve">
+        <value>The authorization server does not support the request parameter.</value>
+    </data>
+  <data name="REQUEST_URI_NOT_SUPPORTED" xml:space="preserve">
+        <value>The authorization server does not support the request_uri parameter.</value>
+    </data>
+    <data name="REGISTRATION_REDIRECT_URIS_REQUIRED" xml:space="preserve">
+        <value>redirect_uris is required.</value>
+    </data>
+    <data name="REGISTRATION_APPLICATION_TYPE_INVALID" xml:space="preserve">
+        <value>application_type must be web or native, not '{value}'.</value>
+    </data>
+    <data name="REGISTRATION_REDIRECT_URI_NOT_ABSOLUTE" xml:space="preserve">
+        <value>redirect_uris entry is not an absolute URI: '{value}'.</value>
+    </data>
+    <data name="REGISTRATION_REDIRECT_URI_FRAGMENT" xml:space="preserve">
+        <value>redirect_uris entry must not contain a fragment: '{value}'.</value>
+    </data>
+    <data name="REGISTRATION_REDIRECT_URI_USERINFO" xml:space="preserve">
+        <value>redirect_uris entry must not contain userinfo: '{value}'.</value>
+    </data>
+    <data name="REGISTRATION_REDIRECT_URI_HTTPS_REQUIRED" xml:space="preserve">
+        <value>web clients must register https redirect URIs: '{value}'.</value>
+    </data>
+    <data name="REGISTRATION_REDIRECT_URI_LOOPBACK_FORBIDDEN" xml:space="preserve">
+        <value>web clients must not register loopback redirect URIs.</value>
+    </data>
+    <data name="REGISTRATION_REDIRECT_URI_LOOPBACK_REQUIRED" xml:space="preserve">
+        <value>native http redirect URIs must use loopback IP literals: '{value}'.</value>
+    </data>
+    <data name="REGISTRATION_REDIRECT_URI_LOCALHOST_FORBIDDEN" xml:space="preserve">
+        <value>native private scheme redirect URIs must not use the localhost host: '{value}'.</value>
+    </data>
+    <data name="REGISTRATION_POST_LOGOUT_URI_INVALID" xml:space="preserve">
+        <value>post_logout_redirect_uris entry is not an absolute fragment-free URI: '{value}'.</value>
+    </data>
+    <data name="REGISTRATION_METADATA_URI_INVALID" xml:space="preserve">
+        <value>'{name}' must be an absolute https URI without a fragment: '{value}'.</value>
+    </data>
+    <data name="REGISTRATION_RESPONSE_TYPE_UNSUPPORTED" xml:space="preserve">
+        <value>unsupported response_type: '{value}'.</value>
+    </data>
+    <data name="REGISTRATION_RESPONSE_TYPE_GRANT_REQUIRED" xml:space="preserve">
+        <value>response_type '{value}' requires grant_types '{required}'.</value>
+    </data>
+    <data name="REGISTRATION_TOKEN_AUTH_METHOD_NOT_ALLOWED" xml:space="preserve">
+        <value>token_endpoint_auth_method '{value}' is not among the server's allowed methods.</value>
+    </data>
+    <data name="REGISTRATION_DEFAULT_MAX_AGE_INVALID" xml:space="preserve">
+        <value>default_max_age must be an integer between 0 and 2147483647: '{value}'.</value>
+    </data>
+    <data name="REGISTRATION_JWKS_EXCLUSIVE" xml:space="preserve">
+        <value>jwks and jwks_uri are mutually exclusive.</value>
+    </data>
+    <data name="REGISTRATION_JWKS_NOT_OBJECT" xml:space="preserve">
+        <value>jwks must be a JSON Web Key Set document (a JSON object).</value>
+    </data>
+    <data name="REGISTRATION_SECTOR_URI_INVALID" xml:space="preserve">
+        <value>sector_identifier_uri must be an absolute https URI.</value>
+    </data>
+    <data name="REGISTRATION_SECTOR_URI_FETCH_FAILED" xml:space="preserve">
+        <value>sector_identifier_uri could not be fetched.</value>
+    </data>
+    <data name="REGISTRATION_SECTOR_URI_NOT_ARRAY" xml:space="preserve">
+        <value>sector_identifier_uri returned a non-array document.</value>
+    </data>
+    <data name="REGISTRATION_SECTOR_URI_EMPTY" xml:space="preserve">
+        <value>sector_identifier_uri returned an empty redirect_uris array.</value>
+    </data>
+    <data name="REGISTRATION_SECTOR_URI_MEMBER_REQUIRED" xml:space="preserve">
+        <value>redirect URI is not a member of the sector_identifier_uri document: '{value}'.</value>
+    </data>
+    <data name="REGISTRATION_URI_HOST_MISMATCH" xml:space="preserve">
+        <value>'{name}' host does not match any redirect_uris host.</value>
+    </data>
+
+    <data name="CLAIMS_PARAMETER_NOT_VALID" xml:space="preserve">
+        <value>The claims parameter is not a valid JSON object.</value>
+    </data>
+    <data name="CLAIMS_USERINFO_REQUIRES_OPENID" xml:space="preserve">
+        <value>The claims userinfo member requires the openid scope.</value>
+    </data>
+    <data name="REGISTRATION_INITIAL_ACCESS_TOKEN_INVALID" xml:space="preserve">
+        <value>The initial access token is invalid or absent.</value>
+    </data>
+    <data name="REGISTRATION_FIELDS_SERVER_MANAGED" xml:space="preserve">
+        <value>registration_access_token, registration_client_uri, client_id_issued_at, and client_secret_expires_at are server-managed and must not be submitted.</value>
+    </data>
+    <data name="REGISTRATION_CLIENT_ID_MISMATCH" xml:space="preserve">
+        <value>client_id is required and must match the registered client.</value>
+    </data>
+    <data name="REGISTRATION_CLIENT_SECRET_MISMATCH" xml:space="preserve">
+        <value>client_secret does not match the registered credential.</value>
+    </data>
+    <data name="SOFTWARE_STATEMENT_NOT_WELL_FORMED" xml:space="preserve">
+        <value>software_statement is not a well-formed JWS.</value>
+    </data>
+    <data name="SOFTWARE_STATEMENT_ISSUER_NOT_APPROVED" xml:space="preserve">
+        <value>software_statement issuer is not approved.</value>
+    </data>
+    <data name="REQUEST_OBJECT_SIGNING_ALG_NOT_SUPPORTED" xml:space="preserve">
+        <value>The request_object_signing_alg '{value}' is not supported by the authorization server.</value>
+    </data>
+    <data name="USERINFO_SIGNED_RESPONSE_ALG_MISMATCH" xml:space="preserve">
+        <value>The userinfo_signed_response_alg '{value}' does not match the issuer's active signing algorithm '{active}'.</value>
+    </data>
+
+  <data name="SERVER_ERROR" xml:space="preserve">
+        <value>The authorization server encountered an unexpected condition.</value>
+    </data>
+  <data name="UNAUTHORIZED_CLIENT" xml:space="preserve">
+        <value>The client is not authorized to use this method.</value>
+    </data>
+  <data name="UNSUPPORTED_GRANT_TYPE" xml:space="preserve">
+        <value>The authorization grant type is not supported by the authorization server.</value>
+    </data>
+  <data name="UNSUPPORTED_RESPONSE_TYPE" xml:space="preserve">
+        <value>The authorization server does not support obtaining an authorization code using this method.</value>
+    </data>
+  <data name="UNSUPPORTED_TOKEN_TYPE" xml:space="preserve">
+        <value>The requested token type is not supported.</value>
+    </data>
+  <data name="USE_DPOP_NONCE" xml:space="preserve">
+        <value>The DPoP proof must carry the server-issued nonce.</value>
+    </data>
+  <data name="INSIGHT_SOURCE_REQUIRES_RESOURCE" xml:space="preserve">
+        <value>A repository source requires a resource parameter.</value>
+    </data>
+  <data name="INSIGHT_UNKNOWN_SOURCE" xml:space="preserve">
+        <value>Unknown resource '{name}'.</value>
+    </data>
+  <data name="INSIGHT_NODE_UNSUPPORTED" xml:space="preserve">
+        <value>Plan node '{node}' is not supported by the repository driver.</value>
+    </data>
+  <data name="INSIGHT_NESTED_STAGE_REQUIRED" xml:space="preserve">
+        <value>Plan node '{node}' is not a nested stage.</value>
+    </data>
+  <data name="INSIGHT_NESTED_COLLECTION_MISSING" xml:space="preserve">
+        <value>Driver '{driver}' returned no child collection for nested selection '{alias}' (path '{field}'); declare Nested or include the child collection in raw rows.</value>
+    </data>
+  <data name="INSIGHT_NESTED_ANCHOR_INVALID" xml:space="preserve">
+        <value>Nested selection '{alias}' (path '{field}') cannot be anchored to a single source.</value>
+    </data>
+  <data name="INSIGHT_NESTED_NOT_COLLECTION" xml:space="preserve">
+        <value>Nested selection '{alias}' (path '{field}') targets a non-collection value.</value>
+    </data>
+  <data name="INSIGHT_LOCAL_STAGE_REQUIRED" xml:space="preserve">
+        <value>Plan node '{stage}' is not a local stage.</value>
+    </data>
+  <data name="INSIGHT_AGGREGATION_UNSUPPORTED" xml:space="preserve">
+        <value>Unsupported aggregation '{function}'.</value>
+    </data>
+  <data name="INSIGHT_SOURCE_REQUIRED" xml:space="preserve">
+        <value>The plan has no source.</value>
+    </data>
+  <data name="INSIGHT_JOIN_SOURCE_REQUIRED" xml:space="preserve">
+        <value>A join input has no source.</value>
+    </data>
+  <data name="INSIGHT_DRIVER_UNREGISTERED" xml:space="preserve">
+        <value>No driver '{driver}' is registered.</value>
+    </data>
+  <data name="INSIGHT_SINGLE_SOURCE_STAGE_REQUIRED" xml:space="preserve">
+        <value>Plan node '{stage}' is not a single-source stage.</value>
+    </data>
+  <data name="INSIGHT_AT_LEAST_ONE_SOURCE" xml:space="preserve">
+        <value>At least one source is required.</value>
+    </data>
+  <data name="INSIGHT_ALIAS_DUPLICATE" xml:space="preserve">
+        <value>Duplicate source alias '{alias}'.</value>
+    </data>
+  <data name="INSIGHT_JOIN_KIND_REQUIRED" xml:space="preserve">
+        <value>A join must specify a kind.</value>
+    </data>
+  <data name="INSIGHT_JOIN_ALREADY_JOINED" xml:space="preserve">
+        <value>Join aliases '{left}' and '{right}' are already joined.</value>
+    </data>
+  <data name="INSIGHT_JOIN_ALL_CONNECTED" xml:space="preserve">
+        <value>All sources must be connected by joins.</value>
+    </data>
+  <data name="INSIGHT_JOIN_ALIAS_UNKNOWN" xml:space="preserve">
+        <value>Join references unknown alias '{alias}'.</value>
+    </data>
+  <data name="INSIGHT_TOP_SKIP_UNSUPPORTED" xml:space="preserve">
+        <value>Mid-pipeline top/skip is not supported at the top level; use top-level page_size/skip.</value>
+    </data>
+  <data name="INSIGHT_TRANSFORM_ONE_OPERATION" xml:space="preserve">
+        <value>A transformation must set exactly one operation.</value>
+    </data>
+  <data name="INSIGHT_EXPRESSION_LANGUAGE_UNKNOWN" xml:space="preserve">
+        <value>Unknown expression language '{language}'.</value>
+    </data>
+  <data name="INSIGHT_EXPRESSION_NOT_VALUE_CAPABLE" xml:space="preserve">
+        <value>Language '{language}' cannot compile value expressions.</value>
+    </data>
+  <data name="INSIGHT_EXPRESSION_INVALID" xml:space="preserve">
+        <value>Invalid expression '{expression}'.</value>
+    </data>
+  <data name="INSIGHT_FLAT_SELECTION_TRANSFORMATIONS" xml:space="preserve">
+        <value>A flat selection cannot carry transformations.</value>
+    </data>
+  <data name="INSIGHT_SELECTION_ALIAS_REQUIRED" xml:space="preserve">
+        <value>A computed selection requires an alias.</value>
+    </data>
+  <data name="INSIGHT_SELECTION_FIELD_REQUIRED" xml:space="preserve">
+        <value>A selection must specify a field.</value>
+    </data>
+  <data name="INSIGHT_NESTED_FIELD_REQUIRED" xml:space="preserve">
+        <value>A nested selection must name its navigation field.</value>
+    </data>
+  <data name="INSIGHT_NESTED_ALIAS_UNKNOWN" xml:space="preserve">
+        <value>A nested selection '{field}' must name an existing source alias.</value>
+    </data>
+  <data name="DEFAULT_ERROR" xml:space="preserve">
+        <value>An unknown failure has occurred.</value>
+    </data>
+  <data name="CONCURRENCY_FAILURE" xml:space="preserve">
+        <value>Optimistic concurrency failure, object has been modified.</value>
+    </data>
+  <data name="INVALID_USER_NAME" xml:space="preserve">
+        <value>User name '{userName}' is invalid, can only contain letters or digits.</value>
+    </data>
+  <data name="INVALID_EMAIL" xml:space="preserve">
+        <value>Email '{email}' is invalid.</value>
+    </data>
+  <data name="DUPLICATE_USER_NAME" xml:space="preserve">
+        <value>User name '{userName}' is already taken.</value>
+    </data>
+  <data name="DUPLICATE_EMAIL" xml:space="preserve">
+        <value>Email '{email}' is already taken.</value>
+    </data>
+  <data name="INVALID_ROLE_NAME" xml:space="preserve">
+        <value>Role name '{role}' is invalid.</value>
+    </data>
+  <data name="DUPLICATE_ROLE_NAME" xml:space="preserve">
+        <value>Role name '{role}' is already taken.</value>
+    </data>
+  <data name="USER_ALREADY_IN_ROLE" xml:space="preserve">
+        <value>User already in role '{role}'.</value>
+    </data>
+  <data name="USER_NOT_IN_ROLE" xml:space="preserve">
+        <value>User is not in role '{role}'.</value>
+    </data>
+  <data name="PASSWORD_TOO_SHORT" xml:space="preserve">
+        <value>Passwords must be at least {length} characters.</value>
+    </data>
+  <data name="PASSWORD_REQUIRES_UNIQUE_CHARS" xml:space="preserve">
+        <value>Passwords must use at least {uniqueChars} different characters.</value>
+    </data>
+  <data name="PASSWORD_REQUIRES_NON_ALPHANUMERIC" xml:space="preserve">
+        <value>Passwords must have at least one non-alphanumeric character.</value>
+    </data>
+  <data name="PASSWORD_REQUIRES_DIGIT" xml:space="preserve">
+        <value>Passwords must have at least one digit ('0'-'9').</value>
+    </data>
+  <data name="PASSWORD_REQUIRES_LOWER" xml:space="preserve">
+        <value>Passwords must have at least one lowercase ('a'-'z').</value>
+    </data>
+  <data name="PASSWORD_REQUIRES_UPPER" xml:space="preserve">
+        <value>Passwords must have at least one uppercase ('A'-'Z').</value>
+    </data>
+  <data name="PASSWORD_MISMATCH" xml:space="preserve">
+        <value>Incorrect password.</value>
+    </data>
+  <data name="RECOVERY_CODE_REDEMPTION_FAILED" xml:space="preserve">
+        <value>Recovery code redemption failed.</value>
+    </data>
+  <data name="LOGIN_ALREADY_ASSOCIATED" xml:space="preserve">
+        <value>A user with this login already exists.</value>
+    </data>
+  <data name="USER_ALREADY_HAS_PASSWORD" xml:space="preserve">
+        <value>User already has a password set.</value>
+    </data>
+  <data name="LOGOUT_PAGE_TITLE" xml:space="preserve">
+        <value>Logging out</value>
+    </data>
+  <data name="LOGOUT_PAGE_TEXT" xml:space="preserve">
+        <value>Logging out…</value>
+    </data>
+  <data name="LOGOUT_PAGE_CONTINUE" xml:space="preserve">
+        <value>Continue</value>
+    </data>
+  <data name="ACTOR_REMINDER_PAYLOAD_TYPE_UNRESOLVED" xml:space="preserve">
+    <value>Actor reminder payload type '{type}' could not be resolved.</value>
+  </data>
+  <data name="ACTOR_REMINDER_PAYLOAD_DESERIALIZE_FAILED" xml:space="preserve">
+    <value>Actor reminder payload of type '{type}' could not be deserialized.</value>
+  </data>
+  <data name="ACTOR_REMINDER_VARIABLE_REQUIRED" xml:space="preserve">
+    <value>Actor reminder job execution is missing required variable '{variable}'.</value>
+  </data>
+  <data name="FLOW_EVENT_SUBSCRIPTION_REQUIRES_UNIT_OF_WORK" xml:space="preserve">
+    <value>Flow event subscriptions for token '{token}' require an active unit of work.</value>
+  </data>
+  <data name="FLOW_PROCESS_DEFINITION_TYPE_INVALID" xml:space="preserve">
+    <value>Process definition type '{type}' must derive from ProcessDefinition.</value>
+  </data>
+  <data name="FLOW_CATCH_HANDLER_NOT_REGISTERED" xml:space="preserve">
+    <value>Flow catch '{name}' waits on a {kind} event, but no registered IFlowCatchHandler delivers that kind; the token would wait forever.</value>
+  </data>
+  <data name="FLOW_PROCESS_SOURCE_NAME_REQUIRED" xml:space="preserve">
+    <value>Process '{name}' source '{source}' has no canonical name; specify a source name.</value>
+  </data>
+  <data name="FLOW_PROCESS_SOURCE_AMBIGUOUS" xml:space="preserve">
+    <value>Process '{name}' binds {count} source types; specify a source name.</value>
+  </data>
+  <data name="REPORT_OPERATION_SERVICE_REQUIRED" xml:space="preserve">
+    <value>Report generation requires an operation service.</value>
+  </data>
+  <data name="REPORT_SCHEDULER_REQUIRED" xml:space="preserve">
+    <value>Report generation requires a scheduler.</value>
+  </data>
+  <data name="REPORT_NAME_OR_QUERY_REQUIRED" xml:space="preserve">
+    <value>Specify exactly one report name or inline query.</value>
+  </data>
+  <data name="REPORT_SNAPSHOT_NAME_REQUIRED" xml:space="preserve">
+    <value>Snapshot name is required.</value>
+  </data>
+  <data name="REPORT_PAGE_SIZE_INVALID" xml:space="preserve">
+    <value>Page size must be greater than zero.</value>
+  </data>
+  <data name="REPORT_SNAPSHOT_NOT_FOUND" xml:space="preserve">
+    <value>Report snapshot was not found.</value>
+  </data>
+  <data name="REPORT_PAGE_TOKEN_INVALID" xml:space="preserve">
+    <value>Invalid page token '{token}': {reason}</value>
+  </data>
+  <data name="REPORT_NOT_FOUND" xml:space="preserve">
+    <value>Report '{name}' was not found.</value>
+  </data>
+  <data name="OPERATION_NOT_FOUND" xml:space="preserve">
+    <value>Operation '{name}' was not found.</value>
+  </data>
+  <data name="JOB_NOT_FOUND" xml:space="preserve">
+    <value>Job '{name}' was not found.</value>
+  </data>
+  <data name="JOB_NOT_RUNNABLE" xml:space="preserve">
+    <value>Job '{name}' cannot be run.</value>
+  </data>
+  <data name="REQUEST_FIELD_REQUIRED" xml:space="preserve">
+    <value>{field} is required.</value>
+  </data>
+  <data name="INSIGHT_PUBLIC_FIELD_INVALID" xml:space="preserve">
+    <value>Field '{field}' is not part of the public query model.</value>
+  </data>
+  <data name="INSIGHT_NESTED_PUBLIC_MODEL_REQUIRED" xml:space="preserve">
+    <value>Nested query rows must use their declared public model.</value>
+  </data>
+  <data name="INSIGHT_REFERENCE_PROVIDER_REQUIRED" xml:space="preserve">
+    <value>Language '{language}' does not provide query field references.</value>
+  </data>
+  <data name="INSIGHT_VALUE_TYPE_UNSUPPORTED" xml:space="preserve">
+    <value>Type '{type}' cannot be represented as a public Insight value.</value>
+  </data>
+  <data name="INSIGHT_SCAN_LIMIT_EXCEEDED" xml:space="preserve">
+    <value>Insight source scan exceeded the maximum of {cap} rows.</value>
+  </data>
+  <data name="FLOW_DEFINITION_VERSION_REQUIRED" xml:space="preserve">
+    <value>An exact process definition version is required.</value>
+  </data>
+  <data name="FLOW_DEFINITION_VERSION_UNBOUND" xml:space="preserve">
+    <value>The process has no exact definition version binding.</value>
+  </data>
+  <data name="FLOW_DEFINITION_VERSION_NOT_REGISTERED" xml:space="preserve">
+    <value>Process definition '{name}@{version}' is not registered.</value>
+  </data>
+  <data name="FLOW_PARTICIPANT_INVALID" xml:space="preserve">
+    <value>A participant subject and valid participation kind are required.</value>
+  </data>
+  <data name="FLOW_PARTICIPATION_PROCESS_ONLY" xml:space="preserve">
+    <value>Historical participation belongs to the process.</value>
+  </data>
+  <data name="FLOW_PROCESS_NOT_FOUND" xml:space="preserve">
+    <value>Process '{name}' was not found.</value>
+  </data>
+  <data name="FLOW_TOKEN_ASSIGNMENT_INELIGIBLE" xml:space="preserve">
+    <value>Token '{token}' is not eligible for assignment.</value>
+  </data>
+  <data name="FLOW_PARTICIPANT_NOT_FOUND" xml:space="preserve">
+    <value>Participation '{uid}' was not found.</value>
+  </data>
+  <data name="INSIGHT_REFERENCE_ANALYSIS_FAILED" xml:space="preserve">
+    <value>Query field reference analysis failed for language '{language}'.</value>
+  </data>
+  <data name="SIGNATURE_COMPONENT_INVALID" xml:space="preserve">
+    <value>The message signature component identifier '{component}' is invalid.</value>
+  </data>
+  <data name="SIGNATURE_COMPONENT_UNSUPPORTED" xml:space="preserve">
+    <value>The message signature component parameter '{parameter}' on '{component}' is not supported.</value>
+  </data>
+  <data name="SIGNATURE_COMPONENT_UNRESOLVABLE" xml:space="preserve">
+    <value>The covered component '{component}' cannot be resolved from the message.</value>
+  </data>
+  <data name="SIGNATURE_COMPONENT_INCOMPATIBLE" xml:space="preserve">
+    <value>The message signature component '{component}' carries inapplicable or mutually incompatible parameters.</value>
+  </data>
+  <data name="SIGNATURE_ALGORITHM_UNKNOWN" xml:space="preserve">
+    <value>The HTTP signature algorithm '{algorithm}' is not registered.</value>
+  </data>
+  <data name="SIGNATURE_ALGORITHM_KEY_MISMATCH" xml:space="preserve">
+    <value>The key material is not appropriate for the HTTP signature algorithm '{algorithm}'.</value>
+  </data>
+  <data name="SIGNATURE_BASE_NOT_ASCII" xml:space="preserve">
+    <value>The signature base contains non-ASCII characters.</value>
+  </data>
+  <data name="SIGNATURE_LABEL_INVALID" xml:space="preserve">
+    <value>The HTTP message signature label '{label}' is not a valid sf-key.</value>
+  </data>
 </root>

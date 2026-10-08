@@ -12,6 +12,7 @@ using Schemata.Messaging.Skeleton;
 using Schemata.Push.Actor.Handlers;
 using Schemata.Push.Foundation.Commands;
 using Schemata.Push.Foundation.Features;
+using Schemata.Push.Skeleton.Entities;
 
 namespace Schemata.Push.Actor.Features;
 
@@ -44,8 +45,8 @@ public sealed class SchemataPushActorFeature : FeatureBase
         IWebHostEnvironment environment
     ) {
         services.Replace(ServiceDescriptor.Scoped<
-            IRequestHandler<AddPushSubscriptionRequest, PushSubscriptionResult>,
-            ActorSerializingHandler<AddPushSubscriptionRequest, PushSubscriptionResult>>());
+            IRequestHandler<AddPushSubscriptionRequest, SchemataPushSubscription>,
+            ActorSerializingHandler<AddPushSubscriptionRequest, SchemataPushSubscription>>());
         services.Replace(ServiceDescriptor.Scoped<
             IRequestHandler<RemovePushSubscriptionRequest, Unit>,
             ActorSerializingHandler<RemovePushSubscriptionRequest, Unit>>());

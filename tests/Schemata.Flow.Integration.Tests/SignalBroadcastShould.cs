@@ -10,15 +10,20 @@ using Schemata.Flow.Foundation;
 using Schemata.Flow.Integration.Tests.Fixtures;
 using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Entities;
-using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
 using Xunit;
 
 namespace Schemata.Flow.Integration.Tests;
 
 [Trait("Category", "Integration")]
-public class SignalBroadcastShould(EfCoreFlowFixture fixture) : IClassFixture<EfCoreFlowFixture>
+public class SignalBroadcastShould : IAsyncLifetime
 {
+    private readonly EfCoreFlowFixture fixture = new();
+
+    public Task InitializeAsync() => fixture.InitializeAsync();
+
+    public Task DisposeAsync() => fixture.DisposeAsync();
+
     private const string SignalName = "broadcast-signal";
 
     private static readonly TimeSpan Delay = TimeSpan.FromMilliseconds(50);
@@ -91,7 +96,7 @@ public class SignalBroadcastShould(EfCoreFlowFixture fixture) : IClassFixture<Ef
 
         using (var scope = fixture.CreateScope()) {
             var registry = scope.ServiceProvider.GetRequiredService<IProcessRegistry>();
-            await registry.RegisterAsync(new ProcessConfiguration {
+            await registry.RegisterAsync(new() {
                 Name           = definition,
                 Engine         = FlowConstants.Engines.Bpmn,
                 DefinitionType = typeof(SignalBroadcastProcess),
@@ -119,6 +124,6 @@ public class SignalBroadcastShould(EfCoreFlowFixture fixture) : IClassFixture<Ef
         var       repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataProcessToken>>();
         var token = await repository.FirstOrDefaultAsync(q => q.Where(t => t.Process == processName));
         Assert.NotNull(token);
-        return token!.WaitingAtName;
+        return token.WaitingAtName;
     }
 }

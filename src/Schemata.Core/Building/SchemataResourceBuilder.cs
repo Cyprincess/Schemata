@@ -17,8 +17,6 @@ namespace Schemata.Core.Building;
 /// </summary>
 public sealed class SchemataResourceBuilder : IExpressionLanguageBuilder, IResourceBuilder
 {
-    private const string RegistryKey      = "Schemata.Resource.Registry";
-    private const string RegistrarKey    = "Schemata.Resource.PipelineRegistrar";
 
     /// <summary>
     ///     Initializes a new instance with the Schemata options and service collection.
@@ -28,7 +26,7 @@ public sealed class SchemataResourceBuilder : IExpressionLanguageBuilder, IResou
     public SchemataResourceBuilder(SchemataOptions schemata, IServiceCollection services) {
         Schemata = schemata;
         Services = services;
-        Registry = GetOrAddRegistry(schemata, services);
+        Registry = ResourceRegistry.GetOrAdd(schemata, services);
         var registrations = Schemata.Get<Dictionary<IResourceBuilder, ResourceSecurityRegistration>>(nameof(ResourceSecurityRegistration)) ?? new();
         Schemata.Set(nameof(ResourceSecurityRegistration), registrations);
         registrations[this] = new(
@@ -65,6 +63,11 @@ public sealed class SchemataResourceBuilder : IExpressionLanguageBuilder, IResou
 
     public ExpressionLanguageProfile Languages { get; } = new();
 
+    public SchemataResourceBuilder WithAuthorization<TEntity>() where TEntity : class, ICanonicalName {
+        Registry.ActivateAuthorization(Services, typeof(TEntity));
+        return this;
+    }
+
     /// <summary>
     ///     Adds a feature to the Schemata configuration.
     /// </summary>
@@ -76,32 +79,34 @@ public sealed class SchemataResourceBuilder : IExpressionLanguageBuilder, IResou
 
 
     /// <summary>
-    ///     Globally suppresses create-request validation
+    ///     Excludes the create-request validation stage from every resource
     ///     per <seealso href="https://google.aip.dev/133">AIP-133: Standard methods: Create</seealso>.
+    ///     A <c>ValidateOnly</c> create request still terminates as a dry-run.
     /// </summary>
     /// <returns>This builder for chaining.</returns>
     public SchemataResourceBuilder WithoutCreateValidation() {
-        Services.Configure<SchemataResourceOptions>(o => o.SuppressCreateValidation = true);
+        Registry.WithoutCreateValidation(Services);
         return this;
     }
 
     /// <summary>
-    ///     Globally suppresses update-request validation
+    ///     Excludes the update-request validation stage from every resource
     ///     per <seealso href="https://google.aip.dev/134">AIP-134: Standard methods: Update</seealso>.
+    ///     A <c>ValidateOnly</c> update request still terminates as a dry-run.
     /// </summary>
     /// <returns>This builder for chaining.</returns>
     public SchemataResourceBuilder WithoutUpdateValidation() {
-        Services.Configure<SchemataResourceOptions>(o => o.SuppressUpdateValidation = true);
+        Registry.WithoutUpdateValidation(Services);
         return this;
     }
 
     /// <summary>
-    ///     Globally suppresses freshness (ETag) checks and generation
+    ///     Excludes the freshness (ETag) check and response stages from every resource
     ///     per <seealso href="https://google.aip.dev/154">AIP-154: Resource freshness validation</seealso>.
     /// </summary>
     /// <returns>This builder for chaining.</returns>
     public SchemataResourceBuilder WithoutFreshness() {
-        Services.Configure<SchemataResourceOptions>(o => o.SuppressFreshness = true);
+        Registry.WithoutFreshness(Services);
         return this;
     }
 
@@ -125,8 +130,8 @@ public sealed class SchemataResourceBuilder : IExpressionLanguageBuilder, IResou
 
     /// <summary>
     ///     Registers a resource, restricting it to the transports selected through
-    ///     <paramref name="transports" />. A <see langword="null" /> or empty selector exposes the
-    ///     resource on every registered endpoint, matching the no-argument overload.
+    ///     <paramref name="transports" />. A <see langword="null" /> or empty selector uses the
+    ///     entity's endpoint declarations, or every registered endpoint when none are declared.
     /// </summary>
     /// <typeparam name="TEntity">The persistent entity type.</typeparam>
     /// <typeparam name="TRequest">The request DTO type.</typeparam>
@@ -171,7 +176,16 @@ public sealed class SchemataResourceBuilder : IExpressionLanguageBuilder, IResou
         var detail  = typeof(TDetail);
         var summary = typeof(TSummary);
 
-        var resource = entity.GetCustomAttribute<ResourceAttribute>() ?? new(entity, request, detail, summary);
+        var declared = entity.GetCustomAttribute<ResourceAttribute>();
+        var resource = new ResourceAttribute(entity, request, detail, summary) {
+            Endpoints = declared?.Endpoints,
+            Operations = declared?.Operations,
+            Methods = declared?.Methods,
+            AuthenticationScheme = declared?.AuthenticationScheme,
+            DefaultPageSize = declared?.DefaultPageSize ?? 0,
+            MaxPageSize = declared?.MaxPageSize ?? 0,
+        };
+        if (declared?.ConfiguredTotalSize is { } totalSize) resource.TotalSize = totalSize;
 
         return Register(resource, endpoints, configure);
     }
@@ -206,15 +220,21 @@ public sealed class SchemataResourceBuilder : IExpressionLanguageBuilder, IResou
         IList<string>?             endpoints,
         Action<ResourceAttribute>? configure
     ) {
-        if (endpoints is null) {
-            resource.Endpoints = null;
-        } else if (resource.Endpoints is null) {
-            resource.Endpoints = endpoints;
-        } else {
-            foreach (var endpoint in endpoints) {
-                resource.Endpoints.Add(endpoint);
-            }
-        }
+        var input = resource;
+        resource = new(input.Entity, input.Request, input.Detail, input.Summary) {
+            Operations = input.Operations?.ToArray(),
+            Methods = input.Methods?.Select(method => new ResourceMethodAttribute(method.Verb, method.Handler, method.Scope) {
+                Method = method.Method,
+            }).ToList(),
+            AuthenticationScheme = input.AuthenticationScheme,
+            DefaultPageSize = input.DefaultPageSize,
+            MaxPageSize = input.MaxPageSize,
+        };
+        if (input.ConfiguredTotalSize is { } totalSize) resource.TotalSize = totalSize;
+
+        resource.Endpoints = endpoints is null ? null
+            : input.Endpoints is null ? new List<string>(endpoints)
+            : input.Endpoints.Concat(endpoints).Distinct(StringComparer.Ordinal).ToList();
 
         configure?.Invoke(resource);
 
@@ -229,19 +249,4 @@ public sealed class SchemataResourceBuilder : IExpressionLanguageBuilder, IResou
         return this;
     }
 
-    private static ResourceRegistry GetOrAddRegistry(SchemataOptions schemata, IServiceCollection services) {
-        // Flow, Report and Scheduling each construct their own builder to register their own
-        // resources, so the registry cannot belong to any one builder. It is created on the first
-        // one and handed to the rest through the options bag, which is the only state every builder
-        // over one host already shares.
-        var registry = schemata.Get<ResourceRegistry>(RegistryKey);
-        if (registry is not null) {
-            return registry;
-        }
-
-        registry = new();
-        schemata.Set(RegistryKey, registry);
-        services.AddSingleton<ResourceRegistry>(registry);
-        return registry;
-    }
 }

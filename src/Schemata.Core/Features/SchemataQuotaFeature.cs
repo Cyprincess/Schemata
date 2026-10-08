@@ -16,9 +16,11 @@ namespace Schemata.Core.Features;
 public sealed class SchemataQuotaFeature : FeatureBase
 {
     /// <summary>
-    ///     Default middleware priority for rate limiting.
+    ///     Default middleware priority for rate limiting. Rate limiting runs after authentication
+    /// and authorization so the limiter can partition on the authenticated subject (and tenancy
+    /// binding) rather than only the remote IP.
     /// </summary>
-    public const int DefaultPriority = SchemataRoutingFeature.DefaultPriority + 10_000_000;
+    public const int DefaultPriority = SchemataAuthenticationFeature.DefaultPriority + 5_000_000;
 
     public override int Priority => DefaultPriority;
 

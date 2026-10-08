@@ -23,8 +23,9 @@ public sealed class ResourceCreateAccessAdvisor<TEntity, TRequest>(IAccessProvid
     ) {
         if (!AnonymousAccess.IsAnonymous<TEntity>(nameof(Operations.Create))) {
             await AuthorizeHelper.EnsureAsync(access,
-                new() { Operation = nameof(Operations.Create), Request = request },
-                request.Name ?? string.Empty, principal, ct);
+                entity,
+                new() { Operation = nameof(Operations.Create), Request = request, Stage = AccessStage.Instance, Name = entity.CanonicalName },
+                entity.CanonicalName ?? string.Empty, principal, ct);
         }
 
         return AdviseResult.Continue;

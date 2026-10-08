@@ -1,14 +1,18 @@
 using System.Linq;
+using LinqToDB;
+using LinqToDB.Data;
+using Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
 using Xunit;
 
 namespace Schemata.Entity.LinqToDB.Integration.Tests;
 
+[Trait("Category", "Unit")]
 public class EstimateQueriesShould
 {
     [Theory]
     [InlineData("PostgreSQL.17", "PostgreSql")]
     [InlineData("MySql.8", "MySql")]
-    [InlineData("MariaDB.11", "MySql")]
+    [InlineData("MariaDB.11", "None")]
     [InlineData("SqlServer.2022", "SqlServer")]
     [InlineData("SQLite.MS", "Sqlite")]
     [InlineData("Oracle", "None")]
@@ -17,35 +21,25 @@ public class EstimateQueriesShould
     }
 
     [Fact]
-    public void TryParsePostgreSql_RecordedPlan_ReturnsPlanRows() {
-        const string json = "[{\"Plan\":{\"Node Type\":\"Seq Scan\",\"Plan Rows\":42}}]";
+    public void IsTableRoot_ChangedCardinalityOrProjection_RejectsQuery() {
+        using var connection = new DataConnection(new DataOptions().UseSQLite("Data Source=:memory:"));
+        var table = connection.GetTable<Student>().TableName("Students");
 
-        var parsed = EstimateQueries.TryParsePostgreSql(json, out var rows);
-
-        Assert.True(parsed);
-        Assert.Equal(42L, rows);
-    }
-
-    [Theory]
-    [InlineData("{\"query_block\":{\"rows_examined_per_scan\":31}}", 31)]
-    [InlineData("{\"query_block\":{\"nested_loop\":[{\"rows_produced_per_join\":17}]}}", 17)]
-    public void TryParseMySql_RecordedPlan_ReturnsEstimatedRows(string json, long expected) {
-        var parsed = EstimateQueries.TryParseMySql(json, out var rows);
-
-        Assert.True(parsed);
-        Assert.Equal(expected, rows);
-    }
-
-    [Theory]
-    [InlineData("{}")]
-    [InlineData("not-json")]
-    public void Parsers_MalformedOrMissingPlan_ReturnFalse(string json) {
-        Assert.False(EstimateQueries.TryParsePostgreSql(json, out _));
-        Assert.False(EstimateQueries.TryParseMySql(json, out _));
+        Assert.True(EstimateQueries.IsTableRoot<Student>(table.OfType<Student>().Expression, "Students"));
+        Assert.False(EstimateQueries.IsTableRoot<Student>(table.Where(item => item.Grade == 2).Expression, "Students"));
+        Assert.False(EstimateQueries.IsTableRoot<Student>(table.Take(1).Expression, "Students"));
+        Assert.False(EstimateQueries.IsTableRoot<Student>(table.Select(item => item.Grade).Expression, "Students"));
+        Assert.False(EstimateQueries.IsTableRoot<Student>(table.Concat(table).Expression, "Students"));
+        Assert.False(EstimateQueries.IsTableRoot<Student>(table.TableName("OtherStudents").Expression, "Students"));
     }
 
     [Fact]
-    public void HasWhere_WhereExpression_ReturnsTrue() {
-        Assert.True(EstimateQueries.HasWhere(new[] { 1 }.AsQueryable().Where(value => value == 1).Expression));
+    public void HasMySqlUnsupportedShape_LimitOrGrouping_RejectsQuery() {
+        var query = new[] { 1, 2 }.AsQueryable();
+
+        Assert.True(EstimateQueries.HasMySqlUnsupportedShape(query.Take(1).Expression));
+        Assert.True(EstimateQueries.HasMySqlUnsupportedShape(query.Skip(1).Expression));
+        Assert.True(EstimateQueries.HasMySqlUnsupportedShape(query.GroupBy(value => value).Expression));
+        Assert.False(EstimateQueries.HasMySqlUnsupportedShape(query.Where(value => value > 1).Expression));
     }
 }

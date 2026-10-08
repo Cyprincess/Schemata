@@ -15,7 +15,7 @@ namespace Schemata.Resource.Foundation.Advisors;
 /// <typeparam name="TEntity">The entity type being updated.</typeparam>
 /// <typeparam name="TRequest">The request DTO type carrying update data.</typeparam>
 /// <typeparam name="TDetail">The resource detail response type.</typeparam>
-public sealed class ResourceUpdateResponsePipelineAdvisor<TEntity, TRequest, TDetail>(IEntityTagProvider entityTags)
+public sealed class ResourceUpdateResponsePipelineAdvisor<TEntity, TRequest, TDetail>
     : IRequestPipelineAdvisor<UpdateResourceRequest<TEntity, TRequest, TDetail>, UpdateResultBase<TDetail>>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
@@ -32,7 +32,7 @@ public sealed class ResourceUpdateResponsePipelineAdvisor<TEntity, TRequest, TDe
         CancellationToken                                     ct
     ) {
         var response = await next(ct);
-        ResourceDetailResponsePipelineAdvisor.Shape<TEntity, TDetail>(entityTags, ctx, response.Detail);
+        ResourceDetailResponsePipelineAdvisor.Shape<TEntity, TDetail>(ctx, response.Detail);
         return response;
     }
 

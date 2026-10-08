@@ -13,7 +13,7 @@ namespace Schemata.Identity.Foundation.Advisors;
 public sealed class AdviceRequestConfirmValidation : IIdentityRequestAdvisor<ConfirmRequest>
 {
     /// <summary>Default order for account-confirmation request validation.</summary>
-    public const int DefaultOrder = AdviceRequestFeature.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = Schemata.Abstractions.SchemataConstants.Orders.Base + 10_000_000;
 
     #region IIdentityRequestAdvisor<ConfirmRequest> Members
 

@@ -21,21 +21,25 @@ public class SchedulingFoundationShould
         var executions = new Mock<IRepository<SchemataJobExecution>>();
         executions.Setup(current => current.AddAsync(
                        It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
-        executions.Setup(current => current.CommitAsync(It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
+                  .ReturnsAsync(MutationResult.Applied);
+        var unit = new Mock<IUnitOfWork>(MockBehavior.Strict);
+        unit.Setup(u => u.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        unit.Setup(u => u.DisposeAsync()).Returns(ValueTask.CompletedTask);
+        executions.Setup(current => current.Begin()).Returns(unit.Object);
 
         var events = new Mock<IEventBus>();
         await using var services = new ServiceCollection()
+            .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
             .AddSingleton(registry.Object)
             .AddSingleton(executions.Object)
+            .AddSingleton(Mock.Of<IRepository<SchemataJob>>())
             .AddSingleton(events.Object)
             .AddSchemataScheduling()
             .BuildServiceProvider();
         var scheduler = services.GetRequiredService<IScheduler>();
         await scheduler.StartAsync(CancellationToken.None);
 
-        var execution = await scheduler.TriggerAsync<SampleJob>(new JobContext {
+        var execution = await scheduler.TriggerAsync<SampleJob>(new() {
             Job       = "jobs/sample",
             StartTime = DateTime.UtcNow.AddHours(1),
         }, CancellationToken.None);

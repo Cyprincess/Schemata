@@ -15,32 +15,28 @@ namespace Schemata.Abstractions.Exceptions;
 ///     <c>google.rpc.Code</c> maps <c>INVALID_ARGUMENT</c> to HTTP 400, which is the default
 ///     <see cref="InvalidArgumentException" /> uses.
 ///     Attaches <see cref="ErrorReasons.ValidationFailed" /> on
-///     <see cref="ErrorInfoDetail" />; each field-level violation is surfaced through
 ///     <see cref="BadRequestDetail.FieldViolations" />.
 /// </remarks>
 public sealed class ValidationException : SchemataException
 {
+    /// <inheritdoc />
+    public override string? Domain => ErrorDomains.Validation;
+
     /// <summary>
-    ///     Initializes a new <see cref="ValidationException" /> carrying field-level violations
-    ///     wrapped in a <see cref="BadRequestDetail" />.
+    ///     Initializes a validation failure carrying field-level violations.
     /// </summary>
-    /// <param name="errors">Individual field violations that caused the validation failure.</param>
-    /// <param name="code">HTTP response status code.</param>
-    /// <param name="status">Canonical error code from <c>google.rpc.Code</c>.</param>
-    /// <param name="message">Developer-oriented diagnostic message.</param>
-    /// <param name="reason">
-    ///     Domain-specific reason attached to <see cref="ErrorInfoDetail.Reason" />.
-    ///     Defaults to <see cref="ErrorReasons.ValidationFailed" />.
-    /// </param>
+    /// <param name="errors">Individual field violations.</param>
+    /// <param name="resourceKey">The message template; the reason stays <see cref="ErrorReasons.ValidationFailed" />.</param>
+    /// <param name="args">Optional named arguments substituted into the template.</param>
     public ValidationException(
         IEnumerable<ErrorFieldViolation> errors,
-        int                              code    = 422,
-        string?                          status  = ErrorCodes.InvalidArgument,
-        string?                          message = null,
-        string?                          reason  = ErrorReasons.ValidationFailed
-    ) : base(code, status, message ?? SchemataResources.GetResourceString(SchemataResources.VALIDATION_ERROR)) {
-        Details = reason is { Length: > 0 }
-            ? [new ErrorInfoDetail { Reason = reason }, new BadRequestDetail { FieldViolations = errors.ToList() }]
-            : [new BadRequestDetail { FieldViolations = errors.ToList() }];
+        string resourceKey = SchemataResources.VALIDATION_ERROR,
+        IReadOnlyDictionary<string, string?>? args = null
+    ) : base(422, ErrorCodes.InvalidArgument, LocalizedMessageFormatter.FormatInvariant(resourceKey, args)) {
+        Details = [
+            new ErrorInfoDetail { Reason = ErrorReasons.ValidationFailed },
+            new BadRequestDetail { FieldViolations = errors.ToList() },
+        ];
+        AttachMetadata(args);
     }
 }

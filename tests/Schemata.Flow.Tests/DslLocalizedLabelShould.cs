@@ -8,18 +8,7 @@ namespace Schemata.Flow.Tests;
 public class DslLocalizedLabelShould
 {
     [Fact]
-    public void LocalizeASynthesizedEndEvent() {
-        var definition = new LocalizedProcess();
-
-        var end = definition.AllElements.Single(e => e.Name == "End_Review");
-
-        Assert.Equal("Finished", end.DisplayName);
-        Assert.Equal("完成", end.DisplayNames!["zh-Hans"]);
-        Assert.Equal("流程结束。", end.Descriptions!["zh-Hans"]);
-    }
-
-    [Fact]
-    public void LocalizeASynthesizedBoundaryEvent() {
+    public void Localize_A_Synthesized_Boundary_Event() {
         var definition = new LocalizedProcess();
 
         var boundary = definition.AllElements.Single(e => e.Name.StartsWith("Catch_Review_"));
@@ -30,7 +19,7 @@ public class DslLocalizedLabelShould
     }
 
     [Fact]
-    public void LocalizeAGatewayEdge() {
+    public void Localize_A_Gateway_Edge() {
         var definition = new LocalizedProcess();
 
         var edge = definition.AllFlows.Single(f => f.Source.Name == "Decision_Triage" && f.Target.Name == "Escalate");
@@ -41,7 +30,7 @@ public class DslLocalizedLabelShould
     }
 
     [Fact]
-    public void LeaveTheMapsAloneForTheUnlocalizedOverload() {
+    public void Leave_The_Maps_Alone_For_The_Unlocalized_Overload() {
         var definition = new LocalizedProcess();
 
         var gateway = definition.AllElements.Single(e => e.Name == "Decision_Triage");

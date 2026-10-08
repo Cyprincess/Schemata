@@ -43,6 +43,7 @@ public class ReportServiceIntegrationShould : IClassFixture<WebAppFactory>
         var pending = await reports.GenerateAsync(new() { Name = "dsl-records", Persist = true });
         Assert.False(pending.Done);
 
+        Assert.NotNull(pending.CanonicalName);
         var completed = await WaitForDoneAsync(operations, pending.CanonicalName!);
         var result    = ReportResults.FromOperation(completed);
         Assert.NotNull(result.Snapshot);
@@ -56,18 +57,21 @@ public class ReportServiceIntegrationShould : IClassFixture<WebAppFactory>
         var operations  = scope.ServiceProvider.GetRequiredService<IOperationService>();
         var snapshots   = scope.ServiceProvider.GetRequiredService<IReportSnapshotStore>();
         var executions  = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
+        var jobs = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJob>>();
+        var job = await jobs.FirstOrDefaultAsync(query => query.Where(row => row.Key == "report:periodic-records"));
+        Assert.NotNull(job);
 
         var armed = await executions.FirstOrDefaultAsync(
-                        query => query.Where(execution => execution.Job == "jobs/report-periodic-records"
+                        query => query.Where(execution => execution.Job == job.CanonicalName
                                                        && execution.State == ExecutionState.Pending));
         Assert.NotNull(armed);
 
-        var before = await ListSnapshotsAsync(snapshots, "periodic-records");
+        var before = await ListSnapshotsAsync(snapshots, "reports/periodic-records");
         var first  = await TriggerAsync(scheduler, operations);
         var second = await TriggerAsync(scheduler, operations);
 
         Assert.NotEqual(first, second);
-        var after = await ListSnapshotsAsync(snapshots, "periodic-records");
+        var after = await ListSnapshotsAsync(snapshots, "reports/periodic-records");
         Assert.True(after.Count >= before.Count + 2,
                     $"Expected at least {before.Count + 2} snapshots after two triggers, found {after.Count}.");
         Assert.Contains(after, snapshot => snapshot.CanonicalName == first);
@@ -115,7 +119,9 @@ public class ReportServiceIntegrationShould : IClassFixture<WebAppFactory>
                                 },
                             },
                             CancellationToken.None);
+        Assert.NotNull(execution.CanonicalName);
         var result = ReportResults.FromOperation(await WaitForDoneAsync(operations, execution.CanonicalName!));
+        Assert.NotNull(result.Snapshot);
         return result.Snapshot!;
     }
 

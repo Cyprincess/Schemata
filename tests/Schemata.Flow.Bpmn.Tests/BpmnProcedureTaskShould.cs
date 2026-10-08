@@ -15,12 +15,39 @@ namespace Schemata.Flow.Bpmn.Tests;
 
 public class BpmnProcedureTaskShould
 {
+    [Trait("Layer", "Unit")]
+    [Fact]
+    [Trait("Category", "Unit")]
+    public async Task Procedure_Cancellation_Reaches_Body_And_Stops_Outgoing_Task() {
+        using var cancellation = new CancellationTokenSource();
+        var reached = false;
+        FlowTaskContext? reachedContext = null;
+        var definition = Definition(new() {
+            Name = "procedure",
+            Body = (context, ct) => {
+                reachedContext = context;
+                reached = true;
+                cancellation.Cancel();
+                ct.ThrowIfCancellationRequested();
+                return ValueTask.CompletedTask;
+            },
+        });
+        var process = Process(definition);
+        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            new BpmnEngine().StartAsync(definition, process, cancellation.Token).AsTask());
+        Assert.True(reached);
+        Assert.Equal(cancellation.Token, error.CancellationToken);
+        Assert.NotNull(reachedContext);
+        Assert.NotEqual("next", reachedContext.Token.StateName);
+    }
+
     [Fact]
     public async Task Start_Procedure_Task_Executes_Body_And_Follows_Auto_Flow() {
         var executed = false;
-        var definition = Definition(new ProcedureTask {
+        var definition = Definition(new() {
             Name = "procedure",
-            Body = _ => {
+            Body = (_, ct) => {
+                ct.ThrowIfCancellationRequested();
                 executed = true;
                 return ValueTask.CompletedTask;
             },
@@ -46,7 +73,8 @@ public class BpmnProcedureTaskShould
         };
         var procedure = new ProcedureTask<int> {
             Name = "procedure",
-            Body = (_, value) => {
+            Body = (_, value, ct) => {
+                ct.ThrowIfCancellationRequested();
                 payload = value;
                 return ValueTask.CompletedTask;
             },
@@ -126,7 +154,7 @@ public class BpmnProcedureTaskShould
             definition,
             process,
             started.Tokens,
-            new FlowExecutionContext(Mock.Of<IUnitOfWork>(), services),
+            Schemata.Flow.Tests.FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), services),
             message,
             42,
             token.CanonicalName,
@@ -166,7 +194,7 @@ public class BpmnProcedureTaskShould
                       It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(),
                       It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<T>, IQueryable<T>> query, CancellationToken _) =>
-                      new ValueTask<T?>(query(data.AsQueryable()).SingleOrDefault()));
+                      new(query(data.AsQueryable()).SingleOrDefault()));
         return repository;
     }
 

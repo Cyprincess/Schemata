@@ -3,7 +3,7 @@ using System;
 namespace Schemata.Tenancy.Skeleton;
 
 /// <summary>
-///     Caches per-tenant <see cref="IServiceProvider" /> instances keyed by tenant identifier string.
+///     Caches tenant providers by identity and authoritative version.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -13,8 +13,14 @@ namespace Schemata.Tenancy.Skeleton;
 ///         lease for that entry has been released.
 ///     </para>
 ///     <para>
-///         Implementations must dispose retired providers that implement <see cref="IDisposable" />
-///         exactly once, the moment the active lease count reaches zero.
+///         Implementations must attempt disposal of retired providers that implement
+///         <see cref="IDisposable" /> or <see cref="IAsyncDisposable" /> exactly once,
+///         the moment the active lease count reaches zero.
+///     </para>
+///     <para>
+///         Cleanup attempts every eligible retired provider before propagating failures.
+///         A failed acquisition releases only its undelivered lease; outstanding handles
+///         retain their provider until their own release.
 ///     </para>
 /// </remarks>
 public interface ITenantProviderCache
@@ -24,7 +30,7 @@ public interface ITenantProviderCache
     ///     <paramref name="factory" /> for a cache miss. The caller must dispose the returned
     ///     lease when the tenant scope it backs is disposed.
     /// </summary>
-    ITenantProviderLease Lease(string id, Func<IServiceProvider> factory);
+    ITenantProviderLease Lease(string id, Guid version, Func<IServiceProvider> factory);
 
     /// <summary>
     ///     Retires the entry for <paramref name="id" /> from the cache. The provider is disposed

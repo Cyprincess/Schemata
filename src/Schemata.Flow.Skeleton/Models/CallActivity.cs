@@ -7,8 +7,25 @@ namespace Schemata.Flow.Skeleton.Models;
 /// </summary>
 public sealed class CallActivity : Activity
 {
+    private string _calledElement = null!;
+    private string _definitionVersion = "1";
+
     /// <summary>
     ///     The name of the <see cref="ProcessDefinition" /> to invoke.
     /// </summary>
-    public string CalledElement { get; set; } = null!;
+    public string CalledElement {
+        get => _calledElement;
+        set {
+            EnsureMutable();
+            _calledElement = value;
+        }
+    }
+
+    public string DefinitionVersion {
+        get => _definitionVersion;
+        set {
+            EnsureMutable();
+            _definitionVersion = value;
+        }
+    }
 }

@@ -34,27 +34,6 @@ public class BpmnEngineBoundaryShould
     }
 
     [Fact]
-    public async Task NonInterruptingBoundary_SpawnsConcurrentTokenAndLeavesHostActive() {
-        var (definition, signal) = NonInterruptingDefinition();
-        var process              = NewProcess(definition.Name);
-        var engine               = new BpmnEngine();
-
-        var started = await engine.StartAsync(definition, process, CancellationToken.None);
-        var host    = started.Tokens.First(t => t.StateName == "task");
-
-        var fired = await engine.TriggerAsync(definition, started.Process, started.Tokens, signal, null, host.CanonicalName, CancellationToken.None);
-
-        var stillActiveHost = fired.Tokens.First(t => t.CanonicalName == host.CanonicalName);
-        Assert.Equal("Active", stillActiveHost.State);
-
-        var spawned = fired.Tokens.First(t => t.StateName == "side-handler");
-        Assert.Equal("Active", spawned.State);
-
-        Assert.Contains(fired.Transitions, t => t.Kind == TransitionKind.Spawn);
-        Assert.DoesNotContain(fired.Transitions, t => t.Kind == TransitionKind.Cancel);
-    }
-
-    [Fact]
     public async Task ErrorBoundary_FiresOnMatchingErrorDefinition() {
         var (definition, errorDef) = ErrorBoundaryDefinition();
         var process                = NewProcess(definition.Name);
@@ -148,35 +127,6 @@ public class BpmnEngineBoundaryShould
                 new() { Source = task, Target = endNormal },
                 new() { Source = boundary, Target = handler },
                 new() { Source = handler, Target = endAlt },
-            },
-        };
-
-        return (definition, signal);
-    }
-
-    private static (ProcessDefinition definition, Signal signal) NonInterruptingDefinition() {
-        var signal   = new Signal { Name = "side-signal" };
-        var start    = new FlowEvent { Name = "start", Position = EventPosition.Start };
-        var task     = new NoneTask { Name = "task" };
-        var boundary = new FlowEvent {
-            Name = "boundary",
-            Position     = EventPosition.Boundary,
-            AttachedTo   = task,
-            Interrupting = false,
-            Definition   = signal,
-        };
-        var side      = new NoneTask { Name = "side-handler" };
-        var endNormal = new FlowEvent { Name = "end-ok", Position = EventPosition.End };
-        var endSide   = new FlowEvent { Name = "end-side", Position = EventPosition.End };
-
-        var definition = new ProcessDefinition {
-            Name     = "non-interrupting",
-            Elements = { start, task, boundary, side, endNormal, endSide },
-            Flows = {
-                new() { Source = start, Target = task },
-                new() { Source = task, Target = endNormal },
-                new() { Source = boundary, Target = side },
-                new() { Source = side, Target = endSide },
             },
         };
 

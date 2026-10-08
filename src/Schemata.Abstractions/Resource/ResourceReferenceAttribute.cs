@@ -4,12 +4,10 @@ using Schemata.Abstractions.Entities;
 namespace Schemata.Abstractions.Resource;
 
 /// <summary>
-///     Marks a property as a cross-resource reference (mode B) carrying a full
-///     <seealso href="https://google.aip.dev/122">AIP-122</seealso> canonical name
-///     of an independent resource. The framework wires foreign-key relationships
-///     against <see cref="ICanonicalName.CanonicalName" /> when <see cref="Target" />
-///     is provided, and validates resolvability via
-///     <see cref="IResourceTypeResolver" /> at write time.
+///     Marks a property carrying a full canonical resource reference. Repository advisors
+///     validate type resolvability through <see cref="IResourceTypeResolver" /> and optionally
+///     validate target existence. Database foreign keys, unique indexes and cascades remain
+///     application mapping responsibilities.
 /// </summary>
 /// <remarks>
 ///     This is distinct from identity-composing parents (mode A), which the framework
@@ -31,10 +29,8 @@ public sealed class ResourceReferenceAttribute : Attribute
     }
 
     /// <summary>
-    ///     Initializes a typed reference to a known entity type. The ORM bridge emits a
-    ///     foreign-key to <see cref="ICanonicalName.CanonicalName" /> on
-    ///     <paramref name="target" /> (an alternate key on the principal side), and
-    ///     write-time validation requires the resolved type to equal <paramref name="target" />.
+    ///     Initializes a typed logical reference. Write-time validation requires the resolved
+    ///     resource type to equal <paramref name="target" />.
     /// </summary>
     /// <param name="target">The referenced entity type.</param>
     public ResourceReferenceAttribute(Type target) {
@@ -54,11 +50,10 @@ public sealed class ResourceReferenceAttribute : Attribute
     ///     surfaces as <c>NOT_FOUND</c> for the target type.
     /// </summary>
     /// <remarks>
-    ///     Existence validation is performed by
-    ///     <c>Schemata.Entity.Owner.Advisors.AdviceValidateResourceReferenceExistence{TEntity}</c>
-    ///     and therefore activates only when the ownership pipeline (<c>UseOwner()</c>) is
-    ///     registered. The referenced entity must implement <see cref="ICanonicalName" />
-    ///     and have its <c>IRepository{T}</c> registered in the container.
+    ///     Repository mutation advisors perform existence validation independently of ownership
+    ///     filtering when this property opts in. The referenced entity must implement
+    ///     <see cref="ICanonicalName" /> and have its repository registered. The check does not
+    ///     prevent a concurrent target deletion after validation.
     /// </remarks>
     public bool ValidateExistence { get; set; }
 }

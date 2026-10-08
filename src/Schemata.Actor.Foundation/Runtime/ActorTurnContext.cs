@@ -29,15 +29,20 @@ internal sealed class ActorTurnContext(
 
     public Task<IActorRef> SpawnAsync(Props props) => owner.SpawnChildAsync(props);
 
-    public Task ScheduleAsync(IMessage message, TimeSpan delay) {
+    public Task<ActorReminder> ScheduleAsync(IMessage message, TimeSpan delay, string reminderName) {
         var reminders = Services.GetService<IActorReminders>();
         if (reminders is null) {
             throw new InvalidOperationException(
                 "IActorContext.ScheduleAsync requires the Actor.Scheduling capability: no IActorReminders is registered.");
         }
 
-        return reminders.ScheduleAsync(Self, message, delay, Guid.NewGuid().ToString("N"));
+        return reminders.ScheduleAsync(Self, message, delay, reminderName);
     }
+
+    public void RegisterTimer(string name, Func<IActorContext, ValueTask> callback, TimeSpan dueTime, TimeSpan? period = null) =>
+        owner.RegisterTimer(name, callback, dueTime, period);
+
+    public void CancelTimer(string name) => owner.CancelTimer(name);
 
     public ValueTask ReplyAsync<TResponse>(TResponse response, CancellationToken ct = default) {
         if (correlationId != Guid.Empty) {

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Entities;
 using Schemata.Common;
@@ -13,7 +14,7 @@ public sealed class EventBranch : IDescriptive
 {
     private readonly IEventDefinition                  _eventDefinition;
     private          Branch[]?                         _decisionBranches;
-    private          Func<FlowTaskContext, ValueTask>? _onEnter;
+    private Func<FlowTaskContext, CancellationToken, ValueTask>? _onEnter;
     private          FlowElement?                      _target;
 
     internal EventBranch(IEventDefinition eventDefinition) { _eventDefinition = eventDefinition; }
@@ -35,7 +36,7 @@ public sealed class EventBranch : IDescriptive
     ///     the body runs when the catch fires and the token passes through the inserted sequence-flow node.
     /// </summary>
     /// <param name="body">The delegate executed by the inserted procedure task when the catch fires.</param>
-    public EventBranch OnEnter(Func<FlowTaskContext, ValueTask> body) {
+    public EventBranch OnEnter(Func<FlowTaskContext, CancellationToken, ValueTask> body) {
         _onEnter = body;
         return this;
     }

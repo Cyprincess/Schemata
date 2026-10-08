@@ -32,7 +32,7 @@ public class DefaultSchedulerTriggerShould
 
         // The scheduler begins stopped; a fire accepted here would never be drained.
         await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await harness.Scheduler.TriggerAsync<SampleJob>(new JobContext(), CancellationToken.None));
+            async () => await harness.Scheduler.TriggerAsync<SampleJob>(new(), CancellationToken.None));
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public class DefaultSchedulerTriggerShould
         var harness = await StartedHarness();
 
         var execution = await harness.Scheduler.TriggerAsync<SampleJob>(
-            new JobContext { Job = "jobs/sample" }, CancellationToken.None);
+            new() { Job = "jobs/sample" }, CancellationToken.None);
 
         Assert.Equal(ExecutionState.Pending, execution.State);
         Assert.Same(execution, Assert.Single(harness.Persisted));
@@ -51,7 +51,7 @@ public class DefaultSchedulerTriggerShould
         var harness = await StartedHarness();
 
         var execution = await harness.Scheduler.TriggerAsync<SampleJob>(
-            new JobContext { Job = "jobs/sample" }, CancellationToken.None);
+            new() { Job = "jobs/sample" }, CancellationToken.None);
 
         Assert.Equal($"operations/{execution.Name}", execution.CanonicalName);
         Assert.Equal("jobs/sample", execution.Job);
@@ -76,12 +76,10 @@ public class DefaultSchedulerTriggerShould
         var uid     = Guid.NewGuid();
 
         var execution = await harness.Scheduler.TriggerAsync<SampleJob>(
-            new JobContext { Job = "jobs/sample", ExecutionUid = uid }, CancellationToken.None);
+            new() { Job = "jobs/sample", ExecutionUid = uid }, CancellationToken.None);
 
-        // The caller owns the operation name when it supplies one, so a client that pre-computed
-        // operations/{uid} can address the row it is about to create.
         Assert.Equal(uid, execution.Uid);
-        Assert.Equal(uid.ToString("n"), execution.Name);
+        Assert.Equal("consumer-execution", execution.Name);
     }
 
     [Fact]
@@ -89,7 +87,7 @@ public class DefaultSchedulerTriggerShould
         var harness = await StartedHarness();
 
         var execution = await harness.Scheduler.TriggerAsync<SampleJob>(
-            new JobContext { Job = "jobs/sample" }, CancellationToken.None);
+            new() { Job = "jobs/sample" }, CancellationToken.None);
 
         Assert.Equal("sample-key", execution.JobKey);
     }
@@ -109,22 +107,27 @@ public class DefaultSchedulerTriggerShould
         var jobs = new Mock<IRepository<SchemataJob>>();
         jobs.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(), It.IsAny<CancellationToken>()))
             .Returns(new ValueTask<SchemataJob?>((SchemataJob?)null));
-        jobs.Setup(r => r.AddAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        jobs.Setup(r => r.UpdateAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        jobs.Setup(r => r.AddAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
+        jobs.Setup(r => r.UpdateAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
         jobs.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        jobs.Setup(r => r.Begin()).Returns(CommittingUnit);
 
         var executions = new Mock<IRepository<SchemataJobExecution>>();
         executions.Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(), It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> _, CancellationToken _) => Empty());
         executions.Setup(r => r.AddAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
-                  .Returns((SchemataJobExecution execution, CancellationToken _) => {
+                  .ReturnsAsync((SchemataJobExecution execution, CancellationToken _) => {
+                      execution.Name = "consumer-execution";
+                      execution.CanonicalName = "operations/consumer-execution";
                       harness.Persisted.Add(execution);
-                      return Task.CompletedTask;
+                      return MutationResult.Applied;
                   });
-        executions.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        executions.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
         executions.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        executions.Setup(r => r.Begin()).Returns(CommittingUnit);
 
         var services = new ServiceCollection()
+                      .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                       .AddSingleton(registry.Object)
                       .AddSingleton(jobs.Object)
                       .AddSingleton(executions.Object)
@@ -140,6 +143,13 @@ public class DefaultSchedulerTriggerShould
     private static async IAsyncEnumerable<SchemataJobExecution> Empty() {
         await Task.CompletedTask;
         yield break;
+    }
+
+    private static IUnitOfWork CommittingUnit() {
+        var unit = new Mock<IUnitOfWork>(MockBehavior.Strict);
+        unit.Setup(u => u.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        unit.Setup(u => u.DisposeAsync()).Returns(ValueTask.CompletedTask);
+        return unit.Object;
     }
 
     private sealed class Harness

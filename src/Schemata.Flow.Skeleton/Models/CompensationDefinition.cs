@@ -6,18 +6,34 @@ namespace Schemata.Flow.Skeleton.Models;
 ///     A BPMN Compensation event definition - triggers or throws compensation
 ///     for the activity referenced by <see cref="Activity" />.
 /// </summary>
-public sealed class CompensationDefinition : IEventDefinition
+public sealed class CompensationDefinition : FlowGraphNode, IEventDefinition
 {
+    private Activity? _activity;
+    private string _name = null!;
+
     /// <summary>
     ///     The activity whose compensation handler should be invoked.
     /// </summary>
-    public Activity? Activity { get; set; }
+    public Activity? Activity {
+        get => _activity;
+        set {
+            EnsureMutable();
+            _activity = value;
+        }
+    }
 
-    #region IEventDefinition Members
+    public string Name {
+        get => _name;
+        set {
+            EnsureMutable();
+            _name = value;
+        }
+    }
 
-    public string Name { get; set; } = null!;
-
-    #endregion
+    /// <inheritdoc />
+    protected internal override void FreezeCore() {
+        Activity?.Freeze();
+    }
 
     #region IDescriptive Members
 

@@ -33,13 +33,13 @@ public sealed class SchedulingEntryEquivalenceShould
         var facadeSpy     = new RecordingCommandAdvisor();
         var facadeHarness = await CreateStartedHarnessAsync(facadeSpy);
         var facadeExecution = await facadeHarness.Scheduler.TriggerAsync<SampleJob>(
-            new JobContext { Job = "sample" }, CancellationToken.None);
+            new() { Job = "sample" }, CancellationToken.None);
 
         var dispatcherSpy     = new RecordingCommandAdvisor();
         var dispatcherHarness = await CreateStartedHarnessAsync(dispatcherSpy);
         var dispatcher         = dispatcherHarness.Services.GetRequiredService<IRequestDispatcher>();
         var dispatcherExecution = await dispatcher.SendAsync<TriggerJobRequest, SchemataJobExecution>(
-            new("sample", typeof(SampleJob), new JobContext { Job = "sample" }), CancellationToken.None);
+            new("sample", typeof(SampleJob), new() { Job = "sample" }), CancellationToken.None);
 
         Assert.Equal(facadeExecution.JobKey, dispatcherExecution.JobKey);
         Assert.Equal(facadeExecution.Job, dispatcherExecution.Job);
@@ -55,12 +55,12 @@ public sealed class SchedulingEntryEquivalenceShould
     public async Task Trigger_Throw_The_Same_Exception_Type_Through_Both_Entries_When_The_Scheduler_Is_Stopped() {
         var facadeHarness = CreateHarness(null);
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            facadeHarness.Scheduler.TriggerAsync<SampleJob>(new JobContext { Job = "sample" }, CancellationToken.None));
+            facadeHarness.Scheduler.TriggerAsync<SampleJob>(new() { Job = "sample" }, CancellationToken.None));
 
         var dispatcherHarness = CreateHarness(null);
         var dispatcher         = dispatcherHarness.Services.GetRequiredService<IRequestDispatcher>();
         await Assert.ThrowsAsync<InvalidOperationException>(() => dispatcher.SendAsync<TriggerJobRequest, SchemataJobExecution>(
-            new("sample", typeof(SampleJob), new JobContext { Job = "sample" }), CancellationToken.None));
+            new("sample", typeof(SampleJob), new() { Job = "sample" }), CancellationToken.None));
     }
 
     private static async Task<Harness> CreateStartedHarnessAsync(IRequestPipelineAdvisor<TriggerJobRequest, SchemataJobExecution>? advisor) {
@@ -78,18 +78,21 @@ public sealed class SchedulingEntryEquivalenceShould
         var jobs = new Mock<IRepository<SchemataJob>>();
         jobs.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(), It.IsAny<CancellationToken>()))
             .Returns(new ValueTask<SchemataJob?>((SchemataJob?)null));
-        jobs.Setup(r => r.AddAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        jobs.Setup(r => r.UpdateAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        jobs.Setup(r => r.AddAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
+        jobs.Setup(r => r.UpdateAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
         jobs.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        jobs.Setup(r => r.Begin()).Returns(CommittingUnit);
 
         var executions = new Mock<IRepository<SchemataJobExecution>>();
         executions.Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(), It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> _, CancellationToken _) => Empty());
-        executions.Setup(r => r.AddAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        executions.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        executions.Setup(r => r.AddAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
+        executions.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
         executions.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        executions.Setup(r => r.Begin()).Returns(CommittingUnit);
 
         var collection = new ServiceCollection()
+                        .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                         .AddSingleton(registry.Object)
                         .AddSingleton(jobs.Object)
                         .AddSingleton(executions.Object)
@@ -110,6 +113,13 @@ public sealed class SchedulingEntryEquivalenceShould
     private static async IAsyncEnumerable<SchemataJobExecution> Empty() {
         await Task.CompletedTask;
         yield break;
+    }
+
+    private static IUnitOfWork CommittingUnit() {
+        var unit = new Mock<IUnitOfWork>(MockBehavior.Strict);
+        unit.Setup(u => u.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        unit.Setup(u => u.DisposeAsync()).Returns(ValueTask.CompletedTask);
+        return unit.Object;
     }
 
     private sealed class Harness

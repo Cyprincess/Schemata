@@ -2,7 +2,7 @@
 
 ## What you'll build
 
-A minimal `IExpressionCompiler` for a "Simple" filter language, registered through the expression language builder seam and enabled on a module. The compiler matches every row, so the focus stays on language registration, profile selection, and resource list integration.
+A small `IExpressionCompiler` for a "Simple" filter language, registered through the expression language builder seam and enabled on a module. Its grammar accepts `title = 'value'` and compares that value against the context's public `Title` property.
 
 ## Prerequisites
 
@@ -30,13 +30,14 @@ public sealed class SimpleTree : IExpressionTree
 }
 ```
 
-**Assertion:** `new SimpleTree("*").Language` is `"simple"`.
+`SimpleTree.Source` retains the expression text used to distinguish cached expressions.
 
 ## Step 2: Implement the compiler
 
 ```csharp
 using System;
 using System.Linq.Expressions;
+using System.Text.RegularExpressions;
 using Schemata.Expressions.Skeleton;
 
 public sealed class SimpleCompiler : IExpressionCompiler
@@ -59,6 +60,11 @@ public sealed class SimpleCompiler : IExpressionCompiler
             throw new NotSupportedException("SimpleCompiler only supports a bool result.");
         }
 
+        var match = Regex.Match(node.Source, "^title\\s*=\\s*'([^']*)'$", RegexOptions.CultureInvariant);
+        if (!match.Success) {
+            throw new ArgumentException("Expected title = 'value'.", nameof(tree));
+        }
+
         var key = ExpressionCacheKey.Create(
             Language,
             node.Source,
@@ -68,7 +74,8 @@ public sealed class SimpleCompiler : IExpressionCompiler
 
         return ExpressionCache.GetOrAddExpression(key, () => {
             var param = Expression.Parameter(typeof(TContext), "e");
-            var body = Expression.Constant(true);
+            var title = Expression.Property(param, "Title");
+            var body = Expression.Equal(title, Expression.Constant(match.Groups[1].Value));
             var lambda = Expression.Lambda<Func<TContext, bool>>(body, param);
             return (Expression<Func<TContext, TResult>>)(object)lambda;
         });
@@ -76,7 +83,7 @@ public sealed class SimpleCompiler : IExpressionCompiler
 }
 ```
 
-**Assertion:** `Parse("title = 'foo'")` returns a `SimpleTree`, and `Compile<Book, bool>(tree)` returns a lambda that evaluates to `true`.
+`Compile<Book, bool>(Parse("title = 'foo'"))` returns a predicate that accepts a book titled `foo` and rejects a different title. The example expects `Book` to expose `public string? Title { get; set; }`.
 
 ## Step 3: Register the language services
 
@@ -96,6 +103,7 @@ public static class SimpleServiceCollectionExtensions
         configure?.Invoke(options);
 
         services.AddKeyedSingleton<IExpressionCompiler, SimpleCompiler>(SimpleLanguage.Name);
+        services.AddKeyedSingleton<IExpressionReferenceProvider, SimpleReferenceProvider>(SimpleLanguage.Name);
         services.AddKeyedSingleton(
             SimpleLanguage.Name,
             new ExpressionLanguageDescriptor(
@@ -105,6 +113,29 @@ public static class SimpleServiceCollectionExtensions
                 SupportsValues: false));
 
         return services;
+    }
+}
+```
+
+`IExpressionReferenceProvider` reports accesses and structural result provenance before expression
+lowering. Insight's `PublicPlanValidator` resolves it through the language key when validating a
+plan, so a language without one cannot run as an Insight filter or selection expression. The
+reference provider reports a `Title` access and a scalar result for this grammar:
+
+```csharp
+using System.Collections.Generic;
+using Schemata.Expressions.Skeleton;
+
+public sealed class SimpleReferenceProvider : IExpressionReferenceProvider
+{
+    public ExpressionReferences Analyze(IExpressionTree tree) {
+        if (tree is not SimpleTree node) {
+            throw new System.ArgumentException("Tree must be a SimpleTree.", nameof(tree));
+        }
+
+        return new ExpressionReferences(
+            new List<ExpressionReference> { new(new object[] { "Title" }) },
+            new ExpressionShape.Scalar());
     }
 }
 ```
@@ -167,6 +198,44 @@ var matches = ExpressionCache.GetOrAddDelegate(filter)(book);
 ```
 
 **Assertion:** the compiled filter applies to an `IQueryable<Book>` and evaluates against a single `Book`.
+
+## Typed Flow execution
+
+Flow script tasks use the same compiler and cache. The execution path is implemented in
+`src/Schemata.Flow.Skeleton/Models/ScriptTask.cs`, `Models/BusinessRuleTask.cs`, and
+`Runtime/FlowTaskBinding.cs`. Install `AddCelExpressions()` and configure a concrete node before
+registering the process:
+
+```csharp
+using System.Globalization;
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Expressions.Cel;
+using Schemata.Flow.Skeleton.Models;
+
+services.AddCelExpressions();
+var compute = new ScriptTask<Order, long> {
+    Name = "compute",
+    Language = "cel",
+    Script = "amount * 2",
+    Input = (context, ct) => context.SourceAsync<Order>(ct),
+    Output = async (context, result, ct) => {
+        var order = await context.SourceAsync<Order>(ct);
+        order.TaskValue = result.ToString(CultureInfo.InvariantCulture);
+    },
+};
+```
+
+This fragment assumes the application `Order` entity implements `ICanonicalName`, exposes `long Amount`
+and `string? TaskValue`, and is declared as a source by the process. The Flow owner flushes the touched
+source in its outer transaction. A binding that calls an explicit resource mutation passes
+`context.UnitOfWork` and the supplied cancellation token.
+
+Application rules implement `IFlowRuleHandler<TInput, TResult>` and return
+`BusinessRuleResult<TResult>`. Register the handler under `(key, version)` with
+`AddKeyedSingleton<IFlowRuleHandler<TInput, TResult>, ApplicationRule>((key, version))` and configure
+`BusinessRuleTask<TInput, TResult>.Key`, `.Version`, `.Input`, and `.Output`. Rule keys and versions,
+compiler options, delegates, and output field tables are frozen with the published graph. Errors in
+language selection, handler selection, bindings, or results surface when the task executes.
 
 ## Resource list integration
 

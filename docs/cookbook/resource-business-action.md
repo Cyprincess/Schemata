@@ -18,7 +18,7 @@ The transition is synchronous and single-step, so the custom-method handler owns
 ## Prerequisites
 
 - An ASP.NET Core application using Schemata resources and an EF Core repository.
-- `Schemata.Resource.Foundation`, `Schemata.Resource.Http`, `Schemata.Resource.Grpc`, `Schemata.Security.Foundation`, `Schemata.Caching.Distributed`, `Schemata.Mapping.Mapster`, and `Schemata.Entity.EntityFrameworkCore`.
+- `Schemata.Resource.Foundation`, `Schemata.Resource.Http`, `Schemata.Resource.Grpc`, `Schemata.Security.Foundation`, `Schemata.Caching.Memory`, `Schemata.Mapping.Mapster`, and `Schemata.Entity.EntityFrameworkCore`.
 - An authorization policy implemented through `IAccessProvider<Course, PublishCourseRequest>` and, when row-level visibility is required, `IEntitlementProvider<Course, PublishCourseRequest>`.
 
 ## Step 1: Model the resource and action contract
@@ -102,15 +102,20 @@ public sealed class PublishCourseRequest : ICommand<CourseDetail>, ICanonicalNam
 
 public sealed class CoursePublishAccessProvider : IAccessProvider<Course, PublishCourseRequest>
 {
-    public Task<bool> HasAccessAsync(
+    public Task<AccessDecision> HasAccessAsync(
         Course?                             course,
         AccessContext<PublishCourseRequest> context,
         ClaimsPrincipal?                    principal,
         CancellationToken                   ct = default)
     {
+        if (principal?.Identity?.IsAuthenticated != true) {
+            return Task.FromResult(AccessDecision.Denied);
+        }
+
         return Task.FromResult(
-            principal?.Identity?.IsAuthenticated == true
-         && principal.HasClaim("permission", "course.publish"));
+            principal.HasClaim("permission", "course.publish")
+                ? AccessDecision.Allowed
+                : AccessDecision.Denied);
     }
 }
 ```
@@ -126,11 +131,12 @@ The resource pipeline first loads the target for instance authorization and fres
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Entities;
 using Schemata.Common.Errors;
 using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 
-public sealed class PublishCourseHandler(IRepository<Course> courses)
+public sealed class PublishCourseHandler(IRepository<Course> courses, IResourceMutation<Course> mutation)
     : IRequestHandler<PublishCourseRequest, CourseDetail>
 {
     public async Task<CourseDetail> HandleAsync(
@@ -156,8 +162,8 @@ public sealed class PublishCourseHandler(IRepository<Course> courses)
         }
 
         course.State = CoursePublicationState.Published;
-        await courses.UpdateAsync(course, ct);
-        await courses.CommitAsync(ct);
+        await mutation.UpdateAsync(course, null, Operations.Update, ct);
+
 
         return new CourseDetail {
             Name          = course.Name,
@@ -169,7 +175,7 @@ public sealed class PublishCourseHandler(IRepository<Course> courses)
 }
 ```
 
-`UpdateAsync` runs repository update advisors and `CommitAsync` persists pending changes. `SchemataResourceErrors.PreconditionFailed<Course>` creates a `FAILED_PRECONDITION` exception with resource and precondition details. The handler is the only code that decides whether `publish` is a legal state transition.
+`IResourceMutation<Course>.UpdateAsync` stages the update on the repository, runs the domain mutation pipeline, and commits the write; the handler never calls `CommitAsync` itself. `SchemataResourceErrors.PreconditionFailed<Course>` creates a `FAILED_PRECONDITION` exception with resource and precondition details. The handler is the only code that decides whether `publish` is a legal state transition.
 
 ## Step 3: Rotate the concurrency token on every Course update
 
@@ -228,8 +234,7 @@ builder.UseSchemata(schema => {
           .Map<Course, CourseSummary>();
 
     schema.ConfigureServices(services => {
-        services.AddDistributedMemoryCache();
-        services.AddDistributedCache();
+        services.AddMemoryCacheProvider();
 
         services.AddRepository<Course, EfCoreRepository<AppDbContext, Course>>()
                 .UseEntityFrameworkCore<AppDbContext>(
@@ -305,7 +310,7 @@ At registration, `RuntimeTypeModelConfigurator` calls `SchemataProtoModelConfigu
 
 ## When to escalate the action
 
-Keep `:publish` synchronous when it performs one bounded state transition and a repository commit. Escalate based on durable execution needs, not on the transport name.
+Keep `:publish` synchronous when it performs one bounded state transition and a mutation commit. Escalate based on durable execution needs, not on the transport name.
 
 | Condition | Owner | Status | Reason |
 | --- | --- | --- | --- |
@@ -320,7 +325,7 @@ Do not move the same transition into a job or Flow while leaving it in the handl
 - **Using Update for `state = published`.** Update expresses a representation change. `publish` has a separate verb, transition precondition, and permission, so it belongs in an instance custom method.
 - **Omitting `WithAuthorization()`.** `UseSecurity()` registers provider defaults, but resource authorization advisors run only after `WithAuthorization()` registers them.
 - **Trusting a body `name`.** The instance route is authoritative. The operation handler overwrites `CanonicalName` from the route before the handler runs.
-- **Adding `IRequestIdentification` without a cache provider.** A request ID invokes `AdviceMethodRequestIdempotency`, which requires `ICacheProvider`; register one `AddDistributedCache()` implementation.
+- **Adding `IRequestIdentification` without atomic caching.** Resource idempotency requires the conditional operations of `ICacheProvider`; register `AddMemoryCacheProvider()` for one process or `AddRedisCache()` for shared state.
 - **Treating an ETag as atomic locking.** The advisor compares the entity loaded by the resource pipeline before dispatch. Provider-specific conditional persistence remains necessary when the domain requires a single atomic state-and-version check.
 - **Returning a static detail or summary type as AIP-157 support.** `CourseDetail` and `CourseSummary` are fixed mapped shapes, not a per-request partial-response protocol.
 - **Returning `Schemata.Abstractions.Resource.Operation` as an AIP-151 operation.** Scheduling offers a durable Schemata operation resource, while AIP-151 requires `google.longrunning.Operation`, its annotations, and the Operations service.

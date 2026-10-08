@@ -11,6 +11,8 @@ using Schemata.Core;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
+using Schemata.Abstractions.Advisors;
+using Schemata.Report.Skeleton.Advisors;
 using Schemata.Expressions.Aip;
 using Schemata.Expressions.Cel;
 using Schemata.Expressions.Order;
@@ -35,7 +37,8 @@ public sealed class ReportActorConcurrencyHarness : IAsyncDisposable
     public required ServiceProvider  Root       { get; init; }
 
     /// <param name="withActor">Installs the Report.Actor bridge when true; otherwise the control-group, unwrapped path.</param>
-    public static async Task<ReportActorConcurrencyHarness> BuildAsync(bool withActor) {
+    /// <param name="snapshotAdvisor">Optional extra <see cref="IReportSnapshotAdvisor" /> installed on the root provider.</param>
+    public static async Task<ReportActorConcurrencyHarness> BuildAsync(bool withActor, IReportSnapshotAdvisor? snapshotAdvisor = null) {
         var connectionString = $"Data Source=file:{Guid.NewGuid():n}?mode=memory&cache=shared";
         var connection       = new SqliteConnection(connectionString);
         connection.Open();
@@ -51,11 +54,13 @@ public sealed class ReportActorConcurrencyHarness : IAsyncDisposable
         services.AddRepository<SchemataReportSnapshotChunk, EfCoreRepository<TestDbContext, SchemataReportSnapshotChunk>>();
         services.AddScoped<IUnitOfWork<TestDbContext>, EfCoreUnitOfWork<TestDbContext>>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataReport>, AdviceAddReportName>());
+    services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataReportSnapshot>, AdviceAddResourceName<SchemataReportSnapshot>>());
+    services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataReportSnapshotChunk>, AdviceAddResourceName<SchemataReportSnapshotChunk>>());
 
         var builder = new SchemataBuilder(new ConfigurationBuilder().Build(), null!);
         builder.UseInsight(insight => {
             insight.UseAip().UseCel().UseOrdering();
-            insight.AddRepositorySource("source-records", "source-records");
+            insight.AddRepositorySource<SourceRecord, SourceRecord>("source-records", r => new SourceRecord { Value = r.Value });
             insight.AddSourceDriver<RepositoryDriver>(RepositoryDriver.DriverName);
         });
         var reports = builder.UseReport(options => options.ChunkSize = 2);
@@ -69,6 +74,9 @@ public sealed class ReportActorConcurrencyHarness : IAsyncDisposable
         }
 
         builder.Invoke(services);
+        if (snapshotAdvisor is not null) {
+            services.AddSingleton<IReportSnapshotAdvisor>(snapshotAdvisor);
+        }
 
         var root = services.BuildServiceProvider();
 

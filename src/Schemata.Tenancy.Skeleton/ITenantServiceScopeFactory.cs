@@ -1,14 +1,12 @@
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions.Tenancy;
 using Schemata.Tenancy.Skeleton.Entities;
 
 namespace Schemata.Tenancy.Skeleton;
 
-/// <summary>
-///     Creates service scopes from the tenant-isolated service provider.
-/// </summary>
-/// <typeparam name="TTenant">The tenant entity type.</typeparam>
-/// <remarks>
-    ///     Resolved tenants use their isolated container. Requests with an absent tenant use the root provider.
-/// </remarks>
-public interface ITenantServiceScopeFactory<TTenant> : IServiceScopeFactory
-    where TTenant : SchemataTenant;
+public interface ITenantServiceScopeFactory<TTenant> where TTenant : SchemataTenant
+{
+    ValueTask<AsyncServiceScope> CreateAsync(TenantIdentity identity, CancellationToken ct = default);
+}

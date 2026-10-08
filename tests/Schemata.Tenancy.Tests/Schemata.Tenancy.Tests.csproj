@@ -7,11 +7,13 @@
 
   <ItemGroup>
     <PackageReference Include="Moq" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Schemata.Tenancy.Foundation\Schemata.Tenancy.Foundation.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Tenancy.Skeleton\Schemata.Tenancy.Skeleton.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Tenancy.Messaging\Schemata.Tenancy.Messaging.csproj" />
   </ItemGroup>
 
 </Project>

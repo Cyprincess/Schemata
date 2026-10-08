@@ -33,7 +33,7 @@ public static class CompensationCoordinator
             try {
                 await handler.InvokeAsync(context, ct);
             }
-            catch (Exception ex) {
+            catch (Exception ex) when (ex is not OperationCanceledException) {
                 return new(compensated, handler, ex);
             }
 
@@ -54,7 +54,7 @@ public static class CompensationCoordinator
             try {
                 await observer.OnCompensationStartedAsync(context.Process, context.Scope, ct);
             }
-            catch (Exception ex) {
+            catch (Exception ex) when (ex is not OperationCanceledException) {
                 logger?.LogWarning(ex, "Compensation lifecycle observer failed while notifying compensation start.");
             }
         }
@@ -69,7 +69,7 @@ public static class CompensationCoordinator
             try {
                 await observer.OnCompensationCompletedAsync(context.Process, context.Scope, ct);
             }
-            catch (Exception ex) {
+            catch (Exception ex) when (ex is not OperationCanceledException) {
                 logger?.LogWarning(ex, "Compensation lifecycle observer failed while notifying compensation completion.");
             }
         }

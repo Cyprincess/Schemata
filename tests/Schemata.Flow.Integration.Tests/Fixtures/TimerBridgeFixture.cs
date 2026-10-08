@@ -41,6 +41,7 @@ public sealed class TimerBridgeFixture : IAsyncLifetime
 
     public async Task InitializeAsync() {
         var services = new ServiceCollection();
+        Schemata.Flow.Tests.FlowTestCreation.Register(services);
         _connection = new(_connectionString);
         await _connection.OpenAsync();
 

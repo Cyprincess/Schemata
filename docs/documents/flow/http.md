@@ -151,6 +151,7 @@ using Schemata.Abstractions.Resource;
 public sealed class StartProcessInstanceRequest : ICanonicalName, IRequestIdentification
 {
     public string  DefinitionName { get; set; } = null!;
+    public string  DefinitionVersion { get; set; } = "1";
     public string? DisplayName    { get; set; }
     public string? Description    { get; set; }
     public string? Source         { get; set; }

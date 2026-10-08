@@ -54,10 +54,7 @@ public sealed class UserInfoHandler : UserInfoEndpoint
                 return result!;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(
-                    OAuthErrors.AccessDenied,
-                    SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED)
-                );
+                throw new OAuthException(OAuthErrors.AccessDenied, SchemataResources.ACCESS_DENIED);
         }
 
         var claims = new List<Claim>();
@@ -78,10 +75,7 @@ public sealed class UserInfoHandler : UserInfoEndpoint
                 return result!;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(
-                    OAuthErrors.AccessDenied,
-                    SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED)
-                );
+                throw new OAuthException(OAuthErrors.AccessDenied, SchemataResources.ACCESS_DENIED);
         }
 
         

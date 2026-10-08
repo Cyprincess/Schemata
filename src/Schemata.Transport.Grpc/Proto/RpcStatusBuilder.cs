@@ -58,7 +58,12 @@ internal static class RpcStatusBuilder
             BadRequestDetail d => Any.Pack(new BadRequest {
                 FieldViolations = {
                     (d.FieldViolations ?? []).Select(fv => new BadRequest.Types.FieldViolation {
-                        Field = fv.Field ?? "", Description = fv.Description ?? "",
+                        Field            = fv.Field ?? "",
+                        Description      = fv.Description ?? "",
+                        Reason           = fv.Reason ?? "",
+                        LocalizedMessage = fv.LocalizedMessage is { } localized
+                            ? new() { Locale = localized.Locale ?? "", Message = localized.Message ?? "" }
+                            : null,
                     }),
                 },
             }),
@@ -120,6 +125,7 @@ internal static class RpcStatusBuilder
             ErrorCodes.FailedPrecondition => StatusCode.FailedPrecondition,
             ErrorCodes.Unauthenticated    => StatusCode.Unauthenticated,
             ErrorCodes.ResourceExhausted  => StatusCode.ResourceExhausted,
+            ErrorCodes.Unimplemented      => StatusCode.Unimplemented,
             var _                         => StatusCode.Internal,
         });
     }

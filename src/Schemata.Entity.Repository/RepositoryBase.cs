@@ -122,14 +122,17 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     protected static readonly bool IsConcurrencyControlled = typeof(IConcurrency).IsAssignableFrom(typeof(TEntity))
                                                           && typeof(TEntity).GetProperty(nameof(IConcurrency.Timestamp))?.GetCustomAttribute<ConcurrencyCheckAttribute>(true) is not null;
 
-    private readonly List<TEntity> _added   = [];
-    private readonly List<TEntity> _removed = [];
-    private readonly List<TEntity> _updated = [];
+    // Instance-level monotonic write sequence; advances only after the provider successfully stages
+    // or executes a write. _enlistmentStart re-baselines at every enlistment so a per-call delta
+    // yields the MutationResult and the join guard reads a scalar fact instead of entity lists.
+    private long _writeSequence;
+    private long _enlistmentStart;
 
     private bool _completed;
     private bool _disposed;
 
     private IUnitOfWork? _uow;
+    private IUnitOfWork? _writeUnitOfWork;
 
     /// <summary>
     ///     Initializes repository base state with the service provider and a new advice context.
@@ -152,7 +155,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
     public virtual AdviceContext AdviceContext { get; }
 
-    internal bool HasOpenWriteUnitOfWork => !_completed && (_uow is not null || _added.Count > 0 || _updated.Count > 0 || _removed.Count > 0);
+    internal bool HasOpenWriteUnitOfWork => !_disposed && !_completed && _writeUnitOfWork is not null;
 
     public virtual async IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
@@ -239,7 +242,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     ) {
         var query = await BuildQueryAsync(predicate, ct);
 
-        var context = new QueryContext<TEntity, TResult, TResult>(this, query);
+        var context = new QueryContext<TEntity, TResult, TResult>(this, QueryOperation.FirstOrDefault, query);
 
         switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, TResult>>()
                              .RunAsync(AdviceContext, context, ct)) {
@@ -273,7 +276,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     ) {
         var query = await BuildQueryAsync(predicate, ct);
 
-        var context = new QueryContext<TEntity, TResult, TResult>(this, query);
+        var context = new QueryContext<TEntity, TResult, TResult>(this, QueryOperation.SingleOrDefault, query);
 
         switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, TResult>>()
                              .RunAsync(AdviceContext, context, ct)) {
@@ -307,7 +310,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     ) {
         var query = await BuildQueryAsync(predicate, ct);
 
-        var context = new QueryContext<TEntity, TResult, bool>(this, query);
+        var context = new QueryContext<TEntity, TResult, bool>(this, QueryOperation.Any, query);
 
         switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, bool>>()
                              .RunAsync(AdviceContext, context, ct)) {
@@ -341,7 +344,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     ) {
         var query = await BuildQueryAsync(predicate, ct);
 
-        var context = new QueryContext<TEntity, TResult, int>(this, query);
+        var context = new QueryContext<TEntity, TResult, int>(this, QueryOperation.Count, query);
 
         switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, int>>()
                              .RunAsync(AdviceContext, context, ct)) {
@@ -375,7 +378,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     ) {
         var query = await BuildQueryAsync(predicate, ct);
 
-        var context = new QueryContext<TEntity, TResult, long>(this, query);
+        var context = new QueryContext<TEntity, TResult, long>(this, QueryOperation.LongCount, query);
 
         switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, long>>()
                              .RunAsync(AdviceContext, context, ct)) {
@@ -403,14 +406,15 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return context.Result;
     }
 
-    public virtual ValueTask<long> EstimateCountAsync<TResult>(
+    public virtual ValueTask<long?> EstimateCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
         CancellationToken                               ct = default
     ) {
-        return LongCountAsync(predicate, ct);
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult<long?>(null);
     }
 
-    public abstract Task AddAsync(TEntity entity, CancellationToken ct = default);
+    public abstract Task<MutationResult> AddAsync(TEntity entity, CancellationToken ct = default);
 
     public virtual async Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default) {
         foreach (var entity in entities) {
@@ -419,9 +423,9 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         }
     }
 
-    public abstract Task UpdateAsync(TEntity entity, CancellationToken ct = default);
+    public abstract Task<MutationResult> UpdateAsync(TEntity entity, CancellationToken ct = default);
 
-    public abstract Task RemoveAsync(TEntity entity, CancellationToken ct = default);
+    public abstract Task<MutationResult> RemoveAsync(TEntity entity, CancellationToken ct = default);
 
     public virtual async Task RemoveRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default) {
         foreach (var entity in entities) {
@@ -445,9 +449,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
             throw new InvalidOperationException("Repository is enlisted in a unit of work. Call IUnitOfWork.CommitAsync instead.");
         }
 
-        // Owned but never mutated: a degenerate commit. Dispatch the empty snapshot so committed
-        // advisors observe the no-op commit on the same footing as the enlisted path.
-        await DispatchCommittedAsync(SnapshotChanges(), ct);
+        // Owned but never mutated: a degenerate commit sends no committed notification.
         Reopen();
     }
 
@@ -465,13 +467,16 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return uow;
     }
 
+
+
     public virtual void Join(IUnitOfWork uow) {
         ArgumentNullException.ThrowIfNull(uow);
+        if (ReferenceEquals(_writeUnitOfWork, uow) && !_completed) return;
         if (!OwnsContext) {
             throw new InvalidOperationException("Repository is already enlisted in a unit of work.");
         }
 
-        if (_added.Count > 0 || _updated.Count > 0 || _removed.Count > 0) {
+        if (_writeSequence != _enlistmentStart) {
             throw new InvalidOperationException("Cannot enlist a repository with uncommitted work. "
                                               + "Call CommitAsync before Join, or resolve a fresh IRepository<T> instance.");
         }
@@ -492,10 +497,6 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
             DisposeContext();
         }
 
-        _added.Clear();
-        _updated.Clear();
-        _removed.Clear();
-
         GC.SuppressFinalize(this);
     }
 
@@ -508,10 +509,6 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         } else if (OwnsContext) {
             await DisposeContextAsync();
         }
-
-        _added.Clear();
-        _updated.Clear();
-        _removed.Clear();
 
         GC.SuppressFinalize(this);
     }
@@ -576,44 +573,53 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     protected abstract Task<long> LongCountAsync<TResult>(IQueryable<TResult> query, CancellationToken ct);
 
     /// <summary>
-    ///     Captures the current add/update/remove tracking lists into a snapshot and then clears
-    ///     them so the next commit starts with empty lists.
+    ///     The instance-level monotonic write sequence. Providers compare it around a call to
+    ///     produce the per-call <see cref="MutationResult" />.
     /// </summary>
-    protected CommitChanges<TEntity> SnapshotChanges() {
-        var snapshot = new CommitChanges<TEntity> {
-            Added = [.. _added], Updated = [.. _updated], Removed = [.. _removed],
-        };
+    protected long WriteSequence => _writeSequence;
 
-        _added.Clear();
-        _updated.Clear();
-        _removed.Clear();
+    /// <summary>
+    ///     Records a successfully staged or executed provider write: advances the write sequence. The
+    ///     per-enlistment commit sink registered by <see cref="Join" />/<c>EnsureWriteUnitOfWork</c>
+    ///     reads the sequence delta to decide whether the type-level committed notification runs.
+    /// </summary>
+    protected void StageWrite() { _writeSequence++; }
 
-        return snapshot;
+    /// <summary>
+    ///     Resolves the per-call result from the write-sequence delta since <paramref name="mark" />.
+    ///     A no-write <see cref="AdviseResult.Handle" /> yields <see cref="MutationResult.NoWrite" />;
+    ///     a handled operation whose advisors staged a nested write on this repository (e.g.
+    ///     soft-delete) yields <see cref="MutationResult.Applied" />; blocking after a staged write
+    ///     is a contract violation and throws.
+    /// </summary>
+    protected MutationResult ResolveWriteResult(long mark, AdviseResult result) {
+        if (_writeSequence == mark) {
+            return MutationResult.NoWrite;
+        }
+
+        if (result == AdviseResult.Block) {
+            throw new InvalidOperationException("An advisor blocked the write after staging changes. Return AdviseResult.Handle for writes that intentionally replace staging.");
+        }
+
+        return MutationResult.Applied;
     }
 
     /// <summary>
-    ///     Runs the <see cref="IRepositoryCommittedAdvisor{TEntity}" /> pipeline against the
-    ///     given change snapshot.
+    ///     Completes the repository's enlistment after the unit of work commits. The type-level
+    ///     <see cref="IRepositoryCommittedAdvisor{TEntity}" /> pipeline runs only when this
+    ///     enlistment staged at least one write; a pure-read or fully handled enlistment completes
+    ///     without notifying.
     /// </summary>
-    protected async Task DispatchCommittedAsync(CommitChanges<TEntity> changes, CancellationToken ct) {
+    private async Task DispatchCommittedAsync(CancellationToken ct) {
+        _completed = true;
+
+        if (_writeSequence == _enlistmentStart) {
+            return;
+        }
+
         await Advisor.For<IRepositoryCommittedAdvisor<TEntity>>()
-                     .RunAsync(AdviceContext, this, changes, ct);
+                     .RunAsync(AdviceContext, this, ct);
     }
-
-    /// <summary>
-    ///     Clears the add/update/remove tracking lists during rollback.
-    /// </summary>
-    protected void ResetTracking() {
-        _added.Clear();
-        _updated.Clear();
-        _removed.Clear();
-    }
-
-    /// <summary>
-    ///     Rollback callback enlisted with the unit of work. Discards the pending change snapshot
-    ///     so a rolled-back commit does not replay its tracking on a later commit.
-    /// </summary>
-    protected virtual void OnRollback() { ResetTracking(); }
 
     /// <summary>
     ///     Ensures the repository writes through a unit of work before its first standalone
@@ -641,65 +647,35 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     ///     and the next write replaces it with a fresh unit-of-work context.
     /// </summary>
     private void Reopen() {
-        _uow        = null;
-        _completed  = false;
-        OwnsContext = true;
-        ResetTracking();
+        _uow             = null;
+        _writeUnitOfWork = null;
+        _enlistmentStart = _writeSequence;
+        _completed       = false;
+        OwnsContext      = true;
     }
 
     private void Enlist(IUnitOfWork uow) {
         AttachContext(uow);
+        _writeUnitOfWork = uow;
+        _enlistmentStart = _writeSequence;
 
-        uow.AddCommitSink(ct => {
-            _completed = true;
-            return DispatchCommittedAsync(SnapshotChanges(), ct);
-        });
-        uow.AddRollbackSink(() => {
-            OnRollback();
-            _completed = true;
-        });
+        // Enlistment completion is registered independently of any staged write: a pure-read or
+        // fully handled enlistment must still observe the outer commit and complete, while the
+        // type-level notification stays gated on the write-sequence delta inside the sink.
+        uow.AddCommitSink(CommitOrders.Repository, DispatchCommittedAsync);
+        uow.AddRollbackSink(() => { _completed = true; });
 
         OwnsContext = false;
     }
 
     /// <summary>
     ///     Runs the <see cref="IRepositoryAddAdvisor{TEntity}" /> chain for a single entity and
-    ///     stages it for the committed-advisor snapshot. Returns <see langword="false" /> when an
-    ///     advisor blocked or handled the add, so callers skip persistence.
+    ///     returns its advise result, so callers skip persistence unless the chain continues.
     /// </summary>
-    protected async Task<bool> RunAddAdvisorsAsync(TEntity entity, CancellationToken ct) {
-        switch (await Advisor.For<IRepositoryAddAdvisor<TEntity>>()
-                             .RunAsync(AdviceContext, this, entity, ct)) {
-            case AdviseResult.Block:
-            case AdviseResult.Handle:
-                return false;
-            case AdviseResult.Continue:
-            default:
-                break;
-        }
-
-        TrackAdd(entity);
-
-        return true;
+    protected async Task<AdviseResult> RunAddAdvisorsAsync(TEntity entity, CancellationToken ct) {
+        return await Advisor.For<IRepositoryAddAdvisor<TEntity>>()
+                            .RunAsync(AdviceContext, this, entity, ct);
     }
-
-    /// <summary>
-    ///     Stages an added entity for the committed-advisor snapshot.
-    /// </summary>
-    /// <param name="entity">The added entity.</param>
-    protected void TrackAdd(TEntity entity) { _added.Add(entity); }
-
-    /// <summary>
-    ///     Stages an updated entity for the committed-advisor snapshot.
-    /// </summary>
-    /// <param name="entity">The updated entity.</param>
-    protected void TrackUpdate(TEntity entity) { _updated.Add(entity); }
-
-    /// <summary>
-    ///     Stages a removed entity for the committed-advisor snapshot.
-    /// </summary>
-    /// <param name="entity">The removed entity.</param>
-    protected void TrackRemove(TEntity entity) { _removed.Add(entity); }
 
     /// <summary>
     ///     Returns the provider query root for <typeparamref name="TEntity" />.
@@ -738,6 +714,11 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         CancellationToken                               ct
     ) {
         ct.ThrowIfCancellationRequested();
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_completed) {
+            throw new InvalidOperationException("Repository's unit of work has already completed. Resolve a fresh IRepository<T> to start new work.");
+        }
 
         var container = AsQueryContainer();
 

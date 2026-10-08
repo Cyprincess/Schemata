@@ -7,8 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using Schemata.Entity.EntityFrameworkCore;
-using Schemata.Entity.Owner;
-using Schemata.Entity.Owner.Advisors;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Flow.Bpmn;
@@ -31,6 +29,7 @@ public sealed class OwnedSourceFixture : IAsyncLifetime
 
     public async Task InitializeAsync() {
         var services = new ServiceCollection();
+        Schemata.Flow.Tests.FlowTestCreation.Register(services);
         _connection = new(_connectionString);
         await _connection.OpenAsync();
 

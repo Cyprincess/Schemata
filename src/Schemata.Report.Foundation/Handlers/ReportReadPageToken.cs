@@ -1,31 +1,63 @@
 using System;
+using System.IO;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text.Json;
+using Microsoft.AspNetCore.DataProtection;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Abstractions.Tenancy;
+using Schemata.Common;
 
 namespace Schemata.Report.Foundation.Handlers;
 
-internal readonly record struct ReportReadPageToken(int ChunkIndex, int Offset)
+internal readonly record struct ReportReadPageToken(
+    string Snapshot, int PageSize, Guid? Tenant, ProtectedContinuationCaller? Caller, int ChunkIndex, int Offset)
 {
-    internal static string Encode(int chunkIndex, int offset) {
-        var bytes = new byte[sizeof(int) * 2];
-        BitConverter.GetBytes(chunkIndex).CopyTo(bytes, 0);
-        BitConverter.GetBytes(offset).CopyTo(bytes, sizeof(int));
-        return Convert.ToBase64String(bytes);
+    internal const string ProtectionPurpose = "Schemata.Report.Foundation.PageToken";
+
+    internal static ReportReadPageToken Bind(string snapshot, int pageSize, ClaimsPrincipal? principal) =>
+        new(snapshot, pageSize, TenantContext.Current.Uid, ProtectedContinuationCaller.Bind(principal), 0, 0);
+
+    internal string Encode(IDataProtector protector, int chunkIndex, int offset) {
+        ValidateCaller();
+        ValidatePosition(chunkIndex, offset);
+        return ProtectedContinuation.Encode(protector, this with { ChunkIndex = chunkIndex, Offset = offset });
     }
 
-    internal static ReportReadPageToken Decode(string token) {
+    internal ReportReadPageToken Decode(IDataProtector protector, string token) {
+        ValidateCaller();
         try {
-            var bytes = Convert.FromBase64String(token);
-            if (bytes.Length == sizeof(int) * 2) {
-                var chunkIndex = BitConverter.ToInt32(bytes, 0);
-                var offset     = BitConverter.ToInt32(bytes, sizeof(int));
-                if (chunkIndex >= 0 && offset >= 0) {
-                    return new(chunkIndex, offset);
-                }
+            var payload = ProtectedContinuation.Decode<ReportReadPageToken>(protector, token);
+            if (payload.Snapshot != Snapshot || payload.PageSize != PageSize
+             || payload.Tenant != Tenant || payload.Caller != Caller) {
+                throw new InvalidArgumentException(SchemataResources.INVALID_PAGE_TOKEN);
             }
-        } catch (FormatException ex) {
-            throw new InvalidArgumentException(message: $"Invalid page token '{token}': {ex.Message}");
-        }
 
-        throw new InvalidArgumentException(message: "Invalid page token.");
+            ValidatePosition(payload.ChunkIndex, payload.Offset);
+            return payload;
+        } catch (Exception ex) when (ex is FormatException or CryptographicException or JsonException or IOException or InvalidDataException) {
+            throw new InvalidArgumentException(SchemataResources.INVALID_PAGE_TOKEN);
+        }
+    }
+
+    internal static int Advance(int chunkIndex) {
+        try {
+            return checked(chunkIndex + 1);
+        } catch (OverflowException) {
+            throw new InvalidArgumentException(SchemataResources.INVALID_PAGE_TOKEN);
+        }
+    }
+
+    private void ValidateCaller() {
+        if (Caller is not { } caller || caller.IsAuthenticated && string.IsNullOrWhiteSpace(caller.Subject)) {
+            throw new InvalidArgumentException(SchemataResources.INVALID_PAGE_TOKEN);
+        }
+    }
+
+    private static void ValidatePosition(int chunkIndex, int offset) {
+        if (chunkIndex < 0 || offset < 0) {
+            throw new InvalidArgumentException(SchemataResources.INVALID_PAGE_TOKEN);
+        }
     }
 }

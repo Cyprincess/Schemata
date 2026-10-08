@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -11,7 +12,8 @@ namespace Schemata.Identity.Foundation.Controllers;
 [ApiController]
 [Route("~/Authenticate")]
 public sealed partial class AuthenticateController<TUser>(
-    IRequestDispatcher                    dispatcher,
-    IOptionsMonitor<BearerTokenOptions> bearer
+    IRequestDispatcher                        dispatcher,
+    IOptionsMonitor<BearerTokenOptions>       bearer,
+    IEnumerable<Skeleton.IHostSignInObserver> observers
 ) : ControllerBase
     where TUser : SchemataUser, new();

@@ -5,12 +5,14 @@ namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>
 ///     Wire-friendly summary of a registered <see cref="ProcessDefinition" />, used as
-///     the element type of <c>ListResultBase&lt;ProcessDefinitionInfo&gt;</c>. The BPMN
+///     the element type of <c>ListResultBase&lt;ProcessDefinitionInfo, ProcessDefinitionInfo&gt;</c>. The BPMN
 ///     definition name is embedded in <see cref="ICanonicalName.CanonicalName" />.
 /// </summary>
-[CanonicalName("definitions/{definition}")]
+[CanonicalName("definitions/{definition}/versions/{version}")]
 public sealed class ProcessDefinitionInfo : ICanonicalName, IDescriptive
 {
+    public string Version { get; set; } = null!;
+
     /// <summary>Optional human-readable display name.</summary>
     public string? DisplayName { get; set; }
 

@@ -16,62 +16,74 @@ repositories under one unit of work.
 
 ## ProcessRegistry
 
-`ProcessRegistry` implements `IProcessRegistry` and is a **singleton**. It stores registrations in a
-`ConcurrentDictionary<string, ProcessRegistration>` keyed case-insensitively by process name.
+`ProcessRegistry` implements `IProcessRegistry` and is a singleton. Registrations are keyed by
+case-insensitive definition name and ordinal version. Registry publication and latest selection are atomic.
 
 Registering a configuration:
 
 1. Instantiates the `ProcessDefinition` subclass, running its DSL constructor.
 2. Resolves the keyed `IFlowRuntime` for the configuration's engine; a missing engine throws
    `InvalidOperationException`.
-3. Validates the definition against the engine's declared `Capabilities` and the activated bridges:
-   message/signal catches require `Schemata.Flow.Event`, timer catches require
-   `Schemata.Flow.Scheduling`. The first unsupported shape throws `InvalidOperationException` naming
-   the shape, the engine, and the missing capability (see [Runtime capabilities](#runtime-capabilities)).
-4. Calls `Validate` on every `IFlowEngineValidator` whose `EngineName` matches the configuration's
+3. Calls `Validate` on every `IFlowEngineValidator` whose `EngineName` matches the configuration's
    engine. Both built-in validators reject inert AST (`AdHocSubProcess`, `LinkDefinition`,
    `MultipleDefinition`) rather than letting it execute with degraded semantics.
-5. Compiles every string condition expression with the keyed `IExpressionCompiler` selected by the
+4. Compiles every string condition expression with the keyed `IExpressionCompiler` selected by the
    configuration's `Language`. A missing or unregistered language throws
    `FailedPreconditionException`; a malformed expression throws `InvalidArgumentException`.
-6. Adds the `ProcessRegistration`; a duplicate name throws `AlreadyExistsException`.
+5. Freezes and publishes the `ProcessRegistration`; a duplicate name/version throws `AlreadyExistsException`.
 
 ```csharp
 ValueTask RegisterAsync<TProcess>(string? engine = null,
     Action<ProcessConfiguration>? configure = null, CancellationToken ct = default)
     where TProcess : ProcessDefinition;
 ValueTask RegisterAsync(ProcessConfiguration configuration, CancellationToken ct = default);
-ValueTask UnregisterAsync(string processName, CancellationToken ct = default);
-IReadOnlyCollection<string> GetRegisteredProcesses();
-bool IsRegistered(string processName);
-ProcessRegistration? GetRegistration(string processName);
+ValueTask UnregisterAsync(string processName, string version, CancellationToken ct = default);
+IReadOnlyCollection<ProcessRegistration> GetRegisteredProcesses();
+bool IsRegistered(string processName, string version = "1");
+ProcessRegistration? GetRegistration(string processName, string version = "1");
 ```
 
-## Runtime capabilities
+`ProcessConfiguration.Version` and `StartProcessOptions.DefinitionVersion` default to the exact version
+`"1"`. Set `IsLatest` when registering a version to select it for new starts explicitly requesting
+`DefinitionVersion = "latest"`. No lexical or numeric version ordering is inferred. Removing the selected
+version clears latest selection instead of choosing a different graph.
 
-Every engine declares what it can execute through `IFlowRuntime.Capabilities`, a
-`FlowRuntimeCapabilities` flag set:
+Each new process persists the resolved name and exact `DefinitionVersion`. Resume, message, signal,
+timer, and source projection paths resolve that binding. Missing or non-exact historical bindings fail
+with `FailedPreconditionException` before transition writes. Applications retain the original definitions
+needed by live instances and handle pre-version persisted data themselves. Call activities select their
+child definition with `CallActivity.DefinitionVersion`; child rows retain the resolved version.
 
-| Flag                      | Covers                                                                                          |
-| ------------------------- | ----------------------------------------------------------------------------------------------- |
-| `ProcedureTasks`          | `ProcedureTaskBase` execution (DSL `OnEnter` / `OnLeave` bodies)                                |
-| `MultiToken`              | Parallel / inclusive / complex gateways and parallel event-based forks                          |
-| `NestedEvents`            | Message / signal catches nested below the root scope (including boundary events on nested hosts) |
-| `NestedTimers`            | Timer catches nested below the root scope                                                       |
-| `Compensation`            | Compensation boundary events and throw events                                                   |
-| `SubProcesses`            | `SubProcess` and `CallActivity`                                                                 |
-| `Loops`                   | Standard and multi-instance loop characteristics                                                |
-| `NonInterruptingBoundaries` | Non-interrupting boundary events                                                              |
+Definition listings return each version at `definitions/{definition}/versions/{version}`.
 
-The default `StateMachineEngine` declares `ProcedureTasks` only; `BpmnEngine` declares `All`.
-Registration validates the definition against the selected engine's flags and the bridges activated in
-the host, so an unsupported shape fails at startup with an exact message instead of degrading silently
-at runtime.
+Publication freezes framework-owned graph topology, node settings, and condition/task delegate slots.
+Changing a published graph throws; labels and application-owned state captured by delegates remain
+application responsibilities. A removed version key cannot be reused within the registry lifetime.
 
-`ProcedureTaskBase` executes on both engines with identical semantics: the engine builds a
-`FlowTaskContext` (definition, process, token, execution context, payload), awaits `InvokeAsync`, then
-resolves the outgoing auto-flow. When no auto-flow resolves, the token parks at the procedure name.
-`StateMachineEngine` is the reference implementation; `BpmnEngine` mirrors it point for point.
+## Task execution
+
+`ProcedureTaskBase` executes on both engines. The engine creates a `FlowTaskContext` for the actual
+addressed token, awaits `InvokeAsync(context, ct)`, and resolves the outgoing auto-flow. When no flow
+resolves, the token parks at the procedure name. Spawned branches execute against their newly created
+child token; parent annotations are independent.
+
+`ScriptTask<TInput, TResult>` resolves its keyed compiler at operation use. `BusinessRuleTask<TInput,
+TResult>` resolves its application handler by `(Key, Version)`. The registry retains structural engine
+validation and compilation of string conditions; task language, handler, and binding errors surface
+when the task runs. Runtime capability flags describe engines and are not a registry service directory.
+
+Input and output delegates receive the same operation cancellation token and Flow-owned unit of work.
+`SourceAsync` tracks loaded sources so later tasks and source conditions observe the current object.
+Output delegates may update that object for the Flow source flush or stage an explicit mutation using
+`context.UnitOfWork`. Flow persistence commits the operation; engines and bindings do not commit it.
+Task failure aborts process, token, source, and transition persistence together.
+
+Field-table output validates all fields and conversions before changing annotations. Compiler options
+capture read-only function entries at publication; mutable application closure state remains outside
+that snapshot. Exact process versions retain their typed binding and handler version. See
+`Models/ScriptTask.cs`, `Models/BusinessRuleTask.cs`, `Runtime/FlowTaskContext.cs`,
+`ProcessRegistry.cs`, and `ProcessPersistence.cs` for these execution boundaries.
+
 
 ## FlowRunner
 
@@ -150,7 +162,7 @@ ValueTask<ProcessSnapshot> CancelTokenAsync(
 
 | Method             | Behavior                                                                                                                                                                                |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `StartAsync`       | Creates a `SchemataProcess`, optionally binds a source entity via `BindStartSourceAsync`, calls `engine.StartAsync`, runs advisors, persists the snapshot, and returns the process row. |
+| `StartAsync`       | Adds a `SchemataProcess` through the repository before binding sources or calling `engine.StartAsync`, runs advisors, persists the snapshot, and returns the process row. |
 | `CompleteAsync`    | Loads tokens, calls `engine.AdvanceAsync`, runs advisors, persists, and returns the snapshot.                                                                                           |
 | `CorrelateAsync`   | Resolves the `Message` definition by name, picks the target token (the supplied `token` argument, or `engine.FindTriggerTargetsAsync` when omitted), calls `engine.TriggerAsync` for that token, runs advisors, persists, and returns the snapshot.     |
 | `ThrowSignalAsync` | Snapshots every persisted process that has a waiting token and declares the signal, then delivers to each in its own scope and unit of work, bounded by `SchemataFlowOptions.SignalBroadcastConcurrency`. Returns one `SignalDeliveryResult` per candidate, ordered by canonical name; a failing target rolls back only itself and the broadcast continues. |
@@ -185,7 +197,7 @@ Every state-changing method follows the same pattern:
 7. Persist the snapshot through `ProcessPersistence.PersistSnapshotAsync`. `PersistSnapshotAsync`
    upserts the process and token rows and appends transition rows; source-binding rows are written
    separately via `BindStartSourceAsync` (start path) and via the source advisor (transition path).
-   All four repositories are joined to one unit of work inside `ProcessPersistence.ExecuteAsync`, so
+   All five repositories are joined to one unit of work inside `ProcessPersistence.ExecuteAsync`, so
    the writes commit or roll back together.
 
 After persistence commits, `ProcessLifecycleNotifier` publishes the lifecycle notifications
@@ -210,6 +222,7 @@ public class SchemataProcess : IIdentifier, ICanonicalName, IConcurrency, IDescr
                                 ISoftDelete, ITimestamp, IStateful, IAnnotatable
 {
     public virtual string  DefinitionName { get; set; }  // registered definition name
+    public virtual string  DefinitionVersion { get; set; } // exact registered version
     public virtual string? IdempotencyKey { get; set; }  // start idempotency key; released on terminal state
     public virtual string? DisplayName    { get; set; }  // optional human-readable label
     public virtual string? Description    { get; set; }  // optional description
@@ -290,21 +303,64 @@ The state-machine engine emits `Move`, `Cancel`, and `Fail`; the BPMN engine add
 `ProcessPersistence.ExecuteAsync` opens a unit of work over `IRepository<SchemataProcess>`, joins
 the token, transition, source-binding, and compensation repositories into the same unit of work, executes the
 supplied runtime work, and commits. `PersistSnapshotAsync` upserts the process and token rows and
-appends transition rows. Source-binding rows are written through `BindStartSourceAsync` on the
+appends transition rows by staging each entity through `IResourceMutation<TEntity>` on that shared
+unit of work, so `IResourceMutationCommittedAdvisor<TEntity>` callbacks fire after the commit.
+Source-binding rows are written through `BindStartSourceAsync` on the
 start path and through `FlowTaskContext.BindSourceAsync` for token-scoped rows; their concurrency
 stamps are refreshed by the source advisor pipeline on every transition. All five repositories commit or
 roll back together because they share the same unit of work. `ProcessPersistence` owns durability in
 the runtime commit path, and lifecycle observers are post-commit notifications.
+Loaded tokens are indexed by process within the operation's `FlowPersistenceScope`; persistence
+reuses that index instead of querying each canonical name. Without a prior load, it performs one
+process-scoped token load. Newly staged tokens keep their create-path authority and concurrency stamps.
+
+### Resource names and engine creation callbacks
+
+The application supplies `Name` for persisted runtime resources through an
+`IRepositoryAddAdvisor<TEntity>` registered with `TryAddEnumerable`. Run the naming advisor before
+`AdviceAddCanonicalName.DefaultOrder` (120,000,000), preserve an explicitly supplied `Name`, and
+cover processes, tokens, transitions, compensation rows, and event subscriptions when that bridge
+is enabled. Canonical-name derivation and validation remain in the repository pipeline; the
+framework provides no generated-name fallback.
+
+`DefaultStartProcessHandler` awaits repository creation of the process before source bindings or
+engine execution use its identity. Token factories return unnamed objects; engines await
+`FlowExecutionContext.CreateTokenAsync` before using a token's canonical name in transitions,
+spawner links, or called-process work. Repository creation stages the row and runs its add advisors;
+the surrounding unit of work still owns the commit.
+
+Custom engines and callers constructing `FlowExecutionContext` must initialize its three required
+callbacks: `CreateProcessAsync`, `CreateTokenAsync`, and `PersistSnapshotAsync`. The first two add
+rows through the joined repositories. The third persists a called process's snapshot within that
+same unit of work. Forward these callbacks into child contexts and await them at the same identity
+boundaries; an in-memory naming substitute bypasses the consumer's repository policy.
+
+BPMN graph node and graph-reference names remain engine/model identifiers and may retain internal
+generation. Persisted process, token, transition, compensation, and subscription resources are not
+graph nodes. Source-binding `Name` values remain the supplied binding labels used to match
+declarations within a process/token scope. Event subscriptions similarly retain `SubscriptionId`
+as their lookup identity, separate from resource `Name`.
+
+Flow timer jobs use `SchemataJob.Key` for their schedule slot. The timer bridge finds that row by
+`Key` and passes its stored `CanonicalName` to unscheduling, rather than constructing a job URI.
+Applications using the bridge also need naming advisors for scheduler jobs and executions.
+
+Implementation: `src/Schemata.Flow.Foundation/FlowPersistenceScope.cs`,
+`src/Schemata.Flow.Foundation/Handlers/DefaultStartProcessHandler.cs`,
+`src/Schemata.Flow.Skeleton/Runtime/FlowExecutionContext.cs`,
+`src/Schemata.Flow.Skeleton/Runtime/TokenFactory.cs`,
+`src/Schemata.Flow.Bpmn/Runtime/SubProcesses/CallActivityExecutor.cs`,
+`src/Schemata.Flow.Event/Handlers/FlowEventCatchHandler.cs`, and
+`src/Schemata.Flow.Scheduling/Handlers/FlowTimerCatchHandler.cs`.
 
 ### Persisted compensation bindings
 
-Compensation registrations are data, not engine memory. `ProcessSnapshot.CompensationBindings` carries
-the scope owner, activity name, and registration order of every armed compensation; each persist
-replaces the process's rows in the `SchemataProcessCompensations` table inside the same unit of work
-(terminal processes and empty binding lists clear the rows). When the runner loads a process, the
-persisted bindings come back through `FlowExecutionContext.LoadedCompensationBindings`, so a throw
-after a host restart still resolves its handlers. A missing binding or handler is an explicit
-`InvalidOperationException` from the throw path, never a silent no-op.
+`ProcessSnapshot.CompensationBindings` carries scope owner, activity, and registration order.
+Persistence reconciles that multiset within the process: unchanged rows retain `Uid`, `Name`, and
+canonical name without writes; additions use consumer naming advisors and removals are deleted.
+Terminal processes and empty snapshots clear bindings in the same joined transaction. No new
+logical-key uniqueness constraint or migration path is introduced. Reload supplies the durable
+bindings through `FlowExecutionContext.LoadedCompensationBindings`; missing handlers fail explicitly.
 
 ## Source advisors
 
@@ -404,13 +460,35 @@ member and skips the update when nothing changed.
 
 ### Concurrency-stamp protocol
 
-Each binding row's `SourceTimestamp` mirrors the bound entity's `IConcurrency.Timestamp`. On every
-transition the framework validates every binding row the process holds for that entity across token
-scopes, and after the entity write it refreshes every one of them
-to the new timestamp. Validating and refreshing across the whole entity is what keeps per-token
-bindings of one entity from raising false conflicts when a sibling branch writes. A stale row
-aborts the transition with `FailedPreconditionException`, reason
-`FLOW_SOURCE_MODIFIED_CONCURRENTLY`, which the transports surface as HTTP 412.
+Each binding row's `SourceTimestamp` records the bound entity's `IConcurrency.Timestamp`.
+`FlowHandlerSupport.BindStartSourceAsync` reads the source through a fresh repository joined to the
+outer unit of work and checks a supplied start stamp before staging the binding. Callers passing a
+loaded source to `StartAsync` must supply its current stamp; a stale source aborts the start with
+`FailedPreconditionException`, reason `FLOW_SOURCE_MODIFIED_CONCURRENTLY`. Sources without
+`IConcurrency` retain their unstamped binding behavior.
+
+`FlowTaskContext` captures the initial source stamp before returning the source to a task or staging
+a token binding. Foundation supplies `FlowExecutionContext.ValidateSourceAsync` to check persisted
+binding expectations before task mutation or source projection. The initial stamp remains fixed
+through the operation's own writes, while provider optimistic concurrency uses the current entity
+stamp for each write. Called processes share that initial authority and the persistence owner's
+applied bindings. A successfully validated create or rebind may therefore retain an intermediate
+own-write stamp until the final flush.
+Applied binding refreshes retain their exact process/token/name/Uid authority in the shared persistence
+scope, allowing successive signal targets to observe the operation's own rotated stamp. Initial external
+binding validation and native source compare-and-swap remain active.
+
+`FlowEventCatchHandler` resolves its subscription read repository and mutation from the active
+`FlowExecutionContext.Services` for each arm operation, joining that operation's explicit unit of work.
+One scoped public runner can therefore arm subscriptions across sequential completed operations.
+Flow.Event lifecycle publication requires the installed Event producer; an in-process host selects
+`schema.UseEvent().UseProducer(producer => producer.UseInProcess())` alongside its consumer.
+
+The final stamp exists at the provider's write boundary: LinqToDB refreshes it when the statement
+executes, and EF Core rotates it at unit-of-work commit. Save preparations project that final stamp
+onto the process's binding rows and same-source bindings staged by called processes in the same
+outer operation. Entity and binding writes commit or roll back together. A stale persisted binding
+aborts the operation with `FLOW_SOURCE_MODIFIED_CONCURRENTLY`, surfaced as HTTP 412.
 
 Sharing one source entity across two processes trips the same check: after one process writes the
 entity, the other process's rows are stale, and its next transition fails with 412. That outcome
@@ -420,12 +498,15 @@ is intended; bind per-process entities or coordinate access in application code.
 
 Entities a task loads or binds through `FlowTaskContext.SourceAsync<T>()` or
 `BindSourceAsync<T>()` are tracked by identity `(type, canonical name)` and persisted
-automatically inside the transition's unit of work. Each tracked entity is written once, so the
-task's field mutations and the projection land in a single update, and the behavior matches across
-the EF Core and LinqToDB providers. Because the projection pass reuses the tracked instance, it
-observes the task's mutations within the same unit of work. Condition evaluation does not track or
-write back sources: conditions are pure reads, and application code must not mutate a source
-inside a `When<T>` predicate.
+inside the transition's unit of work. Tasks may change the tracked entity for automatic write-back
+or stage explicit `IResourceMutation<T>` updates with `context.UnitOfWork`. The final source flush
+includes task mutations and source projection; explicit task writes remain part of the same outer
+transaction. Projection reuses the tracked instance and observes the task's current fields.
+Condition evaluation performs pure reads without source tracking or write-back; application code
+must keep `When<T>` predicates free of source mutations.
+Source advisors receive the execution through `FlowTransitionContext.Execution` and stage changes
+there. `FlowHandlerSupport` owns binding-expectation validation and final entity/binding stamp flush;
+native repositories retain optimistic concurrency for every source write.
 
 `FlowSourceReadScope` suppresses owner and soft-delete query filters while a process reads an
 already-bound source. The durable binding authorizes that transition to retain access to its source;

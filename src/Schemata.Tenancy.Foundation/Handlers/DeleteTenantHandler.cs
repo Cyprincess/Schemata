@@ -3,45 +3,44 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions;
 using Schemata.Entity.Repository;
-using Schemata.Messaging.Skeleton;
-using Schemata.Tenancy.Foundation.Commands;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
 
 namespace Schemata.Tenancy.Foundation.Handlers;
 
-/// <summary>Removes a tenant together with its host associations and evicts its cached provider.</summary>
+/// <summary>Removes a tenant together with its host associations and evicts its cached provider after commit.</summary>
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
 public sealed class DeleteTenantHandler<TTenant>(
-    IRepository<TTenant>            tenants,
-    IRepository<SchemataTenantHost> hosts,
-    ITenantProviderCache            cache
-) : IRequestHandler<DeleteTenantRequest<TTenant>, Unit>
+    IRepository<TTenant>                  tenants,
+    IRepository<SchemataTenantHost>       hosts,
+    IResourceMutation<TTenant>            tenantMutation,
+    IResourceMutation<SchemataTenantHost> hostMutation,
+    ITenantProviderCache                  cache
+)
     where TTenant : SchemataTenant
 {
-    public async Task<Unit> HandleAsync(DeleteTenantRequest<TTenant> request, CancellationToken ct = default) {
-        ArgumentNullException.ThrowIfNull(request);
-
-        // Remove the tenant and its hosts in one unit of work so host rows are committed
-        // with the tenant removal.
+    public async Task HandleAsync(TTenant tenant, CancellationToken ct = default) {
         await using var uow = tenants.Begin();
         hosts.Join(uow);
 
         var existing = new List<SchemataTenantHost>();
-        await foreach (var row in hosts.ListAsync(q => q.Where(h => h.Tenant == request.Tenant.Name), ct)) {
+        await foreach (var row in hosts.ListAsync(q => q.Where(h => h.Parent == tenant.CanonicalName), ct)) {
             existing.Add(row);
         }
 
-        if (existing.Count > 0) {
-            await hosts.RemoveRangeAsync(existing, ct);
+        foreach (var row in existing) {
+            await hostMutation.DeleteAsync(row, uow, ct: ct);
         }
 
-        await tenants.RemoveAsync(request.Tenant, ct);
-        await uow.CommitAsync(ct);
+        var result = await tenantMutation.DeleteAsync(tenant, uow, ct: ct);
+        if (result == MutationResult.Applied) {
+            uow.AddCommitSink(CommitOrders.Domain, _ => {
+                cache.Remove(tenant.Uid.ToString());
+                return Task.CompletedTask;
+            });
+        }
 
-        cache.Remove(request.Tenant.Uid.ToString());
-        return Unit.Value;
+        await uow.CommitAsync(ct);
     }
 }

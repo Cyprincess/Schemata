@@ -50,10 +50,7 @@ public sealed class AdviceAuthorizeNonce<TApp>(IOptions<CodeFlowOptions> options
          && !string.IsNullOrWhiteSpace(authz.Request?.ResponseType)
          && authz.Request.ResponseType.Contains(ResponseTypes.IdToken)
          && string.IsNullOrWhiteSpace(authz.Request.Nonce)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.Nonce)
-            );
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_EMPTY, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.Nonce });
         }
 
         return Task.FromResult(AdviseResult.Continue);

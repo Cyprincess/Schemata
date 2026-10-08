@@ -14,7 +14,7 @@ namespace Schemata.Resource.Foundation.Advisors;
 /// </summary>
 /// <typeparam name="TEntity">The entity type being deleted.</typeparam>
 /// <typeparam name="TDetail">The soft-deleted resource detail response type.</typeparam>
-public sealed class ResourceDeleteResponsePipelineAdvisor<TEntity, TDetail>(IEntityTagProvider entityTags)
+public sealed class ResourceDeleteResponsePipelineAdvisor<TEntity, TDetail>
     : IRequestPipelineAdvisor<DeleteResourceRequest<TEntity, TDetail>, DeleteResultBase<TDetail>>
     where TEntity : class, ICanonicalName
     where TDetail : class, ICanonicalName
@@ -30,7 +30,7 @@ public sealed class ResourceDeleteResponsePipelineAdvisor<TEntity, TDetail>(IEnt
         CancellationToken                                     ct
     ) {
         var response = await next(ct);
-        ResourceDetailResponsePipelineAdvisor.Shape<TEntity, TDetail>(entityTags, ctx, response.Detail);
+        ResourceDetailResponsePipelineAdvisor.Shape<TEntity, TDetail>(ctx, response.Detail);
         return response;
     }
 

@@ -8,6 +8,8 @@ using Schemata.Entity.Repository;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Integration.Tests.Fixtures;
 using Schemata.Flow.Scheduling.Runtime;
+using Schemata.Flow.Skeleton;
+using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;
@@ -38,6 +40,13 @@ public sealed class FlowTimerBridgeShould : IClassFixture<TimerBridgeFixture>
             waiting.Select(t => t.CanonicalName).OrderBy(n => n),
             jobs.Select(j => j.Variables!["tokenName"]).OrderBy(n => n));
 
+
+        using (var registrationScope = _fixture.CreateScope()) {
+            await registrationScope.ServiceProvider.GetRequiredService<IProcessRegistry>()
+                .RegisterAsync<ProcessVersionShould.Original>(FlowConstants.Engines.Bpmn, c => {
+                    c.Name = nameof(ParallelTimerProcess); c.Version = "replacement"; c.IsLatest = true;
+                });
+        }
         var first        = jobs[0];
         var firstToken   = first.Variables!["tokenName"];
         var otherToken   = waiting.Single(t => t.CanonicalName != firstToken).CanonicalName;
@@ -106,7 +115,7 @@ public sealed class FlowTimerBridgeShould : IClassFixture<TimerBridgeFixture>
                 query => query.Where(current => current.Job == job.CanonicalName && current.State == ExecutionState.Pending));
             Assert.NotNull(execution);
 
-            execution!.StartTime = DateTime.UtcNow.AddSeconds(-1);
+            execution.StartTime = DateTime.UtcNow.AddSeconds(-1);
             await executions.UpdateAsync(execution);
             await executions.CommitAsync();
         }
@@ -118,7 +127,7 @@ public sealed class FlowTimerBridgeShould : IClassFixture<TimerBridgeFixture>
         var completed = await verification.FirstOrDefaultAsync(
             query => query.Where(current => current.Job == job.CanonicalName));
         Assert.NotNull(completed);
-        Assert.Equal(ExecutionState.Succeeded, completed!.State);
+        Assert.Equal(ExecutionState.Succeeded, completed.State);
     }
 
     private async Task<List<SchemataJob>> ReadJobsAsync(string processCanonical) {
@@ -127,7 +136,7 @@ public sealed class FlowTimerBridgeShould : IClassFixture<TimerBridgeFixture>
         var leaf = processCanonical[(processCanonical.LastIndexOf('/') + 1)..];
         var jobs = new List<SchemataJob>();
         await foreach (var job in repository.ListAsync(
-                           query => query.Where(current => current.Name!.StartsWith($"flow-{leaf}-")))) {
+                           query => query.Where(current => current.Key!.StartsWith($"flow-{leaf}-")))) {
             jobs.Add(job);
         }
 
@@ -156,7 +165,7 @@ public sealed class FlowTimerBridgeShould : IClassFixture<TimerBridgeFixture>
         var       repository = scope.ServiceProvider.GetRequiredService<IRepository<Order>>();
         var order = await repository.FindAsync([uid]);
         Assert.NotNull(order);
-        return order!;
+        return order;
     }
 
     private async Task<List<SchemataProcessToken>> ReadTokensAsync(string processName) {

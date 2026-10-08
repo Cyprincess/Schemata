@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions.Advisors;
 using Schemata.Flow.Skeleton;
 using System;
 using System.Collections.Generic;
@@ -52,7 +53,6 @@ public class FlowRunnerPrincipalShould
             Name          = "principal-process",
             Engine        = FlowConstants.Engines.StateMachine,
             Definition    = definition,
-            Configuration = new ProcessConfiguration(),
         };
 
         var harness = new Harness();
@@ -63,7 +63,7 @@ public class FlowRunnerPrincipalShould
                   It.IsAny<FlowExecutionContext>(), It.IsAny<CancellationToken>()))
               .Returns((ProcessDefinition _, SchemataProcess p, FlowExecutionContext ctx, CancellationToken _) => {
                   harness.CapturedExecution = ctx;
-                  return new ValueTask<ProcessSnapshot>(Snapshot(p));
+                  return new(Snapshot(p));
               });
         engine.Setup(e => e.TriggerAsync(
                   It.IsAny<ProcessDefinition>(), It.IsAny<SchemataProcess>(),
@@ -72,11 +72,11 @@ public class FlowRunnerPrincipalShould
               .Returns((ProcessDefinition _, SchemataProcess p, IReadOnlyList<SchemataProcessToken> _,
                         FlowExecutionContext ctx, IEventDefinition _, object? _, string? _, CancellationToken _) => {
                   harness.CapturedExecution = ctx;
-                  return new ValueTask<ProcessSnapshot>(Snapshot(p));
+                  return new(Snapshot(p));
               });
 
         var registry = new Mock<IProcessRegistry>();
-        registry.Setup(r => r.GetRegistration("principal-process")).Returns(registration);
+        registry.Setup(r => r.GetRegistration("principal-process", "1")).Returns(registration);
 
         var handler = new Mock<IFlowCatchHandler>();
         handler.Setup(h => h.ArmAsync(It.IsAny<FlowTransitionContext>(), It.IsAny<CancellationToken>()))
@@ -86,9 +86,10 @@ public class FlowRunnerPrincipalShould
                });
 
         var existing = new SchemataProcess {
-            Name           = "p1",
-            CanonicalName  = "processes/p1",
-            DefinitionName = "principal-process",
+            Name              = "p1",
+            CanonicalName     = "processes/p1",
+            DefinitionName    = "principal-process",
+            DefinitionVersion = "1",
         };
 
         var processes     = Repository(existing);
@@ -100,6 +101,7 @@ public class FlowRunnerPrincipalShould
 
         var collection = new ServiceCollection()
                         .AddLogging()
+                        .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                         .AddSingleton(registry.Object)
                         .AddSingleton<IOptions<SchemataFlowOptions>>(Options.Create(new SchemataFlowOptions()))
                         .AddSingleton(processes.Object)
@@ -119,13 +121,14 @@ public class FlowRunnerPrincipalShould
     private static ProcessSnapshot Snapshot(SchemataProcess process) {
         var token = new SchemataProcessToken {
             Name          = "t1",
-            CanonicalName = "processes/p1/tokens/t1",
-            Process       = "p1",
+            CanonicalName = $"{process.CanonicalName}/tokens/t1",
+            Process       = process.Name!,
             State         = "Completed",
         };
         var transition = new SchemataProcessTransition {
+            Process       = token.Process,
             Name          = "tr1",
-            CanonicalName = "processes/p1/transitions/tr1",
+            CanonicalName = $"{process.CanonicalName}/transitions/tr1",
             Token         = token.CanonicalName,
         };
         return new() { Process = process, Tokens = [token], Transitions = [transition] };
@@ -135,20 +138,22 @@ public class FlowRunnerPrincipalShould
         where T : class {
         var data = items.ToList();
         var repository = new Mock<IRepository<T>>();
+        repository.Setup(r => r.AdviceContext).Returns(new AdviceContext(new ServiceCollection().BuildServiceProvider()));
         repository.Setup(r => r.Join(It.IsAny<IUnitOfWork>()));
         repository.Setup(r => r.Begin()).Returns(Mock.Of<IUnitOfWork>());
         repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>()))
-                  .Returns((T entity, CancellationToken _) => {
+                  .ReturnsAsync((T entity, CancellationToken _) => {
+                      FlowTestCreation.Assign(entity);
                       data.Add(entity);
-                      return Task.CompletedTask;
+                      return MutationResult.Applied;
                   });
-        repository.Setup(r => r.UpdateAsync(It.IsAny<T>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        repository.Setup(r => r.UpdateAsync(It.IsAny<T>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
         repository.Setup(r => r.ListAsync<T>(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => Async(predicate(data.AsQueryable()).ToList()));
         repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new ValueTask<T?>(predicate(data.AsQueryable()).SingleOrDefault()));
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new(predicate(data.AsQueryable()).SingleOrDefault()));
         repository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new ValueTask<T?>(predicate(data.AsQueryable()).FirstOrDefault()));
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new(predicate(data.AsQueryable()).FirstOrDefault()));
         return repository;
     }
 

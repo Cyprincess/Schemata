@@ -10,9 +10,9 @@ namespace Schemata.Identity.Skeleton.Entities;
 /// </summary>
 [Table("SchemataUserTokens")]
 [PrimaryKey(nameof(UserId), nameof(LoginProvider), nameof(Name))]
-public class SchemataUserToken : IdentityUserToken<Guid>, ITimestamp
+public class SchemataUserToken : IdentityUserToken<string>, ITimestamp
 {
-    public override Guid UserId { get; set; }
+    public override string UserId { get; set; } = null!;
 
     public override string LoginProvider { get; set; } = null!;
 

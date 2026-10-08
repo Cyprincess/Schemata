@@ -42,10 +42,12 @@ public class RequestConsumerDispatchShould
         await using var scope    = provider.CreateAsyncScope();
 
         var method = typeof(RabbitMqRequestConsumerHost)
-                    .GetMethod("InvokeHandlerAsync", BindingFlags.NonPublic | BindingFlags.Static)!
-                    .MakeGenericMethod(typeof(Ping), typeof(Unit));
+                    .GetMethod("InvokeHandlerAsync", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        var invoke = method.MakeGenericMethod(typeof(Ping), typeof(Unit));
 
-        var task = (Task<object?>)method.Invoke(null, [scope.ServiceProvider, new Ping(), CancellationToken.None])!;
+        var task = Assert.IsAssignableFrom<Task<object?>>(
+            invoke.Invoke(null, [scope.ServiceProvider, new Ping(), CancellationToken.None]));
         await task;
 
         Assert.True(advisor.Invoked);
@@ -73,10 +75,12 @@ public class RequestConsumerDispatchShould
         await using var scope    = provider.CreateAsyncScope();
 
         var method = typeof(RabbitMqRequestConsumerHost)
-                    .GetMethod("InvokeHandlerAsync", BindingFlags.NonPublic | BindingFlags.Static)!
-                    .MakeGenericMethod(typeof(Ping), typeof(Unit));
+                    .GetMethod("InvokeHandlerAsync", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        var invoke = method.MakeGenericMethod(typeof(Ping), typeof(Unit));
 
-        var task = (Task<object?>)method.Invoke(null, [scope.ServiceProvider, new Ping(), CancellationToken.None])!;
+        var task = Assert.IsAssignableFrom<Task<object?>>(
+            invoke.Invoke(null, [scope.ServiceProvider, new Ping(), CancellationToken.None]));
         await task;
 
         Assert.True(advisor.Invoked);

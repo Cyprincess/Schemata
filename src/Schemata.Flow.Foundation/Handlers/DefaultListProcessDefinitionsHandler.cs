@@ -23,10 +23,11 @@ internal sealed class DefaultListProcessDefinitionsHandler(IProcessRegistry regi
 
     private List<ProcessDefinitionInfo> ListProcessDefinitions() {
         return registry.GetRegisteredProcesses()
-                       .Select(n => {
-                           var definition = registry.GetRegistration(n)?.Definition;
+                       .Select(registration => {
+                           var definition = registration.Definition;
                            var info = new ProcessDefinitionInfo {
-                               CanonicalName = $"definitions/{n}",
+                               CanonicalName = $"definitions/{registration.Name}/versions/{registration.Version}",
+                               Version       = registration.Version,
                                Elements      = ProjectElements(definition),
                                Flows         = definition?.AllFlows.Select(ProjectFlow).ToList() ?? [],
                                Messages      = definition?.Messages.Select(ProjectMessage).ToList() ?? [],
@@ -65,7 +66,11 @@ internal sealed class DefaultListProcessDefinitionsHandler(IProcessRegistry regi
 
         var info = new ProcessDefinitionElementInfo {
             Name             = element.Name,
-            Kind             = element.GetType().Name,
+            Kind             = element switch {
+                ScriptTask => nameof(ScriptTask),
+                BusinessRuleTask => nameof(BusinessRuleTask),
+                _ => element.GetType().Name,
+            },
             Position         = flowEvent?.Position,
             Trigger          = flowEvent?.Definition?.Name,
             TriggerKind      = flowEvent?.Definition?.GetType().Name,

@@ -21,6 +21,51 @@ public class UnitOfWorkShould : IAsyncLifetime
 
     #endregion
 
+    [Trait("Layer", "Integration")]
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ShareWriteTransaction_UsesOwnerCommitOrRollback(bool commit) {
+        var (students, courses, _, scope) = _fixture.CreateScopeWithUoW();
+        using (scope) {
+            await using var transaction = students.Begin();
+            courses.Join(transaction);
+            courses.Join(transaction);
+            await students.AddAsync(new() { Name = "shared-owner", FullName = "Owner", Age = 20, Grade = 1 });
+            await courses.AddAsync(new() { Name = "shared-child", Title = "Child", Credits = 3 });
+            await Assert.ThrowsAsync<InvalidOperationException>(() => courses.CommitAsync());
+            if (commit) await transaction.CommitAsync();
+            else await transaction.RollbackAsync();
+        }
+
+        var (verifyStudents, studentScope) = _fixture.CreateScopeWithRepository();
+        using (studentScope) {
+            Assert.Equal(commit ? 1 : 0, await verifyStudents.CountAsync(q => q.Where(s => s.Name == "shared-owner")));
+        }
+        var (verifyCourses, courseScope) = _fixture.CreateScopeWithCourseRepository();
+        using (courseScope) {
+            Assert.Equal(commit ? 1 : 0, await verifyCourses.CountAsync(q => q.Where(c => c.Name == "shared-child")));
+        }
+    }
+
+    [Trait("Layer", "Integration")]
+    [Fact]
+    public async Task Begin_PreservesExternalCommitOwnership() {
+        var (students, courses, transaction, scope) = _fixture.CreateScopeWithUoW();
+        using (scope) {
+            students.Join(transaction);
+            courses.Join(transaction);
+            await courses.AddAsync(new() { Name = "external-child", Title = "External", Credits = 2 });
+            await Assert.ThrowsAsync<InvalidOperationException>(() => students.CommitAsync());
+            await transaction.RollbackAsync();
+            Assert.Throws<InvalidOperationException>(() => students.Begin());
+        }
+        var (verify, verifyScope) = _fixture.CreateScopeWithCourseRepository();
+        using (verifyScope) {
+            Assert.Equal(0, await verify.CountAsync(q => q.Where(c => c.Name == "external-child")));
+        }
+    }
+
     [Fact]
     public async Task CommitAsync_CommitsMultipleOperations() {
         {
@@ -280,6 +325,121 @@ public class UnitOfWorkShould : IAsyncLifetime
         using (scope) {
             await uow.CommitAsync();
             await Assert.ThrowsAsync<InvalidOperationException>(async () => await uow.CommitAsync());
+        }
+    }
+
+    [Trait("Layer", "Integration")]
+    [Fact]
+    public async Task JoinedPureRead_CommitCompletesEnlistment_AndRejectsFurtherUse() {
+        var (students, _, transaction, scope) = _fixture.CreateScopeWithUoW();
+        using (scope) {
+            students.Join(transaction);
+
+            // Pure read on the joined repository: no write stages, so no type-level committed
+            // notification is enlisted, but the outer commit must still complete the enlistment.
+            _ = await students.CountAsync(q => q);
+
+            await transaction.CommitAsync();
+
+            await Assert.ThrowsAsync<InvalidOperationException>(async () => await students.CountAsync(q => q));
+            Assert.Throws<InvalidOperationException>(() => students.Begin());
+        }
+
+        // A fresh scope resolves a repository that reads normally.
+        var (fresh, freshScope) = _fixture.CreateScopeWithRepository();
+        using (freshScope) {
+            _ = await fresh.CountAsync(q => q);
+        }
+    }
+
+    [Trait("Layer", "Integration")]
+    [Fact]
+    public async Task SavePreparation_ObservesRotatedStamp_AndProjectionPersists() {
+        var (seed, seedScope) = _fixture.CreateScopeWithRepository();
+        using (seedScope) {
+            await seed.AddAsync(new() { FullName = "Prep Target", Age = 1, Grade = 1, Name = "prep-target" });
+            await seed.CommitAsync();
+        }
+
+        var original = Guid.Empty;
+        var observed = Guid.Empty;
+        var (students, _, transaction, scope) = _fixture.CreateScopeWithUoW();
+        using (scope) {
+            students.Join(transaction);
+            var entity = await students.FirstOrDefaultAsync(q => q.Where(s => s.Name == "prep-target"));
+            Assert.NotNull(entity);
+            original = entity.Timestamp;
+
+            entity.Age = 2;
+            await students.UpdateAsync(entity);
+
+            // Scalar projection on an already-enlisted entity: runs after the commit-time stamp
+            // rotation, before the save, so it observes the final stamp and the projected Grade
+            // lands in the same save.
+            transaction.AddSavePreparation(() => {
+                observed      = entity.Timestamp;
+                entity.Grade  = 9;
+            });
+
+            await transaction.CommitAsync();
+        }
+
+        Assert.NotEqual(Guid.Empty, observed);
+        Assert.NotEqual(original, observed);
+
+        var (verifier, verifyScope) = _fixture.CreateScopeWithRepository();
+        using (verifyScope) {
+            var persisted = await verifier.FirstOrDefaultAsync(q => q.Where(s => s.Name == "prep-target"));
+            Assert.NotNull(persisted);
+            Assert.Equal(2, persisted.Age);
+            Assert.Equal(9, persisted.Grade);
+            Assert.Equal(observed, persisted.Timestamp);
+        }
+    }
+
+    [Trait("Layer", "Integration")]
+    [Fact]
+    public async Task SavePreparation_Throws_CommitFails_RestoresStamp_RollsBack() {
+        var (seed, seedScope) = _fixture.CreateScopeWithRepository();
+        using (seedScope) {
+            await seed.AddAsync(new() { FullName = "Prep Fail", Age = 1, Grade = 1, Name = "prep-fail" });
+            await seed.CommitAsync();
+        }
+
+        var original = Guid.Empty;
+        var (students, _, transaction, scope) = _fixture.CreateScopeWithUoW();
+        using (scope) {
+            students.Join(transaction);
+            var entity = await students.FirstOrDefaultAsync(q => q.Where(s => s.Name == "prep-fail"));
+            Assert.NotNull(entity);
+            original = entity.Timestamp;
+
+            entity.Age = 3;
+            await students.UpdateAsync(entity);
+            transaction.AddSavePreparation(() => throw new InvalidOperationException("projection failed"));
+
+            await Assert.ThrowsAsync<InvalidOperationException>(async () => await transaction.CommitAsync());
+
+            // The commit-time rotation was rolled back on the tracked entity.
+            Assert.Equal(original, entity.Timestamp);
+        }
+
+        var (verifier, verifyScope) = _fixture.CreateScopeWithRepository();
+        using (verifyScope) {
+            var persisted = await verifier.FirstOrDefaultAsync(q => q.Where(s => s.Name == "prep-fail"));
+            Assert.NotNull(persisted);
+            Assert.Equal(1, persisted.Age);
+            Assert.Equal(original, persisted.Timestamp);
+        }
+    }
+
+    [Trait("Layer", "Integration")]
+    [Fact]
+    public async Task SavePreparation_AfterCompleted_ThrowsInvalidOperation() {
+        var (_, _, transaction, scope) = _fixture.CreateScopeWithUoW();
+        using (scope) {
+            await transaction.CommitAsync();
+            Assert.Throws<InvalidOperationException>(() => transaction.AddSavePreparation(() => { }));
         }
     }
 }

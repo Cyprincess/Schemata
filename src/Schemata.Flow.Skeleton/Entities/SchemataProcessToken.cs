@@ -21,6 +21,8 @@ public class SchemataProcessToken : IIdentifier, ICanonicalName, IConcurrency, I
     /// <summary>Bare leaf id of the owning process (AIP structural parent, mode A).</summary>
     public virtual string Process { get; set; } = null!;
 
+    public virtual Guid? TenantUid { get; set; }
+
     /// <summary>
     ///     Full canonical name of the token that spawned this token (mode B cross-resource FK).
     ///     Named <c>Spawner</c> to leave the <see cref="IChild" /> <c>Parent</c> slot free for the

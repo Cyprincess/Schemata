@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Schemata.Identity.Skeleton.Entities;
@@ -11,9 +13,12 @@ namespace Schemata.Identity.Foundation.Handlers;
 internal sealed partial class IdentityOperationHandler<TUser>
     where TUser : SchemataUser, new()
 {
+    private readonly IEnumerable<Skeleton.IHostSignInObserver> _hostObservers;
+
     private readonly IMailSender<TUser>         _mail;
     private readonly IMessageSender<TUser>      _message;
     private readonly SignInManager<TUser>       _sign;
+    private readonly TimeProvider               _time;
     private readonly SchemataUserManager<TUser> _users;
 
     /// <summary>Creates an identity operation handler.</summary>
@@ -21,16 +26,22 @@ internal sealed partial class IdentityOperationHandler<TUser>
     /// <param name="sign">Sign-in manager for credential operations.</param>
     /// <param name="mail">Mail sender for email codes.</param>
     /// <param name="message">Message sender for phone codes.</param>
+    /// <param name="time">Clock for authentication timestamps; defaults to the system clock.</param>
+    /// <param name="hostObservers">Observers of host authentication renewal.</param>
     public IdentityOperationHandler(
-        SchemataUserManager<TUser> users,
-        SignInManager<TUser>       sign,
-        IMailSender<TUser>         mail,
-        IMessageSender<TUser>      message
+        SchemataUserManager<TUser>                 users,
+        SignInManager<TUser>                       sign,
+        IMailSender<TUser>                         mail,
+        IMessageSender<TUser>                      message,
+        TimeProvider?                              time          = null,
+        IEnumerable<Skeleton.IHostSignInObserver>? hostObservers = null
     ) {
         _users   = users;
         _sign    = sign;
         _mail    = mail;
         _message = message;
+        _time    = time ?? TimeProvider.System;
+        _hostObservers = hostObservers ?? [];
     }
 
     private async Task<TUser?> GetUserAsync(string? email, string? phone) {

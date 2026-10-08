@@ -5,11 +5,8 @@ using LinqToDB;
 using LinqToDB.Mapping;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Caching.Distributed;
-using Schemata.Caching.Skeleton;
 using Schemata.Entity.Repository;
 using Xunit;
 
@@ -47,8 +44,7 @@ public class IntegrationFixture : IAsyncLifetime
         services.TryAddSingleton<Func<TestDataConnection>>(sp => () => new(options));
 
         if (_useQueryCache) {
-            services.AddDistributedMemoryCache();
-            services.TryAddSingleton<ICacheProvider>(sp => new DistributedCacheProvider(sp.GetRequiredService<IDistributedCache>()));
+            services.AddMemoryCacheProvider();
         }
 
         var students = services.AddRepository<Student, LinqToDbRepository<TestDataConnection, Student>>();
@@ -57,6 +53,7 @@ public class IntegrationFixture : IAsyncLifetime
         }
 
         services.AddRepository<Course, LinqToDbRepository<TestDataConnection, Course>>();
+        services.AddRepository<NestedThing, LinqToDbRepository<TestDataConnection, NestedThing>>();
 
         services.AddScoped<IUnitOfWork<TestDataConnection>, LinqToDbUnitOfWork<TestDataConnection>>();
 
@@ -66,6 +63,7 @@ public class IntegrationFixture : IAsyncLifetime
         var       connection = scope.ServiceProvider.GetRequiredService<TestDataConnection>();
         connection.CreateTableWithIndexes<Student>();
         connection.CreateTableWithIndexes<Course>();
+        connection.CreateTableWithIndexes<NestedThing>();
 
         return Task.CompletedTask;
     }

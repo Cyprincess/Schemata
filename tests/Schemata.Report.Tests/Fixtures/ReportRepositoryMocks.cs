@@ -5,6 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Moq;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Entities;
+using Schemata.Common;
 using Schemata.Entity.Repository;
 
 namespace Schemata.Report.Tests.Fixtures;
@@ -64,27 +66,29 @@ internal static class ReportRepositoryMocks
         repository.Setup(value => value.AddAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
                   .Callback<TEntity, CancellationToken>((entity, _) => {
                       EnsureOpen();
+                      if (entity is ICanonicalName resource) {
+                          resource.Name ??= $"consumer-{Guid.NewGuid():n}";
+                          resource.CanonicalName = ResourceNameDescriptor.ForType<TEntity>().Resolve(entity);
+                      }
                       pending.Add(entity);
                   })
-                  .Returns(Task.CompletedTask);
+                  .ReturnsAsync(MutationResult.Applied);
         repository.Setup(value => value.UpdateAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
                   .Callback<TEntity, CancellationToken>((entity, _) => {
                       EnsureOpen();
                       updated.Add(entity);
                   })
-                  .Returns(Task.CompletedTask);
-        repository.Setup(value => value.RemoveRangeAsync(It.IsAny<IEnumerable<TEntity>>(), It.IsAny<CancellationToken>()))
-                  .Callback<IEnumerable<TEntity>, CancellationToken>((entities, _) => {
+                  .ReturnsAsync(MutationResult.Applied);
+        repository.Setup(value => value.RemoveAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
+                  .Callback<TEntity, CancellationToken>((entity, _) => {
                       EnsureOpen();
                       if (unit is null) {
-                          foreach (var entity in entities) {
-                              records.Remove(entity);
-                          }
+                          records.Remove(entity);
                       } else {
-                          removed.AddRange(entities);
+                          removed.Add(entity);
                       }
                   })
-                  .Returns(Task.CompletedTask);
+                  .ReturnsAsync(MutationResult.Applied);
         repository.Setup(value => value.SuppressAddValidation()).Returns(disposable.Object);
         repository.Setup(value => value.SuppressUpdateValidation()).Returns(disposable.Object);
         repository.Setup(value => value.SuppressQuerySoftDelete()).Returns(disposable.Object);

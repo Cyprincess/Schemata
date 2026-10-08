@@ -1,5 +1,7 @@
 using System;
 using System.Security.Claims;
+using System.Collections.Generic;
+using Schemata.Abstractions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
@@ -13,6 +15,7 @@ using Schemata.Insight.Skeleton.Plan;
 using Schemata.Insight.Skeleton.Queries;
 using Schemata.Messaging.Skeleton;
 using Schemata.Report.Foundation.Commands;
+using Schemata.Report.Foundation.Definitions;
 using Schemata.Report.Foundation.Runtime;
 using Schemata.Report.Foundation.Snapshots;
 using Schemata.Report.Skeleton;
@@ -95,13 +98,15 @@ public sealed class RunReportHandler<TReport, TSnapshot, TChunk>(
             var definition = await definitions.ResolveAsync(request.Name, ct);
             return definition is not null
                 ? definition.Value
-                : throw new NotFoundException(message: $"Report '{request.Name}' was not found.");
+                : throw new NotFoundException(
+                    SchemataResources.REPORT_NOT_FOUND,
+                    new Dictionary<string, string?> { ["name"] = request.Name });
         }
 
         if (string.IsNullOrWhiteSpace(request.Name) && request.Query is not null) {
             return (null, request.Query);
         }
 
-        throw new InvalidArgumentException(message: "Specify exactly one report name or inline query.");
+        throw new InvalidArgumentException(SchemataResources.REPORT_NAME_OR_QUERY_REQUIRED);
     }
 }

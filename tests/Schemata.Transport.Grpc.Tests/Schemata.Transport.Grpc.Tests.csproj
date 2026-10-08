@@ -2,15 +2,27 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <SignAssembly>true</SignAssembly>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Grpc.Core.Testing" />
+    <PackageReference Include="protobuf-net.Reflection" Aliases="ProtoReflection" />
     <PackageReference Include="Moq" />
+    <PackageReference Include="Grpc.Net.Client" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Schemata.Transport.Grpc\Schemata.Transport.Grpc.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Resource.Grpc\Schemata.Resource.Grpc.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Insight.Grpc\Schemata.Insight.Grpc.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Entity.EntityFrameworkCore\Schemata.Entity.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Mapping.Mapster\Schemata.Mapping.Mapster.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Push.Foundation\Schemata.Push.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Security.Foundation\Schemata.Security.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Expressions.Cel\Schemata.Expressions.Cel.csproj" />
   </ItemGroup>
 
 </Project>

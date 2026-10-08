@@ -80,13 +80,16 @@ is reserved separately for a built-in sub-feature; only `WellKnown` uses it.
 | 130_000_000 | HttpLogging            | ASP.NET HTTP Logging middleware                              |
 | 140_000_000 | W3CLogging             | ASP.NET W3C Logging middleware                               |
 | 150_000_000 | Https                  | ASP.NET HTTPS and HTTPS Redirection middlewares              |
-| 160_000_000 | Tenancy                | Multi-tenant isolation middleware                            |
 | 170_000_000 | CookiePolicy           | ASP.NET Cookie Policy middleware                             |
 | 180_000_000 | Routing                | ASP.NET Routing middleware                                   |
 | 185_000_000 | WellKnown              | Well-known endpoint sub-feature of Routing (+5M)             |
 | 190_000_000 | Quota                  | ASP.NET Rate Limiter middleware                              |
 | 200_000_000 | Cors                   | ASP.NET CORS middleware                                      |
-| 210_000_000 | Authentication         | ASP.NET Authentication and Authorization middlewares         |
+| 205_000_000 | Tenancy (Request)      | Request-stage tenant resolution + tenant scope binding       |
+| 210_000_000 | Authentication         | ASP.NET Authentication middleware                             |
+| 211_000_000 | Tenancy (Principal)    | Principal-stage tenant resolution after authentication       |
+| 212_000_000 | Authorization          | ASP.NET Authorization middleware                              |
+| 213_000_000 | Tenancy (Execution)    | Tenant execution middleware and MVC resource filter           |
 | 220_000_000 | Session                | ASP.NET Session middleware                                   |
 | 230_000_000 | Controllers            | ASP.NET MVC middlewares, without Views                       |
 | 240_000_000 | JsonSerializer         | System.Text.Json with snake_case and 53-bit integer handling |

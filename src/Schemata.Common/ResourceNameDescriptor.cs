@@ -43,6 +43,8 @@ public sealed class ResourceNameDescriptor
             CollectionPath  = "";
             _segments       = [];
             _parentSegments = [];
+            _singular       = type.Name;
+            _plural         = type.Name.Pluralize();
             return;
         }
 
@@ -109,17 +111,20 @@ public sealed class ResourceNameDescriptor
 
     /// <summary>
     ///     PascalCase singular form, taken from the pattern's leaf placeholder, e.g. <c>"Book"</c>.
-    ///     Available when <see cref="IsAddressable" /> holds; the pattern is the sole source of
-    ///     resource identity.
+    ///     Without a <see cref="CanonicalNameAttribute" /> the CLR type name serves as the
+    ///     singular/plural label pair; it grants no addressability —
+    ///     <see cref="IsAddressable" /> still requires a pattern.
     /// </summary>
-    /// <exception cref="InvalidOperationException">The type declares no addressable pattern.</exception>
+    /// <exception cref="InvalidOperationException">The type declares a non-addressable pattern.</exception>
     public string Singular => _singular ?? throw NotAddressable();
 
     /// <summary>
     ///     PascalCase plural form, taken from the pattern's collection segment as authored, so
-    ///     <c>people/{person}</c> yields <c>"People"</c>.
+    ///     <c>people/{person}</c> yields <c>"People"</c>; when the pattern is a bare placeholder
+    ///     the singular pluralizes, and without a <see cref="CanonicalNameAttribute" /> the
+    ///     pluralized CLR type name is the label.
     /// </summary>
-    /// <exception cref="InvalidOperationException">The type declares no addressable pattern.</exception>
+    /// <exception cref="InvalidOperationException">The type declares a non-addressable pattern.</exception>
     public string Plural => _plural ?? throw NotAddressable();
 
     /// <summary>
@@ -184,6 +189,15 @@ public sealed class ResourceNameDescriptor
         if (_segments.Length == 0) {
             throw new InvalidOperationException(SchemataResources.GetResourceString(SchemataResources.PATTERN_REQUIRED));
         }
+        if (entity is IChild child && _parentSegments is [{ IsPlaceholder: false }, { IsPlaceholder: true }]
+            && !AppDomainTypeCache.GetProperties(entity.GetType()).ContainsKey(_parentSegments[1].Property!)) {
+            var parent = ParseParent(child.Parent);
+            var name = ((ICanonicalName)entity).Name;
+            if (parent is null || parent.Values.Any(value => value == "-") || string.IsNullOrWhiteSpace(name)) {
+                throw new ValidationException([new() { Field = "parent", Description = "A concrete parent and resource name are required." }]);
+            }
+            return $"{child.Parent}/{Collection}/{name}";
+        }
 
         var type       = entity.GetType();
         var properties = AppDomainTypeCache.GetProperties(type);
@@ -240,7 +254,7 @@ public sealed class ResourceNameDescriptor
             return null;
         }
 
-        return MatchSegments(_parentSegments, parent!.Split('/'));
+        return MatchSegments(_parentSegments, parent.Split('/'));
     }
 
     /// <summary>
@@ -351,6 +365,13 @@ public sealed class ResourceNameDescriptor
     public Expression<Func<T, bool>>? BuildParentPredicate<T>(Dictionary<string, string> parentValues) {
         var parameter  = Expression.Parameter(typeof(T), "e");
         var properties = AppDomainTypeCache.GetProperties(typeof(T));
+        if (typeof(IChild).IsAssignableFrom(typeof(T)) && _parentSegments is [{ IsPlaceholder: false }, { IsPlaceholder: true }]
+            && !properties.ContainsKey(_parentSegments[1].Property!)) {
+            if (!parentValues.TryGetValue(_parentSegments[1].Placeholder!, out var value) || value == "-") return null;
+            var parent = $"{_parentSegments[0].Raw}/{value}";
+            var member = Expression.Property(parameter, nameof(IChild.Parent));
+            return Expression.Lambda<Func<T, bool>>(Expression.Equal(member, Expression.Constant(parent)), parameter);
+        }
 
         Expression? body = null;
 

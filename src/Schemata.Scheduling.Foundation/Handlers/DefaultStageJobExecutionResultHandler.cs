@@ -22,10 +22,13 @@ internal sealed class DefaultStageJobExecutionResultHandler(SchedulingHandlerSup
         try {
             using var scope = scheduler.Services.CreateScope();
             var jobs = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJob>>();
+            var executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
+            await using var transaction = jobs.Begin();
+            executions.Join(transaction);
             var persisted = await jobs.FirstOrDefaultAsync(
                 query => query.Where(job => job.CanonicalName == request.JobCanonicalName
                                           || job.Name == request.JobCanonicalName), ct);
-            if (persisted is null) {
+            if (persisted is null || persisted.ScheduleVersion != request.ScheduleVersion) {
                 return Unit.Value;
             }
 
@@ -44,11 +47,13 @@ internal sealed class DefaultStageJobExecutionResultHandler(SchedulingHandlerSup
             persisted.RecentRunTime = request.RecentRunTime;
             persisted.RecentError   = request.RecentError;
             persisted.NextRunTime   = next;
-            await jobs.UpdateAsync(persisted, ct);
-            await jobs.CommitAsync(ct);
+            await scope.ServiceProvider.GetRequiredService<IResourceMutation<SchemataJob>>().UpdateAsync(persisted, transaction, ct: ct);
+            if (request.State == JobState.Active && next is not null) {
+                await support.ReplacePendingExecutionAsync(persisted, executions, scope.ServiceProvider, transaction, ct);
+            }
+            await transaction.CommitAsync(ct);
 
             if (request.State == JobState.Active && next is not null) {
-                await support.EnsurePendingExecutionAsync(persisted, ct);
                 await support.ArmOneShotTimerAsync(persisted, replayed);
                 rearmed = persisted;
             }

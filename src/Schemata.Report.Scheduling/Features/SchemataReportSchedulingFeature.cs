@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Entity.Repository.Advisors;
+using Schemata.Report.Foundation;
 using Schemata.Report.Foundation.Features;
 using Schemata.Report.Scheduling.Advisors;
 using Schemata.Report.Skeleton.Entities;
@@ -36,7 +37,16 @@ public sealed class SchemataReportSchedulingFeature<TReport, TSnapshot, TChunk> 
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
+        services.TryAddSingleton<ReportSchedulingInitializer>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ReportSchedulingInitializer>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryCommittedAdvisor<TReport>, AdviceReportScheduleSync<TReport>>());
+
+        var selected = schemata.Get<ReportRegistration>("Schemata.Report.Selection");
+        if (selected?.Report != typeof(TReport)
+         || selected.Snapshot != typeof(TSnapshot)
+         || selected.Chunk != typeof(TChunk)) {
+            return;
+        }
+
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IResourceMutationCommittedAdvisor<TReport>, AdviceReportScheduleSync<TReport>>());
     }
 }

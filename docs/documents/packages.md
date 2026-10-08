@@ -12,6 +12,9 @@ Runtime packages follow the Skeleton / Foundation / Provider convention:
 
 This split keeps optional runtimes direct-referenceable. A provider depends on the skeleton contract it adapts; a foundation depends on its own skeleton and owns the default feature. Bridge packages join two foundations through a sub-builder, as `Schemata.Push.Scheduling` does for scheduled sends and `Schemata.Flow.Scheduling` does for timer catches.
 
+The current `src/` tree contains 84 source package projects. Generators under `generators/` and the
+10 meta-package projects under `targets/` are separate from that count.
+
 ## Where the code lives
 
 | Folder                                  | Files                                                                                                                                                                                                          |
@@ -31,12 +34,16 @@ Each `.csproj` sets one or more of these flags. The `Directory.Build.props` in t
 | `UseTenancy=true`        | `Schemata.Tenancy.Foundation` (Application only)                                                         |
 | `UseAuthorization=true`  | `Schemata.Authorization.Foundation` (Application) or `Schemata.Authorization.Skeleton` (Business/Module) |
 | `UseIdentity=true`       | `Schemata.Identity.Foundation` (Application) or `Schemata.Identity.Skeleton` (Business/Module)           |
+| `UseFlow=true`          | `Schemata.Flow.Foundation` (Application) or `Schemata.Flow.Skeleton` (Business/Module)                   |
+| `UseInsight=true`       | `Schemata.Insight.Foundation` (Application) or `Schemata.Insight.Skeleton` (Business/Module)             |
 | `UseMapster=true`        | `Schemata.Mapping.Mapster` (Application only)                                                            |
 | `UseMapping=true`        | `Schemata.Mapping.Skeleton` (Business/Module)                                                            |
 | `UseRepository=true`     | `Schemata.Entity.Repository`                                                                             |
 | `UseResourceGrpc=true`   | `Schemata.Resource.Foundation` and `Schemata.Resource.Grpc` (Application only)                           |
 | `UseResourceHttp=true`   | `Schemata.Resource.Foundation` and `Schemata.Resource.Http` (Application only)                           |
 | `UseSecurity=true`       | `Schemata.Security.Foundation` (Application) or `Schemata.Security.Skeleton` (Business/Module)           |
+| `UsePush=true`          | `Schemata.Push.Foundation` (Application) or `Schemata.Push.Skeleton` (Business/Module)                   |
+| `UseReport=true`        | `Schemata.Report.Foundation` (Application) or `Schemata.Report.Skeleton` (Business/Module)               |
 | `UseValidation=true`     | `Schemata.Validation.FluentValidation` (Application/Module)                                              |
 
 ## Application targets

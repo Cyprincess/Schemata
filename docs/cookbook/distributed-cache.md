@@ -7,12 +7,12 @@ A Schemata application that caches repository query results using the distribute
 ## Prerequisites
 
 - The Student example from [Getting Started](../guides/getting-started.md) is running.
-- NuGet packages: `Schemata.Entity.Cache`, `Schemata.Caching.Distributed` (in-memory path) or `Schemata.Caching.Redis` (Redis path).
+- NuGet packages: `Schemata.Entity.Cache`, `Schemata.Caching.Memory` (in-process path) or `Schemata.Caching.Redis` (shared Redis path).
 - For Redis: a running Redis instance and `StackExchange.Redis`.
 
-## Step 1: Enable query caching with the in-memory distributed cache
+## Step 1: Enable query caching with in-process memory
 
-The `IDistributedCache` abstraction from `Microsoft.Extensions.Caching.Distributed` is the backing store. Start with the built-in in-memory implementation for local development.
+`MemoryCacheProvider` supplies the atomic generation operations query caching requires. Its state belongs to one application process.
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args)
@@ -23,8 +23,7 @@ var builder = WebApplication.CreateBuilder(args)
         schema.UseJsonSerializer();
 
         schema.ConfigureServices(services => {
-            services.AddDistributedMemoryCache();   // IDistributedCache backed by memory
-            services.AddDistributedCache();         // wraps IDistributedCache as ICacheProvider
+            services.AddMemoryCacheProvider();
 
             services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
                     .UseEntityFrameworkCore<AppDbContext>(
@@ -38,13 +37,13 @@ var builder = WebApplication.CreateBuilder(args)
     });
 ```
 
-`AddDistributedCache()` registers `DistributedCacheProvider` as the `ICacheProvider` singleton with `TryAddSingleton`, so it does not replace an existing registration. `UseQueryCache` lives on `SchemataRepositoryBuilder` — chain it after `AddRepository`.
+`AddMemoryCacheProvider()` registers one provider singleton for plain, atomic and collection capabilities. `UseQueryCache` lives on `SchemataRepositoryBuilder`; chain it after `AddRepository`.
 
 **Assertion:** `GET /v1/students` returns `200 OK`. A second identical request within 5 minutes returns the same result without hitting the database (confirm by adding a query log to the EF context).
 
 ## Step 2: Configure TTL and understand the cache key
 
-`SchemataQueryCacheOptions.Ttl` is the sliding expiration applied to cached results and reverse-index entries (default 5 minutes). The cache key comes from `QueryContext.ToCacheKey()`, which stringizes the built LINQ expression tree — so the filter, ordering, and `Skip`/`Take` operators all factor into the key — appends `typeof(T).FullName`, and hashes the result. Two queries with different LINQ produce different keys.
+`SchemataQueryCacheOptions.Ttl` is the absolute lifetime of cached results (default 5 minutes); cache hits do not extend it. The query key comes from `QueryContext.ToCacheKey()`, which stringizes the built LINQ expression tree, appends `typeof(T).FullName`, and hashes the result. Filters, ordering, and `Skip`/`Take` operators factor into the key. The stored result key also includes the root entity type's generation captured before query execution. Generation metadata does not expire.
 
 ```csharp
 services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
@@ -57,15 +56,18 @@ services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
 
 ## Step 3: Swap to Redis
 
-Replace `AddDistributedMemoryCache` and `AddDistributedCache` with the Redis equivalents. The `ICacheProvider` contract is identical, so the rest of the code carries over unchanged.
+Replace `AddMemoryCacheProvider` with the Redis registration. Both select a full-contract `ICacheProvider` backend, so the repository registration carries over unchanged.
 
 ```csharp
+using Microsoft.Extensions.DependencyInjection;
+using StackExchange.Redis;
+
 services.AddSingleton<IConnectionMultiplexer>(
     ConnectionMultiplexer.Connect("localhost:6379"));
-services.AddRedisCache();   // registers RedisCacheProvider as ICacheProvider
+services.AddRedisCache();
 ```
 
-`RedisCacheProvider` resolves `IConnectionMultiplexer` and calls `GetDatabase()`. `AddRedisCache()` uses `TryAddSingleton<ICacheProvider, RedisCacheProvider>()`; if `AddDistributedCache()` ran first, `AddRedisCache()` is silently ignored. Register exactly one provider.
+`RedisCacheProvider` resolves `IConnectionMultiplexer` and calls `GetDatabase()`. `AddRedisCache` replaces the backend selected by `AddMemoryCacheProvider` behind the same canonical outlet.
 
 **Assertion:** With Redis running, `GET /v1/students` populates a key in Redis (verify with `redis-cli KEYS "*"`). Restart the app and the first request still returns cached data from Redis.
 
@@ -101,16 +103,14 @@ using (repository.SuppressQueryCache())
 
 ## Common pitfalls
 
-- **`UseQueryCache` lives on `SchemataRepositoryBuilder`.** Chain it after `AddRepository`. The `ICacheProvider` (via `AddDistributedCache` or `AddRedisCache`) must also be registered, separately.
-- **`AddDistributedCache` and `AddRedisCache` both use `TryAddSingleton`.** Calling both registers only the first. Pick one per application.
-- **`DistributedCacheProvider` is single-process safe only for collection operations.** The reverse index that maps an entity to its cache keys is stored in the same `IDistributedCache`. With an in-memory backend, each process holds its own index, so eviction in one process does not reach the others. Use Redis for multi-process deployments.
-- **Redis collection operations are cluster-safe.** `RedisCacheProvider` uses native Redis Set commands (`SADD`, `SMEMBERS`, `SREM`, `DEL`) for the reverse index, atomic at the server. (Its atomic compare-and-swap key-value operations use Lua scripts; the query cache does not use them.)
-- **Rollback skips eviction.** If `CommitAsync` throws and the transaction rolls back, committed advisors do not run. The cache may serve stale data until the TTL expires.
+- **`UseQueryCache` lives on `SchemataRepositoryBuilder`.** Chain it after `AddRepository`. Register the cache provider separately with `AddMemoryCacheProvider` or `AddRedisCache`.
+- **Processes must share a backing cache for invalidation.** An in-memory backend is private to each process. A commit publishes a new entity-type generation into the selected provider, invalidating entity results, aggregates, and projections. Use a shared backend for multi-process deployments.
+- **Redis deployment constraints apply to provider operations.** See [Redis](../documents/caching/redis.md) for hash-slot requirements when using Redis Cluster.
+- **Database commit and cache invalidation are non-atomic.** Rollback skips invalidation. A crash or cache failure after database commit but before generation publication can leave old entries selectable until their absolute TTL expires.
 
 ## See also
 
 - [Query caching guide](../guides/query-caching.md)
 - [Caching overview](../documents/caching/overview.md)
-- [Distributed cache](../documents/caching/distributed.md)
 - [Redis cache](../documents/caching/redis.md)
 - [Query cache](../documents/entity/query-cache.md)

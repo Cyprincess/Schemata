@@ -1,10 +1,38 @@
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Moq;
+using Schemata.Core.Features;
 using Xunit;
 
 namespace Schemata.Core.Tests.Core;
 
 public class ConfiguratorsShould
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Layer", "Integration")]
+    public void Invoke_AppliesStagedAndDeferredOptionsOnce(bool withFeature) {
+        var services = new ServiceCollection();
+        var builder = new SchemataBuilder(new ConfigurationBuilder().Build(), Mock.Of<IWebHostEnvironment>());
+        if (withFeature) {
+            builder.AddFeature<SchemataRoutingFeature>();
+        }
+
+        builder.ConfigureServices(staged => staged.Configure<TestOptions>(options => options.Value += 21));
+        builder.Configure<TestOptions>(options => options.Value *= 2);
+
+        builder.Invoke(services);
+        builder.Invoke(services);
+
+        using var provider = services.BuildServiceProvider();
+
+        Assert.Equal(42, provider.GetRequiredService<IOptions<TestOptions>>().Value.Value);
+    }
+
     [Fact]
     public void Get_AfterSet_InvokesStoredAction() {
         var configurators = new Configurators();
@@ -89,5 +117,10 @@ public class ConfiguratorsShould
 
         Assert.NotNull(action);
         action("test", 42);
+    }
+
+    public sealed class TestOptions
+    {
+        public int Value { get; set; }
     }
 }

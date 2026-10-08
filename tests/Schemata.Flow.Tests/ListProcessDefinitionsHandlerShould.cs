@@ -37,17 +37,17 @@ public class ListProcessDefinitionsHandlerShould
             Name          = "orders",
             Engine        = "StateMachine",
             Definition    = definition,
-            Configuration = new() { Name = "orders" },
         };
 
         var registry = new Mock<IProcessRegistry>();
-        registry.Setup(r => r.GetRegisteredProcesses()).Returns(["orders"]);
-        registry.Setup(r => r.GetRegistration("orders")).Returns(registration);
+        registry.Setup(r => r.GetRegisteredProcesses()).Returns([registration]);
 
         var handler = new DefaultListProcessDefinitionsHandler(registry.Object);
 
         var info = Assert.Single(await handler.HandleAsync(new()));
 
+        Assert.Equal("definitions/orders/versions/1", info.CanonicalName);
+        Assert.Equal("1", info.Version);
         Assert.Equal(5, info.Elements.Count);
         Assert.Equal(new[] { "begin", "review", "Await_review", "Catch_Await_review_approve", "done" },
                      info.Elements.Select(e => e.Name).ToArray());
@@ -64,19 +64,5 @@ public class ListProcessDefinitionsHandlerShould
         Assert.Equal(4, info.Flows.Count);
         Assert.Equal([("begin", "review"), ("review", "Await_review"), ("Await_review", "Catch_Await_review_approve"), ("Catch_Await_review_approve", "done")],
                      info.Flows.Select(f => (f.Source, f.Target)).ToArray());
-    }
-
-    [Fact]
-    public async Task ListDefinitions_LeavesGraphEmptyWhenRegistrationIsMissing() {
-        var registry = new Mock<IProcessRegistry>();
-        registry.Setup(r => r.GetRegisteredProcesses()).Returns(["orders"]);
-        registry.Setup(r => r.GetRegistration("orders")).Returns((ProcessRegistration?)null);
-
-        var handler = new DefaultListProcessDefinitionsHandler(registry.Object);
-
-        var info = Assert.Single(await handler.HandleAsync(new()));
-        Assert.Equal("definitions/orders", info.CanonicalName);
-        Assert.Empty(info.Elements);
-        Assert.Empty(info.Flows);
     }
 }

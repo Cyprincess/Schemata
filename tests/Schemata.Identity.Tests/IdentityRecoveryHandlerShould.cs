@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Moq;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Entities;
-using Schemata.Identity.Skeleton.Models;
 using Xunit;
 using AspNetIdentityResult = Microsoft.AspNetCore.Identity.IdentityResult;
 
@@ -26,7 +25,7 @@ public class IdentityRecoveryHandlerShould
         host.Users.Setup(value => value.ChangeEmailAsync(User, Email, "confirm-code"))
                   .ReturnsAsync(AspNetIdentityResult.Success);
 
-        var result = await host.Handler.ConfirmAsync(new ConfirmRequest {
+        var result = await host.Handler.ConfirmAsync(new() {
             EmailAddress = Email,
             Code         = "confirm-code",
         }, Anonymous, CancellationToken.None);
@@ -45,7 +44,7 @@ public class IdentityRecoveryHandlerShould
                  .Returns(Task.CompletedTask);
 
         var result = await host.Handler.CodeAsync(
-            new ForgetRequest { EmailAddress = Email }, Anonymous, CancellationToken.None);
+            new() { EmailAddress = Email }, Anonymous, CancellationToken.None);
 
         Assert.Equal(IdentityStatus.Success, result.Status);
         host.Users.Verify(value => value.GenerateChangeEmailTokenAsync(User, Email), Times.Once);
@@ -62,7 +61,7 @@ public class IdentityRecoveryHandlerShould
                  .Returns(Task.CompletedTask);
 
         var result = await host.Handler.ForgotAsync(
-            new ForgetRequest { EmailAddress = Email }, Anonymous, CancellationToken.None);
+            new() { EmailAddress = Email }, Anonymous, CancellationToken.None);
 
         Assert.Equal(IdentityStatus.Success, result.Status);
         host.Users.Verify(value => value.GeneratePasswordResetTokenAsync(User), Times.Once);
@@ -76,7 +75,7 @@ public class IdentityRecoveryHandlerShould
         host.Users.Setup(value => value.IsEmailConfirmedAsync(User)).ReturnsAsync(false);
 
         var result = await host.Handler.ForgotAsync(
-            new ForgetRequest { EmailAddress = Email }, Anonymous, CancellationToken.None);
+            new() { EmailAddress = Email }, Anonymous, CancellationToken.None);
 
         Assert.Equal(IdentityStatus.Success, result.Status);
         host.Users.Verify(value => value.GeneratePasswordResetTokenAsync(It.IsAny<SchemataUser>()), Times.Never);
@@ -92,7 +91,7 @@ public class IdentityRecoveryHandlerShould
         host.Users.Setup(value => value.ResetPasswordAsync(User, "reset-code", "new-secret"))
                   .ReturnsAsync(AspNetIdentityResult.Success);
 
-        var result = await host.Handler.ResetAsync(new ResetRequest {
+        var result = await host.Handler.ResetAsync(new() {
             EmailAddress = Email,
             Code         = "reset-code",
             Password     = "new-secret",

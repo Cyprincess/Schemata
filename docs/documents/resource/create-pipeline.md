@@ -19,7 +19,7 @@ The sanitizer clears `Name`, `CanonicalName`, `Timestamp`, `EntityTag`, `Uid`, `
 
 ## Handler stages
 
-The handler maps `TRequest` to `TEntity`; a null mapping throws `ValidationException` with `INVALID_PAYLOAD`. `IResourceCreateAdvisor<TEntity,TRequest>` runs after mapping. `AdviceApplyChildParent` derives a mode-A parent field from the request parent when applicable. The repository adds and commits the entity, then the handler maps it to `TDetail`.
+The handler maps `TRequest` to `TEntity`; a null mapping throws `ValidationException` with `INVALID_PAYLOAD`. It applies `IChild.Parent` to the entity's structural parent fields before running `IResourceCreateAdvisor<TEntity,TRequest>`, so instance access sees the parent used for persistence. Update's create-on-missing branch uses the same sequence. The selected domain mutation owner or repository persists the entity, then the handler maps it to `TDetail`.
 
 Instance access receives the mapped entity and the Create request so an overridden access provider can evaluate both. Create has no row query to which entitlement can apply.
 ## Idempotency

@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
@@ -29,7 +28,8 @@ public class RequestHeaderResolver : ITenantResolver
             return Task.FromResult<Guid?>(null);
         }
 
-        return Task.FromResult<Guid?>(TenantId.Parse(values.FirstOrDefault()));
+        if (values.Count != 1) throw new TenantResolveException();
+        return Task.FromResult<Guid?>(TenantId.Parse(values[0]));
     }
 
     #endregion

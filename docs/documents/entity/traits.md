@@ -3,13 +3,14 @@
 Traits are marker interfaces that add cross-cutting behavior to entities. Each is delivered by an
 advisor registered with the repository pipeline: the advisor checks the entity with an `is`-test (or a
 constrained generic parameter) and runs its logic when the test matches. For the built-in traits below,
-`AddRepository` wires the matching advisors — implementing the interface is the only per-entity step.
+`AddRepository` wires the matching advisors. Resource naming still requires a consumer-supplied
+`Name` or naming advisor, and ownership requires `UseOwner()`.
 A custom trait needs both the interface and an advisor that performs the same kind of check.
 
-The traits live in `Schemata.Abstractions.Entities`. Their built-in advisors live in three packages:
-the always-on repository advisors in `Schemata.Entity.Repository`, the ownership advisors in
-`Schemata.Entity.Owner` (activated by `UseOwner()`), and the query-cache advisors in
-`Schemata.Entity.Cache` (activated by `UseQueryCache()`).
+The traits live in `Schemata.Abstractions.Entities`. Their built-in advisors live in two packages:
+the always-on repository advisors and the ownership advisors (activated by `UseOwner()`) in
+`Schemata.Entity.Repository`, and the query-cache advisors in `Schemata.Entity.Cache` (activated by
+`UseQueryCache()`).
 
 ## Trait-to-advisor summary
 
@@ -97,13 +98,16 @@ implementation, so each consuming entity declares it:
 public Guid Timestamp { get; set; }
 ```
 
-- **EF Core** reads `[ConcurrencyCheck]` natively. `UpdateAsync` detaches the entity, re-attaches it as
-  modified, and bumps `Timestamp` to a fresh GUID as the current value while the incoming token stays
-  the original. `SaveChangesAsync` then issues `UPDATE ... WHERE <key> AND Timestamp = @original`; a
-  zero-row result raises `DbUpdateConcurrencyException`, normalized to `AbortedException`.
-- **LinqToDB** maps `[ConcurrencyCheck]` to an optimistic-lock column through the metadata reader
-  registered by `UseLinqToDb`, and `UpdateAsync` calls `UpdateOptimisticAsync`. A zero-row result
-  raises `AbortedException`.
+- **EF Core** reads `[ConcurrencyCheck]` natively. `UpdateAsync` keeps the tracked instance and
+  records the caller-supplied `Timestamp` as the original value; the unit of work mints the next
+  stamp immediately before `SaveChangesAsync`, which then issues
+  `UPDATE ... WHERE <key> AND Timestamp = @original`. A zero-row result raises
+  `DbUpdateConcurrencyException`, normalized to `AbortedException`. When the save fails, the
+  caller-visible stamp is restored to the original value.
+- **LinqToDB** maps `[ConcurrencyCheck]` to an optimistic-lock column with
+  `VersionBehavior.Guid`, and `UpdateAsync` calls `UpdateOptimisticWithRefreshAsync`: the guarded
+  `UPDATE` rotates the stamp and refreshes the caller's instance in one statement. A zero-row
+  result raises `AbortedException`.
 
 Without `[ConcurrencyCheck]`, the update writes unconditionally; concurrent writers can lose updates.
 The add stamp alone does not guard the update path.
@@ -133,6 +137,22 @@ public class Book : ICanonicalName { /* ... */ }
 
 The advisor has no suppress flag and runs whenever the entity implements `ICanonicalName` and its type
 carries a registered pattern.
+
+The consuming application owns `Name`. It may supply an explicit value before creation or register
+an `IRepositoryAddAdvisor<TEntity>` that assigns missing names before
+`AdviceAddCanonicalName.DefaultOrder` (120,000,000). The framework does not generate a fallback
+`Name`. Its generated `Uid` is a separate persistence identifier.
+
+For an addressable `ICanonicalName` pattern, the final placeholder binds to `Name` regardless of its
+spelling. `ResourceNameDescriptor.Resolve` rejects missing, empty, or whitespace-only segment values
+with `ValidationException`; a prefilled `CanonicalName` does not substitute for `Name`. These rules
+also apply to framework-created persisted resources. BPMN graph node and graph reference names are
+internal graph identifiers, not an exemption for persisted Flow runtime rows.
+
+See [consumer-owned resource names](../repository/mutation-pipeline.md#consumer-owned-resource-names)
+for an advisor implementation and open-generic or entity-specific registration. The implementation
+is in `src/Schemata.Entity.Repository/Advisors/AdviceAddCanonicalName.cs` and
+`src/Schemata.Common/ResourceNameDescriptor.cs`.
 
 ## ISoftDelete
 
@@ -166,17 +186,16 @@ public interface IOwnable
 }
 ```
 
-Records the canonical name of the principal that owns the entity (e.g., `users/chino`). The
-`Schemata.Entity.Owner` package supplies these advisors, all registered by `UseOwner()`:
+Records the canonical name of the principal that owns the entity (e.g., `users/chino`). These
+advisors ship in `Schemata.Entity.Repository` and are all registered by `UseOwner()`:
 
 | Advisor                                               | Pipeline     | Order       | Behavior                                                                                                        |
 | ----------------------------------------------------- | ------------ | ----------- | --------------------------------------------------------------------------------------------------------------- |
 | `AdviceAddOwner<TEntity>`                             | Add          | 121,000,000 | Calls `IOwnerResolver<TEntity>.ResolveAsync` and assigns `Owner` when it is unset.                              |
 | `AdviceBuildQueryOwner<TEntity>`                      | BuildQuery   | 110,000,000 | Appends `.Where(e => e.Owner == owner)` to every query.                                                         |
-| `AdviceValidateResourceReferenceExistence<TEntity>`   | Add + Update | 150,000,000 | Resolves `[ResourceReference(ValidateExistence = true)]` targets and throws `NotFoundException` when missing.  |
 
-`AdviceValidateResourceReferenceExistence` is not trait-gated; it drives off the
-`[ResourceReference]` attribute. See [ownership.md](../repository/ownership.md).
+Repository independently registers `AdviceValidateResourceReferenceExistence` for properties
+opting in with `[ResourceReference(ValidateExistence = true)]`. It is not an ownership capability.
 
 `AdviceAddOwner` and `AdviceBuildQueryOwner` consult `SchemataOwnerOptions.OnNullOwner` when the
 resolver returns `null`: `Reject` (default) throws `PermissionDeniedException`, `EmptyResult` blocks,
@@ -308,3 +327,16 @@ rows with no semantic source leave them empty. No built-in repository advisor.
 - [overview.md](overview.md) — entity design and primary-key convention
 - [repository/mutation-pipeline.md](../repository/mutation-pipeline.md) — add/update/remove advisor chains
 - [repository/query-pipeline.md](../repository/query-pipeline.md) — build-query/query/result advisor chains
+
+## JSON columns and declared conversions
+
+Scalar dictionaries (`Dictionary<string, T>` with scalar values) and scalar collections (`List<T>`/arrays of scalar values) map automatically to a provider JSON column on both the EF Core and LINQ to DB bridges. The automatic eligibility set is fixed; it does not expand for nested shapes such as `Dictionary<string, List<string>>`.
+
+A member outside that set still persists when it declares the column explicitly:
+
+```csharp
+[Column(TypeName = "TEXT")]
+public Dictionary<string, List<string>>? Map { get; set; }
+```
+
+The declared member binds and materializes through the framework JSON converter, and stored values are provider JSON — a raw-seeded valid document materializes, corrupted JSON fails on read instead of disappearing, and `[NotMapped]` members stay excluded. An application-supplied member-level `LinqToDB.Mapping.ValueConverterAttribute` (or an EF Core `HasConversion` configured before the Schemata conventions) is the explicit conversion contract for that member; the automatic converter never overrides it. Registering a `MappingSchema.SetConverter<T, string>` alone does not declare a member or column contract — pair it with an explicit `[Column]` declaration or a member-level converter.

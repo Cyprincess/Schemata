@@ -9,20 +9,49 @@ namespace Schemata.Flow.Skeleton.Models;
 /// </summary>
 public sealed class StandardLoopCharacteristics : LoopCharacteristics
 {
+    private IConditionExpression? _loopCondition;
+    private bool _testBefore;
+    private int? _loopMaximum;
+
     /// <summary>
     ///     The condition expression evaluated before or after each iteration.
     /// </summary>
-    public IConditionExpression? LoopCondition { get; set; }
+    public IConditionExpression? LoopCondition {
+        get => _loopCondition;
+        set {
+            EnsureMutable();
+            _loopCondition = value;
+        }
+    }
 
     /// <summary>
     ///     When <c>true</c>, the condition is evaluated <em>before</em> each iteration
     ///     (while-do). When <c>false</c> (default), it is evaluated <em>after</em>
     ///     each iteration (do-while).
     /// </summary>
-    public bool TestBefore { get; set; }
+    public bool TestBefore {
+        get => _testBefore;
+        set {
+            EnsureMutable();
+            _testBefore = value;
+        }
+    }
 
     /// <summary>
     ///     An optional hard upper bound on the number of loop iterations.
     /// </summary>
-    public int? LoopMaximum { get; set; }
+    public int? LoopMaximum {
+        get => _loopMaximum;
+        set {
+            EnsureMutable();
+            _loopMaximum = value;
+        }
+    }
+
+    /// <inheritdoc />
+    protected internal override void FreezeCore() {
+        if (LoopCondition is FlowGraphNode node) {
+            node.Freeze();
+        }
+    }
 }

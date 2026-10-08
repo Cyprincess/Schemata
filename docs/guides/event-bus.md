@@ -17,6 +17,8 @@ dotnet add package --prerelease Schemata.Event.Foundation
 `UseEvent()` takes no delegate and returns an `EventBuilder`. Chain the configuration:
 
 ```csharp
+using Microsoft.AspNetCore.Builder;
+
 schema.UseEvent()
       .RegisterEvent<StudentEnrolled>("students/student-enrolled")
       .UseProducer(p => p.UseInProcess())
@@ -54,8 +56,8 @@ you publish it:
 ## Configure producer and consumer
 
 `UseProducer(p => p.UseInProcess())` registers `InProcessEventBus` as `IEventBus`.
-`UseConsumer(c => c.UseInProcess())` registers the subscription store, handler resolver, and dispatch
-context for in-process delivery:
+`UseConsumer(c => c.UseInProcess())` registers the handler resolver and dispatch context for
+in-process delivery:
 
 ```csharp
 .UseProducer(p => p.UseInProcess())
@@ -71,6 +73,9 @@ production, see the [RabbitMQ Event Bus](../cookbook/rabbitmq-event-bus.md) reci
 Create `StudentEnrolledHandler.cs`. Implement `IEventHandler<TEvent>`:
 
 ```csharp
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Schemata.Event.Skeleton;
 
 public sealed class StudentEnrolledHandler : IEventHandler<StudentEnrolled>
@@ -95,48 +100,51 @@ handler runs on dispatch.
 
 ## Publish after the student commit
 
-Publish from a committed advisor so the event is recorded only after the Student transaction succeeds:
+Publish from a committed advisor so delivery begins only after the Student transaction succeeds:
 
 ```csharp
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Abstractions.Advisors;
-using Schemata.Entity.Repository;
+using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Event.Skeleton;
 
 public sealed class PublishStudentEnrolledAdvisor(IEventBus bus)
-    : IRepositoryCommittedAdvisor<Student>
+    : IResourceMutationCommittedAdvisor<Student>
 {
     public int Order => 0;
 
-    public async Task<AdviseResult> AdviseAsync(
-        AdviceContext        ctx,
-        IRepository<Student> repository,
-        CommitChanges<Student> changes,
-        CancellationToken    ct = default)
+    public Func<CancellationToken, Task>? Prepare(Student entity, Operations operation)
     {
-        foreach (var student in changes.Added)
+        if (operation is not Operations.Create)
         {
-            await bus.PublishAsync(new StudentEnrolled {
-                StudentName = student.FullName,
-                Age         = student.Age,
-            }, ct);
+            return null;
         }
 
-        return AdviseResult.Continue;
+        var name = entity.FullName;
+        var age  = entity.Age;
+
+        return ct => bus.PublishAsync(new StudentEnrolled {
+            StudentName = name,
+            Age         = age,
+        }, ct);
     }
 }
 
 schema.ConfigureServices(services => {
     services.TryAddEnumerable(
-        ServiceDescriptor.Scoped<IRepositoryCommittedAdvisor<Student>, PublishStudentEnrolledAdvisor>());
+        ServiceDescriptor.Scoped<IResourceMutationCommittedAdvisor<Student>, PublishStudentEnrolledAdvisor>());
 });
 ```
 
-`PublishAsync` records the event in a durable outbox and returns immediately — it does not run the
-handler inline. A background dispatcher drains the outbox and invokes `StudentEnrolledHandler` a
-moment later. The handler can run after the HTTP response returns, so write handlers to be idempotent.
+`InProcessEventBus.PublishAsync` invokes `StudentEnrolledHandler` inline and awaits it before
+returning. Handler failures propagate from the committed advisor, but the Student data is already
+committed. The bus provides neither a transactional outbox nor automatic publish retries; a crash
+after the business commit can leave the event undelivered.
 
 ## Verify
 
@@ -150,8 +158,8 @@ curl -X POST http://localhost:5000/v1/students \
      -d '{"full_name":"Alice","age":20}'
 ```
 
-The committed advisor publishes `StudentEnrolled` after the Student create commits. The console prints,
-shortly after the response, once the outbox dispatcher drains the row:
+The committed advisor publishes `StudentEnrolled` after the Student create commits. The handler's
+expected console message appears during `PublishAsync`, before the successful HTTP response:
 
 ```text
 Student enrolled: Alice, age 20
@@ -165,5 +173,5 @@ Student enrolled: Alice, age 20
 
 ## See also
 
-- [Event Overview](../documents/event/overview.md) — wire names, the outbox, `IEventTypeRegistry`
+- [Event Overview](../documents/event/overview.md) — wire names, audit records, `IEventTypeRegistry`
 - [Domain Events](../cookbook/domain-events.md) — publish an event after a repository commit

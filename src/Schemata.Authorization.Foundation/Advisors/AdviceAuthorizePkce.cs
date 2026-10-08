@@ -61,10 +61,8 @@ public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options)
         }
 
         if (required && string.IsNullOrWhiteSpace(authz.Request?.CodeChallenge)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.CodeChallenge)
-            );
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_EMPTY,
+                new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.CodeChallenge });
         }
 
         if (string.IsNullOrWhiteSpace(authz.Request?.CodeChallenge)) {
@@ -72,10 +70,8 @@ public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options)
         }
 
         if (!PkceValidation.IsValid(authz.Request.CodeChallenge)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), Parameters.CodeChallenge)
-            );
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED,
+                new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.CodeChallenge });
         }
 
         // Normalize a missing method to "plain" per RFC 7636 §4.3, and write the result back to
@@ -93,18 +89,11 @@ public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options)
             case PkceMethods.Plain when !options.Value.RequirePkceS256:
                 break;
             case PkceMethods.Plain:
-                throw new OAuthException(
-                    OAuthErrors.InvalidRequest,
-                    string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), PkceMethods.Plain)
-                );
+                throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED,
+                    new System.Collections.Generic.Dictionary<string, string?> { ["value"] = PkceMethods.Plain });
             default:
-                throw new OAuthException(
-                    OAuthErrors.InvalidRequest,
-                    string.Format(
-                        SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED),
-                        Parameters.CodeChallengeMethod
-                    )
-                );
+                throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED,
+                    new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.CodeChallengeMethod });
         }
 
         return Task.FromResult(AdviseResult.Continue);

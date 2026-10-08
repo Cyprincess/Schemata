@@ -52,7 +52,7 @@ public sealed class CatalogModule : ModuleBase
 {
     public override int Order => 1_000;
 
-    public override void ConfigureServices(
+    public void ConfigureServices(
         IServiceCollection  services,
         IConfiguration      configuration,
         IWebHostEnvironment environment
@@ -60,7 +60,7 @@ public sealed class CatalogModule : ModuleBase
         services.AddScoped<ICatalogService, CatalogService>();
     }
 
-    public override void ConfigureEndpoints(
+    public void ConfigureEndpoints(
         IApplicationBuilder   app,
         IEndpointRouteBuilder endpoints,
         IConfiguration        configuration,
@@ -75,6 +75,9 @@ public sealed class CatalogModule : ModuleBase
 module among others for `ConfigureServices`, and `Priority` to split
 `ConfigureApplication` / `ConfigureEndpoints` ordering. Implement `IModule` directly when the two
 axes must differ.
+
+The lifecycle hooks are plain public methods: `DefaultModulesRunner` invokes `ConfigureServices`,
+`ConfigureApplication`, and `ConfigureEndpoints` by name through reflection when they exist.
 
 **Assertion:** `typeof(CatalogModule).IsAssignableTo(typeof(IModule))` is `true`.
 

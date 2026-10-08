@@ -20,14 +20,14 @@ namespace Schemata.Entity.LinqToDB;
 public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
     where TContext : DataConnection
 {
-    private readonly Func<TContext>                      _factory;
-    private readonly ILogger?                            _logger;
-    private readonly List<Func<CancellationToken, Task>> _committed = [];
-    private readonly List<Action>                        _rollback  = [];
-    private          TContext?                           _context;
-    private          DataConnectionTransaction?          _transaction;
-    private          bool                                _completed;
-    private          bool                                _disposed;
+    private readonly Func<TContext>                            _factory;
+    private readonly ILogger?                                  _logger;
+    private          List<(int Order, Func<CancellationToken, Task> Sink)>? _committed;
+    private          List<Action>?                             _rollback;
+    private          TContext?                                 _context;
+    private          DataConnectionTransaction?                _transaction;
+    private          bool                                      _completed;
+    private          bool                                      _disposed;
 
     /// <summary>
     ///     Initializes a unit of work with a data-connection factory and optional logging services.
@@ -74,11 +74,13 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
             try {
                 await _transaction.CommitAsync(ct);
             } catch (Exception ex) when (DatabaseErrorClassifier.IsUniqueConstraintViolation(ex)) {
-                throw new AlreadyExistsException();
+                throw new AlreadyExistsException(innerException: ex);
             }
         } catch (Exception) {
-            foreach (var reset in _rollback) {
-                reset();
+            if (_rollback is not null) {
+                foreach (var reset in _rollback) {
+                    reset();
+                }
             }
 
             await TryRollbackAsync(_transaction);
@@ -86,8 +88,8 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
 
             _transaction = null;
             _completed   = true;
-            _committed.Clear();
-            _rollback.Clear();
+            _committed?.Clear();
+            _rollback?.Clear();
 
             throw;
         }
@@ -98,16 +100,19 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
         _completed   = true;
 
         List<Exception>? errors = null;
-        foreach (var sink in _committed) {
-            try {
-                await sink(ct);
-            } catch (Exception ex) {
-                (errors ??= []).Add(ex);
+        if (_committed is not null) {
+            foreach (var (_, sink) in _committed) {
+                try {
+                    await sink(ct);
+                } catch (Exception ex) {
+                    (errors ??= []).Add(ex);
+                }
             }
+
+            _committed.Clear();
         }
 
-        _committed.Clear();
-        _rollback.Clear();
+        _rollback?.Clear();
 
         if (errors is not null) {
             throw errors.Count == 1 ? errors.First() : new AggregateException(errors);
@@ -120,8 +125,10 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
             return;
         }
 
-        foreach (var reset in _rollback) {
-            reset();
+        if (_rollback is not null) {
+            foreach (var reset in _rollback) {
+                reset();
+            }
         }
 
         if (_transaction is not null) {
@@ -130,8 +137,8 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
             _transaction = null;
         }
 
-        _committed.Clear();
-        _rollback.Clear();
+        _committed?.Clear();
+        _rollback?.Clear();
         _completed = true;
     }
 
@@ -139,7 +146,10 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
         if (_disposed) return;
 
         if (!_completed) {
-            foreach (var reset in _rollback) reset();
+            if (_rollback is not null) {
+                foreach (var reset in _rollback) reset();
+            }
+
             if (_transaction is not null) {
                 TryRollback(_transaction);
                 _transaction.Dispose();
@@ -149,8 +159,8 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
             _completed = true;
         }
 
-        _committed.Clear();
-        _rollback.Clear();
+        _committed?.Clear();
+        _rollback?.Clear();
 
         _context?.Dispose();
         _context = null;
@@ -163,7 +173,10 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
         if (_disposed) return;
 
         if (!_completed) {
-            foreach (var reset in _rollback) reset();
+            if (_rollback is not null) {
+                foreach (var reset in _rollback) reset();
+            }
+
             if (_transaction is not null) {
                 await TryRollbackAsync(_transaction);
                 await _transaction.DisposeAsync();
@@ -173,8 +186,8 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
             _completed = true;
         }
 
-        _committed.Clear();
-        _rollback.Clear();
+        _committed?.Clear();
+        _rollback?.Clear();
 
         if (_context is not null) {
             await _context.DisposeAsync();
@@ -187,9 +200,32 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>
 
     #region IUnitOfWork Members
 
-    void IUnitOfWork.AddCommitSink(Func<CancellationToken, Task> sink) { _committed.Add(sink); }
+    void IUnitOfWork.AddCommitSink(int order, Func<CancellationToken, Task> sink) {
+        var committed = _committed ??= [];
 
-    void IUnitOfWork.AddRollbackSink(Action reset) { _rollback.Add(reset); }
+        // Stable ordered insert: ascending order, equal orders keep registration sequence.
+        var index = committed.Count;
+        while (index > 0 && committed[index - 1].Order > order) {
+            index--;
+        }
+
+        committed.Insert(index, (order, sink));
+    }
+
+    void IUnitOfWork.AddRollbackSink(Action reset) { (_rollback ??= []).Add(reset); }
+
+    void IUnitOfWork.AddSavePreparation(Action preparation) {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_completed) {
+            throw new InvalidOperationException("Unit of work already completed.");
+        }
+
+        // Immediate: LinqToDB has already executed the staged write inside the open transaction,
+        // so generated values are final and the projection applies synchronously, before the
+        // caller stages any dependent write. A throwing preparation surfaces here; the caller's
+        // disposal of the uncommitted unit of work rolls the transaction back.
+        preparation();
+    }
 
     #endregion
 

@@ -20,8 +20,8 @@ public enum TotalSizeMode
     None,
 
     /// <summary>
-    ///     Use the repository's count estimate; providers without cheap statistics
-    ///     fall back to an exact count.
+    ///     Use the repository's estimate of the filtered query. Omit <c>total_size</c> when
+    ///     estimation is unavailable or filtering requires local residual evaluation; exact counting is skipped.
     /// </summary>
     Estimated,
 

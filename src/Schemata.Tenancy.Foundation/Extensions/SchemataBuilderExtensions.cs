@@ -36,6 +36,8 @@ public static class SchemataBuilderExtensions
         where TManager : class, ITenantManager<TTenant>
         where TTenant : SchemataTenant {
         builder.AddFeature<SchemataTenancyFeature<TManager, TTenant>>();
+        builder.AddFeature<SchemataTenantPrincipalFeature<TTenant>>();
+        builder.AddFeature<SchemataTenantExecutionFeature>();
 
         return new(builder.Services);
     }

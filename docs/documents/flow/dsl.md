@@ -25,7 +25,7 @@ public Message<OrderPaid> PayPaid{ get; } = null!;
 
 | Property type                                                                                                                                                | Materialized element             | Registered to |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- | ------------- |
-| `NoneTask`, `ServiceTask`, `UserTask`, `SendTask`, `ReceiveTask`, `ScriptTask`, `ManualTask`, `BusinessRuleTask`, and other non-abstract `Activity` subtypes | the activity                     | `Elements`    |
+| `NoneTask`, `ServiceTask`, `UserTask`, `SendTask`, `ReceiveTask`, `ScriptTask<TInput, TResult>`, `ManualTask`, `BusinessRuleTask<TInput, TResult>`, and other concrete `Activity` subtypes | the activity | `Elements` |
 | `StartEvent`                                                                                                                                                 | `FlowEvent { Position = Start }` | `Elements`    |
 | `EndEvent`                                                                                                                                                   | `FlowEvent { Position = End }`   | `Elements`    |
 | `FlowEvent`                                                                                                                                                  | `FlowEvent` (default position)   | `Elements`    |
@@ -119,12 +119,19 @@ Procedure tasks are anonymous elements: the task name is synthesized (`Enter_{ac
 
 | Method                                                                             | Effect                                                                                                   |
 | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `.OnEnter(Func<FlowTaskContext, ValueTask> body)`                                  | materializes a `ProcedureTask` before the configured activity; every inbound edge routes through it regardless of declaration order |
-| `.OnEnter<TSource>(Func<FlowTaskContext, TSource, ValueTask> body)`                | typed variant; resolves the source bound under the name derived from `TSource` and passes it to the body |
-| `.OnEnter<TSource>(string source, Func<FlowTaskContext, TSource, ValueTask> body)` | typed variant with an explicit source binding name                                                       |
-| `.OnLeave(Func<FlowTaskContext, ValueTask> body)`                                  | materializes a `ProcedureTask` after the activity, then chains it via `.Go(...)`                         |
-| `.OnLeave<TSource>(Func<FlowTaskContext, TSource, ValueTask> body)`                | typed variant; resolves the source bound under the name derived from `TSource`                           |
-| `.OnLeave<TSource>(string source, Func<FlowTaskContext, TSource, ValueTask> body)` | typed variant with an explicit source binding name                                                       |
+| `.OnEnter(Func<FlowTaskContext, CancellationToken, ValueTask> body)` | materializes a `ProcedureTask` before the configured activity; every inbound edge routes through it regardless of declaration order |
+| `.OnEnter<TSource>(Func<FlowTaskContext, TSource, CancellationToken, ValueTask> body)` | resolves the default source binding and passes the operation token to the body |
+| `.OnEnter<TSource>(string source, Func<FlowTaskContext, TSource, CancellationToken, ValueTask> body)` | resolves an explicit source binding |
+| `.OnLeave(Func<FlowTaskContext, CancellationToken, ValueTask> body)` | materializes a `ProcedureTask` after the activity, then chains it via `.Go(...)` |
+| `.OnLeave<TSource>(Func<FlowTaskContext, TSource, CancellationToken, ValueTask> body)` | resolves the default source binding and passes the operation token to the body |
+| `.OnLeave<TSource>(string source, Func<FlowTaskContext, TSource, CancellationToken, ValueTask> body)` | resolves an explicit source binding |
+
+Configure concrete typed script/rule properties in the definition constructor before registry
+publication. `Input` reads `FlowTaskContext.SourceAsync<TSource>(ct)` or the event payload; `Output`
+updates the touched source, token annotations, or calls a resource mutation with `context.UnitOfWork`.
+Pass the supplied `CancellationToken` to every asynchronous operation. `ActivityBehavior.cs`,
+`EventBehavior.cs`, and `EventBranch.cs` preserve that token through entry/leave bodies.
+
 
 ### Boundary events
 

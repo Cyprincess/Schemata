@@ -58,7 +58,7 @@ public class ClientCredentialsHandlerShould
                                                       It.IsAny<Dictionary<string, List<string?>>?>(),
                                                       It.IsAny<Dictionary<string, List<string?>>?>(),
                                                       It.IsAny<CancellationToken>()))
-                      .ThrowsAsync(new OAuthException(errorCode, "auth failed"));
+                      .ThrowsAsync(OAuthException.FromDescription(errorCode, "auth failed"));
         } else if (application is not null) {
             clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
                                                       It.IsAny<Dictionary<string, List<string?>>?>(),

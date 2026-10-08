@@ -11,6 +11,8 @@ namespace Schemata.Abstractions.Resource;
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public class ResourceAttribute : Attribute
 {
+    private TotalSizeMode? _totalSize;
+
     /// <summary>
     ///     Maps the four type roles that together define a resource API surface.
     ///     Each parameter defaults to <paramref name="entity" /> so callers only
@@ -43,17 +45,17 @@ public class ResourceAttribute : Attribute
     /// <summary>
     ///     The type used for create and update request bodies.
     /// </summary>
-    public Type? Request { get; }
+    public Type Request { get; }
 
     /// <summary>
     ///     The type used for single-resource read responses.
     /// </summary>
-    public Type? Detail { get; }
+    public Type Detail { get; }
 
     /// <summary>
     ///     The type used for each item in a list response.
     /// </summary>
-    public Type? Summary { get; }
+    public Type Summary { get; }
 
     /// <summary>
     ///     When set, restricts which endpoint types expose this resource.
@@ -79,7 +81,26 @@ public class ResourceAttribute : Attribute
     ///     How <c>total_size</c> is computed for this resource's list responses.
     ///     <see cref="TotalSizeMode.Default" /> inherits the global option.
     /// </summary>
-    public TotalSizeMode TotalSize { get; set; }
+    public TotalSizeMode TotalSize {
+        get => _totalSize ?? TotalSizeMode.Default;
+        set => _totalSize = value;
+    }
+
+    public TotalSizeMode? ConfiguredTotalSize => _totalSize;
+
+    /// <summary>
+    ///     The default List page size for this resource; requests that omit <c>page_size</c>
+    ///     (or send zero) use it. Zero means unset: the global resource options default page
+    ///     size applies; a negative value is rejected when the effective policy is resolved.
+    /// </summary>
+    public int DefaultPageSize { get; set; }
+
+    /// <summary>
+    ///     The maximum List page size for this resource; larger requests coerce to it.
+    ///     Zero means unset: the global resource options maximum page size applies; a negative
+    ///     value is rejected when the effective policy is resolved.
+    /// </summary>
+    public int MaxPageSize { get; set; }
 
     /// <summary>
     ///     The authentication scheme this resource's transport endpoints require. When

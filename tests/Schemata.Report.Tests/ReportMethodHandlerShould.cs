@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -28,8 +29,8 @@ using Schemata.Report.Skeleton.Models;
 using Schemata.Insight.Skeleton.Queries;
 using Schemata.Report.Foundation.Commands;
 using Schemata.Report.Foundation.Handlers;
+using Schemata.Report.Foundation.Snapshots;
 using Schemata.Report.Foundation.Jobs;
-using Schemata.Report.Foundation.Queries;
 using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Tests;
@@ -42,14 +43,12 @@ public class ReportMethodHandlerShould
         var driver     = ReportTestHost.CreateDriver(ReportTestRows.Create(1));
         var principal  = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity("test"));
         var operations = new Mock<IOperationService>();
-        Guid? uid      = null;
         string? output = null;
-        operations.Setup(service => service.CreateTerminalAsync(
-                      "generate", It.IsAny<string?>(), null, It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
-                  .Returns((string method, string? value, string? error, Guid? operationUid, CancellationToken ct) => {
-                      uid    = operationUid;
-                      output = value;
-                      return ValueTask.FromResult(new Operation { Done = true });
+        operations.Setup(service => service.ExecuteAsync(
+                      "generate", It.IsAny<Func<Operation, CancellationToken, ValueTask<string?>>>(), It.IsAny<CancellationToken>()))
+                  .Returns(async (string method, Func<Operation, CancellationToken, ValueTask<string?>> execute, CancellationToken ct) => {
+                      output = await execute(new() { Name = "consumer-inline", CanonicalName = "operations/consumer-inline" }, ct);
+                      return new() { Done = true };
                   });
 
         using var provider = ReportTestHost.Create(
@@ -67,12 +66,13 @@ public class ReportMethodHandlerShould
         await handler.HandleAsync(request, default);
 
         var snapshot = Assert.Single(state.Snapshots);
-        Assert.NotNull(uid);
-        Assert.Equal($"operations/{uid.Value:n}", snapshot.Operation);
+        Assert.Equal("operations/consumer-inline", snapshot.Operation);
+        Assert.NotNull(output);
         var terminal = JsonSerializer.Deserialize<ReportOperationOutput>(output!, SchemataJson.Default);
-        Assert.Equal(snapshot.CanonicalName, terminal!.Snapshot);
-        operations.Verify(service => service.CreateTerminalAsync(
-            "generate", output, null, uid, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.NotNull(terminal);
+        Assert.Equal(snapshot.CanonicalName, terminal.Snapshot);
+        operations.Verify(service => service.ExecuteAsync(
+            "generate", It.IsAny<Func<Operation, CancellationToken, ValueTask<string?>>>(), It.IsAny<CancellationToken>()), Times.Once);
         driver.Verify(value => value.ExecuteAsync(
                           It.IsAny<SubPlan>(),
                           It.IsAny<QueryInsightRequest>(),
@@ -102,9 +102,11 @@ public class ReportMethodHandlerShould
         Assert.False(result.Done);
         Assert.NotNull(context);
         Assert.Equal("generate", context!.Method);
+        Assert.NotNull(context.ArgsJson);
         var replayed = Assert.IsType<ReportRequest>(
             JsonSerializer.Deserialize<ReportRequest>(context.ArgsJson!, SchemataJson.Default));
         Assert.True(replayed.Persist);
+        Assert.NotNull(replayed.Query);
         var source = Assert.Single(replayed.Query!.Sources);
         Assert.Equal(("r", "rows"), (source.Alias, source.Name));
         scheduler.Verify(
@@ -124,13 +126,13 @@ public class ReportMethodHandlerShould
         var loadedChunkIndexes = new List<int>();
         var store = CreateSnapshotStore(snapshot, [Chunk(0), Chunk(1), Chunk(2)], loadedChunkIndexes);
         var options = Options.Create(new SchemataReportOptions { MaxReadPageSize = 2_000 });
-        var handler = new ReadSnapshotHandler<SchemataReportSnapshot>(store.Object, options);
+        var handler = new ReadSnapshotHandler<SchemataReportSnapshot>(store.Object, options, new EphemeralDataProtectionProvider());
 
         var first = await handler.HandleAsync(
-            new ReadSnapshotRequest { CanonicalName = snapshot.CanonicalName, PageSize = 1_500 },
+            new() { CanonicalName = snapshot.CanonicalName, PageSize = 1_500 },
             default);
         var second = await handler.HandleAsync(
-            new ReadSnapshotRequest {
+            new() {
                 CanonicalName = snapshot.CanonicalName,
                 PageSize      = 1_500,
                 PageToken     = first.NextPageToken,
@@ -144,24 +146,44 @@ public class ReportMethodHandlerShould
         Assert.Equal([0, 1, 1, 2], loadedChunkIndexes);
     }
 
+    [Trait("Layer", "Component")]
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Read_Rejects_A_Disappeared_Or_Reconstructed_Snapshot_Before_Returning_Rows(bool reconstructed) {
+        var name = "reports/daily/snapshots/current";
+        var original = new SchemataReportSnapshot { Uid = Guid.NewGuid(), CanonicalName = name, ChunkCount = 1 };
+        var store = new Mock<IReportSnapshotStore>(MockBehavior.Strict);
+        store.SetupSequence(value => value.GetAsync(name, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(original)
+            .ReturnsAsync(reconstructed ? new SchemataReportSnapshot { Uid = Guid.NewGuid(), CanonicalName = name, ChunkCount = 1 } : null);
+        store.Setup(value => value.GetChunkAsync(name, 0, It.IsAny<CancellationToken>())).ReturnsAsync(Chunk(0));
+        var handler = new ReadSnapshotHandler<SchemataReportSnapshot>(store.Object,
+            Options.Create(new SchemataReportOptions()), new EphemeralDataProtectionProvider());
+        var error = await Assert.ThrowsAsync<InvalidArgumentException>(() => handler.HandleAsync(new() { CanonicalName = name, PageSize = 1 }));
+        Assert.Equal(Schemata.Abstractions.SchemataResources.REPORT_SNAPSHOT_NOT_FOUND,
+            Assert.Single(error.Details!.OfType<Schemata.Abstractions.Errors.ErrorInfoDetail>()).Reason);
+    }
+
     [Fact]
     public async Task Read_Invalid_Token_Throws_InvalidArgument() {
         var snapshot = new SchemataReportSnapshot { CanonicalName = "reports/daily/snapshots/current" };
         var options  = Options.Create(new SchemataReportOptions());
         var handler = new ReadSnapshotHandler<SchemataReportSnapshot>(
             CreateSnapshotStore(snapshot, [], []).Object,
-            options);
+            options, new EphemeralDataProtectionProvider());
 
         var error = await Assert.ThrowsAsync<InvalidArgumentException>(async () => {
             await handler.HandleAsync(
-                new ReadSnapshotRequest {
+                new() {
                     CanonicalName = snapshot.CanonicalName,
                     PageToken     = "not-a-report-token",
                 },
                 default);
         });
 
-        Assert.Contains("not-a-report-token", error.Message);
+        Assert.Equal(Schemata.Abstractions.SchemataResources.INVALID_PAGE_TOKEN,
+            Assert.Single(error.Details!.OfType<Schemata.Abstractions.Errors.ErrorInfoDetail>()).Reason);
     }
 
     [Fact]
@@ -173,10 +195,10 @@ public class ReportMethodHandlerShould
         var loadedChunkIndexes = new List<int>();
         var store = CreateSnapshotStore(snapshot, [Chunk(0), Chunk(1), Chunk(2)], loadedChunkIndexes);
         var options = Options.Create(new SchemataReportOptions { MaxReadPageSize = 1_000 });
-        var handler = new ReadSnapshotHandler<SchemataReportSnapshot>(store.Object, options);
+        var handler = new ReadSnapshotHandler<SchemataReportSnapshot>(store.Object, options, new EphemeralDataProtectionProvider());
 
         var page = await handler.HandleAsync(
-            new ReadSnapshotRequest {
+            new() {
                 CanonicalName = snapshot.CanonicalName,
                 PageSize      = 5_000,
             },
@@ -191,7 +213,7 @@ public class ReportMethodHandlerShould
     public async Task Generate_With_Name_And_Query_Throws_InvalidArgument() {
         using var services = new ServiceCollection().BuildServiceProvider();
         var handler = new GenerateHandler<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
-            new Mock<IRequestDispatcher>(MockBehavior.Strict).Object,
+            new Schemata.Messaging.Skeleton.Runtime.InProcessRequestDispatcher(services),
             new(),
             services);
         var request = GenerateRequest();
@@ -206,7 +228,7 @@ public class ReportMethodHandlerShould
     public async Task Generate_Without_Operation_Service_Throws_FailedPrecondition() {
         using var services = new ServiceCollection().BuildServiceProvider();
         var handler = new GenerateHandler<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
-            new Mock<IRequestDispatcher>(MockBehavior.Strict).Object,
+            new Schemata.Messaging.Skeleton.Runtime.InProcessRequestDispatcher(services),
             new(),
             services);
 
@@ -273,6 +295,7 @@ public class ReportMethodHandlerShould
             return Task.FromResult(Response);
         }
     }
+
 
     private static Mock<IReportSnapshotStore> CreateSnapshotStore(
         SchemataReportSnapshot                  snapshot,

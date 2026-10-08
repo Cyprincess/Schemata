@@ -132,7 +132,7 @@ public sealed class MultiInstanceExecutor
                 parentBookkeeping[NrOfActiveInstancesName] = 0;
             }
 
-            var join = await ExitParentAsync(engine, definition, process, parent, working, activity, "JoinMultiInstance", transitions, context);
+            var join = await ExitParentAsync(engine, definition, process, parent, working, activity, "JoinMultiInstance", transitions, context, ct: ct);
             if (join is not null) {
                 transitions.Add(join);
             }
@@ -171,7 +171,7 @@ public sealed class MultiInstanceExecutor
         WriteAggregate(token, total, total == 0 ? 0 : 1, 0);
 
         if (total == 0) {
-            return await ExitSequentialAsync(engine, definition, process, token, working, activity, previousState, "SkipMultiInstance", transitions, context);
+            return await ExitSequentialAsync(engine, definition, process, token, working, activity, previousState, "SkipMultiInstance", transitions, context, ct);
         }
 
         var completed = 0;
@@ -199,7 +199,7 @@ public sealed class MultiInstanceExecutor
             }
         }
 
-        return await ExitSequentialAsync(engine, definition, process, token, working, activity, activity.Name, "ExitMultiInstance", transitions, context);
+        return await ExitSequentialAsync(engine, definition, process, token, working, activity, activity.Name, "ExitMultiInstance", transitions, context, ct);
     }
 
     private async ValueTask<ProcessSnapshot> EnterParallelAsync(
@@ -231,7 +231,7 @@ public sealed class MultiInstanceExecutor
                     arrivalEvent));
             }
 
-            return await ExitSequentialAsync(engine, definition, process, parent, working, activity, previousState, "SkipMultiInstance", skipTransitions, context);
+            return await ExitSequentialAsync(engine, definition, process, parent, working, activity, previousState, "SkipMultiInstance", skipTransitions, context, ct);
         }
 
         parent.State         = "Waiting";
@@ -261,6 +261,7 @@ public sealed class MultiInstanceExecutor
             ct.ThrowIfCancellationRequested();
 
             var child = NewInstanceToken(process, parent, activity, i);
+            await context.CreateTokenAsync(child, ct);
             working.Add(child);
             transitions.Add(BpmnEngine.NewTransition(
                 process.Name!,
@@ -285,9 +286,10 @@ public sealed class MultiInstanceExecutor
         string?                            previousState,
         string                             eventName,
         List<SchemataProcessTransition>    transitions,
-        FlowExecutionContext               execution
+        FlowExecutionContext               execution,
+        CancellationToken                  ct
     ) {
-        var join = await ExitParentAsync(engine, definition, process, token, working, activity, eventName, transitions, execution, previousState);
+        var join = await ExitParentAsync(engine, definition, process, token, working, activity, eventName, transitions, execution, previousState, ct: ct);
         if (join is not null) {
             transitions.Add(join);
         }
@@ -306,7 +308,8 @@ public sealed class MultiInstanceExecutor
         string                             eventName,
         List<SchemataProcessTransition>    transitions,
         FlowExecutionContext               execution,
-        string?                            previousState = null
+        string?                            previousState = null,
+        CancellationToken                  ct = default
     ) {
         var outFlow = definition.FirstOutgoing(activity);
         if (outFlow is null) {
@@ -316,7 +319,7 @@ public sealed class MultiInstanceExecutor
         }
 
         var variables = new Dictionary<string, int>();
-        var resolved  = await engine.ResolveTargetAsync(definition, outFlow.Target, variables, BpmnEngine.TokenView(token), execution, process, token);
+        var resolved  = await engine.ResolveTargetAsync(definition, outFlow.Target, variables, BpmnEngine.TokenView(token), execution, process, token, ct: ct);
         BpmnEngine.ApplyResolvedToToken(token, resolved);
 
         return BpmnEngine.NewTransition(

@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Moq;
 using Schemata.Tenancy.Foundation.Services;
 using Schemata.Tenancy.Skeleton;
@@ -12,8 +13,8 @@ public class MemoryCacheTenantProviderCacheShould
     [Fact]
     public void Lease_Returns_Cached_Instance_On_Second_Call() {
         using var cache = BuildCache();
-        using var first = cache.Lease("t1", BuildProvider);
-        using var again = cache.Lease("t1", () => throw new InvalidOperationException("factory must not run"));
+        using var first = cache.Lease("t1", Guid.Empty, BuildProvider);
+        using var again = cache.Lease("t1", Guid.Empty, () => throw new InvalidOperationException("factory must not run"));
 
         Assert.Same(first.Provider, again.Provider);
     }
@@ -26,8 +27,8 @@ public class MemoryCacheTenantProviderCacheShould
         var       disposed   = 0;
         disposable.Setup(d => d.Dispose()).Callback(() => disposed++);
 
-        var first  = cache.Lease("t1", () => mock.Object);
-        var second = cache.Lease("t1", () => throw new InvalidOperationException("factory must not run"));
+        var first  = cache.Lease("t1", Guid.Empty, () => mock.Object);
+        var second = cache.Lease("t1", Guid.Empty, () => throw new InvalidOperationException("factory must not run"));
 
         cache.Remove("t1");
 
@@ -46,7 +47,7 @@ public class MemoryCacheTenantProviderCacheShould
         var       mock       = new Mock<IServiceProvider>();
         var       disposable = mock.As<IDisposable>();
 
-        cache.Lease("t1", () => mock.Object).Dispose();
+        cache.Lease("t1", Guid.Empty, () => mock.Object).Dispose();
         cache.Remove("t1");
 
         disposable.Verify(d => d.Dispose(), Times.Once);
@@ -61,8 +62,8 @@ public class MemoryCacheTenantProviderCacheShould
         var disposed        = 0;
         firstDisposable.Setup(d => d.Dispose()).Callback(() => disposed++);
 
-        var firstLease  = cache.Lease("t1", () => firstMock.Object);
-        var secondLease = cache.Lease("t2", () => new Mock<IServiceProvider>().Object);
+        var firstLease  = cache.Lease("t1", Guid.Empty, () => firstMock.Object);
+        var secondLease = cache.Lease("t2", Guid.Empty, () => new Mock<IServiceProvider>().Object);
 
         Assert.Equal(0, disposed);
 
@@ -81,16 +82,16 @@ public class MemoryCacheTenantProviderCacheShould
         var disposed        = 0;
         firstDisposable.Setup(d => d.Dispose()).Callback(() => disposed++);
 
-        var firstLease = cache.Lease("t1", () => firstMock.Object);
+        var firstLease = cache.Lease("t1", Guid.Empty, () => firstMock.Object);
 
         // Adding t2 with capacity=1 retires t1 even though pinned; disposal is deferred.
-        var secondLease = cache.Lease("t2", () => new Mock<IServiceProvider>().Object);
+        var secondLease = cache.Lease("t2", Guid.Empty, () => new Mock<IServiceProvider>().Object);
 
         Assert.Same(firstMock.Object, firstLease.Provider);
         Assert.Equal(0, disposed);
 
         var rebuiltMock = new Mock<IServiceProvider>();
-        var rebuilt     = cache.Lease("t1", () => rebuiltMock.Object);
+        var rebuilt     = cache.Lease("t1", Guid.Empty, () => rebuiltMock.Object);
         Assert.Same(rebuiltMock.Object, rebuilt.Provider);
         Assert.NotSame(firstLease.Provider, rebuilt.Provider);
 
@@ -104,7 +105,7 @@ public class MemoryCacheTenantProviderCacheShould
 
     [Fact]
     public void Lease_Evicts_Entry_Past_Sliding_Expiration() {
-        var clock = new MutableClock(DateTimeOffset.Parse("2020-01-01T00:00:00Z"));
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2020-01-01T00:00:00Z"));
         var options = Options.Create(new SchemataTenancyOptions {
             ProviderSlidingExpiration = TimeSpan.FromMinutes(30), ProviderMaxCapacity = 1000,
         });
@@ -115,16 +116,16 @@ public class MemoryCacheTenantProviderCacheShould
         var disposed   = 0;
         disposable.Setup(d => d.Dispose()).Callback(() => disposed++);
 
-        cache.Lease("t1", () => mock.Object).Dispose();
+        cache.Lease("t1", Guid.Empty, () => mock.Object).Dispose();
 
         // Advancing past the sliding window makes the next lease sweep the stale entry.
         clock.Advance(TimeSpan.FromMinutes(31));
-        cache.Lease("t2", () => new Mock<IServiceProvider>().Object).Dispose();
+        cache.Lease("t2", Guid.Empty, () => new Mock<IServiceProvider>().Object).Dispose();
 
         Assert.Equal(1, disposed);
 
         var       rebuilt = new Mock<IServiceProvider>();
-        using var lease   = cache.Lease("t1", () => rebuilt.Object);
+        using var lease   = cache.Lease("t1", Guid.Empty, () => rebuilt.Object);
         Assert.Same(rebuilt.Object, lease.Provider);
     }
 
@@ -134,7 +135,7 @@ public class MemoryCacheTenantProviderCacheShould
         var       mock       = new Mock<IServiceProvider>();
         var       disposable = mock.As<IDisposable>();
 
-        var lease = cache.Lease("t1", () => mock.Object);
+        var lease = cache.Lease("t1", Guid.Empty, () => mock.Object);
         cache.Remove("t1");
 
         lease.Dispose();
@@ -152,16 +153,4 @@ public class MemoryCacheTenantProviderCacheShould
         return new(options);
     }
 
-    #region Nested type: MutableClock
-
-    private sealed class MutableClock(DateTimeOffset start) : TimeProvider
-    {
-        private DateTimeOffset _now = start;
-
-        public override DateTimeOffset GetUtcNow() { return _now; }
-
-        public void Advance(TimeSpan delta) { _now += delta; }
-    }
-
-    #endregion
 }

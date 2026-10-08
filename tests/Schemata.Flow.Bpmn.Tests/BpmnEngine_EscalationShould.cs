@@ -319,7 +319,7 @@ public class BpmnEngine_EscalationShould
         var boundary = spec.ToBoundary();
         var handler  = new NoneTask { Name = spec.HandlerId };
         var end      = new FlowEvent { Name = $"{spec.HandlerId}-end", Position = EventPosition.End };
-        parent!.Children.Add(boundary);
+        parent.Children.Add(boundary);
         parent.Children.Add(handler);
         parent.Children.Add(end);
         parent.ChildFlows.Add(new() { Source = boundary, Target = handler });

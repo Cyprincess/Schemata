@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -7,8 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Schemata.Tenancy.Foundation.Services;
 
 /// <summary>
-///     <see cref="IServiceScope" /> that delegates Scoped/Transient resolution to a host
-///     <see cref="IServiceScope" /> while keeping tenant override singletons visible on top.
+///     Pairs tenant and host dependency scopes; explicit tenant registrations resolve first.
 /// </summary>
 internal sealed class CompositeScope :
     IServiceScope,
@@ -21,12 +21,15 @@ internal sealed class CompositeScope :
 {
     private readonly TenantCompositeServiceProvider _composite;
     private readonly IServiceScope                  _hostScope;
+    private readonly IServiceScope _tenantScope;
     private          int                            _disposed;
 
     /// <summary>Initializes a composite scope over tenant overrides and a host scope.</summary>
     public CompositeScope(TenantCompositeServiceProvider composite, IServiceScope hostScope) {
         _composite = composite;
         _hostScope = hostScope;
+        _tenantScope = composite.Overrides.CreateScope();
+        _tenantScope.ServiceProvider.GetRequiredService<TenantResolutionContext>().Services = this;
     }
 
     #region IServiceProvider Members
@@ -37,10 +40,10 @@ internal sealed class CompositeScope :
         }
 
         if (serviceType.IsGenericType && serviceType.GetGenericTypeDefinition() == typeof(IEnumerable<>)) {
-            return TenantCompositeServiceProvider.ComposeEnumerable(serviceType, _hostScope.ServiceProvider, _composite.Overrides);
+            return TenantCompositeServiceProvider.ComposeEnumerable(serviceType, _hostScope.ServiceProvider, _tenantScope.ServiceProvider);
         }
 
-        return _composite.Overrides.GetService(serviceType) ?? _hostScope.ServiceProvider.GetService(serviceType);
+        return _tenantScope.ServiceProvider.GetService(serviceType) ?? _hostScope.ServiceProvider.GetService(serviceType);
     }
 
     #endregion
@@ -54,7 +57,7 @@ internal sealed class CompositeScope :
     #region IKeyedServiceProvider Members
 
     public object? GetKeyedService(Type serviceType, object? serviceKey) {
-        var overrides = (IKeyedServiceProvider)_composite.Overrides;
+        var overrides = (IKeyedServiceProvider)_tenantScope.ServiceProvider;
         if (TenantCompositeServiceProvider.IsEnumerableService(serviceType, out _)) {
             var items = overrides.GetKeyedService(serviceType, serviceKey);
             if (items is System.Collections.ICollection { Count: > 0 }) {
@@ -103,17 +106,30 @@ internal sealed class CompositeScope :
 
     public void Dispose() {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-        _hostScope.Dispose();
+        Exception? failure = null;
+        try { _tenantScope.Dispose(); } catch (Exception error) { failure = error; }
+        try { _hostScope.Dispose(); } catch (Exception error) {
+            if (failure is not null) throw new AggregateException(failure, error);
+            throw;
+        }
+        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
     public async ValueTask DisposeAsync() {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-
-        if (_hostScope is IAsyncDisposable disposable) {
-            await disposable.DisposeAsync();
-        } else {
-            _hostScope.Dispose();
+        Exception? failure = null;
+        try {
+            if (_tenantScope is IAsyncDisposable tenant) await tenant.DisposeAsync();
+            else _tenantScope.Dispose();
+        } catch (Exception error) { failure = error; }
+        try {
+            if (_hostScope is IAsyncDisposable host) await host.DisposeAsync();
+            else _hostScope.Dispose();
+        } catch (Exception error) {
+            if (failure is not null) throw new AggregateException(failure, error);
+            throw;
         }
+        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
     #endregion

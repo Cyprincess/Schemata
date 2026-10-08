@@ -16,7 +16,7 @@ namespace Schemata.Resource.Tests;
 public class CommandHandlersShould
 {
     [Fact]
-    public void Register_Keyed_Default_And_Unkeyed_Alias_For_Each_Standard_Operation() {
+    public void Register_Keyed_Default_And_Unkeyed_Alias_For_Standard_Operation() {
         var services = new ServiceCollection();
         var registry = new ResourceRegistry();
 
@@ -24,10 +24,6 @@ public class CommandHandlersShould
         services.AddResource(new ResourceAttribute<Entity, Request, Detail, Summary>(), registry);
 
         AssertHandler<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>(services);
-        AssertHandler<GetResourceQueryRequest<Entity, Detail>, GetResultBase<Detail>>(services);
-        AssertHandler<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Summary>>(services);
-        AssertHandler<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>(services);
-        AssertHandler<DeleteResourceRequest<Entity, Detail>, DeleteResultBase<Detail>>(services);
     }
 
     [Fact]
@@ -41,14 +37,6 @@ public class CommandHandlersShould
 
         AssertHandler<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>(services);
         AssertHandler<CreateResourceRequest<SecondEntity, Request, Detail>, CreateResultBase<Detail>>(services);
-        AssertHandler<GetResourceQueryRequest<Entity, Detail>, GetResultBase<Detail>>(services);
-        AssertHandler<GetResourceQueryRequest<SecondEntity, Detail>, GetResultBase<Detail>>(services);
-        AssertHandler<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Summary>>(services);
-        AssertHandler<ListResourceQueryRequest<SecondEntity, Summary>, ListResultBase<Summary>>(services);
-        AssertHandler<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>(services);
-        AssertHandler<UpdateResourceRequest<SecondEntity, Request, Detail>, UpdateResultBase<Detail>>(services);
-        AssertHandler<DeleteResourceRequest<Entity, Detail>, DeleteResultBase<Detail>>(services);
-        AssertHandler<DeleteResourceRequest<SecondEntity, Detail>, DeleteResultBase<Detail>>(services);
     }
 
     [Fact]

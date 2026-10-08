@@ -164,6 +164,6 @@ public sealed class SourceOwnerSuppressionShould : IClassFixture<OwnedSourceFixt
         }
 
         Assert.NotNull(persisted);
-        return persisted!;
+        return persisted;
     }
 }

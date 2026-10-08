@@ -19,6 +19,8 @@ namespace Schemata.Scheduling.Skeleton.Entities;
 [PrimaryKey(nameof(Uid))]
 public class SchemataJobExecution : IIdentifier, ICanonicalName, IConcurrency, ISoftDelete, ITimestamp
 {
+    public virtual string Tenant { get; set; } = "host";
+
     /// <summary>
     ///     AIP-122 canonical name of the originating <see cref="SchemataJob" />, or
     ///     <see langword="null" /> when this execution does not correspond to a persistent
@@ -27,6 +29,8 @@ public class SchemataJobExecution : IIdentifier, ICanonicalName, IConcurrency, I
     /// </summary>
     [ResourceReference(typeof(SchemataJob))]
     public virtual string? Job { get; set; }
+
+    public virtual Guid ScheduleVersion { get; set; }
 
     /// <summary>
     ///     The custom method verb that dispatched this execution as a long-running

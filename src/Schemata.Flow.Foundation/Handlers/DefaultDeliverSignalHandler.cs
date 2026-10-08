@@ -14,6 +14,7 @@ internal sealed class DefaultDeliverSignalHandler(FlowHandlerSupport support)
     : IRequestHandler<DeliverSignalRequest, SignalDeliveryResult>
 {
     public async Task<SignalDeliveryResult> HandleAsync(DeliverSignalRequest request, CancellationToken ct = default) {
+        support.Access?.RequirePermission(FlowOperations.Signal, typeof(SchemataProcess), request.ProcessCanonicalName, request.Principal);
         var              delivered = false;
         var              committed = new List<ProcessSnapshot>();
         SchemataProcess? target    = null;
@@ -30,10 +31,10 @@ internal sealed class DefaultDeliverSignalHandler(FlowHandlerSupport support)
                 }
 
                 target = process;
-                var registration = support.FindRegistration(process.DefinitionName);
-                var signal = registration?.Definition.Signals
-                                          .FirstOrDefault(currentSignal => currentSignal.Name == request.SignalName);
-                if (registration is null || signal is null) {
+                var registration = support.ResolveRegistration(process);
+                var signal = registration.Definition.Signals
+                                         .FirstOrDefault(currentSignal => currentSignal.Name == request.SignalName);
+                if (signal is null) {
                     return;
                 }
 
@@ -46,12 +47,15 @@ internal sealed class DefaultDeliverSignalHandler(FlowHandlerSupport support)
                 var targets = await engine.FindTriggerTargetsAsync(
                     registration.Definition, process, tokens, context, signal, current);
                 foreach (var token in FlowHandlerSupport.FilterTargets(targets, request.Token)) {
+                    if (support.Access is { } access) await access.RequireEligibilityAsync(FlowOperations.Signal, process,
+                        tokens.Where(candidate => candidate.CanonicalName == token).ToArray(), request.Principal, scope, current);
                     var before   = FlowHandlerSupport.WaitingMap(tokens);
                     var snapshot = await engine.TriggerAsync(
                         registration.Definition, process, tokens, context, signal, payload, token, current);
                     support.EnsureCatchesHaveHandlers(registration.Definition, snapshot);
                     await support.RunAdvisorsAsync(registration, scope, context, snapshot, before, current);
                     await support.Persistence.PersistSnapshotAsync(scope, snapshot, current);
+                    if (support.Access is { } history) await history.RecordParticipationAsync(process, request.Principal, scope, current);
                     committed.Add(snapshot);
                     delivered = true;
                 }

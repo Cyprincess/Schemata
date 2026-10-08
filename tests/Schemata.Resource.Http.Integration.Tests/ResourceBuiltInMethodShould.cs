@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -73,14 +74,56 @@ public class ResourceBuiltInMethodShould : IClassFixture<WebAppFactory>
 
         using var scope = _factory.Services.CreateScope();
         var executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
+        // Select the execution this dispatch staged by its operation identity: the shared fixture
+        // accumulates purge executions from every test in the class.
         var execution = await executions.FirstOrDefaultAsync(
-            query => query.Where(row => row.Method == "purge"));
+            query => query.Where(row => row.CanonicalName == (operation.Name ?? operation.CanonicalName)));
         Assert.NotNull(execution);
-        var args = JsonSerializer.Deserialize<PurgeOperationArgs>(execution.ArgsJson!, SchemataJson.Default);
+        Assert.NotNull(execution.ArgsJson);
+        var args = JsonSerializer.Deserialize<PurgeOperationArgs>(execution.ArgsJson, SchemataJson.Default);
         Assert.NotNull(args);
         Assert.Equal("*", args.Filter);
         Assert.Equal("aip", args.Language);
         Assert.False(args.Force);
+    }
+
+    [Trait("Layer", "Integration")]
+    [Fact]
+    public async Task Purge_Force_Removes_All_SoftDeleted_Rows_And_Keeps_Live_Rows() {
+        var doomed1 = await CreateTrashAsync($"purge-doomed-{Guid.NewGuid():n}");
+        var doomed2 = await CreateTrashAsync($"purge-doomed-{Guid.NewGuid():n}");
+        var spared  = await CreateTrashAsync($"purge-spared-{Guid.NewGuid():n}");
+        var client  = _factory.CreateClient();
+        Assert.Equal(HttpStatusCode.OK, (await client.DeleteAsync($"/v1/{doomed1}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.DeleteAsync($"/v1/{doomed2}")).StatusCode);
+
+        var response = await client.PostAsJsonAsync(
+            "/v1/trashes:purge", new PurgeResourceRequest<Trash> { Filter = "*", Language = "aip", Force = true });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        // The hosted job dispatcher executes the staged purge; poll for the physical outcome.
+        using var scope = _factory.Services.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IRepository<Trash>>();
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (true) {
+            using (repository.SuppressQuerySoftDelete()) {
+                var remaining = await repository.LongCountAsync(
+                    query => query.Where(row => row.CanonicalName == doomed1 || row.CanonicalName == doomed2));
+                if (remaining == 0) {
+                    break;
+                }
+            }
+            if (DateTime.UtcNow >= deadline) {
+                throw new TimeoutException("The purge job did not remove the soft-deleted rows within 30 seconds.");
+            }
+            await Task.Delay(100);
+        }
+
+        using (repository.SuppressQuerySoftDelete()) {
+            var live = await repository.FirstOrDefaultAsync(query => query.Where(row => row.CanonicalName == spared));
+            Assert.NotNull(live);
+            Assert.Null(live.DeleteTime);
+        }
     }
 
     private async Task<string> CreateTrashAsync(string fullName) {
@@ -88,7 +131,9 @@ public class ResourceBuiltInMethodShould : IClassFixture<WebAppFactory>
             "/v1/trashes", new Trash { FullName = fullName });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        return body.GetProperty("name").GetString()!;
+        var name = body.GetProperty("name").GetString();
+        Assert.NotNull(name);
+        return name;
     }
 
     private async Task<Trash?> FindTrashAsync(string canonicalName) {

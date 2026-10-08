@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using Xunit;
 
 namespace Schemata.Expressions.Cel.Tests.Conformance;
 
@@ -127,7 +128,10 @@ public static class CelSpecLoader
                     continue;
                 }
 
-                map[ParseValue(key)!.Value!] = ParseValue(value)?.Value;
+                var parsedKey = ParseValue(key);
+                Assert.NotNull(parsedKey);
+                Assert.NotNull(parsedKey.Value);
+                map[parsedKey.Value] = ParseValue(value)?.Value;
             }
 
             return new(map);

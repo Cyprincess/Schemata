@@ -9,7 +9,6 @@ using Schemata.Insight.Skeleton.Catalog;
 using Schemata.Insight.Skeleton.Queries;
 using Schemata.Insight.Skeleton.Models;
 using Schemata.Messaging.Skeleton;
-using Schemata.Messaging.Skeleton.Runtime;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -21,10 +20,8 @@ public static class SchemataInsightServiceCollectionExtensions
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddSchemataInsight(this IServiceCollection services) {
-        services.TryAddScoped<InProcessRequestDispatcher>();
-        services.TryAddScoped<IRequestDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<ICommandDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<IQueryDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+        services.AddInProcessRequestDispatcher();
+        services.AddDataProtection();
 
         services.AddOptions<SchemataInsightOptions>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IInsightSourceCatalog, InMemoryInsightSourceCatalog>());

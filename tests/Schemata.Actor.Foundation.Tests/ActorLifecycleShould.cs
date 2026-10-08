@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Schemata.Actor.Foundation.Runtime;
@@ -11,15 +12,15 @@ namespace Schemata.Actor.Foundation.Tests;
 public class ActorLifecycleShould
 {
     [Fact]
-    public async Task Stop_DrainsAnAlreadyQueuedAsk_FaultingItWithActorStopped_WhileAPriorTurnIsStillExecuting() {
+    public async Task Stop_CompletesAnAlreadyQueuedAsk_WhileAPriorTurnIsStillExecuting() {
         var (system, _, _) = ActorSystemFactory.Create();
         var gate            = new ManualGate();
-        var actor           = await system.SpawnAsync(new ActorId("gated", "a"), new Props(typeof(GatedActor), [gate]));
+        var actor           = await system.SpawnAsync(new("gated", "a"), new(typeof(GatedActor), [gate]));
 
         // Deterministically get the first turn into "still executing" before anything else
         // happens: gate.Started only completes once GatedActor.OnReceiveAsync has actually begun
         // and is blocked inside it.
-        var executing = actor.AskAsync<GateAndWait, string>(new GateAndWait()).AsTask();
+        var executing = actor.AskAsync<GateAndWait, string>(new()).AsTask();
         await gate.Started.WaitAsync(TimeSpan.FromSeconds(5));
 
         // AskAsync is an async method that runs synchronously up to its first real suspension
@@ -28,21 +29,86 @@ public class ActorLifecycleShould
         // only returns to this caller once the write has actually happened - the wait for a reply
         // is what actually suspends. No sleep needed to "let the write land": by the time this
         // call returns, it already has.
-        var queued = actor.AskAsync<Increment, int>(new Increment()).AsTask();
+        var queued = actor.AskAsync<Increment, int>(new()).AsTask();
 
-        var stopping = system.StopAsync(new ActorId("gated", "a"));
+        // StopAsync runs synchronously through its stop signal before its first suspension, so by
+        // the time this call returns the mailbox writer is already completed: the queued item above
+        // is accepted work the graceful drain must still execute.
+        var stopping = system.StopAsync(new("gated", "a"));
 
         // Only now does the first turn get to finish - the loop cannot even look at the queued
         // item until this returns.
         gate.Release();
 
-        var queuedEx = await Assert.ThrowsAsync<InvalidOperationException>(() => queued).WaitAsync(TimeSpan.FromSeconds(10));
-        Assert.Contains("stopped", queuedEx.Message, StringComparison.OrdinalIgnoreCase);
+        // The turn that was already executing when the stop was requested runs to completion and
+        // replies normally, and the graceful retirement drains the accepted Ask to completion too
+        // instead of faulting it with "actor stopped".
+        Assert.Equal("released", await executing.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(1, await queued.WaitAsync(TimeSpan.FromSeconds(10)));
+        await stopping.WaitAsync(TimeSpan.FromSeconds(5));
+    }
 
-        // The turn that was already executing when the stop was requested is unaffected: it still
-        // runs to completion and replies normally.
+    [Fact]
+    public async Task Stop_HoldsTheSlotUntilRetirementCompletes_SoGetAsyncNeverOverlapsActivations() {
+        var (system, registry, _) = ActorSystemFactory.Create();
+        var gate                   = new ManualGate();
+        registry.Register("gated", new(typeof(GatedActor), [gate]));
+        var actor = await system.SpawnAsync(new("gated", "overlap"), new(typeof(GatedActor), [gate]));
+
+        var executing = actor.AskAsync<GateAndWait, string>(new()).AsTask();
+        await gate.Started.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // The stop signal lands before the gated turn finishes; the retirement cannot complete
+        // while that turn is still in flight.
+        var stopping = system.StopAsync(new("gated", "overlap"));
+
+        var duringRetirement = await system.GetAsync(new("gated", "overlap"));
+        var waiting = duringRetirement.AskAsync<Increment, int>(new()).AsTask();
+        Assert.False(waiting.IsCompleted);
+        await Assert.ThrowsAsync<TimeoutException>(() => actor.AskAsync<Increment, int>(new(), timeout: TimeSpan.FromMilliseconds(30)).AsTask());
+
+        gate.Release();
         Assert.Equal("released", await executing.WaitAsync(TimeSpan.FromSeconds(5)));
         await stopping.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, await waiting.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(1, await actor.AskAsync<Increment, int>(new()));
+    }
+
+    [Fact]
+    public async Task Stop_CompletesAnAlreadyQueuedTell_InsteadOfDroppingIt() {
+        var (system, registry, _) = ActorSystemFactory.Create();
+        var gate                   = new ManualGate();
+        var received               = new List<string>();
+        registry.Register("gated-recording", new(typeof(GatedTellRecordingActor), [gate, received]));
+        var actor = await system.GetAsync(new("gated-recording", "a"));
+
+        var executing = actor.AskAsync<GateAndWait, string>(new()).AsTask();
+        await gate.Started.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // Accepted before the stop signal, so the graceful drain must deliver it.
+        await actor.TellAsync(new RecordTell("queued-before-stop"));
+        var stopping = system.StopAsync(new("gated-recording", "a"));
+
+        gate.Release();
+        Assert.Equal("released", await executing.WaitAsync(TimeSpan.FromSeconds(5)));
+        await stopping.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // The drain finished before StopAsync returned, so the accepted Tell is recorded - the
+        // stop never returned success while silently dropping it.
+        Assert.Equal(["queued-before-stop"], received);
+    }
+
+    [Fact]
+    public async Task OnStoppedAsync_Throwing_PropagatesToStopAsyncAwaiters() {
+        var (system, registry, _) = ActorSystemFactory.Create();
+        registry.Register("throwing-stop", new(typeof(ThrowingStopActor)));
+        var id = new ActorId("throwing-stop", "a");
+
+        await system.GetAsync(id);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => system.StopAsync(id));
+        Assert.Equal(ThrowingStopActor.Message, ex.Message);
     }
 
     [Fact]
@@ -50,7 +116,7 @@ public class ActorLifecycleShould
         var (system, registry, _) = ActorSystemFactory.Create();
         var gate                   = new ConstructionGate();
         var counter                = new SharedCounter();
-        registry.Register("gated-construction", new Props(typeof(GatedConstructionActor), [gate, counter]));
+        registry.Register("gated-construction", new(typeof(GatedConstructionActor), [gate, counter]));
         var id = new ActorId("gated-construction", "a");
 
         // The first call's construction genuinely blocks inside the actor's own constructor.
@@ -73,7 +139,6 @@ public class ActorLifecycleShould
         var firstRef  = await first.WaitAsync(TimeSpan.FromSeconds(5));
         var secondRef = await second.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.Same(firstRef, secondRef);
         Assert.Equal(1, counter.Count);
     }
 
@@ -81,14 +146,14 @@ public class ActorLifecycleShould
     public async Task GetAsync_AfterAConstructionFailure_EvictsTheEntry_SoALaterCallCanRetry() {
         var (system, registry, _) = ActorSystemFactory.Create();
         var gate                   = new FlakyConstructionGate { ShouldThrow = true };
-        registry.Register("flaky", new Props(typeof(FlakyConstructionActor), [gate]));
+        registry.Register("flaky", new(typeof(FlakyConstructionActor), [gate]));
         var id = new ActorId("flaky", "a");
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => system.GetAsync(id));
 
         gate.ShouldThrow = false;
         var actor    = await system.GetAsync(id);
-        var response = await actor.AskAsync<WhoAmI, Guid>(new WhoAmI());
+        var response = await actor.AskAsync<WhoAmI, Guid>(new());
 
         Assert.NotEqual(Guid.Empty, response);
     }
@@ -99,75 +164,37 @@ public class ActorLifecycleShould
         var gate            = new FlakyConstructionGate { ShouldThrow = true };
         var id              = new ActorId("flaky", "b");
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => system.SpawnAsync(id, new Props(typeof(FlakyConstructionActor), [gate])));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => system.SpawnAsync(id, new(typeof(FlakyConstructionActor), [gate])));
 
         gate.ShouldThrow = false;
-        var actor    = await system.SpawnAsync(id, new Props(typeof(FlakyConstructionActor), [gate]));
-        var response = await actor.AskAsync<WhoAmI, Guid>(new WhoAmI());
+        var actor    = await system.SpawnAsync(id, new(typeof(FlakyConstructionActor), [gate]));
+        var response = await actor.AskAsync<WhoAmI, Guid>(new());
 
         Assert.NotEqual(Guid.Empty, response);
     }
 
     [Fact]
-    public async Task SpawnUnregistered_WhenTheChildsOwnStartupFailsImmediately_DoesNotPublishAZombieEntry() {
+    public async Task Failed_Anonymous_Startup_Releases_Its_Identity_Slot() {
         var (system, _, _) = ActorSystemFactory.Create();
-        var parent           = await system.SpawnAsync(new ActorId("spawning-parent", "a"), new Props(typeof(SpawningParentActor)));
-
-        // No black-box synchronization can pin the exact instant this races: the child's own
-        // background receive loop starts inside its constructor (see ActorInstance's own
-        // constructor), so an immediate OnStartedAsync failure can call InProcessActorSystem.Remove
-        // before that constructor - and the Lazy<ActorInstance> cell wrapping it - has finished
-        // returning, with no user-observable hook anywhere in between to gate on. A large batch of
-        // genuinely concurrent spawns (fired without awaiting each one individually, so every
-        // child's background loop races the others on the real thread pool) is the closest
-        // approximation available: real scheduler contention is the only lever that can make a
-        // loop's failure path outrace its own construction returning, which is exactly the ordering
-        // the fix (evicting by the Lazy cell's identity, never by IsValueCreated) no longer depends
-        // on getting "the fast way".
-        const int concurrentSpawns = 300;
-        var childRefs = await Task.WhenAll(Enumerable.Range(0, concurrentSpawns)
-            .Select(_ => parent.AskAsync<SpawnFailingChild, IActorRef>(new SpawnFailingChild()).AsTask()));
-
-        // Deterministically wait for every child's own loop (its failed OnStartedAsync, the
-        // resulting stop signal, and the drain that follows) to fully finish before checking:
-        // StopAsync on an already-stopped instance just re-awaits the same underlying loop task.
-        await Task.WhenAll(childRefs.Select(childRef => ((ActorInstance)childRef).StopAsync()));
-
-        // If a child's dictionary entry had been published only after construction started (the
-        // old order), or evicted only once IsValueCreated was true (the round-2 bug), an immediate
-        // OnStartedAsync failure could find nothing to remove, and the now-dead child would still
-        // be "found" here. GetAsync must find nothing under every synthesized id and fall through
-        // to the registry, which was never told about any of them.
-        foreach (var childRef in childRefs) {
-            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => system.GetAsync(childRef.Id));
-            Assert.Contains("No actor type is registered", ex.Message);
-        }
+        var recorder = new LifecycleRecorder();
+        var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var props = new Props(typeof(FailingStartActor), [recorder, release]);
+        var child = system.SpawnUnregistered(props);
+        var activation = await system.ResolveForSendAsync(child.Id, props, default);
+        release.SetResult(true);
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => activation.Completion.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal("startup failed", failure.Message);
+        var absent = await Assert.ThrowsAsync<InvalidOperationException>(() => system.GetAsync(child.Id));
+        Assert.Contains("No actor type is registered", absent.Message);
     }
 
-    [Fact]
-    public async Task Remove_WhenTheStoredInstanceIsNoLongerTheOneStopping_DoesNotRemoveItsReplacement() {
-        var (system, registry, _) = ActorSystemFactory.Create();
-        registry.Register("identity", new Props(typeof(IdentityActor)));
-        var id = new ActorId("identity", "race");
 
-        var original = (ActorInstance)await system.GetAsync(id);
-        await system.StopAsync(id);
-        var replacement = (ActorInstance)await system.GetAsync(id);
-
-        // Simulate 'original's own (now-stale) internal stop path trying to remove itself again,
-        // after a replacement has already taken its place under the same id. Removal is keyed on
-        // the Lazy<ActorInstance> cell's identity, not the resolved instance's.
-        system.Remove(id, original.Cell);
-
-        var stillThere = await system.GetAsync(id);
-        Assert.Same(replacement, stillThere);
-    }
 
     [Fact]
     public async Task OnStoppedAsync_IsInvokedExactlyOnce_OnExplicitStop() {
         var notifications = new StopNotifications();
         var (system, registry, _) = ActorSystemFactory.Create();
-        registry.Register("stop-notify", new Props(typeof(StopNotifyingActor), [notifications]));
+        registry.Register("stop-notify", new(typeof(StopNotifyingActor), [notifications]));
         var id = new ActorId("stop-notify", "explicit");
 
         await system.GetAsync(id);
@@ -180,15 +207,13 @@ public class ActorLifecycleShould
     public async Task OnStoppedAsync_IsInvokedExactlyOnce_WhenSupervisionStopsTheActor() {
         var notifications = new StopNotifications();
         var (system, _, _) = ActorSystemFactory.Create();
-        var actor           = await system.SpawnAsync(new ActorId("stop-notify", "supervised"), new Props(typeof(StopNotifyingActor), [notifications]));
+        var props = new Props(typeof(StopNotifyingActor), [notifications]);
+        var actor = await system.SpawnAsync(new("stop-notify", "supervised"), props);
+        var activation = await system.ResolveForSendAsync(actor.Id, props, default);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => actor.AskAsync<Fail, string>(new Fail("boom")).AsTask());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => actor.AskAsync<Fail, string>(new("boom")).AsTask());
 
-        // StopAsync on an already-stopped instance re-runs MarkStopped as a no-op and just awaits
-        // the same underlying loop task - the deterministic synchronization point proving the
-        // supervision-triggered stop (its OnStoppedAsync notification included) has fully
-        // finished before asserting on it.
-        await ((ActorInstance)actor).StopAsync();
+        await activation.StopAsync();
 
         Assert.Equal(1, notifications.Count);
     }

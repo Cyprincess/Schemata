@@ -23,6 +23,7 @@ using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Foundation.Commands;
 using Schemata.Resource.Foundation.Handlers;
+using Schemata.Resource.Tests.Fixtures;
 using Schemata.Security.Skeleton;
 using Xunit;
 
@@ -51,11 +52,11 @@ public class ResourceIdempotencyPipelineAdvisorShould
     }
 
     private static Request CreateRequest() {
-        return new Request { DisplayName = "primary", RequestId = "req-1" };
+        return new() { DisplayName = "primary", RequestId = "req-1" };
     }
 
     private static Detail MappedDetail() {
-        return new Detail {
+        return new() {
             CanonicalName = "tenants/t1/hosts/h1",
             Timestamp     = Timestamp,
         };
@@ -70,13 +71,15 @@ public class ResourceIdempotencyPipelineAdvisorShould
              .ReturnsAsync(Done(Hash(request), cached));
 
         var (repository, mapper) = CreateDoubles(MappedDetail());
+        var owner = ResourceMutationMock.Create<Entity>();
         using var services = BuildCreateServices(cache, repository, mapper,
-            detailWrap: false);
+            detailWrap: false, owner: owner);
 
         var result = await DispatchCreateAsync(services, request);
 
-        Assert.Equal("tenants/t1/hosts/h9", result.Detail!.CanonicalName);
-        repository.Verify(r => r.AddAsync(It.IsAny<Entity>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1/hosts/h9", result.Detail.CanonicalName);
+        owner.Verify(o => o.CreateAsync(It.IsAny<Entity>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()), Times.Never);
         mapper.Verify(m => m.Map<Request, Entity>(It.IsAny<Request>()), Times.Never);
         cache.Verify(c => c.TryAddAsync(
                          It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
@@ -92,15 +95,22 @@ public class ResourceIdempotencyPipelineAdvisorShould
              .ReturnsAsync(Done(Hash(request), cached));
 
         var (repository, mapper) = CreateDoubles(MappedDetail());
+        var owner = ResourceMutationMock.Create<Entity>();
         using var services = BuildUpdateServices(cache, repository, mapper,
-            detailWrap: false);
+            detailWrap: false, owner: owner);
 
         var result = await DispatchUpdateAsync(services, "entities/e1", request);
 
-        Assert.Equal("tenants/t1/hosts/h9", result.Detail!.CanonicalName);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1/hosts/h9", result.Detail.CanonicalName);
         repository.Verify(r => r.SingleOrDefaultAsync(
                               It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
                               It.IsAny<CancellationToken>()), Times.Never);
+        owner.Verify(o => o.UpdateAsync(
+                         It.IsAny<Entity>(),
+                         It.IsAny<IUnitOfWork?>(),
+                         It.IsAny<Operations>(),
+                         It.IsAny<CancellationToken>()), Times.Never);
         mapper.Verify(m => m.Map<Entity, Detail>(It.IsAny<Entity>()), Times.Never);
         cache.Verify(c => c.TryAddAsync(
                          It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
@@ -121,13 +131,15 @@ public class ResourceIdempotencyPipelineAdvisorShould
              .ReturnsAsync(false);
 
         var (repository, mapper) = CreateDoubles(MappedDetail());
+        var owner = ResourceMutationMock.Create<Entity>();
         using var services = BuildCreateServices(cache, repository, mapper,
-            detailWrap: false);
+            detailWrap: false, owner: owner);
 
         var result = await DispatchCreateAsync(services, request);
 
-        Assert.Equal("tenants/t1/hosts/h9", result.Detail!.CanonicalName);
-        repository.Verify(r => r.AddAsync(It.IsAny<Entity>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1/hosts/h9", result.Detail.CanonicalName);
+        owner.Verify(o => o.CreateAsync(It.IsAny<Entity>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -142,13 +154,14 @@ public class ResourceIdempotencyPipelineAdvisorShould
              .ReturnsAsync(false);
 
         var (repository, mapper) = CreateDoubles(MappedDetail());
+        var owner = ResourceMutationMock.Create<Entity>();
         using var services = BuildCreateServices(cache, repository, mapper,
             detailWrap: false,
-            options: new SchemataResourceOptions { IdempotencyPendingWait = TimeSpan.Zero });
+            options: new() { IdempotencyPendingWait = TimeSpan.Zero }, owner: owner);
 
         await Assert.ThrowsAsync<AbortedException>(() => DispatchCreateAsync(services, request));
 
-        repository.Verify(r => r.AddAsync(It.IsAny<Entity>(), It.IsAny<CancellationToken>()), Times.Never);
+        owner.Verify(o => o.CreateAsync(It.IsAny<Entity>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -159,12 +172,13 @@ public class ResourceIdempotencyPipelineAdvisorShould
              .ReturnsAsync(Done("0123456789ABCDEF", new Detail { CanonicalName = "tenants/t1/hosts/h9" }));
 
         var (repository, mapper) = CreateDoubles(MappedDetail());
+        var owner = ResourceMutationMock.Create<Entity>();
         using var services = BuildCreateServices(cache, repository, mapper,
-            detailWrap: false);
+            detailWrap: false, owner: owner);
 
         await Assert.ThrowsAsync<AbortedException>(() => DispatchCreateAsync(services, request));
 
-        repository.Verify(r => r.AddAsync(It.IsAny<Entity>(), It.IsAny<CancellationToken>()), Times.Never);
+        owner.Verify(o => o.CreateAsync(It.IsAny<Entity>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -196,7 +210,8 @@ public class ResourceIdempotencyPipelineAdvisorShould
         var payload = JsonDocument.Parse(store[reservation.Key]).RootElement.GetProperty("Payload");
         Assert.Equal("tenants/t1", payload.GetProperty("Parent").GetString());
         Assert.Equal(WeakTag(Timestamp), payload.GetProperty("EntityTag").GetString());
-        Assert.Equal("tenants/t1", result.Detail!.Parent);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1", result.Detail.Parent);
     }
 
     [Fact]
@@ -224,7 +239,8 @@ public class ResourceIdempotencyPipelineAdvisorShould
         var payload = JsonDocument.Parse(store[reservation.Key]).RootElement.GetProperty("Payload");
         Assert.Equal("tenants/t1", payload.GetProperty("Parent").GetString());
         Assert.Equal(WeakTag(Timestamp), payload.GetProperty("EntityTag").GetString());
-        Assert.Equal("tenants/t1", result.Detail!.Parent);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1", result.Detail.Parent);
     }
 
     [Fact]
@@ -269,13 +285,15 @@ public class ResourceIdempotencyPipelineAdvisorShould
         var cache = new Mock<ICacheProvider>();
 
         var (repository, mapper) = CreateDoubles(MappedDetail());
+        var owner = ResourceMutationMock.Create<Entity>();
         using var services = BuildCreateServices(cache, repository, mapper,
-            detailWrap: false);
+            detailWrap: false, owner: owner);
 
-        var result = await DispatchCreateAsync(services, new Request { DisplayName = "anonymous" });
+        var result = await DispatchCreateAsync(services, new() { DisplayName = "anonymous" });
 
-        Assert.Equal("tenants/t1/hosts/h1", result.Detail!.CanonicalName);
-        repository.Verify(r => r.AddAsync(It.IsAny<Entity>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1/hosts/h1", result.Detail.CanonicalName);
+        owner.Verify(o => o.CreateAsync(It.IsAny<Entity>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()), Times.Once);
         cache.Verify(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         cache.Verify(c => c.TryAddAsync(
                          It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
@@ -291,7 +309,7 @@ public class ResourceIdempotencyPipelineAdvisorShould
         var calls = 0;
 
         var result = await advisor.AdviseAsync(
-            ctx, new CreateResourceRequest<Entity, Request, Detail>(CreateRequest(), null), _ => {
+            ctx, new(CreateRequest(), null), _ => {
                 calls++;
                 return Task.FromResult(new CreateResultBase<Detail>());
             }, CancellationToken.None);
@@ -328,7 +346,7 @@ public class ResourceIdempotencyPipelineAdvisorShould
         // so the fallback TryAddAsync commits were also issued — 4 total TryAddAsync calls at the same key.
         Assert.NotNull(firstKey);
         cache.Verify(c => c.TryAddAsync(
-                         firstKey!,
+                         firstKey,
                          It.IsAny<byte[]>(),
                          It.IsAny<CacheEntryOptions>(),
                          It.IsAny<CancellationToken>()), Times.Exactly(4));
@@ -342,18 +360,21 @@ public class ResourceIdempotencyPipelineAdvisorShould
         var cache    = StatefulCache(store, reserved, replaced);
 
         var (repository, mapper) = CreateDoubles(MappedDetail());
+        var owner = ResourceMutationMock.Create<Entity>();
         using var services = BuildCreateServices(cache, repository, mapper,
-            detailWrap: true);
+            detailWrap: true, owner: owner);
 
         var first  = await DispatchCreateAsync(services, request);
         var second = await DispatchCreateAsync(services, request);
 
         Assert.Single(reserved);
         Assert.Single(replaced);
-        repository.Verify(r => r.AddAsync(It.IsAny<Entity>(), It.IsAny<CancellationToken>()), Times.Once);
-        Assert.Equal(first.Detail!.CanonicalName, second.Detail!.CanonicalName);
-        Assert.Equal(first.Detail.Parent, second.Detail!.Parent);
-        Assert.Equal(first.Detail.EntityTag, second.Detail!.EntityTag);
+        owner.Verify(o => o.CreateAsync(It.IsAny<Entity>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.NotNull(first.Detail);
+        Assert.NotNull(second.Detail);
+        Assert.Equal(first.Detail.CanonicalName, second.Detail.CanonicalName);
+        Assert.Equal(first.Detail.Parent, second.Detail.Parent);
+        Assert.Equal(first.Detail.EntityTag, second.Detail.EntityTag);
     }
 
     [Fact]
@@ -368,7 +389,7 @@ public class ResourceIdempotencyPipelineAdvisorShould
         var (repository, mapper) = CreateDoubles(MappedDetail());
         using var services = BuildCreateServices(cache, repository, mapper,
             detailWrap: false,
-            options: new SchemataResourceOptions { IdempotencyRetention = retention });
+            options: new() { IdempotencyRetention = retention });
 
         await DispatchCreateAsync(services, request);
 
@@ -462,7 +483,7 @@ public class ResourceIdempotencyPipelineAdvisorShould
             static envelope => envelope.Request,
             static envelope => envelope.Request.CanonicalName ?? envelope.Request.Name ?? string.Empty,
             static ctx => ctx.Has<CreateIdempotencySuppressed>(),
-            static detail => new CreateResultBase<Detail> { Detail = detail },
+            static detail => new() { Detail = detail },
             static response => response.Detail);
     }
     private static ResourceIdempotencyPipelineAdvisor<Entity, Request, UpdateResourceRequest<Entity, Request, Detail>, Detail, UpdateResultBase<Detail>>
@@ -473,15 +494,12 @@ public class ResourceIdempotencyPipelineAdvisorShould
             static envelope => envelope.Request,
             static envelope => envelope.Request.CanonicalName ?? envelope.Request.Name ?? string.Empty,
             static ctx => ctx.Has<UpdateIdempotencySuppressed>(),
-            static detail => new UpdateResultBase<Detail> { Detail = detail },
+            static detail => new() { Detail = detail },
             static response => response.Detail);
     }
 
     private static (Mock<IRepository<Entity>> Repository, Mock<ISimpleMapper> Mapper) CreateDoubles(Detail detail) {
         var repository = new Mock<IRepository<Entity>>();
-        repository.Setup(r => r.AddAsync(It.IsAny<Entity>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        repository.Setup(r => r.UpdateAsync(It.IsAny<Entity>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Mock.Of<IDisposable>());
         repository.Setup(r => r.SingleOrDefaultAsync(
                               It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
@@ -502,12 +520,15 @@ public class ResourceIdempotencyPipelineAdvisorShould
         Mock<IRepository<Entity>>  repository,
         Mock<ISimpleMapper>        mapper,
         bool                       detailWrap,
-        SchemataResourceOptions?   options = null
+        SchemataResourceOptions?   options = null,
+        Mock<IResourceMutation<Entity>>? owner = null
     ) {
+        owner ??= ResourceMutationMock.Create<Entity>();
         var services = new ServiceCollection();
         services.AddSingleton(cache.Object);
         services.AddSingleton(repository.Object);
         services.AddSingleton(mapper.Object);
+        services.AddSingleton(owner.Object);
         services.AddSingleton<ResourceOperationHandler<Entity, Request, Detail, Summary>>();
         services.AddSingleton<
             IRequestHandler<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>,
@@ -533,12 +554,15 @@ public class ResourceIdempotencyPipelineAdvisorShould
         Mock<IRepository<Entity>>  repository,
         Mock<ISimpleMapper>        mapper,
         bool                       detailWrap,
-        SchemataResourceOptions?   options = null
+        SchemataResourceOptions?   options = null,
+        Mock<IResourceMutation<Entity>>? owner = null
     ) {
+        owner ??= ResourceMutationMock.Create<Entity>();
         var services = new ServiceCollection();
         services.AddSingleton(cache.Object);
         services.AddSingleton(repository.Object);
         services.AddSingleton(mapper.Object);
+        services.AddSingleton(owner.Object);
         services.AddSingleton<ResourceOperationHandler<Entity, Request, Detail, Summary>>();
         services.AddSingleton<
             IRequestHandler<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>,

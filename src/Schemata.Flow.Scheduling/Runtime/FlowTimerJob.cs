@@ -43,7 +43,9 @@ public sealed class FlowTimerJob : IScheduledJob
         using var scope = _services.CreateScope();
         var dispatcher = scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
         await dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, RunEventRequest, ProcessSnapshot>, ProcessSnapshot>(
-            new(FlowOperations.RunEvent, processName, new(processName, tokenName, timerDef, Payload: null), null), ct);
+            new(FlowOperations.RunEvent, processName, new(processName, tokenName, timerDef, Payload: null) {
+                Principal = FlowSystemPrincipal.Instance,
+            }, FlowSystemPrincipal.Instance), ct);
     }
 
     #endregion

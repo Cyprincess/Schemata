@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository;
 using Schemata.Push.Skeleton;
 using Schemata.Push.Skeleton.Entities;
@@ -44,68 +45,18 @@ public class DefaultPushSubscriptionManagerShould
                   .Returns((Func<IQueryable<SchemataPushSubscription>, IQueryable<SchemataPushSubscription>> query,
                             CancellationToken _) =>
                       ValueTask.FromResult<SchemataPushSubscription?>(query(rows.AsQueryable()).SingleOrDefault()));
-        using var services = BuildServices(repository.Object);
+        var owner = CreateMutation();
+        using var services = BuildServices(repository.Object, owner);
         var manager = services.GetRequiredService<IPushSubscriptionManager>();
 
         var result = await manager.AddAsync("owners/one", "email", "one");
 
-        Assert.Equal(exact.Uid, result.Uid);
-        Assert.Equal(exact.Name, result.Name);
-        Assert.Equal(exact.CanonicalName, result.CanonicalName);
-        Assert.Equal(exact.Owner, result.Owner);
-        Assert.Equal(exact.Provider, result.Provider);
-        Assert.Equal(exact.ProviderKey, result.ProviderKey);
-        Assert.Equal(exact.Metadata, result.Metadata);
-        Assert.Equal(exact.Timestamp, result.Timestamp);
-        Assert.Equal(exact.DisplayName, result.DisplayName);
-        Assert.Equal(exact.DisplayNames, result.DisplayNames);
-        Assert.Equal(exact.Description, result.Description);
-        Assert.Equal(exact.Descriptions, result.Descriptions);
-        Assert.Equal(exact.DeleteTime, result.DeleteTime);
-        Assert.Equal(exact.PurgeTime, result.PurgeTime);
-        Assert.Equal(exact.CreateTime, result.CreateTime);
-        Assert.Equal(exact.UpdateTime, result.UpdateTime);
-        repository.Verify(value => value.AddAsync(
-                              It.IsAny<SchemataPushSubscription>(), It.IsAny<CancellationToken>()), Times.Never);
-        repository.Verify(value => value.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Same(exact, result);
+        owner.Verify(value => value.CreateAsync(
+                         It.IsAny<SchemataPushSubscription>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()),
+                     Times.Never);
     }
 
-    [Fact]
-    public async Task Add_Exact_Triple_Missing_Checks_Then_Adds_And_Commits() {
-        var sequence   = new MockSequence();
-        var repository = new Mock<IRepository<SchemataPushSubscription>>(MockBehavior.Strict);
-        repository.InSequence(sequence)
-                  .Setup(value => value.SingleOrDefaultAsync<SchemataPushSubscription>(
-                             It.IsAny<Func<IQueryable<SchemataPushSubscription>, IQueryable<SchemataPushSubscription>>>(),
-                             It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<SchemataPushSubscription>, IQueryable<SchemataPushSubscription>> query,
-                            CancellationToken _) =>
-                      ValueTask.FromResult<SchemataPushSubscription?>(query(new[] {
-                          Subscription("owners/two", "email", "one"),
-                          Subscription("owners/one", "sms", "one"),
-                          Subscription("owners/one", "email", "two"),
-                      }.AsQueryable()).SingleOrDefault()));
-        repository.InSequence(sequence)
-                  .Setup(value => value.AddAsync(
-                             It.Is<SchemataPushSubscription>(subscription =>
-                                 subscription.Owner == "owners/one"
-                              && subscription.Provider == "email"
-                              && subscription.ProviderKey == "one"),
-                             It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
-        repository.InSequence(sequence)
-                  .Setup(value => value.CommitAsync(It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
-        using var services = BuildServices(repository.Object);
-        var manager = services.GetRequiredService<IPushSubscriptionManager>();
-
-        var result = await manager.AddAsync("owners/one", "email", "one");
-
-        Assert.Equal("owners/one", result.Owner);
-        Assert.Equal("email", result.Provider);
-        Assert.Equal("one", result.ProviderKey);
-        repository.VerifyAll();
-    }
 
     [Fact]
     public async Task Exists_Queries_Exact_Triple() {
@@ -118,39 +69,12 @@ public class DefaultPushSubscriptionManagerShould
                              It.IsAny<Func<IQueryable<SchemataPushSubscription>, IQueryable<SchemataPushSubscription>>>(),
                              It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<SchemataPushSubscription>, IQueryable<SchemataPushSubscription>> query,
-                            CancellationToken _) => new ValueTask<bool>(query(rows.AsQueryable()).Any()));
+                            CancellationToken _) => new(query(rows.AsQueryable()).Any()));
         using var services = BuildServices(repository.Object);
         var manager = services.GetRequiredService<IPushSubscriptionManager>();
 
         Assert.True(await manager.ExistsAsync("owners/one", "email", "one"));
         Assert.False(await manager.ExistsAsync("owners/one", "sms", "one"));
-    }
-
-    [Fact]
-    public async Task Remove_Queries_Exact_Triple_Then_Removes_And_Commits() {
-        var exact = Subscription("owners/one", "email", "one");
-        var rows = new[] {
-            Subscription("owners/one", "email", "two"),
-            exact,
-        };
-        var repository = new Mock<IRepository<SchemataPushSubscription>>();
-        repository.Setup(value => value.FirstOrDefaultAsync<SchemataPushSubscription>(
-                             It.IsAny<Func<IQueryable<SchemataPushSubscription>, IQueryable<SchemataPushSubscription>>>(),
-                             It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<SchemataPushSubscription>, IQueryable<SchemataPushSubscription>> query,
-                            CancellationToken _) =>
-                      ValueTask.FromResult<SchemataPushSubscription?>(query(rows.AsQueryable()).FirstOrDefault()));
-        repository.Setup(value => value.RemoveAsync(exact, It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
-        repository.Setup(value => value.CommitAsync(It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
-        using var services = BuildServices(repository.Object);
-        var manager = services.GetRequiredService<IPushSubscriptionManager>();
-
-        await manager.RemoveAsync("owners/one", "email", "one");
-
-        repository.Verify(value => value.RemoveAsync(exact, It.IsAny<CancellationToken>()), Times.Once);
-        repository.Verify(value => value.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -160,14 +84,17 @@ public class DefaultPushSubscriptionManagerShould
                              It.IsAny<Func<IQueryable<SchemataPushSubscription>, IQueryable<SchemataPushSubscription>>>(),
                              It.IsAny<CancellationToken>()))
                   .Returns(ValueTask.FromResult<SchemataPushSubscription?>(null));
-        using var services = BuildServices(repository.Object);
+        var owner = CreateMutation();
+        using var services = BuildServices(repository.Object, owner);
         var manager = services.GetRequiredService<IPushSubscriptionManager>();
 
         await manager.RemoveAsync("owners/one", "email", "one");
 
-        repository.Verify(value => value.RemoveAsync(
-                              It.IsAny<SchemataPushSubscription>(), It.IsAny<CancellationToken>()), Times.Never);
-        repository.Verify(value => value.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+        owner.Verify(value => value.DeleteAsync(
+                         It.IsAny<SchemataPushSubscription>(),
+                         It.IsAny<IUnitOfWork?>(),
+                         It.IsAny<Operations>(),
+                         It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -216,9 +143,27 @@ public class DefaultPushSubscriptionManagerShould
         Assert.Equal(4, stream.MoveNextCalls);
     }
 
-    private static ServiceProvider BuildServices(IRepository<SchemataPushSubscription> repository) {
+    private static Mock<IResourceMutation<SchemataPushSubscription>> CreateMutation() {
+        var mutation = new Mock<IResourceMutation<SchemataPushSubscription>>();
+        mutation.Setup(m => m.CreateAsync(
+                    It.IsAny<SchemataPushSubscription>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(MutationResult.Applied);
+        mutation.Setup(m => m.DeleteAsync(
+                    It.IsAny<SchemataPushSubscription>(),
+                    It.IsAny<IUnitOfWork?>(),
+                    It.IsAny<Operations>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(MutationResult.Applied);
+        return mutation;
+    }
+
+    private static ServiceProvider BuildServices(
+        IRepository<SchemataPushSubscription>              repository,
+        Mock<IResourceMutation<SchemataPushSubscription>>? owner = null
+    ) {
         return new ServiceCollection()
               .AddSingleton(repository)
+              .AddSingleton((owner ?? CreateMutation()).Object)
               .AddSchemataPush()
               .BuildServiceProvider();
     }

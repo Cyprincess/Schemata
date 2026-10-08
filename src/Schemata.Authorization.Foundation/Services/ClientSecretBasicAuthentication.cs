@@ -58,52 +58,34 @@ public sealed class ClientSecretBasicAuthentication<TApp>(
         try {
             decoded = Encoding.UTF8.GetString(Convert.FromBase64String(header[(Schemes.Basic + " ").Length..].Trim()));
         } catch (FormatException) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
         var colon = decoded.IndexOf(':');
         if (colon < 0) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
         var id     = WebUtility.UrlDecode(decoded[..colon]);
         var secret = WebUtility.UrlDecode(decoded[(colon + 1)..]);
 
         if (string.IsNullOrWhiteSpace(id)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.ClientId)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.NOT_EMPTY, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.ClientId });
         }
 
         var app = await apps.FindByClientIdAsync(id, ct);
         if (app is null) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
         // Confidential clients MUST present a valid secret (RFC 6749 §2.3.1);
         // public clients may authenticate without one.
         if (!string.IsNullOrWhiteSpace(secret)) {
             if (!await apps.ValidateClientSecretAsync(app, secret, ct)) {
-                throw new OAuthException(
-                    OAuthErrors.InvalidClient,
-                    SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-                );
+                throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
             }
         } else if (app.ClientType == ClientTypes.Confidential) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.CLIENT_SECRET_REQUIRED)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.CLIENT_SECRET_REQUIRED);
         }
 
         return app;

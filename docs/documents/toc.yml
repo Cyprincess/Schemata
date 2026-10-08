@@ -55,8 +55,6 @@
   items:
     - name: Overview
       href: caching/overview.md
-    - name: Distributed
-      href: caching/distributed.md
     - name: Redis
       href: caching/redis.md
 - name: Resource

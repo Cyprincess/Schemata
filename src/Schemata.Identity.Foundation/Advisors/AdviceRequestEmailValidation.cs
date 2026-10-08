@@ -16,7 +16,7 @@ namespace Schemata.Identity.Foundation.Advisors;
 public static class AdviceRequestEmailValidation
 {
     /// <summary>Default order for email-change request validation.</summary>
-    public const int DefaultOrder = AdviceRequestFeature.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = Schemata.Abstractions.SchemataConstants.Orders.Base + 10_000_000;
 }
 
 /// <summary>Validates email-change profile requests.</summary>

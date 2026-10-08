@@ -31,7 +31,7 @@ public static class SchemataRepositoryBuilderEventExtensions
     /// <returns>The same builder for chaining.</returns>
     public static SchemataRepositoryBuilder UseEvent(this SchemataRepositoryBuilder builder) {
         builder.Services.TryAddEnumerable(
-            ServiceDescriptor.Scoped(typeof(IRepositoryCommittedAdvisor<>), typeof(AdviceCommittedPendingEvents<>)));
+            ServiceDescriptor.Scoped(typeof(IResourceMutationCommittedAdvisor<>), typeof(AdviceCommittedPendingEvents<>)));
 
         return builder;
     }

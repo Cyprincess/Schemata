@@ -53,6 +53,10 @@ turn's own scope provider — never a long-lived one — and `IMessage`/`IReques
 straight from `Schemata.Messaging.Skeleton`: there is no actor-only message marker, so any existing
 command or query is already a valid actor payload.
 
+Actor callbacks carry runtime-owned turn identity. An Ask to the same tenant/type/key fails before
+mailbox admission; cross-actor requests remain allowed. Callback completion invalidates captured turn
+identity. Ordinary message scopes never install it; multi-actor cycle detection is outside this contract.
+
 `Schemata.Actor.Skeleton` is contracts only; `Schemata.Actor.Foundation` supplies the one runtime
 implementation, `InProcessActorSystem`.
 
@@ -87,10 +91,11 @@ in `SchemataActor.State` — never in an in-flight envelope.
 
 ## Ask, Tell, and supervision
 
-`TellAsync` is fire-and-forget: on a stopped actor's closed channel, the message is dropped. `AskAsync`
-generates a `CorrelationId`, registers a `TaskCompletionSource` in the actor's own pending-reply
-table, enqueues the envelope, and awaits the completion (bounded by an optional `timeout` and the
-caller's own `ct`). Inside the turn, `IActorContext.ReplyAsync`/`ReplyFaultAsync` resolve that same
+`TellAsync` acknowledges mailbox acceptance; a retirement race that loses admission throws explicitly.
+Graceful manual/idle retirement drains accepted messages. Fatal startup/supervision abort remains a
+separate failure mode and can discard queued Tell messages. `AskAsync` creates a correlation and awaits
+the reply; its timeout includes waiting for a retiring activation, admission, and reply.
+The caller's `ct` also cancels the wait. Inside the turn, `IActorContext.ReplyAsync`/`ReplyFaultAsync` resolve the
 table entry; a turn triggered by a `Tell` has `CorrelationId == Guid.Empty` and both calls are
 no-ops. A turn that throws always faults its own `Ask` with the original exception — a reply recorded
 earlier in the same turn is provisional and is discarded once the turn ends abnormally. A turn that
@@ -111,6 +116,51 @@ the keyed default handler, call it, reply with the result or fault with the exce
 Either outcome, the turn that actually threw has already faulted its own caller — a restart never
 swallows the original exception, it only decides what happens to the *next* message.
 
+### Activation and retirement states
+
+Each instance moves through one atomic lifecycle state: `Starting` → `Running` →
+`GracefulStopping`/`Aborting` → `Retired`. Normal receives run only after initialization
+completes successfully. A graceful `StopAsync` that arrives while initialization is still
+running does not skip it: initialization completes, the mailbox closes to new writes, and every
+already-accepted item still gets a normal receive. A startup failure overrides an earlier
+graceful intent — the state escalates to `Aborting`, queued `Ask`s are faulted with an
+"actor stopped" exception, queued `Tell`s are dropped, and `OnStoppedAsync` still fires exactly
+once. The identity slot stays occupied through the drain and `OnStoppedAsync`, so a
+same-identity activation never overlaps the retiring instance's turns. Retained logical references resolve
+the current activation at send time and reactivate after retirement, preserving their activation recipe.
+An already-retiring self-Tell is rejected instead of waiting for its own callback to finish.
+
+### Host shutdown
+
+`AddSchemataActor()` connects the selected in-process runtime to `IHostApplicationLifetime.ApplicationStopping`. That notification closes new acquisition and delivery admission and starts graceful retirement. Accepted turns finish their state saves and replies before `OnStoppedAsync` and actor disposal. Custom `IActorSystem` implementations retain responsibility for their own host integration.
+
+The hosted service waits using the host-supplied cancellation budget, including `HostOptions.ShutdownTimeout`. When that budget expires, outstanding Ask completions fault and each activation receives an asynchronous cancellation request. The host wait reports cancellation; it does not terminate arbitrary managed callbacks. Running turns, cancellation callbacks and lifecycle cleanup keep their identity slot until they actually finish. Construction already in progress is also retained and receives the current shutdown disposition when it finishes.
+
+Cancellation callback failures are observed before terminal notification, without skipping `OnStoppedAsync` or disposal. A single lifecycle failure retains its exception type; independent failures are aggregated. A later shutdown wait can observe retirement that completed after an earlier budget expired.
+
+Sources: `Runtime/ActorHostedService.cs`, `Runtime/InProcessActorSystem.cs`, `Runtime/ActorInstance.cs` and `Runtime/MailboxItem.cs` in `src/Schemata.Actor.Foundation/`.
+
+### Idle collection
+
+The hosted in-process collector uses `TimeProvider` monotonic timestamps. `IdleTimeout` defaults to
+15 minutes and `IdleScanInterval` to one minute. Admission, queued work, active turns, state saves, and
+item disposal keep the activation ineligible; the idle timestamp advances after work is released.
+Collection uses the same graceful retirement protocol and retains the identity slot through cleanup.
+The in-process implementation is the scope of this policy; Orleans integration is separate.
+
+### Activation-local timers
+
+`IActorContext.RegisterTimer(name, callback, dueTime, period)` schedules an in-memory timer through
+`TimeProvider`; omit `period` for one delivery. `CancelTimer(name)` is idempotent. Re-registering a name
+invalidates the previous generation, including ticks already waiting in the mailbox. The consumer checks
+the generation before claiming the callback, which executes with a fresh turn scope and cannot overlap
+receive callbacks. A callback already claimed may finish after cancellation.
+
+Periodic ticks coalesce while one tick is pending in the mailbox; they do not build an unbounded backlog.
+Timer-thread callbacks only enqueue mailbox work. Retirement and supervision restart dispose all timer
+registrations, and stale timer callbacks never reactivate an actor. Durable reminders remain the separate
+`Actor.Scheduling` capability.
+
 ## Persistence is opt-in, and the actor never holds authoritative state
 
 ```csharp
@@ -127,9 +177,26 @@ public interface IPersistentActor : IActor
 strictly before the turn's reply commits — a caller observing a successful reply can rely on the
 state that produced it already being durable. Neither read nor write happens for an actor that does
 not implement `IPersistentActor`, or when `UsePersistence()` was never called — `RequestDispatchingActor`
-itself is stateless and never touches the table. `Actor.Foundation` only *resolves*
-`IRepository<SchemataActor>`; the application registers it, the same convention `Flow.Foundation` and
-`Scheduling.Foundation` follow for their own entities.
+itself is stateless and never touches the table. Each turn resolves the registered
+`ActorStateStore` from the turn's final service scope; `UsePersistence()` installs it scoped over
+the application's `IRepository<SchemataActor>`, the same convention `Flow.Foundation` and
+`Scheduling.Foundation` follow for their own entities. A tenant that needs its own store
+dependencies registers `ActorStateStore` explicitly in the tenant container.
+
+`ActorStateStore` finds state by the unique `(ActorType, ActorKey)` pair on `SchemataActor`, matching
+`ActorId.Type` and `ActorId.Key`. Resource `Name` is independent of that pair. The application
+registers an `IRepositoryAddAdvisor<SchemataActor>` through `TryAddEnumerable` to assign a missing
+name before `AdviceAddCanonicalName.DefaultOrder` (120,000,000), preserving explicit names. The
+store supplies the actor identity and state on insert; it supplies no resource-name fallback.
+
+Existing databases need a consumer migration for the `ActorType` and `ActorKey` columns and their
+unique composite index. Recover the pair from authoritative application identity data or a known,
+unambiguous legacy encoding. Blindly splitting an old `Name` at `/` is unsafe when a type or key
+contains that delimiter. Preserve resource names independently, and validate identity uniqueness
+before applying the index; reads do not fall back to the old concatenated name.
+
+Implementation: `src/Schemata.Actor.Skeleton/Entities/SchemataActor.cs` and
+`src/Schemata.Actor.Foundation/Runtime/ActorStateStore.cs`.
 
 This is deliberately narrow: `SchemataActor` never carries authoritative domain state. The real data
 lives in `SchemataProcess`, reloaded fresh inside the turn every time (see
@@ -249,6 +316,16 @@ These two bridge *into* the actor system rather than serializing an existing wri
   delivers it with `TellAsync`. `IActorContext.ScheduleAsync` throws a clear exception when this
   bridge is not installed, rather than becoming a silent no-op.
 
+Reminder slots use `SchemataJob.Key`: `actor-reminder:` plus the JSON array of tenant, actor type,
+actor key, and caller-supplied reminder name. Scheduling returns `ActorReminder(Target, Name)`;
+cancellation uses that tenant-bound identity. Resource names still come from consumer advisors.
+Replacing a slot atomically cancels unclaimed occurrences and commits the new payload and due time.
+`ScheduleVersion` prevents old running completions from overwriting a replacement or rearming a
+cancelled slot. A delivery already claimed as Running may finish; cancellation suppresses pending work.
+Recovery adopts a matching pending occurrence with its original identity and tenant.
+
+Implementation: `src/Schemata.Actor.Scheduling/Runtime/ActorReminders.cs`.
+
 Both packages capture `MessageContext` from their own consumption/execution scope — the event
 handler's scope, the job's scope — not from whenever the event was originally published or the
 reminder was originally scheduled, for the same reason `Flow.Actor` captures at
@@ -267,35 +344,33 @@ var context = MessageContexts.Capture(callerProvider);   // sender side, synchro
 ```
 
 ```csharp
-// Actor.Foundation's turn dispatcher (Internal/InProcessActorTurnScopeFactory or a tenancy override):
-await using var scope = await turnScopeFactory.CreateAsync(envelope.Context, ct);
-foreach (var propagator in scope.ServiceProvider.GetServices<IMessageContextPropagator>()) {
-    await propagator.RestoreAsync(envelope.Context?.Items ?? Empty, scope.ServiceProvider, ct);
+// Actor.Foundation's turn dispatcher (default MessageExecutionScopeFactory or a tenancy override):
+var scope = await turnScopeFactory.CreateAsync(envelope.Context, ct);
+using var identity = scope.Enter();
+await using (scope) {
+    await scope.RestoreAsync(envelope.Context, ct);
+    // Resolve and invoke the handler through scope.Services here.
 }
-// only now does the turn resolve a handler
 ```
 
-Propagators are resolved as a collection — an empty one means nothing needs rebuilding, so no part
-ever probes whether another part is installed. With no propagator registered, `Capture` returns an
-empty context and every `RestoreAsync` is a no-op. Multi-tenancy is the concrete, shipped example:
-`Schemata.Tenancy.Foundation`'s `TenantMessageContextPropagator<TTenant>` reads the resolved tenant
-off `ITenantContextAccessor<TTenant>` on capture and reinitializes `ITenantContextInitializer<TTenant>`
-on restore, so a turn built in a background mailbox — which never ran the tenancy middleware — still
-resolves repositories against the right tenant provider instead of the wrong or default one.
+`IMessageExecutionScopeFactory.CreateAsync` returns a `MessageExecutionScope` that owns the turn's
+DI scope, exposes its `Services`, and runs the registered `IMessageContextPropagator` collection
+through `RestoreAsync`. Neither `CreateAsync` nor `RestoreAsync` installs ambient identity; only
+`scope.Enter()` calls `TenantContext.Enter(scope.Identity)`. `ActorInstance` calls `Enter` and
+retains the lease for the lifetime of the turn so that propagators, cache lookups, and any
+outgoing `MessageContexts.Capture` see the right `TenantIdentity`. The actor runtime consumes the
+shared identity contract and resolves the installed `IMessageExecutionScopeFactory`.
 
-**`IActorTurnScopeFactory` exists because a DI scope cannot be retargeted to a different provider once
-created.** The default implementation (`Actor.Foundation`, registered with `TryAdd`) builds a scope
-from the host root and restores propagators into it. Multi-tenancy needs the tenant resolved *before*
-the real turn scope exists, because the scope has to be built from the tenant's own isolated provider
-— fixing up ambient state after the fact is too late. `Tenancy.Foundation`'s
-`TenantActorTurnScopeFactory<TTenant>` therefore runs two phases: a short-lived bootstrap scope off the
-host root resolves the tenant and initializes the tenant context; `ITenantServiceScopeFactory<TTenant>`,
-resolved from that same bootstrap scope, then builds the real turn scope from the tenant-isolated
-provider (and owns acquiring/releasing the `ITenantProviderLease`); every propagator runs a second time
-in that final scope, since it descends from a different provider with its own accessor instance.
-Disposal releases the final scope first, then the bootstrap scope. It is registered with `Replace`
-over the default — `Actor.Foundation` itself depends on no tenancy type at all, it only ever resolves
-whatever `IActorTurnScopeFactory` is installed.
+**Multi-tenancy replaces the factory with `Schemata.Tenancy.Messaging`'s `TenantMessageExecutionScopeFactory<TTenant>`**
+(registered by `UseMessaging` on the tenancy builder). The replacement resolves the tenant identity
+from `MessageContexts.Identity(context)`, builds a bootstrap scope off the host root, resolves
+`ITenantServiceScopeFactory<TTenant>` from that bootstrap, then returns a `MessageExecutionScope`
+backed by the tenant-isolated provider (and owns acquiring/releasing the `ITenantProviderLease`).
+`MessageExecutionScope.Enter` is called by `ActorInstance` to install the `TenantIdentity` into
+`TenantContext` for the duration of the turn. Capture already serialized the tenant into
+`MessageContext.Items` through `MessageContexts.Bind(TenantContext.Current, …)`; restore runs every
+registered `IMessageContextPropagator` against the tenant scope so downstream services see the
+resolved tenant. The execution scope is disposed before its identity frame is restored.
 
 `ClaimsPrincipal` does not travel this way: it is already a field on the request records that carry
 it (§8 M3.1 of the messaging/actor RFC), so it crosses the mailbox boundary inside the envelope's own
@@ -326,9 +401,9 @@ means in practice for actors.
   inline bypass is the one sanctioned exception: it resolves the keyed default handler directly for a
   request with no report identity.
 - **Calling `IServiceScopeFactory.CreateAsyncScope()` directly from turn-dispatch code.** Every turn's
-  scope must come from the injected `IActorTurnScopeFactory` — that is the one seam multi-tenancy (or
-  any future capability that needs to change which provider a turn descends from) overrides with
-  `Replace`.
+  scope must come from the injected `IMessageExecutionScopeFactory` — that is the seam
+  `Schemata.Tenancy.Messaging.UseMessaging` overrides with `Replace` so the turn's provider descends
+  from the resolved tenant's isolated container instead of the host root.
 - **Assuming a restarted actor keeps in-memory state.** `OnFailedAsync` returning `true` discards the
   faulted instance and constructs a fresh one from `Props`; only `IPersistentActor`'s durable
   `byte[]` (if `UsePersistence()` is on) survives a restart, never fields on the old instance.

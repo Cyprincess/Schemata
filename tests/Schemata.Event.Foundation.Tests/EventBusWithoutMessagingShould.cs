@@ -1,20 +1,26 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
+using Schemata.Entity.Repository;
 using Schemata.Event.Foundation.Runtime;
 using Schemata.Event.Skeleton;
+using Schemata.Event.Skeleton.Entities;
 using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Runtime;
 using Xunit;
 
 namespace Schemata.Event.Foundation.Tests;
 
 /// <summary>
-///     The bus lost its request/reply member; broadcast is now its whole job. These pin that the
-///     removal did not take publish down with it, and that an application wanting events alone needs
-///     no request dispatcher registered.
+///     The bus lost its request/reply member; broadcast is now its whole job. Publishing must
+///     work with no request dispatcher registered, so an application wanting events alone needs
+///     no request dispatcher.
 /// </summary>
 public class EventBusWithoutMessagingShould
 {
@@ -22,11 +28,23 @@ public class EventBusWithoutMessagingShould
     public async Task Publish_WithNoRequestDispatcherRegistered() {
         var registry = new Mock<IEventTypeRegistry>();
         registry.Setup(r => r.RequireName(typeof(OrderPlaced))).Returns("order.placed");
+        registry.Setup(r => r.GetRouting(It.IsAny<Type>())).Returns(EventRouting.Broadcast);
+
+        var subscriptions = new Mock<IRepository<SchemataEventSubscription>>();
+        subscriptions.Setup(r => r.ListAsync(
+                          It.IsAny<Func<IQueryable<SchemataEventSubscription>, IQueryable<SchemataEventSubscription>>>(),
+                          It.IsAny<CancellationToken>()))
+                     .Returns(EmptyAsync<SchemataEventSubscription>());
 
         var observer = new Mock<IEventLifecycleObserver>();
 
         await using var services = new ServiceCollection()
                                   .AddSingleton(registry.Object)
+                                  .AddSingleton(subscriptions.Object)
+                                  .AddSingleton<IEventDispatchContext>(new EventDispatchContext())
+                                  .AddSingleton<HandlerResolver>()
+                                  .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
+                                  .AddSingleton<IEventHandler<OrderPlaced>>(Mock.Of<IEventHandler<OrderPlaced>>())
                                   .AddSingleton(observer.Object)
                                   .BuildServiceProvider();
 
@@ -37,19 +55,9 @@ public class EventBusWithoutMessagingShould
         observer.Verify(o => o.OnPublishedAsync(It.IsAny<EventContext>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    [Fact]
-    public void Expose_NoRequestDispatchMember() {
-        // Guards the split structurally: a re-added SendAsync would restore the coupling that made
-        // every request/reply consumer depend on the event domain.
-        Assert.DoesNotContain(typeof(IEventBus).GetMethods(), m => m.Name == "SendAsync");
+    private static async IAsyncEnumerable<T> EmptyAsync<T>() {
+        yield break;
     }
 
-    [Fact]
-    public void Keep_EventsAsMessages() {
-        // IEvent still flows anywhere IMessage is accepted — an actor mailbox, for instance —
-        // without the event domain gaining a dependency in return.
-        Assert.True(typeof(IMessage).IsAssignableFrom(typeof(IEvent)));
-    }
-
-    private sealed class OrderPlaced : IEvent;
+    public sealed class OrderPlaced : IEvent;
 }

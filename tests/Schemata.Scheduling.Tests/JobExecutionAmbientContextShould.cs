@@ -38,8 +38,9 @@ public class JobExecutionAmbientContextShould
                   .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> query,
                             CancellationToken _) => ToAsync(query(new[] { execution }.AsQueryable())));
         executions.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
+                  .ReturnsAsync(MutationResult.Applied);
         executions.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        executions.Setup(r => r.Begin()).Returns(CommittingUnit);
 
         var registry = new DefaultScheduledJobRegistry();
         registry.Register<AmbientObservingJob>("jobs.ambient");
@@ -51,7 +52,8 @@ public class JobExecutionAmbientContextShould
                .Callback<AdviceContext, JobContext, CancellationToken>((ctx, _, _) => observedByAdvisor = AdviceContext.Current)
                .ReturnsAsync(AdviseResult.Continue);
 
-        var services = new ServiceCollection().AddSingleton(executions.Object)
+        var services = new ServiceCollection().AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
+                                              .AddSingleton(executions.Object)
                                                .AddSingleton<IScheduledJobRegistry>(registry)
                                                .AddSingleton(job)
                                                .AddSingleton<IJobExecutionAdvisor>(advisor.Object)
@@ -74,6 +76,13 @@ public class JobExecutionAmbientContextShould
                               It.IsAny<CancellationToken>()))
                   .Returns(ValueTask.FromResult<SchemataJob?>(null));
         return repository.Object;
+    }
+
+    private static IUnitOfWork CommittingUnit() {
+        var unit = new Mock<IUnitOfWork>(MockBehavior.Strict);
+        unit.Setup(u => u.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        unit.Setup(u => u.DisposeAsync()).Returns(ValueTask.CompletedTask);
+        return unit.Object;
     }
 
     private static async IAsyncEnumerable<SchemataJobExecution> ToAsync(IEnumerable<SchemataJobExecution> rows) {

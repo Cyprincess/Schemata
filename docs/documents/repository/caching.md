@@ -28,16 +28,15 @@ services.AddRepository<Book, EfCoreRepository<AppDbContext, Book>>()
 | `AdviceResultCache<,,>`       | `IRepositoryResultAdvisor<,,>`  | 100,000,000 |
 | `AdviceCommittedEvictCache<>` | `IRepositoryCommittedAdvisor<>` | 900,000,000 |
 
-A concrete `ICacheProvider` must be registered separately. Use `DistributedCacheProvider` for single-process deployments or `RedisCacheProvider` for multi-process / cluster deployments.
+A concrete `ICacheProvider` backend must be registered separately. Use `MemoryCacheProvider` for single-process deployments or `RedisCacheProvider` for multi-process / cluster deployments.
 
 ## Options
 
 `SchemataQueryCacheOptions` (configured via `UseQueryCache(o => ...)`):
 
-| Property          | Default   | Description                                                                  |
-| ----------------- | --------- | ---------------------------------------------------------------------------- |
-| `Ttl`             | 5 minutes | Sliding expiration for cached results and reverse-index entries.             |
-| `EvictionEnabled` | `true`    | When `false`, committed eviction is skipped; entries live until TTL expires. |
+| Property | Default   | Description                                                                |
+| -------- | --------- | -------------------------------------------------------------------------- |
+| `Ttl`    | 5 minutes | Absolute lifetime of cached results; generation metadata does not expire.  |
 
 ## Suppression
 
@@ -57,19 +56,27 @@ using (repository.SuppressQueryCache())
 
 ## Commit-time eviction
 
-`AdviceCommittedEvictCache` receives `CommitChanges<TEntity>` after a successful standalone repository commit or unit-of-work commit. It evicts reverse-indexed entries for updated and removed entities. If the transaction rolls back, committed advisors do not run and the cache retains the pre-mutation entries until TTL expires.
+`AdviceCommittedEvictCache` runs after a successful standalone repository commit or unit-of-work commit, once per committing repository enlistment that staged at least one write. The notification is type-level, so any committed write publishes a fresh type-wide generation, invalidating entity results, aggregates, and projections alike; a commit with no writes sends no notification. Queries capture their generation before database execution, so late pre-commit fills cannot repopulate the current generation. If the transaction rolls back, committed advisors do not run. Database commit and cache invalidation remain non-atomic; a failure between them can leave entries selectable until their absolute TTL expires.
 
 ## Open write units of work
 
-While a repository has an open write unit of work — enlisted in a shared `IUnitOfWork`, or holding an
-implicit one with pending adds, updates, or removes, and not yet completed — both cache advisors stand
-down: `AdviceQueryCache` skips cache reads and `AdviceResultCache` skips cache writes. The flag
-(`QueryContext.HasOpenWriteUnitOfWork`, surfaced from the repository) keeps uncommitted state out of
-the cache, so a rollback can never leave phantom entries behind. After the commit completes, the next
-query repopulates the cache as usual.
+Every active enlistment bypasses shared cache reads and fills from the moment of `Begin()` or
+`Join()`, including a repository with no local writes. Implicit units of work created by a
+standalone mutation use the same gate, `QueryContext.HasOpenWriteUnitOfWork`. Rollback and
+uncommitted disposal preserve the shared generation. Commit publishes type-level invalidation
+before resource/domain callbacks execute.
+
+External enlistments remain one-shot after completion; resolve a fresh repository to read and
+repopulate the cache. After a successful implicit `repository.CommitAsync()`, that repository
+reopens for standalone queries and may cache their results.
+
+Cache bypass changes only shared-cache access. EF Core's buffered staging remains invisible to
+scalar SQL queries until save, while LinqToDB's immediate SQL writes are visible through the joined
+transaction. Repository queries never flush EF staging. See the provider read-result boundary in
+[entity/query-cache.md](../entity/query-cache.md#commit-time-eviction).
 
 ## See also
 
-- [entity/query-cache.md](../entity/query-cache.md) — full advisor reference, reverse index, and cache key generation
-- [caching/overview.md](../caching/overview.md) — `ICacheProvider` abstraction and provider selection
+- [entity/query-cache.md](../entity/query-cache.md) — full advisor reference, generations, and cache key generation
+- [caching/overview.md](../caching/overview.md) — `ICacheProvider` contract and provider selection
 - [unit-of-work.md](unit-of-work.md) — the committed pipeline that drives eviction

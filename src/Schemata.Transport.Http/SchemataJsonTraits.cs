@@ -13,9 +13,9 @@ namespace Schemata.Transport.Http;
 ///     surface. Hides <see cref="ICanonicalName.Name" />, surfaces
 ///     <see cref="ICanonicalName.CanonicalName" /> as <c>name</c> (AIP-122),
 ///     <see cref="IFreshness.EntityTag" /> as <c>etag</c> (AIP-154), and the
-///     <c>Entities</c> property of <see cref="IEntitiesResult{TItem}" /> implementors
-///     as the entity plural resolved through
-///     <see cref="ResourceNameDescriptor" /> (AIP-132 / AIP-231..235).
+///     <c>Entities</c> property of <see cref="IEntitiesResult{TEntity, TItem}" /> implementors
+///     as the resource plural resolved from the carrier's <c>TEntity</c> through
+///     <see cref="ResourceNameDescriptor" /> (AIP-132).
 /// </summary>
 internal static class SchemataJsonTraits
 {
@@ -24,7 +24,11 @@ internal static class SchemataJsonTraits
     /// </summary>
     /// <param name="options">The JSON serializer options to update.</param>
     public static void Apply(JsonSerializerOptions options) {
-        options.TypeInfoResolver = (options.TypeInfoResolver ?? new DefaultJsonTypeInfoResolver()).WithAddedModifier(info => {
+        // Snapshot the options-bound chain before the .NET 8 setter repopulates that chain.
+        var resolver = options.TypeInfoResolverChain.Count == 0
+            ? new DefaultJsonTypeInfoResolver()
+            : JsonTypeInfoResolver.Combine(options.TypeInfoResolverChain.ToArray());
+        options.TypeInfoResolver = resolver.WithAddedModifier(info => {
             foreach (var property in info.Properties.ToArray()) {
                 if (property.AttributeProvider is not MemberInfo member) {
                     continue;

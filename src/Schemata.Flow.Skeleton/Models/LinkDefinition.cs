@@ -6,11 +6,19 @@ namespace Schemata.Flow.Skeleton.Models;
 ///     A BPMN Link event definition - a pair of Intermediate Catch and Throw events
 ///     connected by name. Acts as an off-page connector.
 /// </summary>
-public sealed class LinkDefinition : IEventDefinition
+public sealed class LinkDefinition : FlowGraphNode, IEventDefinition
 {
+    private string _name = null!;
+
     #region IEventDefinition Members
 
-    public string Name { get; set; } = null!;
+    public string Name {
+        get => _name;
+        set {
+            EnsureMutable();
+            _name = value;
+        }
+    }
 
     #endregion
 

@@ -4,8 +4,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Schemata.Abstractions.Exceptions;
-using Schemata.Insight.Foundation.Planning;
 using Schemata.Messaging.Skeleton;
 
 using Schemata.Insight.Skeleton.Models;
@@ -15,7 +13,7 @@ namespace Schemata.Insight.Http;
 /// <summary>
 ///     Exposes the federated read query endpoint per
 ///     <seealso href="https://google.aip.dev/136">AIP-136: Custom methods</seealso>, dispatching through
-///     the registered Insight request handler and translating Insight rejections into AIP-193 errors.
+///     the registered Insight request handler and the shared Schemata exception boundary.
 /// </summary>
 [ApiController]
 public sealed class InsightController : ControllerBase
@@ -35,25 +33,13 @@ public sealed class InsightController : ControllerBase
     /// <param name="request">The query request.</param>
     [HttpPost("~/v1/insight:query")]
     public async Task<IActionResult> QueryAsync([FromBody] QueryInsightRequest request) {
-        QueryInsightResponse response;
-        try {
-            request.Principal = HttpContext.User;
-            var dispatcher = _services.GetRequiredService<IRequestDispatcher>();
-            response = await dispatcher.SendAsync<QueryInsightRequest, QueryInsightResponse>(request, HttpContext.RequestAborted);
-        } catch (InsightValidationException ex) {
-            throw Translate(ex);
-        }
+        request.Principal = HttpContext.User;
+        var dispatcher = _services.GetRequiredService<IRequestDispatcher>();
+        var response = await dispatcher.SendAsync<QueryInsightRequest, QueryInsightResponse>(request, HttpContext.RequestAborted);
+        for (var i = 0; i < response.Rows.Count; i++)
+            response.Rows[i] = InsightValueModel.EncodeRow(response.Rows[i], response.Schema);
 
         return new JsonResult(response, _json);
     }
 
-    private static SchemataException Translate(InsightValidationException ex) {
-        var code = ex.Reason switch {
-            InsightReasons.UnknownSourceName => 404,
-            InsightReasons.Unimplemented     => 501,
-            var _                            => 400,
-        };
-
-        return new(code, ex.Reason, ex.Message);
-    }
 }

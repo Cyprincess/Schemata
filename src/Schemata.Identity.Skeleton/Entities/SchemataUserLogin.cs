@@ -10,7 +10,7 @@ namespace Schemata.Identity.Skeleton.Entities;
 /// </summary>
 [Table("SchemataUserLogins")]
 [PrimaryKey(nameof(LoginProvider), nameof(ProviderKey))]
-public class SchemataUserLogin : IdentityUserLogin<Guid>, ITimestamp
+public class SchemataUserLogin : IdentityUserLogin<string>, ITimestamp
 {
     public override string LoginProvider { get; set; } = null!;
 

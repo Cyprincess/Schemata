@@ -20,7 +20,7 @@ public sealed class ResourceCreateIdempotencyPipelineAdvisor<TEntity, TRequest, 
         static envelope => envelope.Request,
         static envelope => envelope.Request.CanonicalName ?? envelope.Request.Name ?? string.Empty,
         static ctx => ctx.Has<CreateIdempotencySuppressed>(),
-        static detail => new CreateResultBase<TDetail> { Detail = detail },
+        static detail => new() { Detail = detail },
         static response => response.Detail)
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName

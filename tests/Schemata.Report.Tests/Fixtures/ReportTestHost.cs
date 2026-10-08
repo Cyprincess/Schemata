@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using Schemata.Entity.Repository;
 using Schemata.Insight.Foundation;
@@ -64,14 +65,14 @@ internal static class ReportTestHost
         services.AddScoped<ReportExecutionContext>();
         services.AddSingleton<IReportDefinitionStore>(CreateDefinitionStore(report).Object);
         services.AddSingleton(state);
+        services.TryAddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>));
         if (registerRepositories) {
             services.AddScoped<IRepository<SchemataReportSnapshot>>(_ => state.CreateSnapshotRepository());
             services.AddScoped<IRepository<SchemataReportSnapshotChunk>>(_ => state.CreateChunkRepository());
         }
         services.AddSingleton<ReportRetentionEnforcer<SchemataReportSnapshot, SchemataReportSnapshotChunk>>();
         services.AddSingleton<ReportSnapshotWriter<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>();
-        services.AddSingleton<IReportSnapshotStore, DefaultReportSnapshotStore<SchemataReportSnapshot, SchemataReportSnapshotChunk>>();
-        services.AddSchemataReport<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>();
+        services.AddSchemataReport<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new());
         configure?.Invoke(services);
 
         return services.BuildServiceProvider();
@@ -147,7 +148,7 @@ internal static class ReportTestHost
                  report is not null && string.Equals(report.Name, name, StringComparison.Ordinal)
                      ? ((SchemataReport Report, QueryInsightRequest Query)?)(
                          report,
-                         new QueryInsightRequest { Sources = [new("r", "rows")] })
+                         new() { Sources = [new("r", "rows")] })
                      : null));
         store.Setup(value => value.ListPeriodicAsync(It.IsAny<CancellationToken>()))
              .Returns((CancellationToken _) => ReportTestRows.ToAsync(

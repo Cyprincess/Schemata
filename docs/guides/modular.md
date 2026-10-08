@@ -82,7 +82,7 @@ public sealed class StudentsModule : ModuleBase
 {
     public override int Order => 100;
 
-    public override void ConfigureServices(
+    public void ConfigureServices(
         IServiceCollection  services,
         IConfiguration      configuration,
         IWebHostEnvironment environment

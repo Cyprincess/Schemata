@@ -1,4 +1,8 @@
 using System;
+using System.Security.Claims;
+using System.Threading.RateLimiting;
+using Schemata.Abstractions.Errors;
+using Schemata.Abstractions.Tenancy;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -197,7 +201,7 @@ public static class ServiceCollectionExtensions
             var rejected = options.OnRejected;
             options.OnRejected = async (ctx, ct) => {
                 if (rejected is null) {
-                    throw QuotaExceeded(ctx.HttpContext);
+                    throw QuotaExceeded(ctx);
                 }
 
                 await rejected(ctx, ct);
@@ -206,14 +210,32 @@ public static class ServiceCollectionExtensions
                     return;
                 }
 
-                throw QuotaExceeded(ctx.HttpContext);
+                throw QuotaExceeded(ctx);
             };
         });
 
         return services;
 
-        static QuotaExceededException QuotaExceeded(HttpContext context) {
-            return new([new() { Subject = $"client:{context.Connection.RemoteIpAddress}", }]);
+        static QuotaExceededException QuotaExceeded(OnRejectedContext rejected) {
+            var context = rejected.HttpContext;
+            var hasSubject = rejected.Lease.TryGetMetadata(QuotaMetadata.Subject, out var supplied) && !string.IsNullOrWhiteSpace(supplied);
+            var subject = hasSubject ? supplied : null;
+            if (!hasSubject) {
+                foreach (var identity in context.User.Identities) {
+                    if (!identity.IsAuthenticated) continue;
+                    subject = identity.FindFirst("sub")?.Value;
+                    if (string.IsNullOrWhiteSpace(subject)) subject = identity.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                    if (string.IsNullOrWhiteSpace(subject)) subject = identity.Name;
+                    if (!string.IsNullOrWhiteSpace(subject)) break;
+                }
+            }
+            if (string.IsNullOrWhiteSpace(subject)) subject = $"client:{context.Connection.RemoteIpAddress}";
+            if (!hasSubject && TenantContext.Current.Uid is { } tenant) subject = $"tenants/{tenant:D}/{subject}";
+            var error = new QuotaExceededException([new() { Subject = subject }]);
+            if (rejected.Lease.TryGetMetadata(MetadataName.RetryAfter, out var delay)) {
+                error.Details!.Add(new RetryInfoDetail { RetryDelay = delay });
+            }
+            return error;
         }
     }
 }

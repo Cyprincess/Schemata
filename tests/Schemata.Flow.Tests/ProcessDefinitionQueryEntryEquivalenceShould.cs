@@ -32,9 +32,9 @@ public sealed class ProcessDefinitionQueryEntryEquivalenceShould
 {
     [Fact]
     public async Task List_Through_Dispatcher_Controller_And_Grpc_Produce_Equivalent_Infos_And_Fire_The_Same_Advisor() {
+        var registration = CreateRegistration();
         var registry = new Mock<IProcessRegistry>();
-        registry.Setup(r => r.GetRegisteredProcesses()).Returns(["orders"]);
-        registry.Setup(r => r.GetRegistration("orders")).Returns(CreateRegistration());
+        registry.Setup(r => r.GetRegisteredProcesses()).Returns([registration]);
 
         var advisor = new RecordingQueryAdvisor();
 
@@ -48,23 +48,24 @@ public sealed class ProcessDefinitionQueryEntryEquivalenceShould
         var dispatcher = scope.ServiceProvider.GetRequiredService<IQueryDispatcher>();
 
         var direct = await dispatcher.SendAsync<ListProcessDefinitionsQuery, IReadOnlyList<ProcessDefinitionInfo>>(
-            new ListProcessDefinitionsQuery(), CancellationToken.None);
+            new(), CancellationToken.None);
         Assert.Equal(1, advisor.Count);
 
         var controller = new ProcessDefinitionsController(dispatcher, Options.Create(new JsonSerializerOptions())) {
-            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
+            ControllerContext = new() { HttpContext = new DefaultHttpContext() },
         };
         var action = await controller.ListProcessDefinitions();
         var json   = Assert.IsType<JsonResult>(action);
-        var http   = Assert.IsType<ListResultBase<ProcessDefinitionInfo>>(json.Value).Entities;
+        var http   = Assert.IsType<ListResultBase<ProcessDefinitionInfo, ProcessDefinitionInfo>>(json.Value).Entities;
         Assert.Equal(2, advisor.Count);
 
         var service = new ProcessDefinitionService(dispatcher);
-        var grpc    = (await service.ListProcessDefinitionsAsync(new ListRequest())).Entities;
+        var grpc    = (await service.ListProcessDefinitionsAsync(new())).Entities;
         Assert.Equal(3, advisor.Count);
 
         var info = Assert.Single(direct);
-        Assert.Equal("definitions/orders", info.CanonicalName);
+        Assert.Equal("definitions/orders/versions/1", info.CanonicalName);
+        Assert.Equal("1", info.Version);
         Assert.Equal(8, info.Elements.Count);
         Assert.Equal(4, info.Flows.Count);
         Assert.Single(info.Messages);
@@ -150,11 +151,10 @@ public sealed class ProcessDefinitionQueryEntryEquivalenceShould
         ]);
         definition.Messages.Add(message);
 
-        return new ProcessRegistration {
+        return new() {
             Name          = "orders",
             Engine        = "StateMachine",
             Definition    = definition,
-            Configuration = new() { Name = "orders" },
         };
     }
 

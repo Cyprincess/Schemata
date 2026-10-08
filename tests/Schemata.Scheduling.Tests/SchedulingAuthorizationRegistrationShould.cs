@@ -61,7 +61,7 @@ public sealed class SchedulingAuthorizationRegistrationShould
                                              && descriptor.ImplementationType == typeof(AuthorizationPipelineAdvisor<,>).MakeGenericType(envelope, response));
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
-        var resolve = scope.ServiceProvider.GetRequiredService<Func<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, (string Operation, Type? Entity)>>();
+        var resolve = scope.ServiceProvider.GetRequiredService<Func<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, ResourceTarget>>();
 
         var actual = resolve(new(SchedulingOperations.Trigger, "jobs/sample", new("jobs/sample", typeof(object), new()), null));
 
@@ -70,13 +70,14 @@ public sealed class SchedulingAuthorizationRegistrationShould
     }
     [Fact]
     public async Task Anonymous_Trigger_Bypasses_Authentication_And_Authorization() {
+        using var provider = new ServiceCollection().BuildServiceProvider();
         var resolver = new Mock<IPermissionResolver>(MockBehavior.Strict);
         var matcher  = new Mock<IPermissionMatcher>(MockBehavior.Strict);
         var request  = new ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>(SchedulingOperations.Trigger, "jobs/sample", new("jobs/sample", typeof(object), new()), null);
         var authentication = new AuthenticationPipelineAdvisor<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>(
-            value => (value.Verb, typeof(AnonymousJob)));
+            value => ResourceTarget.Instance(value.Verb, typeof(AnonymousJob), value.Name));
         var authorization = new AuthorizationPipelineAdvisor<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>(
-            value => (value.Verb, typeof(AnonymousJob)), resolver.Object, matcher.Object);
+            value => ResourceTarget.Instance(value.Verb, typeof(AnonymousJob), value.Name), resolver.Object, matcher.Object, provider);
         var calls = 0;
 
         var result = await authentication.AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request,

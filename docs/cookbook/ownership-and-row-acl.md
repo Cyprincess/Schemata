@@ -12,14 +12,10 @@ reads the authenticated user's subject claim.
 ## Prerequisites
 
 - Completed [Getting Started](../guides/getting-started.md) — the `Student`
-  entity and EF Core repository must already be wired up.
-- `Schemata.Entity.Owner` package added.
+  entity and EF Core repository must already be wired up. Ownership ships in
+  the repository package; no additional package is required.
 - An authentication scheme configured (e.g., via `UseIdentity` or bearer
   tokens) so `HttpContext.User` carries a `sub` claim.
-
-```shell
-dotnet add package --prerelease Schemata.Entity.Owner
-```
 
 ## Step 1 — Implement `IOwnable` on the entity
 
@@ -76,23 +72,21 @@ schema.ConfigureServices(services => {
 });
 ```
 
-`UseOwner()` registers three open-generic advisors as `Scoped`:
+`UseOwner()` registers two open-generic advisors as `Scoped`:
 
 | Advisor                                          | Pipeline     | What it does                                                                                  |
 | ------------------------------------------------ | ------------ | --------------------------------------------------------------------------------------------- |
 | `AdviceAddOwner<TEntity>`                        | Add          | Calls `IOwnerResolver<TEntity>.ResolveAsync`, sets `IOwnable.Owner`                           |
 | `AdviceBuildQueryOwner<TEntity>`                 | BuildQuery   | Appends `WHERE Owner = <resolved>` to every query                                             |
-| `AdviceValidateResourceReferenceExistence<TEntity>` | Add + Update | Resolves `[ResourceReference(ValidateExistence = true)]` targets and throws NotFound on a miss |
 
 Both owner advisors check `IOwnable` at runtime — entities that don't implement it
 are skipped. `AdviceAddOwner` runs right after `AdviceAddCanonicalName` (its
 `Order` is `AdviceAddCanonicalName.DefaultOrder + 1_000_000`).
 `AdviceBuildQueryOwner` runs after `AdviceBuildQuerySoftDelete` (its `Order`
 is `AdviceBuildQuerySoftDelete.DefaultOrder + 10_000_000`).
-`AdviceValidateResourceReferenceExistence` runs at
-`AdviceValidateResourceReferences.DefaultOrder + 10_000_000` on both the add and update
-pipelines; entities whose reference properties carry no `ValidateExistence = true` opt-in are
-skipped.
+Repository separately registers `AdviceValidateResourceReferenceExistence` on add/update.
+Properties opt in through `[ResourceReference(ValidateExistence = true)]`; this logical check
+does not install database foreign keys or prevent concurrent target deletion.
 
 **Verify:** Start the app. A `POST /v1/students` request without authentication
 throws `PermissionDeniedException` (the default `OnNullOwner` policy is
@@ -106,7 +100,7 @@ owner. Implement it to return the authenticated user's canonical name:
 ```csharp
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
-using Schemata.Entity.Owner;
+using Schemata.Entity.Repository;
 
 public sealed class HttpContextOwnerResolver<TEntity> : IOwnerResolver<TEntity>
 {

@@ -57,10 +57,7 @@ public sealed class AdviceDeviceAuthorizeScopeValidation<TApp>(
         }
 
         if (requested.Contains(Scopes.OpenId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidScope,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_SCOPE)
-            );
+            throw new OAuthException(OAuthErrors.InvalidScope, SchemataResources.INVALID_SCOPE);
         }
 
         foreach (var s in requested) {

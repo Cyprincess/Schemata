@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
@@ -31,7 +32,8 @@ public static class EventBasedGatewayHandler
         EventBasedGateway         gateway,
         IEventDefinition          trigger,
         object?                    payload,
-        FlowExecutionContext      execution
+        FlowExecutionContext      execution,
+        CancellationToken         ct = default
     ) {
         var outgoing = definition.Outgoing(gateway).ToList();
         var matched  = outgoing
@@ -49,10 +51,10 @@ public static class EventBasedGatewayHandler
         }
 
         if (gateway.Parallel) {
-            return await engine.SpawnFromEventBasedAsync(definition, process, token, working, gateway, matched, trigger, payload, execution);
+            return await engine.SpawnFromEventBasedAsync(definition, process, token, working, gateway, matched, trigger, payload, execution, ct);
         }
 
-        return await engine.RouteSingleEventBasedAsync(definition, process, token, working, gateway, matched[0], trigger, payload, execution);
+        return await engine.RouteSingleEventBasedAsync(definition, process, token, working, gateway, matched[0], trigger, payload, execution, ct);
     }
 
     /// <summary>

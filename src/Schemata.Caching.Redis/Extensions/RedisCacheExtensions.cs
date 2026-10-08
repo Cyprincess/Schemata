@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Caching.Redis;
 using Schemata.Caching.Skeleton;
 
@@ -9,13 +8,12 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class RedisCacheExtensions
 {
     /// <summary>
-    ///     Registers <see cref="RedisCacheProvider" /> as the implementation of
-    ///     <see cref="ICacheProvider" /> using the supplied Redis connection multiplexer.
+    ///     Selects <see cref="RedisCacheProvider" /> as the cache backend for the canonical
+    ///     <see cref="ICacheProvider" /> outlet using the registered Redis connection multiplexer.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The same service collection for chaining.</returns>
     public static IServiceCollection AddRedisCache(this IServiceCollection services) {
-        services.TryAddSingleton<ICacheProvider, RedisCacheProvider>();
-        return services;
+        return services.AddCacheProvider<RedisCacheProvider>();
     }
 }

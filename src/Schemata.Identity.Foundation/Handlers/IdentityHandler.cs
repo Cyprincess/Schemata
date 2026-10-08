@@ -48,12 +48,12 @@ public sealed class IdentityHandler<TUser>
     ) => _dispatcher.SendAsync<RegisterUserRequest<TUser>, IdentityResult<ClaimsPrincipal>>(
         new(request, principal), ct);
 
-    /// <summary>Authenticates a user and builds the sign-in principal.</summary>
-    public Task<IdentityResult<ClaimsPrincipal>> LoginAsync(
+    /// <summary>Authenticates a user and writes sign-in credentials.</summary>
+    public Task<IdentityResult<Unit>> LoginAsync(
         LoginRequest      request,
         ClaimsPrincipal   principal,
         CancellationToken ct = default
-    ) => _dispatcher.SendAsync<LoginUserRequest<TUser>, IdentityResult<ClaimsPrincipal>>(
+    ) => _dispatcher.SendAsync<LoginUserRequest<TUser>, IdentityResult<Unit>>(
         new(request, principal), ct);
 
     /// <summary>Refreshes a sign-in principal from an authentication ticket.</summary>

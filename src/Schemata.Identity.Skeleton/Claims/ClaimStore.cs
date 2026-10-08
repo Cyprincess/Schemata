@@ -21,7 +21,7 @@ public sealed class ClaimStore : IList<string>
             return;
         }
 
-        _values.Add(value!);
+        _values.Add(value);
     }
 
     public void Clear() { _values.Clear(); }

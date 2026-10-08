@@ -16,11 +16,7 @@ internal sealed class CompositeScopeFactory : IServiceScopeFactory
 
     #region IServiceScopeFactory Members
 
-    public IServiceScope CreateScope() {
-        var hostFactory = _composite.Root.GetRequiredService<IServiceScopeFactory>();
-        var hostScope   = hostFactory.CreateScope();
-        return new CompositeScope(_composite, hostScope);
-    }
+    public IServiceScope CreateScope() => _composite.CreateScope();
 
     #endregion
 }

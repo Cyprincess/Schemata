@@ -52,10 +52,7 @@ public sealed class ClientCredentialsHandler<TApp>(IClientAuthenticationService<
             [Parameters.ClientSecret] = [request.ClientSecret],
         }, headers, ct);
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
         var ctx = AdviceContext.Require();
@@ -68,10 +65,7 @@ public sealed class ClientCredentialsHandler<TApp>(IClientAuthenticationService<
                 return result!;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(
-                    OAuthErrors.InvalidClient,
-                    SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-                );
+                throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
         var claims = new List<Claim> {

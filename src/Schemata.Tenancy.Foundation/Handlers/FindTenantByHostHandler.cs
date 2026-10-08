@@ -3,8 +3,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Entity.Repository;
-using Schemata.Messaging.Skeleton;
-using Schemata.Tenancy.Foundation.Queries;
 using Schemata.Tenancy.Skeleton.Entities;
 
 namespace Schemata.Tenancy.Foundation.Handlers;
@@ -14,22 +12,22 @@ namespace Schemata.Tenancy.Foundation.Handlers;
 public sealed class FindTenantByHostHandler<TTenant>(
     IRepository<TTenant>            tenants,
     IRepository<SchemataTenantHost> hosts
-) : IRequestHandler<FindTenantByHostQuery<TTenant>, TTenant?>
+)
     where TTenant : SchemataTenant
 {
-    public async Task<TTenant?> HandleAsync(FindTenantByHostQuery<TTenant> request, CancellationToken ct = default) {
-        ArgumentNullException.ThrowIfNull(request);
-
-        var normalized = TenantHostNormalizer.Normalize(request.Host);
+    public async Task<TTenant?> HandleAsync(string host, CancellationToken ct = default) {
+        using var tenantCache = tenants.SuppressQueryCache();
+        using var hostCache = hosts.SuppressQueryCache();
+        var normalized = TenantHostNormalizer.Normalize(host);
         if (normalized is null) {
             return null;
         }
 
         var match = await hosts.SingleOrDefaultAsync(q => q.Where(h => h.Host == normalized), ct);
-        if (match?.Tenant is null) {
+        if (match?.Parent is null) {
             return null;
         }
 
-        return await tenants.SingleOrDefaultAsync(q => q.Where(t => t.Name == match.Tenant), ct);
+        return await tenants.SingleOrDefaultAsync(q => q.Where(t => t.CanonicalName == match.Parent), ct);
     }
 }

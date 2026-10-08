@@ -15,11 +15,13 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Common;
 using Schemata.Entity.Repository;
+using Schemata.Common.Errors;
 using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
 using Schemata.Flow.Skeleton.Runtime;
+using Schemata.Abstractions.Tenancy;
 
 namespace Schemata.Flow.Foundation.Handlers;
 
@@ -37,6 +39,7 @@ internal sealed class FlowHandlerSupport(
     internal ProcessPersistence Persistence => persistence;
 
     internal ProcessLifecycleNotifier Notifier => notifier;
+    internal FlowAccessPolicy? Access => services.GetService<FlowAccessPolicy>();
 
     internal IServiceProvider Services => services;
 
@@ -56,8 +59,9 @@ internal sealed class FlowHandlerSupport(
         return process;
     }
 
-    internal ProcessRegistration ResolveRegistration(string definitionName) {
-        var registration = registry.GetRegistration(definitionName);
+    internal ProcessRegistration ResolveRegistration(string definitionName, string version) {
+        if (string.IsNullOrWhiteSpace(version)) throw new InvalidArgumentException(SchemataResources.FLOW_DEFINITION_VERSION_REQUIRED);
+        var registration = registry.GetRegistration(definitionName, version);
         if (registration is null) {
             throw new NotFoundException(
                 SchemataResources.PROCESS_NOT_REGISTERED,
@@ -68,8 +72,13 @@ internal sealed class FlowHandlerSupport(
         return registration;
     }
 
-    internal ProcessRegistration? FindRegistration(string definitionName) {
-        return registry.GetRegistration(definitionName);
+    internal ProcessRegistration ResolveRegistration(SchemataProcess process) {
+        if (string.IsNullOrWhiteSpace(process.DefinitionVersion) || process.DefinitionVersion == "latest") {
+            throw new FailedPreconditionException(SchemataResources.FLOW_DEFINITION_VERSION_UNBOUND);
+        }
+        return registry.GetRegistration(process.DefinitionName, process.DefinitionVersion)
+            ?? throw new FailedPreconditionException(SchemataResources.FLOW_DEFINITION_VERSION_NOT_REGISTERED,
+                new Dictionary<string, string?> { ["name"] = process.DefinitionName, ["version"] = process.DefinitionVersion });
     }
 
     internal IFlowRuntime ResolveEngine(ProcessRegistration registration) {
@@ -117,12 +126,22 @@ internal sealed class FlowHandlerSupport(
                 ? await ResolveTargetAsync(
                     engine, registration.Definition, process, tokens, context, trigger, token, current)
                 : token;
+            if (Access is { } access) {
+                if (tokenName is null) {
+                    var live = tokens.Where(candidate => TokenStates.Live.Contains(candidate.State!)).ToArray();
+                    if (live.Length == 1) tokenName = live[0].CanonicalName;
+                }
+                var targets = tokens.Where(candidate => candidate.CanonicalName == tokenName).ToArray();
+                await access.RequireEligibilityAsync(resolveTarget ? FlowOperations.Correlate : FlowOperations.RunEvent,
+                    process, targets, principal, scope, current);
+            }
             var before = WaitingMap(tokens);
             snapshot = await engine.TriggerAsync(
                 registration.Definition, process, tokens, context, trigger, payload, tokenName, current);
             EnsureCatchesHaveHandlers(registration.Definition, snapshot);
             await RunAdvisorsAsync(registration, scope, context, snapshot, before, current);
             await persistence.PersistSnapshotAsync(scope, snapshot, current);
+            if (Access is { } history) await history.RecordParticipationAsync(process, principal, scope, current);
         }, ct);
 
         await NotifyTransitionResultAsync(snapshot!, ct);
@@ -149,6 +168,7 @@ internal sealed class FlowHandlerSupport(
             }
 
             var context = new FlowTransitionContext {
+                Execution = execution,
                 Definition            = registration.Definition,
                 Snapshot              = snapshot,
                 Token                 = TokenSnapshotFactory.From(token),
@@ -169,6 +189,7 @@ internal sealed class FlowHandlerSupport(
             }
 
             var context = new FlowTransitionContext {
+                Execution = execution,
                 Definition            = registration.Definition,
                 Snapshot              = snapshot,
                 Token                 = TokenSnapshotFactory.From(token),
@@ -215,8 +236,11 @@ internal sealed class FlowHandlerSupport(
                 }
 
                 throw new FailedPreconditionException(
-                    message: $"Flow catch '{catchEvent.Name}' waits on a {kind} event, but no registered "
-                           + $"{nameof(IFlowCatchHandler)} delivers that kind; the token would wait forever.");
+                    SchemataResources.FLOW_CATCH_HANDLER_NOT_REGISTERED,
+                    new Dictionary<string, string?> {
+                        ["name"] = catchEvent.Name,
+                        ["kind"] = kind.Value.ToString(),
+                    });
             }
         }
     }
@@ -235,14 +259,17 @@ internal sealed class FlowHandlerSupport(
         }
 
         var (name, type, canonical, stamp) = StartSource(registration, source, sourceType, sourceName);
-        await scope.Sources.AddAsync(new SchemataProcessSource {
-            Process         = process.CanonicalName!,
-            Token           = null,
-            Name            = name,
-            SourceType      = type,
-            Source          = canonical,
-            SourceTimestamp = stamp,
-        }, ct);
+        var binding = new SchemataProcessSource {
+            Process = process.CanonicalName!, Token = null, Name = name,
+            SourceType = type, Source = canonical, SourceTimestamp = stamp,
+        };
+        if (stamp is not null) {
+            var worker = SourceWorkers.GetOrAdd(registration.SourceTypes[name].SourceType, CreateSourceWorker)!;
+            await worker.ValidateStartAsync(services, scope.UnitOfWork, binding, ct);
+        }
+        if (await scope.Mutation<SchemataProcessSource>().CreateAsync(binding, scope.UnitOfWork, ct) == MutationResult.Applied) {
+            scope.TrackSourceBinding(binding);
+        }
     }
 
     internal static (string Name, string Type, string Canonical, Guid? Stamp) StartSource(
@@ -252,6 +279,15 @@ internal sealed class FlowHandlerSupport(
         string?             sourceName
     ) {
         if (source is ICanonicalName canonicalSource) {
+            if (canonicalSource.CanonicalName is null) {
+                throw new FailedPreconditionException(
+                    SchemataResources.FLOW_PROCESS_SOURCE_NAME_REQUIRED,
+                    new Dictionary<string, string?> {
+                        ["name"]   = registration.Name,
+                        ["source"] = canonicalSource.GetType().Name,
+                    });
+            }
+
             if (sourceType is null) {
                 throw new FailedPreconditionException(
                     SchemataResources.PROCESS_SOURCE_BINDING_AMBIGUOUS,
@@ -276,17 +312,30 @@ internal sealed class FlowHandlerSupport(
             return (
                 binding.BindingName,
                 FlowSourceTypeNames.ToName(sourceType),
-                canonicalSource.CanonicalName!,
+                canonicalSource.CanonicalName,
                 source is IConcurrency concurrency ? concurrency.Timestamp : null);
         }
 
         var types = registration.SourceTypes.ToList();
         if (types.Count != 1) {
             throw new FailedPreconditionException(
-                message: $"Process '{registration.Name}' binds {types.Count} source types; specify a source name.");
+                SchemataResources.FLOW_PROCESS_SOURCE_AMBIGUOUS,
+                new Dictionary<string, string?> {
+                    ["name"]  = registration.Name,
+                    ["count"] = types.Count.ToString(),
+                });
         }
 
-        return (types[0].Key, FlowSourceTypeNames.ToName(types[0].Value.SourceType), sourceName!, null);
+        if (sourceName is null) {
+            throw new FailedPreconditionException(
+                SchemataResources.FLOW_PROCESS_SOURCE_NAME_REQUIRED,
+                new Dictionary<string, string?> {
+                    ["name"]   = registration.Name,
+                    ["source"] = types[0].Key,
+                });
+        }
+
+        return (types[0].Key, FlowSourceTypeNames.ToName(types[0].Value.SourceType), sourceName, null);
     }
 
     internal static object? DeserializePayload(object? payload, Type? type) {
@@ -328,7 +377,6 @@ internal sealed class FlowHandlerSupport(
         ClaimsPrincipal?     principal
     ) {
         return new() {
-            Name      = NewLeafId(),
             Process   = process.Name,
             Token     = token.CanonicalName,
             Kind      = TransitionKind.Cancel,
@@ -357,6 +405,7 @@ internal sealed class FlowHandlerSupport(
                            query => query.Where(current => current.Process == processName), ct)) {
             list.Add(token);
         }
+        scope.IndexTokens(processName, list);
 
         return list;
     }
@@ -385,15 +434,33 @@ internal sealed class FlowHandlerSupport(
             LoadedCompensationBindings = bindings,
             Principal                  = principal,
             SourceReadGuard            = FlowSourceReadScope.Enter,
+            FindTokenAsync = async (processName, tokenName, token) => {
+                var index = await scope.GetTokenIndexAsync(processName, token);
+                return index.TryGetValue(tokenName, out var entity) ? entity : null;
+            },
+            FindSourceBinding = scope.FindSourceBinding,
+            TrackSourceBinding = scope.TrackSourceBinding,
+            ValidateSourceAsync = async (processName, sourceType, canonical, initial, token) => {
+                var type = FlowSourceTypeNames.ToName(sourceType);
+                await foreach (var row in scope.Sources.ListAsync<SchemataProcessSource>(
+                                   query => query.Where(binding => (binding.Process == processName || binding.Process == process.CanonicalName)
+                                                               && binding.SourceType == type
+                                                               && binding.Source == canonical), token)) {
+                    if (scope.FindSourceBinding(row.Process, row.Token, row.Name)?.Uid == row.Uid) continue;
+                    RequireSourceStamp(row, initial, canonical);
+                }
+            },
+            CreateProcessAsync         = (entity, token) => scope.CreateProcessAsync(entity, token),
+            CreateTokenAsync           = (entity, token) => scope.CreateTokenAsync(entity, token),
+            PersistSnapshotAsync       = (snapshot, token) => persistence.PersistSnapshotAsync(scope, snapshot, token),
         };
     }
 
-    internal static SchemataProcess NewProcess(string definitionName, StartProcessOptions? startOptions) {
-        var leaf = NewLeafId();
+    internal static SchemataProcess NewProcess(ProcessRegistration registration, StartProcessOptions? startOptions) {
         return new() {
-            Name           = leaf,
-            CanonicalName  = $"processes/{leaf}",
-            DefinitionName = definitionName,
+            DefinitionName = registration.Name,
+            DefinitionVersion = registration.Version,
+            TenantUid = TenantContext.Current.Uid,
             DisplayName    = string.IsNullOrWhiteSpace(startOptions?.DisplayName) ? null : startOptions.DisplayName,
             Description    = string.IsNullOrWhiteSpace(startOptions?.Description) ? null : startOptions.Description,
             IdempotencyKey = string.IsNullOrWhiteSpace(startOptions?.IdempotencyKey) ? null : startOptions.IdempotencyKey,
@@ -420,9 +487,6 @@ internal sealed class FlowHandlerSupport(
         return principal.Identity?.Name;
     }
 
-    internal static string NewLeafId() {
-        return Guid.NewGuid().ToString("n");
-    }
 
     private static IEnumerable<FlowEvent> ResolveExternalCatches(
         ProcessDefinition    definition,
@@ -467,7 +531,7 @@ internal sealed class FlowHandlerSupport(
         foreach (var ((sourceType, _), entity) in execution.TouchedSources) {
             var worker = SourceWorkers.GetOrAdd(sourceType, CreateSourceWorker);
             if (worker is not null) {
-                await worker.FlushAsync(services, scope.UnitOfWork, entity, process, ct);
+                await worker.FlushAsync(services, scope, execution, entity, process, ct);
             }
         }
 
@@ -492,6 +556,12 @@ internal sealed class FlowHandlerSupport(
                            query => query.Where(source => source.Process == process
                                                       && (source.Token == null || source.Token == token)), ct)) {
             bindings.Add(binding);
+        }
+        foreach (var staged in scope.StagedSourceBindings) {
+            if (staged.Process != process || (staged.Token is not null && staged.Token != token)) continue;
+            var index = bindings.FindIndex(row => row.Uid == staged.Uid);
+            if (index < 0) bindings.Add(staged);
+            else bindings[index] = staged;
         }
 
         foreach (var binding in bindings) {
@@ -535,6 +605,14 @@ internal sealed class FlowHandlerSupport(
         return targets[0];
     }
 
+    private static void RequireSourceStamp(SchemataProcessSource binding, Guid initial, string canonical) {
+        if (binding.SourceTimestamp is { } expected && expected != initial) {
+            throw new FailedPreconditionException(
+                SchemataResources.FLOW_SOURCE_MODIFIED_CONCURRENTLY,
+                new Dictionary<string, string?> { ["name"] = canonical });
+        }
+    }
+
     private static ISourceWorker? CreateSourceWorker(Type type) {
         if (!typeof(ICanonicalName).IsAssignableFrom(type)) {
             return null;
@@ -547,6 +625,13 @@ internal sealed class FlowHandlerSupport(
 
     private interface ISourceWorker
     {
+        Task ValidateStartAsync(
+            IServiceProvider provider,
+            IUnitOfWork unitOfWork,
+            SchemataProcessSource binding,
+            CancellationToken ct
+        );
+
         Task AdviseAsync(
             IServiceProvider      provider,
             IUnitOfWork           unitOfWork,
@@ -558,7 +643,8 @@ internal sealed class FlowHandlerSupport(
 
         Task FlushAsync(
             IServiceProvider provider,
-            IUnitOfWork      unitOfWork,
+            FlowPersistenceScope scope,
+            FlowExecutionContext execution,
             object           entity,
             string           process,
             CancellationToken ct
@@ -568,6 +654,27 @@ internal sealed class FlowHandlerSupport(
     private sealed class SourceWorker<TSource> : ISourceWorker
         where TSource : class, ICanonicalName
     {
+        public async Task ValidateStartAsync(
+            IServiceProvider provider,
+            IUnitOfWork unitOfWork,
+            SchemataProcessSource binding,
+            CancellationToken ct
+        ) {
+            var repository = provider.GetRequiredService<IRepository<TSource>>();
+            repository.Join(unitOfWork);
+            TSource? entity;
+            using (FlowSourceReadScope.Enter(repository)) {
+                entity = await repository.FirstOrDefaultAsync(
+                    query => query.Where(source => source.CanonicalName == binding.Source), ct);
+            }
+            if (entity is null) {
+                throw SchemataResourceErrors.NotFound<TSource>(binding.Source);
+            }
+            if (entity is IConcurrency concurrency) {
+                RequireSourceStamp(binding, concurrency.Timestamp, binding.Source);
+            }
+        }
+
         public async Task AdviseAsync(
             IServiceProvider      provider,
             IUnitOfWork           unitOfWork,
@@ -593,18 +700,23 @@ internal sealed class FlowHandlerSupport(
                 return;
             }
 
+            if (entity is IConcurrency concurrency) {
+                await execution.TrackSourceStampAsync(context.Snapshot.Process.CanonicalName!, typeof(TSource), source, concurrency.Timestamp, ct);
+            }
+
             var advice = AdviceContext.Current ?? new AdviceContext(provider);
-            advice.Set(new FlowSourceWriteBack(execution));
             await Advisor.For<IFlowSourceAdvisor<TSource>>().RunAsync(advice, context, entity, ct);
         }
 
         public async Task FlushAsync(
             IServiceProvider provider,
-            IUnitOfWork      unitOfWork,
+            FlowPersistenceScope scope,
+            FlowExecutionContext execution,
             object           entity,
             string           process,
             CancellationToken ct
         ) {
+            var unitOfWork = scope.UnitOfWork;
             var source   = (TSource)entity;
             var sources  = provider.GetRequiredService<IRepository<TSource>>();
             var bindings = provider.GetRequiredService<IRepository<SchemataProcessSource>>();
@@ -624,36 +736,40 @@ internal sealed class FlowHandlerSupport(
                                                            && binding.SourceType == type), ct)) {
                 rows.Add(row);
             }
+            foreach (var staged in scope.StagedSourceBindings) {
+                if (staged.Source != canonical || staged.SourceType != type) continue;
+                var index = rows.FindIndex(row => row.Uid == staged.Uid);
+                if (index < 0) rows.Add(staged);
+                else rows[index] = staged;
+            }
 
             if (source is IConcurrency concurrent) {
+                var initial = execution.InitialSourceStamps.TryGetValue((typeof(TSource), canonical), out var stamp)
+                    ? stamp : concurrent.Timestamp;
                 foreach (var row in rows) {
-                    if (row.SourceTimestamp is { } expected && concurrent.Timestamp != expected) {
-                        throw new FailedPreconditionException(
-                            SchemataResources.FLOW_SOURCE_MODIFIED_CONCURRENTLY,
-                            new Dictionary<string, string?> { ["name"] = canonical });
-                    }
+                    if (scope.FindSourceBinding(row.Process, row.Token, row.Name)?.Uid == row.Uid) continue;
+                    RequireSourceStamp(row, initial, canonical);
                 }
             }
 
-            await sources.UpdateAsync(source, ct);
+            // The bound business entity is a resource: write-back enters the mutation pipeline so
+            // its committed advisors fire, staged on the outer flow unit of work.
+            var applied = await provider.GetRequiredService<IResourceMutation<TSource>>().UpdateAsync(source, unitOfWork, ct: ct);
 
-            if (source is not IConcurrency) {
+            if (applied != MutationResult.Applied || source is not IConcurrency stamped) {
                 return;
             }
 
-            TSource? persisted;
-            using (FlowSourceReadScope.Enter(sources)) {
-                persisted = await sources.FirstOrDefaultAsync(
-                    query => query.Where(current => current.CanonicalName == canonical), ct);
-            }
-
-            if (persisted is not IConcurrency stamped) {
-                return;
-            }
-
+            // The new concurrency stamp is final only at the provider's write boundary: LinqToDB
+            // rotates it when the staged SQL executes, EF at unit-of-work commit. The save
+            // preparation projects the final stamp onto each binding row inside the same
+            // transaction, after rotation and before the save.
+            var bindingMutation = provider.GetRequiredService<IResourceMutation<SchemataProcessSource>>();
             foreach (var row in rows) {
-                row.SourceTimestamp = stamped.Timestamp;
-                await bindings.UpdateAsync(row, ct);
+                unitOfWork.AddSavePreparation(() => row.SourceTimestamp = stamped.Timestamp);
+                if (await bindingMutation.UpdateAsync(row, unitOfWork, ct: ct) == MutationResult.Applied) {
+                    scope.TrackSourceBinding(row);
+                }
             }
         }
     }

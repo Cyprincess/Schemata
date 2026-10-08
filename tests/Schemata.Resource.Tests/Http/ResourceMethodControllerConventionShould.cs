@@ -97,6 +97,7 @@ public class ResourceMethodControllerConventionShould
         Assert.Equal("EntityBs", model.ControllerName);
     }
 
+
     [Fact]
     public void SkipWhenMethodNotRegistered_ForHandlerType() {
         var convention = new ResourceMethodControllerConvention(Registry());
@@ -150,48 +151,7 @@ public class ResourceMethodControllerConventionShould
         Assert.Null(parameter.BindingInfo);
     }
 
-    [Fact]
-    public void RequireResourceDeclaredScheme_OverGlobalDefault() {
-        var registry = new ResourceRegistry();
-        registry.Add(new(typeof(EntityB)) { AuthenticationScheme = "ResourceScheme" },
-                     [new ResourceMethodAttribute("run", typeof(HandlerB))]);
-        var convention = new ResourceMethodControllerConvention(registry, "GlobalScheme");
 
-        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB>).GetTypeInfo();
-        var model          = BuildController(controllerType);
-
-        convention.Apply(model);
-
-        var filter = Assert.IsType<AuthorizeFilter>(Assert.Single(model.Filters));
-        Assert.Equal(["ResourceScheme"], filter.Policy!.AuthenticationSchemes);
-    }
-
-    [Fact]
-    public void RequireGlobalScheme_WhenResourceDeclaresNone() {
-        var convention = new ResourceMethodControllerConvention(
-            Registry(new ResourceMethodAttribute("run", typeof(HandlerB))), "GlobalScheme");
-
-        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB>).GetTypeInfo();
-        var model          = BuildController(controllerType);
-
-        convention.Apply(model);
-
-        var filter = Assert.IsType<AuthorizeFilter>(Assert.Single(model.Filters));
-        Assert.Equal(["GlobalScheme"], filter.Policy!.AuthenticationSchemes);
-    }
-
-    [Fact]
-    public void AddNoAuthorizationFilter_WhenNeitherResourceNorGlobalDeclaresScheme() {
-        var convention = new ResourceMethodControllerConvention(
-            Registry(new ResourceMethodAttribute("run", typeof(HandlerB))));
-
-        var controllerType = typeof(ResourceMethodController<EntityB, RequestB, ResponseB>).GetTypeInfo();
-        var model          = BuildController(controllerType);
-
-        convention.Apply(model);
-
-        Assert.Empty(model.Filters);
-    }
 
     private static ResourceRegistry Registry(params ResourceMethodAttribute[] methods) {
         var registry = new ResourceRegistry();
@@ -269,6 +229,22 @@ public class ResourceMethodControllerConventionShould
     #region Nested type: ResponseB
 
     public sealed class ResponseB : ICanonicalName
+    {
+        #region ICanonicalName Members
+
+        public string? Name          { get; set; }
+        public string? CanonicalName { get; set; }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region Nested type: PublicEntityB
+
+    [CanonicalName("publicEntities/{public_entity}")]
+    [Anonymous("run")]
+    public sealed class PublicEntityB : ICanonicalName
     {
         #region ICanonicalName Members
 

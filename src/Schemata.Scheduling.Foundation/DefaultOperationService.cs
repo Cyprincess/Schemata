@@ -1,3 +1,4 @@
+using Schemata.Abstractions.Tenancy;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -95,40 +96,55 @@ public sealed class DefaultOperationService : IOperationService
 
         execution.State   = ExecutionState.Cancelled;
         execution.EndTime = _time.GetUtcNow().UtcDateTime;
-        await executions.UpdateAsync(execution, ct);
-        await executions.CommitAsync(ct);
+        await scope.ServiceProvider.GetRequiredService<IResourceMutation<SchemataJobExecution>>().UpdateAsync(execution, null, ct: ct);
 
         return OperationMapper.FromExecution(execution);
     }
 
-    public async ValueTask<Operation> CreateTerminalAsync(
+    public async ValueTask<Operation> ExecuteAsync(
         string method,
-        string? output,
-        string? error,
-        Guid? uid = null,
+        Func<Operation, CancellationToken, ValueTask<string?>> execute,
         CancellationToken ct = default
     ) {
         ArgumentNullException.ThrowIfNull(method);
+        ArgumentNullException.ThrowIfNull(execute);
 
-        var name = (uid ?? Guid.NewGuid()).ToString("n");
-        var now  = _time.GetUtcNow().UtcDateTime;
         var execution = new SchemataJobExecution {
-            Uid           = uid ?? Guid.Empty,
-            Name          = name,
-            CanonicalName = $"operations/{name}",
-            Method        = method,
-            State         = error is null ? ExecutionState.Succeeded : ExecutionState.Failed,
-            StartTime     = now,
-            EndTime       = now,
-            Output        = output,
-            RecentError   = error,
+            Tenant    = TenantContext.Current.Uid?.ToString("D") ?? "host",
+            Method    = method,
+            State     = ExecutionState.Running,
+            StartTime = _time.GetUtcNow().UtcDateTime,
         };
-        await using var scope = _scopes.CreateAsyncScope();
-        var executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
-        await executions.AddAsync(execution, ct);
-        await executions.CommitAsync(ct);
+        await using (var scope = _scopes.CreateAsyncScope()) {
+            var mutation = scope.ServiceProvider.GetRequiredService<IResourceMutation<SchemataJobExecution>>();
+            await mutation.CreateAsync(execution, null, ct);
+        }
 
+        try {
+            execution.Output = await execute(OperationMapper.FromExecution(execution), ct);
+            ct.ThrowIfCancellationRequested();
+            execution.State = ExecutionState.Succeeded;
+        } catch (OperationCanceledException) {
+            execution.State = ExecutionState.Cancelled;
+            execution.EndTime = _time.GetUtcNow().UtcDateTime;
+            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await PersistTerminalAsync(execution, cleanup.Token);
+            throw;
+        } catch (Exception exception) {
+            execution.State = ExecutionState.Failed;
+            execution.RecentError = exception.Message;
+        }
+
+        execution.EndTime = _time.GetUtcNow().UtcDateTime;
+        using var completion = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await PersistTerminalAsync(execution, completion.Token);
         return OperationMapper.FromExecution(execution);
+    }
+
+    private async Task PersistTerminalAsync(SchemataJobExecution execution, CancellationToken ct) {
+        await using var scope = _scopes.CreateAsyncScope();
+        var mutation = scope.ServiceProvider.GetRequiredService<IResourceMutation<SchemataJobExecution>>();
+        await mutation.UpdateAsync(execution, null, ct: ct);
     }
 
     private TimeSpan PollInterval {
@@ -148,6 +164,8 @@ public sealed class DefaultOperationService : IOperationService
         var execution = await executions.FirstOrDefaultAsync<SchemataJobExecution>(
             query => query.Where(e => e.CanonicalName == operation || e.Name == operation), ct);
 
-        return execution ?? throw new NotFoundException(message: $"Operation '{operation}' was not found.");
+        return execution ?? throw new NotFoundException(
+            SchemataResources.OPERATION_NOT_FOUND,
+            new Dictionary<string, string?> { ["name"] = operation });
     }
 }

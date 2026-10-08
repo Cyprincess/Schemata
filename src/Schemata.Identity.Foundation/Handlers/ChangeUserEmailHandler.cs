@@ -15,5 +15,11 @@ internal sealed class ChangeUserEmailHandler<TUser>(IdentityOperationHandler<TUs
     public Task<IdentityResult<Unit>> HandleAsync(
         ChangeUserEmailRequest<TUser> request,
         CancellationToken             ct = default
-    ) => operations.ChangeEmailAsync(IdentityRequestHandler.Require(request).Request, request.Principal!, ct);
+    ) {
+        if (request.Principal is null) {
+            return Task.FromResult(IdentityResult<Unit>.Challenge());
+        }
+
+        return operations.ChangeEmailAsync(IdentityRequestHandler.Require(request).Request, request.Principal, ct);
+    }
 }

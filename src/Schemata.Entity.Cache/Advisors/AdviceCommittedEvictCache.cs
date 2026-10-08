@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Advisors;
 using Schemata.Caching.Skeleton;
 using Schemata.Entity.Repository;
@@ -18,69 +17,35 @@ public static class AdviceCommittedEvictCache
 }
 
 /// <summary>
-///     Evicts query-cache entries for updated and removed entities after a repository commit.
+///     Invalidates all cached queries for the entity type after a commit that actually wrote. The
+///     notification is type-level: it fires once per committing repository enlistment with staged
+///     writes, and a commit with no writes sends no notification.
 /// </summary>
-/// <typeparam name="TEntity">The entity type whose committed changes invalidate cached queries.</typeparam>
+/// <typeparam name="TEntity">The entity type whose committed writes invalidate cached queries.</typeparam>
 public sealed class AdviceCommittedEvictCache<TEntity> : IRepositoryCommittedAdvisor<TEntity>
     where TEntity : class
 {
-    private readonly ICacheProvider                      _cache;
-    private readonly IOptions<SchemataQueryCacheOptions> _options;
+    private readonly ICacheProvider _cache;
 
     /// <summary>
-    ///     Initializes a cache-eviction advisor with the cache provider and query-cache options.
+    ///     Initializes a cache-eviction advisor with the cache provider holding generation metadata.
     /// </summary>
-    /// <param name="cache">The cache provider containing query results and reverse indexes.</param>
-    /// <param name="options">The query-cache options controlling eviction.</param>
-    public AdviceCommittedEvictCache(ICacheProvider cache, IOptions<SchemataQueryCacheOptions> options) {
-        _cache   = cache;
-        _options = options;
-    }
+    /// <param name="cache">The cache provider containing query results and generation metadata.</param>
+    public AdviceCommittedEvictCache(ICacheProvider cache) { _cache = cache; }
 
     public int Order => AdviceCommittedEvictCache.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(
-        AdviceContext          ctx,
-        IRepository<TEntity>   repository,
-        CommitChanges<TEntity> changes,
-        CancellationToken      ct = default
+        AdviceContext        ctx,
+        IRepository<TEntity> repository,
+        CancellationToken    ct = default
     ) {
-        if (!_options.Value.EvictionEnabled || ctx.Has<QueryCacheEvictionSuppressed>()) {
+        if (ctx.Has<QueryCacheEvictionSuppressed>()) {
             return AdviseResult.Continue;
         }
 
-        foreach (var entity in changes.Updated) {
-            await EvictAsync(_cache, typeof(TEntity), entity, ct);
-        }
-
-        foreach (var entity in changes.Removed) {
-            await EvictAsync(_cache, typeof(TEntity), entity, ct);
-        }
+        await _cache.SetAsync(CacheGeneration<TEntity>.Key, Guid.NewGuid().ToByteArray(), new(), ct);
 
         return AdviseResult.Continue;
-    }
-
-    private static async Task EvictAsync(
-        ICacheProvider    cache,
-        Type              entityType,
-        object            entity,
-        CancellationToken ct
-    ) {
-        var index = ReverseIndex.BuildKey(entityType, entity);
-        if (index is null) {
-            return;
-        }
-
-        var keys = await cache.CollectionMembersAsync(index, ct);
-        if (keys is not { Count: > 0 }) {
-            await cache.CollectionClearAsync(index, ct);
-            return;
-        }
-
-        foreach (var key in keys) {
-            await cache.RemoveAsync(key, ct);
-        }
-
-        await cache.CollectionClearAsync(index, ct);
     }
 }

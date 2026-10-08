@@ -69,6 +69,35 @@ public abstract class SourceWriteBackShould
         Assert.DoesNotContain(bindings, binding => binding.Name == "temporary");
     }
 
+    [Trait("Layer", "Component")]
+    [Fact]
+    public async Task Roll_Back_All_Rows_When_Save_Preparation_Fails() {
+        // Start commits a stable process/token/binding state; the failing transition runs inside
+        // the assertion so the preparation failure is exercised at the commit boundary.
+        var order   = await CreateOrderAsync();
+        var process = await StartAsync<FailingSavePreparationProcess>(order);
+        var source     = await ReadOrderAsync(order.Uid);
+        var processRow = await ReadProcessRowAsync(process.CanonicalName!);
+        var tokenRows  = await ReadTokenRowsAsync(process.Name!);
+        Assert.Single(tokenRows);
+        var bindings   = await ReadBindingsAsync(process.CanonicalName!);
+        var stamps     = bindings.ConvertAll(binding => binding.SourceTimestamp);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => CompleteAsync(process));
+
+        var persisted = await ReadOrderAsync(order.Uid);
+        Assert.Equal(source.Timestamp, persisted.Timestamp);
+        Assert.Equal("before", persisted.TaskValue);
+        var processAfter = await ReadProcessRowAsync(process.CanonicalName!);
+        Assert.Equal(processRow.State, processAfter.State);
+        Assert.Equal(processRow.Timestamp, processAfter.Timestamp);
+        var tokensAfter = await ReadTokenRowsAsync(process.Name!);
+        Assert.Equal(tokenRows.ConvertAll(token => (token.State, token.Timestamp)),
+                     tokensAfter.ConvertAll(token => (token.State, token.Timestamp)));
+        var after = await ReadBindingsAsync(process.CanonicalName!);
+        Assert.Equal(stamps, after.ConvertAll(binding => binding.SourceTimestamp));
+    }
+
     [Fact]
     public async Task Refresh_Cross_Token_Binding_Rows_On_Branch_Write() {
         var order   = await CreateOrderAsync();
@@ -123,7 +152,7 @@ public abstract class SourceWriteBackShould
         var       repository = scope.ServiceProvider.GetRequiredService<IRepository<Order>>();
         var order = await repository.FindAsync([uid]);
         Assert.NotNull(order);
-        return order!;
+        return order;
     }
 
     private async Task<List<SchemataProcessSource>> ReadBindingsAsync(string process) {
@@ -136,6 +165,27 @@ public abstract class SourceWriteBackShould
         }
 
         return bindings;
+    }
+
+    private async Task<SchemataProcess> ReadProcessRowAsync(string canonicalName) {
+        using var scope      = _fixture.CreateScope();
+        var       repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataProcess>>();
+        var       process    = await repository.FirstOrDefaultAsync(
+            query => query.Where(row => row.CanonicalName == canonicalName));
+        Assert.NotNull(process);
+        return process;
+    }
+
+    private async Task<List<SchemataProcessToken>> ReadTokenRowsAsync(string process) {
+        using var scope      = _fixture.CreateScope();
+        var       repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataProcessToken>>();
+        var       tokens     = new List<SchemataProcessToken>();
+        await foreach (var token in repository.ListAsync<SchemataProcessToken>(
+                           query => query.Where(row => row.Process == process))) {
+            tokens.Add(token);
+        }
+
+        return tokens;
     }
 
     private async Task AddBranchBindingAsync(SchemataProcess process, Order order, string token) {
@@ -168,7 +218,7 @@ public abstract class SourceWriteBackShould
             UnitOfWork = uow,
         };
 
-        var result = await advisor.AdviseAsync(new AdviceContext(scope.ServiceProvider), context, order, CancellationToken.None);
+        var result = await advisor.AdviseAsync(new(scope.ServiceProvider), context, order, CancellationToken.None);
         Assert.Equal(AdviseResult.Continue, result);
         await uow.CommitAsync();
     }

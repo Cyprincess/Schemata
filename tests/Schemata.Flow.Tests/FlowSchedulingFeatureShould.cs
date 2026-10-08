@@ -39,7 +39,8 @@ public sealed class FlowSchedulingFeatureShould
         await handler.ArmAsync(Context(), CancellationToken.None);
 
         Assert.NotNull(scheduled);
-        Assert.Equal("flow-p1-timer-t1", scheduled!.Name);
+        Assert.Equal("flow-p1-timer-t1", scheduled!.Key);
+        Assert.Null(scheduled.Name);
         Assert.Equal(FlowTimerJob.JobKey, scheduled.JobKey);
         Assert.Equal(ScheduleType.Cron, scheduled.ScheduleType);
         Assert.Equal("*/5 * * * *", scheduled.CronExpression);

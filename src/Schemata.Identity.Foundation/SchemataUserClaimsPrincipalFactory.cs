@@ -1,3 +1,4 @@
+using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
@@ -43,9 +44,8 @@ public class SchemataUserClaimsPrincipalFactory<TUser, TRole> : UserClaimsPrinci
             identity.RemoveClaim(existing);
         }
 
-        var canonical = !string.IsNullOrWhiteSpace(user.CanonicalName)
-            ? user.CanonicalName!
-            : $"users/{user.Uid}";
+        var canonical = user.CanonicalName
+                     ?? throw new InvalidOperationException("The user must have a canonical resource name before issuing claims.");
         identity.AddClaim(new(Options.ClaimsIdentity.UserIdClaimType, canonical));
 
         return identity;

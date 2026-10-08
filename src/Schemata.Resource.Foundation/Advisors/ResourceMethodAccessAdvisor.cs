@@ -28,7 +28,7 @@ public sealed class ResourceMethodAccessAdvisor<TEntity, TRequest, TResponse>(IA
         }
 
         await AuthorizeHelper.EnsureAsync(access, entity,
-                                          new() { Operation = method.Verb, Request = request }, entity.CanonicalName ?? string.Empty, principal, ct);
+                                          new() { Operation = method.Verb, Request = request, Stage = AccessStage.Instance, Name = entity.CanonicalName }, entity.CanonicalName ?? string.Empty, principal, ct);
         return AdviseResult.Continue;
     }
 }

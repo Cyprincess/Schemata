@@ -3,12 +3,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Moq;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
 using Schemata.Resource.Foundation;
-using Schemata.Resource.Foundation.Commands;
 using Schemata.Resource.Tests.Fixtures;
 using Xunit;
 
@@ -40,22 +40,21 @@ public class UndeleteHandlerShould
                   .Returns((Func<IQueryable<TrashStudent>, IQueryable<TrashStudent>> query, CancellationToken _) =>
                       ValueTask.FromResult<TrashStudent?>(query(new[] { other, entity }.AsQueryable())
                                                          .SingleOrDefault()));
-        repository.Setup(r => r.UpdateAsync(entity, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var owner = ResourceMutationMock.Create<TrashStudent>();
 
         var mapper = new Mock<ISimpleMapper>();
         mapper.Setup(m => m.Map<TrashStudent, TrashStudent>(entity)).Returns(entity);
-        var handler = new UndeleteHandler<TrashStudent, TrashStudent>(repository.Object, mapper.Object);
+        var handler = new UndeleteHandler<TrashStudent, TrashStudent>(repository.Object, owner.Object, mapper.Object);
 
         var detail = await handler.HandleAsync(
-            new UndeleteResourceRequest<TrashStudent, TrashStudent> { CanonicalName = entity.CanonicalName },
+            new() { CanonicalName = entity.CanonicalName },
             CancellationToken.None);
 
         Assert.Same(entity, detail);
         Assert.Null(entity.DeleteTime);
         Assert.Null(entity.PurgeTime);
-        repository.Verify(r => r.UpdateAsync(entity, CancellationToken.None), Times.Once);
-        repository.Verify(r => r.CommitAsync(CancellationToken.None), Times.Once);
+        repository.Verify(r => r.UpdateAsync(It.IsAny<TrashStudent>(), It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -69,16 +68,21 @@ public class UndeleteHandlerShould
                              It.IsAny<Func<IQueryable<TrashStudent>, IQueryable<TrashStudent>>>(),
                              It.IsAny<CancellationToken>()))
                   .Returns(ValueTask.FromResult<TrashStudent?>(entity));
+        var owner = ResourceMutationMock.Create<TrashStudent>();
+
         var mapper  = new Mock<ISimpleMapper>();
-        var handler = new UndeleteHandler<TrashStudent, TrashStudent>(repository.Object, mapper.Object);
+        var handler = new UndeleteHandler<TrashStudent, TrashStudent>(repository.Object, owner.Object, mapper.Object);
 
         var ex = await Assert.ThrowsAsync<AlreadyExistsException>(() => handler.HandleAsync(
-            new UndeleteResourceRequest<TrashStudent, TrashStudent> { CanonicalName = entity.CanonicalName },
+            new() { CanonicalName = entity.CanonicalName },
             CancellationToken.None));
 
         var resource = Assert.Single(ex.Details!.OfType<ResourceInfoDetail>());
         Assert.Equal(entity.CanonicalName, resource.ResourceName);
-        repository.Verify(r => r.UpdateAsync(It.IsAny<TrashStudent>(), It.IsAny<CancellationToken>()), Times.Never);
-        repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+        owner.Verify(o => o.UpdateAsync(
+                         It.IsAny<TrashStudent>(),
+                         It.IsAny<IUnitOfWork?>(),
+                         It.IsAny<Operations>(),
+                         It.IsAny<CancellationToken>()), Times.Never);
     }
 }

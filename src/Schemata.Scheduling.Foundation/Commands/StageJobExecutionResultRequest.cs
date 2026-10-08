@@ -10,10 +10,12 @@ namespace Schemata.Scheduling.Foundation.Commands;
 /// <param name="RecentRunTime">End time of the finished execution.</param>
 /// <param name="RecentError">Error message when the execution failed, otherwise <see langword="null" />.</param>
 /// <param name="NextRunTime">Next occurrence for a recurring active job, otherwise <see langword="null" />.</param>
+/// <param name="ScheduleVersion">Generation that owns the completed occurrence.</param>
 public sealed record StageJobExecutionResultRequest(
     string    JobCanonicalName,
     JobState  State,
     DateTime? RecentRunTime,
     string?   RecentError,
-    DateTime? NextRunTime
+    DateTime? NextRunTime,
+    Guid      ScheduleVersion
 ) : ICommand, IJobScoped;

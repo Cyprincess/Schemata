@@ -38,7 +38,7 @@ ValueTask<int>      CountAsync<TResult>(
     Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate, CancellationToken ct = default);
 ValueTask<long>     LongCountAsync<TResult>(
     Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate, CancellationToken ct = default);
-ValueTask<long>     EstimateCountAsync<TResult>(
+ValueTask<long?>    EstimateCountAsync<TResult>(
     Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate, CancellationToken ct = default);
 
 // Key-based lookup
@@ -66,38 +66,46 @@ queryable. `GetAsync` reads the key properties off the supplied entity and deleg
 
 ### EstimateCountAsync
 
-`EstimateCountAsync` is a virtual passthrough: the base implementation delegates to `LongCountAsync`
-(exact), and `EfCoreRepository` does not override it. `LinqToDbRepository` overrides it per backend:
+`EstimateCountAsync` returns a nullable estimate of the scoped query's result count. The default
+interface and base implementations return `null`. Unsupported providers or query shapes also return
+`null`; callers that require exact totals must explicitly choose `CountAsync` or `LongCountAsync`.
+Estimation never falls back to either exact-count method. Cancellation, database failures, and invalid
+plan data propagate to the caller.
 
-- **PostgreSQL** — `EXPLAIN (FORMAT JSON)` of the query, reading `Plan Rows`.
-- **MySQL / MariaDB** — `EXPLAIN FORMAT=JSON`, reading `rows_examined_per_scan` /
-  `rows_produced_per_join`.
-- **SQL Server** — `sys.partitions` row sum, only when the predicate carries no `Where`.
-- **SQLite** — `sqlite_stat1` max stat, only when the predicate carries no `Where`.
+EF Core provides per-context opt-in through `WithCountEstimates<TContext>(QueryEstimateProvider)` or
+a custom `IEfCoreCountEstimator<TContext>`. The built-in estimator executes parameterized plan reads
+through EF reader interception and SHOWPLAN mode commands through nonquery interception. Policies
+receive the actual plan SQL and may reject it. LinqToDB selects estimation by its registered provider.
 
-An unrecognized backend or any failure during estimation falls back to the exact `LongCountAsync`
-passthrough, so an estimate never fails the request.
+The plan backends are PostgreSQL `EXPLAIN (FORMAT JSON)`, MySQL `EXPLAIN FORMAT=JSON`, and SQL Server
+`SHOWPLAN_XML`. These request optimizer plans without executing the SELECT for a count. LinqToDB also
+supports SQLite statistics for a restricted unfiltered table query and returns `null` for MariaDB or
+unrecognized provider names. See [Repository Providers](providers.md) for activation, query-shape limits,
+and connection requirements.
 
 ## Mutation API
 
 ```csharp
-Task AddAsync(TEntity entity, CancellationToken ct = default);
+Task<MutationResult> AddAsync(TEntity entity, CancellationToken ct = default);
 Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default);
-Task UpdateAsync(TEntity entity, CancellationToken ct = default);
-Task RemoveAsync(TEntity entity, CancellationToken ct = default);
+Task<MutationResult> UpdateAsync(TEntity entity, CancellationToken ct = default);
+Task<MutationResult> RemoveAsync(TEntity entity, CancellationToken ct = default);
 Task RemoveRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default);
 Task CommitAsync(CancellationToken ct = default);
 ```
 
-Each mutation runs its advisor pipeline before touching the backing store. When an advisor returns
-`Block` or `Handle`, the pipeline stops and the store operation is skipped. `AddRangeAsync` and
-`RemoveRangeAsync` fan out to per-entity calls so each entity gets a full pipeline pass — except
-LinqToDB's `AddRangeAsync`, which runs the add advisors per entity and then persists the survivors in a
-single bulk-copy round trip.
+Each single-entity mutation runs its advisor pipeline before touching the backing store and returns a
+`MutationResult`: `Applied` when this call staged or executed a write, `NoWrite` when an advisor
+blocked or handled it without staging one. `Block` or `Handle` stops the pipeline and skips the
+store operation. `AddRangeAsync` and `RemoveRangeAsync` fan out to per-entity calls so each entity
+gets a full pipeline pass — except LinqToDB's `AddRangeAsync`, which runs the add advisors per
+entity and then persists the survivors in a single bulk-copy round trip.
 
-`CommitAsync` persists pending changes and then dispatches `IRepositoryCommittedAdvisor<TEntity>` with
-a `CommitChanges<TEntity>` snapshot. See [unit-of-work.md](unit-of-work.md) for transaction and commit
-semantics.
+`CommitAsync` persists pending changes; the unit of work then runs two ordered segments — the
+repository type-level `IRepositoryCommittedAdvisor<TEntity>` notification (skippable when nothing
+staged) followed by the `IResourceMutationCommittedAdvisor<TEntity>` and domain sinks enlisted by
+resource mutations and application code. See [unit-of-work.md](unit-of-work.md) for transaction and
+commit semantics.
 
 ## Suppression scopes
 
@@ -123,10 +131,9 @@ using (repository.SuppressQuerySoftDelete())
 }
 ```
 
-The `Schemata.Entity.Owner` and `Schemata.Entity.Cache` packages add further repository scopes as
+Ownership (`UseOwner()`) and query caching (`UseQueryCache()`) add further repository scopes as
 `IRepository<TEntity>` extension methods — `SuppressOwner()`, `SuppressQueryOwner()`,
-`SuppressQueryCache()`, `SuppressQueryCacheEviction()` — when `UseOwner()` or `UseQueryCache()` is
-called on the repository builder.
+`SuppressQueryCache()`, `SuppressQueryCacheEviction()` — installed by the matching builder call.
 
 ## AdviceContext
 

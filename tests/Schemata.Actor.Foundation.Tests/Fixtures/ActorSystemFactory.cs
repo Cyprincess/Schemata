@@ -2,6 +2,7 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Actor.Foundation.Runtime;
+using Schemata.Messaging.Skeleton.Runtime;
 
 namespace Schemata.Actor.Foundation.Tests.Fixtures;
 
@@ -14,7 +15,7 @@ public static class ActorSystemFactory
         var root = services.BuildServiceProvider();
 
         var registry         = new ActorRegistry();
-        var turnScopeFactory = new InProcessActorTurnScopeFactory(root.GetRequiredService<IServiceScopeFactory>());
+        var turnScopeFactory = new MessageExecutionScopeFactory(root.GetRequiredService<IServiceScopeFactory>());
         var system            = new InProcessActorSystem(root, registry, turnScopeFactory, Options.Create(new SchemataActorOptions()));
 
         return (system, registry, root);

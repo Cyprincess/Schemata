@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions.Advisors;
 using Schemata.Flow.Skeleton;
 using System;
 using System.Collections.Generic;
@@ -21,16 +22,17 @@ public class FlowRunnerIdempotencyShould
     [Fact]
     public async Task Defer_Live_Key_Conflicts_To_The_Store() {
         var live = new SchemataProcess {
-            Name           = "p1",
-            CanonicalName  = "processes/p1",
-            DefinitionName = "def",
-            IdempotencyKey = "key-1",
-            State          = "Running",
+            Name              = "p1",
+            CanonicalName     = "processes/p1",
+            DefinitionName    = "def",
+            DefinitionVersion = "1",
+            IdempotencyKey    = "key-1",
+            State             = "Running",
         };
         var engine = Engine();
         var runner = Runner(out _, engine, live);
 
-        var process = await runner.StartAsync("def", new StartProcessOptions { IdempotencyKey = "key-1" });
+        var process = await runner.StartAsync("def", new() { IdempotencyKey = "key-1" });
 
         Assert.Equal("key-1", process.IdempotencyKey);
         engine.Verify(e => e.StartAsync(
@@ -41,16 +43,17 @@ public class FlowRunnerIdempotencyShould
     [Fact]
     public async Task Allow_Restart_When_Key_Matches_Terminal_Process() {
         var done = new SchemataProcess {
-            Name           = "p1",
-            CanonicalName  = "processes/p1",
-            DefinitionName = "def",
-            IdempotencyKey = "key-1",
-            State          = "Completed",
+            Name              = "p1",
+            CanonicalName     = "processes/p1",
+            DefinitionName    = "def",
+            DefinitionVersion = "1",
+            IdempotencyKey    = "key-1",
+            State             = "Completed",
         };
         var engine = Engine();
         var runner = Runner(out var processes, engine, done);
 
-        var process = await runner.StartAsync("def", new StartProcessOptions { IdempotencyKey = "key-1" });
+        var process = await runner.StartAsync("def", new() { IdempotencyKey = "key-1" });
 
         Assert.Equal("key-1", process.IdempotencyKey);
         Assert.NotEqual("processes/p1", process.CanonicalName);
@@ -65,11 +68,12 @@ public class FlowRunnerIdempotencyShould
     [Fact]
     public async Task Skip_Idempotency_Check_When_Key_Is_Null() {
         var live = new SchemataProcess {
-            Name           = "p1",
-            CanonicalName  = "processes/p1",
-            DefinitionName = "def",
-            IdempotencyKey = "key-1",
-            State          = "Running",
+            Name              = "p1",
+            CanonicalName     = "processes/p1",
+            DefinitionName    = "def",
+            DefinitionVersion = "1",
+            IdempotencyKey    = "key-1",
+            State             = "Running",
         };
         var engine = Engine();
         var runner = Runner(out var processes, engine, live);
@@ -90,7 +94,7 @@ public class FlowRunnerIdempotencyShould
                   It.IsAny<ProcessDefinition>(), It.IsAny<SchemataProcess>(),
                   It.IsAny<FlowExecutionContext>(), It.IsAny<CancellationToken>()))
               .Returns((ProcessDefinition d, SchemataProcess p, FlowExecutionContext c, CancellationToken ct) =>
-                  new ValueTask<ProcessSnapshot>(new ProcessSnapshot { Process = p, Tokens = [], Transitions = [] }));
+                  new(new ProcessSnapshot { Process = p, Tokens = [], Transitions = [] }));
         return engine;
     }
 
@@ -100,12 +104,11 @@ public class FlowRunnerIdempotencyShould
         params SchemataProcess[]              seeded
     ) {
         var registry = new Mock<IProcessRegistry>();
-        registry.Setup(r => r.GetRegistration("def"))
+        registry.Setup(r => r.GetRegistration("def", "1"))
                 .Returns(new ProcessRegistration {
                      Name          = "def",
                      Engine        = FlowConstants.Engines.StateMachine,
                      Definition    = new IdempotentProcess(),
-                     Configuration = new ProcessConfiguration(),
                  });
 
         processes = Repository(seeded);
@@ -117,6 +120,7 @@ public class FlowRunnerIdempotencyShould
 
         var collection = new ServiceCollection()
                         .AddLogging()
+                        .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                         .AddSingleton(registry.Object)
                         .AddSingleton<IOptions<SchemataFlowOptions>>(Options.Create(new SchemataFlowOptions()))
                         .AddSingleton(processes.Object)
@@ -135,20 +139,22 @@ public class FlowRunnerIdempotencyShould
         where T : class {
         var data = items.ToList();
         var repository = new Mock<IRepository<T>>();
+        repository.Setup(r => r.AdviceContext).Returns(new AdviceContext(new ServiceCollection().BuildServiceProvider()));
         repository.Setup(r => r.Join(It.IsAny<IUnitOfWork>()));
         repository.Setup(r => r.Begin()).Returns(Mock.Of<IUnitOfWork>());
         repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>()))
-                  .Returns((T entity, CancellationToken _) => {
+                  .ReturnsAsync((T entity, CancellationToken _) => {
+                      FlowTestCreation.Assign(entity);
                       data.Add(entity);
-                      return Task.CompletedTask;
+                      return MutationResult.Applied;
                   });
-        repository.Setup(r => r.UpdateAsync(It.IsAny<T>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        repository.Setup(r => r.UpdateAsync(It.IsAny<T>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
         repository.Setup(r => r.ListAsync<T>(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
                   .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => Async(predicate(data.AsQueryable()).ToList()));
         repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new ValueTask<T?>(predicate(data.AsQueryable()).SingleOrDefault()));
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new(predicate(data.AsQueryable()).SingleOrDefault()));
         repository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new ValueTask<T?>(predicate(data.AsQueryable()).FirstOrDefault()));
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new(predicate(data.AsQueryable()).FirstOrDefault()));
         return repository;
     }
 

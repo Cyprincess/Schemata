@@ -7,18 +7,20 @@
     <PackageReference Include="Grpc.Net.Client" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Moq" />
     <PackageReference Include="protobuf-net.Grpc" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Schemata.Entity.EntityFrameworkCore/Schemata.Entity.EntityFrameworkCore.csproj" />
-    <ProjectReference Include="../../src/Schemata.Caching.Distributed/Schemata.Caching.Distributed.csproj" />
+    <ProjectReference Include="../../src/Schemata.Caching.Memory/Schemata.Caching.Memory.csproj" />
     <ProjectReference Include="../../src/Schemata.Expressions.Aip/Schemata.Expressions.Aip.csproj" />
     <ProjectReference Include="../../src/Schemata.Expressions.Cel/Schemata.Expressions.Cel.csproj" />
     <ProjectReference Include="../../src/Schemata.Expressions.Order/Schemata.Expressions.Order.csproj" />
     <ProjectReference Include="../../src/Schemata.Insight.Foundation/Schemata.Insight.Foundation.csproj" />
     <ProjectReference Include="../../src/Schemata.Mapping.Foundation/Schemata.Mapping.Foundation.csproj" />
     <ProjectReference Include="../../src/Schemata.Mapping.Mapster/Schemata.Mapping.Mapster.csproj" />
+    <ProjectReference Include="../../src/Schemata.Report.Actor/Schemata.Report.Actor.csproj" />
     <ProjectReference Include="../../src/Schemata.Report.Grpc/Schemata.Report.Grpc.csproj" />
     <ProjectReference Include="../../src/Schemata.Report.Http/Schemata.Report.Http.csproj" />
     <ProjectReference Include="../../src/Schemata.Report.Scheduling/Schemata.Report.Scheduling.csproj" />

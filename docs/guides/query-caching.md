@@ -11,10 +11,10 @@ Three advisors intercept the repository pipeline:
 | Advisor                     | When                    | Behavior                                                       |
 | --------------------------- | ----------------------- | -------------------------------------------------------------- |
 | `AdviceQueryCache`          | Before query execution  | Returns cached result on hit, skips the database               |
-| `AdviceResultCache`         | After successful query  | Stores result in cache and updates the reverse index           |
-| `AdviceCommittedEvictCache` | After successful commit | Evicts cached queries that contain updated or removed entities |
+| `AdviceResultCache`         | After successful query  | Stores result under the generation captured before execution  |
+| `AdviceCommittedEvictCache` | After successful commit | Invalidates all cached queries for the changed entity type    |
 
-Caching uses `ICacheProvider` - a pluggable abstraction with in-memory and Redis backends. The cache is opt-in: you must register a provider and call `UseQueryCache()`.
+Query caching uses `ICacheProvider` for reads, fills and generation changes. Register an in-process memory or shared Redis provider and call `UseQueryCache()`.
 
 ## Add the packages
 
@@ -22,7 +22,7 @@ Query caching ships outside the meta target packages, so add both packages expli
 
 ```shell
 dotnet add package --prerelease Schemata.Entity.Cache
-dotnet add package --prerelease Schemata.Caching.Distributed
+dotnet add package --prerelease Schemata.Caching.Memory
 ```
 
 ## Register the cache
@@ -35,8 +35,7 @@ var builder = WebApplication.CreateBuilder(args)
     .UseSchemata(schema => {
         // ...
         schema.ConfigureServices(services => {
-            services.AddDistributedMemoryCache();
-            services.AddDistributedCache();
+            services.AddMemoryCacheProvider();
 
             services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
                 .UseEntityFrameworkCore<AppDbContext>(
@@ -51,23 +50,24 @@ var builder = WebApplication.CreateBuilder(args)
     });
 ```
 
-`AddDistributedMemoryCache()` registers ASP.NET's in-memory `IDistributedCache`. `UseQueryCache()` registers query, result, and committed eviction advisors together with `SchemataQueryCacheOptions`.
+`AddMemoryCacheProvider()` registers one in-process provider for plain, atomic and collection operations behind the canonical `ICacheProvider` outlet. `UseQueryCache()` registers query, result, and committed eviction advisors together with `SchemataQueryCacheOptions`.
 
 If you skipped Unit of Work, omit `.WithUnitOfWork<AppDbContext>()`; query caching remains active, while
 the open-transaction behavior below applies only when a repository joins a unit of work.
 
-## Configure TTL and eviction
+## Configure TTL
 
 Pass an optional delegate to `UseQueryCache` to customize behavior:
 
 ```csharp
 .UseQueryCache(options => {
-    options.Ttl             = TimeSpan.FromMinutes(10); // default: 5 minutes
-    options.EvictionEnabled = false;                    // rely on TTL only
+    options.Ttl = TimeSpan.FromMinutes(10); // default: 5 minutes
 })
 ```
 
-`EvictionEnabled = false` disables `AdviceCommittedEvictCache`. The query and result advisors remain active; entries live until TTL expires.
+Cached entries live until the TTL expires or a committed write evicts them through a new type
+generation. To keep stale entries for a specific operation, suppress eviction per repository with
+`SuppressQueryCacheEviction()` instead of disabling eviction globally.
 
 ## Suppress caching for a single query
 
@@ -89,7 +89,7 @@ uncommitted changes instead of a stale cached copy. Caching resumes when the uni
 
 ## Commit-time eviction
 
-Eviction runs after `CommitAsync` succeeds and covers the cached queries containing updated or removed entities. If a unit of work rolls back, no eviction runs and cached entries remain valid until TTL expires. The reverse index and eviction design are in [Query Cache](../documents/entity/query-cache.md).
+Eviction runs after a successful database commit. Adding, updating, or removing an entity publishes a new generation for its type, invalidating entity results, counts, and projections. Late pre-commit readers can fill only their captured older generation. Results expire absolutely after the configured `Ttl`; hits do not extend their lifetime. Rollback skips invalidation. Database commit and cache publication are non-atomic, so a crash or cache failure between them can leave entries selectable until TTL expires. See [Query Cache](../documents/entity/query-cache.md) for the generation protocol.
 
 ## Production: Redis
 
@@ -105,7 +105,7 @@ services.AddSingleton<IConnectionMultiplexer>(
 services.AddRedisCache();
 ```
 
-`RedisCacheProvider` uses native Redis Set commands for the reverse index, making eviction cluster-safe. The in-memory `IDistributedCache` adapter is single-process safe only on collection operations.
+Processes sharing the same Redis backing store observe the same entity-type generation. Process-local in-memory caches are independent and cannot propagate invalidation between instances. See [Redis](../documents/caching/redis.md) for provider key and deployment constraints.
 
 ## Verify
 
@@ -137,5 +137,5 @@ curl http://localhost:5000/v1/students
 
 ## See also
 
-- [Query Cache](../documents/entity/query-cache.md) — cache advisors, reverse index, eviction design
-- [Distributed Cache](../documents/caching/distributed.md) — `ICacheProvider`, `IndexLocks`
+- [Query Cache](../documents/entity/query-cache.md) — cache advisors, generations, eviction design
+- [Caching Overview](../documents/caching/overview.md) — capability contracts and provider selection

@@ -75,10 +75,7 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
         CancellationToken                  ct
     ) {
         if (string.IsNullOrWhiteSpace(request.RefreshToken)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.RefreshToken)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.NOT_EMPTY, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.RefreshToken });
         }
 
         var application = await client.AuthenticateAsync(null, new(){
@@ -86,10 +83,7 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
             [Parameters.ClientSecret] = [request.ClientSecret],
         }, headers, ct);
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
         var ctx = AdviceContext.Require();
@@ -102,26 +96,17 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
                 return result!;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(
-                    OAuthErrors.InvalidClient,
-                    SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-                );
+                throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
         var token = await tokens.FindByReferenceIdAsync(request.RefreshToken, ct);
         if (string.IsNullOrWhiteSpace(token?.Payload)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         var principal = await issuer.Validate(token.Payload, lifetime: false);
         if (principal is null) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         var exchange = new RefreshTokenContext<TApp, TToken> {
@@ -139,30 +124,21 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
                 return result!;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(
-                    OAuthErrors.AccessDenied,
-                    SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED)
-                );
+                throw new OAuthException(OAuthErrors.AccessDenied, SchemataResources.ACCESS_DENIED);
         }
 
         var scope = principal.FindFirstValue(Claims.Scope);
 
         if (!string.IsNullOrWhiteSpace(request.Scope)) {
             if (!ScopeParser.IsSubset(request.Scope, scope)) {
-                throw new OAuthException(
-                    OAuthErrors.InvalidScope,
-                    SchemataResources.GetResourceString(SchemataResources.INVALID_SCOPE)
-                );
+                throw new OAuthException(OAuthErrors.InvalidScope, SchemataResources.INVALID_SCOPE);
             }
         }
 
         if (!string.IsNullOrWhiteSpace(token.Subject)) {
             var provider = sp.GetService<ISubjectProvider>();
             if (provider is not null && !await provider.ValidateAsync(token.Subject, ct)) {
-                throw new OAuthException(
-                    OAuthErrors.InvalidGrant,
-                    SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-                );
+                throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
             }
         }
 

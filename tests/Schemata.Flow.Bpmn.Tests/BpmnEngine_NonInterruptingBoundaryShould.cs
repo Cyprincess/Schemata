@@ -10,7 +10,7 @@ namespace Schemata.Flow.Bpmn.Tests;
 public class BpmnEngine_NonInterruptingBoundaryShould
 {
     [Fact]
-    public async Task Trigger_NonInterruptingBoundary_KeepsHostTokenActive() {
+    public async Task Trigger_NonInterruptingBoundary_FirstFire_SpawnsSiblingAndKeepsHostActive() {
         var scenario = SignalScenario();
         var engine   = new BpmnEngine();
         var started  = await engine.StartAsync(scenario.Definition, NewProcess(scenario.Definition.Name), CancellationToken.None);
@@ -29,49 +29,14 @@ public class BpmnEngine_NonInterruptingBoundaryShould
         Assert.Equal("Active", stillActiveHost.State);
         Assert.Equal("task", stillActiveHost.StateName);
         Assert.Null(stillActiveHost.WaitingAtName);
-    }
 
-    [Fact]
-    public async Task Trigger_NonInterruptingBoundary_SpawnsSiblingWithSpawnerSet() {
-        var scenario = SignalScenario();
-        var engine   = new BpmnEngine();
-        var started  = await engine.StartAsync(scenario.Definition, NewProcess(scenario.Definition.Name), CancellationToken.None);
-        var host     = started.Tokens.Single(t => t.StateName == "task");
-
-        var fired = await engine.TriggerAsync(
-            scenario.Definition,
-            started.Process,
-            started.Tokens,
-            scenario.Trigger,
-            null,
-            host.CanonicalName,
-            CancellationToken.None);
-
-        var added = fired.Tokens.Where(t => started.Tokens.All(existing => existing.CanonicalName != t.CanonicalName)).ToList();
+        var added   = fired.Tokens.Where(t => started.Tokens.All(existing => existing.CanonicalName != t.CanonicalName)).ToList();
         var spawned = Assert.Single(added);
         Assert.Equal(host.CanonicalName, spawned.Spawner);
         Assert.Equal("Active", spawned.State);
         Assert.Equal("side-handler", spawned.StateName);
         Assert.Null(spawned.WaitingAtName);
-    }
 
-    [Fact]
-    public async Task Trigger_NonInterruptingBoundary_WritesExactlyOneKindSpawnTransition() {
-        var scenario = SignalScenario();
-        var engine   = new BpmnEngine();
-        var started  = await engine.StartAsync(scenario.Definition, NewProcess(scenario.Definition.Name), CancellationToken.None);
-        var host     = started.Tokens.Single(t => t.StateName == "task");
-
-        var fired = await engine.TriggerAsync(
-            scenario.Definition,
-            started.Process,
-            started.Tokens,
-            scenario.Trigger,
-            null,
-            host.CanonicalName,
-            CancellationToken.None);
-
-        var spawned = fired.Tokens.Single(t => t.Spawner == host.CanonicalName);
         var spawn = Assert.Single(fired.Transitions, t => t.Kind == TransitionKind.Spawn);
         Assert.Equal(spawned.CanonicalName, spawn.Token);
         Assert.Equal("boundary", spawn.Previous);

@@ -10,7 +10,9 @@ using Schemata.Push.Skeleton.Entities;
 namespace Schemata.Push.Foundation.Handlers;
 
 /// <summary>Removes a push subscription matching its complete address identity.</summary>
-public sealed class RemovePushSubscriptionHandler(IRepository<SchemataPushSubscription> subscriptions)
+public sealed class RemovePushSubscriptionHandler(
+    IRepository<SchemataPushSubscription> subscriptions,
+    IResourceMutation<SchemataPushSubscription> mutation)
     : IRequestHandler<RemovePushSubscriptionRequest, Unit>
 {
     public async Task<Unit> HandleAsync(
@@ -26,8 +28,7 @@ public sealed class RemovePushSubscriptionHandler(IRepository<SchemataPushSubscr
             return Unit.Value;
         }
 
-        await subscriptions.RemoveAsync(subscription, ct);
-        await subscriptions.CommitAsync(ct);
+        await mutation.DeleteAsync(subscription, null, ct: ct);
         return Unit.Value;
     }
 }

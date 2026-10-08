@@ -40,10 +40,7 @@ public sealed class RevocationHandler<TApp, TToken>(
         CancellationToken                  ct
     ) {
         if (string.IsNullOrWhiteSpace(request.Token)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.Token)
-            );
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_EMPTY, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.Token });
         }
 
         // RFC 7009 §2.1: token_type_hint, when present, is one of access_token or refresh_token; any
@@ -51,10 +48,7 @@ public sealed class RevocationHandler<TApp, TToken>(
         if (!string.IsNullOrWhiteSpace(request.TokenTypeHint)
          && request.TokenTypeHint != TokenTypes.AccessToken
          && request.TokenTypeHint != TokenTypes.RefreshToken) {
-            throw new OAuthException(
-                OAuthErrors.UnsupportedTokenType,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), Parameters.TokenTypeHint)
-            );
+            throw new OAuthException(OAuthErrors.UnsupportedTokenType, SchemataResources.NOT_SUPPORTED, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.TokenTypeHint });
         }
 
         var application = await client.AuthenticateAsync(null, new(){

@@ -19,13 +19,18 @@ namespace Schemata.Resource.Foundation.Handlers;
 public sealed class ExpungeHandler<TEntity> : IRequestHandler<ExpungeResourceRequest<TEntity>, EmptyResourceResponse>
     where TEntity : class, ICanonicalName, ISoftDelete
 {
-    private readonly IRepository<TEntity> _repository;
+    private readonly IResourceMutation<TEntity> _mutation;
+    private readonly IRepository<TEntity>      _repository;
 
     /// <summary>
     ///     Initializes the built-in expunge handler.
     /// </summary>
     /// <param name="repository">The repository for the target resource.</param>
-    public ExpungeHandler(IRepository<TEntity> repository) { _repository = repository; }
+    /// <param name="mutation">The resource mutation owner persisting the physical removal.</param>
+    public ExpungeHandler(IRepository<TEntity> repository, IResourceMutation<TEntity> mutation) {
+        _repository = repository;
+        _mutation   = mutation;
+    }
 
     public async Task<EmptyResourceResponse> HandleAsync(
         ExpungeResourceRequest<TEntity> request,
@@ -48,11 +53,9 @@ public sealed class ExpungeHandler<TEntity> : IRequestHandler<ExpungeResourceReq
                 "Resource is not deleted.");
         }
 
-        using (_repository.SuppressSoftDelete()) {
-            await _repository.RemoveAsync(entity, ct);
-        }
-
-        await _repository.CommitAsync(ct);
+        // The expunge intent scopes the physical-delete suppression on the repository the
+        // mutation actually stages through.
+        await _mutation.DeleteAsync(entity, null, Operations.Expunge, ct);
 
         return new();
     }

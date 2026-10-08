@@ -12,9 +12,10 @@ internal sealed class DefaultRunEventHandler(FlowHandlerSupport support)
 {
     public async Task<ProcessSnapshot> HandleAsync(RunEventRequest request, CancellationToken ct = default) {
         ArgumentNullException.ThrowIfNull(request.Trigger);
+        support.Access?.RequirePermission(FlowOperations.RunEvent, typeof(Schemata.Flow.Skeleton.Entities.SchemataProcess), request.ProcessCanonicalName, request.Principal);
 
         var process      = await support.LoadProcessAsync(request.ProcessCanonicalName, ct);
-        var registration = support.ResolveRegistration(process.DefinitionName);
+        var registration = support.ResolveRegistration(process);
         return await support.TriggerAddressedAsync(
             process,
             registration,
@@ -23,7 +24,7 @@ internal sealed class DefaultRunEventHandler(FlowHandlerSupport support)
             request.Payload,
             request.Token,
             resolveTarget: false,
-            principal: null,
+            principal: request.Principal,
             ct);
     }
 }

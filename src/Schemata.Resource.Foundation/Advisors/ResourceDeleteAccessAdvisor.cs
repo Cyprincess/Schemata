@@ -23,7 +23,7 @@ public sealed class ResourceDeleteAccessAdvisor<TEntity>(IAccessProvider<TEntity
     ) {
         if (!AnonymousAccess.IsAnonymous<TEntity>(nameof(Operations.Delete))) {
             await AuthorizeHelper.EnsureAsync(access, entity,
-                                              new() { Operation = nameof(Operations.Delete), Request = request },
+                                              new() { Operation = nameof(Operations.Delete), Request = request, Stage = AccessStage.Instance, Name = entity.CanonicalName },
                                               entity.CanonicalName ?? string.Empty, principal, ct);
         }
 

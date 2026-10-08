@@ -1,3 +1,4 @@
+using Schemata.Messaging.Skeleton.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -39,11 +40,14 @@ public class JobExecutionDispatcherShould
                                )
                                => ToAsync(query(new[] { execution }.AsQueryable())));
         executions.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
+                  .ReturnsAsync(MutationResult.Applied);
         executions.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        executions.Setup(r => r.Begin()).Returns(CommittingUnit);
 
         var services = new ServiceCollection().AddSingleton(executions.Object)
+                                              .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                                               .AddSingleton<IScheduledJobRegistry>(new DefaultScheduledJobRegistry())
+                                              .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
                                               .BuildServiceProvider();
 
         var dispatcher = new JobExecutionDispatcher(services);
@@ -77,14 +81,16 @@ public class JobExecutionDispatcherShould
                                )
                                => ToAsync(query(new[] { execution }.AsQueryable())));
         executions.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
+                  .ReturnsAsync(MutationResult.Applied);
         executions.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        executions.Setup(r => r.Begin()).Returns(CommittingUnit);
 
         var registry = new DefaultScheduledJobRegistry();
         registry.Register<CapturingJob>("jobs.capturing");
         var capturing = new CapturingJob();
 
         var services = new ServiceCollection().AddSingleton(executions.Object)
+                                               .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                                                .AddSingleton<IScheduledJobRegistry>(registry)
                                                .AddSingleton(capturing)
                                                .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
@@ -107,6 +113,7 @@ public class JobExecutionDispatcherShould
         registry.Register<CompletingJob>("jobs.completing");
 
         var services = new ServiceCollection().AddScoped<IRepository<SchemataJobExecution>>(_ => storage.CreateRepository())
+                                               .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                                                .AddSingleton<IScheduledJobRegistry>(registry)
                                                .AddSingleton<CompletingJob>()
                                                .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
@@ -148,6 +155,7 @@ public class JobExecutionDispatcherShould
         registry.Register<CompletingJob>("jobs.completing");
 
         var services = new ServiceCollection().AddScoped<IRepository<SchemataJobExecution>>(_ => storage.CreateRepository())
+                                              .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                                               .AddSingleton<IScheduledJobRegistry>(registry)
                                               .AddSingleton<CompletingJob>()
                                               .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
@@ -167,7 +175,9 @@ public class JobExecutionDispatcherShould
         var registry = new DefaultScheduledJobRegistry();
 
         var services = new ServiceCollection().AddScoped<IRepository<SchemataJobExecution>>(_ => storage.CreateRepository())
+                                              .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                                               .AddSingleton<IScheduledJobRegistry>(registry)
+                                              .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
                                               .BuildServiceProvider();
         var dispatcher = new JobExecutionDispatcher(services);
 
@@ -201,8 +211,9 @@ public class JobExecutionDispatcherShould
                   .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> query,
                             CancellationToken _) => ToAsync(query(new[] { execution }.AsQueryable())));
         executions.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
+                  .ReturnsAsync(MutationResult.Applied);
         executions.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        executions.Setup(r => r.Begin()).Returns(CommittingUnit);
         var registry = new DefaultScheduledJobRegistry();
         registry.Register<CompletingJob>("jobs.gated");
         var gate = new Mock<IJobExecutionAdvisor>();
@@ -210,6 +221,7 @@ public class JobExecutionDispatcherShould
             .ReturnsAsync(outcome);
         var observer = new Mock<IJobLifecycleObserver>();
         var services = new ServiceCollection().AddSingleton(executions.Object)
+                                               .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                                                .AddSingleton<IScheduledJobRegistry>(registry)
                                                .AddSingleton<IJobExecutionAdvisor>(gate.Object)
                                                .AddSingleton<IJobLifecycleObserver>(observer.Object)
@@ -238,9 +250,11 @@ public class JobExecutionDispatcherShould
         var registry   = new DefaultScheduledJobRegistry();
         registry.Register<CompletingJob>("jobs.completing");
         var services = new ServiceCollection().AddSingleton(executions.Object)
+                                              .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                                               .AddSingleton<IScheduledJobRegistry>(registry)
                                               .AddSingleton<CompletingJob>()
                                               .AddSingleton<IScheduler>(Mock.Of<IScheduler>())
+                                              .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
                                               .BuildServiceProvider();
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -262,9 +276,11 @@ public class JobExecutionDispatcherShould
         var registry   = new DefaultScheduledJobRegistry();
         registry.Register<CompletingJob>("jobs.completing");
         var services = new ServiceCollection().AddSingleton(executions.Object)
+                                              .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                                               .AddSingleton<IScheduledJobRegistry>(registry)
                                               .AddSingleton<CompletingJob>()
                                               .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
+                                              .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
                                               .BuildServiceProvider();
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -281,9 +297,17 @@ public class JobExecutionDispatcherShould
                   .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> query,
                             CancellationToken _) => ToAsync(query(new[] { execution }.AsQueryable())));
         repository.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
+                  .ReturnsAsync(MutationResult.Applied);
         repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        repository.Setup(r => r.Begin()).Returns(CommittingUnit);
         return repository;
+    }
+
+    private static IUnitOfWork CommittingUnit() {
+        var unit = new Mock<IUnitOfWork>(MockBehavior.Strict);
+        unit.Setup(u => u.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        unit.Setup(u => u.DisposeAsync()).Returns(ValueTask.CompletedTask);
+        return unit.Object;
     }
 
     private static IRepository<SchemataJob> EmptyJobRepository() {
@@ -292,6 +316,9 @@ public class JobExecutionDispatcherShould
                               It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(),
                               It.IsAny<CancellationToken>()))
                   .Returns(ValueTask.FromResult<SchemataJob?>(null));
+        repository.Setup(r => r.Begin()).Returns(CommittingUnit);
+        repository.Setup(r => r.UpdateAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
+        repository.Setup(r => r.AddAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
         return repository.Object;
     }
 
@@ -339,24 +366,33 @@ public class JobExecutionDispatcherShould
                                    ) => ValueTask.FromResult<SchemataJobExecution?>(
                                        query(new[] { Copy(_stored) }.AsQueryable()).FirstOrDefault()));
             repository.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
-                      .Returns((SchemataJobExecution row, CancellationToken _) => {
+                      .ReturnsAsync((SchemataJobExecution row, CancellationToken _) => {
                           pending = row;
-                          return Task.CompletedTask;
+                          return MutationResult.Applied;
                       });
-            repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>()))
-                      .Returns((CancellationToken _) => {
-                          if (pending is not null) {
-                              if (pending.Timestamp != _stored.Timestamp) {
-                                  throw new InvalidOperationException("Concurrency token did not match the persisted execution.");
-                              }
+            Task ApplyPending() {
+                if (pending is not null) {
+                    if (pending.Timestamp != _stored.Timestamp) {
+                        throw new InvalidOperationException("Concurrency token did not match the persisted execution.");
+                    }
 
-                              _stored           = Copy(pending);
-                              _stored.Timestamp = Guid.NewGuid();
-                              pending.Timestamp = _stored.Timestamp;
-                          }
+                    _stored           = Copy(pending);
+                    _stored.Timestamp = Guid.NewGuid();
+                    pending.Timestamp = _stored.Timestamp;
+                }
 
-                          return Task.CompletedTask;
-                      });
+                return Task.CompletedTask;
+            }
+
+            // The dispatcher's claim CAS commits through the repository; mutation-routed finalize
+            // commits through the unit of work. Both boundaries apply the staged write.
+            repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(ApplyPending);
+            repository.Setup(r => r.Begin()).Returns(() => {
+                var unit = new Mock<IUnitOfWork>(MockBehavior.Strict);
+                unit.Setup(u => u.CommitAsync(It.IsAny<CancellationToken>())).Returns(ApplyPending);
+                unit.Setup(u => u.DisposeAsync()).Returns(ValueTask.CompletedTask);
+                return unit.Object;
+            });
 
             return repository.Object;
         }
@@ -400,23 +436,32 @@ public class JobExecutionDispatcherShould
                       .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> query,
                                 CancellationToken _) => ToAsync(query(Rows().AsQueryable())));
             repository.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
-                      .Returns((SchemataJobExecution row, CancellationToken _) => {
+                      .ReturnsAsync((SchemataJobExecution row, CancellationToken _) => {
                           pending = row;
-                          return Task.CompletedTask;
+                          return MutationResult.Applied;
                       });
-            repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>()))
-                      .Returns((CancellationToken _) => {
-                          if (pending is not null) {
-                              lock (_gate) {
-                                  var index = _stored.FindIndex(e => e.Uid == pending.Uid);
-                                  if (index >= 0) {
-                                      _stored[index] = Copy(pending);
-                                  }
-                              }
-                          }
+            Task ApplyPending() {
+                if (pending is not null) {
+                    lock (_gate) {
+                        var index = _stored.FindIndex(e => e.Uid == pending.Uid);
+                        if (index >= 0) {
+                            _stored[index] = Copy(pending);
+                        }
+                    }
+                }
 
-                          return Task.CompletedTask;
-                      });
+                return Task.CompletedTask;
+            }
+
+            // The dispatcher's claim CAS commits through the repository; mutation-routed finalize
+            // commits through the unit of work. Both boundaries apply the staged write.
+            repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(ApplyPending);
+            repository.Setup(r => r.Begin()).Returns(() => {
+                var unit = new Mock<IUnitOfWork>(MockBehavior.Strict);
+                unit.Setup(u => u.CommitAsync(It.IsAny<CancellationToken>())).Returns(ApplyPending);
+                unit.Setup(u => u.DisposeAsync()).Returns(ValueTask.CompletedTask);
+                return unit.Object;
+            });
 
             return repository.Object;
         }

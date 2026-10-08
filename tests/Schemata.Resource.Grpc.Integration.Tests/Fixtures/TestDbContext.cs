@@ -8,6 +8,8 @@ public class TestDbContext : DbContext
 
     public DbSet<Student> Students { get; set; } = null!;
 
+    public DbSet<LockedStudent> LockedStudents { get; set; } = null!;
+
     public DbSet<Trash> Trashes { get; set; } = null!;
 
     public DbSet<Scheduling.Skeleton.Entities.SchemataJob> Jobs { get; set; } = null!;

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Exceptions;
@@ -15,17 +16,17 @@ public class SchemataTenantContextAccessor<TTenant> : ITenantContextAccessor<TTe
     where TTenant : SchemataTenant
 {
     private readonly ITenantManager<TTenant> _manager;
-    private readonly ITenantResolver         _resolver;
+    private readonly IEnumerable<ITenantResolver> _resolvers;
     private readonly IServiceProvider        _sp;
 
     /// <summary>Creates an accessor that resolves tenants through the registered resolver and manager.</summary>
     public SchemataTenantContextAccessor(
         IServiceProvider        sp,
-        ITenantResolver         resolver,
+        IEnumerable<ITenantResolver> resolvers,
         ITenantManager<TTenant> manager
     ) {
         _sp       = sp;
-        _resolver = resolver;
+        _resolvers = resolvers;
         _manager  = manager;
     }
 
@@ -33,19 +34,20 @@ public class SchemataTenantContextAccessor<TTenant> : ITenantContextAccessor<TTe
 
     public TTenant? Tenant { get; private set; }
 
-    public async Task InitializeAsync(CancellationToken ct) {
-        var id = await _resolver.ResolveAsync(ct);
+    public Task InitializeAsync(CancellationToken ct) => InitializeAsync(TenantResolutionStage.Request, ct);
 
-        if (id is null) {
-            return;
+    public async Task InitializeAsync(TenantResolutionStage stage, CancellationToken ct) {
+        Guid? selected = Tenant?.Uid;
+        foreach (var resolver in _resolvers) {
+            if (resolver.Stage != stage) continue;
+            var id = await resolver.ResolveAsync(ct);
+            if (id is null) continue;
+            if (selected is { } current && current != id) throw new TenantResolveException();
+            var tenant = await _manager.FindByTenantId(id.Value, ct);
+            if (tenant is null) throw new TenantResolveException();
+            selected = id;
+            Tenant = tenant;
         }
-
-        var tenant = await _manager.FindByTenantId(id.Value, ct);
-        if (tenant is null) {
-            throw new TenantResolveException();
-        }
-
-        await InitializeAsync(tenant, ct);
     }
 
     public Task InitializeAsync(TTenant tenant, CancellationToken ct) {

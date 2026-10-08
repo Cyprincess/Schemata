@@ -1,4 +1,7 @@
 using System;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -61,8 +64,26 @@ public sealed class SchemataModelCustomizer : ModelCustomizer
         PropertyInfo property) {
         var declared = property.PropertyType;
 
-        if (!JsonColumnTypes.IsSupported(declared)) {
+        // Conventions run after the application's OnModelCreating, so the effective model
+        // already reflects [NotMapped] and Ignore() exclusions and any application conversion.
+        // Excluded members must not be resurrected through Property(name).
+        var entityType = modelBuilder.Model.FindEntityType(entityClrType);
+        if (property.GetCustomAttribute<NotMappedAttribute>() is not null
+            || entityType?.IsIgnored(property.Name) == true) {
             return;
+        }
+
+        var metadata = entityType?.FindProperty(property.Name);
+        if (!JsonColumnTypes.IsSupported(declared)) {
+            if (!IsDeclaredNestedValueColumn(property, declared)) {
+                return;
+            }
+
+            // An application-configured conversion is the explicit contract for this member;
+            // the automatic JSON fallback never replaces it.
+            if (metadata?.GetValueConverter() is not null) {
+                return;
+            }
         }
 
         var converterType = typeof(EfCoreJsonValueConverter<>).MakeGenericType(declared);
@@ -71,5 +92,34 @@ public sealed class SchemataModelCustomizer : ModelCustomizer
                     .Property(property.Name)
                     .HasConversion(converterType)
                     .Metadata.SetValueComparer(JsonValueComparers.Create(declared));
+    }
+
+    /// <summary>
+    ///     A property with an explicit <c>[Column]</c> declaration carries an explicit persistence
+    ///     contract even outside the automatic JSON eligibility set. The JSON fallback applies only
+    ///     to nested dictionary / collection shapes, so scalar shapes (including nullable and
+    ///     native provider scalars) and binary arrays keep their existing mappings.
+    /// </summary>
+    private static bool IsDeclaredNestedValueColumn(PropertyInfo property, Type declared) {
+        return property.GetCustomAttribute<ColumnAttribute>() is not null && IsNestedValueShape(declared);
+    }
+
+    private static bool IsNestedValueShape(Type type) {
+        var actual = Nullable.GetUnderlyingType(type) ?? type;
+
+        if (actual == typeof(byte[]) || actual == typeof(char[])) {
+            return false;
+        }
+
+        if (actual.IsGenericType && actual.GetGenericTypeDefinition() == typeof(Dictionary<,>)) {
+            return true;
+        }
+
+        if (actual.IsGenericType && actual.GetGenericTypeDefinition() == typeof(ICollection<>)) {
+            return true;
+        }
+
+        return actual.GetInterfaces()
+                     .Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICollection<>));
     }
 }

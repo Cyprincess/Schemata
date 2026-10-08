@@ -113,13 +113,15 @@ sender down to the mailbox's own processing rate instead of ballooning memory.
 The actor registered for the `flow` route is the shared `RequestDispatchingActor`
 (`Schemata.Actor.Foundation/Internal/RequestDispatchingActor.cs`). Its turn is a four-step loop:
 
-1. Build a fresh DI scope from the injected `IActorTurnScopeFactory` — never from
-   `IServiceScopeFactory.CreateAsyncScope` directly, since multi-tenancy replaces the factory with
-   one that builds the scope from the tenant-isolated provider.
-2. Restore ambient state: every registered `IMessageContextPropagator` runs against the new scope
-   (the tenancy propagator reinitializes `ITenantContextInitializer<TTenant>` from the captured
-   tenant id, so a turn built in a background mailbox still resolves repositories against the
-   right tenant).
+1. Build a fresh DI scope from the injected `IMessageExecutionScopeFactory` — never from
+   `IServiceScopeFactory.CreateAsyncScope` directly. Multi-tenancy replaces the factory with
+   `Schemata.Tenancy.Messaging.TenantMessageExecutionScopeFactory<TTenant>` (installed by
+   `tenancy.UseMessaging()`), which resolves the tenant and builds the scope from the
+   tenant-isolated provider.
+2. Restore ambient state: call `scope.RestoreAsync(envelope.Context, ct)` — it iterates every
+   registered `IMessageContextPropagator` against the new scope. With multi-tenancy, the tenant id
+   captured into `MessageContext.Items` at enqueue time flows through `MessageContexts.Identity`
+   so a turn built in a background mailbox still resolves repositories against the right tenant.
 3. Resolve the *keyed* default handler (`FlowConstants.Handlers.Default`) inside that fresh scope,
    call it, and `ReplyAsync` with the result. `ClaimsPrincipal` already travels on the request
    record itself, so it does not need to round-trip through `MessageContext`.
@@ -158,13 +160,15 @@ the keyed default handler reloads the aggregate inside the turn. Stuffing a trac
 command records flat: name + payload, never an entity.
 
 **Ambient state crosses only through `MessageContext`.** Capture happens once, in the sender's
-scope, before enqueue (`MessageContexts.Capture(caller)`). Restore happens once, inside the
-turn's fresh scope, through the resolved `IMessageContextPropagator` collection. With no
-propagator registered, capture returns an empty context and every restore is a no-op. With
-`Schemata.Tenancy.Foundation`, `TenantMessageContextPropagator<TTenant>` plus
-`TenantActorTurnScopeFactory<TTenant>` rebuilds the turn scope from the tenant-isolated provider —
-a mailbox- or scheduler-originated turn still resolves the right tenant's repositories instead of
-the wrong or default ones.
+scope, before enqueue (`MessageContexts.Capture(caller)`). `Capture` always returns
+`Bind(TenantContext.Current, …)`, which inserts `tenancy.tenant-id` (the resolved Uid or
+`"host"`) regardless of how many propagators are registered — propagators only contribute extra
+keys alongside the tenant identity. Restore happens inside the turn's fresh scope, calling every
+registered `IMessageContextPropagator` against the new scope. With
+`Schemata.Tenancy.Messaging.UseMessaging()` on the tenancy builder, the actor's
+`IMessageExecutionScopeFactory` resolves to `TenantMessageExecutionScopeFactory<TTenant>` and
+the turn scope is built from the tenant-isolated provider — a mailbox- or scheduler-originated
+turn still resolves the right tenant's repositories instead of the wrong or default ones.
 
 **Resolving the keyed default handler yourself reintroduces the race.** Keyed defaults exist for
 the turn to resolve. Calling them from application code, or from anywhere that is not the actor's

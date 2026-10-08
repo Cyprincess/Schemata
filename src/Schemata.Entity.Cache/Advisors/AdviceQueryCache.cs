@@ -44,7 +44,7 @@ public sealed class AdviceQueryCache<TEntity, TResult, T> : IRepositoryQueryAdvi
     /// <summary>
     ///     Initializes a new instance of the <see cref="AdviceQueryCache{TEntity, TResult, T}" /> class.
     /// </summary>
-    /// <param name="cache">The distributed cache instance.</param>
+    /// <param name="cache">The cache provider holding query results and generation metadata.</param>
     public AdviceQueryCache(ICacheProvider cache) { _cache = cache; }
 
     #region IRepositoryQueryAdvisor<TEntity,TResult,T> Members
@@ -60,12 +60,17 @@ public sealed class AdviceQueryCache<TEntity, TResult, T> : IRepositoryQueryAdvi
             return AdviseResult.Continue;
         }
 
-        var key = context.ToCacheKey();
+        var queryKey = context.ToCacheKey();
+        if (string.IsNullOrWhiteSpace(queryKey)) {
+            return AdviseResult.Continue;
+        }
+
+        var key = await CacheGeneration<TEntity>.CaptureAsync(_cache, context, queryKey, ct);
         if (string.IsNullOrWhiteSpace(key)) {
             return AdviseResult.Continue;
         }
 
-        var bytes = await _cache.GetAsync(key!, ct);
+        var bytes = await _cache.GetAsync(key, ct);
         if (bytes is null) {
             return AdviseResult.Continue;
         }

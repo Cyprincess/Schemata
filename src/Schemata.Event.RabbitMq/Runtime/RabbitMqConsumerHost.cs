@@ -1,3 +1,4 @@
+using Schemata.Messaging.Skeleton;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -121,11 +122,15 @@ public sealed class RabbitMqConsumerHost : BackgroundService
         var replyTo       = ea.BasicProperties.ReplyTo;
         var body          = Encoding.UTF8.GetString(ea.Body.Span);
 
-        using var scope         = _services.CreateScope();
-        var       subscriptions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataEventSubscription>>();
-        var       resolver      = scope.ServiceProvider.GetRequiredService<HandlerResolver>();
-        var       registry      = scope.ServiceProvider.GetRequiredService<IEventTypeRegistry>();
-        var       tracker       = scope.ServiceProvider.GetService<CorrelationTracker>();
+        var message = new MessageContext(MessageContextHeaders.Read(ea.BasicProperties.Headers));
+        var scope = await _services.GetRequiredService<IMessageExecutionScopeFactory>().CreateAsync(message, ct);
+        using var identity = scope.Enter();
+        await using var owned = scope;
+        await scope.RestoreAsync(message, ct);
+        var       subscriptions = scope.Services.GetRequiredService<IRepository<SchemataEventSubscription>>();
+        var       resolver      = new HandlerResolver(scope.Services);
+        var       registry      = scope.Services.GetRequiredService<IEventTypeRegistry>();
+        var       tracker       = scope.Services.GetService<CorrelationTracker>();
 
         // Reply correlation comes first because reply payloads bypass subscription matching.
         if (!string.IsNullOrEmpty(correlationId) && tracker != null) {
@@ -158,7 +163,7 @@ public sealed class RabbitMqConsumerHost : BackgroundService
             return true;
         }
 
-        var context = scope.ServiceProvider.GetRequiredService<IEventDispatchContext>();
+        var context = scope.Services.GetRequiredService<IEventDispatchContext>();
         context.SetSubscriptions(matched);
 
         var eventInstance = JsonSerializer.Deserialize(body, eventType, _json);
@@ -166,7 +171,10 @@ public sealed class RabbitMqConsumerHost : BackgroundService
             return false;
         }
 
-        var method        = typeof(HandlerResolver).GetMethod(nameof(HandlerResolver.InvokeEventHandlersAsync))!;
+        var method = typeof(HandlerResolver).GetMethods()
+                                            .Single(candidate => candidate.Name == nameof(HandlerResolver.InvokeEventHandlersAsync)
+                                                              && candidate.GetParameters().Length == 3);
+
         var genericMethod = method.MakeGenericMethod(eventType);
 
         var routing = registry.GetRouting(eventType);
@@ -197,7 +205,7 @@ public sealed class RabbitMqConsumerHost : BackgroundService
             eventCtx.Exception = ex;
             throw;
         } finally {
-            var consumeAdviceCtx = new AdviceContext(scope.ServiceProvider);
+            var consumeAdviceCtx = new AdviceContext(scope.Services);
             using var _ = AdviceContext.Establish(consumeAdviceCtx);
             switch (await Advisor.For<IEventConsumeAdvisor>()
                                  .RunAsync(consumeAdviceCtx, eventCtx, ct)) {
@@ -211,7 +219,7 @@ public sealed class RabbitMqConsumerHost : BackgroundService
             Exception? observerFailure = null;
             // Audit-last ordering is enforced here regardless of DI registration order: application
             // observers run before SchemataEventAuditObserver so the audit record sees their outcome.
-            var observers = scope.ServiceProvider.GetServices<IEventLifecycleObserver>()
+            var observers = scope.Services.GetServices<IEventLifecycleObserver>()
                                  .OrderBy(observer => observer is SchemataEventAuditObserver);
             foreach (var observer in observers) {
                 try {

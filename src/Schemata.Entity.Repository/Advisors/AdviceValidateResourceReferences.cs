@@ -86,6 +86,13 @@ public sealed class AdviceValidateResourceReferences<TEntity> :
                 continue;
             }
 
+            // Canonical references are {collection}/{id}-shaped and never carry a scheme;
+            // an absolute URI is an identity (e.g. an issuer), not a resource reference.
+            // Untyped references only: typed references keep resolving and validating.
+            if (reference.Target is null && Uri.TryCreate(value, UriKind.Absolute, out _)) {
+                continue;
+            }
+
             var resolved = resolver.Resolve(value);
 
             if (reference.Target is not null) {

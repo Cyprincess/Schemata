@@ -5,10 +5,14 @@ using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Resource;
+using Schemata.Insight.Foundation.Materialization;
 using Schemata.Advice;
 using Schemata.Expressions.Skeleton;
 using Schemata.Insight.Foundation.Planning;
@@ -39,6 +43,9 @@ public sealed class PlanExecutor
     private readonly SchemataInsightOptions _options;
     private readonly IServiceProvider       _services;
 
+    private IDataProtector Protector => _services.GetRequiredService<IDataProtectionProvider>()
+        .CreateProtector(InsightPageToken.ProtectionPurpose);
+
     /// <summary>Wires the plan executor with keyed-driver resolution, the local pipeline fallback, and the configured Insight options.</summary>
     /// <param name="services">The provider resolving keyed source drivers.</param>
     /// <param name="local">The local pipeline executor for stages the driver cannot push.</param>
@@ -60,6 +67,7 @@ public sealed class PlanExecutor
         ClaimsPrincipal?    principal,
         CancellationToken   ct
     ) {
+        new PublicPlanValidator(_services).Validate(plan);
         int? requestedSkip = null;
         int? requestedTake = null;
         var  root          = plan;
@@ -70,14 +78,21 @@ public sealed class PlanExecutor
         }
 
         var pageSize = ClampPageSize(requestedTake);
-        var skip = request.PageToken is { Length: > 0 } token
-            ? InsightPageToken.Decode(token)
-            : Math.Max(0, requestedSkip ?? 0);
+        InsightPageToken.ValidateOffset(request.Skip ?? 0);
+        var initialSkip = requestedSkip ?? 0;
+        InsightPageToken.ValidateOffset(initialSkip);
+        InsightPageToken? continuation = null;
+        var skip = initialSkip;
+        if (request.PageToken is { Length: > 0 } token) {
+            continuation = InsightPageToken.Bind(request, principal, initialSkip, pageSize, _options);
+            skip = continuation.Decode(Protector, token);
+        }
+        InsightPageToken.Advance(skip, pageSize);
         var mode = _options.TotalSize is TotalSizeMode.Default ? TotalSizeMode.Exact : _options.TotalSize;
 
         return root.SourceSet.Count > 1
-            ? await ExecuteJoinAsync(root, request, principal, true, skip, pageSize, mode, ct)
-            : await ExecuteSingleAsync(root, request, principal, true, skip, pageSize, mode, ct);
+            ? await ExecuteJoinAsync(root, request, principal, true, skip, initialSkip, pageSize, mode, continuation, ct)
+            : await ExecuteSingleAsync(root, request, principal, true, skip, initialSkip, pageSize, mode, continuation, ct);
     }
 
     /// <summary>
@@ -97,6 +112,7 @@ public sealed class PlanExecutor
         bool                enforceSecurity = true,
         CancellationToken   ct = default
     ) {
+        new PublicPlanValidator(_services).Validate(plan);
         var root = plan is LimitNode limit ? limit.Input : plan;
         if (root.SourceSet.Count > 1) {
             return ValueTask.FromResult(new MaterializedQuery(
@@ -114,13 +130,15 @@ public sealed class PlanExecutor
         ClaimsPrincipal?    principal,
         bool                enforceSecurity,
         int                 skip,
+        int                 initialSkip,
         int                 pageSize,
         TotalSizeMode       mode,
+        InsightPageToken?   continuation,
         CancellationToken   ct
     ) {
         var source = FindSource(root);
         if (source is null) {
-            throw new InsightValidationException(InsightReasons.InvalidArgument, "The plan has no source.");
+            throw new InsightValidationException(InsightReasons.InvalidArgument, SchemataResources.INSIGHT_SOURCE_REQUIRED);
         }
 
         var driver = await OpenSourceAsync(source, request, principal, ct);
@@ -128,6 +146,7 @@ public sealed class PlanExecutor
         var subPlan = new SubPlan(pushable, source.Alias, source.Config) { EnforceSecurity = enforceSecurity };
 
         await using var result = await driver.ExecuteAsync(subPlan, request, principal, ct);
+        var sourceRows = SourceRows(result.Rows, result.Schema, ct);
 
         // An Estimated total over a local pipeline is the pushed-superset size: an upper bound on the
         // post-local row count, never the exact final count. The driver rows are buffered once so the
@@ -137,17 +156,14 @@ public sealed class PlanExecutor
         IAsyncEnumerable<IReadOnlyDictionary<string, object?>> rows;
         int?                                                   estimate = null;
         if (estimateSuperset) {
-            var buffer = new List<IReadOnlyDictionary<string, object?>>();
-            await foreach (var row in TaskAsyncEnumerableExtensions.WithCancellation<IReadOnlyDictionary<string, object?>>(result.Rows, ct)) {
-                buffer.Add(row);
-            }
+            var buffer = await LocalPipelineExecutor.Buffer(sourceRows, _options.MaxResidualScanRows, ct);
 
             estimate = buffer.Count;
             rows     = _local.RunAsync(ToAsync(buffer, ct), source.Alias, localStages, ct);
         } else {
             rows = localStages.Count == 0
-                ? result.Rows
-                : _local.RunAsync(result.Rows, source.Alias, localStages, ct);
+                ? sourceRows
+                : _local.RunAsync(sourceRows, source.Alias, localStages, ct);
         }
 
         var countExact = mode is TotalSizeMode.Exact || (mode is TotalSizeMode.Estimated && !estimateSuperset);
@@ -157,16 +173,18 @@ public sealed class PlanExecutor
                                                static _ => true,
                                                skip,
                                                pageSize,
-                                               _options.MaxResidualScanRows,
+                                               int.MaxValue,
                                                countExact,
                                                ct);
 
-        return new() {
+        return SchemaBuilder.Complete(new QueryInsightResponse {
             Rows          = page,
-            Schema        = ResultSchema(result.Schema, localStages),
-            NextPageToken = hasMore ? InsightPageToken.Encode(skip + pageSize) : null,
+            Schema        = SchemaBuilder.Transform(result.Schema, localStages),
+            NextPageToken = hasMore
+                ? (continuation ?? InsightPageToken.Bind(request, principal, initialSkip, pageSize, _options))
+                    .Encode(Protector, InsightPageToken.Advance(skip, pageSize)) : null,
             TotalSize     = mode is TotalSizeMode.None ? null : estimate ?? total,
-        };
+        });
     }
 
     private async ValueTask<MaterializedQuery> MaterializeSingleAsync(
@@ -178,7 +196,7 @@ public sealed class PlanExecutor
     ) {
         var source = FindSource(root);
         if (source is null) {
-            throw new InsightValidationException(InsightReasons.InvalidArgument, "The plan has no source.");
+            throw new InsightValidationException(InsightReasons.InvalidArgument, SchemataResources.INSIGHT_SOURCE_REQUIRED);
         }
 
         var driver = await OpenSourceAsync(source, request, principal, ct);
@@ -187,10 +205,10 @@ public sealed class PlanExecutor
         var result = await driver.ExecuteAsync(subPlan, request, principal, ct);
         try {
             var rows = localStages.Count == 0
-                ? result.Rows
-                : _local.RunAsync(result.Rows, source.Alias, localStages, ct);
+                ? SourceRows(result.Rows, result.Schema, ct)
+                : _local.RunAsync(SourceRows(result.Rows, result.Schema, ct), source.Alias, localStages, ct);
 
-            return new(ResultSchema(result.Schema, localStages), rows, result);
+            return new(SchemaBuilder.Transform(result.Schema, localStages), rows, result);
         } catch {
             await result.DisposeAsync();
             throw;
@@ -203,8 +221,10 @@ public sealed class PlanExecutor
         ClaimsPrincipal?    principal,
         bool                enforceSecurity,
         int                 skip,
+        int                 initialSkip,
         int                 pageSize,
         TotalSizeMode       mode,
+        InsightPageToken?   continuation,
         CancellationToken   ct
     ) {
         var rows       = Evaluate(root, request, principal, enforceSecurity, ct);
@@ -215,16 +235,18 @@ public sealed class PlanExecutor
                                                static _ => true,
                                                skip,
                                                pageSize,
-                                               _options.MaxResidualScanRows,
+                                               int.MaxValue,
                                                countExact,
                                                ct);
 
-        return new() {
+        return SchemaBuilder.Complete(new QueryInsightResponse {
             Rows          = page,
             Schema        = TerminalSchema(root),
-            NextPageToken = hasMore ? InsightPageToken.Encode(skip + pageSize) : null,
+            NextPageToken = hasMore
+                ? (continuation ?? InsightPageToken.Bind(request, principal, initialSkip, pageSize, _options))
+                    .Encode(Protector, InsightPageToken.Advance(skip, pageSize)) : null,
             TotalSize     = mode is TotalSizeMode.None ? null : total,
-        };
+        });
     }
 
     /// <summary>
@@ -272,7 +294,7 @@ public sealed class PlanExecutor
     ) {
         var source = FindSource(node);
         if (source is null) {
-            throw new InsightValidationException(InsightReasons.InvalidArgument, "A join input has no source.");
+            throw new InsightValidationException(InsightReasons.InvalidArgument, SchemataResources.INSIGHT_JOIN_SOURCE_REQUIRED);
         }
 
         var driver = await OpenSourceAsync(source, request, principal, ct);
@@ -281,8 +303,18 @@ public sealed class PlanExecutor
 
         await using var result = await driver.ExecuteAsync(subPlan, request, principal, ct);
 
-        await foreach (var row in _local.RunAsync(result.Rows, source.Alias, localStages, ct)) {
+        await foreach (var row in _local.RunAsync(SourceRows(result.Rows, result.Schema, ct), source.Alias, localStages, ct)) {
             yield return row;
+        }
+    }
+
+    private async IAsyncEnumerable<IReadOnlyDictionary<string, object?>> SourceRows(
+        IAsyncEnumerable<IReadOnlyDictionary<string, object?>> rows,
+        IReadOnlyList<FieldDescriptor> schema,
+        [EnumeratorCancellation] CancellationToken ct
+    ) {
+        await foreach (var row in LocalPipelineExecutor.Scan(rows, _options.MaxResidualScanRows, ct)) {
+            yield return RowMaterializer.NormalizeRow(row, schema);
         }
     }
 
@@ -300,7 +332,7 @@ public sealed class PlanExecutor
         if (driver is null) {
             throw new InsightValidationException(
                 InsightReasons.Unimplemented,
-                $"No driver '{source.Config.DriverName}' is registered."
+                SchemataResources.INSIGHT_DRIVER_UNREGISTERED, new Dictionary<string, string?> { ["driver"] = source.Config.DriverName }
             );
         }
 
@@ -330,10 +362,7 @@ public sealed class PlanExecutor
             return [];
         }
 
-        var fields = ImmutableArray.CreateBuilder<FieldDescriptor>(selection.Items.Length);
-        AddSelectionFields(selection.Items, false, [], fields);
-        AddSelectionFields(selection.Items, true, [], fields);
-        return fields.ToImmutable();
+        return SchemaBuilder.Transform([], [selection]);
     }
 
     private static SelectionNode? FindSelection(PlanNode node) {
@@ -431,7 +460,7 @@ public sealed class PlanExecutor
             OrderNode   => DriverCapabilities.Order,
             var stage   => throw new InsightValidationException(
                                InsightReasons.Unimplemented,
-                               $"Plan node '{stage.GetType().Name}' is not a single-source stage."),
+                               SchemataResources.INSIGHT_SINGLE_SOURCE_STAGE_REQUIRED, new Dictionary<string, string?> { ["stage"] = stage.GetType().Name }),
         };
 
         return capabilities.HasFlag(required);
@@ -478,58 +507,6 @@ public sealed class PlanExecutor
         return nested.ToImmutable();
     }
 
-    private static ImmutableArray<FieldDescriptor> ResultSchema(
-        IReadOnlyList<FieldDescriptor> driverSchema,
-        IReadOnlyList<PlanNode>        localStages
-    ) {
-        if (localStages.Count == 0 || localStages[^1] is not SelectionNode selection || selection.Items.IsDefaultOrEmpty) {
-            return [..driverSchema];
-        }
-
-        var fields = ImmutableArray.CreateBuilder<FieldDescriptor>(selection.Items.Length);
-        AddSelectionFields(selection.Items, false, driverSchema, fields);
-        AddSelectionFields(selection.Items, true, driverSchema, fields);
-        return fields.ToImmutable();
-    }
-
-    private static void AddSelectionFields(
-        ImmutableArray<SelectionItem>                   items,
-        bool                                            expressions,
-        IReadOnlyList<FieldDescriptor>                  driverSchema,
-        ImmutableArray<FieldDescriptor>.Builder         fields
-    ) {
-        foreach (var item in items) {
-            if ((item.Kind is SelectionKind.Expression) != expressions) {
-                continue;
-            }
-
-            fields.Add(FieldFor(item, driverSchema));
-        }
-    }
-
-    private static FieldDescriptor FieldFor(SelectionItem item, IReadOnlyList<FieldDescriptor> driverSchema) {
-        if (item.Kind is SelectionKind.Expression) {
-            return new(item.Alias, FieldType.Object, null, false, []);
-        }
-
-        var path = item.FieldPath;
-        var name = path is null ? null : LastSegment(path);
-        foreach (var field in driverSchema) {
-            if (string.Equals(field.Name, item.Alias, StringComparison.Ordinal)
-             || (name is not null && string.Equals(field.Name, name, StringComparison.Ordinal))) {
-                return field with { Name = item.Alias };
-            }
-        }
-
-        return item.Kind is SelectionKind.Nested
-            ? new(item.Alias, FieldType.Object, null, true, [])
-            : new(item.Alias, FieldType.Object, null, false, []);
-    }
-
-    private static string LastSegment(string path) {
-        var index = path.LastIndexOf('.');
-        return index < 0 ? path : path[(index + 1)..];
-    }
 
     private static PlanNode WithInput(PlanNode node, PlanNode input) {
         return node switch {
@@ -541,7 +518,7 @@ public sealed class PlanExecutor
             SelectionNode selection => selection with { Input = input },
             var stage               => throw new InsightValidationException(
                                            InsightReasons.Unimplemented,
-                                           $"Plan node '{stage.GetType().Name}' is not a single-source stage."),
+                                           SchemataResources.INSIGHT_SINGLE_SOURCE_STAGE_REQUIRED, new Dictionary<string, string?> { ["stage"] = stage.GetType().Name }),
         };
     }
 
@@ -566,7 +543,7 @@ public sealed class PlanExecutor
             ComputeNode compute     => compute.Input,
             GroupNode group         => group.Input,
             var _ => throw new InsightValidationException(InsightReasons.Unimplemented,
-                                                         $"Plan node '{node.GetType().Name}' is not a single-source stage."),
+                                                         SchemataResources.INSIGHT_SINGLE_SOURCE_STAGE_REQUIRED, new Dictionary<string, string?> { ["stage"] = node.GetType().Name }),
         };
     }
 

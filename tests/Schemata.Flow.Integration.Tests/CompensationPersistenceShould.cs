@@ -30,12 +30,16 @@ public abstract class CompensationPersistenceShould
         Assert.Equal(process.CanonicalName, binding.ScopeOwnerCanonicalName);
         Assert.Equal("host", binding.ActivityName);
         Assert.Equal(0, binding.RegistrationOrder);
+        Assert.StartsWith("consumer-", binding.Name);
+        Assert.Equal($"process-compensations/{binding.Name}", binding.CanonicalName);
 
         var compensated = await CompleteAsync(process);
 
         var transition = Assert.Single(compensated.Transitions, current => current.Kind == TransitionKind.Compensate);
         Assert.Equal("host", transition.Previous);
         Assert.Equal("undo-host", transition.Posterior);
+        Assert.StartsWith("consumer-", transition.Name);
+        Assert.Contains(compensated.Tokens, token => token.CanonicalName == transition.Token);
         Assert.Empty(await ReadBindingsAsync(process.CanonicalName!));
     }
 
@@ -53,6 +57,50 @@ public abstract class CompensationPersistenceShould
         Assert.Empty(await ReadBindingsAsync(process.CanonicalName!));
     }
 
+    [Fact]
+    public async Task Retain_Binding_Uid_And_Consumer_Name_When_Snapshot_Is_Unchanged() {
+        var process = await StartAsync<CompensationReloadProcess>();
+        await CompleteAsync(process);
+        var before = Assert.Single(await ReadBindingsAsync(process.CanonicalName!));
+        using (var services = _fixture.CreateScope()) {
+            var persistence = services.ServiceProvider.GetRequiredService<ProcessPersistence>();
+            await persistence.ExecuteAsync(services.ServiceProvider, async (scope, ct) => {
+                var stored = await scope.Processes.FirstOrDefaultAsync(q => q.Where(p => p.CanonicalName == process.CanonicalName), ct);
+                await persistence.PersistSnapshotAsync(scope, new() {
+                    Process = stored!, Tokens = [], Transitions = [],
+                    CompensationBindings = [new(before.ScopeOwnerCanonicalName, before.ActivityName, before.RegistrationOrder)],
+                }, ct);
+            }, CancellationToken.None);
+        }
+        var after = Assert.Single(await ReadBindingsAsync(process.CanonicalName!));
+        Assert.Equal(before.Uid, after.Uid);
+        Assert.Equal(before.Name, after.Name);
+        Assert.Equal(before.CanonicalName, after.CanonicalName);
+    }
+
+    [Fact]
+    public async Task Restore_A_Removed_Binding_In_The_Same_Unit_Of_Work() {
+        var process = await StartAsync<CompensationReloadProcess>();
+        await CompleteAsync(process);
+        var binding = Assert.Single(await ReadBindingsAsync(process.CanonicalName!));
+        using (var services = _fixture.CreateScope()) {
+            var persistence = services.ServiceProvider.GetRequiredService<ProcessPersistence>();
+            await persistence.ExecuteAsync(services.ServiceProvider, async (scope, ct) => {
+                var stored = await scope.Processes.FirstOrDefaultAsync(q => q.Where(p => p.CanonicalName == process.CanonicalName), ct);
+                await persistence.PersistSnapshotAsync(scope, new() { Process = stored!, Tokens = [], Transitions = [], CompensationBindings = [] }, ct);
+                await persistence.PersistSnapshotAsync(scope, new() {
+                    Process = stored!, Tokens = [], Transitions = [],
+                    CompensationBindings = [new(binding.ScopeOwnerCanonicalName, binding.ActivityName, binding.RegistrationOrder)],
+                }, ct);
+            }, CancellationToken.None);
+        }
+        var restored = Assert.Single(await ReadBindingsAsync(process.CanonicalName!));
+        Assert.Equal(binding.ActivityName, restored.ActivityName);
+        Assert.Equal(binding.ScopeOwnerCanonicalName, restored.ScopeOwnerCanonicalName);
+        Assert.Equal(binding.RegistrationOrder, restored.RegistrationOrder);
+        Assert.StartsWith("consumer-", restored.Name);
+    }
+
     private async Task<SchemataProcess> StartAsync<TProcess>()
         where TProcess : ProcessDefinition {
         using var scope  = _fixture.CreateScope();
@@ -67,7 +115,7 @@ public abstract class CompensationPersistenceShould
         var persisted = await repository.FirstOrDefaultAsync(
                             query => query.Where(current => current.CanonicalName == process.CanonicalName));
         Assert.NotNull(persisted);
-        return await runner.CompleteAsync(persisted!, null, null, CancellationToken.None);
+        return await runner.CompleteAsync(persisted, null, null, CancellationToken.None);
     }
 
     private async Task<List<SchemataProcessCompensation>> ReadBindingsAsync(string process) {

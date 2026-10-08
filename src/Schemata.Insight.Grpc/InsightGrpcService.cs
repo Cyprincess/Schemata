@@ -4,20 +4,17 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoBuf.Grpc;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Insight.Foundation.Planning;
 using Schemata.Insight.Grpc.Mapping;
 using Schemata.Insight.Grpc.Wire;
 using Schemata.Messaging.Skeleton;
-using static Schemata.Abstractions.SchemataConstants;
 
 using Schemata.Insight.Skeleton.Models;
 using Schemata.Insight.Skeleton.Queries;
 namespace Schemata.Insight.Grpc;
 
 /// <summary>
-///     Maps the gRPC edge messages to and from the core wire types, dispatches the query through the
-///     registered handler, and translates Insight rejections into <see cref="SchemataException" />
-///     so the shared gRPC exception interceptor produces the right status.
+///     Maps gRPC messages over the registered query handler. The shared exception interceptor
+///     consumes the canonical Schemata exception produced by the domain.
 /// </summary>
 public sealed class InsightGrpcService : IInsightGrpcService
 {
@@ -42,27 +39,12 @@ public sealed class InsightGrpcService : IInsightGrpcService
         var principal = _accessor.HttpContext?.User;
         query.Principal = principal;
 
-        QueryInsightResponse response;
-        try {
-            var dispatcher = _services.GetRequiredService<IRequestDispatcher>();
-            response = await dispatcher.SendAsync<QueryInsightRequest, QueryInsightResponse>(query, context.CancellationToken);
-        } catch (InsightValidationException ex) {
-            throw Translate(ex);
-        }
+        var dispatcher = _services.GetRequiredService<IRequestDispatcher>();
+        var response = await dispatcher.SendAsync<QueryInsightRequest, QueryInsightResponse>(query, context.CancellationToken);
 
         return InsightStructMapper.ToResponse(response);
     }
 
     #endregion
 
-    private static SchemataException Translate(InsightValidationException ex) {
-        // The gRPC interceptor derives the status from the canonical google.rpc code, so map the
-        // Insight reason to one; the specific reason stays in the message.
-        var (code, status) = ex.Reason switch {
-            InsightReasons.UnknownSourceName => (404, ErrorCodes.NotFound),
-            var _                            => (400, ErrorCodes.InvalidArgument),
-        };
-
-        return new(code, status, ex.Message);
-    }
 }

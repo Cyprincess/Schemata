@@ -4,6 +4,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Humanizer;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
@@ -13,6 +14,8 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Advice;
 using Schemata.Common;
+using Schemata.Entity.Repository;
+using Schemata.Security.Skeleton;
 using Schemata.Mapping.Skeleton;
 using Schemata.Resource.Foundation.Advisors;
 using static Schemata.Abstractions.SchemataConstants;
@@ -48,7 +51,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     ) {
         ct ??= CancellationToken.None;
         var ctx = CreateAdviceContext();
-        return UpdateCoreAsync(ctx, name, request, principal, ct.Value, true);
+        return UpdateCoreAsync(ctx, name, request, principal, ct.Value);
     }
 
     /// <summary>
@@ -59,15 +62,13 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     /// <param name="request">The update request DTO.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
     /// <param name="ct">A cancellation token.</param>
-    /// <param name="finalize">Whether to commit the repository and run response advisors.</param>
     /// <returns>An <see cref="UpdateResultBase{TDetail}" /> containing the updated detail DTO.</returns>
     internal async Task<UpdateResultBase<TDetail>> UpdateCoreAsync(
         AdviceContext     ctx,
         string            name,
         TRequest          request,
         ClaimsPrincipal?  principal,
-        CancellationToken ct,
-        bool              finalize
+        CancellationToken ct
     ) {
         ResourceNameDescriptor.ForType<TEntity>().ClearParentProperties(request);
 
@@ -88,8 +89,16 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         }
 
         if (entity is null) {
+            // Entitlement-filtered null and physical absence are indistinguishable; authorize
+            // the missing outcome before create-on-missing (whose create-side permissions still
+            // run) or a NOT_FOUND — an unauthorized caller learns neither.
+            if (!AnonymousAccess.IsAnonymous<TEntity>(nameof(Operations.Update))
+             && _sp.GetKeyedService<ResourceAccessStage>(typeof(TEntity)) is { } access) {
+                await access.FinalizeMissingAsync<TEntity, TRequest>(nameof(Operations.Update), request, name, principal, ct);
+            }
+
             if (request is IAllowMissing { AllowMissing: true }) {
-                return await CreateMissingAsync(ctx, name, request, principal, ct, finalize);
+                return await CreateMissingAsync(ctx, name, request, principal, ct);
             }
 
             throw ResourceNotFound(name);
@@ -110,16 +119,10 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             _mapper.Map(request, entity, ResolveMaskFields(mask));
         }
 
-        await _repository.UpdateAsync(entity, ct);
+        var mutation = _sp.GetRequiredService<IResourceMutation<TEntity>>();
+        await mutation.UpdateAsync(entity, null, Operations.Update, ct);
 
-        if (!finalize) {
-            var staged = _mapper.Map<TEntity, TDetail>(entity);
-            return new() { Detail = staged };
-        }
-
-        await _repository.CommitAsync(ct);
-
-        var detail = _mapper.Map<TEntity, TDetail>(entity);
+        var detail = RequireDetail(_mapper.Map<TEntity, TDetail>(entity));
 
         return new() { Detail = detail };
     }
@@ -129,11 +132,16 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         string            name,
         TRequest          request,
         ClaimsPrincipal?  principal,
-        CancellationToken ct,
-        bool              finalize
+        CancellationToken ct
     ) {
         var container = new ResourceRequestContainer<TEntity>();
         ResourceIdentifiers.Apply(container, name);
+        var descriptor = ResourceNameDescriptor.ForType<TEntity>();
+        if (descriptor.HasParent && descriptor.ParseCanonicalName(name) is { } addressed) {
+            var routeValues = new Dictionary<string, object?>(addressed.ParentValues.Count);
+            foreach (var parent in addressed.ParentValues) routeValues[parent.Key] = parent.Value;
+            descriptor.SetParentFromRouteValues(request, routeValues);
+        }
 
         var requestResult = await RunPipelineAsync<UpdateResultBase<TDetail>>(
             ctx,
@@ -151,6 +159,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
                 Reason      = SchemataResources.INVALID_PAYLOAD,
             }]);
         }
+        AdviceApplyChildParent<TEntity, TRequest>.Apply(request, entity);
 
         var entityResult = await RunPipelineAsync<UpdateResultBase<TDetail>>(
             ctx,
@@ -160,16 +169,10 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             return entityResult;
         }
 
-        await _repository.AddAsync(entity, ct);
+        var mutation = _sp.GetRequiredService<IResourceMutation<TEntity>>();
+        await mutation.CreateAsync(entity, null, ct);
 
-        if (!finalize) {
-            var staged = _mapper.Map<TEntity, TDetail>(entity);
-            return new() { Detail = staged };
-        }
-
-        await _repository.CommitAsync(ct);
-
-        var detail = _mapper.Map<TEntity, TDetail>(entity);
+        var detail = RequireDetail(_mapper.Map<TEntity, TDetail>(entity));
 
         return new() { Detail = detail };
     }

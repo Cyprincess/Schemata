@@ -23,7 +23,7 @@ public sealed class ResourceUpdateAccessAdvisor<TEntity, TRequest>(IAccessProvid
     ) {
         if (!AnonymousAccess.IsAnonymous<TEntity>(nameof(Operations.Update))) {
             await AuthorizeHelper.EnsureAsync(access, entity,
-                                              new() { Operation = nameof(Operations.Update), Request = request },
+                                              new() { Operation = nameof(Operations.Update), Request = request, Stage = AccessStage.Instance, Name = entity.CanonicalName },
                                               entity.CanonicalName ?? string.Empty, principal, ct);
         }
 

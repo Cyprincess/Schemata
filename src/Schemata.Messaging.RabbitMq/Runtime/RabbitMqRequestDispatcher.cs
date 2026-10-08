@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Security.Claims;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -9,6 +12,7 @@ using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using Schemata.Abstractions;
 using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Runtime;
 using Schemata.Transport.RabbitMq;
 
 namespace Schemata.Messaging.RabbitMq.Runtime;
@@ -19,7 +23,7 @@ namespace Schemata.Messaging.RabbitMq.Runtime;
 ///     <see cref="CorrelationTracker" />; it opens channels but never a connection, so a process
 ///     still holds exactly one.
 /// </remarks>
-internal sealed class RabbitMqRequestDispatcher : ICommandDispatcher, IQueryDispatcher, IAsyncDisposable
+internal sealed class RabbitMqRequestDispatcher : ICommandDispatcher, IQueryDispatcher, IStreamDispatcher, IAsyncDisposable
 {
     private readonly IRabbitMqConnectionProvider        _connections;
     private readonly CorrelationTracker                 _correlation;
@@ -47,6 +51,9 @@ internal sealed class RabbitMqRequestDispatcher : ICommandDispatcher, IQueryDisp
 
         _replyQueueName = $"reply.{Guid.NewGuid():n}";
     }
+
+    public IAsyncEnumerable<TItem> Stream<TRequest, TItem>(TRequest request, ClaimsPrincipal? principal = null, CancellationToken ct = default)
+        where TRequest : IStreamRequest<TItem> => throw new NotSupportedException("RabbitMQ request streaming is not supported.");
 
     #region IAsyncDisposable Members
 
@@ -79,6 +86,7 @@ internal sealed class RabbitMqRequestDispatcher : ICommandDispatcher, IQueryDisp
 
     public async Task<TResponse> SendAsync<TRequest, TResponse>(TRequest request, CancellationToken ct = default)
         where TRequest : IRequest<TResponse> {
+        if (ResponseShape<TResponse>.IsStream) throw new NotSupportedException("RabbitMQ request streaming is not supported.");
         var binding = _options.Value.Require(typeof(TRequest));
 
         // Capture runs here, synchronously, in the CALLER's scope: it is the only place the ambient
@@ -92,26 +100,33 @@ internal sealed class RabbitMqRequestDispatcher : ICommandDispatcher, IQueryDisp
 
         var tcs           = new TaskCompletionSource<TResponse>();
         var correlationId = _correlation.Track(tcs, TimeSpan.FromMilliseconds(_options.Value.RequestTimeoutMs));
-        _replyTypes[correlationId] = typeof(TResponse);
-
-        var props = new BasicProperties {
-            ContentType   = "application/json",
-            DeliveryMode  = DeliveryModes.Persistent,
-            ReplyTo       = _replyQueueName,
-            CorrelationId = correlationId,
-            Headers       = MessageContextHeaders.Write(context),
-        };
-
-        var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(request, _json));
-
-        await channel.ExchangeDeclareAsync(_options.Value.ExchangeName, _options.Value.ExchangeType, true,
-                                           cancellationToken: ct);
-        await channel.BasicPublishAsync(_options.Value.ExchangeName, binding.Name, true, props, body, ct);
 
         try {
+            _replyTypes[correlationId] = typeof(TResponse);
+
+            var props = new BasicProperties {
+                ContentType   = "application/json",
+                DeliveryMode  = DeliveryModes.Persistent,
+                ReplyTo       = _replyQueueName,
+                CorrelationId = correlationId,
+                Headers       = MessageContextHeaders.Write(context?.Items),
+            };
+
+            var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(request, _json));
+
+            await channel.ExchangeDeclareAsync(_options.Value.ExchangeName, _options.Value.ExchangeType, true,
+                                               cancellationToken: ct);
+            await channel.BasicPublishAsync(_options.Value.ExchangeName, binding.Name, true, props, body, ct);
+
             return await tcs.Task.WaitAsync(ct);
         } finally {
             _replyTypes.TryRemove(correlationId, out _);
+
+            // The entry's timeout would otherwise fire a TimeoutException at a wrapper nobody
+            // observes any more.
+            if (_correlation.Abandon(correlationId)) {
+                tcs.TrySetCanceled(ct);
+            }
         }
     }
 
@@ -175,10 +190,26 @@ internal sealed class RabbitMqRequestDispatcher : ICommandDispatcher, IQueryDisp
             return Task.CompletedTask;
         }
 
-        var body     = Encoding.UTF8.GetString(ea.Body.Span);
+        var body = Encoding.UTF8.GetString(ea.Body.Span);
+
+        // The broker boxes header values; a hand-rolled publisher may emit the flag as a string.
+        if (ea.BasicProperties.Headers?.TryGetValue(RequestErrorHeaders.RemoteError, out var flagged) == true
+         && flagged is true or "true" or "True") {
+            var error = JsonSerializer.Deserialize<RemoteRequestError>(body, _json);
+            _correlation.Fail(correlationId, new RemoteRequestException(error?.Reason ?? "internal", null));
+
+            return Task.CompletedTask;
+        }
+
         var response = JsonSerializer.Deserialize(body, responseType, _json);
         _correlation.Complete(correlationId, response);
 
         return Task.CompletedTask;
+    }
+
+    private static class ResponseShape<TResponse>
+    {
+        internal static readonly bool IsStream = IsSequence(typeof(TResponse)) || typeof(TResponse).GetInterfaces().Any(IsSequence);
+        private static bool IsSequence(Type type) => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IAsyncEnumerable<>);
     }
 }

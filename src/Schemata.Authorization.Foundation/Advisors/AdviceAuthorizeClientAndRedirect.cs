@@ -65,37 +65,25 @@ public sealed class AdviceAuthorizeClientAndRedirect<TApp>(
         CancellationToken      ct = default
     ) {
         if (string.IsNullOrWhiteSpace(authz.Request?.ClientId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.ClientId)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.NOT_EMPTY, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.ClientId });
         }
 
         var application = await apps.FindByClientIdAsync(authz.Request.ClientId, ct);
         if (application is null) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
         authz.Application = application;
 
         if (!await apps.ValidateRedirectUriAsync(authz.Application, authz.Request.RedirectUri, ct)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidRedirectUri,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_REDIRECT_URI)
-            );
+            throw new OAuthException(OAuthErrors.InvalidRedirectUri, SchemataResources.INVALID_REDIRECT_URI);
         }
 
         var type = authz.Request.ResponseType?.Split(' ').OrderBy(x => x).ToList() ?? [];
         authz.Request.ResponseType = string.Join(' ', type);
 
         if (!options.Value.AllowedResponseTypes.Contains(authz.Request.ResponseType)) {
-            throw new OAuthException(
-                OAuthErrors.UnsupportedResponseType,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), Parameters.ResponseType)
-            ) {
+            throw new OAuthException(OAuthErrors.UnsupportedResponseType, SchemataResources.NOT_SUPPORTED, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.ResponseType }) {
                 RedirectUri  = authz.Request.RedirectUri,
                 State        = authz.Request.State,
                 ResponseMode = authz.Request.ResponseMode,
@@ -104,10 +92,7 @@ public sealed class AdviceAuthorizeClientAndRedirect<TApp>(
 
         if (!string.IsNullOrWhiteSpace(authz.Request.ResponseMode)
          && !options.Value.AllowedResponseModes.Contains(authz.Request.ResponseMode)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), Parameters.ResponseMode)
-            ) {
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.ResponseMode }) {
                 RedirectUri  = authz.Request.RedirectUri,
                 State        = authz.Request.State,
                 ResponseMode = ResponseModes.Query,

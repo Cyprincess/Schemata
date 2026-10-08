@@ -39,7 +39,7 @@ Add more capabilities from the [Feature Domains](#feature-domains) below.
 ## Feature Domains
 
 - [Authorization](https://nuget.org/packages/Schemata.Authorization.Foundation) — OAuth 2.0 / OpenID Connect server
-- [Caching](https://nuget.org/packages/Schemata.Caching.Skeleton) — distributed cache abstraction; Redis and `IDistributedCache` adapters
+- [Caching](https://nuget.org/packages/Schemata.Caching.Skeleton) — scalar, atomic and collection cache operations through Memory or Redis providers
 - [DSL](https://nuget.org/packages/Schemata.Modeling.Generator) — `.skm` source generator
 - [Event](https://nuget.org/packages/Schemata.Event.Foundation) — in-process / RabbitMQ event bus
 - [Flow](https://nuget.org/packages/Schemata.Flow.Foundation) — BPMN process engine, HTTP/gRPC transports, event/scheduling bridges

@@ -57,10 +57,7 @@ public sealed class AdviceAuthorizeResponseMode<TApp>(IOptions<CodeFlowOptions> 
 
         if ((responseTypes.Contains(ResponseTypes.Token) || responseTypes.Contains(ResponseTypes.IdToken))
          && authz.ResponseMode == ResponseModes.Query) {
-            throw new OAuthException(
-                OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), Parameters.ResponseMode)
-            ) {
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.ResponseMode }) {
                 RedirectUri  = authz.Request?.RedirectUri,
                 State        = authz.Request?.State,
                 ResponseMode = ResponseModes.Fragment,

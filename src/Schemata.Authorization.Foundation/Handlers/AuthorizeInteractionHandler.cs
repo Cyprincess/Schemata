@@ -93,26 +93,17 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
          || interaction.Type != TokenTypes.Interaction
             || (interaction.ExpireTime.HasValue && interaction.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime)
          || string.IsNullOrWhiteSpace(interaction.Payload)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         var authorize = JsonSerializer.Deserialize<AuthorizeRequest>(interaction.Payload, _json.Value);
         if (string.IsNullOrWhiteSpace(authorize?.ClientId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         var application = await _apps.FindByClientIdAsync(authorize.ClientId, ct);
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         var requested = ScopeParser.Parse(authorize.Scope);
@@ -161,8 +152,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
         // redirect the caller cannot follow, so an unauthenticated approval is a plain 401.
         var subject = principal.FindFirstValue(IdentityClaims.Subject);
         if (string.IsNullOrWhiteSpace(subject)) {
-            throw new UnauthenticatedException(
-                message: SchemataResources.GetResourceString(SchemataResources.USER_AUTHENTICATION_REQUIRED));
+            throw new UnauthenticatedException(SchemataResources.USER_AUTHENTICATION_REQUIRED);
         }
 
         var interaction = await _tokens.FindByReferenceIdAsync(request.Code, ct);
@@ -170,26 +160,17 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
          || interaction.Type != TokenTypes.Interaction
             || (interaction.ExpireTime.HasValue && interaction.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime)
          || string.IsNullOrWhiteSpace(interaction.Payload)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         var authorize = JsonSerializer.Deserialize<AuthorizeRequest>(interaction.Payload, _json.Value);
         if (string.IsNullOrWhiteSpace(authorize?.ClientId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         var application = await _apps.FindByClientIdAsync(authorize.ClientId, ct);
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         var claims = new List<Claim> {

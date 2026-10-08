@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Flow.Skeleton.Builders;
 using Schemata.Flow.Skeleton.Models;
@@ -18,9 +19,10 @@ public sealed class FailingTaskProcess : ProcessDefinition
     public UserTask Review { get; } = null!;
     public UserTask Fail   { get; } = null!;
 
-    private static async ValueTask MutateThenFailAsync(FlowTaskContext context, Order order) {
+    private static async ValueTask MutateThenFailAsync(FlowTaskContext context, Order order, CancellationToken ct) {
+        ct.ThrowIfCancellationRequested();
         order.TaskValue = "rolled-back";
-        await context.BindSourceAsync("temporary", order);
+        await context.BindSourceAsync("temporary", order, ct);
         throw new InvalidOperationException("Expected integration test failure.");
     }
 }

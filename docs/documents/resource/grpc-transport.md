@@ -30,7 +30,7 @@ schema.UseResource()
 ```csharp
 public interface IResourceService<TEntity, TRequest, TDetail, TSummary>
 {
-    [Operation] ValueTask<ListResultBase<TSummary>> ListAsync(ListRequest request, CallContext context = default);
+    [Operation] ValueTask<ListResultBase<TEntity, TSummary>> ListAsync(ListRequest request, CallContext context = default);
     [Operation] ValueTask<TDetail>  GetAsync(GetRequest request, CallContext context = default);
     [Operation] ValueTask<TDetail>  CreateAsync(TRequest request, CallContext context = default);
     [Operation] ValueTask<TDetail>  UpdateAsync(TRequest request, CallContext context = default);
@@ -63,8 +63,8 @@ responds with the updated detail per AIP-164, a hard-deletable entity with `goog
 
 ## Request and response wire format
 
-`SchemataProtoModelConfigurator` adds each request, detail, summary, and `ListResultBase<TSummary>` type to the
-`RuntimeTypeModel`. For each writable property it resolves the wire name through
+`SchemataProtoModelConfigurator` adds each request, detail, summary, and `ListResultBase<TEntity, TSummary>` type
+to the `RuntimeTypeModel`. For each writable property it resolves the wire name through
 `ResourceWireNameRules.ResolveWireName` — the same `ResourceWireNameRules` aliases as HTTP (`Name` dropped,
 `CanonicalName` → `name`, `EntityTag` → `etag`, `Entities` → plural) — then applies snake_case via Humanizer
 `Underscore()`. `GrpcMarshallers.Create<T>` builds marshallers over the model, so payloads serialize with the
@@ -84,10 +84,17 @@ each error detail is packed into a `google.protobuf.Any`. The status is attached
 
 `SchemataTransportGrpcFeature` maps `ReflectionServiceImpl` (v1alpha) and `ReflectionV1ServiceImpl` (v1) once for
 the application and merges descriptors from every `IGrpcServiceDescriptorContributor`.
-`ResourceGrpcServiceDescriptorContributor` contributes the closed `ResourceService<,,,>` types;
-`FileDescriptorBridge.BuildServiceDescriptors` builds a `proto3` file descriptor per resource (named
-`{singular}_service.proto`) with the standard and custom RPCs. Reflection-capable clients such as `grpcurl` see
-the full schema.
+`ResourceGrpcServiceDescriptorContributor` passes the selected resource model and method metadata
+to `FileDescriptorBridge.BuildServiceDescriptors`. The shared `GrpcSchema` emits a `proto2`
+descriptor named `{fully-qualified-service-name}.proto` for each service. Its descriptors preserve
+optional-field presence, enum defaults, and streaming method kinds from the configured runtime model.
+The same model supplies resource marshalling and the contributed reflection schema.
+
+Schema generation uses the pinned `protobuf-net` 3.2.56 field emitter for reachable custom-serializer
+messages that its public schema emitter omits. This integration depends on that version's private
+emitter signature; a dependency upgrade requires checking both descriptor generation and serialized
+bytes. Implementations: `src/Schemata.Transport.Grpc/Proto/GrpcSchema.cs` and
+`src/Schemata.Resource.Grpc/FileDescriptorBridge.cs`.
 
 ## Extension points
 

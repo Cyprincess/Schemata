@@ -1,4 +1,5 @@
 using Schemata.Identity.Tests.Fixtures;
+using System;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -34,7 +35,7 @@ public class IdentityAccessHandlerShould
             Password     = "secret",
         };
 
-        var result = await host.Handler.RegisterAsync(request, new ClaimsPrincipal(), CancellationToken.None);
+        var result = await host.Handler.RegisterAsync(request, new(), CancellationToken.None);
 
         Assert.Equal(IdentityStatus.Success, result.Status);
         Assert.Same(Principal, result.Data);
@@ -46,48 +47,16 @@ public class IdentityAccessHandlerShould
     }
 
     [Fact]
-    public async Task Login_With_Valid_Password_Returns_Principal() {
-        using var host = new IdentityHandlerTestHost();
-        host.Users.Setup(value => value.FindByNameAsync("alice")).ReturnsAsync(User);
-        host.SignIn.Setup(value => value.CheckPasswordSignInAsync(User, "secret", true))
-                   .ReturnsAsync(SignInResult.Success);
-        host.SignIn.Setup(value => value.CreateUserPrincipalAsync(User)).ReturnsAsync(Principal);
-
-        var result = await host.Handler.LoginAsync(
-            new() { Username = "alice", Password = "secret" },
-            new ClaimsPrincipal(),
-            CancellationToken.None);
-
-        Assert.Equal(IdentityStatus.Success, result.Status);
-        Assert.Same(Principal, result.Data);
-    }
-
-    [Fact]
-    public async Task Login_Requiring_TwoFactor_Without_Code_Returns_Challenge() {
-        using var host = new IdentityHandlerTestHost();
-        host.Users.Setup(value => value.FindByNameAsync("alice")).ReturnsAsync(User);
-        host.SignIn.Setup(value => value.CheckPasswordSignInAsync(User, "secret", true))
-                   .ReturnsAsync(SignInResult.TwoFactorRequired);
-
-        var result = await host.Handler.LoginAsync(
-            new() { Username = "alice", Password = "secret" },
-            new ClaimsPrincipal(),
-            CancellationToken.None);
-
-        Assert.Equal(IdentityStatus.Challenge, result.Status);
-        Assert.Null(result.Data);
-        host.SignIn.Verify(value => value.CreateUserPrincipalAsync(It.IsAny<SchemataUser>()), Times.Never);
-    }
-
-    [Fact]
     public async Task Refresh_With_Valid_Ticket_Returns_Refreshed_Principal() {
         using var host = new IdentityHandlerTestHost();
         var ticketPrincipal = new ClaimsPrincipal(new ClaimsIdentity("refresh"));
-        var ticket = new AuthenticationTicket(ticketPrincipal, "refresh");
+        var ticket = new AuthenticationTicket(ticketPrincipal, new AuthenticationProperties {
+            ExpiresUtc = DateTimeOffset.MaxValue,
+        }, "refresh");
         host.SignIn.Setup(value => value.ValidateSecurityStampAsync(ticketPrincipal)).ReturnsAsync(User);
         host.SignIn.Setup(value => value.CreateUserPrincipalAsync(User)).ReturnsAsync(Principal);
 
-        var result = await host.Handler.RefreshAsync(ticket, new ClaimsPrincipal(), CancellationToken.None);
+        var result = await host.Handler.RefreshAsync(ticket, new(), CancellationToken.None);
 
         Assert.Equal(IdentityStatus.Success, result.Status);
         Assert.Same(Principal, result.Data);
@@ -97,7 +66,7 @@ public class IdentityAccessHandlerShould
     public async Task Refresh_Without_Ticket_Returns_Challenge() {
         using var host = new IdentityHandlerTestHost();
 
-        var result = await host.Handler.RefreshAsync(null, new ClaimsPrincipal(), CancellationToken.None);
+        var result = await host.Handler.RefreshAsync(null, new(), CancellationToken.None);
 
         Assert.Equal(IdentityStatus.Challenge, result.Status);
         Assert.Null(result.Data);
