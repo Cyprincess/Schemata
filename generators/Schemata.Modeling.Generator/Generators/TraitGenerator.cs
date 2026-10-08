@@ -30,7 +30,7 @@ internal static class TraitGenerator
             sb.AppendLine("}");
         }
 
-        spc.AddSource($"{name}", sb.ToString());
+        spc.AddSource(SourceIdentity.Hint("interface", doc.Namespace, name), sb.ToString());
     }
 
     private static void GenerateFields(StringBuilder sb, EquatableArray<Field> fields) {

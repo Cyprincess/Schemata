@@ -239,7 +239,15 @@ internal static partial class Parser
 
         // ── Use ───────────────────────────────────────────────────────
 
-        var names = Separated(comma, QualifiedName);
+        var contract = Deferred<string>();
+        var typeArguments = Between(Terms.Char('<'), Separated(comma, contract), Terms.Char('>'))
+            .Then(arguments => "<" + string.Join(", ", arguments) + ">");
+        var contractSegment = Identifier.And(ZeroOrOne(typeArguments)).Then(pair => pair.Item1.ToString() + pair.Item2);
+        var suffix = Terms.Char('?').Then(_ => "?")
+            .Or(Between(Terms.Char('['), ZeroOrMany(comma), Terms.Char(']')).Then(commas => "[" + new string(',', commas.Count) + "]"));
+        contract.Parser = Separated(dot, contractSegment).And(ZeroOrMany(suffix))
+            .Then(pair => string.Join(".", pair.Item1) + string.Concat(pair.Item2));
+        var names = Separated(comma, contract);
 
         Use = Terms.Text("Use", true)
                    .SkipAnd(names)
@@ -758,11 +766,13 @@ internal static partial class Parser
                        return new Document(ns, entities.ToImmutable(), traits.ToImmutable(),
                                            enums.ToImmutable());
                    })
+                  .AndSkip(ZeroOrOne(Terms.WhiteSpace()))
                   .WithComments(comments => {
                        comments.WithWhiteSpaceOrNewLine();
                        comments.WithSingleLine("//");
                        comments.WithMultiLine("/*", "*/");
                    })
+                  .Eof()
                   .Compile();
     }
 

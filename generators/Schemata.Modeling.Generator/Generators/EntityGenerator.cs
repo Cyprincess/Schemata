@@ -9,8 +9,9 @@ namespace Schemata.Modeling.Generator;
 
 internal static class EntityGenerator
 {
-    public static void Generate(SourceProductionContext spc, Entity entity, Document doc) {
+    public static void Generate(SourceProductionContext spc, Entity entity, Document doc, Compilation compilation, Location location) {
         var sb = new StringBuilder();
+        sb.AppendLine("#nullable enable");
 
         if (!string.IsNullOrWhiteSpace(doc.Namespace)) {
             sb.AppendLine($"namespace {doc.Namespace} {{");
@@ -24,7 +25,7 @@ internal static class EntityGenerator
 
         GenerateEnums(sb, entity);
 
-        GenerateFields(sb, entity.Fields);
+        if (!InterfaceProperties.Generate(spc, sb, entity, doc, compilation, location)) return;
 
         sb.AppendLine("    }");
 
@@ -32,7 +33,7 @@ internal static class EntityGenerator
             sb.AppendLine("}");
         }
 
-        spc.AddSource($"{entity.Name}", sb.ToString());
+        spc.AddSource(SourceIdentity.Hint("record", doc.Namespace, entity.Name), sb.ToString());
     }
 
     internal static void GenerateUses(
@@ -84,7 +85,7 @@ internal static class EntityGenerator
         }
     }
 
-    private static void GenerateFields(StringBuilder sb, EquatableArray<Field> fields) {
+    internal static void GenerateFields(StringBuilder sb, IEnumerable<Field> fields) {
         foreach (var field in fields) {
             var type  = field.Type;
             var name  = field.Name;

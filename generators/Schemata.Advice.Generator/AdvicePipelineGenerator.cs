@@ -20,14 +20,21 @@ public class AdvicePipelineGenerator : IIncrementalGenerator
         var advisors = context.SyntaxProvider
                               .CreateSyntaxProvider(static (node, _) => IsAdvisorCandidate(node),
                                                     static (ctx,  _) => GetAdvisorInfo(ctx))
-                              .Where(static info => info is not null);
+                              .Where(static info => info is not null)
+                              .Collect();
 
-        var combined = advisors.Combine(hasInfrastructure);
+        var deduped = advisors.Select(static (infos, _) => DedupeBySymbol(infos));
+
+        var combined = deduped.Combine(hasInfrastructure);
 
         context.RegisterSourceOutput(combined, static (spc, pair) => {
-            var (info, has) = pair;
+            var (infos, has) = pair;
 
-            if (has && info is not null) {
+            if (!has) {
+                return;
+            }
+
+            foreach (var info in infos) {
                 GenerateSource(spc, info);
             }
         });
@@ -37,6 +44,27 @@ public class AdvicePipelineGenerator : IIncrementalGenerator
 
     private static bool IsAdvisorCandidate(SyntaxNode node) {
         return node is InterfaceDeclarationSyntax { BaseList: not null };
+    }
+
+    private static ImmutableArray<AdvisorInterfaceInfo> DedupeBySymbol(
+        ImmutableArray<AdvisorInterfaceInfo?> infos
+    ) {
+        if (infos.IsDefaultOrEmpty) {
+            return ImmutableArray<AdvisorInterfaceInfo>.Empty;
+        }
+
+        var seen = new HashSet<string>(System.StringComparer.Ordinal);
+        var result = ImmutableArray.CreateBuilder<AdvisorInterfaceInfo>(infos.Length);
+
+        foreach (var info in infos) {
+            if (info is null || !seen.Add(info.InterfaceMinimalName)) {
+                continue;
+            }
+
+            result.Add(info);
+        }
+
+        return result.ToImmutable();
     }
 
     private static AdvisorInterfaceInfo? GetAdvisorInfo(GeneratorSyntaxContext ctx) {
@@ -74,20 +102,30 @@ public class AdvicePipelineGenerator : IIncrementalGenerator
         }
 
         var advisorTypeArgs = advisorInterface.TypeArguments;
+        var containing = new Stack<INamedTypeSymbol>();
+        for (var current = symbol; current is not null; current = current.ContainingType) containing.Push(current);
+        var parameters = containing.SelectMany(type => type.TypeParameters).ToImmutableArray();
+        var names = new Dictionary<ITypeParameterSymbol, string>(SymbolEqualityComparer.Default);
+        var used = new HashSet<string>(System.StringComparer.Ordinal);
+        foreach (var parameter in parameters) {
+            var name = parameter.Name;
+            while (!used.Add(name)) name += "_";
+            names.Add(parameter, name);
+        }
 
         var typeParams      = new List<string>();
         var typeConstraints = new List<string>();
 
-        foreach (var tp in symbol.TypeParameters) {
-            typeParams.Add(tp.Name);
+        foreach (var tp in parameters) {
+            typeParams.Add(names[tp]);
 
             var constraints = new List<string>();
 
             if (tp.HasReferenceTypeConstraint) {
-                constraints.Add("class");
+                constraints.Add(tp.ReferenceTypeConstraintNullableAnnotation == NullableAnnotation.Annotated ? "class?" : "class");
             }
 
-            if (tp.HasValueTypeConstraint) {
+            if (tp.HasValueTypeConstraint && !tp.HasUnmanagedTypeConstraint) {
                 constraints.Add("struct");
             }
 
@@ -100,7 +138,7 @@ public class AdvicePipelineGenerator : IIncrementalGenerator
             }
 
             foreach (var ct in tp.ConstraintTypes) {
-                constraints.Add(ct.ToDisplayString(FullyQualified));
+                constraints.Add(ResolveTypeArgDisplay(ct, names));
             }
 
             if (tp.HasConstructorConstraint) {
@@ -108,29 +146,18 @@ public class AdvicePipelineGenerator : IIncrementalGenerator
             }
 
             if (constraints.Count > 0) {
-                typeConstraints.Add($"where {tp.Name} : {string.Join(", ", constraints)}");
+                typeConstraints.Add($"where {names[tp]} : {string.Join(", ", constraints)}");
             }
         }
 
-        string constructedAdvisorType;
-        if (symbol.TypeParameters.Length > 0) {
-            var paramNames = string.Join(", ", symbol.TypeParameters.Select(tp => tp.Name));
-            constructedAdvisorType = $"{
-                symbol.ToDisplayString(FullyQualified)
-                      .Replace($"<{
-                          string.Join(", ", symbol.TypeParameters.Select(tp => tp.ToDisplayString(FullyQualified)))
-                      }>", $"<{paramNames}>")
-            }";
-        } else {
-            constructedAdvisorType = symbol.ToDisplayString(FullyQualified);
-        }
+        var constructedAdvisorType = ResolveTypeArgDisplay(symbol, names);
 
         var methodParams = new List<string> { "global::Schemata.Abstractions.Advisors.AdviceContext ctx" };
 
         var callArgs = new List<string> { "ctx" };
 
         for (var i = 0; i < advisorTypeArgs.Length; i++) {
-            var argType   = ResolveTypeArgDisplay(advisorTypeArgs[i], symbol.TypeParameters);
+            var argType   = ResolveTypeArgDisplay(advisorTypeArgs[i], names);
             var paramName = $"a{i + 1}";
             methodParams.Add($"{argType} {paramName}");
             callArgs.Add(paramName);
@@ -141,14 +168,12 @@ public class AdvicePipelineGenerator : IIncrementalGenerator
 
         var runnerTypeArgs = new List<string> { constructedAdvisorType };
         foreach (var t in advisorTypeArgs) {
-            runnerTypeArgs.Add(ResolveTypeArgDisplay(t, symbol.TypeParameters));
+            runnerTypeArgs.Add(ResolveTypeArgDisplay(t, names));
         }
 
         var result = new AdvisorInterfaceInfo(symbol.ToDisplayString(FullyQualified),
-                                              symbol.Name
-                                            + (symbol.TypeParameters.Length > 0
-                                                  ? "_" + string.Join("_", symbol.TypeParameters.Select(tp => tp.Name))
-                                                  : ""), constructedAdvisorType);
+                                              BuildSymbolKeyName(symbol),
+                                              constructedAdvisorType);
 
         result.InterfaceTypeParameters.AddRange(typeParams);
         result.InterfaceTypeConstraints.AddRange(typeConstraints);
@@ -164,19 +189,54 @@ public class AdvicePipelineGenerator : IIncrementalGenerator
             && type.OriginalDefinition.Interfaces.Any(baseType => SymbolEqualityComparer.Default.Equals(baseType, advisorDefinition));
     }
 
-    private static string ResolveTypeArgDisplay(
-        ITypeSymbol                          typeArg,
-        ImmutableArray<ITypeParameterSymbol> interfaceTypeParams
-    ) {
-        foreach (var tp in interfaceTypeParams) {
-            if (SymbolEqualityComparer.Default.Equals(typeArg, tp)) {
-                return typeArg.NullableAnnotation == NullableAnnotation.Annotated
-                    ? tp.Name + "?"
-                    : tp.Name;
-            }
+    private static string ResolveTypeArgDisplay(ITypeSymbol type, IReadOnlyDictionary<ITypeParameterSymbol, string> names) {
+        var text = new StringBuilder();
+        foreach (var part in type.ToDisplayParts(FullyQualified)) {
+            if (part.Symbol is ITypeParameterSymbol parameter && names.TryGetValue(parameter, out var name)) text.Append(name);
+            else text.Append(part.ToString());
+        }
+        return text.ToString();
+    }
+
+    private static string BuildSymbolKeyName(INamedTypeSymbol symbol) {
+        var segments = new List<string>
+        {
+            symbol.TypeKind.ToString(),
+            symbol.ContainingNamespace.IsGlobalNamespace ? "" : symbol.ContainingNamespace.ToDisplayString(),
+            BuildContainingTypesKey(symbol.ContainingType),
+            symbol.Name,
+            symbol.TypeParameters.Length.ToString(),
+            string.Join(",", symbol.TypeParameters.Select(tp => tp.Name)),
+        };
+
+        var result = new StringBuilder();
+        foreach (var segment in segments) {
+            AppendHexLengthFramedSegment(result, segment);
         }
 
-        return typeArg.ToDisplayString(FullyQualified);
+        return result.ToString();
+    }
+
+    private static string BuildContainingTypesKey(INamedTypeSymbol? containing) {
+        if (containing is null) {
+            return "";
+        }
+
+        var chain = new List<string>();
+        for (var current = containing; current is not null; current = current.ContainingType) {
+            chain.Add($"{current.Name}`{current.TypeParameters.Length}");
+        }
+
+        chain.Reverse();
+        return string.Join("/", chain);
+    }
+
+    private static void AppendHexLengthFramedSegment(StringBuilder sb, string value) {
+        var bytes = Encoding.UTF8.GetBytes(value);
+        sb.Append(bytes.Length.ToString("x4"));
+        foreach (var b in bytes) {
+            sb.Append(b.ToString("x2"));
+        }
     }
 
     private static void GenerateSource(SourceProductionContext spc, AdvisorInterfaceInfo info) {
@@ -212,11 +272,6 @@ public class AdvicePipelineGenerator : IIncrementalGenerator
 
         sb.AppendLine("}");
 
-        var hintName = info.InterfaceMinimalName.Replace("global::", "")
-                           .Replace("<", "_")
-                           .Replace(">", "_")
-                           .Replace(", ", "_")
-                           .Replace(".", "_");
-        spc.AddSource($"{hintName}.g.cs", sb.ToString());
+        spc.AddSource($"{info.InterfaceMinimalName}.g.cs", sb.ToString());
     }
 }

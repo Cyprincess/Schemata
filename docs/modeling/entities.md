@@ -1,7 +1,7 @@
 # Entities
 
-The generator emits each entity as a `public record` with one init-set auto-property per field.
-Trait interfaces from `Use` declarations and the base list appear in the record's base list.
+The generator emits each entity as a `public record` with auto-properties for its fields and
+required property contracts composed through `Use`.
 
 The generator emits no resource registration. To expose a generated entity as an AIP resource, register it
 explicitly with `AddResource<TEntity>()` (or `Use<TEntity, TRequest, TDetail, TSummary>()`) on the resource
@@ -28,7 +28,7 @@ Members may appear in any order.
 | Member   | Emitted                           |
 | -------- | --------------------------------- |
 | `Note`   | No                                |
-| `Use`    | Base list only                    |
+| `Use`    | Interface base list and required properties |
 | `Enum`   | Yes (inline, via `EnumGenerator`) |
 | `Trait`  | No                                |
 | `Object` | No (stored as a `View` node)      |
@@ -46,6 +46,27 @@ Entity Student : Entity, SoftDelete {
     // equivalent to: Use Entity, SoftDelete
 }
 ```
+
+`Use` can name an accessible closed C# interface from the consuming compilation:
+
+```text
+Namespace My.Models
+Entity AuditRow {
+    Use Schemata.Abstractions.Entities.ITimestamp
+}
+```
+
+This emits `System.DateTime? CreateTime` and `UpdateTime` properties. Interface property types,
+nullable annotations and required get/set/init accessors come from Roslyn symbols. Inherited
+properties are deduplicated; compatible explicit DSL fields are reused. Local trait fields are
+also composed recursively. Default interface implementations remain on the interface.
+
+Closed generic arguments support nullable, array and nested generic types. Required methods,
+events, indexers, static-abstract members and property types that cannot be stored in a record
+produce `SKM001`, as do unresolved, inaccessible, open or conflicting contracts. Invalid document
+syntax produces `SKM002`. Diagnostics identify the `.skm` file and affected entity or member.
+Property synthesis assigns no resource names and performs no timestamp updates.
+
 
 ## Emission
 

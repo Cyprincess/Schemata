@@ -7,10 +7,12 @@
 
   <ItemGroup>
     <PackageReference Include="Parlot" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\generators\Schemata.Modeling.Generator\Schemata.Modeling.Generator.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Abstractions\Schemata.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>

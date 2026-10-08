@@ -7,19 +7,19 @@ namespace Schemata.Modeling.Generator;
 
 internal static class DocumentGenerator
 {
-    public static void Generate(SourceProductionContext spc, Document doc) {
+    public static void Generate(SourceProductionContext spc, Document doc, Compilation compilation, Location location) {
         GenerateEnums(spc, doc);
 
         GenerateTraits(spc, doc);
 
-        GenerateEntities(spc, doc);
+        GenerateEntities(spc, doc, compilation, location);
     }
 
     private static void GenerateEnums(SourceProductionContext spc, Document doc) {
         foreach (var @enum in doc.Enumerations) {
             var sb = new StringBuilder();
             EnumGenerator.Generate(sb, @enum, doc);
-            spc.AddSource($"{@enum.Name}", sb.ToString());
+            spc.AddSource(SourceIdentity.Hint("enum", doc.Namespace, @enum.Name), sb.ToString());
         }
     }
 
@@ -29,9 +29,9 @@ internal static class DocumentGenerator
         }
     }
 
-    private static void GenerateEntities(SourceProductionContext spc, Document doc) {
+    private static void GenerateEntities(SourceProductionContext spc, Document doc, Compilation compilation, Location location) {
         foreach (var entity in doc.Entities) {
-            EntityGenerator.Generate(spc, entity, doc);
+            EntityGenerator.Generate(spc, entity, doc, compilation, location);
         }
     }
 }
