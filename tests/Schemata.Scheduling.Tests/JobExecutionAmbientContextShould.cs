@@ -59,6 +59,7 @@ public class JobExecutionAmbientContextShould
                                                .AddSingleton<IJobExecutionAdvisor>(advisor.Object)
                                                .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
                                                .AddSchemataScheduling()
+                                               .AddSchemataSchedulingRepositoryStore()
                                                .BuildServiceProvider();
 
         await new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None);

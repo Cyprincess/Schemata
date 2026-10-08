@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Errors;
@@ -528,6 +529,47 @@ public class BpmnValidatorShould
                 new() { Source = element, Target = endEvent },
             },
         };
+    }
+
+    [Fact]
+    public void Validate_CyclicWaitingLoopWithMatchingTypedCatch_Passes() {
+        var definition = CyclicTypedCatchDefinition(new Message<int> { Name = "work-item" }, new ProcedureTask<int> { Name = "task" });
+
+        var ex = Record.Exception(() => BpmnValidator.Validate(definition));
+
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public void Validate_CyclicWaitingLoopWithMismatchedTypedCatch_ThrowsPayloadMismatch() {
+        var definition = CyclicTypedCatchDefinition(new Message<string> { Name = "work-item" }, new ProcedureTask<int> { Name = "task" });
+
+        var ex = Assert.Throws<InvalidOperationException>(() => BpmnValidator.Validate(definition));
+
+        Assert.Contains("payload mismatch", ex.Message, StringComparison.Ordinal);
+    }
+
+    private static ProcessDefinition CyclicTypedCatchDefinition(Message message, ProcedureTaskBase task) {
+        var start      = new FlowEvent { Name = "start", Position = EventPosition.Start };
+        var catchEvent = new FlowEvent { Name = "catch", Position = EventPosition.IntermediateCatch, Definition = message };
+        var review     = new UserTask { Name = "review" };
+        var decide     = new ExclusiveGateway { Name = "decide" };
+        var endEvent   = new FlowEvent { Name = "end", Position = EventPosition.End };
+
+        var definition = new ProcessDefinition {
+            Name     = "cyclic-typed",
+            Elements = { start, catchEvent, task, review, decide, endEvent },
+            Flows = {
+                new() { Source = start, Target = catchEvent },
+                new() { Source = catchEvent, Target = task },
+                new() { Source = task, Target = review },
+                new() { Source = review, Target = decide },
+                new() { Source = decide, Target = catchEvent, Condition = new LambdaConditionExpression { Lambda = _ => new(true) } },
+                new() { Source = decide, Target = endEvent, IsDefault = true },
+            },
+        };
+        definition.Messages.Add(message);
+        return definition;
     }
 
     private static ProcessDefinition DefinitionWithEventSubProcess(EventSubProcess eventSub) {

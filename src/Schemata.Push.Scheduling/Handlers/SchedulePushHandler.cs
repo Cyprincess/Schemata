@@ -31,6 +31,7 @@ internal sealed class SchedulePushHandler(IScheduler scheduler) : IRequestHandle
             Method       = SendMethod,
             ArgsJson     = argsJson,
             StartTime    = request.At?.UtcDateTime,
+            Principal    = SchedulingSystemPrincipal.Instance,
         };
 
         var execution = await scheduler.TriggerAsync<PushDispatchJob>(jobContext, ct);

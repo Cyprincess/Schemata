@@ -90,7 +90,8 @@ alongside the waiting-element subscriptions.
 
 `FlowEventCatchHandler` writes `SchemataEventSubscription` rows through
 `IRepository<SchemataEventSubscription>`. Each row carries `SubscriptionId`, `EventType`,
-`CorrelationKey`, `Target`, and `Token`.
+`CorrelationKey`, `Target`, and `Token`, plus an optional `CorrelationFilter` the bus evaluates
+against the envelope's correlation metadata before dispatch.
 
 ```csharp
 // Message catch (point-to-point, token-scoped):
@@ -124,37 +125,36 @@ The DSL emits one intermediate catch event per `On(message)` call, and the gatew
 ## FlowEventHandler
 
 `FlowEventHandler` implements `IEventHandler<IEvent>`. It reads `IEventDispatchContext`'s
-`MatchedSubscriptions`, which the event bus fills before handler dispatch, and wakes waiting
-processes by invoking the engine-neutral resource method handlers in `Schemata.Flow.Foundation`
-within a fresh DI scope per call. The handlers in turn call `FlowRunner.CorrelateAsync` or
-`FlowRunner.ThrowSignalAsync`.
+`MatchedSubscriptions`, which the event bus fills before handler dispatch after evaluating each
+row's `CorrelationFilter` against the envelope's correlation metadata, and wakes the matched
+processes through the engine-neutral request handlers in `Schemata.Flow.Foundation` within a fresh
+DI scope per call.
 
 The bridge forwards the materialized event instance as the request `Payload`; the matched
 `EventType` becomes the message or signal name. Passing the instance (rather than a serialized JSON
 string) keeps delivery working for processes that declare no payload type for the catch, since the
 flow handlers bind only string payloads against the declared payload type. The handler-internal
-request types (`CorrelateMessageRequest`, `ThrowSignalRequest`) live in
-`Schemata.Flow.Skeleton.Models`.
+request types (`CorrelateMessageRequest`, `DeliverSignalRequest`) live in
+`Schemata.Flow.Foundation.Commands`.
 
 - `CorrelationKey` set — open a scope, resolve `IRequestDispatcher` from it, and send
   `CorrelateMessageRequest` with `MessageName = sub.EventType`, the event instance as payload,
   `Token = sub.Token`, and the flow system principal.
 - `CorrelationKey` null — open a scope, resolve `IRequestDispatcher` from it, and send
-  `ThrowSignalRequest` with `SignalName = sub.EventType`, the event instance as payload,
-  `Token = null`, and the flow system principal.
+  `DeliverSignalRequest` with `ProcessCanonicalName = sub.Target`, `SignalName = sub.EventType`,
+  the event instance as payload, `Token = null`, and the flow system principal.
 
-Signal throws are de-duplicated by event type within one handler call. If one dispatched event
-matches several signal subscriptions with the same `EventType`, `FlowEventHandler` invokes the
-`ThrowSignalHandler` once for that name; `FlowRunner.ThrowSignalAsync` then delivers to every waiting
-process that declares the signal, each in its own unit of work, and returns one `SignalDeliveryResult`
-per target. Message subscriptions are handled one by one because each message subscription targets one
-process instance.
+Signal deliveries are de-duplicated by target process within one handler call: the matched
+subscription rows are the candidate set, so a process receives at most one delivery per dispatched
+event even when several of its catches share the signal name. Each delivery runs in its own unit of
+work and returns one `SignalDeliveryResult`. Message subscriptions are handled one by one because
+each message subscription targets one process instance.
 
-Signal broadcasts report per-target `SignalDeliveryResult` outcomes instead of throwing; the bridge
-inspects them and rethrows the first faulted delivery's original exception, so a failed delivery
-never reads as a successful publish. `NoLongerWaiting` — the target stopped waiting between
-subscription match and delivery — is a legitimate race outcome and stays non-fatal. Message
-deliveries propagate handler exceptions directly.
+Signal deliveries report per-target `SignalDeliveryResult` outcomes instead of throwing; the bridge
+inspects them and rethrows a faulted delivery's original exception, so a failed delivery never
+reads as a successful publish. `NoLongerWaiting` — the target stopped waiting between subscription
+match and delivery — is a legitimate race outcome and stays non-fatal. Message deliveries propagate
+handler exceptions directly.
 
 ## ProcessEventLifecycleObserver
 

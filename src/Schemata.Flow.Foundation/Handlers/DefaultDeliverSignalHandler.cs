@@ -57,6 +57,9 @@ internal sealed class DefaultDeliverSignalHandler(FlowHandlerSupport support)
                     await support.Persistence.PersistSnapshotAsync(scope, snapshot, current);
                     if (support.Access is { } history) await history.RecordParticipationAsync(process, request.Principal, scope, current);
                     committed.Add(snapshot);
+                    // The next boundary delivery must see the tokens this delivery routed, so adopt
+                    // the committed snapshot's inventory instead of the originally loaded rows.
+                    tokens    = snapshot.Tokens;
                     delivered = true;
                 }
             }, ct);

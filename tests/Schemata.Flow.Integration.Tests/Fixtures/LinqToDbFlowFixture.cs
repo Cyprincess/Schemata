@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using Schemata.Entity.LinqToDB;
 using Schemata.Entity.Repository;
+using Schemata.Flow.Repository;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Observers;
 using Schemata.Flow.Skeleton.Runtime;
@@ -41,6 +42,7 @@ public sealed class LinqToDbFlowFixture : IAsyncLifetime, IFlowIntegrationFixtur
         services.TryAddSingleton<Func<TestDataConnection>>(_ => () => new(options));
         services.AddRepository<Order, LinqToDbRepository<TestDataConnection, Order>>();
         services.AddRepository<SchemataProcess, LinqToDbRepository<TestDataConnection, SchemataProcess>>();
+        services.AddRepository<SchemataFlowEffectIntent, LinqToDbRepository<TestDataConnection, SchemataFlowEffectIntent>>();
         services.AddRepository<SchemataProcessToken, LinqToDbRepository<TestDataConnection, SchemataProcessToken>>();
         services.AddRepository<SchemataProcessTransition, LinqToDbRepository<TestDataConnection, SchemataProcessTransition>>();
         services.AddRepository<SchemataProcessSource, LinqToDbRepository<TestDataConnection, SchemataProcessSource>>();
@@ -64,6 +66,7 @@ public sealed class LinqToDbFlowFixture : IAsyncLifetime, IFlowIntegrationFixtur
             var connection = scope.ServiceProvider.GetRequiredService<TestDataConnection>();
             connection.CreateTable<Order>(tableOptions: TableOptions.CreateIfNotExists);
             connection.CreateTable<SchemataProcess>(tableOptions: TableOptions.CreateIfNotExists);
+            connection.CreateTable<SchemataFlowEffectIntent>(tableOptions: TableOptions.CreateIfNotExists);
             connection.Execute("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_SchemataProcesses_DefinitionName_IdempotencyKey\" ON \"SchemataProcesses\" (\"DefinitionName\", \"IdempotencyKey\")");
             connection.CreateTable<SchemataProcessToken>(tableOptions: TableOptions.CreateIfNotExists);
             connection.CreateTable<SchemataProcessTransition>(tableOptions: TableOptions.CreateIfNotExists);

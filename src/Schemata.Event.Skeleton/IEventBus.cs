@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Entities;
@@ -23,6 +24,20 @@ public interface IEventBus
         where TEvent : IEvent;
 
     /// <summary>
+    ///     Broadcasts <paramref name="event" /> with business correlation metadata. Subscriptions
+    ///     carrying a correlation filter match only when every filtered pair is present in
+    ///     <paramref name="correlation" />; unfiltered subscriptions receive the event regardless.
+    /// </summary>
+    /// <param name="event">The event instance.</param>
+    /// <param name="correlation">
+    ///     Business correlation metadata (order id, case id) traveling on the envelope. An empty set
+    ///     behaves like the overload without correlation.
+    /// </param>
+    /// <param name="ct">A cancellation token.</param>
+    Task PublishAsync<TEvent>(TEvent @event, IReadOnlyDictionary<string, string> correlation, CancellationToken ct = default)
+        where TEvent : IEvent;
+
+    /// <summary>
     ///     Broadcasts <paramref name="event" /> with an optimistic-snapshot reference to
     ///     <paramref name="sourceEntity" />. The source entity must implement both
     ///     <see cref="ICanonicalName" /> and <see cref="IConcurrency" /> so consumers can
@@ -40,5 +55,29 @@ public interface IEventBus
         where TEvent : IEvent {
         EventSourceContract.Ensure(sourceEntity);
         return PublishAsync(@event, ct);
+    }
+
+    /// <summary>
+    ///     Broadcasts <paramref name="event" /> with an optimistic-snapshot reference to
+    ///     <paramref name="sourceEntity" /> and business correlation metadata.
+    /// </summary>
+    /// <typeparam name="TEvent">The event type.</typeparam>
+    /// <param name="event">The event instance.</param>
+    /// <param name="sourceEntity">
+    ///     The originating business entity. Must implement <see cref="ICanonicalName" /> and
+    ///     <see cref="IConcurrency" />; otherwise an <see cref="InvalidOperationException" />
+    ///     is thrown before the publish runs.
+    /// </param>
+    /// <param name="correlation">Business correlation metadata traveling on the envelope.</param>
+    /// <param name="ct">A cancellation token.</param>
+    Task PublishAsync<TEvent>(
+        TEvent                                @event,
+        object                                sourceEntity,
+        IReadOnlyDictionary<string, string>   correlation,
+        CancellationToken                     ct = default
+    )
+        where TEvent : IEvent {
+        EventSourceContract.Ensure(sourceEntity);
+        return PublishAsync(@event, correlation, ct);
     }
 }

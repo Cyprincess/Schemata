@@ -29,17 +29,16 @@ public sealed class CallActivityExecutor
 
     /// <summary>
     ///     Enters a call activity by parking the parent token, starting the called process with the
-    ///     same BPMN engine, and persisting the spawned child process rows and parent spawn transition.
+    ///     engine keyed on the child registration, and persisting the spawned child process rows and
+    ///     parent spawn transition.
     /// </summary>
     public async ValueTask<SchemataProcessTransition> EnterAsync(
-        BpmnEngine           engine,
         SchemataProcess      parentProcess,
         SchemataProcessToken parentToken,
         CallActivity         callActivity,
         FlowExecutionContext context,
         CancellationToken    ct
     ) {
-        ArgumentNullException.ThrowIfNull(engine);
         ArgumentNullException.ThrowIfNull(parentProcess);
         ArgumentNullException.ThrowIfNull(parentToken);
         ArgumentNullException.ThrowIfNull(callActivity);
@@ -82,7 +81,14 @@ public sealed class CallActivityExecutor
             InitialSourceStamps = context.InitialSourceStamps,
             TouchedSources = context.TouchedSources,
         };
-        var childSnapshot = await engine.StartAsync(registration.Definition, childProcess, childContext, ct);
+        var childEngine = _services.GetKeyedService<IFlowRuntime>(registration.Engine);
+        if (childEngine is null) {
+            throw new FailedPreconditionException(
+                SchemataResources.FLOW_RUNTIME_NOT_REGISTERED,
+                new Dictionary<string, string?> { ["engine"] = registration.Engine });
+        }
+
+        var childSnapshot = await childEngine.StartAsync(registration.Definition, childProcess, childContext, ct);
         var spawn = NewTransition(
             parentProcess.Name!,
             parentToken.CanonicalName,

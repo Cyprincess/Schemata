@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -54,6 +55,28 @@ public sealed class FlowTaskContext
     public IUnitOfWork UnitOfWork => _execution.UnitOfWork;
 
     internal bool TrackSources { get; set; } = true;
+
+    /// <summary>
+    ///     Stable request identifier the engine generated for this task instance. Forward it to the
+    ///     external system as that system's idempotency/request id: a re-driven transition reproduces the
+    ///     same value, so an outcome query or a receiver-side deduplication keyed on it collapses a
+    ///     crash-and-recovery repeat into one effective call.
+    /// </summary>
+    public string? RequestId { get; internal set; }
+
+    internal string? EffectTaskName { get; set; }
+
+    /// <summary>
+    ///     Reports that the outcome of this task's external effect cannot be determined: the external
+    ///     system supports neither result query nor idempotent re-issue for <see cref="RequestId" />.
+    ///     The engine surfaces the report through the process failure path instead of re-executing or
+    ///     skipping the effect.
+    /// </summary>
+    [DoesNotReturn]
+    public void ReportOutcomeUnknown() {
+        throw new FlowEffectOutcomeUnknownException(
+            new Dictionary<string, string?> { ["name"] = Process.CanonicalName, ["task"] = EffectTaskName, ["request"] = RequestId });
+    }
 
     /// <summary>The event payload delivered to typed procedure tasks and conditions.</summary>
     public object? Payload { get; }

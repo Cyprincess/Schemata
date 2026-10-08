@@ -187,7 +187,9 @@ request record (`StartProcessRequest`, `CompleteActivityRequest`, `CorrelateMess
 is dispatched by the public bridge facade `FlowRunner.RunEventAsync` and, directly (not through the
 facade), by `Flow.Scheduling`'s `FlowTimerJob` on a timer catch's fire. `Flow.Event`'s
 `FlowEventHandler` dispatches the other two bridge-relevant requests instead — `CorrelateMessageRequest`
-for a matched message correlation and `ThrowSignalRequest` for a matched signal — not `RunEventRequest`.
+for a matched subscription row carrying a `CorrelationKey` and `DeliverSignalRequest` for a signal
+target — working from the subscription rows the bus already matched on event type plus correlation
+filter (one signal delivery per target process), not `RunEventRequest`.
 
 `FlowRunner` is a thin request constructor. `CompleteAsync(process, token, principal, ct)` resolves `IRequestDispatcher` and sends `CompleteActivityRequest`. The registered Flow handlers load a process, resolve an engine, run a transition, arm catch handlers, and persist the snapshot.
 

@@ -9,7 +9,10 @@ public sealed class FailingJob : IScheduledJob
 {
     public const string Key = "jobs.failing";
 
+    public int Attempts { get; private set; }
+
     public Task ExecuteAsync(JobContext context, CancellationToken ct) {
+        Attempts++;
         throw new InvalidOperationException("body exploded");
     }
 }

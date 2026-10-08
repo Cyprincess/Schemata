@@ -163,6 +163,7 @@ public sealed class ReminderShould
             services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJobExecution>, SchedulingNameAdvisor<SchemataJobExecution>>());
         }
         services.AddSchemataScheduling();
+        services.AddSchemataSchedulingRepositoryStore();
         var actorBuilder = new SchemataActorBuilder(new(), services);
         actorBuilder.Register<RecordingActor>("recorder");
         services.AddSchemataActor();

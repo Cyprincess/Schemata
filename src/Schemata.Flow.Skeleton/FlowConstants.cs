@@ -31,4 +31,18 @@ public static class FlowConstants
     }
 
     #endregion
+
+    #region Nested type: Effects
+
+    /// <summary>Well-known names for external-effect intent recording.</summary>
+    public static class Effects
+    {
+        /// <summary>Token bookkeeping key holding the per-token in-transition effect sequence.</summary>
+        public const string SequenceKey = "effectSequence";
+
+        /// <summary>Request id path segment separating the token canonical name from the effect ordinal.</summary>
+        public const string RequestIdSegment = "effects";
+    }
+
+    #endregion
 }

@@ -50,6 +50,7 @@ public class JobExecutionCancellationShould
                                               .AddSingleton(executions.Object).AddSingleton<IScheduledJobRegistry>(registry)
                                               .AddSingleton(job).AddSingleton(running).AddSingleton(jobs.Object)
                                               .AddSingleton<IScheduler>(scheduler.Object).AddSchemataScheduling()
+                                              .AddSchemataSchedulingRepositoryStore()
                                               .BuildServiceProvider();
         var dispatcher = new JobExecutionDispatcher(services);
         var operation = new DefaultOperationService(services.GetRequiredService<IServiceScopeFactory>(), Options.Create(new SchemataSchedulingOptions()), scheduler.Object);

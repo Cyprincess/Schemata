@@ -159,10 +159,10 @@ public sealed class OrdersController(IEventBus bus) : ControllerBase
 ```
 
 When the consumer dispatches `PaymentReceived`, the bus populates
-`IEventDispatchContext.MatchedSubscriptions`. `FlowEventHandler.HandleAsync` serializes the
-inbound event to JSON once, then iterates the matches. Because the subscription's
+`IEventDispatchContext.MatchedSubscriptions`. `FlowEventHandler.HandleAsync` forwards the
+materialized event instance as the payload and iterates the matches. Because the subscription's
 `CorrelationKey` is non-null, it invokes `CorrelateMessageHandler` with
-`MessageName = sub.EventType`, the serialized payload, and `Token = sub.Token`, so the waiting
+`MessageName = sub.EventType`, the event instance, and `Token = sub.Token`, so the waiting
 instance receives both the BPMN-level event name and the event body.
 
 The correlated instance advances from the gateway to `Fulfill`, then to the end event.
@@ -182,12 +182,12 @@ public async Task<IActionResult> Shutdown(CancellationToken ct) {
 }
 ```
 
-For signal subscriptions, `CorrelationKey` is null. `FlowEventHandler` invokes `ThrowSignalHandler`
-once per distinct `EventType`, again forwarding the serialized payload. The handler drives
-`FlowRunner.ThrowSignalAsync`, which snapshots the waiting processes whose definition declares the
-named signal and advances each one through `Cancel` to its end. Every target commits on its own, and
-the call returns a `SignalDeliveryResult` per target — `ThrowSignalHandler` does not surface them, so
-a component that needs to know which targets landed should call the runner directly.
+For signal subscriptions, `CorrelationKey` is null. `FlowEventHandler` delivers the event to each
+matched subscription's target process through `DeliverSignalHandler`, once per process, forwarding
+the event instance as payload. Every target commits on its own unit of work; a faulted delivery is
+rethrown so the publish does not read as successful. To reach only the instances of one business
+case, arm filters on the subscription rows and publish with the correlation metadata:
+`bus.PublishAsync(new SystemShutdown(), new Dictionary<string, string> { ["tenant"] = id }, ct)`.
 
 **Check:** every instance parked at the gateway transitions to complete via the `Cancel` path.
 

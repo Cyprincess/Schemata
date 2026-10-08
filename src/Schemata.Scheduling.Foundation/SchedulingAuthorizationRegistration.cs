@@ -6,6 +6,7 @@ using Schemata.Messaging.Skeleton.Advisors;
 using Schemata.Messaging.Skeleton.Commands;
 using Schemata.Scheduling.Foundation.Commands;
 using Schemata.Scheduling.Skeleton.Entities;
+using Schemata.Security.Skeleton;
 using Schemata.Security.Skeleton.Advisors;
 
 namespace Schemata.Scheduling.Foundation;
@@ -18,6 +19,8 @@ internal static class SchedulingAuthorizationRegistration
     }
 
     internal static IServiceCollection AddSchedulingAuthorization(this IServiceCollection services) {
+        services.TryAddScoped<SchedulingAccessPolicy>();
+        services.TryAddKeyedScoped<IResourceTargetPolicy>(typeof(SchemataJob), (provider, _) => provider.GetRequiredService<SchedulingAccessPolicy>());
         AddAuthorization<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>(services, static request => ResourceTarget.Instance(request.Verb, typeof(SchemataJob), request.Name));
         return services;
     }

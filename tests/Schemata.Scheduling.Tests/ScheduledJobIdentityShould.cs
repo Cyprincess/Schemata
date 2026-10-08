@@ -108,7 +108,9 @@ public class ScheduledJobIdentityShould
                                     It.IsAny<CancellationToken>()))
             .Returns(ToAsync<SchemataJob>([]));
 
-        return new ServiceCollection().AddSingleton(jobs.Object).AddSingleton(executions.Object).BuildServiceProvider();
+        return new ServiceCollection().AddSingleton(jobs.Object).AddSingleton(executions.Object)
+                                      .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
+                                      .AddSchemataSchedulingRepositoryStore().BuildServiceProvider();
     }
 
     private static async IAsyncEnumerable<T> ToAsync<T>(IEnumerable<T> rows) {

@@ -50,6 +50,29 @@ public sealed class ProcessPersistence
             }
         }
     }
+    /// <summary>Lists persisted processes that currently have at least one active token not waiting at an element.</summary>
+    public async IAsyncEnumerable<SchemataProcess> ListActiveHostsAsync(
+        IServiceProvider                           services,
+        [EnumeratorCancellation] CancellationToken ct
+    ) {
+        var processes = services.GetRequiredService<IRepository<SchemataProcess>>();
+        var tokens    = services.GetRequiredService<IRepository<SchemataProcessToken>>();
+        var tenant = TenantContext.Current.Uid;
+
+        var activeProcesses = new HashSet<string>(StringComparer.Ordinal);
+        await foreach (var token in tokens.ListAsync<SchemataProcessToken>(
+                           q => q.Where(t => t.WaitingAtName == null && t.State == "Active" && t.TenantUid == tenant), ct)) {
+            activeProcesses.Add(token.Process);
+        }
+
+        foreach (var processName in activeProcesses) {
+            var match = await processes.FirstOrDefaultAsync(q => q.Where(p => p.Name == processName && p.TenantUid == tenant), ct);
+            if (match is not null) {
+                yield return match;
+            }
+        }
+    }
+
 
     /// <summary>Runs Flow work with process, token, transition, and source repositories joined.</summary>
     public async Task ExecuteAsync(
@@ -144,10 +167,10 @@ public sealed class ProcessPersistence
         IReadOnlyList<ProcessCompensationBinding> bindings,
         CancellationToken                        ct
     ) {
-        var remaining = new Dictionary<(string Scope, string Activity, int Order), int>();
+        var remaining = new Dictionary<(string Scope, string Activity, string Boundary, int Order), int>();
         if (!ProcessStates.IsTerminal(process.State)) {
             foreach (var binding in bindings) {
-                var key = (binding.ScopeOwnerCanonicalName, binding.ActivityName, binding.RegistrationOrder);
+                var key = (binding.ScopeOwnerCanonicalName, binding.ActivityName, binding.BoundaryName, binding.RegistrationOrder);
                 remaining.TryGetValue(key, out var count);
                 remaining[key] = count + 1;
             }
@@ -155,7 +178,7 @@ public sealed class ProcessPersistence
         var removed = new List<SchemataProcessCompensation>();
         var effective = await scope.GetCompensationsAsync(process.CanonicalName!, ct);
         foreach (var row in effective) {
-            var key = (row.ScopeOwnerCanonicalName, row.ActivityName, row.RegistrationOrder);
+            var key = (row.ScopeOwnerCanonicalName, row.ActivityName, row.BoundaryName, row.RegistrationOrder);
             if (remaining.TryGetValue(key, out var count) && count > 0) remaining[key] = count - 1;
             else removed.Add(row);
         }
@@ -173,7 +196,7 @@ public sealed class ProcessPersistence
             for (var i = 0; i < count; i++) {
                 added.Add(new() {
                     Process = process.CanonicalName!, ScopeOwnerCanonicalName = key.Scope,
-                    ActivityName = key.Activity, RegistrationOrder = key.Order,
+                    ActivityName = key.Activity, BoundaryName = key.Boundary, RegistrationOrder = key.Order,
                 });
             }
         }

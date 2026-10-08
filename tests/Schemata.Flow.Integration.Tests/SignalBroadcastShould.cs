@@ -61,6 +61,106 @@ public class SignalBroadcastShould : IAsyncLifetime
             fixture.FlowOptions.SignalBroadcastConcurrency = concurrency;
         }
     }
+    [Fact]
+    public async Task DeliverToActiveBoundaryHost_WhenNoTokenWaits() {
+        fixture.CatchKinds.Add(FlowCatchKind.Signal);
+
+        var definition = $"{nameof(BoundarySignalProcess)}-{Guid.NewGuid():n}";
+        using (var scope = fixture.CreateScope()) {
+            var registry = scope.ServiceProvider.GetRequiredService<IProcessRegistry>();
+            await registry.RegisterAsync(new() {
+                Name           = definition,
+                Engine         = FlowConstants.Engines.StateMachine,
+                DefinitionType = typeof(BoundarySignalProcess),
+            });
+        }
+
+        SchemataProcess process;
+        using (var scope = fixture.CreateScope()) {
+            var runner = scope.ServiceProvider.GetRequiredService<FlowRunner>();
+            process = await runner.StartAsync(definition, null, CancellationToken.None);
+        }
+
+        Assert.Null(await ReadWaitingAtAsync(process.Name!));
+
+        IReadOnlyList<SignalDeliveryResult> results;
+        using (var scope = fixture.CreateScope()) {
+            var runner = scope.ServiceProvider.GetRequiredService<FlowRunner>();
+            results = await runner.ThrowSignalAsync(
+                BoundarySignalProcess.SignalName, (string?)null, null, null, CancellationToken.None);
+        }
+
+        var result = Assert.Single(results);
+        Assert.Equal(process.CanonicalName, result.ProcessCanonicalName);
+        Assert.Equal(SignalDeliveryStatus.Delivered, result.Status);
+
+        using (var scope = fixture.CreateScope()) {
+            var processes = scope.ServiceProvider.GetRequiredService<IRepository<SchemataProcess>>();
+            var persisted = await processes.FirstOrDefaultAsync(
+                q => q.Where(p => p.CanonicalName == process.CanonicalName));
+            Assert.Equal("Completed", persisted?.State);
+        }
+    }
+
+    [Fact]
+    public async Task ReportNoDeliveries_WhenNoLiveCatchMatches() {
+        fixture.CatchKinds.Add(FlowCatchKind.Signal);
+
+        using var scope  = fixture.CreateScope();
+        var       runner = scope.ServiceProvider.GetRequiredService<FlowRunner>();
+        var results = await runner.ThrowSignalAsync("nobody-listens", (string?)null, null, null, CancellationToken.None);
+
+        Assert.Empty(results);
+    }
+
+
+    [Fact]
+    public async Task DeliverToEachBoundaryHost_SeesChildrenRoutedByPriorDelivery() {
+        fixture.CatchKinds.Add(FlowCatchKind.Signal);
+
+        var definition = $"{nameof(DualBoundarySignalProcess)}-{Guid.NewGuid():n}";
+        using (var scope = fixture.CreateScope()) {
+            var registry = scope.ServiceProvider.GetRequiredService<IProcessRegistry>();
+            await registry.RegisterAsync(new() {
+                Name           = definition,
+                Engine         = FlowConstants.Engines.Bpmn,
+                DefinitionType = typeof(DualBoundarySignalProcess),
+            });
+        }
+
+        SchemataProcess process;
+        using (var scope = fixture.CreateScope()) {
+            var runner = scope.ServiceProvider.GetRequiredService<FlowRunner>();
+            process = await runner.StartAsync(definition, null, CancellationToken.None);
+        }
+
+        IReadOnlyList<SignalDeliveryResult> results;
+        using (var scope = fixture.CreateScope()) {
+            var runner = scope.ServiceProvider.GetRequiredService<FlowRunner>();
+            results = await runner.ThrowSignalAsync(
+                DualBoundarySignalProcess.SignalName, (string?)null, null, null, CancellationToken.None);
+        }
+
+        var result = Assert.Single(results);
+        Assert.Equal(SignalDeliveryStatus.Delivered, result.Status);
+
+        using (var scope = fixture.CreateScope()) {
+            var tokens = scope.ServiceProvider.GetRequiredService<IRepository<SchemataProcessToken>>();
+            var routed = new List<SchemataProcessToken>();
+            await foreach (var token in tokens.ListAsync<SchemataProcessToken>(
+                               q => q.Where(t => t.Process == process.Name && t.StateName == "after-a"))) {
+                routed.Add(token);
+            }
+
+            var child = Assert.Single(routed);
+            Assert.Equal("Active", child.State);
+
+            var processes = scope.ServiceProvider.GetRequiredService<IRepository<SchemataProcess>>();
+            var persisted = await processes.FirstOrDefaultAsync(
+                q => q.Where(p => p.CanonicalName == process.CanonicalName));
+            Assert.NotEqual("Completed", persisted?.State);
+        }
+    }
 
     [Fact]
     public async Task RunDeliveriesSerially_WhenConcurrencyIsOne() {

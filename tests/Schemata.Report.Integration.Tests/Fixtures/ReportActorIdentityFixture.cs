@@ -69,6 +69,7 @@ internal sealed class ReportActorIdentityFixture(IHost host, string path) : IAsy
             insight.AddSourceDriver<ControlledReportDriver>("controlled");
         });
         builder.UseActor();
+        services.AddSchemataSchedulingRepositoryStore();
         builder.UseScheduling();
         builder.UseReport(options => options.ChunkSize = 1).UseActor();
         builder.Invoke(services);

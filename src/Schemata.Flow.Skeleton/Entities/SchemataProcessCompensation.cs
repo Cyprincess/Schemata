@@ -19,6 +19,9 @@ public class SchemataProcessCompensation : IIdentifier, ICanonicalName, ITimesta
     /// <summary>Name of the activity invoked when this binding is compensated.</summary>
     public virtual string ActivityName { get; set; } = null!;
 
+    /// <summary>Graph name of the compensation boundary event this binding was registered for.</summary>
+    public virtual string BoundaryName { get; set; } = null!;
+
     /// <summary>Stable registration order within the owning compensation scope.</summary>
     public virtual int RegistrationOrder { get; set; }
 

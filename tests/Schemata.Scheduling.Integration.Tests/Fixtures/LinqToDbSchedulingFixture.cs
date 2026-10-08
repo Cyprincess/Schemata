@@ -22,7 +22,8 @@ using Xunit;
 
 namespace Schemata.Scheduling.Integration.Tests.Fixtures;
 
-public sealed class LinqToDbSchedulingFixture : IAsyncLifetime
+public sealed class LinqToDbSchedulingFixture(Action<SchemataSchedulingOptions>? configureScheduling = null)
+    : IAsyncLifetime
 {
     private readonly string _dbPath = $"{Guid.NewGuid():n}.db";
 
@@ -59,7 +60,12 @@ public sealed class LinqToDbSchedulingFixture : IAsyncLifetime
         services.AddSingleton<SuccessJob>();
         services.AddSingleton<FailingJob>();
         services.AddSingleton<GatedJob>();
+        if (configureScheduling is not null) {
+            services.Configure(configureScheduling);
+        }
+
         services.AddSchemataScheduling();
+        services.AddSchemataSchedulingRepositoryStore();
 
         _root = services.BuildServiceProvider();
 

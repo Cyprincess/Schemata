@@ -1,4 +1,5 @@
 using System;
+using System.Security.Claims;
 using Schemata.Messaging.Skeleton;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -13,4 +14,8 @@ public sealed record TriggerJobRequest(
     string     JobCanonicalName,
     Type       JobType,
     JobContext Context
-) : ICommand<SchemataJobExecution>, IJobScoped;
+) : ICommand<SchemataJobExecution>, IJobScoped, IRequestPrincipal
+{
+    /// <summary>The initiating caller forwarded from the dispatch envelope.</summary>
+    public ClaimsPrincipal? Principal { get; set; }
+}

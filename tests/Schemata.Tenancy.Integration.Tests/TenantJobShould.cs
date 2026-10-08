@@ -46,6 +46,7 @@ public class TenantJobShould
         services.AddSingleton<IScheduledJobRegistry>(registry);
         services.AddSingleton(observed);
         services.AddSchemataScheduling();
+        services.AddSchemataSchedulingRepositoryStore();
         new SchemataTenancyFeature<SchemataTenantManager<SchemataTenant>, SchemataTenant>()
             .ConfigureServices(services, new(), new(), new ConfigurationBuilder().Build(), null!);
         services.Configure<SchemataTenancyOptions>(options => options.DynamicOverrides.Add((_, tenant, _) => tenant.AddScoped<ProbeJob>()));

@@ -140,6 +140,7 @@ builder.UseSchemata(schema => {
     schema.UseAuthentication(auth => auth.AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, TestAuthHandler>("SnapshotScheme", null));
 
     schema.Services.AddMemoryCacheProvider();
+    schema.Services.AddSchemataSchedulingRepositoryStore();
 
     schema.Services.AddDbContextFactory<TestDbContext>(opts => opts.UseSqlite(connectionString)
                                                                    .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());

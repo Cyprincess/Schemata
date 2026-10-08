@@ -6,10 +6,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Schemata.Flow.Bpmn.Runtime.Compensation;
 
-/// <summary>Runs scope compensation handlers in BPMN reverse completion order.</summary>
+/// <summary>Runs scope compensation handlers: activity groups unwind LIFO, and consecutive entries of one activity drain in registration order.</summary>
 public static class CompensationCoordinator
 {
-    /// <summary>Invokes handlers from the stack snapshot in reverse order, stopping at the first failure.</summary>
+    /// <summary>Invokes handlers from the stack snapshot, stopping at the first failure. Activity groups unwind LIFO; consecutive entries of one activity run in registration order.</summary>
     /// <param name="stack">The scope compensation stack.</param>
     /// <param name="context">The compensation invocation payload.</param>
     /// <param name="observers">Lifecycle observers to notify around compensation.</param>
@@ -25,19 +25,31 @@ public static class CompensationCoordinator
         var snapshot    = stack.Snapshot();
         var compensated = new List<ICompensationHandler>(snapshot.Count);
 
-        for (var i = snapshot.Count - 1; i >= 0; i--) {
-            var handler = snapshot[i];
-
-            await NotifyStartedAsync(observers, context, logger, ct);
-
-            try {
-                await handler.InvokeAsync(context, ct);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException) {
-                return new(compensated, handler, ex);
+        var i = snapshot.Count - 1;
+        while (i >= 0) {
+            // Consecutive entries registered for one activity drain in registration order;
+            // activity groups unwind LIFO across the scope.
+            var j = i;
+            while (j > 0 && ReferenceEquals(snapshot[j - 1].Activity, snapshot[i].Activity)) {
+                j--;
             }
 
-            compensated.Add(handler);
+            for (var k = j; k <= i; k++) {
+                var handler = snapshot[k];
+
+                await NotifyStartedAsync(observers, context, logger, ct);
+
+                try {
+                    await handler.InvokeAsync(context, ct);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException) {
+                    return new(compensated, handler, ex);
+                }
+
+                compensated.Add(handler);
+            }
+
+            i = j - 1;
         }
 
         await NotifyCompletedAsync(observers, context, logger, ct);

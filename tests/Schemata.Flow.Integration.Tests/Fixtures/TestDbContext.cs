@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Schemata.Flow.Repository;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Scheduling.Skeleton.Entities;
 
@@ -9,6 +10,7 @@ public sealed class TestDbContext : DbContext
     public TestDbContext(DbContextOptions<TestDbContext> options) : base(options) { }
 
     public DbSet<Order>                     Orders      { get; set; } = null!;
+    public DbSet<SchemataFlowEffectIntent>  EffectIntents { get; set; } = null!;
     public DbSet<OwnedOrder>                OwnedOrders { get; set; } = null!;
     public DbSet<SchemataProcess>           Processes   { get; set; } = null!;
     public DbSet<SchemataProcessToken>      Tokens      { get; set; } = null!;

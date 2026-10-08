@@ -45,6 +45,7 @@ builder.UseSchemata(schema => {
         schema.Services.AddScoped(typeof(IEntitlementProvider<,>), typeof(DefaultEntitlementProvider<,>));
     }
     schema.UseScheduling().MapHttp().MapGrpc();
+    schema.Services.AddSchemataSchedulingRepositoryStore();
 
     var resource = schema.UseResource();
     resource.UseAip().UseOrdering();

@@ -48,6 +48,7 @@ internal sealed class ReportScheduleLifecycleHost(WebApplication app, string pat
             schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJob>, RejectJobWrite>());
             schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<ScheduleReport>, BlockReportCreate>());
             schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryUpdateAdvisor<ScheduleReport>, BlockReportUpdate>());
+            schema.Services.AddSchemataSchedulingRepositoryStore();
             schema.UseScheduling();
             var reports = schema.UseReport<ScheduleReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>();
             if (configured) {

@@ -10,6 +10,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
+using Schemata.Flow.Repository;
 using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Observers;
@@ -71,6 +72,7 @@ public sealed class EfCoreFlowFixture : IAsyncLifetime, IFlowIntegrationFixture
         services.AddDbContextFactory<TestDbContext>(options => options.UseSqlite($"Data Source={_dbPath}")
                                                                .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
         services.AddRepository<Order, EfCoreRepository<TestDbContext, Order>>();
+        services.AddRepository<SchemataFlowEffectIntent, EfCoreRepository<TestDbContext, SchemataFlowEffectIntent>>();
         services.AddRepository<SchemataProcess, EfCoreRepository<TestDbContext, SchemataProcess>>();
         services.AddRepository<SchemataProcessToken, EfCoreRepository<TestDbContext, SchemataProcessToken>>();
         services.AddRepository<SchemataProcessTransition, EfCoreRepository<TestDbContext, SchemataProcessTransition>>();

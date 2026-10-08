@@ -6,10 +6,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Scheduling.Foundation;
+using Schemata.Scheduling.Foundation.Commands;
 using Schemata.Scheduling.Foundation.Runtime;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Advisors;
@@ -48,6 +51,7 @@ public class JobExecutionDispatcherShould
                                               .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                                               .AddSingleton<IScheduledJobRegistry>(new DefaultScheduledJobRegistry())
                                               .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
+                                              .AddSchemataSchedulingRepositoryStore()
                                               .BuildServiceProvider();
 
         var dispatcher = new JobExecutionDispatcher(services);
@@ -95,6 +99,7 @@ public class JobExecutionDispatcherShould
                                                .AddSingleton(capturing)
                                                .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
                                                .AddSchemataScheduling()
+                                               .AddSchemataSchedulingRepositoryStore()
                                                .BuildServiceProvider();
 
         var dispatcher = new JobExecutionDispatcher(services);
@@ -118,6 +123,7 @@ public class JobExecutionDispatcherShould
                                                .AddSingleton<CompletingJob>()
                                                .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
                                                .AddSchemataScheduling()
+                                               .AddSchemataSchedulingRepositoryStore()
                                                .BuildServiceProvider();
         var dispatcher = new JobExecutionDispatcher(services);
 
@@ -160,6 +166,7 @@ public class JobExecutionDispatcherShould
                                               .AddSingleton<CompletingJob>()
                                               .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
                                               .AddSchemataScheduling()
+                                              .AddSchemataSchedulingRepositoryStore()
                                               .BuildServiceProvider();
 
         await new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None);
@@ -178,6 +185,7 @@ public class JobExecutionDispatcherShould
                                               .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                                               .AddSingleton<IScheduledJobRegistry>(registry)
                                               .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
+                                              .AddSchemataSchedulingRepositoryStore()
                                               .BuildServiceProvider();
         var dispatcher = new JobExecutionDispatcher(services);
 
@@ -227,6 +235,7 @@ public class JobExecutionDispatcherShould
                                                .AddSingleton<IJobLifecycleObserver>(observer.Object)
                                                .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
                                                .AddSchemataScheduling()
+                                               .AddSchemataSchedulingRepositoryStore()
                                                .BuildServiceProvider();
 
         await new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None);
@@ -239,7 +248,7 @@ public class JobExecutionDispatcherShould
     }
 
     [Fact]
-    public async Task DispatchPendingAsync_MissingJobRepository_Throws() {
+    public async Task DispatchPendingAsync_MissingJobRepository_Settles_The_Claimed_Execution_Failed() {
         var execution = new SchemataJobExecution {
             Uid       = Guid.NewGuid(),
             JobKey    = "jobs.completing",
@@ -255,12 +264,137 @@ public class JobExecutionDispatcherShould
                                               .AddSingleton<CompletingJob>()
                                               .AddSingleton<IScheduler>(Mock.Of<IScheduler>())
                                               .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
+                                              .AddSchemataSchedulingRepositoryStore()
                                               .BuildServiceProvider();
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None));
+        await new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None);
 
-        Assert.Contains(nameof(IRepository<SchemataJob>), exception.Message);
+        Assert.Equal(ExecutionState.Failed, execution.State);
+        Assert.Contains(nameof(IRepository<SchemataJob>), execution.RecentError);
+    }
+
+    [Fact]
+    public async Task DispatchPendingAsync_AdvisorThrow_Settles_The_Claimed_Execution_Failed_Without_Running_The_Body() {
+        var execution = new SchemataJobExecution {
+            Uid       = Guid.NewGuid(),
+            JobKey    = "jobs.gated",
+            State     = ExecutionState.Pending,
+            StartTime = DateTime.UtcNow.AddMinutes(-1),
+        };
+        var executions = ExecutionRepository(execution);
+        var registry   = new DefaultScheduledJobRegistry();
+        registry.Register<TrackingJob>("jobs.gated");
+        var job  = new TrackingJob();
+        var gate = new Mock<IJobExecutionAdvisor>();
+        gate.Setup(a => a.AdviseAsync(It.IsAny<AdviceContext>(), It.IsAny<JobContext>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("gate exploded"));
+        var observer = new Mock<IJobLifecycleObserver>();
+        var services = new ServiceCollection().AddSingleton(executions.Object)
+                                              .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
+                                              .AddSingleton<IScheduledJobRegistry>(registry)
+                                              .AddSingleton(job)
+                                              .AddSingleton<IJobExecutionAdvisor>(gate.Object)
+                                              .AddSingleton<IJobLifecycleObserver>(observer.Object)
+                                              .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
+                                              .AddSchemataScheduling()
+                                              .AddSchemataSchedulingRepositoryStore()
+                                              .BuildServiceProvider();
+
+        await new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None);
+
+        Assert.Equal(ExecutionState.Failed, execution.State);
+        Assert.Contains("gate exploded", execution.RecentError);
+        Assert.False(job.Ran);
+        // The body never ran, so the job-outcome observer contract does not fire.
+        observer.Verify(o => o.OnFailedAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<Exception>(), It.IsAny<CancellationToken>()),
+                        Times.Never);
+    }
+
+    [Fact]
+    public async Task DispatchPendingAsync_ObserverThrow_Before_The_Body_Settles_The_Claimed_Execution_Failed() {
+        var execution = new SchemataJobExecution {
+            Uid       = Guid.NewGuid(),
+            JobKey    = "jobs.gated",
+            State     = ExecutionState.Pending,
+            StartTime = DateTime.UtcNow.AddMinutes(-1),
+        };
+        var executions = ExecutionRepository(execution);
+        var registry   = new DefaultScheduledJobRegistry();
+        registry.Register<TrackingJob>("jobs.gated");
+        var job      = new TrackingJob();
+        var observer = new Mock<IJobLifecycleObserver>();
+        observer.Setup(o => o.OnTriggeredAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("publication exploded"));
+        var services = new ServiceCollection().AddSingleton(executions.Object)
+                                              .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
+                                              .AddSingleton<IScheduledJobRegistry>(registry)
+                                              .AddSingleton(job)
+                                              .AddSingleton<IJobLifecycleObserver>(observer.Object)
+                                              .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
+                                              .AddSchemataScheduling()
+                                              .AddSchemataSchedulingRepositoryStore()
+                                              .BuildServiceProvider();
+
+        await new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None);
+
+        Assert.Equal(ExecutionState.Failed, execution.State);
+        Assert.Contains("publication exploded", execution.RecentError);
+        Assert.False(job.Ran);
+    }
+
+    [Fact]
+    public async Task DispatchPendingAsync_PreBody_Failure_On_A_Recurring_Job_Advances_The_Schedule() {
+        var cron = new SchemataJob {
+            CanonicalName   = "jobs/cron",
+            JobKey          = "jobs.gated",
+            ScheduleType    = ScheduleType.Cron,
+            CronExpression  = "0 * * * *",
+            ScheduleVersion = Guid.NewGuid(),
+            NextRunTime     = DateTime.UtcNow,
+            State           = JobState.Active,
+        };
+        var execution = new SchemataJobExecution {
+            Uid             = Guid.NewGuid(),
+            Job             = cron.CanonicalName,
+            JobKey          = "jobs.gated",
+            ScheduleVersion = cron.ScheduleVersion,
+            State           = ExecutionState.Pending,
+            StartTime       = DateTime.UtcNow.AddMinutes(-1),
+        };
+        var executions = ExecutionRepository(execution);
+        var jobs       = new Mock<IRepository<SchemataJob>>();
+        jobs.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(), It.IsAny<CancellationToken>()))
+            .Returns(new ValueTask<SchemataJob?>(cron));
+        var registry = new DefaultScheduledJobRegistry();
+        registry.Register<TrackingJob>("jobs.gated");
+        var job  = new TrackingJob();
+        var gate = new Mock<IJobExecutionAdvisor>();
+        gate.Setup(a => a.AdviseAsync(It.IsAny<AdviceContext>(), It.IsAny<JobContext>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("gate exploded"));
+        StageJobExecutionResultRequest? staged = null;
+        var dispatcher = new Mock<IRequestDispatcher>();
+        dispatcher.Setup(d => d.SendAsync<StageJobExecutionResultRequest, Unit>(It.IsAny<StageJobExecutionResultRequest>(), It.IsAny<CancellationToken>()))
+                  .Callback<StageJobExecutionResultRequest, CancellationToken>((request, _) => staged = request)
+                  .ReturnsAsync(Unit.Value);
+        var services = new ServiceCollection().AddSingleton(executions.Object)
+                                              .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
+                                              .AddSingleton<IScheduledJobRegistry>(registry)
+                                              .AddSingleton(job)
+                                              .AddSingleton<IJobExecutionAdvisor>(gate.Object)
+                                              .AddSingleton<IRepository<SchemataJob>>(jobs.Object)
+                                              .AddSingleton(dispatcher.Object)
+                                              .AddSchemataScheduling()
+                                              .AddSchemataSchedulingRepositoryStore()
+                                              .BuildServiceProvider();
+
+        await new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None);
+
+        Assert.Equal(ExecutionState.Failed, execution.State);
+        Assert.False(job.Ran);
+        Assert.NotNull(staged);
+        Assert.Equal(cron.CanonicalName, staged.JobCanonicalName);
+        Assert.Equal(JobState.Active, staged.State);
+        Assert.NotNull(staged.NextRunTime);
     }
 
     [Fact]
@@ -281,12 +415,356 @@ public class JobExecutionDispatcherShould
                                               .AddSingleton<CompletingJob>()
                                               .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
                                               .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
+                                              .AddSchemataSchedulingRepositoryStore()
                                               .BuildServiceProvider();
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None));
 
         Assert.Contains(nameof(IRequestDispatcher), exception.Message);
+    }
+
+    [Fact]
+    public async Task DispatchPendingAsync_Settled_Execution_Counts_The_Attempt_And_Clears_The_Lease() {
+        var storage  = new CompletionStorage();
+        var registry = new DefaultScheduledJobRegistry();
+        registry.Register<CompletingJob>("jobs.completing");
+
+        var services = new ServiceCollection().AddScoped<IRepository<SchemataJobExecution>>(_ => storage.CreateRepository())
+                                              .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
+                                              .AddSingleton<IScheduledJobRegistry>(registry)
+                                              .AddSingleton<CompletingJob>()
+                                              .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
+                                              .AddSchemataScheduling()
+                                              .AddSchemataSchedulingRepositoryStore()
+                                              .BuildServiceProvider();
+
+        await new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None);
+
+        await using var scope = services.CreateAsyncScope();
+        var executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
+        var persisted  = await executions.FirstOrDefaultAsync<SchemataJobExecution>(
+                             query => query.Where(row => row.Uid == storage.ExecutionUid), CancellationToken.None);
+
+        Assert.NotNull(persisted);
+        Assert.Equal(1, persisted.Attempt);
+        Assert.Null(persisted.LeaseExpireTime);
+    }
+
+    [Fact]
+    public async Task DispatchPendingAsync_Body_Failure_With_Attempts_Remaining_Requeues_With_Backoff() {
+        var before = DateTime.UtcNow;
+        var storage = new MultiExecutionStorage(
+            new SchemataJobExecution {
+                Uid       = Guid.Parse("4d8e2ff1-26db-5c41-bda1-8e4f5a617b7d"),
+                JobKey    = "jobs.exploding",
+                State     = ExecutionState.Pending,
+                StartTime = DateTime.UnixEpoch,
+                Timestamp = Guid.Parse("bb000000-0000-0000-0000-000000000001"),
+            });
+
+        var registry = new DefaultScheduledJobRegistry();
+        registry.Register<ExplodingJob>("jobs.exploding");
+
+        var services = new ServiceCollection().AddScoped<IRepository<SchemataJobExecution>>(_ => storage.CreateRepository())
+                                              .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
+                                              .AddSingleton<IScheduledJobRegistry>(registry)
+                                              .AddSingleton<ExplodingJob>()
+                                              .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
+                                              .AddSchemataScheduling()
+                                              .AddSchemataSchedulingRepositoryStore()
+                                              .Configure<SchemataSchedulingOptions>(options => options.Jobs.Add(
+                                                   new JobRegistration(typeof(ExplodingJob)) {
+                                                       MaxAttempts  = 2,
+                                                       RetryBackoff = TimeSpan.FromMinutes(1),
+                                                   }))
+                                              .BuildServiceProvider();
+
+        await new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None);
+
+        var row = Assert.Single(storage.Snapshot());
+        Assert.Equal(ExecutionState.Pending, row.State);
+        Assert.Equal(1, row.Attempt);
+        Assert.Null(row.LeaseExpireTime);
+        Assert.Null(row.EndTime);
+        Assert.Contains("body exploded", row.RecentError);
+        Assert.True(row.StartTime >= before.AddMinutes(1));
+    }
+
+    [Fact]
+    public async Task DispatchPendingAsync_Body_Failure_At_The_Ceiling_Settles_Failed() {
+        var storage = new MultiExecutionStorage(
+            new SchemataJobExecution {
+                Uid       = Guid.Parse("5e9f3aa2-37ec-6d52-ceb2-9f5a6b728c8e"),
+                JobKey    = "jobs.exploding",
+                State     = ExecutionState.Pending,
+                StartTime = DateTime.UnixEpoch,
+                Timestamp = Guid.Parse("cc000000-0000-0000-0000-000000000001"),
+            });
+
+        var registry = new DefaultScheduledJobRegistry();
+        registry.Register<ExplodingJob>("jobs.exploding");
+        var observer = new Mock<IJobLifecycleObserver>();
+
+        var services = new ServiceCollection().AddScoped<IRepository<SchemataJobExecution>>(_ => storage.CreateRepository())
+                                              .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
+                                              .AddSingleton<IScheduledJobRegistry>(registry)
+                                              .AddSingleton<ExplodingJob>()
+                                              .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
+                                              .AddSingleton(observer.Object)
+                                              .AddSchemataScheduling()
+                                              .AddSchemataSchedulingRepositoryStore()
+                                              .Configure<SchemataSchedulingOptions>(options => options.Jobs.Add(
+                                                   new JobRegistration(typeof(ExplodingJob)) { MaxAttempts = 1 }))
+                                              .BuildServiceProvider();
+
+        await new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None);
+
+        var row = Assert.Single(storage.Snapshot());
+        Assert.Equal(ExecutionState.Failed, row.State);
+        Assert.Equal(1, row.Attempt);
+        Assert.NotNull(row.EndTime);
+        Assert.Contains("body exploded", row.RecentError);
+        observer.Verify(o => o.OnFailedAsync(It.IsAny<SchemataJob>(), It.IsAny<JobContext>(), It.IsAny<Exception>(), It.IsAny<CancellationToken>()),
+                        Times.Once);
+    }
+
+    [Fact]
+    public async Task DispatchPendingAsync_Reclaims_Running_Row_Whose_Lease_Lapsed() {
+        var job = new TrackingJob();
+        var storage = new MultiExecutionStorage(
+            new SchemataJobExecution {
+                Uid             = Guid.Parse("6fa04bb3-48fd-7e63-dfc3-a06b7c839d9f"),
+                JobKey          = "jobs.tracking",
+                State           = ExecutionState.Running,
+                Attempt         = 1,
+                LeaseExpireTime = DateTime.UtcNow.AddMinutes(-1),
+                StartTime       = DateTime.UnixEpoch,
+                Timestamp       = Guid.Parse("dd000000-0000-0000-0000-000000000001"),
+            });
+
+        var registry = new DefaultScheduledJobRegistry();
+        registry.Register<TrackingJob>("jobs.tracking");
+
+        var services = new ServiceCollection().AddScoped<IRepository<SchemataJobExecution>>(_ => storage.CreateRepository())
+                                              .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
+                                              .AddSingleton<IScheduledJobRegistry>(registry)
+                                              .AddSingleton(job)
+                                              .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
+                                              .AddSchemataScheduling()
+                                              .AddSchemataSchedulingRepositoryStore()
+                                              .BuildServiceProvider();
+
+        await new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None);
+
+        Assert.True(job.Ran);
+        var row = Assert.Single(storage.Snapshot());
+        Assert.Equal(ExecutionState.Succeeded, row.State);
+        Assert.Equal(2, row.Attempt);
+        Assert.Null(row.LeaseExpireTime);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DispatchPendingAsync_Leaves_Running_Row_Outside_Crash_Recovery(bool leaseless) {
+        var job = new TrackingJob();
+        var storage = new MultiExecutionStorage(
+            new SchemataJobExecution {
+                Uid             = Guid.Parse("7ab15cc4-590e-8f74-ed04-b17c8d94ae0a"),
+                JobKey          = "jobs.tracking",
+                State           = ExecutionState.Running,
+                Attempt         = 1,
+                LeaseExpireTime = leaseless ? null : DateTime.UtcNow.AddMinutes(10),
+                StartTime       = DateTime.UnixEpoch,
+                Timestamp       = Guid.Parse("ee000000-0000-0000-0000-000000000001"),
+            });
+
+        var registry = new DefaultScheduledJobRegistry();
+        registry.Register<TrackingJob>("jobs.tracking");
+
+        var services = new ServiceCollection().AddScoped<IRepository<SchemataJobExecution>>(_ => storage.CreateRepository())
+                                              .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
+                                              .AddSingleton<IScheduledJobRegistry>(registry)
+                                              .AddSingleton(job)
+                                              .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
+                                              .AddSchemataScheduling()
+                                              .AddSchemataSchedulingRepositoryStore()
+                                              .BuildServiceProvider();
+
+        await new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None);
+
+        Assert.False(job.Ran);
+        var row = Assert.Single(storage.Snapshot());
+        Assert.Equal(ExecutionState.Running, row.State);
+        Assert.Equal(1, row.Attempt);
+    }
+
+    [Fact]
+    public async Task DispatchPendingAsync_Lost_Lease_Mid_Run_Does_Not_Complete_As_Succeeded() {
+        var storage  = new LeaseTakeoverStorage();
+        var registry = new DefaultScheduledJobRegistry();
+        registry.Register<SignalingJob>("jobs.signaling");
+        var job = new SignalingJob();
+
+        var services = new ServiceCollection().AddScoped<IRepository<SchemataJobExecution>>(_ => storage.CreateRepository())
+                                              .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
+                                              .AddSingleton<IScheduledJobRegistry>(registry)
+                                              .AddSingleton(job)
+                                              .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
+                                              .AddSchemataScheduling()
+                                              .AddSchemataSchedulingRepositoryStore()
+                                              .Configure<SchemataSchedulingOptions>(options => options.Jobs.Add(
+                                                   new JobRegistration(typeof(SignalingJob)) {
+                                                       Lease = TimeSpan.FromMilliseconds(100),
+                                                   }))
+                                              .BuildServiceProvider();
+
+        var dispatch = new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None);
+        await job.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // Another worker transitions the row (e.g. :cancel) while the body still runs; the next
+        // renewal observes the lost lease and cancels the body instead of settling it Succeeded.
+        storage.TakeOver();
+        await job.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await dispatch.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(ExecutionState.Cancelled, storage.Stored.State);
+        Assert.Null(storage.Stored.Output);
+    }
+
+    [Fact]
+    public async Task DispatchPendingAsync_Invalid_Policy_Fails_Only_That_Execution() {
+        var storage = new MultiExecutionStorage(
+            new SchemataJobExecution {
+                Uid       = Guid.Parse("9cd37ee6-7b20-0196-af26-d39e0fb6c02c"),
+                JobKey    = "jobs.misconfigured",
+                State     = ExecutionState.Pending,
+                StartTime = DateTime.UnixEpoch,
+                Timestamp = Guid.Parse("ff000000-0000-0000-0000-000000000001"),
+            },
+            new SchemataJobExecution {
+                Uid       = Guid.Parse("ade48ff7-8c31-12a7-b037-e40f1ac7d13d"),
+                JobKey    = "jobs.completing",
+                State     = ExecutionState.Pending,
+                StartTime = DateTime.UnixEpoch,
+                Timestamp = Guid.Parse("ff000000-0000-0000-0000-000000000002"),
+            });
+
+        var registry = new DefaultScheduledJobRegistry();
+        registry.Register<TrackingJob>("jobs.misconfigured");
+        registry.Register<CompletingJob>("jobs.completing");
+
+        var services = new ServiceCollection().AddScoped<IRepository<SchemataJobExecution>>(_ => storage.CreateRepository())
+                                              .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
+                                              .AddSingleton<IScheduledJobRegistry>(registry)
+                                              .AddSingleton<TrackingJob>()
+                                              .AddSingleton<CompletingJob>()
+                                              .AddSingleton<IRepository<SchemataJob>>(EmptyJobRepository())
+                                              .AddSchemataScheduling()
+                                              .AddSchemataSchedulingRepositoryStore()
+                                              .Configure<SchemataSchedulingOptions>(options => options.Jobs.Add(
+                                                   new JobRegistration(typeof(TrackingJob)) {
+                                                       Lease = TimeSpan.Zero,
+                                                   }))
+                                              .BuildServiceProvider();
+
+        await new JobExecutionDispatcher(services).DispatchPendingAsync(CancellationToken.None);
+
+        var snapshot = storage.Snapshot();
+        var broken   = Assert.Single(snapshot, row => row.JobKey == "jobs.misconfigured");
+        Assert.Equal(ExecutionState.Failed, broken.State);
+        Assert.Contains("Execution lease", broken.RecentError);
+        var healthy = Assert.Single(snapshot, row => row.JobKey == "jobs.completing");
+        Assert.Equal(ExecutionState.Succeeded, healthy.State);
+    }
+
+    private sealed class ExplodingJob : IScheduledJob
+    {
+        public Task ExecuteAsync(JobContext context, CancellationToken ct) {
+            throw new InvalidOperationException("body exploded");
+        }
+    }
+
+    private sealed class SignalingJob : IScheduledJob
+    {
+        internal TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal TaskCompletionSource Cancelled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task ExecuteAsync(JobContext context, CancellationToken ct) {
+            Started.SetResult();
+            try {
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            } catch (OperationCanceledException) when (ct.IsCancellationRequested) {
+                Cancelled.SetResult();
+                throw;
+            }
+        }
+    }
+
+    private sealed class LeaseTakeoverStorage
+    {
+        internal LeaseTakeoverStorage() {
+            Stored = new() {
+                Uid       = Guid.Parse("8bc26dd5-6a1f-9085-fe15-c28d9ea5bf1b"),
+                JobKey    = "jobs.signaling",
+                State     = ExecutionState.Pending,
+                StartTime = DateTime.UtcNow.AddMinutes(-1),
+                Timestamp = Guid.NewGuid(),
+            };
+            DispatchCopy = Copy(Stored);
+        }
+
+        private SchemataJobExecution DispatchCopy { get; }
+
+        internal SchemataJobExecution Stored { get; private set; }
+
+        internal void TakeOver() {
+            Stored           = Copy(Stored);
+            Stored.State     = ExecutionState.Cancelled;
+            Stored.Timestamp = Guid.NewGuid();
+        }
+
+        internal IRepository<SchemataJobExecution> CreateRepository() {
+            var repository = new Mock<IRepository<SchemataJobExecution>>();
+            repository.Setup(r => r.ListAsync(
+                                  It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(),
+                                  It.IsAny<CancellationToken>()))
+                      .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> query,
+                                CancellationToken _) => ToAsync(query(new[] { DispatchCopy }.AsQueryable())));
+            repository.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
+                      .Callback<SchemataJobExecution, CancellationToken>((row, _) => Apply(row))
+                      .ReturnsAsync(MutationResult.Applied);
+            repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+            repository.Setup(r => r.Begin()).Returns(CommittingUnit);
+            return repository.Object;
+        }
+
+        private void Apply(SchemataJobExecution row) {
+            if (row.Timestamp != Stored.Timestamp) {
+                throw new AbortedException();
+            }
+
+            Stored           = Copy(row);
+            Stored.Timestamp = Guid.NewGuid();
+            row.Timestamp    = Stored.Timestamp;
+        }
+
+        private static SchemataJobExecution Copy(SchemataJobExecution source) {
+            return new() {
+                Uid             = source.Uid,
+                JobKey          = source.JobKey,
+                State           = source.State,
+                StartTime       = source.StartTime,
+                EndTime         = source.EndTime,
+                RecentError     = source.RecentError,
+                Output          = source.Output,
+                Attempt         = source.Attempt,
+                LeaseExpireTime = source.LeaseExpireTime,
+                Timestamp       = source.Timestamp,
+            };
+        }
     }
 
     private static Mock<IRepository<SchemataJobExecution>> ExecutionRepository(SchemataJobExecution execution) {
@@ -399,14 +877,16 @@ public class JobExecutionDispatcherShould
 
         private static SchemataJobExecution Copy(SchemataJobExecution source) {
             return new() {
-                Uid         = source.Uid,
-                JobKey      = source.JobKey,
-                State       = source.State,
-                StartTime   = source.StartTime,
-                EndTime     = source.EndTime,
-                RecentError = source.RecentError,
-                Output      = source.Output,
-                Timestamp   = source.Timestamp,
+                Uid             = source.Uid,
+                JobKey          = source.JobKey,
+                State           = source.State,
+                StartTime       = source.StartTime,
+                EndTime         = source.EndTime,
+                RecentError     = source.RecentError,
+                Output          = source.Output,
+                Attempt         = source.Attempt,
+                LeaseExpireTime = source.LeaseExpireTime,
+                Timestamp       = source.Timestamp,
             };
         }
     }
@@ -474,14 +954,16 @@ public class JobExecutionDispatcherShould
 
         private static SchemataJobExecution Copy(SchemataJobExecution source) {
             return new() {
-                Uid         = source.Uid,
-                JobKey      = source.JobKey,
-                State       = source.State,
-                StartTime   = source.StartTime,
-                EndTime     = source.EndTime,
-                RecentError = source.RecentError,
-                Output      = source.Output,
-                Timestamp   = source.Timestamp,
+                Uid             = source.Uid,
+                JobKey          = source.JobKey,
+                State           = source.State,
+                StartTime       = source.StartTime,
+                EndTime         = source.EndTime,
+                RecentError     = source.RecentError,
+                Output          = source.Output,
+                Attempt         = source.Attempt,
+                LeaseExpireTime = source.LeaseExpireTime,
+                Timestamp       = source.Timestamp,
             };
         }
     }
@@ -491,6 +973,16 @@ public class JobExecutionDispatcherShould
     private sealed class CompletingJob : IScheduledJob
     {
         public Task ExecuteAsync(JobContext context, CancellationToken ct) => Task.CompletedTask;
+    }
+
+    private sealed class TrackingJob : IScheduledJob
+    {
+        public bool Ran { get; private set; }
+
+        public Task ExecuteAsync(JobContext context, CancellationToken ct) {
+            Ran = true;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class CapturingJob : IScheduledJob

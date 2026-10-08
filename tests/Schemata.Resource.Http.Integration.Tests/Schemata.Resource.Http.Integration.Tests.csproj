@@ -28,6 +28,7 @@
     <ProjectReference Include="..\..\src\Schemata.Flow.Skeleton\Schemata.Flow.Skeleton.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Scheduling.Foundation\Schemata.Scheduling.Foundation.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Scheduling.Http\Schemata.Scheduling.Http.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Scheduling.Repository\Schemata.Scheduling.Repository.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Scheduling.Skeleton\Schemata.Scheduling.Skeleton.csproj" />
   </ItemGroup>
 

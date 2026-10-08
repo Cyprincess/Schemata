@@ -126,6 +126,31 @@ public class BpmnEngine_MultiInstanceShould
     }
 
     [Fact]
+    public async Task Execute_SequentialProcedureBody_RunsOncePerInstance() {
+        var invocations = 0;
+        var harness     = Harness.Create(MultiInstanceProcedureDefinition(3, true, () => invocations++));
+
+        var snapshot = await harness.StartAsync();
+
+        Assert.Equal(3, invocations);
+        Assert.Equal(3, ReadInt(snapshot.Tokens.Single(), "nrOfCompletedInstances"));
+    }
+
+    [Fact]
+    public async Task Complete_ParallelProcedureBody_RunsOncePerInstance() {
+        var invocations = 0;
+        var harness     = Harness.Create(MultiInstanceProcedureDefinition(3, false, () => invocations++));
+
+        var snapshot = await harness.StartAsync();
+        Assert.Equal(0, invocations);
+
+        snapshot = await harness.CompleteSiblingsAsync(snapshot, 3);
+
+        Assert.Equal(3, invocations);
+        Assert.Equal("after", Assert.Single(snapshot.Tokens, t => t.Spawner is null).StateName);
+    }
+
+    [Fact]
     public async Task Execute_OneCompletedEventBehaviorOne_ThrowsNotSupported() {
         var definition = MultiInstanceDefinition(1, false, behavior: MIEventBehavior.One);
         var harness    = Harness.Create(definition);
@@ -156,6 +181,33 @@ public class BpmnEngine_MultiInstanceShould
 
         return new() {
             Name     = $"multi-{cardinality}-{sequential}",
+            Elements = { start, multi, after, endEvent },
+            Flows = {
+                new() { Source = start, Target = multi },
+                new() { Source = multi, Target = after },
+                new() { Source = after, Target = endEvent },
+            },
+        };
+    }
+
+    private static ProcessDefinition MultiInstanceProcedureDefinition(int cardinality, bool sequential, Action body) {
+        var start    = new FlowEvent { Name = "start", Position = EventPosition.Start };
+        var after    = new NoneTask { Name = "after" };
+        var endEvent = new FlowEvent { Name = "end", Position = EventPosition.End };
+        var multi = new ProcedureTask {
+            Name = "multi",
+            Body = (_, _) => {
+                body();
+                return ValueTask.CompletedTask;
+            },
+            LoopCharacteristics = new MultiInstanceLoopCharacteristics {
+                LoopCardinality = new CardinalityExpression(cardinality),
+                IsSequential    = sequential,
+            },
+        };
+
+        return new() {
+            Name     = $"multi-procedure-{cardinality}-{sequential}",
             Elements = { start, multi, after, endEvent },
             Flows = {
                 new() { Source = start, Target = multi },

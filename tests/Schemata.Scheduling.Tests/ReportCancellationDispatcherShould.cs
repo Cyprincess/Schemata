@@ -36,6 +36,7 @@ public class ReportCancellationDispatcherShould
                                                .AddSingleton(jobs.Object)
                                                .AddSingleton<IScheduler>(Mock.Of<IScheduler>())
                                                .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
+                                               .AddSchemataSchedulingRepositoryStore()
                                                .BuildServiceProvider();
         var dispatcher = new JobExecutionDispatcher(services);
 

@@ -84,6 +84,8 @@ public sealed class StandardLoopExecutor
                     TransitionKind.Move,
                     "StandardLoop"));
 
+                await engine.InvokeActivityBodyAsync(definition, process, token, activity, execution, ct);
+
                 counter++;
                 WriteCounter(token, counter);
 

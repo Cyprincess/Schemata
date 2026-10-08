@@ -8,10 +8,13 @@ using Schemata.Abstractions.Resource;
 namespace Schemata.Scheduling.Skeleton.Entities;
 
 /// <summary>
-///     Long-running operation backing row. <see cref="IScheduler.TriggerAsync{TJob}" /> writes
-///     the Pending row directly so the returned execution is immediately addressable; cron and
-///     periodic fires upsert through <see cref="IJobLifecycleObserver" />. The public wire form
-///     is <see cref="Schemata.Abstractions.Resource.Operation" /> and external callers see
+///     Durable execution backing row. Its purpose is framework-internal reliable scheduling and
+///     audit: <see cref="IScheduler.TriggerAsync{TJob}" /> writes the Pending row directly so the
+///     returned execution is immediately addressable, cron and periodic fires upsert through
+///     <see cref="IJobLifecycleObserver" />, and the execution-store provider contract
+///     (<see cref="IJobExecutionStore" />) carries the lease, retry-ceiling, and crash-recovery
+///     semantics of the dispatch lifecycle. The public wire form is
+///     <see cref="Schemata.Abstractions.Resource.Operation" /> and external callers see
 ///     read / list / delete only.
 /// </summary>
 [Table("SchemataJobExecutions")]
@@ -71,6 +74,22 @@ public class SchemataJobExecution : IIdentifier, ICanonicalName, IConcurrency, I
     ///     observer persists it alongside the terminal state.
     /// </summary>
     public virtual string? Output { get; set; }
+
+    /// <summary>
+    ///     Number of times this execution has been claimed. The store increments it atomically
+    ///     with every claim, including crash-recovery reclaims, so the retry ceiling configured on
+    ///     the job registration keeps counting across attempts.
+    /// </summary>
+    public virtual int Attempt { get; set; }
+
+    /// <summary>
+    ///     Instant at which the current claim lapses. The dispatcher renews it while the job body
+    ///     runs; once it passes without renewal (host shutdown or crash), the row returns to the
+    ///     pending set and any dispatcher may reclaim it. <see langword="null" /> when no
+    ///     dispatcher holds the row, including Running rows owned by an in-process
+    ///     long-running-operation client, which are never claimable.
+    /// </summary>
+    public virtual DateTime? LeaseExpireTime { get; set; }
 
     #region ICanonicalName Members
 

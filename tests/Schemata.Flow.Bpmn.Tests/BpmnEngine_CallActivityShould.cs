@@ -83,6 +83,33 @@ public class BpmnEngine_CallActivityShould
         Assert.Contains(failed.Transitions, t => t.Kind == TransitionKind.Fail && t.Token == token.CanonicalName);
     }
 
+    [Fact]
+    public async Task Start_ThroughExclusiveGateway_SpawnsChildProcessRow() {
+        var harness = Harness.Create(GatewayParentDefinition());
+
+        var snapshot = await harness.StartParentAsync();
+
+        var child = Assert.Single(harness.Processes, p => p.DefinitionName == "called");
+        Assert.StartsWith("processes/", child.CanonicalName, StringComparison.Ordinal);
+        Assert.Single(harness.Transitions, t => t.Process == snapshot.Process.Name && t.Kind == TransitionKind.Spawn);
+        var parent = Assert.Single(snapshot.Tokens);
+        Assert.Equal("call", parent.WaitingAtName);
+    }
+
+    [Fact]
+    public async Task Complete_ChildOfGatewayRoutedCall_ResumesParentToken() {
+        var harness = Harness.Create(GatewayParentDefinition());
+        var parent  = await harness.StartParentAsync();
+        await harness.CompleteChildAsync();
+
+        var resumed = await harness.AdvanceParentAsync(parent);
+
+        var token = Assert.Single(resumed.Tokens);
+        Assert.Equal("Active", token.State);
+        Assert.Equal("after-call", token.StateName);
+    }
+
+
     private static ProcessDefinition ParentDefinition() {
         var start    = new FlowEvent { Name = "start", Position = EventPosition.Start };
         var call     = new CallActivity { Name = "call", CalledElement = "called" };
@@ -94,6 +121,25 @@ public class BpmnEngine_CallActivityShould
             Elements = { start, call, after, endEvent },
             Flows = {
                 new() { Source = start, Target = call },
+                new() { Source = call, Target = after },
+                new() { Source = after, Target = endEvent },
+            },
+        };
+    }
+
+    private static ProcessDefinition GatewayParentDefinition() {
+        var start   = new FlowEvent { Name = "start", Position = EventPosition.Start };
+        var gateway = new ExclusiveGateway { Name = "decide" };
+        var call    = new CallActivity { Name = "call", CalledElement = "called" };
+        var after   = new NoneTask { Name = "after-call" };
+        var endEvent = new FlowEvent { Name = "end", Position = EventPosition.End };
+
+        return new() {
+            Name     = "parent",
+            Elements = { start, gateway, call, after, endEvent },
+            Flows = {
+                new() { Source = start, Target = gateway },
+                new() { Source = gateway, Target = call, IsDefault = true },
                 new() { Source = call, Target = after },
                 new() { Source = after, Target = endEvent },
             },
@@ -117,8 +163,8 @@ public class BpmnEngine_CallActivityShould
 
     private sealed class Harness
     {
-        private Harness() {
-            ParentDefinition = ParentDefinition();
+        private Harness(ProcessDefinition parentDefinition) {
+            ParentDefinition = parentDefinition;
             CalledDefinition = CalledDefinition();
 
             Processes   = [];
@@ -139,8 +185,9 @@ public class BpmnEngine_CallActivityShould
             services.AddSingleton<IRepository<SchemataProcess>>(CreateRepository(Processes).Object);
             services.AddSingleton<IRepository<SchemataProcessToken>>(CreateRepository(Tokens).Object);
             services.AddSingleton<IRepository<SchemataProcessTransition>>(CreateRepository(Transitions).Object);
-            Services = services.BuildServiceProvider();
             Engine   = new();
+            services.AddKeyedSingleton<IFlowRuntime>(FlowConstants.Engines.Bpmn, Engine);
+            Services = services.BuildServiceProvider();
         }
 
         public ProcessDefinition ParentDefinition { get; }
@@ -157,7 +204,7 @@ public class BpmnEngine_CallActivityShould
 
         private ServiceProvider Services { get; }
 
-        public static Harness Create() { return new(); }
+        public static Harness Create(ProcessDefinition? parentDefinition = null) { return new(parentDefinition ?? ParentDefinition()); }
 
         public async Task<ProcessSnapshot> StartParentAsync() {
             var process = new SchemataProcess {

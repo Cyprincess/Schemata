@@ -32,8 +32,8 @@ public class ProcessPersistenceCompensationShould
             Tokens = [],
             Transitions = [],
             CompensationBindings = [
-                new("processes/p1", "first", 0),
-                new("processes/p1", "second", 1),
+                new("processes/p1", "first", "boundary-first", 0),
+                new("processes/p1", "second", "boundary-second", 1),
             ],
         };
 
@@ -44,6 +44,7 @@ public class ProcessPersistenceCompensationShould
             rows.Select(row => new ProcessCompensationBinding(
                             row.ScopeOwnerCanonicalName,
                             row.ActivityName,
+                            row.BoundaryName,
                             row.RegistrationOrder)));
         Assert.All(rows, row => Assert.Equal(process.CanonicalName, row.Process));
     }
@@ -62,7 +63,7 @@ public class ProcessPersistenceCompensationShould
             Process = Process("Completed"),
             Tokens = [],
             Transitions = [],
-            CompensationBindings = [new("processes/p1", "host", 0)],
+            CompensationBindings = [new("processes/p1", "host", "boundary-host", 0)],
         };
 
         await new ProcessPersistence().PersistSnapshotAsync(Scope(rows), snapshot, CancellationToken.None);
@@ -74,12 +75,12 @@ public class ProcessPersistenceCompensationShould
     public async Task Preserve_Unchanged_Binding_Identity_And_Duplicate_Multiplicity() {
         var retained = new SchemataProcessCompensation {
             Uid = Guid.NewGuid(), Name = "consumer-binding", CanonicalName = "compensations/consumer-binding",
-            Process = "processes/p1", ScopeOwnerCanonicalName = "processes/p1", ActivityName = "activity", RegistrationOrder = 2,
+            Process = "processes/p1", ScopeOwnerCanonicalName = "processes/p1", ActivityName = "activity", BoundaryName = "boundary", RegistrationOrder = 2,
         };
         var rows = new List<SchemataProcessCompensation> { retained };
         var snapshot = new ProcessSnapshot {
             Process = Process("Running"), Tokens = [], Transitions = [],
-            CompensationBindings = [new("processes/p1", "activity", 2), new("processes/p1", "activity", 2)],
+            CompensationBindings = [new("processes/p1", "activity", "boundary", 2), new("processes/p1", "activity", "boundary", 2)],
         };
         var persistence = new ProcessPersistence();
         await persistence.PersistSnapshotAsync(Scope(rows), snapshot, default);

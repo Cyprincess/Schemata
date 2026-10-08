@@ -54,6 +54,7 @@ public class TenantReminderShould
         new SchemataTenancyFeature<SchemataTenantManager<SchemataTenant>, SchemataTenant>()
             .ConfigureServices(services, new(), new(), new ConfigurationBuilder().Build(), null!);
         services.AddSchemataScheduling();
+        services.AddSchemataSchedulingRepositoryStore();
         new SchemataActorBuilder(new(), services).Register<Counter>("counter", received.Writer);
         new SchemataActorSchedulingFeature().ConfigureServices(services, new(), new(), new ConfigurationBuilder().Build(), null!);
         services.AddSchemataActor();

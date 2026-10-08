@@ -50,6 +50,12 @@ public interface IScheduler
     ///     Pending row is still drained by the dispatcher (and typically fails with
     ///     a missing handler when the business context that produced it never landed).
     ///     The contract provides eventual consistency.
+    ///     <para>
+    ///         The trigger dispatch envelope carries
+    ///         <paramref name="context" />.<see cref="JobContext.Principal" /> as the caller identity
+    ///         for the installed authentication/authorization pipeline; system producers pass
+    ///         <see cref="SchedulingSystemPrincipal.Instance" />.
+    ///     </para>
     /// </remarks>
     Task<SchemataJobExecution> TriggerAsync<TJob>(JobContext context, CancellationToken ct)
         where TJob : class, IScheduledJob;

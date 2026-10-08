@@ -36,6 +36,8 @@ public class SchedulingInitializerShould
             .Returns((Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>> _, CancellationToken __) => ToAsyncJobs([]));
 
         var services = new ServiceCollection().AddSingleton(jobs.Object).AddSingleton(executions.Object)
+                                              .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
+                                              .AddSchemataSchedulingRepositoryStore()
                                               .BuildServiceProvider();
 
         var initializer = new SchedulingInitializer(scheduler.Object, Options.Create(new SchemataSchedulingOptions()),
@@ -50,6 +52,25 @@ public class SchedulingInitializerShould
         await initializer.StopAsync(CancellationToken.None);
 
         scheduler.Verify(s => s.StopAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RefuseToStart_WhenNoExecutionStoreIsInstalled() {
+        var executions = new Mock<IRepository<SchemataJobExecution>>();
+        var jobs       = new Mock<IRepository<SchemataJob>>();
+
+        var services = new ServiceCollection().AddSingleton(jobs.Object).AddSingleton(executions.Object)
+                                              .BuildServiceProvider();
+
+        var scheduler = new Mock<IScheduler>();
+        var initializer = new SchedulingInitializer(scheduler.Object, Options.Create(new SchemataSchedulingOptions()),
+                                                    services, new DefaultScheduledJobRegistry());
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => initializer.StartAsync(CancellationToken.None));
+
+        Assert.Contains(nameof(IJobExecutionStore), exception.Message);
+        scheduler.Verify(s => s.StartAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -76,6 +97,7 @@ public class SchedulingInitializerShould
 
         var services = new ServiceCollection().AddSingleton(jobs.Object).AddSingleton(executions.Object)
                                               .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
+                                              .AddSchemataSchedulingRepositoryStore()
                                               .BuildServiceProvider();
 
         var scheduler = new Mock<IScheduler>();
@@ -93,6 +115,65 @@ public class SchedulingInitializerShould
         executions.Verify(r => r.UpdateAsync(orphan, It.IsAny<CancellationToken>()), Times.Once);
 
         await initializer.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task SweepOrphans_ThroughTheExecutionStoreContractOnly() {
+        var store = new RecordingStore();
+
+        var jobs = new Mock<IRepository<SchemataJob>>();
+        jobs.Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(),
+                                    It.IsAny<CancellationToken>()))
+            .Returns((Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>> _, CancellationToken __) => ToAsyncJobs([]));
+
+        // Deliberately no IRepository<SchemataJobExecution> and no IResourceMutation<>: the
+        // initializer must reach orphaned rows through the IJobExecutionStore seam alone, so a
+        // non-repository backend starts cleanly.
+        var services = new ServiceCollection().AddSingleton(jobs.Object).AddSingleton<IJobExecutionStore>(store)
+                                              .BuildServiceProvider();
+
+        var scheduler = new Mock<IScheduler>();
+        scheduler.Setup(s => s.StartAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        var initializer = new SchedulingInitializer(scheduler.Object, Options.Create(new SchemataSchedulingOptions()),
+                                                    services, new DefaultScheduledJobRegistry());
+        await initializer.StartAsync(CancellationToken.None);
+        Assert.NotNull(initializer.ExecuteTask);
+        await initializer.ExecuteTask!;
+
+        Assert.Equal(1, store.FailOrphanedCalls);
+
+        await initializer.StopAsync(CancellationToken.None);
+    }
+
+    private sealed class RecordingStore : IJobExecutionStore
+    {
+        public int FailOrphanedCalls { get; private set; }
+
+        public IAsyncEnumerable<SchemataJobExecution> ListDueAsync(DateTime asOfUtc, int batchSize, CancellationToken ct) {
+            return ToAsyncExecutions([]);
+        }
+
+        public Task<bool> TryClaimAsync(SchemataJobExecution execution, DateTime leaseExpireUtc, CancellationToken ct) {
+            return Task.FromResult(false);
+        }
+
+        public Task<bool> TryRenewLeaseAsync(SchemataJobExecution execution, DateTime leaseExpireUtc, CancellationToken ct) {
+            return Task.FromResult(false);
+        }
+
+        public Task<bool> TrySettleAsync(SchemataJobExecution execution, CancellationToken ct) {
+            return Task.FromResult(false);
+        }
+
+        public Task<bool> TryRequeueAsync(SchemataJobExecution execution, DateTime nextStartUtc, CancellationToken ct) {
+            return Task.FromResult(false);
+        }
+
+        public Task FailOrphanedRunningAsync(DateTime failedAtUtc, CancellationToken ct) {
+            FailOrphanedCalls++;
+            return Task.CompletedTask;
+        }
     }
 
     private static async IAsyncEnumerable<SchemataJob> ToAsyncJobs(IEnumerable<SchemataJob> jobs) {

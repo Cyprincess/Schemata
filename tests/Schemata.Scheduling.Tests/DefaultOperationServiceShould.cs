@@ -83,13 +83,34 @@ public class DefaultOperationServiceShould
     }
 
     [Fact]
-    public async Task Cancel_Pending_Row_Marks_Row_And_Unschedules() {
+    public async Task Cancel_Pending_Row_Delegates_The_Transition_To_The_Unschedule_Owner() {
         var row = CreateExecution(ExecutionState.Pending);
         row.Job = "jobs/report";
         var executions = CreateRepositoryReturning(row);
+        var scheduler = new Mock<IScheduler>();
+        // The unschedule handler commits the pending rows' Cancelled state in its own transaction.
+        scheduler.Setup(s => s.UnscheduleAsync(row.Job, It.IsAny<CancellationToken>()))
+                 .Callback(() => {
+                      row.State   = ExecutionState.Cancelled;
+                      row.EndTime = DateTime.UtcNow;
+                  })
+                 .Returns(Task.CompletedTask);
+        var service = CreateService(executions, scheduler);
+
+        var operation = await service.CancelAsync(row.CanonicalName!, CancellationToken.None);
+
+        Assert.True(operation.Done);
+        scheduler.Verify(s => s.UnscheduleAsync(row.Job, It.IsAny<CancellationToken>()), Times.Once);
+        // The service must not write the row a second time with the stamp the unschedule rotated.
+        executions.Verify(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Cancel_Pending_Row_Without_Job_Commits_The_Cancellation_Directly() {
+        var row = CreateExecution(ExecutionState.Pending);
+        var executions = CreateRepositoryReturning(row);
         executions.Setup(r => r.UpdateAsync(row, It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
         var scheduler = new Mock<IScheduler>();
-        scheduler.Setup(s => s.UnscheduleAsync(row.Job, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var service = CreateService(executions, scheduler);
 
         var operation = await service.CancelAsync(row.CanonicalName!, CancellationToken.None);
@@ -97,7 +118,7 @@ public class DefaultOperationServiceShould
         Assert.True(operation.Done);
         Assert.Equal(ExecutionState.Cancelled, row.State);
         Assert.NotNull(row.EndTime);
-        scheduler.Verify(s => s.UnscheduleAsync(row.Job, It.IsAny<CancellationToken>()), Times.Once);
+        scheduler.Verify(s => s.UnscheduleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         executions.Verify(r => r.UpdateAsync(row, It.IsAny<CancellationToken>()), Times.Once);
     }
 

@@ -109,6 +109,7 @@ public class MissedFirePolicyShould
                                               .AddSingleton<IScheduledJobRegistry>(registry)
                                               .AddSingleton(job)
                                               .AddSchemataScheduling()
+                                              .AddSchemataSchedulingRepositoryStore()
                                               .BuildServiceProvider();
         var scheduler  = services.GetRequiredService<DefaultScheduler>();
         var dispatcher = new JobExecutionDispatcher(services, time: clock);

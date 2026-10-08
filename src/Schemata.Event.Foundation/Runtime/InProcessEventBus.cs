@@ -45,18 +45,39 @@ public sealed class InProcessEventBus : IEventBus
 
     public Task PublishAsync<TEvent>(TEvent @event, CancellationToken ct = default)
         where TEvent : IEvent {
-        return PublishCoreAsync(@event, null, ct);
+        return PublishCoreAsync(@event, null, null, ct);
+    }
+
+    public Task PublishAsync<TEvent>(TEvent @event, IReadOnlyDictionary<string, string> correlation, CancellationToken ct = default)
+        where TEvent : IEvent {
+        return PublishCoreAsync(@event, null, correlation, ct);
     }
 
     public async Task PublishAsync<TEvent>(TEvent @event, object sourceEntity, CancellationToken ct = default)
         where TEvent : IEvent {
         EventSourceContract.Ensure(sourceEntity);
-        await PublishCoreAsync(@event, sourceEntity, ct);
+        await PublishCoreAsync(@event, sourceEntity, null, ct);
+    }
+
+    public async Task PublishAsync<TEvent>(
+        TEvent                              @event,
+        object                              sourceEntity,
+        IReadOnlyDictionary<string, string> correlation,
+        CancellationToken                   ct = default
+    )
+        where TEvent : IEvent {
+        EventSourceContract.Ensure(sourceEntity);
+        await PublishCoreAsync(@event, sourceEntity, correlation, ct);
     }
 
     #endregion
 
-    private async Task PublishCoreAsync<TEvent>(TEvent @event, object? source, CancellationToken ct)
+    private async Task PublishCoreAsync<TEvent>(
+        TEvent                               @event,
+        object?                              source,
+        IReadOnlyDictionary<string, string>? correlation,
+        CancellationToken                    ct
+    )
         where TEvent : IEvent {
         var message = MessageContexts.Capture(_services);
         var scope = await _services.GetRequiredService<IMessageExecutionScopeFactory>().CreateAsync(message, ct);
@@ -73,6 +94,7 @@ public sealed class InProcessEventBus : IEventBus
         var ctx = new EventContext(@event, name) {
             Payload       = JsonSerializer.Serialize(@event, type, _json),
             CorrelationId = Guid.NewGuid().ToString("n"),
+            Correlation   = correlation,
             Source        = source,
         };
         var adviceCtx = new AdviceContext(scope.Services);
@@ -94,7 +116,7 @@ public sealed class InProcessEventBus : IEventBus
 
         var subscriptions = scope.Services.GetRequiredService<IRepository<SchemataEventSubscription>>();
         var matched       = new List<SchemataEventSubscription>();
-        await foreach (var sub in subscriptions.ListMatchingAsync(name, ct: ct)) {
+        await foreach (var sub in subscriptions.ListMatchingAsync(name, ctx.Correlation, ct)) {
             matched.Add(sub);
         }
 

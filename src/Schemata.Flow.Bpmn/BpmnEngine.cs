@@ -123,12 +123,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 
         ApplyAggregateState(process, [token]);
 
-        return new() {
-            Process              = process,
-            Tokens               = [token],
-            Transitions          = [transition],
-            CompensationBindings = [..context.CompensationBindings],
-        };
+        return Snapshot(process, [token], [transition], context);
     }
 
     public async ValueTask<ProcessSnapshot> TriggerAsync(
@@ -658,7 +653,8 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
                     $"Compensation binding for activity '{binding.ActivityName}' is missing from process definition '{definition.Name}'.");
             }
 
-            var boundary = CompensationBoundaryHandler.FindCompensationBoundaries(definition, activity).FirstOrDefault();
+            var boundary = CompensationBoundaryHandler.FindCompensationBoundaries(definition, activity)
+                                                      .FirstOrDefault(candidate => candidate.Name == binding.BoundaryName);
             var handler = boundary is null ? null : CompensationBoundaryHandler.Build(definition, activity, boundary, this);
             if (handler is null) {
                 throw new InvalidOperationException(
@@ -1090,7 +1086,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         CancellationToken    ct
     ) {
         var executor = new CallActivityExecutor(context.Services);
-        return await executor.EnterAsync(this, process, token, call, context, ct);
+        return await executor.EnterAsync(process, token, call, context, ct);
     }
 
     private async ValueTask<ProcessSnapshot> TryResumeCallActivityAsync(
@@ -1102,7 +1098,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         FlowExecutionContext       context,
         CancellationToken          ct
     ) {
-        var executor = new CallActivityExecutor(context.Services);
+        var executor   = new CallActivityExecutor(context.Services);
         var completion = await executor.TryCompleteAsync(process, token, call, ct);
         if (completion is null) {
             return Snapshot(process, working, [], context);
@@ -1762,8 +1758,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
 
         switch (target) {
             case ProcedureTaskBase procedure when process is not null && tokenEntity is not null: {
-                var task = new FlowTaskContext(definition, process, tokenEntity, execution, payload);
-                await procedure.InvokeAsync(task, ct);
+                await FlowTaskInvocation.InvokeAsync(procedure, definition, process, tokenEntity, execution, payload, ct);
 
                 var flow = await ResolveOutgoingAsync(definition, procedure, token, variables, execution, process, tokenEntity, payload);
                 return flow is null
@@ -1781,6 +1776,12 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
                 throw new FailedPreconditionException(
                     SchemataResources.BPMN_CALL_ACTIVITY_REQUIRES_SERVICES,
                     new Dictionary<string, string?> { ["name"] = target.Name });
+
+            case CallActivity call when process is not null && tokenEntity is not null: {
+                var spawn = await EnterCallActivityCoreAsync(process, tokenEntity, call, execution, ct);
+                execution.DeferredTransitions.Add(spawn);
+                return new(call.Name, call.Name, false);
+            }
 
             case CallActivity call:
                 return new(call.Name, call.Name, false);
@@ -1848,6 +1849,19 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
                     new Dictionary<string, string?> { ["name"] = target.Name });
         }
     }
+    internal async ValueTask InvokeActivityBodyAsync(
+        ProcessDefinition      definition,
+        SchemataProcess        process,
+        SchemataProcessToken   token,
+        Activity               activity,
+        FlowExecutionContext   execution,
+        CancellationToken      ct
+    ) {
+        if (activity is ProcedureTaskBase procedure) {
+            await FlowTaskInvocation.InvokeAsync(procedure, definition, process, token, execution, null, ct);
+        }
+    }
+
 
     internal FlowConditionContext BuildConditionContext(
         ProcessDefinition           definition,
@@ -1904,7 +1918,7 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
                              .Max() + 1;
         foreach (var boundary in CompensationBoundaryHandler.FindCompensationBoundaries(definition, activity)) {
             if (CompensationBoundaryHandler.Build(definition, activity, boundary, this) is not null) {
-                execution.CompensationBindings.Add(new(owner, activity.Name, order++));
+                execution.CompensationBindings.Add(new(owner, activity.Name, boundary.Name, order++));
             }
         }
     }
@@ -1930,8 +1944,12 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         }
 
         foreach (var transition in transitions.Where(transition => transition.Kind == TransitionKind.Compensate && transition.Previous is not null)) {
+            // Compensate transitions carry the boundary event name as Event, so removal keys on the
+            // persisted boundary identity: the binding removed is exactly the handler that ran.
             var index = execution.CompensationBindings.FindLastIndex(binding =>
-                binding.ScopeOwnerCanonicalName == owner && binding.ActivityName == transition.Previous);
+                binding.ScopeOwnerCanonicalName == owner
+             && binding.ActivityName == transition.Previous
+             && binding.BoundaryName == transition.Event);
             if (index >= 0) {
                 execution.CompensationBindings.RemoveAt(index);
             }
@@ -2132,6 +2150,11 @@ public sealed class BpmnEngine : IFlowRuntime, ICompensationExecutor
         IReadOnlyList<SchemataProcessTransition> transitions,
         FlowExecutionContext                     execution
     ) {
+        if (execution.DeferredTransitions.Count > 0) {
+            transitions = [..transitions, ..execution.DeferredTransitions];
+            execution.DeferredTransitions.Clear();
+        }
+
         return new() {
             Process              = process,
             Tokens               = [..tokens],

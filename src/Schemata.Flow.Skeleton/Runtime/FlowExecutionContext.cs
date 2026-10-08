@@ -68,6 +68,9 @@ public sealed class FlowExecutionContext
     internal List<ProcessCompensationBinding> CompensationBindings { get; } = [];
 
     internal bool CompensationBindingsLoaded { get; set; }
+    /// <summary>Transitions recorded by nested entry owners during target resolution; the engine appends them to the snapshot it returns.</summary>
+    internal List<SchemataProcessTransition> DeferredTransitions { get; } = [];
+
 
     internal IDictionary<(Type SourceType, string CanonicalName), object> TouchedSources { get; init; } = new Dictionary<(Type SourceType, string CanonicalName), object>();
 

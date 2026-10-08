@@ -56,6 +56,7 @@ public sealed class SchedulingFixture(bool supplyNames = true) : IAsyncLifetime
         services.AddSingleton(BlockingJob);
         services.AddSingleton<IRepositoryUpdateAdvisor<SchemataJob>>(BlockingJobUpdateAdvisor);
         services.AddSchemataScheduling();
+        services.AddSchemataSchedulingRepositoryStore();
 
         _root = services.BuildServiceProvider();
 

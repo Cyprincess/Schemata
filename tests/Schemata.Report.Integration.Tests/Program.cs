@@ -68,6 +68,7 @@ builder.UseSchemata(schema => {
         insight.AddSourceDriver<RepositoryDriver>(RepositoryDriver.DriverName);
     });
     if (useScheduling) {
+        schema.Services.AddSchemataSchedulingRepositoryStore();
         schema.UseScheduling().MapHttp().MapGrpc();
     }
     schema.UseResource().MapHttp().MapGrpc();

@@ -46,6 +46,12 @@ public sealed class SchedulingInitializer : BackgroundService
     }
 
     public override async Task StartAsync(CancellationToken ct) {
+        // The dispatcher cannot claim a single row without an execution store, so a missing
+        // backend is a startup error, not a dispatch-time surprise.
+        using (var scope = _services.CreateScope()) {
+            scope.ServiceProvider.GetRequiredService<IJobExecutionStore>();
+        }
+
         _registry.RegisterAll(_options.Value.Jobs.Select(j => j.JobType));
         await _scheduler.StartAsync(ct);
         await base.StartAsync(ct);
@@ -79,35 +85,17 @@ public sealed class SchedulingInitializer : BackgroundService
     }
 
     /// <summary>
-    ///     Fails executions left <see cref="ExecutionState.Running" /> by a crash. The scheduler is
-    ///     single-node, so any Running row at startup is orphaned by an interrupted process. Each
-    ///     becomes <see cref="ExecutionState.Failed" /> so its operation reaches a terminal state and
-    ///     the caller can re-issue; the interrupted occurrence is not rerun automatically.
+    ///     Fails executions left <see cref="ExecutionState.Running" /> without a lease by a crash.
+    ///     Lease-less Running rows belong to in-process long-running-operation clients, so any of
+    ///     them present at startup was orphaned by the interrupted process and is settled
+    ///     <see cref="ExecutionState.Failed" /> to reach a terminal state. Dispatcher-claimed rows
+    ///     carry a lease and recover through the store's pending set instead: once the lease
+    ///     lapses, a dispatch pass reclaims the row and reruns it.
     /// </summary>
     private async Task FailOrphanedRunningAsync(CancellationToken ct) {
-        using var scope      = _services.CreateScope();
-        var       executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
-
-        var orphaned = new List<SchemataJobExecution>();
-        await foreach (var row in executions.ListAsync(q => q.Where(e => e.State == ExecutionState.Running), ct)) {
-            orphaned.Add(row);
-        }
-
-        if (orphaned.Count == 0) {
-            return;
-        }
-
-        var now = _time.GetUtcNow().UtcDateTime;
-        var mutation = scope.ServiceProvider.GetRequiredService<IResourceMutation<SchemataJobExecution>>();
-        await using var unit = executions.Begin();
-        foreach (var row in orphaned) {
-            row.State       = ExecutionState.Failed;
-            row.EndTime     = now;
-            row.RecentError = "Execution was interrupted by a host restart.";
-            await mutation.UpdateAsync(row, unit, ct: ct);
-        }
-
-        await unit.CommitAsync(ct);
+        using var scope = _services.CreateScope();
+        var       store = scope.ServiceProvider.GetRequiredService<IJobExecutionStore>();
+        await store.FailOrphanedRunningAsync(_time.GetUtcNow().UtcDateTime, ct);
     }
 
     public override async Task StopAsync(CancellationToken ct) {

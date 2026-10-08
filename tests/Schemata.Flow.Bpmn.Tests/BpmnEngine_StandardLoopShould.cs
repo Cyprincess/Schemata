@@ -95,6 +95,119 @@ public class BpmnEngine_StandardLoopShould
         Assert.Contains(result.Transitions, t => t.Kind == TransitionKind.Fail && t.Token == result.Snapshot.Tokens.Single().CanonicalName);
     }
 
+    [Fact]
+    public async Task Execute_ProcedureBody_RunsEachIterationAndCanTerminateOnChangedState() {
+        var invocations = 0;
+        var start       = new FlowEvent { Name = "start", Position = EventPosition.Start };
+        var loop = new ProcedureTask {
+            Name = "loop",
+            Body = (_, _) => {
+                invocations++;
+                return ValueTask.CompletedTask;
+            },
+            LoopCharacteristics = new StandardLoopCharacteristics {
+                TestBefore    = true,
+                LoopMaximum   = 10,
+                LoopCondition = new LambdaConditionExpression { Lambda = _ => new(invocations < 3) },
+            },
+        };
+        var after    = new NoneTask { Name = "after" };
+        var endEvent = new FlowEvent { Name = "end", Position = EventPosition.End };
+        var definition = new ProcessDefinition {
+            Name     = "standard-loop-body",
+            Elements = { start, loop, after, endEvent },
+            Flows = {
+                new() { Source = start, Target = loop },
+                new() { Source = loop, Target = after },
+                new() { Source = after, Target = endEvent },
+            },
+        };
+        var engine = new BpmnEngine();
+
+        var snapshot = await engine.StartAsync(definition, NewProcess(definition.Name), CancellationToken.None);
+
+        Assert.Equal(3, invocations);
+        Assert.Equal(3, snapshot.Transitions.Count(t => t is { Kind: TransitionKind.Move, Previous: "loop", Posterior: "loop" }));
+        Assert.Equal("after", Assert.Single(snapshot.Tokens).StateName);
+    }
+
+    [Fact]
+    public async Task Execute_ProcedureBody_Forwards_Distinct_Request_Id_Per_Iteration() {
+        var ids         = new List<string?>();
+        var invocations = 0;
+        var start       = new FlowEvent { Name = "start", Position = EventPosition.Start };
+        var loop = new ProcedureTask {
+            Name = "loop",
+            Body = (context, _) => {
+                invocations++;
+                ids.Add(context.RequestId);
+                return ValueTask.CompletedTask;
+            },
+            LoopCharacteristics = new StandardLoopCharacteristics {
+                TestBefore    = true,
+                LoopMaximum   = 10,
+                LoopCondition = new LambdaConditionExpression { Lambda = _ => new(invocations < 3) },
+            },
+        };
+        var after    = new NoneTask { Name = "after" };
+        var endEvent = new FlowEvent { Name = "end", Position = EventPosition.End };
+        var definition = new ProcessDefinition {
+            Name     = "standard-loop-request-id",
+            Elements = { start, loop, after, endEvent },
+            Flows = {
+                new() { Source = start, Target = loop },
+                new() { Source = loop, Target = after },
+                new() { Source = after, Target = endEvent },
+            },
+        };
+        var engine = new BpmnEngine();
+
+        var snapshot = await engine.StartAsync(definition, NewProcess(definition.Name), CancellationToken.None);
+
+        Assert.Equal(3, ids.Count);
+        Assert.All(ids, id => Assert.NotNull(id));
+        Assert.Equal(3, ids.Distinct().Count());
+        Assert.All(ids, id => Assert.StartsWith($"{snapshot.Tokens[0].CanonicalName}/effects/", id));
+    }
+
+    [Fact]
+    public async Task Execute_WhenBodyThrows_MarksTokenFailedWithoutCompleting() {
+        var invocations = 0;
+        var start       = new FlowEvent { Name = "start", Position = EventPosition.Start };
+        var loop = new ProcedureTask {
+            Name = "loop",
+            Body = (_, _) => {
+                invocations++;
+                return invocations == 2 ? throw new InvalidOperationException("body boom") : ValueTask.CompletedTask;
+            },
+            LoopCharacteristics = new StandardLoopCharacteristics {
+                TestBefore    = true,
+                LoopMaximum   = 5,
+                LoopCondition = Const(true),
+            },
+        };
+        var after    = new NoneTask { Name = "after" };
+        var endEvent = new FlowEvent { Name = "end", Position = EventPosition.End };
+        var definition = new ProcessDefinition {
+            Name     = "standard-loop-body-failure",
+            Elements = { start, loop, after, endEvent },
+            Flows = {
+                new() { Source = start, Target = loop },
+                new() { Source = loop, Target = after },
+                new() { Source = after, Target = endEvent },
+            },
+        };
+        var engine = new BpmnEngine();
+
+        var snapshot = await engine.StartAsync(definition, NewProcess(definition.Name), CancellationToken.None);
+
+        Assert.Equal(2, invocations);
+        var token = Assert.Single(snapshot.Tokens);
+        Assert.Equal("Failed", token.State);
+        Assert.Equal("Failed", snapshot.Process.State);
+        Assert.Contains(snapshot.Transitions, t => t.Kind == TransitionKind.Fail && t.Note == "body boom");
+    }
+
     private static async Task<LoopExecutionResult> ExecuteAsync(
         bool                  testBefore,
         IConditionExpression? condition,

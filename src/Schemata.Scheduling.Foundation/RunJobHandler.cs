@@ -73,6 +73,7 @@ public sealed class RunJobHandler(
             Job          = entity.CanonicalName ?? jobType.Name,
             Variables    = request.Variables ?? new Dictionary<string, string?>(),
             ExecutionUid = Guid.NewGuid(),
+            Principal    = request.Principal,
         };
 
         var trigger = TriggerOpenMethod.MakeGenericMethod(jobType);

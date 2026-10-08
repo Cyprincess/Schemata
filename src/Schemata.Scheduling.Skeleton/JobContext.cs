@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Security.Claims;
 using Schemata.Scheduling.Skeleton.Entities;
 
 namespace Schemata.Scheduling.Skeleton;
@@ -23,6 +24,15 @@ public class JobContext
     ///     timer fires; otherwise the scheduler allocates a fresh UID on fire.
     /// </summary>
     public Guid? ExecutionUid { get; set; }
+
+    /// <summary>
+    ///     The caller that initiated this fire, carried by
+    ///     <see cref="IScheduler.TriggerAsync{TJob}" /> into the trigger dispatch envelope so the
+    ///     installed authentication/authorization pipeline evaluates the initiating identity.
+    ///     Transport handlers pass the request principal; system producers pass
+    ///     <see cref="SchedulingSystemPrincipal.Instance" />. Not persisted on the execution row.
+    /// </summary>
+    public ClaimsPrincipal? Principal { get; set; }
 
     /// <summary>Scheduler-managed execution start time reserved for scheduler assignment.</summary>
     public DateTime? StartTime { get; set; }

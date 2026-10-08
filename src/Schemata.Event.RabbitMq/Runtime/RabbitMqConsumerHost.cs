@@ -152,8 +152,9 @@ public sealed class RabbitMqConsumerHost : BackgroundService
             return false;
         }
 
-        var matched = new List<SchemataEventSubscription>();
-        await foreach (var sub in subscriptions.ListMatchingAsync(eventTypeName, ct: ct)) {
+        var correlation = EventCorrelationHeaders.Read(ea.BasicProperties.Headers);
+        var matched     = new List<SchemataEventSubscription>();
+        await foreach (var sub in subscriptions.ListMatchingAsync(eventTypeName, correlation, ct)) {
             matched.Add(sub);
         }
 
@@ -181,8 +182,9 @@ public sealed class RabbitMqConsumerHost : BackgroundService
 
         var eventForCtx = (IEvent)eventInstance;
         var eventCtx = new EventContext(eventForCtx, eventTypeName) {
-            Payload = body,
+            Payload       = body,
             CorrelationId = correlationId ?? Guid.NewGuid().ToString("n"),
+            Correlation   = correlation,
         };
 
         try {

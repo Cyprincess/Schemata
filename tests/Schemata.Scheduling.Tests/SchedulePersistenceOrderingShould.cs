@@ -60,6 +60,7 @@ public class SchedulePersistenceOrderingShould
             .AddSingleton<IScheduledJobRegistry>(registry)
             .AddSingleton(recording)
             .AddSchemataScheduling()
+            .AddSchemataSchedulingRepositoryStore()
             .RemoveAll<IJobLifecycleObserver>()
             .BuildServiceProvider();
         var scheduler  = services.GetRequiredService<DefaultScheduler>();

@@ -29,4 +29,11 @@ public class SchemataSchedulingOptions
 
     /// <summary>Interval between persisted operation state reads while waiting in-process.</summary>
     public TimeSpan OperationPollInterval { get; set; } = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>
+    ///     Default lease duration granted to a dispatcher claiming an execution, renewed while the
+    ///     job body runs. A job registration overrides it with <see cref="JobRegistration.Lease" />.
+    ///     Defaults to 5 minutes.
+    /// </summary>
+    public TimeSpan ExecutionLease { get; set; } = TimeSpan.FromMinutes(5);
 }

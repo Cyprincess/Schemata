@@ -1,11 +1,13 @@
 using System;
+using System.Collections.Generic;
 using Schemata.Event.Skeleton.Entities;
 
 namespace Schemata.Event.Skeleton;
 
 /// <summary>
 ///     Per-dispatch context carrying the event alongside the wire-format type, serialized body,
-///     correlation key, audit record, and the handler outcome (result or exception).
+///     correlation identifier, business correlation metadata, audit record, and the handler outcome
+///     (result or exception).
 /// </summary>
 public class EventContext
 {
@@ -39,6 +41,13 @@ public class EventContext
 
     /// <summary>Correlation identifier for tracking the dispatch end-to-end.</summary>
     public string? CorrelationId { get; set; }
+
+    /// <summary>
+    ///     Optional business correlation metadata supplied by the publisher (order id, case id).
+    ///     Subscriptions carrying a <see cref="SchemataEventSubscription.CorrelationFilter" /> match
+    ///     only when every filtered pair is present here; unfiltered subscriptions match regardless.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? Correlation { get; set; }
 
     /// <summary>Audit record attached by an <see cref="IEventLifecycleObserver" /> during publish.</summary>
     public SchemataEvent? Record { get; set; }

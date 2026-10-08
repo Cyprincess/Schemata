@@ -48,14 +48,22 @@ public static class ProcedureTaskPayloadValidator
             : null;
     }
 
-    private static IEnumerable<Type> IncomingCatchPayloadTypes(ProcessDefinition definition, FlowElement target) {
+    private static IEnumerable<Type> IncomingCatchPayloadTypes(
+        ProcessDefinition   definition,
+        FlowElement         target,
+        HashSet<FlowElement>? visited = null
+    ) {
+        // The walk is bounded by a visited set: a legal durable cycle (typed catch → task → waiting
+        // user task → gateway → back to the catch) revisits elements, and without the bound the
+        // recursion never terminates.
+        visited ??= [];
         foreach (var flow in definition.AllFlows.Where(f => f.Target == target)) {
             if (flow.Source is FlowEvent { Position: EventPosition.IntermediateCatch, Definition: Message { PayloadType: not null } message }) {
                 yield return message.PayloadType;
             } else if (flow.Source is FlowEvent { Position: EventPosition.IntermediateCatch, Definition: Signal { PayloadType: not null } signal }) {
                 yield return signal.PayloadType;
-            } else {
-                foreach (var type in IncomingCatchPayloadTypes(definition, flow.Source)) {
+            } else if (flow.Source is not null && visited.Add(flow.Source)) {
+                foreach (var type in IncomingCatchPayloadTypes(definition, flow.Source, visited)) {
                     yield return type;
                 }
             }

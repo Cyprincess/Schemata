@@ -9,4 +9,6 @@ public sealed class MutableClock(DateTimeOffset start) : TimeProvider
     public DateTime Now => _now.UtcDateTime;
 
     public override DateTimeOffset GetUtcNow() { return _now; }
+
+    public void Advance(TimeSpan delta) { _now += delta; }
 }

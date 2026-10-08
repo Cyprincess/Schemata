@@ -243,8 +243,7 @@ public sealed class StateMachineEngine : IFlowRuntime
         }
 
         if (target is ProcedureTaskBase procedure) {
-            var task = new FlowTaskContext(definition, process, token, context, payload);
-            await procedure.InvokeAsync(task, ct);
+            await FlowTaskInvocation.InvokeAsync(procedure, definition, process, token, context, payload, ct);
             var flow = await ResolveAutoFlowAsync(definition, process, token, context, procedure, payload);
             if (flow is null) {
                 return new(procedure.Name, null, false);

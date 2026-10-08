@@ -156,6 +156,30 @@ internal sealed class FlowHandlerSupport(
         IReadOnlyDictionary<string, string?> before,
         CancellationToken                    ct
     ) {
+        await RunSnapshotAdvisorsAsync(registration, scope, execution, snapshot, before, true, ct);
+    }
+
+    internal async Task RunCalledSnapshotAdvisorsAsync(
+        ProcessRegistration                  registration,
+        FlowPersistenceScope                 scope,
+        FlowExecutionContext                 execution,
+        ProcessSnapshot                      snapshot,
+        CancellationToken                    ct
+    ) {
+        // The called snapshot runs inside the caller's transition: its sources flush once with the
+        // outer snapshot, so this run advises without flushing the shared touched-source set.
+        await RunSnapshotAdvisorsAsync(registration, scope, execution, snapshot, new Dictionary<string, string?>(), false, ct);
+    }
+
+    private async Task RunSnapshotAdvisorsAsync(
+        ProcessRegistration                  registration,
+        FlowPersistenceScope                 scope,
+        FlowExecutionContext                 execution,
+        ProcessSnapshot                      snapshot,
+        IReadOnlyDictionary<string, string?> before,
+        bool                                 flushSources,
+        CancellationToken                    ct
+    ) {
         var tokens = snapshot.Transitions
                              .Select(transition => transition.Token)
                              .Where(token => !string.IsNullOrEmpty(token))
@@ -179,7 +203,9 @@ internal sealed class FlowHandlerSupport(
             await RunSourceAdvisorsAsync(registration, scope, execution, context, ct);
         }
 
-        await FlushTouchedSourcesAsync(scope, execution, snapshot.Process.CanonicalName ?? string.Empty, ct);
+        if (flushSources) {
+            await FlushTouchedSourcesAsync(scope, execution, snapshot.Process.CanonicalName ?? string.Empty, ct);
+        }
 
         var handlers = services.GetServices<IFlowCatchHandler>().ToList();
         foreach (var transition in snapshot.Transitions) {
@@ -426,11 +452,13 @@ internal sealed class FlowHandlerSupport(
                 bindings.Add(new(
                     binding.ScopeOwnerCanonicalName,
                     binding.ActivityName,
+                    binding.BoundaryName,
                     binding.RegistrationOrder));
             }
         }
 
-        return new(scope.UnitOfWork, services) {
+        FlowExecutionContext? context = null;
+        context = new(scope.UnitOfWork, services) {
             LoadedCompensationBindings = bindings,
             Principal                  = principal,
             SourceReadGuard            = FlowSourceReadScope.Enter,
@@ -450,10 +478,26 @@ internal sealed class FlowHandlerSupport(
                     RequireSourceStamp(row, initial, canonical);
                 }
             },
-            CreateProcessAsync         = (entity, token) => scope.CreateProcessAsync(entity, token),
-            CreateTokenAsync           = (entity, token) => scope.CreateTokenAsync(entity, token),
-            PersistSnapshotAsync       = (snapshot, token) => persistence.PersistSnapshotAsync(scope, snapshot, token),
+            CreateProcessAsync = (entity, token) => scope.CreateProcessAsync(entity, token),
+            CreateTokenAsync   = (entity, token) => scope.CreateTokenAsync(entity, token),
+            PersistSnapshotAsync = (snapshot, token) => RouteCalledSnapshotAsync(scope, context!, snapshot, token),
         };
+
+        return context;
+    }
+
+    private async Task RouteCalledSnapshotAsync(
+        FlowPersistenceScope scope,
+        FlowExecutionContext execution,
+        ProcessSnapshot      snapshot,
+        CancellationToken    ct
+    ) {
+        // A called child process snapshot flows through the same catch-handler, advisor, and
+        // persistence owners as any other snapshot; its tokens had no prior waiting state.
+        var registration = ResolveRegistration(snapshot.Process);
+        EnsureCatchesHaveHandlers(registration.Definition, snapshot);
+        await RunCalledSnapshotAdvisorsAsync(registration, scope, execution, snapshot, ct);
+        await persistence.PersistSnapshotAsync(scope, snapshot, ct);
     }
 
     internal static SchemataProcess NewProcess(ProcessRegistration registration, StartProcessOptions? startOptions) {

@@ -79,6 +79,7 @@ public sealed class ReportConflictTransportShould
                 schema.Services.AddRepository<SchemataJobExecution, EfCoreRepository<ScheduleDbContext, SchemataJobExecution>>();
                 schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJob>, AdviceAddResourceName<SchemataJob>>());
                 schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJobExecution>, AdviceAddResourceName<SchemataJobExecution>>());
+                schema.Services.AddSchemataSchedulingRepositoryStore();
                 var selected = schema.UseReport<ScheduleReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>();
                 var conflicting = schema.UseReport<ConflictingReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>();
                 if (selectedScheduling) selected.UseScheduling();

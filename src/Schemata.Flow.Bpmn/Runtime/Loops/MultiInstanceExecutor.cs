@@ -92,6 +92,8 @@ public sealed class MultiInstanceExecutor
             return BpmnEngine.Snapshot(process, working, [], context);
         }
 
+        await engine.InvokeActivityBodyAsync(definition, process, instance, activity, context, ct);
+
         instance.State         = "Completed";
         instance.StateName     = activity.Name;
         instance.WaitingAtName = null;
@@ -190,6 +192,8 @@ public sealed class MultiInstanceExecutor
                 "MultiInstance");
             transition.Note = i.ToString(CultureInfo.InvariantCulture);
             transitions.Add(transition);
+
+            await engine.InvokeActivityBodyAsync(definition, process, token, activity, context, ct);
 
             completed++;
             WriteAggregate(token, total, 0, completed);

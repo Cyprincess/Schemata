@@ -67,6 +67,7 @@ public sealed class TimerBridgeFixture : IAsyncLifetime
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowEngineValidator, BpmnFlowEngineValidator>());
 
         ConfigureFeature(new SchemataSchedulingFeature(), services);
+        services.AddSchemataSchedulingRepositoryStore();
         ConfigureFeature(new SchemataFlowSchedulingFeature(), services);
         // Claims no catch kind, so it never satisfies the has-an-owner check: it is here only to
         // record the transitions the timer path produces.
@@ -79,6 +80,14 @@ public sealed class TimerBridgeFixture : IAsyncLifetime
                return ValueTask.CompletedTask;
            });
         services.AddSingleton(spy.Object);
+        // Claims message catches so gateway fixtures mixing message and timer branches satisfy the
+        // has-an-owner check.
+        var messages = new Mock<IFlowCatchHandler>();
+        messages.Setup(handler => handler.Handles(It.IsAny<FlowCatchKind>()))
+                .Returns((FlowCatchKind kind) => kind is FlowCatchKind.Message);
+        messages.Setup(handler => handler.ArmAsync(It.IsAny<FlowTransitionContext>(), It.IsAny<CancellationToken>()))
+                .Returns(ValueTask.CompletedTask);
+        services.AddSingleton(messages.Object);
 
         _root = services.BuildServiceProvider();
 

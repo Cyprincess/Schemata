@@ -44,6 +44,8 @@ schema.UseScheduling()
       .WithJob<ReportJob>("0 8 * * *");  // daily at 08:00 UTC
 ```
 
+`UseScheduling()` activates the dispatcher, which runs executions through the `IJobExecutionStore` contract (lease, retry ceiling, crash recovery). Install the default repository-backed store with `builder.Services.AddSchemataSchedulingRepositoryStore()` from the `Schemata.Scheduling.Repository` package, or register a custom `IJobExecutionStore` to run against a different backend; startup fails when no store is registered.
+
 Register an on-demand job without a schedule through `WithJob<T>()`. That records the type in `SchemataSchedulingOptions.Jobs` so the registry can resolve executions after a restart without arming a timer at startup.
 
 ### Internal registration helper

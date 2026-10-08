@@ -26,4 +26,26 @@ public sealed class JobRegistration
     ///     known-only registration that is keyed but not armed on startup.
     /// </summary>
     public IScheduleDefinition? Schedule { get; }
+
+    /// <summary>
+    ///     Maximum number of attempts for one execution, counting the initial claim and every
+    ///     crash-recovery reclaim. A job body that fails with attempts remaining returns to the
+    ///     pending set after <see cref="RetryBackoff" />; the attempt that reaches the ceiling is
+    ///     settled <see cref="Entities.ExecutionState.Failed" />. Defaults to 1 (no retry).
+    /// </summary>
+    public int MaxAttempts { get; set; } = 1;
+
+    /// <summary>
+    ///     Backoff unit applied before a failed attempt is retried; the next due time is
+    ///     <c>RetryBackoff × Attempt</c> after the failure, so retries back off linearly.
+    ///     Defaults to 30 seconds.
+    /// </summary>
+    public TimeSpan RetryBackoff { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    ///     Lease duration granted to a dispatcher claiming an execution of this job, renewed while
+    ///     the job body runs. <see langword="null" /> falls back to
+    ///     <see cref="SchemataSchedulingOptions.ExecutionLease" />.
+    /// </summary>
+    public TimeSpan? Lease { get; set; }
 }

@@ -59,7 +59,7 @@ and a publish gate before acting:
 - `OnSucceededAsync` — publishes `JobCompleted` unless the gate is `Block`.
 - `OnFailedAsync` — publishes `JobFailed` unless the gate is `Block`.
 
-## InterceptExecution
+## Execution gating
 
 `IJobLifecycleObserver` only publishes notifications. Execution advisors decide whether a
 job runs: `Continue` runs it, `Block` writes `Blocked`, and `Handle` writes `Skipped`.
@@ -72,7 +72,7 @@ in priority order:
 1. `SchemataSchedulingEventOptions.Jobs[jobType]` — explicit per-type registration.
 2. `[PublishEvent]` on the job class.
 3. `SchemataSchedulingEventOptions.DefaultPublishEventResult` — the global default
-   (`AdviseResult.Continue`, `InterceptExecution = false`).
+   (`AdviseResult.Continue`).
 
 A job whose `JobKey` does not resolve to a registered type falls back to the global default.
 
@@ -82,18 +82,15 @@ A job whose `JobKey` does not resolve to a registered type falls back to the glo
 [AttributeUsage(AttributeTargets.Class)]
 public sealed class PublishEventAttribute : Attribute
 {
-    public PublishEventAttribute(
-        AdviseResult result             = AdviseResult.Continue,
-        bool         interceptExecution = false);
+    public PublishEventAttribute(AdviseResult result = AdviseResult.Continue);
 
-    public AdviseResult Result             { get; }
-    public bool         InterceptExecution { get; }
+    public AdviseResult Result { get; }
 }
 ```
 
 ```csharp
-[PublishEvent(interceptExecution: true)]
-public sealed class ExternallyManagedJob : IScheduledJob
+[PublishEvent(AdviseResult.Block)]
+public sealed class QuietJob : IScheduledJob
 {
     public Task ExecuteAsync(JobContext context, CancellationToken ct) => Task.CompletedTask;
 }
@@ -105,9 +102,9 @@ public sealed class ExternallyManagedJob : IScheduledJob
 
 ```csharp
 schema.UseScheduling()
-      .WithJob<ExternallyManagedJob>("*/5 * * * *")
+      .WithJob<QuietJob>("*/5 * * * *")
       .UseEvent()
-      .WithEventPublishing<ExternallyManagedJob>(interceptExecution: true);
+      .WithEventPublishing<QuietJob>(AdviseResult.Block);
 ```
 
 ### SchemataSchedulingEventOptions
@@ -121,16 +118,15 @@ public class SchemataSchedulingEventOptions
 
 public sealed class JobEventConfiguration
 {
-    public AdviseResult Result             { get; set; } = AdviseResult.Continue;
-    public bool         InterceptExecution { get; set; }
+    public AdviseResult Result { get; set; } = AdviseResult.Continue;
 }
 ```
 
 ```csharp
 schema.UseScheduling()
-      .WithJob<ExternallyManagedJob>("*/5 * * * *")
+      .WithJob<QuietJob>("*/5 * * * *")
       .UseEvent(options => {
-          options.Jobs[typeof(ExternallyManagedJob)] = new() { InterceptExecution = true };
+          options.Jobs[typeof(QuietJob)] = new() { Result = AdviseResult.Block };
       });
 ```
 
@@ -202,9 +198,6 @@ public sealed class JobSkipped : IEvent
 
 ## Caveats
 
-- `InterceptExecution` is accepted by `[PublishEvent]`, `SchemataSchedulingEventOptions.Jobs`, and
-  `WithEventPublishing<T>`, but no built-in component reads it — gating a fire belongs to
-  `IJobExecutionAdvisor`, and suppressing a publication to the `Result` gate shown above.
 - The seven lifecycle event types are registered in `IEventTypeRegistry` by the feature. Consumers
   reach them through the event bus by their wire names; a bare `IEventHandler<T>` registration without
   the wire-name registration would not route.

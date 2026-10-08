@@ -52,8 +52,10 @@ A persisted subscription is not required for an in-process handler to run. See [
 
 `SchemataEventSubscription` rows persist through `IRepository<SchemataEventSubscription>`, so
 subscriptions survive restarts. `SchemataEventSubscriptionExtensions.ListMatchingAsync(eventType,
-correlationKey)` is the read-side helper the in-process publisher and the RabbitMQ consumer use to
-resolve matching subscriptions during dispatch.
+correlation)` is the read-side helper the in-process publisher and the RabbitMQ consumer use to
+resolve matching subscriptions during dispatch: it streams subscriptions of the event type and keeps
+only those whose `CorrelationFilter` is satisfied by the envelope's business correlation metadata
+(a null or empty filter matches every event).
 
 ## RabbitMQ provider
 

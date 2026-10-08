@@ -1,5 +1,6 @@
 using Schemata.Messaging.Skeleton;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -56,18 +57,39 @@ public sealed class RabbitMqEventBus : IEventBus
 
     public Task PublishAsync<TEvent>(TEvent @event, CancellationToken ct = default)
         where TEvent : IEvent {
-        return PublishCoreAsync(@event, null, ct);
+        return PublishCoreAsync(@event, null, null, ct);
+    }
+
+    public Task PublishAsync<TEvent>(TEvent @event, IReadOnlyDictionary<string, string> correlation, CancellationToken ct = default)
+        where TEvent : IEvent {
+        return PublishCoreAsync(@event, null, correlation, ct);
     }
 
     public async Task PublishAsync<TEvent>(TEvent @event, object sourceEntity, CancellationToken ct = default)
         where TEvent : IEvent {
         EventSourceContract.Ensure(sourceEntity);
-        await PublishCoreAsync(@event, sourceEntity, ct);
+        await PublishCoreAsync(@event, sourceEntity, null, ct);
+    }
+
+    public async Task PublishAsync<TEvent>(
+        TEvent                              @event,
+        object                              sourceEntity,
+        IReadOnlyDictionary<string, string> correlation,
+        CancellationToken                   ct = default
+    )
+        where TEvent : IEvent {
+        EventSourceContract.Ensure(sourceEntity);
+        await PublishCoreAsync(@event, sourceEntity, correlation, ct);
     }
 
     #endregion
 
-    private async Task PublishCoreAsync<TEvent>(TEvent @event, object? source, CancellationToken ct)
+    private async Task PublishCoreAsync<TEvent>(
+        TEvent                               @event,
+        object?                              source,
+        IReadOnlyDictionary<string, string>? correlation,
+        CancellationToken                    ct
+    )
         where TEvent : IEvent {
         // Resolve by the runtime type so a derived event published through a base/interface
         // static type keeps its registered name and serialized derived members.
@@ -82,6 +104,7 @@ public sealed class RabbitMqEventBus : IEventBus
         var eventCtx = new EventContext(@event, routingKey) {
             Payload       = JsonSerializer.Serialize(@event, type, _json),
             CorrelationId = Guid.NewGuid().ToString("n"),
+            Correlation   = correlation,
             Source        = source,
         };
         var adviceCtx = new AdviceContext(scope.Services);
@@ -115,7 +138,7 @@ public sealed class RabbitMqEventBus : IEventBus
             ContentType   = "application/json",
             DeliveryMode  = DeliveryModes.Persistent,
             CorrelationId = eventCtx.CorrelationId,
-            Headers = MessageContextHeaders.Write(message.Items),
+            Headers       = WriteHeaders(message.Items, eventCtx.Correlation),
         };
 
         await channel.ExchangeDeclareAsync(exchange, _options.Value.ExchangeType, true, cancellationToken: ct);
@@ -125,5 +148,19 @@ public sealed class RabbitMqEventBus : IEventBus
         foreach (var observer in observers.OrderBy(observer => observer is SchemataEventAuditObserver)) {
             await observer.OnDeliveredAsync(eventCtx, ct);
         }
+    }
+
+    private static IDictionary<string, object?>? WriteHeaders(
+        IReadOnlyDictionary<string, string?>  items,
+        IReadOnlyDictionary<string, string>?  correlation
+    ) {
+        var headers = MessageContextHeaders.Write(items);
+        if (correlation is null || correlation.Count == 0) {
+            return headers;
+        }
+
+        headers ??= new Dictionary<string, object?>(StringComparer.Ordinal);
+        EventCorrelationHeaders.Write(headers, correlation);
+        return headers;
     }
 }

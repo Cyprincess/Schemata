@@ -8,6 +8,7 @@
     <ProjectReference Include="../../src/Schemata.Caching.Memory/Schemata.Caching.Memory.csproj" />
     <ProjectReference Include="../../src/Schemata.Actor.Foundation/Schemata.Actor.Foundation.csproj" />
     <ProjectReference Include="../../src/Schemata.Scheduling.Foundation/Schemata.Scheduling.Foundation.csproj" />
+    <ProjectReference Include="../../src/Schemata.Scheduling.Repository/Schemata.Scheduling.Repository.csproj" />
     <ProjectReference Include="../../src/Schemata.Actor.Scheduling/Schemata.Actor.Scheduling.csproj" />
     <ProjectReference Include="../../src/Schemata.Event.RabbitMq/Schemata.Event.RabbitMq.csproj" />
     <ProjectReference Include="../../src/Schemata.Event.Foundation/Schemata.Event.Foundation.csproj" />

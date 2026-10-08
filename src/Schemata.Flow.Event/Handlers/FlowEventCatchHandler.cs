@@ -61,8 +61,8 @@ public sealed class FlowEventCatchHandler : IFlowCatchHandler
         if (!string.IsNullOrEmpty(context.PreviousWaitingAtName)
          && context.PreviousWaitingAtName != token.WaitingAtName) {
             var oldElement = definition.AllElements.FirstOrDefault(e => e.Name == context.PreviousWaitingAtName);
-            foreach (var elementName in ResolveCatchElementNames(oldElement, definition)) {
-                await RemoveSubscriptionAsync(subscriptions, mutations, SubscriptionId(processName, elementName, token.CanonicalName), context.UnitOfWork, ct);
+            foreach (var (elementName, eventDef) in ResolveCatchEventDefinitions(oldElement, definition)) {
+                await RemoveOwnedSubscriptionAsync(subscriptions, mutations, context, elementName, eventDef, null, context.UnitOfWork, ct);
             }
         }
 
@@ -74,8 +74,8 @@ public sealed class FlowEventCatchHandler : IFlowCatchHandler
         if (!string.IsNullOrEmpty(previousState)
          && previousState != token.StateName
          && definition.AllElements.FirstOrDefault(e => e.Name == previousState) is Activity previousHost) {
-            foreach (var (elementName, _) in ResolveBoundaryCatchEventDefinitions(previousHost, definition)) {
-                await RemoveSubscriptionAsync(subscriptions, mutations, SubscriptionId(processName, elementName, token.CanonicalName), context.UnitOfWork, ct);
+            foreach (var (elementName, eventDef) in ResolveBoundaryCatchEventDefinitions(previousHost, definition)) {
+                await RemoveOwnedSubscriptionAsync(subscriptions, mutations, context, elementName, eventDef, previousHost.Name, context.UnitOfWork, ct);
             }
         }
 
@@ -168,6 +168,63 @@ public sealed class FlowEventCatchHandler : IFlowCatchHandler
     private static string SubscriptionId(string processName, string elementName, string? token) {
         return $"flow:{processName}:{elementName}:{token ?? "broadcast"}";
     }
+    private static async Task RemoveOwnedSubscriptionAsync(
+        IRepository<SchemataEventSubscription> subscriptions,
+        IResourceMutation<SchemataEventSubscription> mutations,
+        FlowTransitionContext context,
+        string            elementName,
+        IEventDefinition  eventDef,
+        string?           hostName,
+        IUnitOfWork       unitOfWork,
+        CancellationToken ct
+    ) {
+        // Identity must match UpsertAsync: messages are token-scoped, signals are the shared
+        // process-level broadcast row, which survives until its last owning catch leaves.
+        var subscriptionToken = eventDef is Message ? context.Token.CanonicalName : null;
+        if (subscriptionToken is null && HasOtherLiveOwner(context, elementName, hostName)) {
+            return;
+        }
+
+        await RemoveSubscriptionAsync(subscriptions, mutations, SubscriptionId(context.Snapshot.Process.CanonicalName!, elementName, subscriptionToken), unitOfWork, ct);
+    }
+
+    private static bool HasOtherLiveOwner(FlowTransitionContext context, string elementName, string? hostName) {
+        foreach (var other in context.Snapshot.Tokens) {
+            if (string.Equals(other.CanonicalName, context.Token.CanonicalName, StringComparison.Ordinal)) {
+                continue;
+            }
+
+            if (!TokenStates.Live.Contains(other.State ?? string.Empty)) {
+                continue;
+            }
+
+            if (hostName is not null) {
+                if (other.WaitingAtName is null && other.StateName == hostName) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (other.WaitingAtName == elementName) {
+                return true;
+            }
+
+            // A token waiting at an event-based gateway co-owns the broadcast rows of the
+            // gateway's outgoing signal catches: its waiting element is the gateway, not the catch.
+            if (context.Definition is { } definition
+             && other.WaitingAtName is { } waitingAt
+             && definition.AllElements.FirstOrDefault(e => e.Name == waitingAt) is EventBasedGateway gateway
+             && definition.Flows.Any(flow => flow.Source == gateway
+                                          && flow.Target is FlowEvent { Position: EventPosition.IntermediateCatch } outgoing
+                                          && outgoing.Name == elementName)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
 
     private static string? PreviousStateOf(FlowTransitionContext context) {
         return context.Snapshot.Transitions
@@ -176,9 +233,6 @@ public sealed class FlowEventCatchHandler : IFlowCatchHandler
                       .FirstOrDefault();
     }
 
-    private static IEnumerable<string> ResolveCatchElementNames(FlowElement? element, ProcessDefinition definition) {
-        return ResolveCatchEventDefinitions(element, definition).Select(t => t.ElementName);
-    }
 
     private static IEnumerable<(string ElementName, IEventDefinition Definition)> ResolveBoundaryCatchEventDefinitions(
         Activity          host,

@@ -4,6 +4,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Errors;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Integration.Tests.Fixtures;
@@ -93,6 +96,166 @@ public sealed class FlowTimerBridgeShould : IClassFixture<TimerBridgeFixture>
 
         var persisted = await ReadOrderAsync(order.Uid);
         Assert.Equal("apply", persisted.State);
+    }
+
+    [Fact]
+    public async Task Reentering_The_Gateway_Replaces_The_Timer_And_Rejects_The_Stale_Firing() {
+        var definition = await RegisterAsync(typeof(ReentrantGatewayTimerProcess));
+        var process    = await StartAsync(definition);
+
+        var token = await ReadTokenAsync(process.Name!);
+        Assert.Equal("gateway", token.WaitingAtName);
+        var job = Assert.Single(await ReadJobsAsync(process.CanonicalName!));
+        Assert.Equal(JobState.Active, job.State);
+        var firstVersion   = job.ScheduleVersion;
+        var firstExecution = await ReadPendingExecutionAsync(job.CanonicalName!);
+        Assert.NotNull(firstExecution);
+        Assert.Equal(firstVersion, firstExecution.ScheduleVersion);
+
+        await CorrelateAsync(process, "redo-message");
+
+        // Leaving through the message branch cancelled the pending timer branch; re-entering
+        // armed a fresh generation under the same job identity.
+        var reentered = await ReadTokenAsync(process.Name!);
+        Assert.Equal("gateway", reentered.WaitingAtName);
+        var rearmed = Assert.Single(await ReadJobsAsync(process.CanonicalName!));
+        Assert.Equal(JobState.Active, rearmed.State);
+        Assert.Equal(job.CanonicalName, rearmed.CanonicalName);
+        Assert.NotEqual(firstVersion, rearmed.ScheduleVersion);
+        var cancelled = await ReadExecutionAsync(firstExecution.Uid);
+        Assert.Equal(ExecutionState.Cancelled, cancelled.State);
+        var current = await ReadPendingExecutionAsync(rearmed.CanonicalName!);
+        Assert.NotNull(current);
+        Assert.Equal(rearmed.ScheduleVersion, current.ScheduleVersion);
+
+        await AssertStaleFiringAsync(rearmed, firstVersion);
+        Assert.Equal("gateway", (await ReadTokenAsync(process.Name!)).WaitingAtName);
+
+        await FireExecutionAsync(rearmed, current);
+
+        var completed = await ReadTokenAsync(process.Name!);
+        Assert.Null(completed.WaitingAtName);
+        Assert.Equal("end", completed.StateName);
+    }
+
+    [Fact]
+    public async Task Terminate_Active_Host_Disarms_Its_Boundary_Timer() {
+        var definition = await RegisterAsync(typeof(BoundaryTimerBridgeProcess));
+        var process    = await StartAsync(definition);
+
+        var job = Assert.Single(await ReadJobsAsync(process.CanonicalName!));
+        Assert.Equal(JobState.Active, job.State);
+        var version = job.ScheduleVersion;
+
+        await TerminateAsync(process);
+
+        var disarmed = Assert.Single(await ReadJobsAsync(process.CanonicalName!));
+        Assert.Equal(JobState.Paused, disarmed.State);
+        Assert.NotEqual(version, disarmed.ScheduleVersion);
+        Assert.Null(await ReadPendingExecutionAsync(job.CanonicalName!));
+
+        await AssertStaleFiringAsync(disarmed, version);
+    }
+
+    [Fact]
+    public async Task Terminate_End_Event_Disarms_The_Sibling_Timer() {
+        var definition = await RegisterAsync(typeof(TerminateEndTimerProcess));
+        var process    = await StartAsync(definition);
+
+        var tokens = await ReadTokensAsync(process.Name!);
+        var worker = Assert.Single(tokens, token => token.StateName == "work");
+        Assert.Single(tokens, token => token.WaitingAtName == "timer-catch");
+        var job = Assert.Single(await ReadJobsAsync(process.CanonicalName!));
+        Assert.Equal(JobState.Active, job.State);
+
+        await CompleteAsync(process, worker.CanonicalName);
+
+        var disarmed = Assert.Single(await ReadJobsAsync(process.CanonicalName!));
+        Assert.Equal(JobState.Paused, disarmed.State);
+        Assert.Null(await ReadPendingExecutionAsync(job.CanonicalName!));
+    }
+
+    private async Task<string> RegisterAsync(Type definition) {
+        using var scope    = _fixture.CreateScope();
+        var       registry = scope.ServiceProvider.GetRequiredService<IProcessRegistry>();
+        var       name     = $"{definition.Name}-{Guid.NewGuid():n}";
+        await registry.RegisterAsync(new() {
+            Name           = name,
+            Engine         = FlowConstants.Engines.Bpmn,
+            DefinitionType = definition,
+        });
+        return name;
+    }
+
+    private async Task CorrelateAsync(SchemataProcess process, string message) {
+        using var scope  = _fixture.CreateScope();
+        var       runner = scope.ServiceProvider.GetRequiredService<FlowRunner>();
+        await runner.CorrelateAsync(process, message, (string?)null, null, null, CancellationToken.None);
+    }
+
+    private async Task TerminateAsync(SchemataProcess process) {
+        using var scope  = _fixture.CreateScope();
+        var       runner = scope.ServiceProvider.GetRequiredService<FlowRunner>();
+        await runner.TerminateAsync(process, null, CancellationToken.None);
+    }
+
+    private async Task CompleteAsync(SchemataProcess process, string? token) {
+        using var scope  = _fixture.CreateScope();
+        var       runner = scope.ServiceProvider.GetRequiredService<FlowRunner>();
+        await runner.CompleteAsync(process, token, null, CancellationToken.None);
+    }
+
+    private async Task AssertStaleFiringAsync(SchemataJob job, Guid version) {
+        using var scope    = _fixture.CreateScope();
+        var       timerJob = new FlowTimerJob(scope.ServiceProvider);
+        var exception = await Assert.ThrowsAsync<FailedPreconditionException>(() => timerJob.ExecuteAsync(new() {
+            Job       = job.CanonicalName,
+            Variables = job.Variables ?? new Dictionary<string, string?>(),
+            Execution = new() { ScheduleVersion = version },
+        }, CancellationToken.None));
+        var info = Assert.Single(exception.Details!.OfType<ErrorInfoDetail>());
+        Assert.Equal(SchemataResources.FLOW_TIMER_STALE_FIRING, info.Reason);
+    }
+
+    private async Task<SchemataJobExecution?> ReadPendingExecutionAsync(string jobCanonical) {
+        using var scope      = _fixture.CreateScope();
+        var       executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
+        return await executions.FirstOrDefaultAsync(
+            query => query.Where(current => current.Job == jobCanonical && current.State == ExecutionState.Pending));
+    }
+
+    private async Task<SchemataJobExecution> ReadExecutionAsync(Guid uid) {
+        using var scope      = _fixture.CreateScope();
+        var       executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
+        var       execution  = await executions.FindAsync([uid]);
+        Assert.NotNull(execution);
+        return execution;
+    }
+
+    private async Task<SchemataProcessToken> ReadTokenAsync(string processName) {
+        var token = Assert.Single(await ReadTokensAsync(processName));
+        Assert.Null(token.DeleteTime);
+        return token;
+    }
+
+    private async Task FireExecutionAsync(SchemataJob job, SchemataJobExecution execution) {
+        using (var scope = _fixture.CreateScope()) {
+            var executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
+            var pending    = await executions.FindAsync([execution.Uid]);
+            Assert.NotNull(pending);
+            Assert.Equal(ExecutionState.Pending, pending.State);
+            pending.StartTime = DateTime.UtcNow.AddSeconds(-1);
+            await executions.UpdateAsync(pending);
+            await executions.CommitAsync();
+        }
+
+        await _fixture.DispatchPendingAsync();
+
+        using var verificationScope = _fixture.CreateScope();
+        var       verification      = verificationScope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
+        var       completed         = await verification.FindAsync([execution.Uid]);
+        Assert.NotNull(completed);
+        Assert.Equal(ExecutionState.Succeeded, completed.State);
     }
 
     private async Task<SchemataProcess> StartAsync(string definitionName) {

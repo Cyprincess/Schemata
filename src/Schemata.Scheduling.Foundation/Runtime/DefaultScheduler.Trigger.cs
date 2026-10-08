@@ -18,7 +18,7 @@ public sealed partial class DefaultScheduler
         var       dispatcher = scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
         var inner = new TriggerJobRequest(context.Job ?? string.Empty, typeof(TJob), context);
         return await dispatcher.SendAsync<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>(
-            new(SchedulingOperations.Trigger, inner.JobCanonicalName, inner, null), ct);
+            new(SchedulingOperations.Trigger, inner.JobCanonicalName, inner, context.Principal), ct);
     }
 
     public async Task RescheduleAsync(SchemataJob job, JobContext? preparedContext, CancellationToken ct) {

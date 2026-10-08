@@ -30,7 +30,6 @@ using Schemata.Flow.Skeleton.Models;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Advisors;
 using Xunit;
-using ThrowSignalRequest = Schemata.Flow.Foundation.Commands.ThrowSignalRequest;
 
 namespace Schemata.Flow.Integration.Tests;
 
@@ -87,7 +86,7 @@ public sealed class EventCompositionShould : IAsyncLifetime
         new SchemataFlowEventFeature().ConfigureServices(services, new(), new(), new ConfigurationBuilder().Build(), null!);
 
         services.AddSingleton<IEventHandler<ReviewSignal>>(TypedHandler);
-        services.AddSingleton<IRequestPipelineAdvisor<ThrowSignalRequest, IReadOnlyList<SignalDeliveryResult>>>(SignalThrows);
+        services.AddSingleton<IRequestPipelineAdvisor<DeliverSignalRequest, SignalDeliveryResult>>(SignalThrows);
 
         _root = services.BuildServiceProvider();
 
@@ -129,8 +128,7 @@ public sealed class EventCompositionShould : IAsyncLifetime
         Assert.Equal("end", token.StateName);
         var subscriptions = await reader.ServiceProvider.GetRequiredService<IRepository<SchemataEventSubscription>>()
             .ListAsync(q => q.Where(row => row.Target == process.CanonicalName)).ToListAsync();
-        Assert.Contains(subscriptions, row => row.SubscriptionId == $"flow:{process.CanonicalName}:second:broadcast"
-            && row.EventType == "repeat" && row.Token is null);
+        Assert.DoesNotContain(subscriptions, row => row.SubscriptionId == $"flow:{process.CanonicalName}:second:broadcast");
     }
 
     public sealed class RepeatedSignalProcess : ProcessDefinition
@@ -177,10 +175,9 @@ public sealed class EventCompositionShould : IAsyncLifetime
         Assert.Equal(1, TypedHandler.Calls);
         Assert.Equal(1, SignalThrows.Calls);
 
-        // The flow bridge swallows per-target delivery failures into the result list, so assert the
-        // recorded outcome instead of inferring delivery from the token state alone.
-        var delivery = Assert.Single(SignalThrows.Results ?? []);
-        Assert.Equal(SignalDeliveryStatus.Delivered, delivery.Status);
+        // The bridge reports per-target delivery outcomes, so assert the recorded outcome instead of
+        // inferring delivery from the token state alone.
+        Assert.Equal(SignalDeliveryStatus.Delivered, SignalThrows.Result?.Status);
 
         await using (var scope = _root.CreateAsyncScope()) {
             var tokens = scope.ServiceProvider.GetRequiredService<IRepository<SchemataProcessToken>>();
@@ -207,11 +204,11 @@ public sealed class EventCompositionShould : IAsyncLifetime
     [Trait("Layer", "Component")]
     [Fact]
     public async Task Propagate_Signal_Delivery_Failure_Instead_Of_Faking_Publish_Success() {
-        // A signal broadcast reports per-target outcomes; the bridge rethrows the first fault so a
-        // failed delivery can never read as a successful publish.
+        // Per-target delivery reports its outcome; the bridge rethrows the fault so a failed
+        // delivery can never read as a successful publish.
         var services = new ServiceCollection();
         services.AddInProcessRequestDispatcher();
-        services.AddSingleton<IRequestHandler<ThrowSignalRequest, IReadOnlyList<SignalDeliveryResult>>>(
+        services.AddSingleton<IRequestHandler<DeliverSignalRequest, SignalDeliveryResult>>(
             new FailingSignalDeliveryHandler());
         await using var root = services.BuildServiceProvider();
 
@@ -227,12 +224,72 @@ public sealed class EventCompositionShould : IAsyncLifetime
         Assert.Equal("delivery failed", ex.Message);
     }
 
-    private sealed class FailingSignalDeliveryHandler : IRequestHandler<ThrowSignalRequest, IReadOnlyList<SignalDeliveryResult>>
+    private sealed class FailingSignalDeliveryHandler : IRequestHandler<DeliverSignalRequest, SignalDeliveryResult>
     {
-        public Task<IReadOnlyList<SignalDeliveryResult>> HandleAsync(ThrowSignalRequest request, CancellationToken ct) {
-            IReadOnlyList<SignalDeliveryResult> results =
-                [new("processes/one", SignalDeliveryStatus.Failed, new InvalidOperationException("delivery failed"))];
-            return Task.FromResult(results);
+        public Task<SignalDeliveryResult> HandleAsync(DeliverSignalRequest request, CancellationToken ct) {
+            return Task.FromResult(
+                new SignalDeliveryResult(
+                    request.ProcessCanonicalName,
+                    SignalDeliveryStatus.Failed,
+                    new InvalidOperationException("delivery failed")));
+        }
+    }
+
+    [Trait("Layer", "Integration")]
+    [Fact]
+    public async Task Publish_With_Correlation_Delivers_Through_Matching_Subscription_Filter_Only() {
+        var definition = $"{nameof(SignalBroadcastProcess)}-{Guid.NewGuid():n}";
+        await using (var scope = _root.CreateAsyncScope()) {
+            var registry = scope.ServiceProvider.GetRequiredService<IProcessRegistry>();
+            await registry.RegisterAsync(new() {
+                Name           = definition,
+                Engine         = FlowConstants.Engines.Bpmn,
+                DefinitionType = typeof(SignalBroadcastProcess),
+            });
+        }
+
+        string processName;
+        string processCanonical;
+        await using (var scope = _root.CreateAsyncScope()) {
+            var runner  = scope.ServiceProvider.GetRequiredService<FlowRunner>();
+            var process = await runner.StartAsync(definition, null, CancellationToken.None);
+            processName      = process.Name!;
+            processCanonical = process.CanonicalName!;
+        }
+
+        // The subscriber narrows its armed row with a business correlation filter.
+        await using (var scope = _root.CreateAsyncScope()) {
+            var db  = scope.ServiceProvider.GetRequiredService<EventCompositionDbContext>();
+            var row = await db.EventSubscriptions.SingleAsync(r => r.Target == processCanonical);
+            row.CorrelationFilter = new() { ["order"] = "o-1" };
+            await db.SaveChangesAsync();
+        }
+
+        await using (var scope = _root.CreateAsyncScope()) {
+            var bus = scope.ServiceProvider.GetRequiredService<IEventBus>();
+            await bus.PublishAsync(new ReviewSignal(processName), new Dictionary<string, string> { ["order"] = "o-2" });
+        }
+
+        Assert.Equal(0, SignalThrows.Calls);
+        await using (var scope = _root.CreateAsyncScope()) {
+            var tokens = scope.ServiceProvider.GetRequiredService<IRepository<SchemataProcessToken>>();
+            var token  = await tokens.FirstOrDefaultAsync(q => q.Where(t => t.Process == processName));
+            Assert.NotNull(token);
+            Assert.Equal("signal-catch", token.WaitingAtName);
+        }
+
+        await using (var scope = _root.CreateAsyncScope()) {
+            var bus = scope.ServiceProvider.GetRequiredService<IEventBus>();
+            await bus.PublishAsync(new ReviewSignal(processName), new Dictionary<string, string> { ["order"] = "o-1" });
+        }
+
+        Assert.Equal(1, SignalThrows.Calls);
+        Assert.Equal(SignalDeliveryStatus.Delivered, SignalThrows.Result?.Status);
+        await using (var scope = _root.CreateAsyncScope()) {
+            var tokens = scope.ServiceProvider.GetRequiredService<IRepository<SchemataProcessToken>>();
+            var token  = await tokens.FirstOrDefaultAsync(q => q.Where(t => t.Process == processName));
+            Assert.NotNull(token);
+            Assert.Null(token.WaitingAtName);
         }
     }
 
@@ -281,23 +338,23 @@ public sealed class EventCompositionShould : IAsyncLifetime
         }
     }
 
-    public sealed class CountingSignalAdvisor : IRequestPipelineAdvisor<ThrowSignalRequest, IReadOnlyList<SignalDeliveryResult>>
+    public sealed class CountingSignalAdvisor : IRequestPipelineAdvisor<DeliverSignalRequest, SignalDeliveryResult>
     {
         public int Order => 0;
 
         public int Calls;
 
-        public IReadOnlyList<SignalDeliveryResult>? Results;
+        public SignalDeliveryResult? Result;
 
-        public async Task<IReadOnlyList<SignalDeliveryResult>> AdviseAsync(
-            AdviceContext                                        ctx,
-            ThrowSignalRequest                                   request,
-            RequestHandlerContinuation<IReadOnlyList<SignalDeliveryResult>> next,
-            CancellationToken                                    ct
+        public async Task<SignalDeliveryResult> AdviseAsync(
+            AdviceContext                               ctx,
+            DeliverSignalRequest                        request,
+            RequestHandlerContinuation<SignalDeliveryResult> next,
+            CancellationToken                           ct
         ) {
             Calls++;
-            Results = await next(ct);
-            return Results;
+            Result = await next(ct);
+            return Result;
         }
     }
 

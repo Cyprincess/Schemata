@@ -21,8 +21,9 @@ on `IRequestDispatcher` in [Messaging](../messaging/overview.md).
 `PublishAsync<TEvent>` (in `InProcessEventBus` and `RabbitMqEventBus`):
 
 1. `IEventTypeRegistry.RequireName(@event.GetType())` — throws if unregistered.
-2. Builds an `EventContext` with the wire name, JSON payload, a fresh correlation id,
-   and the optional source entity, within a new DI scope and `AdviceContext`.
+2. Builds an `EventContext` with the wire name, JSON payload, a fresh correlation id, the optional
+   business correlation metadata, and the optional source entity, within a new DI scope and
+   `AdviceContext`.
 3. Runs the `IEventPublishAdvisor` pipeline (sorted by `Order`).
    - `Continue` proceeds; `Block` throws `InvalidOperationException("Event publish blocked by advisor.")`;
      `Handle` returns without recording or delivery; the advisor owns `EventContext.Result`.
@@ -212,13 +213,23 @@ Selected subscription fields are listed below; the full entity and framework tra
 | --- | --- |
 | `EventType` | `string` |
 | `CorrelationKey` | `string?` |
+| `CorrelationFilter` | `Dictionary<string, string>?` |
 | `Target` | `string` |
 | `Token` | `string?` |
 | `SubscriptionId` | `string` |
 
-`IRepository<SchemataEventSubscription>.ListMatchingAsync(eventType, correlationKey)` returns
-subscriptions matching the wire name and the optional correlation key. The extension lives in
-`Schemata.Event.Foundation.SchemataEventSubscriptionExtensions`.
+`IRepository<SchemataEventSubscription>.ListMatchingAsync(eventType, correlation)` streams
+subscriptions matching the wire name whose `CorrelationFilter` is satisfied by the envelope's
+correlation metadata: a null or empty filter matches every event of the type; otherwise every
+filtered pair must be present with an ordinal-equal value. `MatchesCorrelation` evaluates one row.
+Both members live in `Schemata.Event.Foundation.SchemataEventSubscriptionExtensions`, and both
+buses apply them before handler resolution, so a filtered-out subscription never reaches
+`IEventDispatchContext.MatchedSubscriptions`.
+
+The publisher supplies the metadata set through
+`IEventBus.PublishAsync(@event, correlation, ct)`. The in-process bus carries it on the
+`EventContext`; the RabbitMQ bus writes each pair as a `schemata-cor-{key}` AMQP header and the
+consumer host decodes them back into the consume-side `EventContext.Correlation`.
 
 ## Routing
 

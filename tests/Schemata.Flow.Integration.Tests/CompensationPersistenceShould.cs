@@ -68,7 +68,7 @@ public abstract class CompensationPersistenceShould
                 var stored = await scope.Processes.FirstOrDefaultAsync(q => q.Where(p => p.CanonicalName == process.CanonicalName), ct);
                 await persistence.PersistSnapshotAsync(scope, new() {
                     Process = stored!, Tokens = [], Transitions = [],
-                    CompensationBindings = [new(before.ScopeOwnerCanonicalName, before.ActivityName, before.RegistrationOrder)],
+                    CompensationBindings = [new(before.ScopeOwnerCanonicalName, before.ActivityName, before.BoundaryName, before.RegistrationOrder)],
                 }, ct);
             }, CancellationToken.None);
         }
@@ -90,7 +90,7 @@ public abstract class CompensationPersistenceShould
                 await persistence.PersistSnapshotAsync(scope, new() { Process = stored!, Tokens = [], Transitions = [], CompensationBindings = [] }, ct);
                 await persistence.PersistSnapshotAsync(scope, new() {
                     Process = stored!, Tokens = [], Transitions = [],
-                    CompensationBindings = [new(binding.ScopeOwnerCanonicalName, binding.ActivityName, binding.RegistrationOrder)],
+                    CompensationBindings = [new(binding.ScopeOwnerCanonicalName, binding.ActivityName, binding.BoundaryName, binding.RegistrationOrder)],
                 }, ct);
             }, CancellationToken.None);
         }

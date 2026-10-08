@@ -281,6 +281,156 @@ public class FlowEventCatchHandlerShould
         Assert.Empty(rows);
     }
 
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async SystemTask RemovesBroadcastSignalSubscription_WhenWaitingCatchLeaves() {
+        var rows = new List<SchemataEventSubscription> {
+            new() {
+                SubscriptionId = "flow:processes/p1:catch-sig:broadcast",
+                Token          = null,
+                EventType      = "shutdown",
+                Target         = "processes/p1",
+            },
+        };
+        using var services = Provider(Repository(rows).Object, Mutation(rows).Object);
+        var advisor = new FlowEventCatchHandler();
+
+        var definition = new ProcessDefinition();
+        definition.Elements.Add(new FlowEvent {
+            Name       = "catch-sig",
+            Position   = EventPosition.IntermediateCatch,
+            Definition = new Signal { Name = "shutdown" },
+        });
+        var process = new SchemataProcess { CanonicalName = "processes/p1" };
+
+        await advisor.ArmAsync(Context(services, process, definition, "next", previousWaitingAtName: "catch-sig"));
+
+        Assert.Empty(rows);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async SystemTask KeepsBroadcastSignalSubscription_WhenAnotherTokenStillWaits() {
+        var rows = new List<SchemataEventSubscription> {
+            new() {
+                SubscriptionId = "flow:processes/p1:catch-sig:broadcast",
+                Token          = null,
+                EventType      = "shutdown",
+                Target         = "processes/p1",
+            },
+        };
+        using var services = Provider(Repository(rows).Object, Mutation(rows).Object);
+        var advisor = new FlowEventCatchHandler();
+
+        var definition = new ProcessDefinition();
+        definition.Elements.Add(new FlowEvent {
+            Name       = "catch-sig",
+            Position   = EventPosition.IntermediateCatch,
+            Definition = new Signal { Name = "shutdown" },
+        });
+        var process = new SchemataProcess { CanonicalName = "processes/p1" };
+        var sibling = new SchemataProcessToken {
+            Process       = "p1",
+            CanonicalName = "processes/p1/tokens/t2",
+            StateName     = "catch-sig",
+            WaitingAtName = "catch-sig",
+            State         = "Waiting",
+        };
+
+        await advisor.ArmAsync(Context(services, process, definition, "next", previousWaitingAtName: "catch-sig", otherTokens: [sibling]));
+
+        Assert.Single(rows);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async SystemTask RemovesBoundarySignalSubscription_WhenLastOwnerLeavesHost() {
+        var rows = new List<SchemataEventSubscription> {
+            new() {
+                SubscriptionId = "flow:processes/p1:Catch_work_payment:broadcast",
+                Token          = null,
+                EventType      = "shutdown",
+                Target         = "processes/p1",
+            },
+        };
+        using var services = Provider(Repository(rows).Object, Mutation(rows).Object);
+        var advisor = new FlowEventCatchHandler();
+
+        var (definition, host, _) = BoundarySetup(new Signal { Name = "shutdown" });
+        var next = new UserTask { Name = "next" };
+        definition.Elements.Add(next);
+        var process = new SchemataProcess { CanonicalName = "processes/p1" };
+
+        await advisor.ArmAsync(Context(services, process, definition, null, stateName: next.Name, previousStateName: host.Name));
+
+        Assert.Empty(rows);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async SystemTask KeepsBroadcastSignalSubscription_WhenSiblingWaitsAtSameGateway() {
+        var rows = new List<SchemataEventSubscription> {
+            new() {
+                SubscriptionId = "flow:processes/p1:catch-sig:broadcast",
+                Token          = null,
+                EventType      = "shutdown",
+                Target         = "processes/p1",
+            },
+        };
+        using var services = Provider(Repository(rows).Object, Mutation(rows).Object);
+        var advisor = new FlowEventCatchHandler();
+
+        var definition = GatewaySignalDefinition();
+        var process = new SchemataProcess { CanonicalName = "processes/p1" };
+        var sibling = new SchemataProcessToken {
+            Process       = "p1",
+            CanonicalName = "processes/p1/tokens/t2",
+            StateName     = "gw",
+            WaitingAtName = "gw",
+            State         = "Waiting",
+        };
+
+        await advisor.ArmAsync(Context(services, process, definition, "next", previousWaitingAtName: "gw", otherTokens: [sibling]));
+
+        Assert.Single(rows);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async SystemTask RemovesBroadcastSignalSubscription_WhenLastGatewayWaiterLeaves() {
+        var rows = new List<SchemataEventSubscription> {
+            new() {
+                SubscriptionId = "flow:processes/p1:catch-sig:broadcast",
+                Token          = null,
+                EventType      = "shutdown",
+                Target         = "processes/p1",
+            },
+        };
+        using var services = Provider(Repository(rows).Object, Mutation(rows).Object);
+        var advisor = new FlowEventCatchHandler();
+
+        var definition = GatewaySignalDefinition();
+        var process = new SchemataProcess { CanonicalName = "processes/p1" };
+
+        await advisor.ArmAsync(Context(services, process, definition, "next", previousWaitingAtName: "gw"));
+
+        Assert.Empty(rows);
+    }
+
+    private static ProcessDefinition GatewaySignalDefinition() {
+        var gateway = new EventBasedGateway { Name = "gw" };
+        var catchEvent = new FlowEvent {
+            Name       = "catch-sig",
+            Position   = EventPosition.IntermediateCatch,
+            Definition = new Signal { Name = "shutdown" },
+        };
+        var definition = new ProcessDefinition();
+        definition.Elements.Add(gateway);
+        definition.Elements.Add(catchEvent);
+        definition.Flows.Add(new() { Source = gateway, Target = catchEvent });
+        return definition;
+    }
+
     private static ServiceProvider Provider(IRepository<SchemataEventSubscription> repository,
         IResourceMutation<SchemataEventSubscription> mutation) => new ServiceCollection()
         .AddSingleton(repository).AddSingleton(mutation).BuildServiceProvider();
@@ -293,7 +443,8 @@ public class FlowEventCatchHandlerShould
         string?           previousWaitingAtName = null,
         string?           stateName             = null,
         string?           status                = null,
-        string?           previousStateName     = null
+        string?           previousStateName     = null,
+        IReadOnlyList<SchemataProcessToken>? otherTokens = null
     ) {
         var token = new TokenSnapshot {
             CanonicalName = "processes/p1/tokens/t1",
@@ -316,7 +467,7 @@ public class FlowEventCatchHandlerShould
         };
         return new() {
             Definition            = definition,
-            Snapshot              = new() { Process = process, Tokens = [], Transitions = transitions },
+            Snapshot              = new() { Process = process, Tokens = [..otherTokens ?? []], Transitions = transitions },
             Token                 = token,
             PreviousWaitingAtName = previousWaitingAtName,
             UnitOfWork            = unit,

@@ -87,12 +87,16 @@ public sealed class CompensationThrowHandler
         IEnumerable<ICompensationLifecycleObserver> observers,
         CancellationToken                           ct) {
         var snapshot = stack.Snapshot();
-        for (var i = snapshot.Count - 1; i >= 0; i--) {
+        var matched  = false;
+        // A targeted compensation drains every boundary registered for the activity in
+        // registration order; the stack snapshot is bottom-to-top registration order.
+        for (var i = 0; i < snapshot.Count; i++) {
             var handler = snapshot[i];
             if (!ReferenceEquals(handler.Activity, target)) {
                 continue;
             }
 
+            matched = true;
             await NotifyStartedAsync(observers, context, execution, ct);
             try {
                 await handler.InvokeAsync(context, ct);
@@ -103,10 +107,13 @@ public sealed class CompensationThrowHandler
 
             await NotifyCompletedAsync(observers, context, execution, ct);
             stack.Remove(handler);
-            return CompensationThrowResult.Completed([.. context.Transitions]);
         }
 
-        throw new InvalidOperationException($"Compensation binding is missing for activity '{target.Name}'.");
+        if (!matched) {
+            throw new InvalidOperationException($"Compensation binding is missing for activity '{target.Name}'.");
+        }
+
+        return CompensationThrowResult.Completed([.. context.Transitions]);
     }
 
     private static async ValueTask<CompensationThrowResult> FireGlobalAsync(

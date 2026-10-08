@@ -80,7 +80,12 @@ public sealed class DefaultOperationService : IOperationService
         }
 
         if (execution.State == ExecutionState.Pending && !string.IsNullOrEmpty(execution.Job)) {
+            // The unschedule owner commits this row's Cancelled transition in its own transaction,
+            // rotating the concurrency stamp, so the settled row is reloaded from a fresh scope.
             await _scheduler.UnscheduleAsync(execution.Job, ct);
+            await using var reload = _scopes.CreateAsyncScope();
+            var settled = await FindAsync(reload.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>(), operation, ct);
+            return OperationMapper.FromExecution(settled);
         }
 
         if (execution.State == ExecutionState.Running) {

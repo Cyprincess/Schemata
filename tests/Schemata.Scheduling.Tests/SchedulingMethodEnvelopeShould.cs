@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,6 +51,24 @@ public sealed class SchedulingMethodEnvelopeShould
         Assert.Equal(1, command.Count);
     }
 
+    [Fact]
+    public async Task Trigger_Facade_Carries_The_Context_Principal_Through_The_Envelope() {
+        var wrap    = new RecordingEnvelopeAdvisor();
+        var command = new RecordingCommandAdvisor();
+        var harness = await CreateStartedHarnessAsync(services => {
+            services.AddSingleton<IRequestPipelineAdvisor<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>>(wrap);
+            services.AddSingleton<IRequestPipelineAdvisor<TriggerJobRequest, SchemataJobExecution>>(command);
+        });
+        var principal = new ClaimsPrincipal(new ClaimsIdentity("test"));
+
+        var execution = await harness.Scheduler.TriggerAsync<SampleJob>(
+            new() { Job = "sample", Principal = principal }, CancellationToken.None);
+
+        Assert.Equal("sample", execution.Job);
+        Assert.Same(principal, Assert.Single(wrap.Observed).Principal);
+        Assert.Same(principal, command.Principal);
+    }
+
 
     [Fact]
     public async Task Authorization_Only_Denies_And_Matching_Permission_Allows_Trigger() {
@@ -71,10 +90,25 @@ public sealed class SchedulingMethodEnvelopeShould
             services.AddScoped<IPermissionMatcher, DefaultPermissionMatcher>();
             services.AddSchedulingAuthorization();
         });
-        var allowedPrincipal = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity([new("role", "schemata-job.trigger")], "test"));
+        var allowedPrincipal = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity([new("role", "schemata-job.run")], "test"));
 
         var execution = await allowed.Services.GetRequiredService<IRequestDispatcher>().SendAsync<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>(
             new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new() { Job = "sample" }), allowedPrincipal), CancellationToken.None);
+
+        Assert.Equal("sample", execution.Job);
+    }
+
+    [Fact]
+    public async Task Authorization_Admits_The_System_Principal_Without_Permission_Claims() {
+        var harness = await CreateStartedHarnessAsync(services => {
+            services.Configure<SchemataSecurityOptions>(_ => { });
+            services.AddScoped<IPermissionResolver, DefaultPermissionResolver>();
+            services.AddScoped<IPermissionMatcher, DefaultPermissionMatcher>();
+            services.AddSchedulingAuthorization();
+        });
+
+        var execution = await harness.Services.GetRequiredService<IRequestDispatcher>().SendAsync<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>(
+            new(SchedulingOperations.Trigger, "sample", new("sample", typeof(SampleJob), new() { Job = "sample" }), SchedulingSystemPrincipal.Instance), CancellationToken.None);
 
         Assert.Equal("sample", execution.Job);
     }
@@ -145,7 +179,7 @@ public sealed class SchedulingMethodEnvelopeShould
 
     private sealed class RecordingEnvelopeAdvisor : IRequestPipelineAdvisor<ResourceMethodRequest<SchemataJob, TriggerJobRequest, SchemataJobExecution>, SchemataJobExecution>
     {
-        public List<(string Verb, string? Name, Type Entity)> Observed { get; } = [];
+        public List<(string Verb, string? Name, Type Entity, ClaimsPrincipal? Principal)> Observed { get; } = [];
 
         public int Order => 0;
 
@@ -155,7 +189,7 @@ public sealed class SchedulingMethodEnvelopeShould
             RequestHandlerContinuation<SchemataJobExecution>                               next,
             CancellationToken                                                              ct = default
         ) {
-            Observed.Add((request.Verb, request.Name, request.GetType().GetGenericArguments()[0]));
+            Observed.Add((request.Verb, request.Name, request.GetType().GetGenericArguments()[0], request.Principal));
             return next(ct);
         }
     }
@@ -163,6 +197,8 @@ public sealed class SchedulingMethodEnvelopeShould
     private sealed class RecordingCommandAdvisor : IRequestPipelineAdvisor<TriggerJobRequest, SchemataJobExecution>
     {
         public int Count { get; private set; }
+
+        public ClaimsPrincipal? Principal { get; private set; }
 
         public int Order => 0;
 
@@ -172,6 +208,7 @@ public sealed class SchedulingMethodEnvelopeShould
             RequestHandlerContinuation<SchemataJobExecution> next,
             CancellationToken                               ct = default) {
             Count++;
+            Principal = request.Principal;
             return next(ct);
         }
     }

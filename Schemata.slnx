@@ -47,6 +47,7 @@
     <Project Path="src/Schemata.Flow.Foundation/Schemata.Flow.Foundation.csproj" />
     <Project Path="src/Schemata.Flow.Grpc/Schemata.Flow.Grpc.csproj" />
     <Project Path="src/Schemata.Flow.Http/Schemata.Flow.Http.csproj" />
+    <Project Path="src/Schemata.Flow.Repository/Schemata.Flow.Repository.csproj" />
     <Project Path="src/Schemata.Flow.Scheduling/Schemata.Flow.Scheduling.csproj" />
     <Project Path="src/Schemata.Flow.Skeleton/Schemata.Flow.Skeleton.csproj" />
     <Project Path="src/Schemata.Flow.StateMachine/Schemata.Flow.StateMachine.csproj" />
@@ -82,6 +83,7 @@
     <Project Path="src/Schemata.Scheduling.Foundation/Schemata.Scheduling.Foundation.csproj" />
     <Project Path="src/Schemata.Scheduling.Grpc/Schemata.Scheduling.Grpc.csproj" />
     <Project Path="src/Schemata.Scheduling.Http/Schemata.Scheduling.Http.csproj" />
+    <Project Path="src/Schemata.Scheduling.Repository/Schemata.Scheduling.Repository.csproj" />
     <Project Path="src/Schemata.Scheduling.Skeleton/Schemata.Scheduling.Skeleton.csproj" />
     <Project Path="src/Schemata.Security.Foundation/Schemata.Security.Foundation.csproj" />
     <Project Path="src/Schemata.Security.Skeleton/Schemata.Security.Skeleton.csproj" />
