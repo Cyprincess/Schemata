@@ -8,12 +8,16 @@ using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Extensions;
 using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
+using Schemata.Authorization.Skeleton.Services;
 using Schemata.Common;
 using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
@@ -29,19 +33,19 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     consent screen and POST to approve or deny.
 ///     Implements <see cref="IInteractionHandler" /> for <see cref="TokenTypeUris.UserCode" />.
 /// </summary>
-public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
+public sealed class DeviceInteractionHandler<TApp, TAuth, TScope>(
     IApplicationManager<TApp>              apps,
-    ITokenManager<TToken>                  tokens,
+    ITokenStore<SchemataToken>                    tokens,
     IScopeManager<TScope>                  scopes,
     IAuthorizationManager<TAuth>           auths,
     IOptions<SchemataAuthorizationOptions> options,
     IOptions<JsonSerializerOptions>        json,
-    TimeProvider?                          time = null
+    TimeProvider?                          time = null,
+    IAuthenticationContextProvider?        contexts = null
 ) : IInteractionHandler
     where TApp : SchemataApplication
     where TAuth : SchemataAuthorization, new()
     where TScope : SchemataScope
-    where TToken : SchemataToken
 {
     private readonly TimeProvider _time = time ?? TimeProvider.System;
 
@@ -69,7 +73,9 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
             throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
-        var uc = JsonSerializer.Deserialize<UserCodePayload>(token.Payload, json.Value);
+        var clear = token.Payload;
+
+        var uc = JsonSerializer.Deserialize<UserCodePayload>(clear, json.Value);
         if (string.IsNullOrWhiteSpace(uc?.DeviceCodeName)) {
             throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
@@ -82,7 +88,9 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
             throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
-        var payload = JsonSerializer.Deserialize<DeviceCodePayload>(device.Payload, json.Value);
+        var deviceClear = device.Payload;
+
+        var payload = JsonSerializer.Deserialize<DeviceCodePayload>(deviceClear, json.Value);
         if (string.IsNullOrWhiteSpace(payload?.ClientId)) {
             throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
@@ -140,7 +148,9 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
             throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
-        var uc = JsonSerializer.Deserialize<UserCodePayload>(token.Payload, json.Value);
+        var clear = token.Payload;
+
+        var uc = JsonSerializer.Deserialize<UserCodePayload>(clear, json.Value);
         if (string.IsNullOrWhiteSpace(uc?.DeviceCodeName)) {
             throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
@@ -153,7 +163,9 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
             throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
-        var payload = JsonSerializer.Deserialize<DeviceCodePayload>(device.Payload, json.Value);
+        var deviceClear = device.Payload;
+
+        var payload = JsonSerializer.Deserialize<DeviceCodePayload>(deviceClear, json.Value);
         if (string.IsNullOrWhiteSpace(payload?.ClientId)) {
             throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
@@ -164,7 +176,6 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         }
 
         var authorization = new TAuth {
-            Name        = Guid.NewGuid().ToString("n"),
             Application = application.CanonicalName,
             Subject     = subject,
             Type        = AuthorizationTypes.Device,
@@ -174,13 +185,20 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         await auths.CreateAsync(authorization, ct);
 
         var sid = principal.FindFirstValue(options.Value.SessionIdClaimType);
+        var authentication = contexts is null
+            ? AuthenticationContextExtensions.Read(principal.Claims)
+            : await contexts.GetContextAsync(principal, ct);
+        var grant = AuthorizationGrantContexts.Create(
+            subject, payload.Scope, sid, GrantTypes.DeviceCode, authentication, GrantProfiles.OAuth);
 
-        device.Subject       = subject;
+        device.Parent        = subject;
         device.Status        = TokenStatuses.Authorized;
         device.Authorization = authorization.CanonicalName;
         device.SessionId     = sid;
+        device.GrantContext  = AuthorizationGrantContexts.Serialize(grant);
 
-        await tokens.UpdateAsync(device, ct);
+        await tokens.UpdateAsync(device, ct,
+            (transaction, cancellation) => apps.EnlistTokenPublicationAsync(transaction, [device], cancellation));
         await tokens.RevokeAsync(token, ct);
 
         throw new NoContentException();
@@ -198,7 +216,9 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
             throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
-        var uc = JsonSerializer.Deserialize<UserCodePayload>(token.Payload, json.Value);
+        var clear = token.Payload;
+
+        var uc = JsonSerializer.Deserialize<UserCodePayload>(clear, json.Value);
         if (string.IsNullOrWhiteSpace(uc?.DeviceCodeName)) {
             throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }

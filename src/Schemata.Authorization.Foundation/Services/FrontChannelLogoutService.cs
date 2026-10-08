@@ -4,81 +4,45 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
-using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
+using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Services;
 
-/// <summary>
-///     OIDC Front-Channel Logout per
-///     <seealso href="https://openid.net/specs/openid-connect-frontchannel-1_0.html">
-///         OpenID Connect Front-Channel Logout
-///         1.0
-///     </seealso>
-///     .
-///     Discovers session clients from stored tokens and returns their
-///     <c>frontchannel_logout_uri</c> values with appended <c>iss</c>
-///     and <c>sid</c> parameters.  The caller renders these as iframes.
-/// </summary>
-public sealed class FrontChannelLogoutService<TApp, TToken>(
+public sealed class FrontChannelLogoutService<TApp>(
     IApplicationManager<TApp>              apps,
-    ITokenManager<TToken>                  tokens,
-    IOptions<SchemataAuthorizationOptions> options
+    ITokenStore<SchemataToken>             tokens,
+    IOptions<Authentication.SchemataAuthorizationOptions> options
 ) : ILogoutNotifier
     where TApp : SchemataApplication
-    where TToken : SchemataToken
 {
-    #region ILogoutNotifier Members
-
-    public async Task<List<string>> GetFrontChannelUrisAsync(
-        string?           subject,
-        string?           session,
-        CancellationToken ct = default
-    ) {
+    public async Task<LogoutNotificationSnapshot> PrepareAsync(
+        string? subject, string? session, CancellationToken ct = default) {
         var clients = await LogoutSessionHelper.GetSessionClientsAsync(tokens, subject, session, ct);
-
         var uris = new List<string>();
-
         await foreach (var app in apps.ListAsync(
                            q => q.Where(a => a.FrontChannelLogoutUri != null
-                                          && a.Name != null
-                                          && clients.Contains(a.Name)), ct)) {
+                                          && a.CanonicalName != null
+                                          && clients.Contains(a.CanonicalName)), ct)) {
             var uri = app.FrontChannelLogoutUri;
-            if (string.IsNullOrWhiteSpace(uri)) {
-                continue;
+            if (string.IsNullOrWhiteSpace(uri)) continue;
+            if (app.FrontChannelLogoutSessionRequired && string.IsNullOrWhiteSpace(session)) continue;
+            if (!string.IsNullOrWhiteSpace(session)) {
+                var separator = uri.Contains('?') ? '&' : '?';
+                uri = $"{uri}{separator}{Claims.Issuer}={Uri.EscapeDataString(options.Value.Issuer!)}"
+                    + $"&{Claims.SessionId}={Uri.EscapeDataString(session)}";
             }
-
-            if (app.FrontChannelLogoutSessionRequired && string.IsNullOrWhiteSpace(session)) {
-                continue;
-            }
-
-            var separator  = uri.Contains('?') ? '&' : '?';
-            var parameters = new List<string>();
-
-            if (!string.IsNullOrWhiteSpace(options.Value.Issuer)) {
-                parameters.Add($"{Claims.Issuer}={Uri.EscapeDataString(options.Value.Issuer)}");
-            }
-
-            if (app.FrontChannelLogoutSessionRequired && !string.IsNullOrWhiteSpace(session)) {
-                parameters.Add($"{Claims.SessionId}={Uri.EscapeDataString(session)}");
-            }
-
-            if (parameters.Count > 0) {
-                uri = $"{uri}{separator}{string.Join('&', parameters)}";
-            }
-
             uris.Add(uri);
         }
-
-        return uris;
+        return new(uris, []);
     }
 
-    public Task EnqueueBackChannelAsync(string? subject, string? session, CancellationToken ct = default) {
+    public Task DispatchAsync(LogoutNotificationSnapshot snapshot, CancellationToken ct = default) {
         return Task.CompletedTask;
     }
-
-    #endregion
 }

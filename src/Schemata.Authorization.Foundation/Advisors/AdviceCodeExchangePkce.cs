@@ -11,11 +11,12 @@ using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
-/// <summary>Order constants for <see cref="AdviceCodeExchangePkce{TApp, TToken}" />.</summary>
+/// <summary>Order constants for <see cref="AdviceCodeExchangePkce{TApp}" />.</summary>
 public static class AdviceCodeExchangePkce
 {
     /// <summary>The default advisor ordering value.</summary>
@@ -31,7 +32,6 @@ public static class AdviceCodeExchangePkce
 ///     .
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
-/// <typeparam name="TToken">The token entity type.</typeparam>
 /// <remarks>
 ///     When the authorization request included PKCE parameters, the token endpoint must verify
 ///     that the <c>code_verifier</c> matches the original <c>code_challenge</c>. If the initial
@@ -41,34 +41,42 @@ public static class AdviceCodeExchangePkce
 /// </remarks>
 /// <seealso cref="AdviceAuthorizePkce{TApp}" />
 /// <seealso cref="CodeFlowOptions" />
-public sealed class AdviceCodeExchangePkce<TApp, TToken>(IOptions<CodeFlowOptions> options) : ICodeExchangeAdvisor<TApp, TToken>
+public sealed class AdviceCodeExchangePkce<TApp>(IOptions<CodeFlowOptions> options) : ICodeExchangeAdvisor<TApp>
     where TApp : SchemataApplication
-    where TToken : SchemataToken
 {
-    #region ICodeExchangeAdvisor<TApp,TToken> Members
+    #region ICodeExchangeAdvisor<TApp> Members
 
     public int Order => AdviceCodeExchangePkce.DefaultOrder;
 
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
-        CodeExchangeContext<TApp, TToken> exchange,
+        CodeExchangeContext<TApp> exchange,
         CancellationToken                 ct = default
     ) {
         if (string.IsNullOrWhiteSpace(exchange.Payload?.CodeChallenge)) {
             if (!string.IsNullOrWhiteSpace(exchange.Request?.CodeVerifier)
              && options.Value.RequirePkceDowngradeProtection) {
-                throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.PKCE_VERIFIER_MISMATCH);
+                throw new OAuthException(
+                    OAuthErrors.InvalidGrant,
+                    SchemataResources.PKCE_VERIFIER_UNEXPECTED
+                );
             }
 
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        if (string.IsNullOrWhiteSpace(exchange.Request?.CodeVerifier)) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.PKCE_VERIFIER_MISMATCH);
+        if (string.IsNullOrEmpty(exchange.Request?.CodeVerifier)) {
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.PKCE_VERIFIER_REQUIRED
+            );
         }
 
-        if (!PkceValidation.IsValid(exchange.Request.CodeVerifier)) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.PKCE_VERIFIER_MISMATCH);
+        if (!Pkce.IsValid(exchange.Request.CodeVerifier)) {
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.PKCE_VERIFIER_INVALID
+            );
         }
 
         // Use CryptographicOperations.FixedTimeEquals to compare verifier-derived values so
@@ -88,7 +96,10 @@ public sealed class AdviceCodeExchangePkce<TApp, TToken>(IOptions<CodeFlowOption
         };
 
         if (!valid) {
-            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.PKCE_VERIFIER_MISMATCH);
+            throw new OAuthException(
+                OAuthErrors.InvalidGrant,
+                SchemataResources.PKCE_VERIFIER_MISMATCH
+            );
         }
 
         return Task.FromResult(AdviseResult.Continue);

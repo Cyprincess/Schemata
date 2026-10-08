@@ -1,8 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Skeleton;
@@ -24,6 +26,10 @@ public class TokenHandlerShould
         return new(services.BuildServiceProvider());
     }
 
+    private static IDisposable Ambient() {
+        return AdviceContext.Establish(new(new ServiceCollection().BuildServiceProvider()));
+    }
+
     private static Mock<IGrantHandler> MockGrant(string grantType) {
         var mock = new Mock<IGrantHandler>(MockBehavior.Strict);
         mock.Setup(h => h.GrantType).Returns(grantType);
@@ -32,6 +38,7 @@ public class TokenHandlerShould
 
     [Fact]
     public async Task Routes_ToMatchingGrantHandler() {
+        using var ambient = Ambient();
         var grant = MockGrant(GrantTypes.ClientCredentials);
         grant.Setup(h => h.HandleAsync(It.IsAny<TokenRequest>(), It.IsAny<Dictionary<string, List<string?>>?>(),
                                        It.IsAny<CancellationToken>()))
@@ -47,6 +54,7 @@ public class TokenHandlerShould
 
     [Fact]
     public async Task ThrowsUnsupportedGrantType_WhenNoMatchingHandler() {
+        using var ambient = Ambient();
         var grant   = MockGrant(GrantTypes.ClientCredentials);
         var handler = CreateHandler((GrantTypes.ClientCredentials, grant));
         var request = new TokenRequest { GrantType = "unknown" };
@@ -59,6 +67,7 @@ public class TokenHandlerShould
 
     [Fact]
     public async Task ThrowsUnsupportedGrantType_WhenGrantTypeNull() {
+        using var ambient = Ambient();
         var grant   = MockGrant(GrantTypes.ClientCredentials);
         var handler = CreateHandler((GrantTypes.ClientCredentials, grant));
         var request = new TokenRequest { GrantType = null };
@@ -71,6 +80,7 @@ public class TokenHandlerShould
 
     [Fact]
     public async Task Returns_ResultFromMatchedHandler() {
+        using var ambient = Ambient();
         var expected = AuthorizationResult.Content(new { token = "abc" });
         var grant    = MockGrant(GrantTypes.RefreshToken);
         grant.Setup(h => h.HandleAsync(It.IsAny<TokenRequest>(), It.IsAny<Dictionary<string, List<string?>>?>(),
@@ -87,6 +97,7 @@ public class TokenHandlerShould
 
     [Fact]
     public async Task RoutesToCorrectHandler_WhenMultipleRegistered() {
+        using var ambient = Ambient();
         var cc      = MockGrant(GrantTypes.ClientCredentials);
         var refresh = MockGrant(GrantTypes.RefreshToken);
 

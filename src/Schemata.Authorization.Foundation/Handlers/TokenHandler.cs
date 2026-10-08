@@ -4,7 +4,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Authorization.Foundation.Commands;
+using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Authorization.Skeleton.Models;
@@ -23,6 +26,12 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     </seealso>
 ///     .
 /// </summary>
+/// <remarks>
+///     Grant handlers consume the header map for client authentication and then drop it, so the
+///     DPoP proof is published to the ambient context for the proof advisor, and a granted
+///     binding crosses the dispatch boundary back to the sign-in issuer through the result
+///     properties.
+/// </remarks>
 public sealed class TokenHandler(IServiceProvider sp) : TokenEndpoint
 {
     public override async Task<AuthorizationResult> HandleAsync(
@@ -30,13 +39,46 @@ public sealed class TokenHandler(IServiceProvider sp) : TokenEndpoint
         Dictionary<string, List<string?>>? headers,
         CancellationToken                  ct
     ) {
+        var ctx = AdviceContext.Require();
+
+        ctx.Set(DpopProof.FromHeaders(headers));
+
         var grant = request.GrantType;
 
         var handler = sp.GetKeyedService<IGrantHandler>(grant);
         if (handler is null) {
-            throw new OAuthException(OAuthErrors.UnsupportedGrantType, SchemataResources.NOT_SUPPORTED, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.GrantType });
+            throw new OAuthException(OAuthErrors.UnsupportedGrantType, SchemataResources.NOT_SUPPORTED, new Dictionary<string, string?> { ["value"] = Parameters.GrantType });
         }
 
-        return await handler.HandleAsync(request, headers, ct);
+        var result = await handler.HandleAsync(request, headers, ct);
+
+        if (result.Status == AuthorizationStatus.SignIn
+         && ctx.TryGet<DpopBinding>(out var binding)
+         && binding is not null) {
+            if (result.Properties is null) {
+                throw new InvalidOperationException(
+                    "The sign-in result carries no properties to attach the DPoP binding to.");
+            }
+
+            result.Properties[Properties.DpopJkt] = binding.Jkt;
+        }
+
+        if (result.Status == AuthorizationStatus.SignIn
+         && ctx.TryGet<DeviceSecretIssuance>(out var deviceSecret)
+         && deviceSecret is not null) {
+            if (result.Properties is null) {
+                throw new InvalidOperationException(
+                    "The sign-in result carries no properties to attach the device secret to.");
+            }
+
+            result.Properties[Properties.DeviceSecret] = deviceSecret.DeviceSecret;
+            result.Properties[Properties.SessionId] = deviceSecret.SessionId;
+            if (deviceSecret.PreparedToken is not null) {
+                result.Properties[Properties.DeviceSecretToken] =
+                    System.Text.Json.JsonSerializer.Serialize(deviceSecret.PreparedToken, Common.SchemataJson.Default);
+            }
+        }
+
+        return result;
     }
 }

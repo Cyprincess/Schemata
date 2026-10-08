@@ -1,18 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
 using Microsoft.IdentityModel.Tokens;
-using Schemata.Abstractions;
 using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Authentication;
 
 /// <summary>
-///     Configuration for the Schemata authorization server, including key material,
-///     token lifetimes, allowed response types/modes, and endpoint URIs.
-///     Provides fluent helpers to add ephemeral signing and encryption keys.
+///     Configuration for the Schemata authorization server: token lifetimes, allowed
+///     response types/modes, and endpoint URIs. Signing and encryption key material is
+///     served from stored security rows under the issuer, not from options.
 /// </summary>
 public class SchemataAuthorizationOptions
 {
@@ -27,9 +25,10 @@ public class SchemataAuthorizationOptions
     ///     </seealso>
     ///     .
     /// </summary>
+    /// <remarks>Effective only when the pairwise flow feature (<c>UsePairwiseSubjects()</c>) is installed.</remarks>
     public string SubjectType { get; set; } = SubjectTypes.Public;
 
-    /// <summary>Salt for pairwise subject identifier computation when <see cref="SubjectType" /> is <c>pairwise</c>.</summary>
+    /// <summary>Salt for pairwise subject identifier computation when <see cref="SubjectType" /> is <c>pairwise</c>; read only by the pairwise flow feature.</summary>
     public string? PairwiseSalt { get; set; }
 
     /// <summary>Serialization format for access tokens (JWT, JWE, or opaque reference).</summary>
@@ -49,6 +48,9 @@ public class SchemataAuthorizationOptions
 
     /// <summary>Validity duration of refresh tokens before they must be rotated.</summary>
     public TimeSpan RefreshTokenLifetime { get; set; } = TimeSpan.FromDays(14);
+
+    /// <summary>Lifetime of the server-side online OP-session authority used by Native SSO.</summary>
+    public TimeSpan OnlineSessionLifetime { get; set; } = TimeSpan.FromHours(8);
 
     /// <summary>Validity duration of interaction tokens used during consent/login flows.</summary>
     public TimeSpan InteractionTokenLifetime { get; set; } = TimeSpan.FromMinutes(10);
@@ -86,6 +88,7 @@ public class SchemataAuthorizationOptions
     /// </summary>
     public int DeviceCodeInterval { get; set; } = 5;
 
+
     /// <summary>
     ///     Token issuer identifier included in the "iss" claim,
     ///     per
@@ -97,17 +100,50 @@ public class SchemataAuthorizationOptions
     /// </summary>
     public string? Issuer { get; set; }
 
-    /// <summary>Asymmetric or symmetric key for JWT signatures.</summary>
-    public SecurityKey? SigningKey { get; set; }
+    /// <summary>
+    ///     Default resource indicator used as the access token audience when no resource is requested,
+    ///     falling back to the issuer when unset,
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8707.html#section-2">
+    ///         RFC 8707: Resource Indicators for OAuth 2.0 §2: Resource Parameter
+    ///     </seealso>
+    ///     and
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9068.html#section-2.2">
+    ///         RFC 9068: JSON Web Token (JWT) Profile
+    ///         for OAuth 2.0 Access Tokens §2.2: Data Structure
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? DefaultResource { get; set; }
 
-    /// <summary>JWS algorithm identifier (e.g., "RS256"); auto-detected from the key when null.</summary>
-    public string? SigningAlgorithm { get; set; }
+    /// <summary>
+    ///     Audience values this server accepts for itself when it validates presented access
+    ///     tokens as a resource server (UserInfo, framework-hosted resources), per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9068.html#section-4">
+    ///         RFC 9068: JSON Web Token (JWT) Profile
+    ///     for OAuth 2.0 Access Tokens §4: Validating JWT Access Tokens
+    ///     </seealso>
+    ///     : the token's <c>aud</c> MUST contain a resource indicator the resource server
+    ///     expects for itself. Defaults to the non-blank <see cref="DefaultResource" /> and
+    ///     <see cref="Issuer" /> — the audience the server mints when no resource parameter
+    ///     is sent. Tokens audience-restricted to external resources are rejected here.
+    /// </summary>
+    public List<string>? ResourceAudiences { get; set; }
 
-    /// <summary>Key for JWE access token encryption; <see langword="null" /> selects signed JWT or reference tokens.</summary>
-    public SecurityKey? EncryptionKey { get; set; }
-
-    /// <summary>JWE key-management algorithm (e.g., "RSA-OAEP"); required when EncryptionKey is set.</summary>
-    public string? EncryptionAlgorithm { get; set; }
+    /// <summary>
+    ///     Deployment mapping from an authenticated introspection caller's <c>client_id</c> to the
+    ///     resource/audience identifiers that caller represents,
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7662.html#section-2">
+    ///         RFC 7662: OAuth 2.0 Token Introspection §2
+    ///     </seealso>
+    ///     : a token is active only when it is valid for use at the protected resource making the
+    ///     introspection call. The mapping deliberately applies only to access tokens. An access
+    ///     token is reported active when at least one verified <c>aud</c> value matches (ordinal)
+    ///     one of the caller's configured identifiers; missing or empty entries report it inactive.
+    ///     Other token types remain under their token-validity policy.
+    /// </summary>
+    public Dictionary<string, List<string>> IntrospectionResourceAudiences { get; } = new(StringComparer.Ordinal);
 
     /// <summary>JWE content encryption algorithm (e.g., "A256CBC-HS512"); defaults to A256CBC-HS512.</summary>
     public string ContentEncryptionAlgorithm { get; set; } = ContentEncryptionAlgorithms.Aes256CbcHmacSha512;
@@ -132,6 +168,15 @@ public class SchemataAuthorizationOptions
     /// <summary>Authentication scheme name for the authorization-code handler.</summary>
     public string CodeScheme { get; set; } = SchemataAuthorizationSchemes.Code;
 
+    /// <summary>Tolerance for ordinary token and client-assertion timestamps; proof freshness has separate policy.</summary>
+    public TimeSpan TokenValidationClockSkew { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>Requires a period in native private-use redirect schemes, per RFC 8252 §8.4.</summary>
+    public bool RequireNativeSchemeDomain { get; set; } = true;
+
+    /// <summary>Allows HTTP logout URIs for confidential clients; HTTPS remains the default policy.</summary>
+    public bool AllowHttpLogoutUris { get; set; }
+
     /// <summary>
     ///     Claim type for the OP session identifier on the authenticated user principal.
     ///     Defaults to "sid". Framework users who use a different claim type for their authentication
@@ -145,20 +190,70 @@ public class SchemataAuthorizationOptions
     /// </summary>
     public string SessionIdClaimType { get; set; } = "sid";
 
+    /// <summary>
+    ///     Optional finite lifetime for registration access tokens. <see langword="null" /> (the
+    ///     default) keeps them valid for as long as the client stays registered, per RFC 7592 §5;
+    ///     an expired finite token is always rejected.
+    /// </summary>
+    public TimeSpan? RegistrationTokenLifetime { get; set; }
+
+    /// <summary>
+    ///     Whether management read/update responses rotate the registration access token
+    ///     (RFC 7592 §5). Off by default; when on, the token store redeems the predecessor and
+    ///     publishes the successor in one commit, and a request that loses a concurrent rotation
+    ///     is rejected instead of receiving the retired predecessor.
+    /// </summary>
+    public bool RotateRegistrationTokens { get; set; }
+
     /// <summary>OAuth 2.0 response_type values the server will accept (e.g., "code", "code id_token").</summary>
     public HashSet<string> AllowedResponseTypes { get; } = [];
 
     /// <summary>Client authentication methods the server supports (e.g., "client_secret_post").</summary>
     public HashSet<string> AllowedClientAuthMethods { get; } = [
         ClientAuthMethods.ClientSecretBasic,
-        ClientAuthMethods.ClientSecretPost
+        ClientAuthMethods.ClientSecretPost,
+        ClientAuthMethods.None,
     ];
+
+    /// <summary>
+    ///     Trusted third-party assertion issuers for the
+    ///     <c>urn:ietf:params:oauth:grant-type:jwt-bearer</c> grant: each entry maps an
+    ///     assertion <c>iss</c> to the key verifying that issuer's signatures, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7523.html#section-3.1">
+    ///         RFC 7523: JSON Web Token (JWT) Profile for OAuth 2.0 Client
+    ///         Authentication and Authorization Grants §3.1: Authorization Grant Processing
+    ///     </seealso>
+    ///     . The table is the trust anchor: an assertion whose issuer has no entry is
+    ///     rejected, and an empty map leaves the grant unusable.
+    /// </summary>
+    public Dictionary<string, SecurityKey> JwtBearerTrustedIssuers { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Registers a trusted <c>jwt-bearer</c> assertion issuer with its verification key.</summary>
+    /// <param name="issuer">Assertion <c>iss</c> value, compared with ordinal string equality.</param>
+    /// <param name="key">Key verifying assertions issued by <paramref name="issuer" />.</param>
+    public SchemataAuthorizationOptions AddJwtBearerTrustedIssuer(string issuer, SecurityKey key) {
+        JwtBearerTrustedIssuers[issuer] = key;
+        return this;
+    }
 
     /// <summary>Response modes the server accepts (e.g., "query", "fragment", "form_post").</summary>
     public HashSet<string> AllowedResponseModes { get; } = [];
 
     /// <summary>Claim types advertised in the discovery document's claims_supported.</summary>
     public HashSet<string> SupportedClaims { get; } = [IdentityClaims.Subject];
+
+    /// <summary>
+    ///     Authentication Context Class References the deployment supports, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata">
+    ///         OpenID Connect Discovery 1.0
+    ///         §3: OpenID Provider Metadata
+    ///     </seealso>
+    ///     . Advertised as the discovery <c>acr_values_supported</c> array; left empty, the
+    ///     metadata member is omitted. Requested <c>acr_values</c> are voluntary
+    ///     (OpenID Connect Core 1.0 §5.5.1.1): the login stamps the class the authentication
+    ///     satisfied, so membership here advertises capability without enforcing matches.
+    /// </summary>
+    public HashSet<string> AcrValuesSupported { get; } = new(StringComparer.Ordinal);
 
     /// <summary>Permits a single response_type value (e.g., "code").</summary>
     public SchemataAuthorizationOptions PermitResponseType(string type) {
@@ -177,51 +272,6 @@ public class SchemataAuthorizationOptions
     public SchemataAuthorizationOptions PermitResponseType((string first, string second, string third) types) {
         var normalized = string.Join(' ', new[] { types.first, types.second, types.third }.OrderBy(x => x));
         AllowedResponseTypes.Add(normalized);
-        return this;
-    }
-
-    /// <summary>
-    ///     Generates an ephemeral key pair and sets <see cref="SigningKey" />
-    ///     and <see cref="SigningAlgorithm" />.  Key type is derived from the
-    ///     algorithm identifier.
-    /// </summary>
-    /// <param name="algorithm">JWS algorithm (default: <see cref="SigningAlgorithms.RsaSha256" />).</param>
-    public SchemataAuthorizationOptions AddEphemeralSigningKey(string algorithm = SigningAlgorithms.RsaSha256) {
-        SigningKey = algorithm switch {
-            SigningAlgorithms.RsaSha256 or SigningAlgorithms.RsaSha384 or SigningAlgorithms.RsaSha512 => new RsaSecurityKey(RSA.Create(2048)),
-            SigningAlgorithms.EcdsaSha256 => new ECDsaSecurityKey(ECDsa.Create(ECCurve.NamedCurves.nistP256)),
-            SigningAlgorithms.EcdsaSha384 => new ECDsaSecurityKey(ECDsa.Create(ECCurve.NamedCurves.nistP384)),
-            SigningAlgorithms.EcdsaSha512 => new ECDsaSecurityKey(ECDsa.Create(ECCurve.NamedCurves.nistP521)),
-            SigningAlgorithms.RsaPssSha256 or SigningAlgorithms.RsaPssSha384 or SigningAlgorithms.RsaPssSha512 => new RsaSecurityKey(RSA.Create(2048)),
-            SigningAlgorithms.HmacSha256 => new SymmetricSecurityKey(RandomNumberGenerator.GetBytes(32)),
-            SigningAlgorithms.HmacSha384 => new SymmetricSecurityKey(RandomNumberGenerator.GetBytes(48)),
-            SigningAlgorithms.HmacSha512 => new SymmetricSecurityKey(RandomNumberGenerator.GetBytes(64)),
-            var _ => throw new ArgumentException(
-                string.Format(SchemataResources.GetResourceString(SchemataResources.UNSUPPORTED_ALGORITHM), algorithm),
-                nameof(algorithm)
-            ),
-        };
-        SigningAlgorithm = algorithm;
-        return this;
-    }
-
-    /// <summary>
-    ///     Generates an ephemeral key and sets <see cref="EncryptionKey" />
-    ///     and <see cref="EncryptionAlgorithm" />.
-    /// </summary>
-    /// <param name="algorithm">JWE algorithm (default: <see cref="EncryptionAlgorithms.RsaOaep" />).</param>
-    public SchemataAuthorizationOptions AddEphemeralEncryptionKey(string algorithm = EncryptionAlgorithms.RsaOaep) {
-        EncryptionKey = algorithm switch {
-            EncryptionAlgorithms.RsaOaep or EncryptionAlgorithms.RsaOaep256 => new RsaSecurityKey(RSA.Create(2048)),
-            EncryptionAlgorithms.A128Kw => new SymmetricSecurityKey(RandomNumberGenerator.GetBytes(16)),
-            EncryptionAlgorithms.A192Kw => new SymmetricSecurityKey(RandomNumberGenerator.GetBytes(24)),
-            EncryptionAlgorithms.A256Kw => new SymmetricSecurityKey(RandomNumberGenerator.GetBytes(32)),
-            var _ => throw new ArgumentException(
-                string.Format(SchemataResources.GetResourceString(SchemataResources.UNSUPPORTED_ALGORITHM), algorithm),
-                nameof(algorithm)
-            ),
-        };
-        EncryptionAlgorithm = algorithm;
         return this;
     }
 }

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Schemata.Authorization.Skeleton.Models;
 
 /// <summary>
@@ -25,6 +27,54 @@ public class AuthorizeRequest
     public string? ClientId { get; set; }
 
     /// <summary>
+    ///     Server-side OP session lineage for the interaction continuation. Set by the authorize
+    ///     handler from the resolved session identifier (overwriting any client-supplied value) and
+    ///     carried inside the interaction payload so the approval leg can restore the session on
+    ///     the continuation principal. Not a client input.
+    /// </summary>
+    public string? OpSessionId { get; set; }
+
+    /// <summary>
+    ///     The subject the <see cref="OpSessionId" /> was issued for; the approval leg restores the
+    ///     session only when the approving subject matches, so an authorize-as-A / approve-as-B
+    ///     switch never carries A's session onto B. Server-side only, like <see cref="OpSessionId" />.
+    /// </summary>
+    public string? OpSessionSubject { get; set; }
+
+    /// <summary>
+    ///     Server-minted session-state salt for the interaction continuation. The authorize handler
+    ///     overwrites any client-supplied value from the session-state advisor's fact, and the
+    ///     approval leg carries it so the final callback can recompute session_state from the
+    ///     post-login browser state. Not a client input.
+    /// </summary>
+    public string? SessionStateSalt { get; set; }
+
+    /// <summary>
+    ///     Server-resolved authentication evidence carried inside the interaction payload. The
+    ///     authorize handler overwrites client input before persistence.
+    /// </summary>
+    public Services.AuthenticationContext? Authentication { get; set; }
+
+    /// <summary>
+    ///     Canonical subject that the server-resolved authentication evidence belongs to. The
+    ///     approval leg reuses the evidence only when the approving subject matches and the
+    ///     persisted <see cref="OpSessionId" /> lineage matches the approval session.
+    /// </summary>
+    public string? AuthenticationSubject { get; set; }
+
+    /// <summary>
+    ///     Server-resolved authorization profile persisted across PAR and interaction
+    ///     continuations. The authorization pipeline overwrites client input.
+    /// </summary>
+    public string? GrantProfile { get; set; }
+    /// <summary>
+    ///     Unix-second boundary recorded when the authorize leg requires a new authentication
+    ///     event. The approval leg accepts only evidence at or after this boundary. Server-side only.
+    /// </summary>
+    public long? AuthenticationRequiredAfter { get; set; }
+
+
+    /// <summary>
     ///     URI the authorization server redirects to after approval.
     ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-3.1.2">
     ///         RFC 6749: The OAuth 2.0 Authorization
@@ -50,6 +100,37 @@ public class AuthorizeRequest
     ///     </seealso>
     /// </summary>
     public string? Scope { get; set; }
+
+    /// <summary>
+    ///     Target services or resources to which access is requested; the parameter may be repeated,
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8707.html#section-2.1">
+    ///         RFC 8707: Resource Indicators for OAuth 2.0 §2.1: Authorization Request
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public ICollection<string>? Resource { get; set; }
+
+    /// <summary>
+    ///     Raw <c>authorization_details</c> JSON array requesting fine-grained authorization, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9396.html#section-2">
+    ///         RFC 9396: OAuth 2.0 Rich Authorization
+    ///         Requests §2: Request Parameter "authorization_details"
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? AuthorizationDetails { get; set; }
+
+    /// <summary>
+    ///     Raw <c>claims</c> request parameter listing individually requested Claims for the
+    ///     UserInfo endpoint and/or the ID Token, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter">
+    ///         OpenID Connect Core 1.0 §5.5: Requesting Claims using the "claims" Request
+    ///         Parameter
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? Claims { get; set; }
 
     /// <summary>
     ///     Opaque value for CSRF protection, returned unchanged in the redirect.
@@ -87,6 +168,16 @@ public class AuthorizeRequest
     /// </summary>
     public string? CodeChallengeMethod { get; set; }
 
+    /// <summary>
+    ///     JWK thumbprint committing the authorization code to a DPoP key, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9449.html#section-10">
+    ///         RFC 9449: OAuth 2.0 Demonstrating Proof-of-Possession at the Application Layer
+    ///         (DPoP) §10: Authorization Code Binding to a DPoP Key
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? DpopJkt { get; set; }
+
     /// <summary>Mechanism for returning parameters, e.g. <c>"query"</c>, <c>"fragment"</c>, <c>"form_post"</c>.</summary>
     public string? ResponseMode { get; set; }
 
@@ -108,9 +199,6 @@ public class AuthorizeRequest
     /// <summary>Maximum authentication age in seconds; forces re-authentication if exceeded.</summary>
     public string? MaxAge { get; set; }
 
-    /// <summary>Authentication time in epoch seconds recorded for the authorization code.</summary>
-    public string? AuthTime { get; set; }
-
     /// <summary><c>id_token</c> hint for session validation.</summary>
     public string? IdTokenHint { get; set; }
 
@@ -122,4 +210,26 @@ public class AuthorizeRequest
     ///     </seealso>
     /// </summary>
     public string? AcrValues { get; set; }
+    /// <summary>
+    ///     JWT-secured request object carrying the authorization request parameters,
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9101.html#section-2">
+    ///         RFC 9101: The JWT Secured Authorization Request (JAR) §2: Request Object
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? Request { get; set; }
+
+    /// <summary>
+    ///     Reference to a previously pushed authorization request, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9126.html#section-2.1">
+    ///         RFC 9126: OAuth 2.0 Pushed Authorization Requests §2.1: Request Parameter
+    ///     </seealso>
+    ///     ; also the URL form
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9101.html#section-3">
+    ///         RFC 9101 §3
+    ///     </seealso>
+    ///     references a stored request object.
+    /// </summary>
+    public string? RequestUri { get; set; }
 }

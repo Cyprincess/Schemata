@@ -8,13 +8,14 @@ using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Advisors;
+using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Handlers;
+using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
-using Schemata.Common;
 using Xunit;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
@@ -23,7 +24,7 @@ namespace Schemata.Authorization.Tests;
 public class ClientCredentialsHandlerShould
 {
     private static SchemataApplication CreateApplication(
-        string type     = "confidential",
+        string? type    = null,
         bool   hasGrant = true,
         string clientId = "test-client",
         Guid   uid      = default
@@ -31,12 +32,12 @@ public class ClientCredentialsHandlerShould
         var app = new SchemataApplication {
             Uid         = uid == Guid.Empty ? Guid.NewGuid() : uid,
             ClientId    = clientId,
-            ClientType  = type,
+            ApplicationType = type,
             Permissions = new List<string>(),
         };
 
         if (hasGrant) {
-            app.Permissions.Add("g:client_credentials");
+            app.GrantTypes = [GrantTypes.ClientCredentials];
         }
 
         return app;
@@ -45,26 +46,30 @@ public class ClientCredentialsHandlerShould
     private static (ClientCredentialsHandler<SchemataApplication> handler,
         Mock<IClientAuthenticationService<SchemataApplication>> clientAuth,
         Mock<IApplicationManager<SchemataApplication>> manager,
-        System.IServiceProvider sp) CreateHandler(
+        IServiceProvider sp) CreateHandler(
             SchemataApplication? application = null,
             bool                 authFails   = false,
-            string               errorCode   = OAuthErrors.InvalidClient
+            string               errorCode   = OAuthErrors.InvalidClient,
+            bool                 authenticated = true
         ) {
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>(MockBehavior.Strict);
         var manager    = new Mock<IApplicationManager<SchemataApplication>>(MockBehavior.Strict);
+manager.SetupTypedMetadata();
 
         if (authFails) {
             clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
                                                       It.IsAny<Dictionary<string, List<string?>>?>(),
                                                       It.IsAny<Dictionary<string, List<string?>>?>(),
-                                                      It.IsAny<CancellationToken>()))
+                                                      It.IsAny<CancellationToken>(),
+                                                      It.IsAny<string?>()))
                       .ThrowsAsync(OAuthException.FromDescription(errorCode, "auth failed"));
         } else if (application is not null) {
             clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
                                                       It.IsAny<Dictionary<string, List<string?>>?>(),
                                                       It.IsAny<Dictionary<string, List<string?>>?>(),
-                                                      It.IsAny<CancellationToken>()))
-                      .ReturnsAsync(application);
+                                                      It.IsAny<CancellationToken>(),
+                                                      It.IsAny<string?>()))
+                      .ReturnsAsync(new ClientAuthenticationResult<SchemataApplication> { Application = application, Method = authenticated ? ClientAuthMethods.ClientSecretPost : ClientAuthMethods.None, Authenticated = authenticated });
 
             foreach (var perm in application.Permissions!) {
                 manager.Setup(m => m.HasPermissionAsync(application, perm, It.IsAny<CancellationToken>()))
@@ -93,20 +98,25 @@ public class ClientCredentialsHandlerShould
     public async Task Accept_ValidConfidentialClient() {
         var application = CreateApplication();
         var (handler, _, _, sp) = CreateHandler(application);
-        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
-        var request = CreateRequest();
+        using var ambient = AdviceContext.Establish(new(sp));
+        var       request = CreateRequest();
 
         var result = await handler.HandleAsync(request, null, CancellationToken.None);
 
-        Assert.NotNull(result);
-        Assert.NotNull(result.Principal);
+        Assert.Equal(AuthorizationStatus.SignIn, result.Status);
+        Assert.Equal("test-client", Assert.Single(result.Principal!.Claims, claim => claim.Type == Claims.ClientId).Value);
+        var identity = Assert.Single(result.Principal!.Identities);
+        Assert.True(identity.IsAuthenticated);
+        Assert.Equal(SchemataAuthorizationSchemes.Bearer, identity.AuthenticationType);
+        Assert.NotNull(result.Properties);
+        Assert.Equal(GrantTypes.ClientCredentials, result.Properties![Properties.GrantType]);
     }
 
     [Fact]
     public async Task Reject_UnknownClient() {
         var (handler, _, _, sp) = CreateHandler(authFails: true);
-        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
-        var request = CreateRequest("unknown");
+        using var ambient = AdviceContext.Establish(new(sp));
+        var       request = CreateRequest("unknown");
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
                                                               request, null, CancellationToken.None));
@@ -116,8 +126,8 @@ public class ClientCredentialsHandlerShould
     [Fact]
     public async Task Reject_ConfidentialClientWithoutSecret() {
         var (handler, _, _, sp) = CreateHandler(authFails: true);
-        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
-        var request = CreateRequest(secret: string.Empty);
+        using var ambient = AdviceContext.Establish(new(sp));
+        var       request = CreateRequest(secret: string.Empty);
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
                                                               request, null, CancellationToken.None));
@@ -125,23 +135,25 @@ public class ClientCredentialsHandlerShould
     }
 
     [Fact]
-    public async Task Accept_PublicClientWithoutSecret() {
-        var application = CreateApplication(ClientTypes.Public);
-        var (handler, _, _, sp) = CreateHandler(application);
-        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
-        var request = CreateRequest(secret: string.Empty);
+    public async Task Reject_PublicClient_Without_Verified_Credential() {
+        // RFC 6749 §4.4.2: client credentials demand a confidential client whose credential was
+        // verified; a public client identified through none is not an authenticated authority.
+        var application = CreateApplication(ApplicationTypes.Native);
+        var (handler, _, _, sp) = CreateHandler(application, authenticated: false);
+        using var ambient = AdviceContext.Establish(new(sp));
+        var       request = CreateRequest(secret: string.Empty);
 
-        var result = await handler.HandleAsync(request, null, CancellationToken.None);
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
+                                                              request, null, CancellationToken.None));
 
-        Assert.NotNull(result);
-        Assert.NotNull(result.Principal);
+        Assert.Equal(OAuthErrors.InvalidClient, ex.Status);
     }
 
     [Fact]
     public async Task Reject_InvalidSecret() {
         var (handler, _, _, sp) = CreateHandler(authFails: true);
-        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
-        var request = CreateRequest(secret: "wrong-secret");
+        using var ambient = AdviceContext.Establish(new(sp));
+        var       request = CreateRequest(secret: "wrong-secret");
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
                                                               request, null, CancellationToken.None));
@@ -152,7 +164,7 @@ public class ClientCredentialsHandlerShould
     public async Task Reject_ClientWithoutGrantPermission() {
         var application = CreateApplication(hasGrant: false);
         var (handler, _, manager, sp) = CreateHandler(application);
-        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
+        using var ambient = AdviceContext.Establish(new(sp));
 
         manager.Setup(m => m.HasPermissionAsync(application, "g:client_credentials", It.IsAny<CancellationToken>()))
                .ReturnsAsync(false);

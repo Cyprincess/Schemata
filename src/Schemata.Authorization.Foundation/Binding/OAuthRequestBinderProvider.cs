@@ -11,7 +11,7 @@ namespace Schemata.Authorization.Foundation.Binding;
 /// </summary>
 /// <remarks>
 ///     Registered as the first model binder provider in the MVC pipeline by
-///     <see cref="Features.SchemataAuthorizationFeature{TApp, TAuth, TScope, TToken}" />.
+///     <see cref="Features.SchemataAuthorizationFeature{TApp, TAuth, TScope}" />.
 ///     Non-OAuth models fall through to the default model binder.
 /// </remarks>
 /// <seealso cref="OAuthFormBinder{T}" />

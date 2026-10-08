@@ -27,7 +27,7 @@ namespace Schemata.Authorization.Skeleton.Entities;
 [Table("SchemataSubjectMappings")]
 [CanonicalName("subjectMappings/{subjectMapping}")]
 [PrimaryKey(nameof(Uid))]
-[Index(nameof(Application), nameof(CanonicalSubject), IsUnique = true)]
+[Index(nameof(Application), nameof(Subject), IsUnique = true)]
 [Index(nameof(Application), nameof(PairwiseSubject),  IsUnique = true)]
 public class SchemataSubjectMapping : IIdentifier, ICanonicalName, ITimestamp
 {
@@ -41,7 +41,7 @@ public class SchemataSubjectMapping : IIdentifier, ICanonicalName, ITimestamp
     ///     non-<c>users</c> subjects (service accounts, agents, etc.) to OAuth clients.
     /// </summary>
     [ResourceReference]
-    public virtual string? CanonicalSubject { get; set; }
+    public virtual string? Subject { get; set; }
 
     /// <summary>The pairwise <c>sub</c> value emitted to the client. Base64URL-encoded SHA-256 hash.</summary>
     public virtual string? PairwiseSubject { get; set; }

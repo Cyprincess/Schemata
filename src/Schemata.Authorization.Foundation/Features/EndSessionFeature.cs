@@ -1,11 +1,19 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Authorization.Foundation.Advisors;
+using Schemata.Authorization.Foundation.Commands;
 using Schemata.Authorization.Foundation.Handlers;
+using Schemata.Authorization.Foundation.Services;
+using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
+using Schemata.Authorization.Foundation.Advisors;
+using Schemata.Messaging.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
+using Schemata.Authorization.Skeleton.Services;
 using Schemata.Core;
+
+using Schemata.Authorization.Foundation.Controllers;
+using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Features;
 
@@ -16,20 +24,37 @@ namespace Schemata.Authorization.Foundation.Features;
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
 /// <remarks>
-///     Installed via <c>UseEndSession()</c> on <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope, TToken}" />.
+///     Installed via <c>UseEndSession()</c> on <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope}" />.
 /// </remarks>
-/// <seealso cref="BackChannelLogoutFeature{TApp, TToken}" />
 public sealed class EndSessionFeature<TApp> : IAuthorizationFlowFeature
     where TApp : SchemataApplication
 {
     #region IAuthorizationFlowFeature Members
 
-    public int Order => 60_000;
+    public int Order => EndSessionFeature.DefaultOrder;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
-        services.TryAddScoped<EndSessionEndpoint, EndSessionHandler<TApp>>();
+        services.TryAddScoped<IOpSessionService, DefaultOpSessionService>();
+        services.TryAddScoped<IOpLogoutService, DefaultOpLogoutService>();
+        services.TryAddScoped<EndSessionHandler<TApp>>();
+        services.TryAddScoped<EndSessionEndpoint>(sp => sp.GetRequiredService<EndSessionHandler<TApp>>());
+        services.TryAddKeyedScoped<IInteractionHandler, LogoutInteractionHandler<TApp>>(TokenTypeUris.Logout);
+        services.TryAddScoped<
+            IRequestHandler<EndSessionEndpointRequest, AuthorizationResult>,
+            EndpointDispatchHandler<EndSessionEndpointRequest, EndSessionEndpoint, AuthorizationResult>>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryEndSession>());
     }
 
     #endregion
+}
+
+
+/// <summary>
+///     Ordering anchor for <see cref="EndSessionFeature{TApp}" /> so successor features can chain
+///     off its <c>DefaultOrder</c> without naming type arguments.
+/// </summary>
+internal static class EndSessionFeature
+{
+    /// <summary>The default feature ordering value (chained after its predecessor).</summary>
+    public const int DefaultOrder = PairwiseSubjectsFeature.DefaultOrder + 100;
 }

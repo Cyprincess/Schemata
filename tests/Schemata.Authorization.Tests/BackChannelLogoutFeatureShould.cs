@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Schemata.Authorization.Foundation.Features;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Core;
 using Schemata.Scheduling.Foundation.Features;
 using Schemata.Scheduling.Skeleton;
@@ -26,9 +27,9 @@ namespace Schemata.Authorization.Tests
         public void ConfigureServices_WithoutScheduling_DeclaresBackChannelLogoutJob() {
             var services = new ServiceCollection();
             var options  = new SchemataOptions();
-            var feature  = new BackChannelLogoutFeature<SchemataApplication, SchemataToken>();
+            var feature  = new BackChannelLogoutFeature<SchemataApplication>();
 
-            feature.ConfigureServices(services, options, new Configurators());
+            feature.ConfigureServices(services, options, new());
 
             Assert.False(options.HasFeature<SchemataSchedulingFeature>());
             Assert.Contains(services, descriptor => descriptor.ServiceType == typeof(BackChannelLogoutJob));
@@ -45,22 +46,22 @@ namespace Schemata.Authorization.Tests
         public void ConfigureServices_WithoutScheduling_DeclaresScheduledTokenCleanupJob() {
             var services = new ServiceCollection();
 
-            ConfigureAuthorization(services, new SchemataOptions());
+            ConfigureAuthorization(services, new());
 
-            Assert.Contains(services, descriptor => descriptor.ServiceType == typeof(TokenCleanupJob<SchemataToken>));
+            Assert.Contains(services, descriptor => descriptor.ServiceType == typeof(TokenCleanupJob));
 
             using var provider = services.BuildServiceProvider();
             var registration = Assert.Single(
                 provider.GetRequiredService<IOptions<SchemataSchedulingOptions>>().Value.Jobs,
-                job => job.JobType == typeof(TokenCleanupJob<SchemataToken>));
+                job => job.JobType == typeof(TokenCleanupJob));
             var schedule = Assert.IsType<CronSchedule>(registration.Schedule);
 
             Assert.Equal("0 * * * *", schedule.Expression);
         }
 
         private static void ConfigureAuthorization(IServiceCollection services, SchemataOptions options) {
-            new SchemataAuthorizationFeature<SchemataApplication, SchemataAuthorization, SchemataScope, SchemataToken>()
-                .ConfigureServices(services, options, new Configurators(), new ConfigurationBuilder().Build(), null!);
+            new SchemataAuthorizationFeature<SchemataApplication, SchemataAuthorization, SchemataScope>()
+                .ConfigureServices(services, options, new(), new ConfigurationBuilder().Build(), null!);
         }
     }
 }

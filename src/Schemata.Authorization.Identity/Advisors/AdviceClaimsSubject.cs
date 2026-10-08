@@ -17,13 +17,13 @@ namespace Schemata.Authorization.Identity.Advisors;
 public sealed class AdviceClaimsSubject(ISubjectProvider subjects) : IClaimsAdvisor
 {
     /// <summary>Default advisor order for Identity subject claim enrichment.</summary>
-    public const int DefaultOrder = AdviceClaimsAudience.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = AdviceClaimsAuthenticationContext.DefaultOrder + 10_000_000;
 
     #region IClaimsAdvisor Members
 
     public int Order => DefaultOrder;
 
-    public async Task<AdviseResult> AdviseAsync(AdviceContext ctx, List<Claim> claims, CancellationToken ct = default) {
+    public async Task<AdviseResult> AdviseAsync(AdviceContext ctx, List<Claim> claims, Schemata.Authorization.Skeleton.Models.AuthorizationClaimContext issuance, CancellationToken ct = default) {
         var sub = claims.FirstOrDefault(c => c.Type == IdentityClaims.Subject)?.Value;
         if (string.IsNullOrWhiteSpace(sub)) {
             return AdviseResult.Continue;

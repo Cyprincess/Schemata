@@ -1,3 +1,4 @@
+using System;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Threading;
@@ -9,9 +10,9 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Handlers;
-using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Entities;
-using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Models;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
@@ -21,24 +22,23 @@ namespace Schemata.Authorization.Tests;
 
 public class AuthorizeHandlerShould
 {
-    private static (AuthorizeHandler<SchemataApplication, SchemataToken> Handler, System.IServiceProvider Sp)
+    private static (AuthorizeHandler<SchemataApplication> Handler, IServiceProvider Sp)
         CreateHandler() {
-        var opts = new SchemataAuthorizationOptions();
-        opts.AddEphemeralSigningKey();
-        opts.Issuer         = "https://localhost";
-        opts.InteractionUri = "https://localhost/consent";
+        var opts = new SchemataAuthorizationOptions { Issuer = "https://localhost", InteractionUri = "https://localhost/consent" };
 
-        var tokens = new Mock<ITokenManager<SchemataToken>>();
-        tokens.Setup(t => t.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>()))
-              .ReturnsAsync((SchemataToken t, CancellationToken _) => t);
+        var tokens = new Mock<ITokenStore<SchemataToken>>();
+        tokens.Setup(t => t.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(),
+                                               It.IsAny<Func<Schemata.Entity.Repository.IUnitOfWork, CancellationToken, Task>?>()))
+              .ReturnsAsync((SchemataToken t, CancellationToken _, Func<Schemata.Entity.Repository.IUnitOfWork, CancellationToken, Task>? _) => t);
 
-        var tokenService = new TokenService(Options.Create(opts));
+        var tokenService = TestSecurityKeys.CreateTokenService(opts);
         var jsonOpts     = Options.Create(new JsonSerializerOptions());
 
         var services = new ServiceCollection();
         var sp       = services.BuildServiceProvider();
 
-        return (new(tokens.Object, tokenService, Options.Create(opts), jsonOpts), sp);
+        return (new(new Mock<Schemata.Authorization.Skeleton.Managers.IApplicationManager<SchemataApplication>>().Object,
+            tokens.Object, tokenService, Options.Create(opts), jsonOpts), sp);
     }
 
     private static ClaimsPrincipal AuthenticatedUser(string subject = "user-1") {
@@ -49,8 +49,8 @@ public class AuthorizeHandlerShould
     public async Task ThrowInvalidClient_WhenApplicationMissing() {
         // An empty advisor pipeline leaves the application unresolved.
         var (handler, sp) = CreateHandler();
-        using var ambient = AdviceContext.Establish(new AdviceContext(sp));
-        var request = new AuthorizeRequest { ClientId = "test", ResponseType = "code" };
+        using var ambient = AdviceContext.Establish(new(sp));
+        var       request = new AuthorizeRequest { ClientId = "test", ResponseType = "code" };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.AuthorizeAsync(
                                                               request, AuthenticatedUser(), CancellationToken.None));

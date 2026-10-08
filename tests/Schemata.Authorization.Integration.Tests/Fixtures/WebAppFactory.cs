@@ -18,9 +18,9 @@ public class WebAppFactory : WebApplicationFactory<Program>
         _configure = configure;
     }
 
-    public WebAppFactory WithEnvironment(string environment) { return new WebAppFactory(environment, _configure); }
+    public WebAppFactory WithEnvironment(string environment) { return new(environment, _configure); }
 
-    public WebAppFactory WithServices(Action<IServiceCollection> configure) { return new WebAppFactory(_environment, configure); }
+    public WebAppFactory WithServices(Action<IServiceCollection> configure) { return new(_environment, configure); }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder) {
         builder.UseEnvironment(_environment);

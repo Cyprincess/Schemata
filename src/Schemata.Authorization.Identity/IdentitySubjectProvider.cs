@@ -18,11 +18,8 @@ namespace Schemata.Authorization.Identity;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Accepts <c>subject</c> in either AIP-122 canonical form (<c>"users/{uid}"</c> or the
-///         stamped <c>"users/{name}"</c>) emitted by <c>SchemataUserClaimsPrincipalFactory</c>, or
-///         as the bare uid string. A leaf segment that parses as a <see cref="Guid" /> is looked
-///         up through <c>SchemataUserManager.FindByIdAsync</c>; any other subject is matched
-///         against the stored canonical name through <c>SchemataUserManager.FindByCanonicalNameAsync</c>.
+///         Canonical subjects resolve by resource name, including GUID-shaped names.
+///         Bare GUID subjects resolve by database identifier.
 ///     </para>
 ///     <para>
 ///         Emits <c>sub</c> as the resolved user's <c>CanonicalName</c> so downstream
@@ -41,9 +38,8 @@ internal sealed class IdentitySubjectProvider<TUser>(SchemataUserManager<TUser> 
             return [];
         }
 
-        var canonical = !string.IsNullOrWhiteSpace(user.CanonicalName)
-            ? user.CanonicalName!
-            : $"users/{user.Uid}";
+        var canonical = user.CanonicalName
+                     ?? throw new InvalidOperationException("The user must have a canonical resource name before issuing claims.");
 
         var claims = new List<Claim> {
             new(IdentityClaims.Subject, canonical),
@@ -84,20 +80,17 @@ internal sealed class IdentitySubjectProvider<TUser>(SchemataUserManager<TUser> 
 
     #endregion
 
-    /// <summary>
-    ///     Resolves a subject string to the owning user. The leaf comes from the user pattern, so a
-    ///     subject under any other collection stays with the canonical-name lookup and finds nothing.
-    ///     A Guid leaf takes the id lookup; every other leaf takes the canonical-name lookup.
-    /// </summary>
     private Task<TUser?> ResolveAsync(string subject) {
         if (string.IsNullOrWhiteSpace(subject)) {
             return Task.FromResult<TUser?>(null);
         }
 
-        var leaf = ResourceNameDescriptor.ForType<TUser>().ParseCanonicalName(subject)?.LeafName ?? subject;
+        if (ResourceNameDescriptor.ForType<TUser>().ParseCanonicalName(subject) is not null) {
+            return manager.FindByCanonicalNameAsync(subject);
+        }
 
-        return Guid.TryParse(leaf, out _)
-            ? manager.FindByIdAsync(leaf)
+        return Guid.TryParse(subject, out _)
+            ? manager.FindByIdAsync(subject)
             : manager.FindByCanonicalNameAsync(subject);
     }
 }

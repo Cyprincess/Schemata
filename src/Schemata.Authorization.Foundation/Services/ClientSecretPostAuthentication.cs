@@ -9,6 +9,8 @@ using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Services;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Services;
@@ -25,17 +27,22 @@ namespace Schemata.Authorization.Foundation.Services;
 /// </summary>
 public sealed class ClientSecretPostAuthentication<TApp>(
     IApplicationManager<TApp>              apps,
-    IOptions<SchemataAuthorizationOptions> options
+    IOptions<SchemataAuthorizationOptions> options,
+    ISecurityStore<SchemataSecurity>       securities,
+    ISecretVerifier                        verifier
 ) : IClientAuthentication<TApp>
     where TApp : SchemataApplication
 {
     #region IClientAuthentication<TApp> Members
 
+    public string Method => ClientAuthMethods.ClientSecretPost;
+
     public async Task<TApp?> AuthenticateAsync(
         Dictionary<string, List<string?>>? query,
         Dictionary<string, List<string?>>? form,
         Dictionary<string, List<string?>>? headers,
-        CancellationToken                  ct
+        CancellationToken                  ct,
+        string? endpointAudience = null
     ) {
         if (!options.Value.AllowedClientAuthMethods.Contains(ClientAuthMethods.ClientSecretPost)) {
             return null;
@@ -48,12 +55,12 @@ public sealed class ClientSecretPostAuthentication<TApp>(
         }
 
         if (ids.Count != 1) {
-            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.NOT_EMPTY, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.ClientId });
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.NOT_EMPTY, new Dictionary<string, string?> { ["value"] = Parameters.ClientId });
         }
 
         var id = ids.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(id)) {
-            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.NOT_EMPTY, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.ClientId });
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.NOT_EMPTY, new Dictionary<string, string?> { ["value"] = Parameters.ClientId });
         }
 
         form.TryGetValue(Parameters.ClientSecret, out var secrets);
@@ -64,13 +71,14 @@ public sealed class ClientSecretPostAuthentication<TApp>(
             throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
-        if (!string.IsNullOrWhiteSpace(secret)) {
-            if (!await apps.ValidateClientSecretAsync(app, secret, ct)) {
-                throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
-            }
-        } else if (app.ClientType == ClientTypes.Confidential) {
-            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.CLIENT_SECRET_REQUIRED);
+        // An identification-only request (no secret) for a client registered `none` belongs to the
+        // none authenticator; claiming it here would misreport the client's method as
+        // client_secret_post.
+        if (string.IsNullOrWhiteSpace(secret) && app.TokenEndpointAuthMethod == ClientAuthMethods.None) {
+            return null;
         }
+
+        await ClientSecretValidator.ValidateAsync(securities, verifier, app, secret, ct);
 
         return app;
     }

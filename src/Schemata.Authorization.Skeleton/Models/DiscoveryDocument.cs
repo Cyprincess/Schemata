@@ -66,6 +66,22 @@ public sealed class DiscoveryDocument
     /// </summary>
     public string? RevocationEndpoint { get; set; }
 
+    /// <summary>
+    ///     URL of the dynamic client registration endpoint, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-discovery-1_0.html">
+    ///         OpenID Connect Discovery 1.0 §3: Provider Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? RegistrationEndpoint { get; set; }
+
+    /// <summary>
+    ///     Authorization detail types supported for rich authorization requests, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9396.html#section-10">RFC 9396 §10: Metadata</seealso>
+    ///     .
+    /// </summary>
+    public List<string>? AuthorizationDetailsTypesSupported { get; set; }
+
     /// <summary>Scope values the server supports.</summary>
     public List<string>? ScopesSupported { get; set; }
 
@@ -76,7 +92,17 @@ public sealed class DiscoveryDocument
     public List<string>? ResponseModesSupported { get; set; }
 
     /// <summary>OAuth 2.0 <c>grant_type</c> values the server supports.</summary>
-    public List<string>? GrantTypesSupported { get; set; } = [];
+    public List<string>? GrantTypesSupported { get; set; }
+
+    /// <summary>
+    ///     Authentication Context Class References the OP supports, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata">
+    ///         OpenID Connect Discovery 1.0
+    ///         §3: OpenID Provider Metadata
+    ///     </seealso>
+    ///     . Omitted when the deployment declares none.
+    /// </summary>
+    public List<string>? AcrValuesSupported { get; set; }
 
     /// <summary>Subject identifier types the server supports, e.g. <c>"public"</c> or <c>"pairwise"</c>.</summary>
     public List<string>? SubjectTypesSupported { get; set; }
@@ -91,13 +117,49 @@ public sealed class DiscoveryDocument
     public List<string>? TokenEndpointAuthMethodsSupported { get; set; }
 
     /// <summary>
+    ///     JWS <c>alg</c> values the token endpoint verifies on client assertion JWTs for the
+    ///     <c>private_key_jwt</c> and <c>client_secret_jwt</c> authentication methods, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata">
+    ///         OpenID Connect Discovery 1.0
+    ///         §3: OpenID Provider Metadata
+    ///     </seealso>
+    ///     .  The value <c>none</c> MUST NOT be used.  Omitted when no assertion method is enabled.
+    /// </summary>
+    public List<string>? TokenEndpointAuthSigningAlgValuesSupported { get; set; }
+
+    /// <summary>
+    ///     Whether the authorization server supports the <c>claims</c> request parameter, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata">
+    ///         OpenID Connect Discovery 1.0 §3: OpenID Provider Metadata
+    ///     </seealso>
+    ///     and
+    ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter">
+    ///         OpenID Connect Core 1.0 §5.5: Requesting Claims using the "claims" Request
+    ///         Parameter
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public bool? ClaimsParameterSupported { get; set; }
+
+    /// <summary>
+    ///     JWS <c>alg</c> values the authorization server supports for DPoP proof JWTs, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9449.html#section-5.1">
+    ///         RFC 9449: OAuth 2.0 Demonstrating Proof
+    ///         of Possession (DPoP) §5.1: Authorization Server
+    ///         Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public List<string>? DpopSigningAlgValuesSupported { get; set; }
+
+    /// <summary>
     ///     PKCE code challenge methods the server supports.
     ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7636.html">
     ///         RFC 7636: Proof Key for Code Exchange by OAuth Public
     ///         Clients
     ///     </seealso>
     /// </summary>
-    public List<string>? CodeChallengeMethodsSupported { get; set; } = [];
+    public List<string>? CodeChallengeMethodsSupported { get; set; }
 
     /// <summary>Whether front-channel logout is supported.</summary>
     public bool? FrontchannelLogoutSupported { get; set; }
@@ -119,4 +181,90 @@ public sealed class DiscoveryDocument
     ///     </seealso>
     /// </summary>
     public bool? AuthorizationResponseIssParameterSupported { get; set; }
+
+    /// <summary>
+    ///     URL of the pushed authorization request endpoint, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9126.html#section-5">
+    ///         RFC 9126: OAuth 2.0 Pushed Authorization Requests §5: Authorization Server Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? PushedAuthorizationRequestEndpoint { get; set; }
+
+    /// <summary>
+    ///     Whether the authorization server accepts authorization requests only through the pushed
+    ///     authorization request endpoint, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9126.html#section-5">
+    ///         RFC 9126: OAuth 2.0 Pushed Authorization Requests §5: Authorization Server Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public bool? RequirePushedAuthorizationRequests { get; set; }
+
+    /// <summary>
+    ///     JWS <c>alg</c> values the authorization server supports for signed request objects, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9101.html#section-10.5">
+    ///         RFC 9101: JWT-Secured Authorization Request (JAR) §10.5: Request Object Signing
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public List<string>? RequestObjectSigningAlgValuesSupported { get; set; }
+
+    /// <summary>
+    ///     Whether the authorization server requires authorization requests to be signed request
+    ///     objects, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9101.html#section-10.5">
+    ///         RFC 9101: JWT-Secured Authorization Request (JAR) §10.5: Request Object Signing
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public bool? RequireSignedRequestObject { get; set; }
+
+    /// <summary>
+    ///     Whether the authorization server supports the <c>request</c> parameter for JWT-secured
+    ///     authorization requests, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata">
+    ///         OpenID Connect Discovery 1.0 §3: OpenID Provider Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public bool? RequestParameterSupported { get; set; }
+
+    /// <summary>
+    ///     Whether the authorization server supports the <c>request_uri</c> parameter for
+    ///     authorization requests by reference, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata">
+    ///         OpenID Connect Discovery 1.0 §3: OpenID Provider Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public bool? RequestUriParameterSupported { get; set; }
+
+    /// <summary>
+    ///     Whether the authorization server requires <c>request_uri</c> values to be registered
+    ///     with the client beforehand, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata">
+    ///         OpenID Connect Discovery 1.0 §3: OpenID Provider Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public bool? RequireRequestUriRegistration { get; set; }
+
+    /// <summary>
+    ///     Whether the authorization server supports Native SSO device secrets, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-native-sso-1_0.html">
+    ///         OpenID Connect Native SSO for Mobile Apps 1.0 §5: Authorization Server Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public bool? NativeSsoSupported { get; set; }
+
+    /// <summary>
+    ///     URL of an OP iframe that supports cross-origin communication for session state, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-session-1_0.html#OPMetadata">
+    ///         OpenID Connect Session Management 1.0 §3.3: OP iframe Discovery
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? CheckSessionIframe { get; set; }
 }

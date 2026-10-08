@@ -12,14 +12,16 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Foundation.Commands;
+using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
-using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
-using Schemata.Common;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
@@ -36,15 +38,15 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     User codes use an 8-character human-readable alphabet with a dash separator
 ///     (formatted as XXXX-XXXX) excluding visually ambiguous characters.
 /// </summary>
-public sealed class DeviceAuthorizeHandler<TApp, TToken>(
+public sealed class DeviceAuthorizeHandler<TApp>(
+    Schemata.Authorization.Skeleton.Managers.IApplicationManager<TApp> applications,
     IClientAuthenticationService<TApp>     client,
-    ITokenManager<TToken>                  tokens,
+    ITokenStore<SchemataToken>                    tokens,
     IOptions<SchemataAuthorizationOptions> options,
     IOptions<JsonSerializerOptions>        json,
     TimeProvider?                          time = null
 ) : DeviceAuthorizeEndpoint
     where TApp : SchemataApplication
-    where TToken : SchemataToken, new()
 {
     private const    string       UserCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private readonly TimeProvider _time            = time ?? TimeProvider.System;
@@ -54,15 +56,15 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
         Dictionary<string, List<string?>>? headers,
         CancellationToken                  ct
     ) {
-        var application = await client.AuthenticateAsync(null, new(){
-            [Parameters.ClientId]     = [request.ClientId],
-            [Parameters.ClientSecret] = [request.ClientSecret],
-        }, headers, ct);
+        var ctx = AdviceContext.Require();
+
+        var application = (await client.AuthenticateAsync(null, ClientAuthenticationForm.Build(
+            request.ClientId, request.ClientSecret, request.ClientAssertion, request.ClientAssertionType),
+            headers, ct, CanonicalIssuer.Combine(options.Value.Issuer, Endpoints.Device)))?.Application;
+
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
             throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
-
-        var ctx = AdviceContext.Require();
 
         switch (await Advisor.For<IDeviceAuthorizeAdvisor<TApp>>()
                              .RunAsync(ctx, application, request, ct)) {
@@ -78,8 +80,7 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
         var now    = _time.GetUtcNow().UtcDateTime;
         var expiry = now + options.Value.DeviceCodeLifetime;
 
-        var dc = new TToken {
-            Name        = Guid.NewGuid().ToString("n"),
+        var dc = new SchemataToken {
             Application = application.CanonicalName,
             Type            = TokenTypes.DeviceCode,
             Status          = TokenStatuses.Valid,
@@ -91,10 +92,10 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
             ExpireTime = expiry,
         };
 
-        await tokens.CreateAsync(dc, ct);
+        await tokens.CreateAsync(dc, ct,
+            (transaction, cancellation) => applications.EnlistTokenPublicationAsync(transaction, [dc], cancellation));
 
-        var uc = new TToken {
-            Name        = Guid.NewGuid().ToString("n"),
+        var uc = new SchemataToken {
             Application = application.CanonicalName,
             Type            = TokenTypes.UserCode,
             Status          = TokenStatuses.Valid,
@@ -107,7 +108,8 @@ public sealed class DeviceAuthorizeHandler<TApp, TToken>(
             ExpireTime = expiry,
         };
 
-        await tokens.CreateAsync(uc, ct);
+        await tokens.CreateAsync(uc, ct,
+            (transaction, cancellation) => applications.EnlistTokenPublicationAsync(transaction, [uc], cancellation));
 
         var query = QueryString.Create(new Dictionary<string, string?> {
             { Parameters.UserCode, uc.ReferenceId },

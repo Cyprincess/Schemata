@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 
 namespace Schemata.Authorization.Foundation.Authentication;
 
@@ -15,7 +16,7 @@ namespace Schemata.Authorization.Foundation.Authentication;
 ///     <see cref="IAuthorizationSignInService" />; this type only writes the issued response when an
 ///     application invokes the legacy authorization-code sign-in scheme directly.
 /// </summary>
-public class SchemataAuthorizationCodeHandler<TApp, TToken>(
+public class SchemataAuthorizationCodeHandler<TApp>(
     IOptionsMonitor<SchemataAuthenticationHandlerOptions> options,
     ILoggerFactory                                        logger,
     UrlEncoder                                            encoder,
@@ -23,7 +24,6 @@ public class SchemataAuthorizationCodeHandler<TApp, TToken>(
     IAuthorizationSignInHttpWriter                        writer
 ) : SignInAuthenticationHandler<SchemataAuthenticationHandlerOptions>(options, logger, encoder)
     where TApp : SchemataApplication
-    where TToken : SchemataToken, new()
 {
     protected override Task<AuthenticateResult> HandleAuthenticateAsync() {
         throw new NotImplementedException();

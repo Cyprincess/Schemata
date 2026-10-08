@@ -1,6 +1,9 @@
 using System.Security.Claims;
 using System.Text.Json.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
 using Schemata.Authorization.Skeleton;
+using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Messaging.Skeleton;
 
@@ -10,8 +13,14 @@ public sealed record InteractionApproveRequest(
     InteractRequest  Request,
     ClaimsPrincipal? Principal,
     string           Issuer
-) : ICommand<AuthorizationResult>, IRequestPrincipal
+) : ICommand<AuthorizationResult>, IEndpointRequest<InteractionEndpoint, AuthorizationResult>, IRequestPrincipal
 {
     [JsonIgnore]
     public ClaimsPrincipal? Principal { get; set; } = Principal;
+
+    public Task<AuthorizationResult> ExecuteAsync(InteractionEndpoint endpoint, CancellationToken ct) {
+        return Principal is null
+            ? Task.FromResult(AuthorizationResult.Challenge())
+            : endpoint.ApproveAsync(Request, Principal, Issuer, ct);
+    }
 }

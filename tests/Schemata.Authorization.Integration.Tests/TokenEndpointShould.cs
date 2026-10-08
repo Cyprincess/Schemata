@@ -45,7 +45,8 @@ public class TokenEndpointShould : IClassFixture<WebAppFactory>
         await using var context = await factory.CreateDbContextAsync();
         var token = await context.Tokens.SingleAsync(t => t.ReferenceId == accessToken.GetString());
 
-        Assert.False(string.IsNullOrWhiteSpace(token.Name));
+        Assert.StartsWith("resource-", token.Name);
+        Assert.NotEqual(token.ReferenceId, token.Name);
         Assert.Equal($"tokens/{token.Name}", token.CanonicalName);
     }
 

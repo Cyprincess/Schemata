@@ -34,7 +34,4 @@ public sealed class DiscoveryContext
 
     /// <summary>Whether the server includes the <c>sid</c> claim in back-channel logout tokens.</summary>
     public bool SupportsBackChannelSession { get; set; }
-
-    /// <summary>Whether any <see cref="Handlers.ITokenExchangeHandler{TApplication}" /> implementations are registered.</summary>
-    public bool HasTokenExchangeHandlers { get; set; }
 }

@@ -1,25 +1,37 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Authorization.Foundation.Commands;
 using Schemata.Authorization.Foundation.Handlers;
+using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Handlers;
+using Schemata.Messaging.Skeleton;
 using Schemata.Core;
+
+using Schemata.Authorization.Foundation.Controllers;
 
 namespace Schemata.Authorization.Foundation.Features;
 
 /// <summary>Registers the token endpoint handler, shared by all grant types.</summary>
 /// <remarks>
 ///     Installed automatically by flow features that require a token endpoint
-///     (<see cref="AuthorizationCodeFlowFeature{TApp, TAuth, TScope, TToken}" /> etc.).
+///     (<see cref="AuthorizationCodeFlowFeature{TApp, TAuth, TScope}" /> etc.).
 /// </remarks>
 /// <seealso cref="IAuthorizationFlowFeature" />
 public sealed class TokenFeature : IAuthorizationFlowFeature
 {
     #region IAuthorizationFlowFeature Members
 
-    public int Order => 1_000;
+    /// <summary>The default feature ordering value (sequence root).</summary>
+    public const int DefaultOrder = 1_000;
+
+    public int Order => DefaultOrder;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
+
         services.TryAddScoped<TokenEndpoint, TokenHandler>();
+        services.TryAddScoped<
+            IRequestHandler<TokenEndpointRequest, AuthorizationResult>,
+            EndpointDispatchHandler<TokenEndpointRequest, TokenEndpoint, AuthorizationResult>>();
     }
 
     #endregion

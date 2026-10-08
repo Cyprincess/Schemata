@@ -9,7 +9,6 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Authorization.Identity;
 using Schemata.Authorization.Skeleton;
-using Schemata.Common;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Managers;
 using Schemata.Identity.Skeleton.Stores;
@@ -37,17 +36,23 @@ public class IdentitySubjectProviderShould
     }
 
     [Fact]
-    public async Task Resolve_Guid_Subject_Through_Id_Lookup() {
-        var uid  = Guid.NewGuid();
-        var user = new SchemataUser { Uid = uid, UserName = "alice" };
+    public async Task Resolve_Guid_Shaped_Name_Without_Selecting_Another_Users_Id() {
+        var name = Guid.NewGuid().ToString();
+        var owner = new SchemataUser { Uid = Guid.NewGuid(), Name = name, CanonicalName = $"users/{name}" };
+        var other = new SchemataUser { Uid = Guid.Parse(name), Name = "other", CanonicalName = "users/other" };
         var store = NewStore();
-        store.Setup(s => s.FindByIdAsync(uid.ToString(), It.IsAny<CancellationToken>()))
-             .ReturnsAsync(user);
+        store.Setup(s => s.FindByIdAsync(name, It.IsAny<CancellationToken>())).ReturnsAsync(other);
+        store.Setup(s => s.FindByCanonicalNameAsync(owner.CanonicalName, It.IsAny<CancellationToken>()))
+             .ReturnsAsync(owner);
 
-        var claims = await NewProvider(store).GetClaimsAsync($"users/{uid}");
+        var provider = NewProvider(store);
+        var claims = await provider.GetClaimsAsync(owner.CanonicalName);
 
-        Assert.Contains(claims, c => c.Type == "sub" && c.Value == $"users/{uid}");
-        store.Verify(s => s.FindByCanonicalNameAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Contains(claims, c => c.Type == "sub" && c.Value == owner.CanonicalName);
+        Assert.DoesNotContain(claims, c => c.Type == "sub" && c.Value == other.CanonicalName);
+        Assert.Contains(await provider.GetClaimsAsync(name), c => c.Type == "sub" && c.Value == other.CanonicalName);
+        Assert.True(await provider.ValidateAsync(owner.CanonicalName));
+        Assert.False(await provider.ValidateAsync("users/missing"));
     }
 
     [Fact]

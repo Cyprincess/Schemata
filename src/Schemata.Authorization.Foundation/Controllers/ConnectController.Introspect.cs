@@ -13,6 +13,6 @@ public partial class ConnectController
         var headers = CollectHeaders();
         var result  = await dispatcher.SendAsync<IntrospectionEndpointQuery, IntrospectionResponse>(
             new(request, headers), ct);
-        return Ok(result);
+        return new JsonResult(result);
     }
 }

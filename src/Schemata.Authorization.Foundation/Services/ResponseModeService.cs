@@ -74,7 +74,10 @@ public static class ResponseModeService
             ResponseModes.Query    => CreateQueryRedirect(redirectUri, parameters),
             ResponseModes.Fragment => CreateFragmentRedirect(redirectUri, parameters),
             ResponseModes.FormPost => CreateFormPost(redirectUri, parameters),
-            var _                  => CreateQueryRedirect(redirectUri, parameters),
+            // The renderer handles resolved, supported modes only: an unknown mode reaching this
+            // point is an unvalidated pipeline path, never a silent query-encoding guess.
+            var unsupported => throw new InvalidOperationException(
+                $"The response mode '{unsupported}' is not a supported authorization response encoding."),
         };
     }
 

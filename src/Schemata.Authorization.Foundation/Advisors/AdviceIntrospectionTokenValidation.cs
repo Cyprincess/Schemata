@@ -4,11 +4,12 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
-/// <summary>Order constants for <see cref="AdviceIntrospectionTokenValidation{TApp, TToken}" />.</summary>
+/// <summary>Order constants for <see cref="AdviceIntrospectionTokenValidation{TApp}" />.</summary>
 public static class AdviceIntrospectionTokenValidation
 {
     /// <summary>The default advisor ordering value.</summary>
@@ -25,19 +26,16 @@ public static class AdviceIntrospectionTokenValidation
 ///     .
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
-/// <typeparam name="TToken">The token entity type.</typeparam>
-/// <seealso cref="AdviceIntrospectionProtectedResource{TApp, TToken}" />
-public sealed class AdviceIntrospectionTokenValidation<TApp, TToken> : IIntrospectionAdvisor<TApp, TToken>
+public sealed class AdviceIntrospectionTokenValidation<TApp> : IIntrospectionAdvisor<TApp>
     where TApp : SchemataApplication
-    where TToken : SchemataToken
 {
-    #region IIntrospectionAdvisor<TApp,TToken> Members
+    #region IIntrospectionAdvisor<TApp> Members
 
     public int Order => AdviceIntrospectionTokenValidation.DefaultOrder;
 
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                      ctx,
-        IntrospectionContext<TApp, TToken> introspection,
+        IntrospectionContext<TApp> introspection,
         CancellationToken                  ct = default
     ) {
         var token = introspection.Token;

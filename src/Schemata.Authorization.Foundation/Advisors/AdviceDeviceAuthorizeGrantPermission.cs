@@ -40,7 +40,7 @@ public sealed class AdviceDeviceAuthorizeGrantPermission<TApp>(IApplicationManag
         DeviceAuthorizeRequest request,
         CancellationToken      ct = default
     ) {
-        await PermissionAdvice.RequireAsync(apps, application, PermissionPrefixes.GrantType + GrantTypes.DeviceCode, ct);
+        await Permissions.RequireTrueAsync(await apps.HasGrantTypeAsync(application, GrantTypes.DeviceCode, ct));
 
         return AdviseResult.Continue;
     }

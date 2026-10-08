@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Schemata.Authorization.Foundation.Services;
 using Xunit;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
+using System;
 
 namespace Schemata.Authorization.Tests;
 
@@ -86,12 +87,12 @@ public class ResponseModeServiceShould
     }
 
     [Fact]
-    public void CreateCallback_UnknownMode_FallsBackToQuery() {
-        var result = ResponseModeService.CreateCallback("https://client.example.com/cb", Params(("code", "abc")),
-                                                        "unknown_mode");
-
-        var redirect = Assert.IsType<RedirectResult>(result);
-        Assert.StartsWith("https://client.example.com/cb?", redirect.Url);
+    public void CreateCallback_UnknownMode_Rejects_Instead_Of_Guessing_Query() {
+        // Issue #135: the renderer handles resolved, supported modes only - an unresolved mode is
+        // an unvalidated pipeline path and must never silently encode as a query callback.
+        Assert.Throws<InvalidOperationException>(
+            () => ResponseModeService.CreateCallback("https://client.example.com/cb", Params(("code", "abc")),
+                                                     "unknown_mode"));
     }
 
     [Theory]

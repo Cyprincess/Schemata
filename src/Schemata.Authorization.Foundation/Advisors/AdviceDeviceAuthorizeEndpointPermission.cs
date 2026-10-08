@@ -40,7 +40,7 @@ public sealed class AdviceDeviceAuthorizeEndpointPermission<TApp>(IApplicationMa
         DeviceAuthorizeRequest request,
         CancellationToken      ct = default
     ) {
-        await PermissionAdvice.RequireAsync(manager, application, PermissionPrefixes.Endpoint + Endpoints.Device, ct, code: 403);
+        await Permissions.RequireAsync(manager, application, PermissionPrefixes.Endpoint + Endpoints.Device, ct, code: 403);
 
         return AdviseResult.Continue;
     }

@@ -32,7 +32,7 @@ public class OAuthExceptionFilterShould
     public void AddsIssToQueryRedirect_WhenIssuerConfigured() {
         var filter = CreateFilter("https://auth.example.com");
         var exception = OAuthException.FromDescription(OAuthErrors.InvalidScope, "scope denied");
-        exception.RedirectUri = "https://client.example.com/callback";
+                exception.RedirectUri = "https://client.example.com/callback";
         exception.State = "xyz";
         exception.ResponseMode = ResponseModes.Query;
         var ctx = CreateContext(exception);
@@ -50,7 +50,7 @@ public class OAuthExceptionFilterShould
     public void AddsIssToFragmentRedirect_WhenIssuerConfigured() {
         var filter = CreateFilter("https://auth.example.com");
         var exception = OAuthException.FromDescription(OAuthErrors.AccessDenied, "denied");
-        exception.RedirectUri = "https://client.example.com/callback";
+                exception.RedirectUri = "https://client.example.com/callback";
         exception.ResponseMode = ResponseModes.Fragment;
         var ctx = CreateContext(exception);
 
@@ -65,7 +65,7 @@ public class OAuthExceptionFilterShould
     public void OmitsIss_WhenIssuerNotConfigured() {
         var filter = CreateFilter(null);
         var exception = OAuthException.FromDescription(OAuthErrors.InvalidScope, "scope denied");
-        exception.RedirectUri = "https://client.example.com/callback";
+                exception.RedirectUri = "https://client.example.com/callback";
         exception.ResponseMode = ResponseModes.Query;
         var ctx = CreateContext(exception);
 
@@ -85,6 +85,47 @@ public class OAuthExceptionFilterShould
 
         var json = Assert.IsType<JsonResult>(ctx.Result);
         Assert.Equal(exception.Code, json.StatusCode);
+    }
+
+    [Fact]
+    public void Emits_A_Parameter_Free_Status_When_Marked() {
+        var filter    = CreateFilter("https://auth.example.com");
+        var exception = OAuthException.FromDescription(OAuthErrors.InvalidRequest, "unsupported response_mode");
+        exception.OmitErrorParameters = true;
+        var ctx = CreateContext(exception);
+
+        filter.OnException(ctx);
+
+        var status = Assert.IsType<StatusCodeResult>(ctx.Result);
+        Assert.Equal(400, status.StatusCode);
+        Assert.True(ctx.ExceptionHandled);
+    }
+
+    [Fact]
+    public void Keeps_Exception_Headers_On_A_Parameter_Free_Response() {
+        var filter    = CreateFilter("https://auth.example.com");
+        var exception = OAuthException.FromDescription(OAuthErrors.InvalidRequest, "unsupported response_mode");
+        exception.OmitErrorParameters = true;
+        exception.Headers = new Dictionary<string, string> { [Headers.DpopNonce] = "nonce-2" };
+        var ctx = CreateContext(exception);
+
+        filter.OnException(ctx);
+
+        Assert.IsType<StatusCodeResult>(ctx.Result);
+        Assert.Equal("nonce-2", ctx.HttpContext.Response.Headers[Headers.DpopNonce].ToString());
+    }
+
+    [Fact]
+    public void Attaches_Exception_Headers_To_Rendered_Response() {
+        var filter    = CreateFilter("https://auth.example.com");
+        var exception = OAuthException.FromDescription(OAuthErrors.UseDpopNonce, "nonce required");
+        exception.Headers = new Dictionary<string, string> { [Headers.DpopNonce] = "nonce-1" };
+        var ctx = CreateContext(exception);
+
+        filter.OnException(ctx);
+
+        Assert.IsType<JsonResult>(ctx.Result);
+        Assert.Equal("nonce-1", ctx.HttpContext.Response.Headers[Headers.DpopNonce].ToString());
     }
 
     [Fact]

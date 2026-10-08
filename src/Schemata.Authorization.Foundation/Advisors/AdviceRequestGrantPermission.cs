@@ -41,9 +41,8 @@ public sealed class AdviceRequestGrantPermission<TApp>(IApplicationManager<TApp>
         TokenRequest      request,
         CancellationToken ct = default
     ) {
-        var grant = request.GrantType;
-
-        await PermissionAdvice.RequireAsync(manager, application, PermissionPrefixes.GrantType + grant, ct);
+        // The registered grant_types metadata is the runtime authority.
+        await Permissions.RequireTrueAsync(await manager.HasGrantTypeAsync(application, request.GrantType, ct));
 
         return AdviseResult.Continue;
     }

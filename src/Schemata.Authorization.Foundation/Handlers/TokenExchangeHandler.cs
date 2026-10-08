@@ -7,6 +7,7 @@ using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
+using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
@@ -21,7 +22,7 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     Handles the <c>urn:ietf:params:oauth:grant-type:token-exchange</c> grant type.
 ///     Authenticates the client, runs the <see cref="ITokenRequestAdvisor{TApp}" />
 ///     pipeline, then delegates to a keyed <see cref="ITokenExchangeHandler{TApp}" />
-///     resolved by <c>subject_token_type</c>,
+///     resolved by the exact <c>subject_token_type|requested_token_type</c> composite key,
 ///     per <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html">RFC 8693: OAuth 2.0 Token Exchange</seealso>.
 /// </summary>
 public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp> client, IServiceProvider sp) : IGrantHandler
@@ -33,9 +34,12 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
 
     /// <summary>
     ///     Processes a token exchange request by authenticating the client,
-    ///     running the advisor pipeline, and routing to the appropriate
-    ///     <see cref="ITokenExchangeHandler{TApp}" /> based on the
-    ///     <see cref="TokenRequest.SubjectTokenType" />.
+    ///     running the advisor pipeline, and routing to the keyed
+    ///     <see cref="ITokenExchangeHandler{TApp}" /> registered for the exact
+    ///     <c>subject_token_type|requested_token_type</c> composite. The subject-only
+    ///     registration applies only when <see cref="TokenRequest.RequestedTokenType" />
+    ///     is absent or a standard RFC 8693 §3 type; a custom requested type requires
+    ///     its exact composite registration.
     /// </summary>
     /// <param name="request">Token exchange request.</param>
     /// <param name="headers">HTTP request headers for client authentication.</param>
@@ -46,33 +50,26 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
         CancellationToken                  ct
     ) {
         if (string.IsNullOrWhiteSpace(request.SubjectToken)) {
-            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_EMPTY, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.SubjectToken });
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_EMPTY, new Dictionary<string, string?> { ["value"] = Parameters.SubjectToken });
         }
 
         if (string.IsNullOrWhiteSpace(request.SubjectTokenType)) {
-            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_EMPTY, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.SubjectTokenType });
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_EMPTY, new Dictionary<string, string?> { ["value"] = Parameters.SubjectTokenType });
         }
 
         // RFC 8693 §2.1: actor_token and actor_token_type are paired — one present without the other
         // is malformed.
         if (!string.IsNullOrWhiteSpace(request.ActorToken) && string.IsNullOrWhiteSpace(request.ActorTokenType)) {
-            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_EMPTY, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.ActorTokenType });
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_EMPTY, new Dictionary<string, string?> { ["value"] = Parameters.ActorTokenType });
         }
 
         if (!string.IsNullOrWhiteSpace(request.ActorTokenType) && string.IsNullOrWhiteSpace(request.ActorToken)) {
-            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_EMPTY, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.ActorToken });
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_EMPTY, new Dictionary<string, string?> { ["value"] = Parameters.ActorToken });
         }
 
-        // RFC 8693 §2.1 / §3: when requested_token_type is supplied it must name a standard exchange
-        // token type the server can issue; an unrecognized URI is rejected before routing.
-        if (!string.IsNullOrWhiteSpace(request.RequestedTokenType) && !TokenTypeUris.IsStandard(request.RequestedTokenType)) {
-            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.RequestedTokenType });
-        }
-
-        var application = await client.AuthenticateAsync(null, new(){
-            [Parameters.ClientId]     = [request.ClientId],
-            [Parameters.ClientSecret] = [request.ClientSecret],
-        }, headers, ct);
+        var application = (await client.AuthenticateAsync(null, ClientAuthenticationForm.Build(
+                                                              request.ClientId, request.ClientSecret,
+                                                              request.ClientAssertion, request.ClientAssertionType), headers, ct))?.Application;
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
             throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
@@ -90,9 +87,19 @@ public sealed class TokenExchangeHandler<TApp>(IClientAuthenticationService<TApp
                 throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
-        var handler = sp.GetKeyedService<ITokenExchangeHandler<TApp>>(request.SubjectTokenType);
+        var standard = string.IsNullOrWhiteSpace(request.RequestedTokenType) || TokenTypeUris.IsStandard(request.RequestedTokenType);
+
+        // A custom requested_token_type resolves only through its exact composite registration:
+        // the subject-only profile would bypass the requested profile's trust and output policy.
+        var compositeKey = $"{request.SubjectTokenType}|{request.RequestedTokenType ?? string.Empty}";
+        var handler      = sp.GetKeyedService<ITokenExchangeHandler<TApp>>(compositeKey);
+        if (handler is null && standard) {
+            handler = sp.GetKeyedService<ITokenExchangeHandler<TApp>>(request.SubjectTokenType);
+        }
+
         if (handler is null) {
-            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED, new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.SubjectTokenType });
+            var parameter = standard ? Parameters.SubjectTokenType : Parameters.RequestedTokenType;
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED, new Dictionary<string, string?> { ["value"] = parameter });
         }
 
         return await handler.HandleAsync(application, request, null, ct);

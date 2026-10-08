@@ -7,12 +7,13 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
-/// <summary>Order constants for <see cref="AdviceRefreshTokenValidation{TApp, TToken}" />.</summary>
+/// <summary>Order constants for <see cref="AdviceRefreshTokenValidation{TApp}" />.</summary>
 public static class AdviceRefreshTokenValidation
 {
     /// <summary>The default advisor ordering value.</summary>
@@ -20,8 +21,8 @@ public static class AdviceRefreshTokenValidation
 }
 
 /// <summary>
-///     Validates a refresh token at token exchange: checks type, application, expiry, status, and subject,
-///     per
+///     Validates refresh token type, application, expiry, family, status, and subject before
+///     successor preparation, per
 ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-6">
 ///         RFC 6749: The OAuth 2.0 Authorization
 ///         Framework §6: Refreshing an Access Token
@@ -29,21 +30,18 @@ public static class AdviceRefreshTokenValidation
 ///     .
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
-/// <typeparam name="TToken">The token entity type.</typeparam>
-/// <seealso cref="AdviceCodeExchangeValidation{TApp, TToken}" />
-public sealed class AdviceRefreshTokenValidation<TApp, TToken>(TimeProvider? time = null) : IRefreshTokenAdvisor<TApp, TToken>
+public sealed class AdviceRefreshTokenValidation<TApp>(TimeProvider? time = null) : IRefreshTokenAdvisor<TApp>
     where TApp : SchemataApplication
-    where TToken : SchemataToken
 {
     private readonly TimeProvider _time = time ?? TimeProvider.System;
 
-    #region IRefreshTokenAdvisor<TApp,TToken> Members
+    #region IRefreshTokenAdvisor<TApp> Members
 
     public int Order => AdviceRefreshTokenValidation.DefaultOrder;
 
     public Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
-        RefreshTokenContext<TApp, TToken> exchange,
+        RefreshTokenContext<TApp> exchange,
         CancellationToken                 ct = default
     ) {
         if (exchange.Token?.Type != TokenTypes.RefreshToken) {
@@ -57,12 +55,14 @@ public sealed class AdviceRefreshTokenValidation<TApp, TToken>(TimeProvider? tim
         if (exchange.Token.ExpireTime.HasValue && exchange.Token.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime) {
             throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
-
+        if (string.IsNullOrWhiteSpace(exchange.Token.Family)) {
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
+        }
         if (exchange.Token.Status != TokenStatuses.Valid) {
             throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
-        if (string.IsNullOrWhiteSpace(exchange.Token.Subject)) {
+        if (string.IsNullOrWhiteSpace(exchange.Token.Parent)) {
             throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 

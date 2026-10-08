@@ -1,13 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
@@ -17,10 +15,10 @@ using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
-using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
-using Schemata.Common;
 using Xunit;
 using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
@@ -31,34 +29,32 @@ public class IntrospectionHandlerShould
 {
     private const string Issuer = "https://auth.example.com";
 
-    private static readonly RSA            Rsa        = RSA.Create(2048);
-    private static readonly RsaSecurityKey SigningKey = new(Rsa);
+    private static readonly DateTimeOffset Now = new(2026, 8, 26, 0, 0, 0, TimeSpan.Zero);
 
     private static Fixture CreateFixture(string callerAppName = "test-app") {
-        var opts = Options.Create(new SchemataAuthorizationOptions {
-            Issuer = Issuer, SigningKey = SigningKey, SigningAlgorithm = SigningAlgorithms.RsaSha256,
-        });
+        var opts = Options.Create(new SchemataAuthorizationOptions { Issuer = Issuer });
 
-        var tokensMock   = new Mock<ITokenManager<SchemataToken>>(MockBehavior.Loose);
-        var tokenService = new TokenService(opts);
+        var tokensMock   = new Mock<ITokenStore<SchemataToken>>(MockBehavior.Loose);
+        var tokenService = TestSecurityKeys.CreateTokenService(opts.Value);
 
         var app        = new SchemataApplication { Uid = Guid.NewGuid(), ClientId = callerAppName };
         var clientAuth = new Mock<IClientAuthenticationService<SchemataApplication>>();
         clientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
                                                   It.IsAny<Dictionary<string, List<string?>>?>(),
                                                   It.IsAny<Dictionary<string, List<string?>>?>(),
-                                                  It.IsAny<CancellationToken>()))
-                  .ReturnsAsync(app);
+                                                  It.IsAny<CancellationToken>(),
+                                                  It.IsAny<string?>()))
+                  .ReturnsAsync(new ClientAuthenticationResult<SchemataApplication> { Application = app, Method = ClientAuthMethods.ClientSecretPost, Authenticated = true });
 
         var services = new ServiceCollection();
         services.TryAddEnumerable(ServiceDescriptor
-                                     .Scoped<IIntrospectionAdvisor<SchemataApplication, SchemataToken>,
-                                          AdviceIntrospectionTokenValidation<SchemataApplication, SchemataToken>>());
+                                     .Scoped<IIntrospectionAdvisor<SchemataApplication>,
+                                          AdviceIntrospectionTokenValidation<SchemataApplication>>());
         var sp = services.BuildServiceProvider();
 
-        var handler = new IntrospectionHandler<SchemataApplication, SchemataToken>(
-            clientAuth.Object, tokenService, tokensMock.Object);
-        return new(handler, tokensMock, tokenService, sp);
+        var handler = new IntrospectionHandler<SchemataApplication>(
+            clientAuth.Object, tokenService, tokensMock.Object, opts);
+        return new(handler, tokensMock, tokenService, sp, clientAuth);
     }
 
     private static SchemataToken CreateTokenEntity(
@@ -67,7 +63,9 @@ public class IntrospectionHandlerShould
         string  format  = "jwt",
         string  status  = "valid",
         string? appName = "test-app",
-        string  type    = TokenTypes.AccessToken
+        string  type    = TokenTypes.AccessToken,
+        AuthenticationContext? authentication = null,
+        string? subject = "users/u-42"
     ) {
         return new() {
             Uid         = Guid.NewGuid(),
@@ -77,15 +75,21 @@ public class IntrospectionHandlerShould
             Payload     = payload,
             Format      = format,
             Status      = status,
-            ExpireTime  = DateTime.UtcNow.AddHours(1),
+            GrantContext = AuthorizationGrantContexts.Serialize(new() {
+                Subject        = subject,
+                SubjectKind    = GrantSubjectKinds.EndUser,
+                Source         = GrantTypes.AuthorizationCode,
+                Authentication = authentication,
+            }),
+            ExpireTime  = Now.AddHours(1).UtcDateTime,
         };
     }
 
     [Fact]
     public async Task ReturnsInactive_WhenTokenNotResolved() {
-        var f       = CreateFixture();
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
-        var request = new IntrospectRequest { Token = "invalid-jwt-string" };
+        var       f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new(f.Sp));
+        var       request = new IntrospectRequest { Token = "invalid-jwt-string" };
 
         var response = await f.Handler.HandleAsync(request, null, CancellationToken.None);
 
@@ -94,9 +98,9 @@ public class IntrospectionHandlerShould
 
     [Fact]
     public async Task ThrowsInvalidRequest_WhenTokenEmpty() {
-        var f       = CreateFixture();
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
-        var request = new IntrospectRequest { Token = "" };
+        var       f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new(f.Sp));
+        var       request = new IntrospectRequest { Token = "" };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
                                                               request, null, CancellationToken.None));
@@ -106,9 +110,9 @@ public class IntrospectionHandlerShould
 
     [Fact]
     public async Task ThrowsInvalidRequest_WhenTokenWhitespace() {
-        var f       = CreateFixture();
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
-        var request = new IntrospectRequest { Token = "   " };
+        var       f       = CreateFixture();
+        using var ambient = AdviceContext.Establish(new(f.Sp));
+        var       request = new IntrospectRequest { Token = "   " };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => f.Handler.HandleAsync(
                                                               request, null, CancellationToken.None));
@@ -119,7 +123,7 @@ public class IntrospectionHandlerShould
     [Fact]
     public async Task ReturnsActive_WhenJwtTokenResolved() {
         var f = CreateFixture();
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
+        using var ambient = AdviceContext.Establish(new(f.Sp));
 
         var claims = new List<Claim> {
             new(Claims.JwtId, Guid.NewGuid().ToString()),
@@ -130,7 +134,7 @@ public class IntrospectionHandlerShould
             new(Claims.Issuer, Issuer),
         };
 
-        var jwt    = f.TokenService.CreateToken(claims, TimeSpan.FromHours(1));
+        var jwt    = await f.TokenService.CreateToken(claims, TimeSpan.FromHours(1));
         var entity = CreateTokenEntity(jwt, jwt);
 
         f.Tokens.Setup(m => m.FindByReferenceIdAsync(jwt, It.IsAny<CancellationToken>())).ReturnsAsync(entity);
@@ -146,11 +150,68 @@ public class IntrospectionHandlerShould
     }
 
     [Fact]
+    public async Task Echoes_Acr_And_AuthTime_From_The_Token() {
+        var f = CreateFixture();
+        using var ambient = AdviceContext.Establish(new(f.Sp));
+
+        var claims = new List<Claim> {
+            new(Claims.JwtId, Guid.NewGuid().ToString()),
+            new(IdentityClaims.Subject, "users/u-42"),
+            new(Claims.ClientId, "test-client"),
+            new(Claims.Audience, "api"),
+            new(Claims.Issuer, Issuer),
+            // Deliberately drifted JWT view: introspection must use the persisted grant event.
+            new(Claims.Acr, "urn:example:drifted"),
+            new(Claims.Amr, """["sms"]"""),
+            new(Claims.AuthTime, "1"),
+        };
+
+        var jwt    = await f.TokenService.CreateToken(claims, TimeSpan.FromHours(1));
+        var entity = CreateTokenEntity(jwt, jwt, authentication: new(
+            "urn:schemata:acr:classes:multifactor", ["pwd", "otp"], 1767225600));
+
+        f.Tokens.Setup(m => m.FindByReferenceIdAsync(jwt, It.IsAny<CancellationToken>())).ReturnsAsync(entity);
+
+        var request  = new IntrospectRequest { Token = jwt };
+        var response = await f.Handler.HandleAsync(request, null, CancellationToken.None);
+
+        Assert.True(response.Active);
+        Assert.Equal("urn:schemata:acr:classes:multifactor", response.Acr);
+        Assert.Equal(1767225600, response.AuthTime);
+    }
+
+    [Fact]
+    public async Task Echoes_Nothing_When_The_Token_Carries_No_Context_Claims() {
+        var f = CreateFixture();
+        using var ambient = AdviceContext.Establish(new(f.Sp));
+
+        var claims = new List<Claim> {
+            new(Claims.JwtId, Guid.NewGuid().ToString()),
+            new(IdentityClaims.Subject, "users/u-42"),
+            new(Claims.ClientId, "test-client"),
+            new(Claims.Audience, "api"),
+            new(Claims.Issuer, Issuer),
+        };
+
+        var jwt    = await f.TokenService.CreateToken(claims, TimeSpan.FromHours(1));
+        var entity = CreateTokenEntity(jwt, jwt);
+
+        f.Tokens.Setup(m => m.FindByReferenceIdAsync(jwt, It.IsAny<CancellationToken>())).ReturnsAsync(entity);
+
+        var request  = new IntrospectRequest { Token = jwt };
+        var response = await f.Handler.HandleAsync(request, null, CancellationToken.None);
+
+        Assert.True(response.Active);
+        Assert.Null(response.Acr);
+        Assert.Null(response.AuthTime);
+    }
+
+    [Fact]
     public async Task ReturnsActive_WhenCallerDiffersFromTokenClient() {
         // RFC 7662 introspection callers are protected resources, with access gated
         // upstream via the ep:introspection permission.
         var f = CreateFixture("resource-server");
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
+        using var ambient = AdviceContext.Establish(new(f.Sp));
 
         var claims = new List<Claim> {
             new(Claims.JwtId, Guid.NewGuid().ToString()),
@@ -160,7 +221,7 @@ public class IntrospectionHandlerShould
             new(Claims.Issuer, Issuer),
         };
 
-        var jwt    = f.TokenService.CreateToken(claims, TimeSpan.FromHours(1));
+        var jwt    = await f.TokenService.CreateToken(claims, TimeSpan.FromHours(1));
         var entity = CreateTokenEntity(jwt, jwt, appName: "other-client");
 
         f.Tokens.Setup(m => m.FindByReferenceIdAsync(jwt, It.IsAny<CancellationToken>())).ReturnsAsync(entity);
@@ -174,7 +235,7 @@ public class IntrospectionHandlerShould
     [Fact]
     public async Task ReturnsInactive_WhenEntityStatusNotValid() {
         var f = CreateFixture();
-        using var ambient = AdviceContext.Establish(new AdviceContext(f.Sp));
+        using var ambient = AdviceContext.Establish(new(f.Sp));
 
         var claims = new List<Claim> {
             new(Claims.JwtId, Guid.NewGuid().ToString()),
@@ -182,7 +243,7 @@ public class IntrospectionHandlerShould
             new(Claims.Audience, "api"),
         };
 
-        var jwt    = f.TokenService.CreateToken(claims, TimeSpan.FromHours(1));
+        var jwt    = await f.TokenService.CreateToken(claims, TimeSpan.FromHours(1));
         var entity = CreateTokenEntity(jwt, jwt, "jwt", "revoked");
 
         f.Tokens.Setup(m => m.FindByReferenceIdAsync(jwt, It.IsAny<CancellationToken>())).ReturnsAsync(entity);
@@ -193,13 +254,55 @@ public class IntrospectionHandlerShould
         Assert.False(response.Active);
     }
 
+    [Fact]
+    public async Task Forwards_The_Assertion_And_Publishes_The_Introspection_Audience() {
+        var f = CreateFixture();
+
+        Dictionary<string, List<string?>>? presented = null;
+        string?                          audience  = null;
+        f.ClientAuth.Setup(c => c.AuthenticateAsync(It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                    It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                    It.IsAny<Dictionary<string, List<string?>>?>(),
+                                                    It.IsAny<CancellationToken>(),
+                                                    It.IsAny<string?>()))
+         .Callback((Dictionary<string, List<string?>>? _, Dictionary<string, List<string?>>? form,
+                    Dictionary<string, List<string?>>? _, CancellationToken _, string? endpointAudience) => {
+              presented = form;
+              audience  = endpointAudience;
+          })
+         .ReturnsAsync(new ClientAuthenticationResult<SchemataApplication> {
+              Application   = new() { Uid = Guid.NewGuid(), ClientId = "test-app" },
+              Method        = ClientAuthMethods.PrivateKeyJwt,
+              Authenticated = true,
+          });
+
+        var       ctx     = new AdviceContext(f.Sp);
+        using var ambient = AdviceContext.Establish(ctx);
+        var request = new IntrospectRequest {
+            Token               = "unknown-token",
+            ClientAssertion     = "header.payload.signature",
+            ClientAssertionType = ClientAssertionTypes.JwtBearer,
+        };
+
+        var response = await f.Handler.HandleAsync(request, null, CancellationToken.None);
+
+        Assert.False(response.Active);
+        Assert.NotNull(presented);
+        Assert.Equal("header.payload.signature", Assert.Single(presented![Parameters.ClientAssertion]));
+        Assert.Equal(ClientAssertionTypes.JwtBearer, Assert.Single(presented[Parameters.ClientAssertionType]));
+        Assert.False(presented.ContainsKey(Parameters.ClientId));
+        Assert.False(presented.ContainsKey(Parameters.ClientSecret));
+        Assert.Equal($"{Issuer}{Endpoints.Introspect}", audience);
+    }
+
     #region Nested type: Fixture
 
     private record Fixture(
-        IntrospectionHandler<SchemataApplication, SchemataToken> Handler,
-        Mock<ITokenManager<SchemataToken>>                       Tokens,
+        IntrospectionHandler<SchemataApplication> Handler,
+        Mock<ITokenStore<SchemataToken>>                       Tokens,
         TokenService                                             TokenService,
-        IServiceProvider                                         Sp
+        IServiceProvider                                         Sp,
+        Mock<IClientAuthenticationService<SchemataApplication>>  ClientAuth
     );
 
     #endregion

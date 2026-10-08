@@ -28,8 +28,8 @@ public partial class ConnectController
             AuthorizationStatus.Redirect when !string.IsNullOrWhiteSpace(result.RedirectUri) => Redirect(
                 result.RedirectUri
             ),
-            AuthorizationStatus.Content when result.Data is string html => new ContentResult {
-                Content     = html,
+            AuthorizationStatus.Content when result.Data is Services.LogoutPage page => new ContentResult {
+                Content     = page.Html,
                 ContentType = MediaTypeNames.Text.Html,
                 StatusCode  = 200,
             },

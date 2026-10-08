@@ -28,7 +28,7 @@ public static class AdviceRequestScopeValidation
 ///     .
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
-/// <seealso cref="AdviceAuthorizeScopeValidation{TApp}" />
+/// <seealso cref="AdviceAuthorizeGrantProfile{TApp}" />
 public sealed class AdviceRequestScopeValidation<TApp>(IApplicationManager<TApp> apps) : ITokenRequestAdvisor<TApp>
     where TApp : SchemataApplication
 {
@@ -52,7 +52,7 @@ public sealed class AdviceRequestScopeValidation<TApp>(IApplicationManager<TApp>
         }
 
         foreach (var s in requested) {
-            await PermissionAdvice.RequireAsync(apps, application, PermissionPrefixes.Scope + s, ct,
+            await Permissions.RequireTrueAsync(await apps.HasScopeAsync(application, s, ct),
                 OAuthErrors.InvalidScope, SchemataResources.INVALID_SCOPE);
         }
 

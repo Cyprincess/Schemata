@@ -8,6 +8,8 @@ using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Core;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
+using Schemata.Authorization.Foundation.Controllers;
+
 namespace Schemata.Authorization.Foundation.Features;
 
 /// <summary>
@@ -22,20 +24,31 @@ namespace Schemata.Authorization.Foundation.Features;
 /// <typeparam name="TApp">The application entity type.</typeparam>
 /// <remarks>
 ///     Installed via <c>UseClientCredentialsFlow()</c> on
-///     <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope, TToken}" />.
+///     <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope}" />.
 /// </remarks>
-/// <seealso cref="AuthorizationCodeFlowFeature{TApp, TAuth, TScope, TToken}" />
 public sealed class ClientCredentialsFlowFeature<TApp> : IAuthorizationFlowFeature
     where TApp : SchemataApplication
 {
     #region IAuthorizationFlowFeature Members
 
-    public int Order => 10_300;
+    public int Order => ClientCredentialsFlowFeature.DefaultOrder;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
+
         services.TryAddKeyedScoped<IGrantHandler, ClientCredentialsHandler<TApp>>(GrantTypes.ClientCredentials);
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryClientCredentials>());
     }
 
     #endregion
+}
+
+
+/// <summary>
+///     Ordering anchor for <see cref="ClientCredentialsFlowFeature{TApp}" /> so successor features can chain
+///     off its <c>DefaultOrder</c> without naming type arguments.
+/// </summary>
+internal static class ClientCredentialsFlowFeature
+{
+    /// <summary>The default feature ordering value (chained after its predecessor).</summary>
+    public const int DefaultOrder = RefreshTokenFlowFeature.DefaultOrder + 100;
 }

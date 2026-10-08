@@ -3,7 +3,6 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Options;
 
@@ -28,7 +27,7 @@ internal sealed class AuthorizationSignInHttpWriter(IOptions<JsonSerializerOptio
                 response.Callback.RedirectUri,
                 response.Callback.Parameters,
                 response.Callback.ResponseMode!);
-            await action.ExecuteResultAsync(new ActionContext(context, context.GetRouteData(), new()));
+            await action.ExecuteResultAsync(new(context, context.GetRouteData(), new()));
         }
     }
 }

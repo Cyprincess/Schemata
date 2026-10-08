@@ -28,4 +28,24 @@ public class RevokeRequest
 
     /// <summary>Client secret for authentication when using the request body.</summary>
     public string? ClientSecret { get; set; }
+
+    /// <summary>
+    ///     Client assertion used to authenticate the client itself, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7523.html#section-2.2">
+    ///         RFC 7523: JSON Web Token (JWT) Profile for OAuth 2.0
+    ///         Client Authentication and Authorization Grants §2.2: Using JWTs for Client Authentication
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? ClientAssertion { get; set; }
+
+    /// <summary>
+    ///     Type identifier of <see cref="ClientAssertion" />, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7523.html#section-2.2">
+    ///         RFC 7523: JSON Web Token (JWT) Profile for OAuth 2.0
+    ///         Client Authentication and Authorization Grants §2.2: Using JWTs for Client Authentication
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? ClientAssertionType { get; set; }
 }

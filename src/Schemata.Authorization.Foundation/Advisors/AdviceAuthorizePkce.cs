@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
@@ -16,7 +17,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 public static class AdviceAuthorizePkce
 {
     /// <summary>The default advisor ordering value.</summary>
-    public const int DefaultOrder = AdviceAuthorizeScopeValidation.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = AdviceAuthorizeResource.DefaultOrder + 10_000_000;
 }
 
 /// <summary>
@@ -35,14 +36,12 @@ public static class AdviceAuthorizePkce
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
 /// <remarks>
-///     When PKCE is required (either at the server level via
-///     <see cref="CodeFlowOptions.RequirePkce" /> or the application level via
-///     <see cref="SchemataApplication.RequirePkce" />), the <c>code_challenge</c> must be present.
+///     When PKCE is required at the server level via
+///     <see cref="CodeFlowOptions.RequirePkce" />, the <c>code_challenge</c> must be present.
 ///     If <c>code_challenge_method</c> is omitted, <c>plain</c> is assumed per RFC 7636.
 ///     When <see cref="CodeFlowOptions.RequirePkceS256" /> is true, only <c>S256</c> is accepted.
 /// </remarks>
 /// <seealso cref="CodeFlowOptions" />
-/// <seealso cref="AdviceCodeExchangePkce{TApp, TToken}" />
 public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options) : IAuthorizeAdvisor<TApp>
     where TApp : SchemataApplication
 {
@@ -56,22 +55,28 @@ public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options)
         CancellationToken      ct = default
     ) {
         var required = options.Value.RequirePkce;
-        if (authz.Application?.RequirePkce.HasValue == true) {
-            required = authz.Application.RequirePkce.Value;
+
+        // An absent or empty challenge is only a violation when PKCE is required. A present
+        // value — including whitespace-only input that older IsNullOrWhiteSpace checks erased —
+        // must satisfy the RFC 7636 §4.2 grammar either way, so malformed-present input is
+        // reported as a grammar failure rather than folded into the required/absent fact.
+        if (required && string.IsNullOrEmpty(authz.Request?.CodeChallenge)) {
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                SchemataResources.NOT_EMPTY,
+                new Dictionary<string, string?> { ["value"] = Parameters.CodeChallenge }
+            );
         }
 
-        if (required && string.IsNullOrWhiteSpace(authz.Request?.CodeChallenge)) {
-            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_EMPTY,
-                new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.CodeChallenge });
-        }
-
-        if (string.IsNullOrWhiteSpace(authz.Request?.CodeChallenge)) {
+        if (string.IsNullOrEmpty(authz.Request?.CodeChallenge)) {
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        if (!PkceValidation.IsValid(authz.Request.CodeChallenge)) {
-            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED,
-                new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.CodeChallenge });
+        if (!Pkce.IsValid(authz.Request.CodeChallenge)) {
+            throw new OAuthException(
+                OAuthErrors.InvalidRequest,
+                SchemataResources.CODE_CHALLENGE_INVALID
+            );
         }
 
         // Normalize a missing method to "plain" per RFC 7636 §4.3, and write the result back to
@@ -89,12 +94,19 @@ public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options)
             case PkceMethods.Plain when !options.Value.RequirePkceS256:
                 break;
             case PkceMethods.Plain:
-                throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED,
-                    new System.Collections.Generic.Dictionary<string, string?> { ["value"] = PkceMethods.Plain });
+                throw new OAuthException(
+                    OAuthErrors.InvalidRequest,
+                    SchemataResources.CODE_CHALLENGE_METHOD_NOT_ALLOWED,
+                    new Dictionary<string, string?> { ["value"] = PkceMethods.Plain }
+                );
             default:
-                throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED,
-                    new System.Collections.Generic.Dictionary<string, string?> { ["value"] = Parameters.CodeChallengeMethod });
+                throw new OAuthException(
+                    OAuthErrors.InvalidRequest,
+                    SchemataResources.NOT_SUPPORTED,
+                    new Dictionary<string, string?> { ["value"] = method }
+                );
         }
+
 
         return Task.FromResult(AdviseResult.Continue);
     }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using static Schemata.Abstractions.SchemataConstants;
 
@@ -83,14 +84,55 @@ public static class AuthorizationConstants
     /// </summary>
     public static class Claims
     {
+        /// <summary>
+        ///     Authentication Context Class Reference claim, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#IDToken">
+        ///         OpenID Connect Core 1.0 §2: ID Token
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string Acr                 = "acr";
+
+        /// <summary>
+        ///     Authentication Methods References claim (JSON array of case-sensitive strings), per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#IDToken">
+        ///         OpenID Connect Core 1.0 §2: ID Token
+        ///     </seealso>
+        ///     and
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8176.html#section-2">
+        ///         RFC 8176: Authentication Method Reference Values §2
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string Amr                 = "amr";
+
         /// <summary>End-user postal address claim.</summary>
         public const string Address             = "address";
 
         /// <summary>Access token hash claim.</summary>
         public const string AtHash              = "at_hash";
 
+        /// <summary>
+        ///     Device secret hash claim binding an ID token to the device secret, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-native-sso-1_0.html">
+        ///         OpenID Connect Native SSO for Mobile Apps 1.0 §3.4.1: Native SSO ID Token
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string DsHash             = "ds_hash";
+
         /// <summary>Audience claim.</summary>
         public const string Audience            = "aud";
+
+        /// <summary>
+        ///     Rich authorization request claim carrying granted authorization details, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9396.html#section-14.2">
+        ///         RFC 9396: OAuth 2.0 Rich Authorization
+        ///         Requests §14.2: JSON Web Token Claims Registration
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string AuthorizationDetails = "authorization_details";
 
         /// <summary>End-user birthdate claim.</summary>
         public const string Birthdate           = "birthdate";
@@ -100,6 +142,17 @@ public static class AuthorizationConstants
 
         /// <summary>OAuth client identifier claim.</summary>
         public const string ClientId            = "client_id";
+
+        /// <summary>
+        ///     Confirmation claim whose jkt member carries the DPoP public key thumbprint, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9449.html#section-6.1">
+        ///         RFC 9449: OAuth 2.0 Demonstrating Proof
+        ///         of Possession (DPoP) §6.1: JWK Thumbprint
+        ///         Confirmation Method
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string Cnf                 = "cnf";
 
         /// <summary>Email verification status claim.</summary>
         public const string EmailVerified       = "email_verified";
@@ -127,6 +180,18 @@ public static class AuthorizationConstants
 
         /// <summary>JWT identifier claim.</summary>
         public const string JwtId               = "jti";
+
+        /// <summary>
+        ///     JWK SHA-256 thumbprint confirmation member of the cnf claim, carrying the DPoP public
+        ///     key hash, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9449.html#section-6.1">
+        ///         RFC 9449: OAuth 2.0 Demonstrating Proof
+        ///         of Possession (DPoP) §6.1: JWK Thumbprint
+        ///         Confirmation Method
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string Jkt                 = "jkt";
 
         /// <summary>End-user locale claim.</summary>
         public const string Locale              = "locale";
@@ -158,6 +223,21 @@ public static class AuthorizationConstants
         /// <summary>End-user profile page URL claim.</summary>
         public const string Profile             = "profile";
 
+        /// <summary>Server-restored trusted grant subject category; never emitted in access tokens.</summary>
+        public const string GrantSubjectKind    = "urn:schemata:authorization:grant-subject-kind";
+
+        /// <summary>Server-restored trusted authorization profile; never emitted in access tokens.</summary>
+        public const string GrantProfile        = "urn:schemata:authorization:grant-profile";
+
+        /// <summary>
+        ///     Space-joined resource indicators claim, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8707.html#section-2">
+        ///         RFC 8707: Resource Indicators for OAuth 2.0 §2: Resource Parameter
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string Resources           = "resources";
+
         /// <summary>OAuth scope claim.</summary>
         public const string Scope               = "scope";
 
@@ -178,6 +258,75 @@ public static class AuthorizationConstants
 
         /// <summary>End-user authentication time claim.</summary>
         public const string AuthTime            = "auth_time";
+
+        /// <summary>
+        ///     Private access-token claim carrying the space-joined UserInfo claim names requested
+        ///     through the <c>claims</c> parameter (Core 1.0 §5.5), so the UserInfo endpoint can
+        ///     widen its output beyond the scope-derived set. Not a registered JWT claim.
+        /// </summary>
+        public const string UserinfoRequest     = ".userinfo_request";
+    }
+
+    #endregion
+
+    #region Nested type: ClientAssertionAlgorithms
+
+    /// <summary>
+    ///     JWS algorithms the assertion-based client authentication channels verify, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7521.html#section-4.2">
+    ///         RFC 7521: Assertion Framework for OAuth 2.0 Client Authentication and
+    ///         Authorization Grants §4.2: Using Assertions for Client Authentication
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public static class ClientAssertionAlgorithms
+    {
+        /// <summary>JWS algorithms the <c>client_secret_jwt</c> channel verifies: HMAC keyed with the raw client secret.</summary>
+        public static readonly HashSet<string> SymmetricAlgorithms = new(StringComparer.Ordinal) {
+            SigningAlgorithms.HmacSha256,
+            SigningAlgorithms.HmacSha384,
+            SigningAlgorithms.HmacSha512,
+        };
+
+        /// <summary>JWS algorithms the <c>private_key_jwt</c> channel verifies with keys from the client's registered JWK Set.</summary>
+        public static readonly HashSet<string> AsymmetricAlgorithms = new(StringComparer.Ordinal) {
+            SigningAlgorithms.RsaSha256,
+            SigningAlgorithms.RsaSha384,
+            SigningAlgorithms.RsaSha512,
+            SigningAlgorithms.RsaPssSha256,
+            SigningAlgorithms.RsaPssSha384,
+            SigningAlgorithms.RsaPssSha512,
+            SigningAlgorithms.EcdsaSha256,
+            SigningAlgorithms.EcdsaSha384,
+            SigningAlgorithms.EcdsaSha512,
+        };
+    }
+
+    #endregion
+
+    #region Nested type: ClientAssertionTypes
+
+    /// <summary>
+    ///     Client assertion type identifiers, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7523.html#section-2.2">
+    ///         RFC 7523: JSON Web Token (JWT) Profile for OAuth 2.0 Client
+    ///         Authentication and Authorization Grants §2.2: Using JWTs
+    ///         for Client Authentication
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public static class ClientAssertionTypes
+    {
+        /// <summary>
+        ///     JWT Bearer client assertion type, registered at
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7523.html#section-8.2">
+        ///         RFC 7523: JSON Web Token (JWT) Profile for OAuth 2.0 Client
+        ///         Authentication and Authorization Grants §8.2: Sub-Namespace
+        ///         Registration of urn:ietf:params:oauth:client-assertion-type:jwt-bearer
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string JwtBearer = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
     }
 
     #endregion
@@ -205,6 +354,17 @@ public static class AuthorizationConstants
         public const string ClientSecretBasic = "client_secret_basic";
 
         /// <summary>
+        ///     Client authenticates by signing a client assertion JWT with its registered
+        ///     client secret, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication">
+        ///         OpenID Connect Core 1.0
+        ///         §9: Client Authentication
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string ClientSecretJwt = "client_secret_jwt";
+
+        /// <summary>
         ///     Client authenticates by including credentials in the request body, per
         ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-2.3.1">
         ///         RFC 6749: The OAuth 2.0 Authorization
@@ -213,41 +373,27 @@ public static class AuthorizationConstants
         ///     .
         /// </summary>
         public const string ClientSecretPost = "client_secret_post";
-    }
 
-    #endregion
+        /// <summary>
+        ///     No client authentication; identification-only use by public clients, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication">
+        ///         OpenID Connect Core 1.0
+        ///         §9: Client Authentication
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string None = "none";
 
-    #region Nested type: ClientTypes
-
-    /// <summary>
-    ///     OAuth 2.0 client type identifiers.
-    /// </summary>
-    public static class ClientTypes
-    {
-        /// <summary>A confidential client that can maintain the confidentiality of its credentials.</summary>
-        public const string Confidential = "confidential";
-
-        /// <summary>A public client with credentials exposed to the user agent.</summary>
-        public const string Public = "public";
-    }
-
-    #endregion
-
-    #region Nested type: ConsentTypes
-
-    /// <summary>
-    ///     OAuth 2.0 consent type identifiers.
-    /// </summary>
-    public static class ConsentTypes
-    {
-        /// <summary>The user must explicitly grant consent.</summary>
-        public const string Explicit = "explicit";
-
-        /// <summary>Consent is managed by an external system.</summary>
-        public const string External = "external";
-
-        /// <summary>Consent is implicitly granted.</summary>
-        public const string Implicit = "implicit";
+        /// <summary>
+        ///     Client authenticates by signing a client assertion JWT with a key from its
+        ///     registered JWK Set, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication">
+        ///         OpenID Connect Core 1.0
+        ///         §9: Client Authentication
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string PrivateKeyJwt = "private_key_jwt";
     }
 
     #endregion
@@ -472,11 +618,43 @@ public static class AuthorizationConstants
         /// </summary>
         public const string EndSession = "/Connect/EndSession";
 
-        /// <summary>OpenID Connect Discovery document endpoint path.</summary>
-        public const string Discovery = "openid-configuration";
+        /// <summary>
+        ///     Dynamic client registration endpoint path, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-registration-1_0.html">OpenID Connect Dynamic Client Registration 1.0</seealso>
+        ///     .
+        /// </summary>
+        public const string Register = "/Connect/Register";
 
-        /// <summary>JWKS (JSON Web Key Set) endpoint path.</summary>
-        public const string Jwks = "jwks";
+        /// <summary>
+        ///     OpenID Connect discovery document endpoint path, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig">OpenID Connect Discovery 1.0 §§4-4.1: OpenID Provider Configuration Request</seealso>
+        ///     . Prefixed by the issuer path when the issuer is not a root URI.
+        /// </summary>
+        public const string Discovery = "/.well-known/openid-configuration";
+
+        /// <summary>
+        ///     OAuth 2.0 authorization server metadata endpoint path, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8414.html#section-3.1">RFC 8414: OAuth 2.0 Authorization Server Metadata §3.1: Authorization Server Metadata Request</seealso>
+        ///     . The issuer path is appended after this prefix when the issuer is not a root URI.
+        /// </summary>
+        public const string OAuthAuthorizationServer = "/.well-known/oauth-authorization-server";
+
+        /// <summary>JWKS (JSON Web Key Set) endpoint path. Prefixed by the issuer path when the issuer is not a root URI.</summary>
+        public const string Jwks = "/.well-known/jwks";
+
+        /// <summary>
+        ///     Pushed authorization request endpoint path, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9126.html#section-2">RFC 9126: OAuth 2.0 Pushed Authorization Requests §2: Pushed Authorization Request Endpoint</seealso>
+        ///     .
+        /// </summary>
+        public const string Par = "/Connect/Par";
+
+        /// <summary>
+        ///     Session-management check_session_iframe endpoint path, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-session-1_0.html#OPiframe">OpenID Connect Session Management 1.0 §3.2: OP iframe</seealso>
+        ///     .
+        /// </summary>
+        public const string CheckSession = "/Connect/CheckSession";
     }
 
     #endregion
@@ -501,6 +679,38 @@ public static class AuthorizationConstants
 
     #endregion
 
+    #region Nested type: GrantProfiles
+
+    /// <summary>
+    ///     Trusted authorization profiles.
+    /// </summary>
+    public static class GrantProfiles
+    {
+        /// <summary>OAuth authorization without OpenID Connect artifacts.</summary>
+        public const string OAuth = "oauth";
+
+        /// <summary>OpenID Connect authorization.</summary>
+        public const string OpenIdConnect = "openid_connect";
+    }
+
+    #endregion
+
+    #region Nested type: GrantSubjectKinds
+
+    /// <summary>
+    ///     Trusted grant-subject categories.
+    /// </summary>
+    public static class GrantSubjectKinds
+    {
+        /// <summary>An authenticated end-user subject.</summary>
+        public const string EndUser = "end_user";
+
+        /// <summary>An application acting as its own subject.</summary>
+        public const string Application = "application";
+    }
+
+    #endregion
+
     #region Nested type: GrantTypes
 
     /// <summary>
@@ -519,6 +729,16 @@ public static class AuthorizationConstants
         ///     .
         /// </summary>
         public const string AuthorizationCode = "authorization_code";
+
+        /// <summary>
+        ///     Implicit grant, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.2">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §4.2: Implicit Grant
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string Implicit = "implicit";
 
         /// <summary>
         ///     Client credentials grant, per
@@ -548,10 +768,49 @@ public static class AuthorizationConstants
         public const string DeviceCode = "urn:ietf:params:oauth:grant-type:device_code";
 
         /// <summary>
+        ///     JWT bearer authorization grant, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7523.html">RFC 7523: JSON Web Token (JWT) Profile for OAuth 2.0 Client Authentication and Authorization Grants</seealso>
+        ///     .
+        /// </summary>
+        public const string JwtBearer = "urn:ietf:params:oauth:grant-type:jwt-bearer";
+
+        /// <summary>
         ///     Token exchange grant, per
         ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html">RFC 8693: OAuth 2.0 Token Exchange</seealso>.
         /// </summary>
         public const string TokenExchange = "urn:ietf:params:oauth:grant-type:token-exchange";
+    }
+
+    #endregion
+
+    #region Nested type: Headers
+
+    /// <summary>
+    ///     HTTP header field names carrying DPoP proofs and server-provided nonces.
+    /// </summary>
+    public static class Headers
+    {
+        /// <summary>
+        ///     HTTP request header field carrying the DPoP proof JWT, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9449.html#section-4.1">
+        ///         RFC 9449: OAuth 2.0 Demonstrating Proof
+        ///         of Possession (DPoP) §4.1: The DPoP
+        ///         HTTP Header
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string Dpop = "DPoP";
+
+        /// <summary>
+        ///     HTTP response header field supplying a server-provided nonce, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9449.html#section-8">
+        ///         RFC 9449: OAuth 2.0 Demonstrating Proof
+        ///         of Possession (DPoP) §8: Authorization Server-Provided
+        ///         Nonce
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string DpopNonce = "DPoP-Nonce";
     }
 
     #endregion
@@ -568,6 +827,22 @@ public static class AuthorizationConstants
 
         /// <summary>A device authorization interaction.</summary>
         public const string Device = "device";
+    }
+
+    #endregion
+
+    #region Nested type: NativeSessionKinds
+
+    /// <summary>
+    ///     Native SSO session authority kinds.
+    /// </summary>
+    public static class NativeSessionKinds
+    {
+        /// <summary>An online native session validated against the authority slot generation.</summary>
+        public const string Online = "online";
+
+        /// <summary>An offline native session validated against the token family.</summary>
+        public const string Offline = "offline";
     }
 
     #endregion
@@ -664,7 +939,10 @@ public static class AuthorizationConstants
         /// </summary>
         public const string UnsupportedResponseType = "unsupported_response_type";
 
-        /// <summary>The redirect URI is invalid or mismatched with the registered URI.</summary>
+        /// <summary>
+        ///     The redirect URI is invalid or mismatched with the registered URI.
+        ///     DCR registration context only (OIDC DCR §3.3).
+        /// </summary>
         public const string InvalidRedirectUri = "invalid_redirect_uri";
 
         /// <summary>
@@ -728,6 +1006,85 @@ public static class AuthorizationConstants
         public const string ConsentRequired = "consent_required";
 
         /// <summary>
+        ///     The authorization server requires end-user interaction, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#AuthError">
+        ///         OpenID Connect Core 1.0 §3.1.2.6:
+        ///         Authentication Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string InteractionRequired = "interaction_required";
+
+        /// <summary>
+        ///     The end-user must select an account at the authorization server, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#AuthError">
+        ///         OpenID Connect Core 1.0 §3.1.2.6:
+        ///         Authentication Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string AccountSelectionRequired = "account_selection_required";
+
+        /// <summary>
+        ///     The request_uri returned an error or invalid data, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#AuthError">
+        ///         OpenID Connect Core 1.0 §3.1.2.6:
+        ///         Authentication Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string InvalidRequestUri = "invalid_request_uri";
+
+        /// <summary>
+        ///     The request parameter contains an invalid request object, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#AuthError">
+        ///         OpenID Connect Core 1.0 §3.1.2.6:
+        ///         Authentication Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string InvalidRequestObject = "invalid_request_object";
+
+        /// <summary>
+        ///     The authorization server does not support the request parameter, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#AuthError">
+        ///         OpenID Connect Core 1.0 §3.1.2.6:
+        ///         Authentication Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string RequestNotSupported = "request_not_supported";
+
+        /// <summary>
+        ///     The authorization server does not support the request_uri parameter, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#AuthError">
+        ///         OpenID Connect Core 1.0 §3.1.2.6:
+        ///         Authentication Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string RequestUriNotSupported = "request_uri_not_supported";
+
+        /// <summary>
+        ///     The authorization server does not support registration, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#AuthError">
+        ///         OpenID Connect Core 1.0 §3.1.2.6:
+        ///         Authentication Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string RegistrationNotSupported = "registration_not_supported";
+
+        /// <summary>
+        ///     The authorization server rejects the requested resource target, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8707.html#section-2">
+        ///         RFC 8707: Resource Indicators for OAuth 2.0 §2: Requesting a Resource
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string InvalidTarget = "invalid_target";
+
+        /// <summary>
         ///     The authorization server rejects the presented token type, per
         ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7009.html#section-2.2.1">
         ///         RFC 7009: OAuth 2.0 Token Revocation
@@ -736,6 +1093,80 @@ public static class AuthorizationConstants
         ///     .
         /// </summary>
         public const string UnsupportedTokenType = "unsupported_token_type";
+
+        /// <summary>
+        ///     The registration request contains invalid or unsupported client metadata, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7591.html#section-3.2.2">
+        ///         RFC 7591: OAuth 2.0 Dynamic Client
+        ///         Registration Protocol §3.2.2: Client Registration Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string InvalidClientMetadata = "invalid_client_metadata";
+
+        /// <summary>
+        ///     The software statement is malformed or its signature does not verify, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7591.html#section-3.2.2">
+        ///         RFC 7591: OAuth 2.0 Dynamic Client
+        ///         Registration Protocol §3.2.2: Client Registration Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string InvalidSoftwareStatement = "invalid_software_statement";
+
+        /// <summary>
+        ///     The software statement is valid but the authorization server does not trust its issuer, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7591.html#section-3.2.2">
+        ///         RFC 7591: OAuth 2.0 Dynamic Client
+        ///         Registration Protocol §3.2.2: Client Registration Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string UnapprovedSoftwareStatement = "unapproved_software_statement";
+
+        /// <summary>
+        ///     The access token provided is expired, revoked, malformed, or bound to a key
+        ///     other than the one demonstrated by the request, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6750.html#section-3.1">
+        ///         RFC 6750: The OAuth 2.0 Authorization Framework: Bearer Token Usage
+        ///         §3.1: Error Codes
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string InvalidToken = "invalid_token";
+
+        /// <summary>
+        ///     The DPoP proof is invalid, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9449.html#section-5">
+        ///         RFC 9449: OAuth 2.0 Demonstrating Proof
+        ///         of Possession (DPoP) §5: DPoP Access Token
+        ///         Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string InvalidDpopProof = "invalid_dpop_proof";
+
+        /// <summary>
+        ///     A server-provided nonce is required in the DPoP proof, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9449.html#section-8">
+        ///         RFC 9449: OAuth 2.0 Demonstrating Proof
+        ///         of Possession (DPoP) §8: Authorization Server-Provided
+        ///         Nonce
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string UseDpopNonce = "use_dpop_nonce";
+
+        /// <summary>
+        ///     The authorization details contain an unknown type value or do not conform to the
+        ///     respective type definition, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9396.html#section-5">
+        ///         RFC 9396: OAuth 2.0 Rich Authorization
+        ///         Requests §5: Authorization Error Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string InvalidAuthorizationDetails = "invalid_authorization_details";
     }
 
     #endregion
@@ -786,6 +1217,44 @@ public static class AuthorizationConstants
         ///     .
         /// </summary>
         public const string ClientSecret = "client_secret";
+
+        /// <summary>
+        ///     OAuth client_assertion_type parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7523.html#section-2.2">
+        ///         RFC 7523: JSON Web Token (JWT) Profile for OAuth 2.0 Client
+        ///         Authentication and Authorization Grants §2.2: Using JWTs
+        ///         for Client Authentication
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string ClientAssertionType = "client_assertion_type";
+
+        /// <summary>
+        ///     OAuth client_assertion parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7523.html#section-2.2">
+        ///         RFC 7523: JSON Web Token (JWT) Profile for OAuth 2.0 Client
+        ///         Authentication and Authorization Grants §2.2: Using JWTs
+        ///         for Client Authentication
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string ClientAssertion = "client_assertion";
+
+        /// <summary>
+        ///     OAuth assertion parameter carrying an authorization grant, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7521.html#section-4.1">
+        ///         RFC 7521: Assertion Framework for OAuth 2.0 Client Authentication
+        ///         and Authorization Grants §4.1: Using Assertions as Authorization Grants
+        ///     </seealso>
+        ///     and
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7523.html#section-2.1">
+        ///         RFC 7523: JSON Web Token (JWT) Profile for OAuth 2.0 Client
+        ///         Authentication and Authorization Grants §2.1: Using JWTs
+        ///         as Authorization Grants
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string Assertion = "assertion";
 
         /// <summary>
         ///     OAuth authorization code parameter, per
@@ -981,14 +1450,18 @@ public static class AuthorizationConstants
         public const string IssuedTokenType = "issued_token_type";
 
         /// <summary>
-        ///     Token exchange resource parameter, per
+        ///     Resource indicator parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8707.html#section-2">
+        ///         RFC 8707: Resource Indicators for OAuth 2.0 §2: Requesting a Resource
+        ///     </seealso>
+        ///     and
         ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8693.html#section-2.1">
         ///         RFC 8693: OAuth 2.0 Token Exchange §2.1:
         ///         Request
         ///     </seealso>
         ///     .
         /// </summary>
-        public const string TargetResource = "resource";
+        public const string Resource = "resource";
 
         /// <summary>
         ///     Token exchange audience parameter, per
@@ -1068,6 +1541,97 @@ public static class AuthorizationConstants
         ///     .
         /// </summary>
         public const string ErrorUri = "error_uri";
+
+        /// <summary>
+        ///     OAuth dpop_jkt authorization request parameter binding the authorization code to a
+        ///     DPoP key, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9449.html#section-10">
+        ///         RFC 9449: OAuth 2.0 Demonstrating Proof
+        ///         of Possession (DPoP) §10: Authorization Code Binding to a DPoP
+        ///         Key
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string DpopJkt = "dpop_jkt";
+
+        /// <summary>
+        ///     Rich authorization request parameter carrying a JSON array of authorization
+        ///     details objects, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9396.html#section-2">
+        ///         RFC 9396: OAuth 2.0 Rich Authorization
+        ///         Requests §2: Request Parameter "authorization_details"
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string AuthorizationDetails = "authorization_details";
+
+        /// <summary>
+        ///     OpenID Connect claims request parameter, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter">
+        ///         OpenID Connect Core 1.0 §5.5: Requesting Claims using the "claims" Request
+        ///         Parameter
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string Claims = "claims";
+
+        /// <summary>OAuth redirect_uri authorization request parameter.</summary>
+        public const string RedirectUri = "redirect_uri";
+
+        /// <summary>OAuth scope authorization request parameter.</summary>
+        public const string Scope = "scope";
+
+        /// <summary>OpenID Connect prompt authorization request parameter.</summary>
+        public const string Prompt = "prompt";
+
+        /// <summary>OpenID Connect display authorization request parameter.</summary>
+        public const string Display = "display";
+
+        /// <summary>OpenID Connect login_hint authorization request parameter.</summary>
+        public const string LoginHint = "login_hint";
+
+        /// <summary>OpenID Connect id_token_hint authorization request parameter.</summary>
+        public const string IdTokenHint = "id_token_hint";
+
+        /// <summary>OpenID Connect acr_values authorization request parameter.</summary>
+        public const string AcrValues = "acr_values";
+
+        /// <summary>
+        ///     JWT-Secured Authorization Request object carried by value, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9101.html#section-4">
+        ///         RFC 9101: The OAuth 2.0 Authorization Framework: JWT-Secured Authorization Request
+        ///         (JAR) §4: Request Object
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string Request = "request";
+
+        /// <summary>
+        ///     Reference to a pushed or stored authorization request object, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9126.html#section-2.2">
+        ///         RFC 9126: OAuth 2.0 Pushed Authorization Requests §2.2: Successful Response
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string RequestUri = "request_uri";
+
+        /// <summary>
+        ///     Device secret presented with the authorization code and refresh token grants, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-native-sso-1_0.html">
+        ///         OpenID Connect Native SSO for Mobile Apps 1.0 §3.3: Token Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string DeviceSecret = "device_secret";
+
+        /// <summary>
+        ///     Session state value returned in the authorization response, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-session-1_0.html#CreatingUpdatingSessions">
+        ///         OpenID Connect Session Management 1.0 §3: Creating and Updating Sessions
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string SessionState = "session_state";
     }
 
     #endregion
@@ -1079,12 +1643,6 @@ public static class AuthorizationConstants
     /// </summary>
     public static class PermissionPrefixes
     {
-        /// <summary>Prefix for grant type permission entries.</summary>
-        public const string GrantType = "g:";
-
-        /// <summary>Prefix for scope permission entries.</summary>
-        public const string Scope = "s:";
-
         /// <summary>Prefix for endpoint permission entries.</summary>
         public const string Endpoint = "e:";
     }
@@ -1152,6 +1710,11 @@ public static class AuthorizationConstants
         /// <summary>Serialized scope property key.</summary>
         public const string Scope               = ".scope";
 
+        /// <summary>Serialized space-joined resource indicators property key.</summary>
+        public const string Resources           = ".resources";
+
+        public const string AccessResources = ".access_resources";
+
         /// <summary>Serialized issued token type property key.</summary>
         public const string IssuedTokenType     = ".issued_token_type";
 
@@ -1179,14 +1742,41 @@ public static class AuthorizationConstants
         /// <summary>Serialized authorization name property key.</summary>
         public const string AuthorizationName   = ".authorization_name";
 
+        /// <summary>Serialized trusted grant lineage carried between handlers and issuance.</summary>
+        public const string GrantContext        = ".grant_context";
+
+        /// <summary>Serialized predecessor refresh row used by the issuance family fence.</summary>
+        public const string RefreshPredecessor  = ".refresh_predecessor";
+
         /// <summary>Serialized session identifier property key.</summary>
         public const string SessionId           = ".session_id";
+
+        /// <summary>Device secret approved for the token response.</summary>
+        public const string DeviceSecret        = ".device_secret";
 
         /// <summary>Serialized max_age property key.</summary>
         public const string MaxAge              = ".max_age";
 
-        /// <summary>Serialized authentication time property key.</summary>
-        public const string AuthTime            = ".auth_time";
+        /// <summary>Serialized prepared device-secret row for atomic family publication.</summary>
+        public const string DeviceSecretToken   = ".device_secret_token";
+
+        /// <summary>Serialized authorization details grant set property key.</summary>
+        public const string AuthorizationDetails = ".authorization_details";
+
+        /// <summary>Serialized server-resolved authorization profile.</summary>
+        public const string GrantProfile         = ".grant_profile";
+
+        /// <summary>Serialized DPoP proof key thumbprint property key.</summary>
+        public const string DpopJkt            = ".dpop_jkt";
+
+        /// <summary>Serialized raw claims request property key (OpenID Connect Core 1.0 §5.5).</summary>
+        public const string ClaimsRequest      = ".claims_request";
+
+        /// <summary>Serialized space-joined UserInfo claim request property key (Core 1.0 §5.5).</summary>
+        public const string UserinfoClaims     = ".userinfo_claims";
+
+        /// <summary>Serialized server-minted session-state salt carried across interaction.</summary>
+        public const string SessionStateSalt   = ".session_state_salt";
     }
 
     #endregion
@@ -1242,6 +1832,17 @@ public static class AuthorizationConstants
 
     #endregion
 
+    #region Nested type: RequestUriPrefixes
+
+    /// <summary>URN prefixes issued as authorization request references.</summary>
+    public static class RequestUriPrefixes
+    {
+        /// <summary>RFC 9126 pushed authorization request URI prefix.</summary>
+        public const string Par = "urn:ietf:params:oauth:request_uri:";
+    }
+
+    #endregion
+
     #region Nested type: Schemes
 
     /// <summary>
@@ -1263,6 +1864,19 @@ public static class AuthorizationConstants
         ///     .
         /// </summary>
         public const string Bearer = "Bearer";
+
+        /// <summary>
+        ///     DPoP authentication scheme name, also the token_type value of DPoP-bound access
+        ///
+        ///     tokens, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9449.html#section-7.1">
+        ///         RFC 9449: OAuth 2.0 Demonstrating Proof
+        ///         of Possession (DPoP) §7.1: The DPoP Authentication
+        ///         Scheme
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string Dpop = "DPoP";
 
         /// <summary>Basic scheme type.</summary>
         public const string Basic = "Basic";
@@ -1311,6 +1925,15 @@ public static class AuthorizationConstants
         ///     .
         /// </summary>
         public const string OfflineAccess = "offline_access";
+
+        /// <summary>
+        ///     Requests a device secret for same-device cross-application single sign-on, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-native-sso-1_0.html">
+        ///         OpenID Connect Native SSO for Mobile Apps 1.0 §3.1: Authentication Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string DeviceSso = "device_sso";
     }
 
     #endregion
@@ -1517,6 +2140,55 @@ public static class AuthorizationConstants
 
     #endregion
 
+    #region Nested type: TokenMediaTypes
+
+    /// <summary>
+    ///     Media type identifiers stamped into the JWT <c>typ</c>/<c>cty</c> headers.
+    /// </summary>
+    public static class TokenMediaTypes
+    {
+        /// <summary>
+        ///     Access token profile, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9068.html#section-2.1">
+        ///         RFC 9068: JSON Web Token (JWT) Profile
+        ///         for OAuth 2.0 Access Tokens §2.1: Header
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string AccessToken = "at+jwt";
+
+        /// <summary>
+        ///     Logout token, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-backchannel-1_0.html#LogoutToken">
+        ///         OpenID Connect Back-Channel Logout 1.0 §2.4: Logout Token
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string Logout = "logout+jwt";
+
+        /// <summary>
+        ///     Media type of the DPoP proof JWT in the typ JOSE header parameter, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9449.html#section-4.2">
+        ///         RFC 9449: OAuth 2.0 Demonstrating Proof
+        ///         of Possession (DPoP) §4.2: DPoP Proof JWT
+        ///         Syntax
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string DpopJwt = "dpop+jwt";
+
+        /// <summary>
+        ///     Nested JWT content type for encrypted tokens, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7519.html#section-5.2">
+        ///         RFC 7519: JSON Web Token (JWT) §5.2: "cty" (Content Type) Header Parameter
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string NestedJwt = "JWT";
+    }
+
+    #endregion
+
     #region Nested type: TokenStatuses
 
     /// <summary>
@@ -1538,6 +2210,9 @@ public static class AuthorizationConstants
 
         /// <summary>The token has been denied by the user.</summary>
         public const string Denied = "denied";
+
+        /// <summary>The token has been superseded by a rotated replacement and is no longer valid.</summary>
+        public const string Superseded = "superseded";
     }
 
     #endregion
@@ -1580,6 +2255,31 @@ public static class AuthorizationConstants
 
         /// <summary>A logout token used during RP-initiated logout with front-channel notifications.</summary>
         public const string Logout = TokenTypeUris.Logout;
+
+        /// <summary>
+        ///     A registration access token authorizing read-back of a dynamically registered client,
+        ///     per
+        ///     <seealso href="https://openid.net/specs/openid-connect-registration-1_0.html">
+        ///         OpenID Connect Dynamic Client Registration 1.0 §3.2.1
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string Registration = "registration";
+
+        /// <summary>
+        ///     A pushed authorization request stored for later consumption at the authorization endpoint,
+        ///     per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9126.html">RFC 9126: OAuth 2.0 Pushed Authorization Requests</seealso>
+        ///     .
+        /// </summary>
+        public const string ParRequest = "par_request";
+
+        /// <summary>
+        ///     A device secret issued for same-device single sign-on, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-native-sso-1_0.html">OpenID Connect Native SSO for Mobile Apps 1.0</seealso>
+        ///     .
+        /// </summary>
+        public const string DeviceSecret = "device_secret";
     }
 
     #endregion
@@ -1672,6 +2372,15 @@ public static class AuthorizationConstants
 
         /// <summary>Schemata-internal token type URI for a logout interaction token.</summary>
         public const string Logout = "urn:schemata:authorization:token-type:logout";
+
+        /// <summary>
+        ///     Device secret actor token type URI used in the Native SSO token exchange, per
+        ///     <seealso href="https://openid.net/specs/openid-connect-native-sso-1_0.html">
+        ///         OpenID Connect Native SSO for Mobile Apps 1.0 §4.1: Token Exchange Request
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string DeviceSecret = "urn:openid:params:token-type:device-secret";
     }
 
     #endregion

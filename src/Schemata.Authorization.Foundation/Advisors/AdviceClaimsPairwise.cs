@@ -36,7 +36,7 @@ public static class AdviceClaimsPairwise
 ///     The projection is delegated to <see cref="ISubjectIdentifierService" /> and applied only when
 ///     the sectored identifier or subject type requires it.
 /// </remarks>
-/// <seealso cref="AdviceClaimsAudience{TApp}" />
+/// <seealso cref="AdviceClaimsAudience" />
 public sealed class AdviceClaimsPairwise<TApp> : IClaimsAdvisor
     where TApp : SchemataApplication
 {
@@ -55,7 +55,7 @@ public sealed class AdviceClaimsPairwise<TApp> : IClaimsAdvisor
 
     public int Order => AdviceClaimsPairwise.DefaultOrder;
 
-    public async Task<AdviseResult> AdviseAsync(AdviceContext ctx, List<Claim> claims, CancellationToken ct = default) {
+    public async Task<AdviseResult> AdviseAsync(AdviceContext ctx, List<Claim> claims, Schemata.Authorization.Skeleton.Models.AuthorizationClaimContext issuance, CancellationToken ct = default) {
         var sub    = claims.FirstOrDefault(c => c.Type == IdentityClaims.Subject)?.Value;
         var client = claims.FirstOrDefault(c => c.Type == Claims.ClientId)?.Value;
 
