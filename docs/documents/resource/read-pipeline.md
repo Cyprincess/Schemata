@@ -19,7 +19,9 @@ Resource List uses `Schemata.Common.ProtectedContinuation` to stream internal JS
 protect the compressed payload with ASP.NET DataProtection, and encode it as Base64 URL text. Its
 purpose remains `Schemata.Resource.Foundation.PageToken`. The payload retains filter, language,
 order-by, parent, show-deleted, page size, and skip; changing the first five request parameters
-rejects the continuation with a `page_token` field violation.
+rejects the continuation with a `page_token` field violation. The payload also binds the issuing
+tenant and caller identity; replaying the token under a different tenant or principal fails with
+the same violation.
 
 A continuation without `page_size` retains the token's effective size under the current maximum.
 An explicit zero selects the configured default, and a larger explicit size clamps to the maximum.

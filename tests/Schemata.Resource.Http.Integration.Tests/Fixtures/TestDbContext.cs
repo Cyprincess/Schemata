@@ -14,6 +14,9 @@ public class TestDbContext : DbContext
 
     public DbSet<PagedThing> PagedThings { get; set; } = null!;
     public DbSet<ParentedRecord> ParentedRecords { get; set; } = null!;
+
+    public DbSet<IdempotentOrder> IdempotentOrders { get; set; } = null!;
+
     public DbSet<HttpNote> HttpNotes { get; set; } = null!;
     public DbSet<GrpcNote> GrpcNotes { get; set; } = null!;
 

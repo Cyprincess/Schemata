@@ -33,9 +33,6 @@ public static class AdviceUpdateFreshness
 ///         strong-format or malformed tags — raises <see cref="AbortedException" /> with the
 ///         <c>CONCURRENCY_MISMATCH</c> reason. Only an absent or whitespace tag opts out.
 ///     </para>
-///     <para>
-///         Suppressed when <see cref="FreshnessSuppressed" /> is present.
-///     </para>
 /// </remarks>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>
@@ -54,7 +51,7 @@ public sealed class AdviceUpdateFreshness<TEntity, TRequest> : IResourceUpdateAd
         ClaimsPrincipal?  principal,
         CancellationToken ct = default
     ) {
-        if (!FreshnessHelper.TryGetEntityTag(ctx, entity, out var expected)) {
+        if (!FreshnessHelper.TryGetEntityTag(entity, out var expected)) {
             return Task.FromResult(AdviseResult.Continue);
         }
 

@@ -13,6 +13,7 @@ using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
+using Schemata.Abstractions.Tenancy;
 using Schemata.Advice;
 using Schemata.Common;
 using Schemata.Expressions.Skeleton;
@@ -58,6 +59,9 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
 
         ResourceIdentifiers.ApplyParent(container, request.Parent);
 
+        var tenant = TenantContext.Current.Uid;
+        var caller = ProtectedContinuationCaller.Bind(principal);
+
         var token = await PageToken.FromStringAsync(request.PageToken, Protector)
                  ?? new PageToken {
                         Parent      = request.Parent,
@@ -65,8 +69,12 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
                         Language    = request.Language,
                         OrderBy     = request.OrderBy,
                         ShowDeleted = request.ShowDeleted,
+                        Tenant      = tenant,
+                        Caller      = caller,
                     };
-        if (token.Parent != request.Parent
+        if (token.Tenant != tenant
+         || token.Caller != caller
+         || token.Parent != request.Parent
          || token.Filter != request.Filter
          || token.Language != request.Language
          || token.OrderBy != request.OrderBy

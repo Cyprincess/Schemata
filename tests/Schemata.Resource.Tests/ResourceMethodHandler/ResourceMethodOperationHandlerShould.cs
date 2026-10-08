@@ -8,7 +8,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Exceptions;
+using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Core.Building;
 using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Advisors;
@@ -87,6 +90,34 @@ public class ResourceMethodOperationHandlerShould
         Assert.Equal(entity.CanonicalName, handler.Request!.CanonicalName);
     }
 
+    [Fact]
+    public async Task InstanceMethod_Without_Name_Fails_Before_Handler_Execution() {
+        var repository = Mock.Of<IRepository<MethodEntity>>(MockBehavior.Strict);
+        var handler    = new MethodHandler();
+        using var services = Services(repository, handler: handler);
+        var operation = services.GetRequiredService<ResourceMethodOperationHandler<MethodEntity, MethodRequest, MethodResponse>>();
+
+        await Assert.ThrowsAsync<ValidationException>(
+            () => operation.InvokeAsync("archive", null, new MethodRequest(), null, default));
+
+        Assert.Equal(0, handler.Invocations);
+    }
+
+    [Fact]
+    public async Task CollectionMethod_Ignores_Request_Canonical_Name() {
+        var repository = Mock.Of<IRepository<MethodEntity>>(MockBehavior.Strict);
+        var handler    = new MethodHandler();
+        using var services = Services(repository, handler: handler);
+        var operation = services.GetRequiredService<ResourceMethodOperationHandler<MethodEntity, MethodRequest, MethodResponse>>();
+        var request   = new MethodRequest { CanonicalName = "methodEntities/payload" };
+
+        var response = await operation.InvokeAsync("batchArchive", request.CanonicalName, request, null, default);
+
+        Assert.Same(handler.Response, response);
+        Assert.Equal(1, handler.Invocations);
+        Assert.Equal("methodEntities/payload", request.CanonicalName);
+    }
+
     private static ServiceProvider Services(
         IRepository<MethodEntity> repository,
         MethodHandler?            handler   = null,
@@ -94,6 +125,7 @@ public class ResourceMethodOperationHandlerShould
     ) {
         var services = new ServiceCollection();
         services.AddSingleton(repository);
+        services.AddSingleton(Registry());
         services.AddSingleton<IRequestHandler<MethodRequest, MethodResponse>>(handler ?? new MethodHandler());
         services.AddSingleton(sp => new ResourceMethodOperationHandler<MethodEntity, MethodRequest, MethodResponse>(
             sp.GetRequiredService<IRepository<MethodEntity>>(), sp, new InProcessRequestDispatcher(sp)));
@@ -103,6 +135,16 @@ public class ResourceMethodOperationHandlerShould
         configure?.Invoke(services);
 
         return services.BuildServiceProvider();
+    }
+
+
+    private static ResourceRegistry Registry() {
+        var registry = new ResourceRegistry();
+        registry.Add(new ResourceAttribute(typeof(MethodEntity)), [
+            new ResourceMethodAttribute("archive", typeof(MethodHandler)),
+            new ResourceMethodAttribute("batchArchive", typeof(MethodHandler), ResourceMethodScope.Collection),
+        ]);
+        return registry;
     }
 
     [CanonicalName("methodEntities/{methodEntity}")]

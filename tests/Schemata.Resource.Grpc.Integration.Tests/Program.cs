@@ -27,6 +27,7 @@ builder.UseSchemata(schema => {
     schema.UseMapster().Map<Student, Student>();
     schema.UseMapster().Map<Trash, Trash>();
     schema.UseMapster().Map<LockedStudent, LockedStudent>();
+    schema.UseMapster().Map<IdempotentOrderRequest, IdempotentOrder>();
     schema.UseScheduling().MapGrpc();
     schema.UseFlow().MapGrpc();
 
@@ -59,6 +60,7 @@ builder.UseSchemata(schema => {
     }
     resource.MapGrpc().Use<Trash, Trash, Trash, Trash>();
     resource.MapGrpc().Use<LockedStudent, LockedStudent, LockedStudent, LockedStudent>();
+    resource.MapGrpc().Use<IdempotentOrder, IdempotentOrderRequest, IdempotentOrder, IdempotentOrder>();
 
     // Disable validation so freshness behavior remains isolated.
     resource.WithoutCreateValidation().WithoutUpdateValidation();
@@ -88,6 +90,8 @@ builder.UseSchemata(schema => {
 
     // Supply the leaf name before canonical-name advice builds students/{slug}.
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, AdviceAddStudentName>());
+    schema.Services.AddRepository<IdempotentOrder, EfCoreRepository<TestDbContext, IdempotentOrder>>();
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<IdempotentOrder>, AdviceAddResourceName<IdempotentOrder>>());
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJob>, AdviceAddResourceName<SchemataJob>>());
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJobExecution>, AdviceAddResourceName<SchemataJobExecution>>());
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataProcess>, AdviceAddResourceName<SchemataProcess>>());
@@ -95,6 +99,8 @@ builder.UseSchemata(schema => {
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataProcessTransition>, AdviceAddResourceName<SchemataProcessTransition>>());
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataProcessCompensation>, AdviceAddResourceName<SchemataProcessCompensation>>());
 });
+
+builder.Services.Insert(0, ServiceDescriptor.Transient<Microsoft.AspNetCore.Hosting.IStartupFilter, TenantHeaderStartupFilter>());
 
 var app = builder.Build();
 

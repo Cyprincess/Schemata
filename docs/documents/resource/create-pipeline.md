@@ -9,7 +9,7 @@ The ordered wrap chain performs these steps:
 1. Authentication checks a non-anonymous caller when `WithAuthentication()` registered the closed advisor.
 2. Coarse authorization checks the Create permission when `WithAuthorization()` registered it.
 3. The sanitize wrap clears server-managed fields from `TRequest`.
-4. The validation wrap runs `IValidationAdvisor<TRequest>` unless `CreateRequestValidationSuppressed` is present.
+4. The validation wrap runs `IValidationAdvisor<TRequest>` when the stage is installed; `WithoutCreateValidation()` excludes it at registration, and `RepositoryBase.SuppressAddValidation()` skips it for one operation.
 5. The idempotency wrap replays a finalized AIP-155 result or reserves its key.
 6. The handler maps, persists, and returns its result.
 7. The detail-response wrap derives a child parent and obtains an ETag.
@@ -24,7 +24,7 @@ The handler maps `TRequest` to `TEntity`; a null mapping throws `ValidationExcep
 Instance access receives the mapped entity and the Create request so an overridden access provider can evaluate both. Create has no row query to which entitlement can apply.
 ## Idempotency
 
-The idempotency wrap derives its key from `IRequestIdentification.RequestId`, `Create`, entity type, principal, target, and payload hash. A finalized matching record returns `CreateResultBase<TDetail>` without invoking the handler. A pending record waits for completion or throws `AbortedException`. Reservation data is local to the wrap invocation; the ambient context carries only pipeline markers such as suppression.
+The idempotency wrap derives its key from `IRequestIdentification.RequestId`, `Create`, entity type, principal, and target; the payload hash travels with the cached value. A finalized record with a matching hash returns `CreateResultBase<TDetail>` without invoking the handler. A finalized record or pending reservation carrying a different hash fails validation on `request_id` with `REQUEST_ID_PAYLOAD_MISMATCH`. A matching pending reservation waits for completion up to `SchemataResourceOptions.IdempotencyPendingWait`, then throws `AbortedException`. Reservation data is local to the wrap invocation; the ambient context carries only pipeline markers such as suppression.
 
 ## Extension points
 

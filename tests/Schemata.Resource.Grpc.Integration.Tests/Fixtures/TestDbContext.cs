@@ -12,6 +12,8 @@ public class TestDbContext : DbContext
 
     public DbSet<Trash> Trashes { get; set; } = null!;
 
+    public DbSet<IdempotentOrder> IdempotentOrders { get; set; } = null!;
+
     public DbSet<Scheduling.Skeleton.Entities.SchemataJob> Jobs { get; set; } = null!;
 
     public DbSet<Scheduling.Skeleton.Entities.SchemataJobExecution> Executions { get; set; } = null!;

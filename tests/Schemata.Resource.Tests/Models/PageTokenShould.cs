@@ -20,6 +20,8 @@ public class PageTokenShould
         var original = new PageToken {
             Parent = "organizations/acme", Filter = "age > 18", Language = "aip",
             OrderBy = "name DESC", PageSize = 25, Skip = 50, ShowDeleted = false,
+            Tenant = Guid.Parse("00000000-0000-0000-0000-000000000042"),
+            Caller = new ProtectedContinuationCaller(true, "test", "alice", null),
         };
         var protector = new EphemeralDataProtectionProvider().CreateProtector(PageToken.ProtectionPurpose);
         var encoded = await original.ToStringAsync(protector);
@@ -32,6 +34,8 @@ public class PageTokenShould
         Assert.Equal(original.PageSize, decoded.PageSize);
         Assert.Equal(original.Skip, decoded.Skip);
         Assert.Equal(original.ShowDeleted, decoded.ShowDeleted);
+        Assert.Equal(original.Tenant, decoded.Tenant);
+        Assert.Equal(original.Caller, decoded.Caller);
     }
 
     [Theory]

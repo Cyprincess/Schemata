@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Core.Building;
+using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Caching.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
@@ -25,9 +26,9 @@ internal static class IdempotencyHelper
 
     /// <summary>
     ///     Reads the cache entry under <paramref name="key" /> and, when it is a finalized
-    ///     (DONE) envelope, returns its payload. A payload-hash mismatch raises
-    ///     <see cref="AbortedException" /> (same request id, different payload). A missing
-    ///     entry or a still-pending reservation yields <c>(false, null)</c>.
+    ///     (DONE) envelope, returns its payload. A payload-hash mismatch raises a
+    ///     <see cref="ValidationException" /> on <c>request_id</c> (same request id, different
+    ///     payload). A missing entry or a still-pending reservation yields <c>(false, null)</c>.
     /// </summary>
     public static async Task<(bool Found, TPayload? Payload)> ReadDoneAsync<TPayload>(
         ICacheProvider    cache,
@@ -51,7 +52,7 @@ internal static class IdempotencyHelper
         }
 
         if (cached.Hash != payloadHash) {
-            throw new AbortedException();
+            throw PayloadMismatch();
         }
 
         return (true, cached.Payload);
@@ -83,6 +84,38 @@ internal static class IdempotencyHelper
 
             await Task.Delay(TimeSpan.FromMilliseconds(100), time, ct);
         }
+    }
+
+    /// <summary>
+    ///     Throws <see cref="ValidationException" /> when the reservation under <paramref name="key" />
+    ///     is still pending and was made with a different payload: the <c>request_id</c> is being
+    ///     reused, so the replay is rejected without waiting for the in-flight attempt to finalize.
+    /// </summary>
+    public static async Task ThrowIfPendingMismatchAsync(
+        ICacheProvider    cache,
+        string            key,
+        string            payloadHash,
+        CancellationToken ct
+    ) {
+        var bytes = await cache.GetAsync(key, ct);
+        if (bytes is null
+            || JsonSerializer.Deserialize<IdempotencyHeader>(bytes)?.Kind != IdempotencyKind.Pending) {
+            return;
+        }
+
+        if (JsonSerializer.Deserialize<PendingIdempotencyRecord>(bytes)?.PayloadHash != payloadHash) {
+            throw PayloadMismatch();
+        }
+    }
+
+    private static ValidationException PayloadMismatch() {
+        return new([
+            new() {
+                Field       = "request_id",
+                Reason      = ErrorReasons.RequestIdPayloadMismatch,
+                Description = "The request_id was already used with a different request payload.",
+            },
+        ]);
     }
 
     /// <summary>

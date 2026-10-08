@@ -18,21 +18,15 @@ internal static class ValidationHelper
 {
     /// <summary>
     ///     Runs all registered <see cref="IValidationAdvisor{TRequest}" /> implementations against the request.
-    ///     Supports per-operation suppression via the <paramref name="suppressed" /> flag. On
-    ///     validation failure, throws <see cref="ValidationException" /> with the collected errors.
+    ///     On validation failure, throws <see cref="ValidationException" /> with the collected errors.
     /// </summary>
     public static async Task<AdviseResult> ValidateAsync<TRequest>(
         AdviceContext     ctx,
         TRequest          request,
         Operations        operation,
-        bool              suppressed,
         CancellationToken ct = default
     )
         where TRequest : class {
-        if (suppressed) {
-            return AdviseResult.Continue;
-        }
-
         var errors = new List<ErrorFieldViolation>();
         switch (await Advisor.For<IValidationAdvisor<TRequest>>()
                              .RunAsync(ctx, operation, request, errors, ct)) {

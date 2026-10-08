@@ -13,8 +13,9 @@ using Schemata.Common;
 namespace Schemata.Resource.Foundation.Models;
 
 /// <summary>
-///     Encodes list query parameters (filter, order-by, parent, show-deleted, page size, skip)
-///     into a Brotli-compressed, data-protected, Base64 URL-safe token
+///     Encodes the issuing scope (tenant, caller identity) and list query parameters (filter,
+///     order-by, parent, show-deleted, page size, skip) into a Brotli-compressed, data-protected,
+///     Base64 URL-safe token
 ///     per <seealso href="https://google.aip.dev/158">AIP-158: Pagination</seealso>. Tokens are
 ///     encrypted so clients cannot read or alter the continuation position; any token that
 ///     fails to decode raises <c>INVALID_ARGUMENT</c>.
@@ -26,6 +27,18 @@ public class PageToken : IPagination
     ///     from other protected payloads.
     /// </summary>
     public const string ProtectionPurpose = "Schemata.Resource.Foundation.PageToken";
+
+    /// <summary>
+    ///     The tenant scope that issued the token; a continuation replayed under a different
+    ///     tenant fails validation like a malformed token.
+    /// </summary>
+    public virtual Guid? Tenant { get; set; }
+
+    /// <summary>
+    ///     The caller identity that issued the token; a continuation replayed by a different
+    ///     principal fails validation like a malformed token.
+    /// </summary>
+    public virtual ProtectedContinuationCaller? Caller { get; set; }
 
     /// <summary>
     ///     Gets or sets the filter expression.

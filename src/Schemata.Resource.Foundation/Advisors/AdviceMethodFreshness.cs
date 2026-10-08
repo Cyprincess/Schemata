@@ -26,9 +26,6 @@ public static class AdviceMethodFreshness
 ///         strong-format or malformed tags — raises <see cref="AbortedException" /> (AIP-154:
 ///         a provided mismatching etag MUST abort). Only an absent or whitespace tag opts out.
 ///     </para>
-///     <para>
-///         Suppressed when <see cref="FreshnessSuppressed" /> is present.
-///     </para>
 /// </remarks>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>
@@ -49,7 +46,7 @@ public sealed class AdviceMethodFreshness<TEntity, TRequest, TResponse> : IResou
         ClaimsPrincipal?  principal,
         CancellationToken ct = default
     ) {
-        if (!FreshnessHelper.TryGetEntityTag(ctx, entity, out var expected)) {
+        if (!FreshnessHelper.TryGetEntityTag(entity, out var expected)) {
             return Task.FromResult(AdviseResult.Continue);
         }
 

@@ -53,6 +53,7 @@ public sealed class PurgeHandler<TEntity> : IRequestHandler<PurgeResourceRequest
             ExecutionUid = uid,
             Method       = Verbs.Purge,
             ArgsJson     = args,
+            Principal    = request.Principal,
         };
 
         var execution = await scheduler.TriggerAsync<PurgeJob<TEntity>>(context, ct);

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,6 +11,7 @@ using Schemata.Abstractions.Resource;
 using Schemata.Advice;
 using Schemata.Common;
 using Schemata.Common.Errors;
+using Schemata.Core.Building;
 using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Commands;
@@ -53,10 +55,8 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
     ///     <see cref="Schemata.Abstractions.Resource.ResourceMethodAttribute" />.
     /// </param>
     /// <param name="name">
-    ///     The canonical name of the target resource for
-    ///     <see cref="ResourceMethodScope.Instance" />-scoped methods, or
-    ///     <see langword="null" /> for
-    ///     <see cref="ResourceMethodScope.Collection" />-scoped methods.
+    ///     The canonical name of the target resource. Used only when the registered method is
+    ///     <see cref="ResourceMethodScope.Instance" />-scoped; a collection-scoped method ignores it.
     /// </param>
     /// <param name="request">The incoming request payload.</param>
     /// <param name="principal">
@@ -88,8 +88,8 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
     ///     <see cref="Schemata.Abstractions.Resource.ResourceMethodAttribute" />.
     /// </param>
     /// <param name="name">
-    ///     The canonical name of the target resource for instance-scoped methods, or
-    ///     <see langword="null" /> for collection-scoped methods.
+    ///     The canonical name of the target resource. Used only when the registered method is
+    ///     <see cref="ResourceMethodScope.Instance" />-scoped; a collection-scoped method ignores it.
     /// </param>
     /// <param name="request">The incoming request payload.</param>
     /// <param name="principal">The authenticated caller, or <see langword="null" /> for anonymous calls.</param>
@@ -102,11 +102,15 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
         ClaimsPrincipal?  principal,
         CancellationToken ct
     ) {
+        var scope = ResolveScope(verb);
+
         var ctx = AdviceContext.Require();
         ctx.Set(new ResourceMethodVerb(verb));
 
         var container = new ResourceRequestContainer<TEntity>();
-        if (name is not null) {
+        if (scope == ResourceMethodScope.Instance) {
+            // An instance-scoped method requires its target; ResourceIdentifiers.Apply rejects a
+            // missing or malformed name before any business handler can run.
             ResourceIdentifiers.Apply(container, name);
 
             // The URI target identifies the resource for AIP-155 idempotency; carry it on the request
@@ -125,7 +129,7 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
         }
 
         TEntity? entity = null;
-        if (name is not null) {
+        if (scope == ResourceMethodScope.Instance) {
             using (_repository.SuppressQuerySoftDelete()) {
                 entity = await _repository.SingleOrDefaultAsync(q => container.Query(q), ct);
             }
@@ -141,7 +145,6 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
                 throw ResourceNotFound(name);
             }
 
-
             var methodResult = await ResourcePipelineRunner<string>.RunAsync<TResponse>(
                 ctx,
                 () => Advisor.For<IResourceMethodAdvisor<TEntity, TRequest, TResponse>>()
@@ -153,6 +156,19 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
 
         request.Principal = principal;
         return await _dispatcher.SendAsync<TRequest, TResponse>(request, ct);
+    }
+
+    private ResourceMethodScope ResolveScope(string verb) {
+        var method = _sp.GetService<ResourceRegistry>()
+                       ?.GetMethods(typeof(TEntity))
+                        .FirstOrDefault(candidate => candidate.Verb == verb);
+        if (method is null) {
+            throw new InvalidOperationException(
+                $"Custom method '{verb}' is not registered for resource '{typeof(TEntity).FullName}'; "
+                + "register it on the resource before dispatch.");
+        }
+
+        return method.Scope;
     }
 
     private static NotFoundException Blocked(string? name) {

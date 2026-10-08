@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Insight.Skeleton.Advisors;
 using Schemata.Insight.Skeleton.Drivers;
 using Schemata.Insight.Skeleton.Plan;
 using Schemata.Report.Foundation;
@@ -121,6 +122,87 @@ public class DefaultReportServiceShould
         await Assert.ThrowsAsync<PermissionDeniedException>(async () => {
             await service.RunAsync(ReportTestHost.InlineRequest());
         });
+    }
+
+    [Fact]
+    public async Task Run_Propagates_Insight_Plan_Advisor_Rejection() {
+        var driver = ReportTestHost.CreateDriver(ReportTestRows.Create(1));
+        var advisor = new Mock<IInsightPlanAdvisor>();
+        advisor.SetupGet(value => value.Order).Returns(0);
+        advisor.Setup(value => value.AdviseAsync(
+                    It.IsAny<AdviceContext>(),
+                    It.IsAny<InsightPlanContext>(),
+                    It.IsAny<CancellationToken>()))
+               .Throws(new PermissionDeniedException());
+        using var provider = ReportTestHost.Create(
+            driver,
+            configure: services => services.TryAddEnumerable(
+                ServiceDescriptor.Singleton<IInsightPlanAdvisor>(advisor.Object)));
+        var service = provider.GetRequiredService<IReportService>();
+
+        await Assert.ThrowsAsync<PermissionDeniedException>(async () => {
+            await service.RunAsync(ReportTestHost.InlineRequest());
+        });
+        driver.Verify(value => value.ExecuteAsync(
+                          It.IsAny<SubPlan>(),
+                          It.IsAny<QueryInsightRequest>(),
+                          It.IsAny<ClaimsPrincipal?>(),
+                          It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Run_Inline_Reflects_Insight_Plan_Advisor_Rewrite() {
+        var driver = ReportTestHost.CreateDriver(ReportTestRows.Create(3));
+        using var provider = ReportTestHost.Create(
+            driver,
+            configure: services => services.TryAddEnumerable(
+                ServiceDescriptor.Singleton<IInsightPlanAdvisor>(CreateLimitAdvisor(2).Object)));
+        var service = provider.GetRequiredService<IReportService>();
+
+        var result = await service.RunAsync(ReportTestHost.InlineRequest());
+
+        Assert.Equal(2, result.Response.Rows.Count);
+        Assert.Equal(2, result.Response.TotalSize);
+    }
+
+    [Trait("Layer", "Component")]
+    [Fact]
+    public async Task Run_Persist_Reflects_Insight_Plan_Advisor_Rewrite() {
+        var state = new ReportPersistenceState();
+        var driver = ReportTestHost.CreateDriver(ReportTestRows.Create(3));
+        using var provider = ReportTestHost.Create(
+            driver,
+            state,
+            configure: services => services.TryAddEnumerable(
+                ServiceDescriptor.Singleton<IInsightPlanAdvisor>(CreateLimitAdvisor(2).Object)));
+        var service = provider.GetRequiredService<IReportService>();
+
+        await service.RunAsync(ReportTestHost.InlineRequest(persist: true));
+
+        var snapshot = Assert.Single(state.Snapshots);
+        Assert.Equal(SnapshotState.Succeeded, snapshot.State);
+        Assert.Equal(2, snapshot.RowCount);
+        Assert.Single(state.Chunks);
+    }
+
+    // Materialization ignores the top-level pagination limit, so the advisor's window sits under
+    // the terminal selection where the local pipeline applies it to the row stream.
+    private static Mock<IInsightPlanAdvisor> CreateLimitAdvisor(int take) {
+        var advisor = new Mock<IInsightPlanAdvisor>();
+        advisor.SetupGet(value => value.Order).Returns(0);
+        advisor.Setup(value => value.AdviseAsync(
+                    It.IsAny<AdviceContext>(),
+                    It.IsAny<InsightPlanContext>(),
+                    It.IsAny<CancellationToken>()))
+               .Callback((AdviceContext context, InsightPlanContext rewrite, CancellationToken cancellationToken) => {
+                    if (rewrite.Plan is LimitNode { Input: SelectionNode selection }) {
+                        rewrite.Plan = selection with {
+                            Input = new LimitNode(selection.Input, 0, take) { SourceSet = selection.SourceSet },
+                        };
+                    }
+                })
+               .Returns(Task.FromResult(AdviseResult.Continue));
+        return advisor;
     }
 
     [Fact]

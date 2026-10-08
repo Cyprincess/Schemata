@@ -39,7 +39,7 @@ internal static class ResourceAuthorizationRegistration
         foreach (var method in methods) {
             var descriptor = ResourceMethodHandlerHelper.Describe(resource.Entity, method.Handler)!;
             AddAuthenticationMethodMethod.MakeGenericMethod(resource.Entity, descriptor.Request, descriptor.Response)
-                                       .Invoke(null, [services]);
+                                       .Invoke(null, [services, method.Scope]);
         }
     }
 
@@ -53,7 +53,7 @@ internal static class ResourceAuthorizationRegistration
         foreach (var method in methods) {
             var descriptor = ResourceMethodHandlerHelper.Describe(resource.Entity, method.Handler)!;
             AddAuthorizationMethodMethod.MakeGenericMethod(resource.Entity, descriptor.Request, descriptor.Response)
-                                      .Invoke(null, [services]);
+                                      .Invoke(null, [services, method.Scope]);
         }
     }
 
@@ -92,19 +92,29 @@ internal static class ResourceAuthorizationRegistration
         AddAuthorization<DeleteResourceRequest<TEntity, TDetail>, DeleteResultBase<TDetail>>(services, static request => ResourceTarget.Instance(nameof(Operations.Delete), typeof(TEntity), request.Name));
     }
 
-    private static void AddAuthenticationMethod<TEntity, TRequest, TResponse>(IServiceCollection services)
+    private static void AddAuthenticationMethod<TEntity, TRequest, TResponse>(IServiceCollection services, ResourceMethodScope scope)
         where TEntity : class, ICanonicalName
         where TRequest : class, IRequest<TResponse>, IRequestPrincipal
         where TResponse : class, ICanonicalName {
+        if (scope == ResourceMethodScope.Collection) {
+            AddAuthentication<ResourceMethodRequest<TEntity, TRequest, TResponse>, TResponse>(services, static request => ResourceTarget.Collection(request.Verb, typeof(TEntity)));
+            return;
+        }
+
         AddAuthentication<ResourceMethodRequest<TEntity, TRequest, TResponse>, TResponse>(services, static request => ResourceTarget.Instance(request.Verb, typeof(TEntity), request.Name));
     }
 
-    private static void AddAuthorizationMethod<TEntity, TRequest, TResponse>(IServiceCollection services)
+    private static void AddAuthorizationMethod<TEntity, TRequest, TResponse>(IServiceCollection services, ResourceMethodScope scope)
         where TEntity : class, ICanonicalName
         where TRequest : class, IRequest<TResponse>, IRequestPrincipal
         where TResponse : class, ICanonicalName {
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IResourceMethodRequestAdvisor<TEntity, TRequest>, ResourceEntitlementMethodAdvisor<TEntity, TRequest>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IResourceMethodAdvisor<TEntity, TRequest, TResponse>, ResourceMethodAccessAdvisor<TEntity, TRequest, TResponse>>());
+        if (scope == ResourceMethodScope.Collection) {
+            AddAuthorization<ResourceMethodRequest<TEntity, TRequest, TResponse>, TResponse>(services, static request => ResourceTarget.Collection(request.Verb, typeof(TEntity)));
+            return;
+        }
+
         AddAuthorization<ResourceMethodRequest<TEntity, TRequest, TResponse>, TResponse>(services, static request => ResourceTarget.Instance(request.Verb, typeof(TEntity), request.Name));
     }
 

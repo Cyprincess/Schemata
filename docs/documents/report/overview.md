@@ -137,6 +137,7 @@ resolves advisors by `Order` and stops at the first result other than `AdviseRes
 | --- | --- |
 | `IReportGenerateAdvisor` | Before definition resolution. It can replace `ReportGenerateContext.Principal`. |
 | `IReportDefinitionAdvisor` | After definition resolution and before Insight planning. It can replace `ReportDefinitionContext.Query`. |
+| `IInsightPlanAdvisor` | After Insight planning and before materialization. It can reject the run or rewrite the plan drivers receive. |
 | `IReportSnapshotAdvisor` | After materialization and before a persisted snapshot finalizes. |
 | `IReportDefinitionProvider` | Produces a program-backed `QueryInsightRequest` for a keyed definition. |
 

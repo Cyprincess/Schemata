@@ -51,6 +51,14 @@ public class CustomMethodGrpcShould : IClassFixture<WebAppFactory>
     }
 
     [Fact]
+    public async Task Announce_Without_Name_Returns_InvalidArgument_Before_Handler() {
+        var error = await Assert.ThrowsAsync<RpcException>(() =>
+            Call<LockedStudent, LockedAnnounceRequest, LockedStudent>("announce", new()));
+
+        Assert.Equal(StatusCode.InvalidArgument, error.StatusCode);
+    }
+
+    [Fact]
     public async Task CancelOperation_And_WaitOperation_Return_Expected_Envelopes() {
         var pending = Execution(ExecutionState.Pending, DateTime.UtcNow.AddHours(1));
         var done    = Execution(ExecutionState.Succeeded, DateTime.UtcNow.AddHours(-1));

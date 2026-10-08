@@ -108,9 +108,7 @@ The gRPC error adapter preserves each violation's field, description, reason, an
 localized message in `google.rpc.BadRequest` details. HTTP validation failures retain the
 framework's 422 mapping; the canonical gRPC status is `INVALID_ARGUMENT`.
 
-`CreateRequestValidationSuppressed` and `UpdateRequestValidationSuppressed` are pipeline markers on the ambient `AdviceContext`. A request type with no registered validator leaves the violation list empty.
-
-`WithoutCreateValidation()`, `WithoutUpdateValidation()`, and `WithoutFreshness()` on the resource builder are registration-time installation choices: the corresponding wraps are never added to the service collection (or are removed when the call follows resource registration), in either ordering. They write no runtime flag; request-scoped opt-out remains the markers above.
+`WithoutCreateValidation()`, `WithoutUpdateValidation()`, and `WithoutFreshness()` on the resource builder are registration-time installation choices: the corresponding wraps are never added to the service collection (or are removed when the call follows resource registration), in either ordering. They write no runtime flag. A single operation opts out through the repository instead: `RepositoryBase.SuppressAddValidation()` and `SuppressUpdateValidation()` scope validation off for that operation's duration. A request type with no registered validator leaves the violation list empty.
 
 ## Validator implementation
 

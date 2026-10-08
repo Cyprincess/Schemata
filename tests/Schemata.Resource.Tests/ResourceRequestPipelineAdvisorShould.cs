@@ -93,32 +93,6 @@ public class ResourceRequestPipelineAdvisorShould
         mapper.Verify(m => m.Map<Request, Entity>(It.IsAny<Request>()), Times.Never);
     }
 
-    [Trait("Layer", "Component")]
-    [Fact]
-    public async Task Create_SuppressedValidationMarker_SkipsValidator() {
-        var request = new Request { DisplayName = "" };
-
-        var (repository, mapper) = CreateDoubles();
-        var validator = new RejectingValidationAdvisor();
-        using var services = BuildServices(
-            repository.Object,
-            mapper.Object,
-            services => {
-                services.AddSingleton<IRequestPipelineAdvisor<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>>(
-                    new ResourceCreateValidationPipelineAdvisor<Entity, Request, Detail>());
-                services.AddSingleton<IRequestPipelineAdvisor<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>>(
-                    new SuppressCreateValidationCommandAdvisor());
-                services.AddSingleton<IValidationAdvisor<Request>>(validator);
-            });
-        var dispatcher = new InProcessRequestDispatcher(services);
-
-        var result = await dispatcher.SendAsync<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>(
-            new(request, null), CancellationToken.None);
-
-        Assert.Same(MappedDetail, result.Detail);
-        Assert.False(validator.Invoked);
-    }
-
     [Fact]
     public async Task Update_Sanitize_ClearsSystemFields_AndStripsMask_BeforeHandlerMaps() {
         var request = new Request {
@@ -182,32 +156,6 @@ public class ResourceRequestPipelineAdvisorShould
     }
 
     [Trait("Layer", "Component")]
-    [Fact]
-    public async Task Update_SuppressedValidationMarker_SkipsValidator() {
-        var request = new Request { DisplayName = "" };
-
-        var (repository, mapper) = CreateDoubles();
-        var validator = new RejectingValidationAdvisor();
-        using var services = BuildServices(
-            repository.Object,
-            mapper.Object,
-            services => {
-                services.AddSingleton<IRequestPipelineAdvisor<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>>(
-                    new ResourceUpdateValidationPipelineAdvisor<Entity, Request, Detail>());
-                services.AddSingleton<IRequestPipelineAdvisor<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>>(
-                    new SuppressUpdateValidationCommandAdvisor());
-                services.AddSingleton<IValidationAdvisor<Request>>(validator);
-            });
-        var dispatcher = new InProcessRequestDispatcher(services);
-
-        var result = await dispatcher.SendAsync<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>(
-            new("entities/e1", request, null), CancellationToken.None);
-
-        Assert.Same(MappedDetail, result.Detail);
-        Assert.False(validator.Invoked);
-    }
-
-
     [Fact]
     public async Task Update_Authorization_Sees_Client_System_Fields_Before_Sanitize_And_Handler_Sees_Scrubbed_Payload() {
         var request = new Request {
@@ -323,40 +271,6 @@ public class ResourceRequestPipelineAdvisorShould
                 Description = "Display name is required.",
             });
             return Task.FromResult(AdviseResult.Block);
-        }
-    }
-
-    /// <summary>Command advisor that plants the create-request validation suppression marker on the ambient context.</summary>
-    private sealed class SuppressCreateValidationCommandAdvisor
-        : IRequestPipelineAdvisor<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>
-    {
-        public int Order => 0;
-
-        public Task<CreateResultBase<Detail>> AdviseAsync(
-            AdviceContext                                        ctx,
-            CreateResourceRequest<Entity, Request, Detail>       a1,
-            RequestHandlerContinuation<CreateResultBase<Detail>> next,
-            CancellationToken                                    ct = default
-        ) {
-            ctx.Set(new CreateRequestValidationSuppressed());
-            return next(ct);
-        }
-    }
-
-    /// <summary>Command advisor that plants the update-request validation suppression marker on the ambient context.</summary>
-    private sealed class SuppressUpdateValidationCommandAdvisor
-        : IRequestPipelineAdvisor<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>
-    {
-        public int Order => 0;
-
-        public Task<UpdateResultBase<Detail>> AdviseAsync(
-            AdviceContext                                        ctx,
-            UpdateResourceRequest<Entity, Request, Detail>       a1,
-            RequestHandlerContinuation<UpdateResultBase<Detail>> next,
-            CancellationToken                                    ct = default
-        ) {
-            ctx.Set(new UpdateRequestValidationSuppressed());
-            return next(ct);
         }
     }
 

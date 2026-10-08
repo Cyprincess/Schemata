@@ -11,6 +11,7 @@ using Google.Protobuf.Reflection;
 using Grpc.Core;
 using ProtoBuf;
 using ProtoBuf.Meta;
+using Schemata.Abstractions.Resource;
 
 namespace Schemata.Transport.Grpc.Proto;
 
@@ -134,8 +135,73 @@ public static class GrpcSchema
                 visiting.Remove(name);
                 emitted.Add(name);
             }
+            AnnotateRequestIdFormats(model, files);
             results.AddRange(FileDescriptor.BuildFromByteStrings(files).SelectMany(file => file.Services));
         }
         return results;
+    }
+
+    // protobuf-net's GetSchema emits no field options, so the AIP-202 UUID4 annotation is
+    // applied to the serialized FileDescriptorProto: every request message implementing
+    // IRequestIdentification gets (google.api.field_info).format = UUID4 on request_id, and
+    // the field_info descriptor chain is prepended so the pool resolves the dependency.
+    private static void AnnotateRequestIdFormats(RuntimeTypeModel model, List<ByteString> files) {
+        var names = new HashSet<string>(model.GetTypes().Cast<MetaType>()
+                                             .Where(meta => typeof(IRequestIdentification).IsAssignableFrom(meta.Type))
+                                             .Select(meta => string.IsNullOrEmpty(meta.Name) ? meta.Type.Name : meta.Name),
+                                        StringComparer.Ordinal);
+        if (names.Count == 0) {
+            return;
+        }
+
+        var annotated = false;
+        for (var i = 0; i < files.Count; i++) {
+            var file    = FileDescriptorProto.Parser.ParseFrom(files[i]);
+            var touched = false;
+            foreach (var message in file.MessageType) {
+                if (!names.Contains(message.Name)) {
+                    continue;
+                }
+
+                var field = message.Field.FirstOrDefault(candidate => candidate.Name == "request_id");
+                if (field is null) {
+                    continue;
+                }
+
+                field.Options ??= new FieldOptions();
+                field.Options.SetExtension(Google.Api.FieldInfoExtensions.FieldInfo,
+                                           new Google.Api.FieldInfo { Format = Google.Api.FieldInfo.Types.Format.Uuid4 });
+                if (!file.Dependency.Contains("google/api/field_info.proto")) {
+                    file.Dependency.Add("google/api/field_info.proto");
+                }
+
+                touched = true;
+            }
+
+            if (touched) {
+                files[i] = file.ToByteString();
+                annotated = true;
+            }
+        }
+
+        if (!annotated) {
+            return;
+        }
+
+        var present = new HashSet<string>(files.Select(file => FileDescriptorProto.Parser.ParseFrom(file).Name),
+                                          StringComparer.Ordinal);
+        var extras  = new List<ByteString>();
+        Supply(Google.Api.FieldInfoReflection.Descriptor);
+        files.InsertRange(0, extras);
+
+        void Supply(FileDescriptor descriptor) {
+            foreach (var dependency in descriptor.Dependencies) {
+                Supply(dependency);
+            }
+
+            if (present.Add(descriptor.Name)) {
+                extras.Add(descriptor.ToProto().ToByteString());
+            }
+        }
     }
 }

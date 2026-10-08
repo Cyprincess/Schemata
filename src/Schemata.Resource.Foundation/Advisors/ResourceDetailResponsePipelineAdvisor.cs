@@ -24,7 +24,7 @@ public static class ResourceDetailResponsePipelineAdvisor
     /// <summary>
     ///     Shapes one detail in place: parent first, then the ETag. The ETag is emitted only when an
     ///     <see cref="IEntityTagProvider" /> is installed — the same installation decision that
-    ///     governs the freshness check stages — and freshness is not suppressed for the dispatch.
+    ///     governs the freshness check stages.
     /// </summary>
     /// <typeparam name="TEntity">The entity type behind the response.</typeparam>
     /// <typeparam name="TDetail">The detail DTO type carrying the response.</typeparam>
@@ -44,7 +44,7 @@ public static class ResourceDetailResponsePipelineAdvisor
             }
         }
 
-        if (ctx.Has<FreshnessSuppressed>() || detail is not IFreshness freshness) {
+        if (detail is not IFreshness freshness) {
             return;
         }
 

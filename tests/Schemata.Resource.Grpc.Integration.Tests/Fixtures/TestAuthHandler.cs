@@ -23,7 +23,11 @@ public sealed class TestAuthHandler(
     protected override Task<AuthenticateResult> HandleAuthenticateAsync() {
         if (Context.Request.Headers["X-Test-Auth"] == "valid"
          && (!Context.Request.Headers.TryGetValue("X-Test-Scheme", out var requested) || requested == base.Scheme.Name)) {
-            var identity  = new System.Security.Claims.ClaimsIdentity(base.Scheme.Name);
+            var identity = new System.Security.Claims.ClaimsIdentity(base.Scheme.Name);
+            if (Context.Request.Headers.TryGetValue("X-Test-Subject", out var subject) && !string.IsNullOrWhiteSpace(subject)) {
+                identity.AddClaim(new(System.Security.Claims.ClaimTypes.NameIdentifier, subject.ToString()));
+            }
+
             var principal = new System.Security.Claims.ClaimsPrincipal(identity);
             var ticket    = new AuthenticationTicket(principal, base.Scheme.Name);
             return Task.FromResult(AuthenticateResult.Success(ticket));

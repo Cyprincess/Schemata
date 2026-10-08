@@ -6,7 +6,7 @@ An Update request enters the dispatcher as `UpdateResourceRequest<TEntity,TReque
 
 `SecurityOrders` fixes this chain: authentication, coarse authorization, sanitize, validation, idempotency, response shaping. Before segments run in that order. The response detail is shaped before the idempotency wrap commits its cache record.
 
-The sanitize wrap clears the same server-managed fields as Create. The validation wrap runs `IValidationAdvisor<TRequest>` unless `UpdateRequestValidationSuppressed` is present. The idempotency wrap replays a completed response for a matching request ID and payload hash or reserves a pending record.
+The sanitize wrap clears the same server-managed fields as Create. The validation wrap runs `IValidationAdvisor<TRequest>` when the stage is installed; `WithoutUpdateValidation()` excludes it at registration, and `RepositoryBase.SuppressUpdateValidation()` skips it for one operation. The idempotency wrap replays a completed response for a matching request ID and payload hash or reserves a pending record.
 
 ## Handler stages
 

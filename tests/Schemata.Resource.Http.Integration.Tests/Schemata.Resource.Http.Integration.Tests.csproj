@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\src\Schemata.Entity.EntityFrameworkCore\Schemata.Entity.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Entity.LinqToDB\Schemata.Entity.LinqToDB.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Caching.Memory\Schemata.Caching.Memory.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Tenancy.Caching\Schemata.Tenancy.Caching.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Flow.Foundation\Schemata.Flow.Foundation.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Flow.Http\Schemata.Flow.Http.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Flow.Skeleton\Schemata.Flow.Skeleton.csproj" />

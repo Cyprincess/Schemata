@@ -76,7 +76,7 @@ internal sealed class RepositorySource<TEntity, TPublic>(Expression<Func<TEntity
             }
 
             var shape     = Lower(plan.Root);
-            var compiled  = CompileFilters(shape, provider);
+            var compiled  = CompileFilters(shape, provider, plan.SourceAlias);
 
             var repo    = provider.GetRequiredService<IRepository<TEntity>>();
             var rows    = Rows(repo, entitlement, shape, compiled, provider, plan.SourceAlias, ct);
@@ -90,9 +90,13 @@ internal sealed class RepositorySource<TEntity, TPublic>(Expression<Func<TEntity
         }
     }
 
-    private static CompiledFilters CompileFilters(PlanShape shape, IServiceProvider provider) {
+    private static CompiledFilters CompileFilters(PlanShape shape, IServiceProvider provider, string alias) {
         var pushedExpressions = new List<Expression<Func<TPublic, bool>>>(shape.Filters.Length);
         var residuals         = new List<Func<TPublic, bool>>(shape.Filters.Length);
+
+        // The validator admitted this plan against the source alias, so the alias root binds to
+        // the compiled row instead of a member lookup.
+        var options = new ExpressionCompileOptions { ContextAlias = alias };
 
         foreach (var filter in shape.Filters) {
             var compiler = provider.GetRequiredKeyedService<IExpressionCompiler>(filter.Predicate.Language);
@@ -100,16 +104,33 @@ internal sealed class RepositorySource<TEntity, TPublic>(Expression<Func<TEntity
             var plan     = planner.Plan(filter.Predicate.Tree, ExpressionCapabilities.Relational);
 
             if (plan.Pushed is not null) {
-                pushedExpressions.Add(compiler.Compile<TPublic, bool>(plan.Pushed));
+                pushedExpressions.Add(compiler.Compile<TPublic, bool>(plan.Pushed, options));
             }
 
             if (plan.Residual is not null) {
-                residuals.Add(ExpressionCache.GetOrAddDelegate(compiler.Compile<TPublic, bool>(plan.Residual)));
+                residuals.Add(ExpressionCache.GetOrAddDelegate(compiler.Compile<TPublic, bool>(plan.Residual, options)));
             }
         }
 
         return new(pushedExpressions, residuals);
     }
+
+    // The validator admits order keys qualified by the source alias; strip that leading qualifier
+    // so the order compiler binds against the public row shape.
+    private static string LowerOrderAlias(string orderBy, string alias) {
+        var prefix = alias + ".";
+        var segments = orderBy.Split(',');
+        for (var i = 0; i < segments.Length; i++) {
+            var tokens = segments[i].Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            if (tokens.Length > 0 && tokens[0].StartsWith(prefix, StringComparison.Ordinal)) {
+                tokens[0]  = tokens[0][prefix.Length..];
+                segments[i] = string.Join(" ", tokens);
+            }
+        }
+
+        return string.Join(",", segments);
+    }
+
 
     private IAsyncEnumerable<IReadOnlyDictionary<string, object?>> Rows(
         IRepository<TEntity>                              repo,
@@ -120,7 +141,7 @@ internal sealed class RepositorySource<TEntity, TPublic>(Expression<Func<TEntity
         string                                            alias,
         CancellationToken                                 ct
     ) {
-        var rows = repo.ListAsync<TPublic>(q => BuildQuery(q, entitlement, shape, compiled, provider), ct);
+        var rows = repo.ListAsync<TPublic>(q => BuildQuery(q, entitlement, shape, compiled, provider, alias), ct);
         var cap = provider.GetService<IOptions<SchemataInsightOptions>>()?.Value.MaxResidualScanRows ?? 10_000;
         return Materialize(LocalPipelineExecutor.Scan(rows, cap, ct), compiled.Residuals, shape.Items, alias, ct);
     }
@@ -130,7 +151,8 @@ internal sealed class RepositorySource<TEntity, TPublic>(Expression<Func<TEntity
         Expression<Func<TEntity, bool>>? entitlement,
         PlanShape                        shape,
         CompiledFilters                  compiled,
-        IServiceProvider                 provider
+        IServiceProvider                 provider,
+        string                           alias
     ) {
         var query = source;
         if (entitlement is not null) {
@@ -144,7 +166,7 @@ internal sealed class RepositorySource<TEntity, TPublic>(Expression<Func<TEntity
         }
 
         if (shape.Order is not null) {
-            publicQuery = provider.GetRequiredService<IOrderCompiler>().CompileOrder<TPublic>(shape.Order.OrderBy)(publicQuery);
+            publicQuery = provider.GetRequiredService<IOrderCompiler>().CompileOrder<TPublic>(LowerOrderAlias(shape.Order.OrderBy, alias))(publicQuery);
         }
 
         return publicQuery;

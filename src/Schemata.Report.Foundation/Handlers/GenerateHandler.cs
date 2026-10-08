@@ -51,6 +51,7 @@ public sealed class GenerateHandler<TReport, TSnapshot, TChunk>(
                 ExecutionUid = Guid.NewGuid(),
                 Method       = Verbs.Generate,
                 ArgsJson     = JsonSerializer.Serialize(reportRequest, SchemataJson.Default),
+                Principal    = request.Principal,
             };
             var scheduled = await scheduler.TriggerAsync<ReportGenerationJob<TReport, TSnapshot, TChunk>>(context, ct);
             return OperationMapper.FromExecution(scheduled);

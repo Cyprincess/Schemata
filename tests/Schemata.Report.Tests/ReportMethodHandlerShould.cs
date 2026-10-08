@@ -245,6 +245,9 @@ public class ReportMethodHandlerShould
         var request = new GenerateReportRequest { Name = "reports/daily" };
         var collection = new ServiceCollection();
         collection.AddSingleton(Mock.Of<IRepository<SchemataReport>>(MockBehavior.Strict));
+        var registry   = new Schemata.Core.Building.ResourceRegistry();
+        registry.Add(new ResourceAttribute(typeof(SchemataReport)), ReportResourceRegistration<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>.ReportMethods);
+        collection.AddSingleton(registry);
         collection.AddSingleton<IRequestHandler<GenerateReportRequest, Operation>>(handler);
         collection.AddSingleton(sp => new ResourceMethodOperationHandler<SchemataReport, GenerateReportRequest, Operation>(
             sp.GetRequiredService<IRepository<SchemataReport>>(), sp, new InProcessRequestDispatcher(sp)));

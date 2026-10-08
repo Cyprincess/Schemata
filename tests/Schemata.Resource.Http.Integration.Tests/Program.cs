@@ -31,6 +31,7 @@ builder.UseSchemata(schema => {
     schema.UseMapster().Map<PagedThing, PagedThing>();
     schema.UseMapster().Map<ParentedRecordRequest, ParentedRecord>();
     schema.UseMapster().Map<ParentedRecord, ParentedRecord>();
+    schema.UseMapster().Map<IdempotentOrderRequest, IdempotentOrder>();
     schema.UseFlow().MapHttp();
     schema.UseScheduling().MapHttp();
 
@@ -124,6 +125,7 @@ builder.UseSchemata(schema => {
     resource.MapHttp().Use<LockedStudent, LockedStudent, LockedStudent, LockedStudent>();
     resource.MapHttp().Use<PagedThing, PagedThing, PagedThing, PagedThing>();
     resource.MapHttp().Use<ParentedRecord, ParentedRecordRequest, ParentedRecord, ParentedRecord>();
+    resource.MapHttp().Use<IdempotentOrder, IdempotentOrderRequest, IdempotentOrder, IdempotentOrder>();
     if (builder.Configuration["ParentGrpc"] == "true") {
         resource.MapGrpc().Use<ParentedRecord, ParentedRecordRequest, ParentedRecord, ParentedRecord>();
     }
@@ -140,6 +142,7 @@ builder.UseSchemata(schema => {
     schema.UseAuthentication(auth => auth.AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, TestAuthHandler>("SnapshotScheme", null));
 
     schema.Services.AddMemoryCacheProvider();
+    schema.Services.AddTenantCache();
     schema.Services.AddSchemataSchedulingRepositoryStore();
 
     schema.Services.AddDbContextFactory<TestDbContext>(opts => opts.UseSqlite(connectionString)
@@ -155,6 +158,8 @@ builder.UseSchemata(schema => {
     schema.Services.AddRepository<PagedThing, EfCoreRepository<TestDbContext, PagedThing>>();
     schema.Services.AddRepository<ParentedRecord, EfCoreRepository<TestDbContext, ParentedRecord>>();
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<ParentedRecord>, AdviceAddResourceName<ParentedRecord>>());
+    schema.Services.AddRepository<IdempotentOrder, EfCoreRepository<TestDbContext, IdempotentOrder>>();
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<IdempotentOrder>, AdviceAddResourceName<IdempotentOrder>>());
     schema.Services.AddRepository<SchemataJob, EfCoreRepository<TestDbContext, SchemataJob>>();
     schema.Services.AddRepository<SchemataProcess, EfCoreRepository<TestDbContext, SchemataProcess>>();
     schema.Services.AddRepository<SchemataProcessToken, EfCoreRepository<TestDbContext, SchemataProcessToken>>();
@@ -175,6 +180,8 @@ builder.UseSchemata(schema => {
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataProcessTransition>, AdviceAddResourceName<SchemataProcessTransition>>());
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataProcessCompensation>, AdviceAddResourceName<SchemataProcessCompensation>>());
 });
+
+builder.Services.Insert(0, ServiceDescriptor.Transient<Microsoft.AspNetCore.Hosting.IStartupFilter, TenantHeaderStartupFilter>());
 
 var app = builder.Build();
 

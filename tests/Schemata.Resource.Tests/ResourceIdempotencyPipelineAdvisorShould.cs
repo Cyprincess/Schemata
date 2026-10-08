@@ -11,6 +11,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Caching.Skeleton;
@@ -25,6 +26,7 @@ using Schemata.Resource.Foundation.Commands;
 using Schemata.Resource.Foundation.Handlers;
 using Schemata.Resource.Tests.Fixtures;
 using Schemata.Security.Skeleton;
+using static Schemata.Abstractions.SchemataConstants;
 using Xunit;
 
 namespace Schemata.Resource.Tests;
@@ -47,8 +49,8 @@ public class ResourceIdempotencyPipelineAdvisorShould
         return JsonSerializer.SerializeToUtf8Bytes(new { Kind = "DONE", Hash = hash, Payload = payload });
     }
 
-    private static byte[] Pending() {
-        return JsonSerializer.SerializeToUtf8Bytes(new { Kind = "PENDING" });
+    private static byte[] Pending(string hash) {
+        return JsonSerializer.SerializeToUtf8Bytes(new { Kind = "PENDING", PayloadHash = hash });
     }
 
     private static Request CreateRequest() {
@@ -122,8 +124,8 @@ public class ResourceIdempotencyPipelineAdvisorShould
         var request = CreateRequest();
         var cache   = new Mock<ICacheProvider>();
         cache.SetupSequence(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-             .ReturnsAsync(Pending())
-             .ReturnsAsync(Pending())
+             .ReturnsAsync(Pending(Hash(request)))
+             .ReturnsAsync(Pending(Hash(request)))
              .ReturnsAsync(Done(Hash(request), new Detail { CanonicalName = "tenants/t1/hosts/h9" }));
         cache.Setup(c => c.TryAddAsync(
                   It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
@@ -147,7 +149,7 @@ public class ResourceIdempotencyPipelineAdvisorShould
         var request = CreateRequest();
         var cache   = new Mock<ICacheProvider>();
         cache.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-             .ReturnsAsync(Pending());
+             .ReturnsAsync(Pending(Hash(request)));
         cache.Setup(c => c.TryAddAsync(
                   It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
                   It.IsAny<CancellationToken>()))
@@ -165,7 +167,7 @@ public class ResourceIdempotencyPipelineAdvisorShould
     }
 
     [Fact]
-    public async Task Create_SameRequestDifferentPayload_ThrowsAborted() {
+    public async Task Create_SameRequestDifferentPayload_FailsValidation() {
         var request = CreateRequest();
         var cache   = new Mock<ICacheProvider>();
         cache.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -176,8 +178,36 @@ public class ResourceIdempotencyPipelineAdvisorShould
         using var services = BuildCreateServices(cache, repository, mapper,
             detailWrap: false, owner: owner);
 
-        await Assert.ThrowsAsync<AbortedException>(() => DispatchCreateAsync(services, request));
+        var exception = await Assert.ThrowsAsync<ValidationException>(() => DispatchCreateAsync(services, request));
 
+        var violation = Assert.Single((exception.Details ?? []).OfType<BadRequestDetail>().SelectMany(d => d.FieldViolations ?? []));
+        Assert.Equal("request_id", violation.Field);
+        Assert.Equal(ErrorReasons.RequestIdPayloadMismatch, violation.Reason);
+        owner.Verify(o => o.CreateAsync(It.IsAny<Entity>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Create_ConcurrentDifferentPayload_FailsValidation_WithoutWaitingForTheWinner() {
+        var request = CreateRequest();
+        var cache   = new Mock<ICacheProvider>();
+        cache.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .ReturnsAsync(Pending("0123456789ABCDEF"));
+        cache.Setup(c => c.TryAddAsync(
+                  It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
+                  It.IsAny<CancellationToken>()))
+             .ReturnsAsync(false);
+
+        var (repository, mapper) = CreateDoubles(MappedDetail());
+        var owner = ResourceMutationMock.Create<Entity>();
+        using var services = BuildCreateServices(cache, repository, mapper,
+            detailWrap: false,
+            options: new() { IdempotencyPendingWait = TimeSpan.Zero }, owner: owner);
+
+        var exception = await Assert.ThrowsAsync<ValidationException>(() => DispatchCreateAsync(services, request));
+
+        var violation = Assert.Single((exception.Details ?? []).OfType<BadRequestDetail>().SelectMany(d => d.FieldViolations ?? []));
+        Assert.Equal("request_id", violation.Field);
+        Assert.Equal(ErrorReasons.RequestIdPayloadMismatch, violation.Reason);
         owner.Verify(o => o.CreateAsync(It.IsAny<Entity>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 

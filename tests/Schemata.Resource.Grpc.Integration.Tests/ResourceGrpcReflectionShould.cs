@@ -7,6 +7,7 @@ using Schemata.Transport.Grpc.Proto;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Google.Protobuf;
 using Google.Protobuf.Reflection;
 using Grpc.Reflection.V1Alpha;
 using Schemata.Resource.Grpc.Integration.Tests.Fixtures;
@@ -96,6 +97,36 @@ public class ResourceGrpcReflectionShould
             var message = Assert.Single(messages, descriptor => descriptor.Name == name);
             Assert.DoesNotContain(message.Field, field => field.Name == "principal");
         }
+    }
+
+    [Fact]
+    public async Task FileDescriptor_Annotates_RequestId_With_Uuid4_Format() {
+        var channel = _factory.CreateGrpcChannel();
+        var client  = new ServerReflection.ServerReflectionClient(channel);
+
+        using var call = client.ServerReflectionInfo();
+        await call.RequestStream.WriteAsync(new() {
+            FileContainingSymbol = "Schemata.Resource.Grpc.Integration.Tests.Fixtures.IdempotentOrderService",
+        });
+        await call.RequestStream.CompleteAsync();
+
+        Assert.True(await call.ResponseStream.MoveNext(CancellationToken.None));
+        var registry = new ExtensionRegistry { Google.Api.FieldInfoExtensions.FieldInfo };
+        var files = call.ResponseStream.Current.FileDescriptorResponse.FileDescriptorProto
+                        .Select(bytes => FileDescriptorProto.Parser.WithExtensionRegistry(registry).ParseFrom(bytes))
+                        .ToList();
+
+        var message = files.Where(file => !file.Name.StartsWith("google/"))
+                           .SelectMany(file => file.MessageType)
+                           .Single(descriptor => descriptor.Name == "IdempotentOrderRequest");
+        var field = Assert.Single(message.Field, field => field.Name == "request_id");
+        var info = field.Options.GetExtension(Google.Api.FieldInfoExtensions.FieldInfo);
+        Assert.NotNull(info);
+        Assert.Equal(Google.Api.FieldInfo.Types.Format.Uuid4, info.Format);
+
+        var declaring = files.Single(file => file.MessageType.Contains(message));
+        Assert.Contains("google/api/field_info.proto", declaring.Dependency);
+        Assert.Contains(files, file => file.Name == "google/api/field_info.proto");
     }
 
 }

@@ -84,25 +84,6 @@ public class ResourceDetailResponsePipelineAdvisorShould
         Assert.Null(result.Detail.EntityTag);
     }
 
-    [Trait("Layer", "Component")]
-    [Fact]
-    public async Task Get_SuppressedFreshnessMarker_LeavesEntityTag_Unset() {
-        var detail = MappedDetail();
-
-        using var services = BuildServices<Detail>(CreateRepository(), CreateMapper(detail), services => {
-            // The per-request suppression marker still governs ETag emission for its dispatch;
-            // the global options flag is gone.
-            services.AddSingleton<
-                IRequestPipelineAdvisor<GetResourceQueryRequest<Entity, Detail>, GetResultBase<Detail>>,
-                SuppressFreshnessCommandAdvisor>();
-        });
-        var result = await DispatchGetAsync<Detail>(services);
-
-        Assert.NotNull(result.Detail);
-        Assert.Equal("tenants/t1", result.Detail.Parent);
-        Assert.Null(result.Detail.EntityTag);
-    }
-
     [Fact]
     public async Task Get_CustomEntityTagProvider_OverridesDefaultTag() {
         var detail = MappedDetail();
@@ -334,23 +315,6 @@ public class ResourceDetailResponsePipelineAdvisorShould
         }
 
         #endregion
-    }
-
-    /// <summary>Command advisor that plants the per-request freshness suppression marker on the ambient context.</summary>
-    private sealed class SuppressFreshnessCommandAdvisor
-        : IRequestPipelineAdvisor<GetResourceQueryRequest<Entity, Detail>, GetResultBase<Detail>>
-    {
-        public int Order => 0;
-
-        public Task<GetResultBase<Detail>> AdviseAsync(
-            AdviceContext                                   ctx,
-            GetResourceQueryRequest<Entity, Detail>         a1,
-            RequestHandlerContinuation<GetResultBase<Detail>> next,
-            CancellationToken                               ct = default
-        ) {
-            ctx.Set(new FreshnessSuppressed());
-            return next(ct);
-        }
     }
 
     #region Fixtures

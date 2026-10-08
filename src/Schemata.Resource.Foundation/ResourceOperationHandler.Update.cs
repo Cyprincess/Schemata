@@ -113,11 +113,16 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         }
 
         var mask = (request as IUpdateMask)?.UpdateMask;
-        if (mask is null || mask.Trim() == Wildcards.Any) {
-            _mapper.Map(request, entity);
-        } else {
-            _mapper.Map(request, entity, ResolveMaskFields(mask));
-        }
+        ResourceSanitizePipelineAdvisor.RetainSystemFields(
+            entity,
+            ResourceSanitizePipelineAdvisor.UpdateSystemFields,
+            () => {
+                if (mask is null || mask.Trim() == Wildcards.Any) {
+                    _mapper.Map(request, entity);
+                } else {
+                    _mapper.Map(request, entity, ResolveMaskFields(mask));
+                }
+            });
 
         var mutation = _sp.GetRequiredService<IResourceMutation<TEntity>>();
         await mutation.UpdateAsync(entity, null, Operations.Update, ct);

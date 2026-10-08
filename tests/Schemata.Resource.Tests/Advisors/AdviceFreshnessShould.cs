@@ -55,19 +55,6 @@ public class AdviceFreshnessShould
     }
 
     [Fact]
-    public async Task UpdateFreshness_SuppressFreshness_Continues() {
-        var advisor = new AdviceUpdateFreshness<Student, Student>();
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        ctx.Set(new FreshnessSuppressed());
-        var entity  = new Student { Timestamp = Guid.NewGuid() };
-        var request = new Student { EntityTag = "W/\"wrong\"" };
-
-        var result = await advisor.AdviseAsync(ctx, request, entity, null);
-
-        Assert.Equal(AdviseResult.Continue, result);
-    }
-
-    [Fact]
     public async Task UpdateFreshness_StrongFormatETag_ThrowsAborted() {
         var advisor = new AdviceUpdateFreshness<Student, Student>();
         var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());

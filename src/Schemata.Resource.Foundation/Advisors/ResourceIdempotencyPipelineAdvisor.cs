@@ -4,9 +4,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Caching.Skeleton;
+using Schemata.Common.Errors;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Advisors;
 using Schemata.Security.Skeleton;
@@ -121,13 +121,15 @@ public class ResourceIdempotencyPipelineAdvisor<TEntity, TRequest, TEnvelope, TD
             }, ct);
 
             if (!reserved) {
+                await IdempotencyHelper.ThrowIfPendingMismatchAsync(_cache, key, payloadHash, ct);
+
                 var awaited = await IdempotencyHelper.AwaitDoneAsync<TDetail>(
                     _cache, key, payloadHash, options.IdempotencyPendingWait, _time, ct);
                 if (awaited is not null) {
                     return replayShape(awaited);
                 }
 
-                throw new AbortedException();
+                throw SchemataResourceErrors.Aborted<TEntity>(target(request));
             }
         }
 

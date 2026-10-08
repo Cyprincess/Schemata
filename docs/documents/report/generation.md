@@ -27,8 +27,10 @@ public interface IReportService
 
 `RunAsync` dispatches `RunReportRequest`. `RunReportHandler<TReport, TSnapshot, TChunk>` invokes
 `IReportGenerateAdvisor`, resolves the named or inline definition, invokes `IReportDefinitionAdvisor`,
-builds an Insight plan, and materializes it under the supplied principal. Insight applies its source
-access and entitlement providers during that materialization.
+builds an Insight plan, and runs `IInsightPlanAdvisor` rewrites on it. The rewritten plan is what
+materializes under the supplied principal; a rejecting advisor stops inline runs, persisted snapshot
+generation, and scheduled generation alike. Insight applies its source access and entitlement
+providers during that materialization.
 
 | Request shape | Result |
 | --- | --- |

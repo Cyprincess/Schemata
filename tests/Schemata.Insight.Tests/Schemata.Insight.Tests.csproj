@@ -11,6 +11,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Schemata.Expressions.Aip\Schemata.Expressions.Aip.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Expressions.Cel\Schemata.Expressions.Cel.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Expressions.Order\Schemata.Expressions.Order.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Insight.Foundation\Schemata.Insight.Foundation.csproj" />
   </ItemGroup>
 

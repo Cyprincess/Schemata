@@ -53,7 +53,7 @@ public class ResourceMethodEnvelopeShould
         var principal  = new ClaimsPrincipal(new ClaimsIdentity());
         using var services = BuildServices(handler: handler);
 
-        var response = await DispatchAsync(services, "archive", null, request, principal);
+        var response = await DispatchAsync(services, "batchArchive", null, request, principal);
 
         Assert.Same(handler.Response, response);
         Assert.Equal(1, handler.Invocations);
@@ -112,7 +112,7 @@ public class ResourceMethodEnvelopeShould
                 ResourceMethodResponsePipelineAdvisor<MethodEntity, MethodRequest, MethodResponse>>();
         });
 
-        var response = await DispatchAsync(services, "archive", null, new(), null);
+        var response = await DispatchAsync(services, "batchArchive", null, new(), null);
 
         Assert.Equal("tenants/t1", response.Parent);
         Assert.Equal(WeakTag(Timestamp), response.EntityTag);
@@ -268,6 +268,7 @@ public class ResourceMethodEnvelopeShould
         var services = new ServiceCollection();
         services.AddSingleton(repository ?? Mock.Of<IRepository<MethodEntity>>());
         services.AddSingleton<IRequestHandler<MethodRequest, MethodResponse>>(handler ?? new MethodHandler());
+        services.AddSingleton(Registry());
         services.AddSingleton(sp => new ResourceMethodOperationHandler<MethodEntity, MethodRequest, MethodResponse>(
             sp.GetRequiredService<IRepository<MethodEntity>>(), sp, new InProcessRequestDispatcher(sp)));
         services.AddSingleton<
@@ -276,6 +277,15 @@ public class ResourceMethodEnvelopeShould
         configure?.Invoke(services);
 
         return services.BuildServiceProvider();
+    }
+
+    private static ResourceRegistry Registry() {
+        var registry = new ResourceRegistry();
+        registry.Add(new ResourceAttribute(typeof(MethodEntity)), [
+            new ResourceMethodAttribute("archive", typeof(MethodHandler)),
+            new ResourceMethodAttribute("batchArchive", typeof(MethodHandler), ResourceMethodScope.Collection),
+        ]);
+        return registry;
     }
 
     private static Mock<IRepository<MethodEntity>> LoadedRepository() {

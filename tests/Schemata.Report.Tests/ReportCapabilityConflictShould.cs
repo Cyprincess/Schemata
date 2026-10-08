@@ -270,6 +270,10 @@ public class ReportCapabilityConflictShould
         var services = new ServiceCollection();
         services.AddScoped(_ => repository.Object);
         services.AddScoped(_ => registration);
+        var registry = new Schemata.Core.Building.ResourceRegistry();
+        registry.Add(new ResourceAttribute(typeof(SchemataReportSnapshot)),
+                     ReportResourceRegistration<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>.SnapshotMethods);
+        services.AddSingleton(registry);
         services.TryAddEnumerable(ServiceDescriptor.Scoped<
             Schemata.Resource.Foundation.Advisors.IResourceMethodRequestAdvisor<SchemataReportSnapshot, ReadSnapshotRequest>,
             ReportEntityMethodRequestAdvisor<SchemataReportSnapshot, ReadSnapshotRequest>>());

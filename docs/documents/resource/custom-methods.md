@@ -68,7 +68,7 @@ ResourceMethodController (HTTP) / ResourceCustomMethod (gRPC)
 
 `ResourceMethodOperationHandler` writes the target canonical name to an `ICanonicalName` request before its Resource handler stages run. The instance handler loads the target under soft-delete suppression and throws `NotFoundException` if it is absent. Collection methods skip that load.
 
-The envelope lets wrap advisors use the verb for `[Anonymous]` matching, permission resolution, and idempotency. The method idempotency wrap partitions its cache key by request ID, verb, resource type, principal, target, and payload hash. It replays a finalized response or reserves a pending key before calling the remainder of the pipeline; it commits the response after response shaping.
+The envelope lets wrap advisors use the verb for `[Anonymous]` matching, permission resolution, and idempotency. The method idempotency wrap partitions its cache key by request ID, verb, resource type, principal, and target; the payload hash travels with the cached value. It replays a finalized response or reserves a pending key before calling the remainder of the pipeline; a replay with a changed payload fails validation on `request_id`; it commits the response after response shaping.
 
 ## Handler extension points
 

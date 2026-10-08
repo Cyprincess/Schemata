@@ -10,6 +10,7 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Insight.Foundation.Execution;
 using Schemata.Insight.Foundation.Planning;
+using Schemata.Insight.Skeleton.Advisors;
 using Schemata.Insight.Skeleton.Models;
 using Schemata.Insight.Skeleton.Plan;
 using Schemata.Insight.Skeleton.Queries;
@@ -56,15 +57,16 @@ public sealed class RunReportHandler<TReport, TSnapshot, TChunk>(
         await Advisor.For<IReportDefinitionAdvisor>().RunAsync(ctx, definitionContext, ct);
         query = definitionContext.Query;
 
-        var plan = await plans.BuildAsync(query, ct);
+        var rewrite = new InsightPlanContext(query, await plans.BuildAsync(query, ct));
+        await Advisor.For<IInsightPlanAdvisor>().RunAsync(ctx, rewrite, ct);
         if (!generation.Request.Persist) {
-            return await CollectInlineAsync(plan, query, generation.Principal, ct);
+            return await CollectInlineAsync(rewrite.Plan, query, generation.Principal, ct);
         }
 
         return await writer.WriteAsync(
                    report,
                    execution.Kind,
-                   token => executor.MaterializeAsync(plan, query, generation.Principal, ct: token),
+                   token => executor.MaterializeAsync(rewrite.Plan, query, generation.Principal, ct: token),
                    execution.Operation,
                    execution.IsCancelled,
                    ct);
