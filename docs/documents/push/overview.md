@@ -6,8 +6,10 @@ Push fans one `PushContext` out to every registered `IPushTransport`. Each trans
 
 | Package | Role |
 | --- | --- |
-| `Schemata.Push.Skeleton` | Push contracts, targets, transports, results, subscriptions, and request envelopes |
-| `Schemata.Push.Foundation` | Push service, subscription manager, builder, feature, and request handler |
+| `Schemata.Push.Skeleton` | Push contracts, targets, transports, results, subscriptions, and shared control requests/policies |
+| `Schemata.Push.Http` | HTTP binding for subscription and send control requests |
+| `Schemata.Push.Grpc` | gRPC binding for subscription and send control requests |
+| `Schemata.Push.Foundation` | Push service, subscription manager, builder, feature, and shared control handler |
 | `Schemata.Push.Scheduling` | Deferred push delivery through Scheduling |
 
 ## Startup
@@ -21,6 +23,17 @@ builder.UseSchemata(schema => {
 ```
 
 The feature registers `IPushService`, `IPushSubscriptionManager`, and the `SchemataPushSubscription` resource. An active Resource HTTP or gRPC transport exposes the subscription resource.
+`AddSchemataPushHttp()` and `AddSchemataPushGrpc()` expose the owner-derived subscription and send
+control endpoints over HTTP and gRPC; see [Control plane](control-plane.md).
+
+The control handler owns action authorization, subscription owner resolution, required input
+validation, target/default options, and secret-free subscription results. Local management callers
+dispatch the same requests with a trusted principal. Application-internal `IPushService` and
+`IPushSubscriptionManager` remain the entry points for background dispatch and explicit-owner
+subscription work.
+
+Control messages retain arbitrary JSON values, including null. Missing priority uses Normal;
+explicit Low remains Low. See [Control plane](control-plane.md) for binding and duration contracts.
 
 ## Dispatch
 

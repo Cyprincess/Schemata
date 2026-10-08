@@ -95,6 +95,10 @@ public sealed class SubscriptionService(IPushSubscriptionManager subscriptions)
 returns the existing row. The owner is a free-form canonical name, so `groups/{id}` and `tags/{id}`
 address groups and tags through the same table.
 
+The subscription mutation uses the host's repository add advisors to supply `Name`. Register the
+same consumer naming advisor used by your other resource creation paths; the Push producer sets
+the owner, provider, address, and metadata.
+
 ## Send a notification
 
 Inject `IPushService` and call `SendAsync`:
@@ -116,11 +120,10 @@ public sealed class NotificationService(IPushService push)
 }
 ```
 
-`SendAsync` runs the advisor pipeline and fans out to every transport concurrently. The facade keeps
-its `IAsyncEnumerable<TransportResult>` signature, but it now awaits the whole dispatch and then
-yields the collected results, so every transport's outcome arrives together rather than one per
-completion; the result set is unchanged. The console transport delivers to the subscribed device and
-reports `Sent`; a transport with no matching subscription reports `Skipped`.
+`SendAsync` runs the advisor pipeline and fans out to every transport concurrently. The facade
+awaits the complete dispatch and then yields the collected outcomes in completion order. The
+console transport delivers to the subscribed device and reports `Sent`; a transport with no
+matching subscription reports `Skipped`.
 
 ## Targets
 
@@ -132,7 +135,22 @@ reports `Sent`; a transport with no matching subscription reports `Skipped`.
 | `ChannelTarget(channel)`     | a named channel or group           |
 | `TopicTarget(topic)`         | a publish/subscribe topic          |
 | `BroadcastTarget()`          | every connection a transport holds |
-| `CustomTarget(kind, params)` | transports matching `kind`         |
+| `CustomTarget(customKind, params)` | transports matching `customKind` |
+
+## Expose authenticated management
+
+Use the Push HTTP or gRPC control surface for caller-owned subscription management and
+operator sends. Both transports dispatch the shared Create/List/Delete/Send control requests in
+`Schemata.Push.Skeleton.Control`. Their handler checks the corresponding `PushPolicies` action
+before owner resolution or required-field validation. Configure the four policies with ASP.NET
+Core authorization. Local management callers supply a trusted principal to the same requests.
+
+Control results contain subscription identity and timestamps; endpoint credentials and metadata
+stay input-only. Send accepts any JSON value, preserves nested `data`, defaults an absent target
+to broadcast, and rejects unknown target kinds or empty selected target fields before delivery.
+Missing options or priority use Normal; explicit Low stays Low.
+
+See [Control plane](../documents/push/control-plane.md) for host installation and wire models.
 
 ## Verify
 

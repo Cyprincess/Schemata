@@ -73,12 +73,28 @@ and `RemovePushSubscriptionRequest`. The facade keeps its `IAsyncEnumerable` sig
 | Method             | Behaviour                                                                                           |
 | ------------------ | --------------------------------------------------------------------------------------------------- |
 | `GetForOwnerAsync` | `GetPushSubscriptionsQuery` — `ToListAsync` over `Owner == owner && (provider == null \|\| Provider == provider)`, materialized before yield |
-| `AddAsync`         | `AddPushSubscriptionRequest` — idempotent on the triple: returns the existing row if present, otherwise creates, adds, and commits |
-| `RemoveAsync`      | `RemovePushSubscriptionRequest` — finds the matching row, soft-deletes it, and commits; a no-op when absent |
+| `AddAsync`         | `AddPushSubscriptionRequest`: returns the existing row, or creates through `IResourceMutation<SchemataPushSubscription>` and returns the entity stamped by that owner |
+| `RemoveAsync`      | `RemovePushSubscriptionRequest`: deletes through the same mutation owner; a missing row produces no write |
 | `ExistsAsync`      | `ExistsPushSubscriptionQuery` — `AnyAsync` over the triple                                          |
 
 Each request carries the subscription triple on the wire. `Uid` is stamped by the built-in
 `AdviceAddIdentifier` when the row is added; the manager never assigns it itself.
+
+The mutation path preserves consumer-supplied `Name` generation through repository add advisors.
+The lower subscription manager returns the entity directly. The public control handler projects
+that entity into `PushSubscriptionInfo`, which contains only uid, canonical name, provider, and
+create/update times. Provider keys and metadata remain input-only at the control boundary.
+
+`CreatePushControlRequest`, `ListPushControlRequest`, and `DeletePushControlRequest` carry a
+trusted principal supplied by their caller. `PushControlHandler` authorizes the corresponding
+`PushPolicies` action before resolving the owner or validating required provider/address fields.
+Local management callers use the same requests and policies. `IPushSubscriptionManager` remains
+the trusted application-internal facade accepting an explicit owner.
+
+Sources: `src/Schemata.Push.Foundation/Handlers/AddPushSubscriptionHandler.cs`,
+`src/Schemata.Push.Foundation/Handlers/RemovePushSubscriptionHandler.cs`,
+`src/Schemata.Push.Foundation/Handlers/PushControlHandler.cs`,
+`src/Schemata.Push.Skeleton/Models/PushSubscriptionModels.cs`.
 
 ## Ownership interaction
 
