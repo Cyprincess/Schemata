@@ -32,6 +32,19 @@ public static class FlowConstants
 
     #endregion
 
+    #region Nested type: Routes
+
+    /// <summary>
+    ///     HTTP paths owned by the Flow management surface.
+    /// </summary>
+    public static class Routes
+    {
+        /// <summary>The definitions collection path.</summary>
+        public const string Definitions = "/v1/processes:definitions";
+    }
+
+    #endregion
+
     #region Nested type: Effects
 
     /// <summary>Well-known names for external-effect intent recording.</summary>

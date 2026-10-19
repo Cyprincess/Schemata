@@ -88,6 +88,15 @@ public static class ResourceLinkTargets
             : "/v1/";
 
     /// <summary>
+    ///     Builds the encoded path of a resource collection under its versioned route prefix.
+    /// </summary>
+    /// <param name="registration">The resolved registration.</param>
+    /// <returns>The encoded-path collection target without a query.</returns>
+    public static string CollectionPath(ResourceRegistration registration) =>
+        LinkTargets.EncodePath(Prefix(registration)
+                             + ResourceNameDescriptor.ForType(registration.Entity).CollectionPath);
+
+    /// <summary>
     ///     Builds the target of a persisted canonical resource name.
     /// </summary>
     /// <param name="request">The current request.</param>
@@ -122,11 +131,10 @@ public static class ResourceLinkTargets
     /// <param name="filter">An optional AIP filter expression.</param>
     /// <returns>The relative target.</returns>
     public static string Collection(HttpRequest request, ResourceRegistration registration, string? filter = null) {
-        var descriptor = ResourceNameDescriptor.ForType(registration.Entity);
-        var query      = filter is null ? QueryString.Empty : QueryString.Create("filter", filter);
+        var query = filter is null ? QueryString.Empty : QueryString.Create("filter", filter);
 
         return UriHelper.BuildRelative(request.PathBase,
-                                       new PathString(LinkTargets.EncodePath(Prefix(registration) + descriptor.CollectionPath)),
+                                       new PathString(CollectionPath(registration)),
                                        query);
     }
 
@@ -136,7 +144,7 @@ public static class ResourceLinkTargets
     /// <param name="resource">The registration.</param>
     /// <returns><see langword="true" /> when the registration publishes an HTTP endpoint.</returns>
     public static bool IsPublished(ResourceRegistration resource) =>
-        resource.Endpoints is null || resource.Endpoints.Contains(HttpResourceAttribute.Name);
+        resource.IsEndpointEnabled(HttpResourceAttribute.Name);
 
     /// <summary>
     ///     Reports whether a registration permits listing.

@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Text;
+using Schemata.Abstractions.Linking;
+using Schemata.Common.Linking;
 
 namespace Schemata.Transport.Http.Linking;
 
@@ -214,7 +216,7 @@ public static class LinkHeaderParser
         Dictionary<string, string>? extensions = null;
 
         foreach (var parameter in parameters) {
-            if (LinkHeader.IsReservedParameter(parameter.Key)) {
+            if (LinkValue.IsReservedParameter(parameter.Key)) {
                 continue;
             }
 
@@ -242,16 +244,16 @@ public static class LinkHeaderParser
             return false;
         }
 
-        if (LinkHeader.HasScheme(value)) {
-            if (LinkHeader.IsDrivePath(value)) {
-                return LinkHeader.IsUriReference(value, true);
+        if (LinkValue.HasScheme(value)) {
+            if (LinkValue.IsDrivePath(value)) {
+                return LinkValue.IsUriReference(value, true);
             }
 
             if (!Uri.TryCreate(value, UriKind.Absolute, out var absolute)) {
                 return false;
             }
 
-            resolved = LinkHeader.NormalizeAbsolute(absolute) ?? absolute.AbsoluteUri;
+            resolved = LinkValue.NormalizeAbsolute(absolute) ?? absolute.AbsoluteUri;
 
             return true;
         }
@@ -264,7 +266,7 @@ public static class LinkHeaderParser
             return false;
         }
 
-        resolved = LinkHeader.NormalizeAbsolute(uri) ?? uri.AbsoluteUri;
+        resolved = LinkValue.NormalizeAbsolute(uri) ?? uri.AbsoluteUri;
 
         return true;
     }

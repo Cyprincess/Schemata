@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Resource;
 using Schemata.Core.Building;
 using Schemata.Resource.Http.Integration.Tests.Fixtures;
+using Schemata.Abstractions.Linking;
 using Schemata.Transport.Http.Linking;
 using Xunit;
 
@@ -45,6 +46,11 @@ public class LinkHeaderShould : IClassFixture<WebAppFactory>
 
         var next = Assert.Single(first, link => link.Rel == "next");
         Assert.Contains("page_token=", next.Target);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var nextPageToken = body.GetProperty("next_page_token").GetString();
+        Assert.False(string.IsNullOrEmpty(nextPageToken));
+        Assert.Contains("page_token=" + Uri.EscapeDataString(nextPageToken!), next.Target);
 
         var last = Assert.Single(first, link => link.Rel == "last");
         Assert.Contains("page_token=", last.Target);

@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Schemata.Transport.Grpc\Schemata.Transport.Grpc.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Transport.Http\Schemata.Transport.Http.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Resource.Grpc\Schemata.Resource.Grpc.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Insight.Grpc\Schemata.Insight.Grpc.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Push.Grpc\Schemata.Push.Grpc.csproj" />

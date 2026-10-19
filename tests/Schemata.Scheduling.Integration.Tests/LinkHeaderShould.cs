@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Scheduling.Integration.Tests.Fixtures;
 using Schemata.Scheduling.Skeleton.Entities;
+using Schemata.Abstractions.Linking;
 using Schemata.Transport.Http.Linking;
 using Xunit;
 

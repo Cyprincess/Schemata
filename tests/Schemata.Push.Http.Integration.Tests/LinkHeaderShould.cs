@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Schemata.Abstractions.Linking;
 using Schemata.Transport.Http.Linking;
 using Xunit;
 

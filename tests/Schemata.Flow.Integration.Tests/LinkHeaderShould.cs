@@ -17,6 +17,7 @@ using Schemata.Flow.Skeleton.Models;
 using Schemata.Resource.Grpc.Runtime;
 using Schemata.Transport.Grpc;
 using Schemata.Transport.Grpc.Proto;
+using Schemata.Abstractions.Linking;
 using Schemata.Transport.Http.Linking;
 using Xunit;
 

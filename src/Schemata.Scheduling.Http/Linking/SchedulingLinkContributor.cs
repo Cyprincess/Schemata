@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Schemata.Abstractions.Resource;
 using Schemata.Core.Building;
+using Schemata.Abstractions.Linking;
 using Schemata.Scheduling.Skeleton.Entities;
 using Schemata.Transport.Http.Linking;
 

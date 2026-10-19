@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
+using Schemata.Abstractions.Linking;
 using Schemata.Core.Building;
+using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Transport.Http.Linking;
 
@@ -14,20 +16,18 @@ namespace Schemata.Flow.Http.Linking;
 /// </summary>
 public sealed class FlowLinkContributor(ResourceRegistry registry) : ILinkContributor
 {
-    private const string DefinitionsPath = "/v1/processes:definitions";
-
     #region ILinkContributor Members
 
     public IEnumerable<WebLink> GetLinks(LinkContext context) {
         var request = context.HttpContext.Request;
         if (HttpMethods.IsGet(request.Method)
-         && string.Equals(request.Path.Value, DefinitionsPath, StringComparison.OrdinalIgnoreCase)) {
+         && string.Equals(request.Path.Value, FlowConstants.Routes.Definitions, StringComparison.OrdinalIgnoreCase)) {
             return [new WebLink(UriHelper.GetEncodedPathAndQuery(request), "self")];
         }
 
         return context.Value switch {
             SchemataProcess { DefinitionName.Length: > 0 } process => [
-                new(Target(request, DefinitionsPath), "related", Title: process.DefinitionName),
+                new(Target(request, FlowConstants.Routes.Definitions), "related", Title: process.DefinitionName),
             ],
             SchemataProcessToken token => TokenLinks(request, token),
             SchemataProcessTransition transition => TransitionLinks(request, transition),

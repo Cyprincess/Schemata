@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Extensions;
+using Schemata.Abstractions.Linking;
 using Schemata.Insight.Foundation.Execution;
 using Schemata.Insight.Foundation.Planning;
 using Schemata.Insight.Skeleton.Models;

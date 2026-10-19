@@ -7,10 +7,12 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Abstractions.Linking;
 using Schemata.Core.Building;
 using Schemata.Resource.Foundation.Models;
 using Schemata.Transport.Http.Linking;
@@ -28,9 +30,6 @@ public sealed class ResourceLinkContributor(
     IOptions<SchemataResourceOptions>  options
 ) : ILinkContributor
 {
-    private const string PageTokenField = "page_token";
-    private const string SkipField      = "skip";
-
     private static readonly ConcurrentDictionary<Type, (PropertyInfo? Next, PropertyInfo? Total)> Paging =
         new();
 
@@ -66,18 +65,24 @@ public sealed class ResourceLinkContributor(
         };
 
         if (!string.IsNullOrWhiteSpace(nextPageToken)) {
-            links.Add(new(BuildTarget(request, PageTokenField, nextPageToken, SkipField), "next"));
+            var target = BuildTarget(request, SchemataConstants.Pagination.PageToken, nextPageToken,
+                SchemataConstants.Pagination.Skip);
+            links.Add(new(target, "next"));
         }
 
         var next    = ReadToken(nextPageToken);
-        var current = ReadToken(request.Query[PageTokenField].ToString());
+        var current = ReadToken(request.Query[SchemataConstants.Pagination.PageToken].ToString());
 
         if (current is not null) {
-            links.Add(new(BuildTarget(request, null, null, PageTokenField, SkipField), "first"));
+            var first = BuildTarget(request, null, null, SchemataConstants.Pagination.PageToken,
+                SchemataConstants.Pagination.Skip);
+            links.Add(new(first, "first"));
 
             if (current.PageSize > 0 && current.Skip > 0) {
-                var previous = Encode(current, Math.Max(current.Skip - current.PageSize, 0));
-                links.Add(new(BuildTarget(request, PageTokenField, previous, SkipField), "prev"));
+                var target = Encode(current, Math.Max(current.Skip - current.PageSize, 0));
+                var previous = BuildTarget(request, SchemataConstants.Pagination.PageToken, target,
+                    SchemataConstants.Pagination.Skip);
+                links.Add(new(previous, "prev"));
             }
         }
 
@@ -89,8 +94,9 @@ public sealed class ResourceLinkContributor(
             var offset = current?.Skip ?? (next is null ? 0 : Math.Max(next.Skip - next.PageSize, 0));
             var last   = ((totalSize.Value - 1) / basis.PageSize) * basis.PageSize;
             if (last > offset) {
-                var target = Encode(basis, last);
-                links.Add(new(BuildTarget(request, PageTokenField, target, SkipField), "last"));
+                var target = BuildTarget(request, SchemataConstants.Pagination.PageToken, Encode(basis, last),
+                    SchemataConstants.Pagination.Skip);
+                links.Add(new(target, "last"));
             }
         }
 

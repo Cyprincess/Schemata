@@ -8,6 +8,7 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Core.Building;
 using Schemata.Report.Foundation.Jobs;
+using Schemata.Abstractions.Linking;
 using Schemata.Report.Skeleton.Entities;
 using Schemata.Scheduling.Skeleton.Entities;
 using Schemata.Transport.Http.Linking;

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Schemata.Transport.Http.Linking;
+namespace Schemata.Abstractions.Linking;
 
 /// <summary>
 ///     A link conveyed by an RFC 8288 <c>Link</c> header field: one target, one relation type,

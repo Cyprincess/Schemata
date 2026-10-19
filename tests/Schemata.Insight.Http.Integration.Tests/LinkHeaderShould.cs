@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Schemata.Insight.Http.Integration.Tests.Fixtures;
+using Schemata.Abstractions.Linking;
 using Schemata.Transport.Http.Linking;
 using Xunit;
 

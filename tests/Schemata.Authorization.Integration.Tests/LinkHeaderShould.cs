@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Authorization.Integration.Tests.Fixtures;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Security.Skeleton.Entities;
+using Schemata.Abstractions.Linking;
 using Schemata.Transport.Http.Linking;
 using Xunit;
 

@@ -11,6 +11,7 @@ using ProtoBuf.Grpc.Configuration;
 using Schemata.Common;
 using Schemata.Transport.Grpc;
 using Schemata.Transport.Grpc.Interceptors;
+using Schemata.Transport.Grpc.Linking;
 using ProtoServiceDescriptor = Google.Protobuf.Reflection.ServiceDescriptor;
 
 // ReSharper disable once CheckNamespace
@@ -53,9 +54,16 @@ public static class ServicesExtensions
             if (!options.Interceptors.Any(interceptor => interceptor.Type == typeof(ExceptionMappingInterceptor))) {
                 options.Interceptors.Add<ExceptionMappingInterceptor>();
             }
+
+            if (!options.Interceptors.Any(interceptor => interceptor.Type == typeof(GrpcLinkMetadataInterceptor))) {
+                options.Interceptors.Add<GrpcLinkMetadataInterceptor>();
+            }
         });
 
         services.TryAddSingleton<ExceptionMappingInterceptor>();
+        services.TryAddSingleton<GrpcLinkMetadataInterceptor>();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IGrpcLinkContributor, ResourcePaginationLinkContributor>());
 
         services.TryAddSingleton(sp => new ReflectionServiceImpl(MergeDescriptors(sp)));
         services.TryAddSingleton(sp => new ReflectionV1ServiceImpl(MergeDescriptors(sp)));

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Schemata.Abstractions.Linking;
 
 namespace Schemata.Transport.Http.Linking;
 

@@ -16,10 +16,10 @@ namespace Schemata.Push.Http.Controllers;
 
 [ApiController]
 [Authorize]
-[Route("~/v1/push")]
+[Route("~" + PushConstants.Routes.Base)]
 public sealed class PushController(IRequestDispatcher dispatcher) : ControllerBase
 {
-    [HttpPost("subscriptions")]
+    [HttpPost(PushConstants.Routes.Subscriptions)]
     [Authorize(Policy = PushPolicies.Create)]
     public async Task<IActionResult> Create([FromBody] CreatePushSubscriptionRequest request, CancellationToken ct) {
         var result = await dispatcher.SendAsync<CreatePushControlRequest, PushSubscriptionInfo>(
@@ -27,7 +27,7 @@ public sealed class PushController(IRequestDispatcher dispatcher) : ControllerBa
         return StatusCode(StatusCodes.Status201Created, result);
     }
 
-    [HttpGet("subscriptions")]
+    [HttpGet(PushConstants.Routes.Subscriptions)]
     [Authorize(Policy = PushPolicies.List)]
     public async Task<IActionResult> List([FromQuery] string? provider, CancellationToken ct) {
         var subscriptions = await dispatcher.SendAsync<ListPushControlRequest, IReadOnlyList<PushSubscriptionInfo>>(
@@ -35,14 +35,14 @@ public sealed class PushController(IRequestDispatcher dispatcher) : ControllerBa
         return Ok(new PushSubscriptionListResponse(subscriptions));
     }
 
-    [HttpDelete("subscriptions")]
+    [HttpDelete(PushConstants.Routes.Subscriptions)]
     [Authorize(Policy = PushPolicies.Delete)]
     public async Task<IActionResult> Delete([FromBody] DeletePushSubscriptionRequest request, CancellationToken ct) {
         _ = await dispatcher.SendAsync<DeletePushControlRequest, Unit>(new(User, request.Provider, request.ProviderKey), ct);
         return NoContent();
     }
 
-    [HttpPost("subscriptions:send")]
+    [HttpPost(PushConstants.Routes.Subscriptions + ":send")]
     [Authorize(Policy = PushPolicies.Send)]
     public async Task<IActionResult> Send([FromBody] SendPushWireRequest request, CancellationToken ct) {
         var results = await dispatcher.SendAsync<SendPushControlRequest, ImmutableArray<TransportResult>>(

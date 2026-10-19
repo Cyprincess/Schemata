@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions.Linking;
 using Schemata.Transport.Http.Linking;
 using Xunit;
 
@@ -128,6 +129,18 @@ public class LinkHeaderShould
         ]);
 
         Assert.Equal("<https://api.example.com/items>; rel=\"next\"; title=\"say \\\"hi\\\" \\\\ done\"", header);
+    }
+
+    [Fact]
+    public void Round_Trip_A_Next_Link_With_A_Page_Token_Target_Attribute() {
+        var link = new WebLink("/schemata.transport.grpc.tests.LinkEntryService/ListLinkEntries", "next",
+            Extensions: new Dictionary<string, string> { ["page_token"] = "continuation" });
+
+        var parsed = Assert.Single(LinkHeader.Parse(LinkHeader.Serialize([link])));
+
+        Assert.Equal("next", parsed.Rel);
+        Assert.Equal(link.Target, parsed.Target);
+        Assert.Equal("continuation", Assert.Single(parsed.Extensions!).Value);
     }
 
     [Fact]

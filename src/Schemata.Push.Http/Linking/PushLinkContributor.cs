@@ -3,7 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
+using Schemata.Abstractions.Linking;
+using Schemata.Core.Building;
 using Schemata.Push.Http.Models;
+using Schemata.Push.Skeleton;
+using Schemata.Push.Skeleton.Entities;
 using Schemata.Transport.Http.Linking;
 
 namespace Schemata.Push.Http.Linking;
@@ -14,15 +18,13 @@ namespace Schemata.Push.Http.Linking;
 /// </summary>
 public sealed class PushLinkContributor : ILinkContributor
 {
-    private const string SubscriptionsPath = "/v1/push/subscriptions";
-    private const string ProviderField     = "provider";
+    private const string ProviderField = "provider";
 
     #region ILinkContributor Members
 
     public IEnumerable<WebLink> GetLinks(LinkContext context) {
         var request = context.HttpContext.Request;
-        if (!HttpMethods.IsGet(request.Method)
-         || !string.Equals(request.Path.Value, SubscriptionsPath, StringComparison.OrdinalIgnoreCase)) {
+        if (!HttpMethods.IsGet(request.Method) || !IsSubscriptionCollection(context)) {
             return [];
         }
 
@@ -40,6 +42,18 @@ public sealed class PushLinkContributor : ILinkContributor
     }
 
     #endregion
+
+    private static bool IsSubscriptionCollection(LinkContext context) {
+        var request = context.HttpContext.Request;
+        var resource = context.HttpContext.GetEndpoint()?.Metadata.GetMetadata<ResourceRegistration>();
+        if (resource is not null && typeof(SchemataPushSubscription).IsAssignableFrom(resource.Entity)) {
+            return string.Equals(request.Path.Value, ResourceLinkTargets.CollectionPath(resource),
+                                 StringComparison.OrdinalIgnoreCase);
+        }
+
+        return string.Equals(request.Path.Value, PushConstants.Routes.SubscriptionsPath,
+                             StringComparison.OrdinalIgnoreCase);
+    }
 
     private static IEnumerable<string> Providers(LinkContext context) {
         if (context.Value is not PushSubscriptionListResponse list) {
