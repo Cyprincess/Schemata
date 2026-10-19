@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Insight.Skeleton;
 using Schemata.Insight.Skeleton.Queries;
 using Schemata.Security.Skeleton;
 
@@ -19,7 +20,7 @@ namespace Schemata.Insight.Foundation.Security;
 /// </summary>
 public static class InsightSecurityGate
 {
-    private const string Operation = "Insight";
+    private const string Operation = InsightConstants.Operations.Insight;
 
     /// <summary>
     ///     Checks source-level access (throwing on denial) and returns the row-level entitlement
