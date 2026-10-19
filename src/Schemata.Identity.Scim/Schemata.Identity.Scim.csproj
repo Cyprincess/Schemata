@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Identity SCIM Users adapter</Description>
+    <PackageTags>application;framework;identity;scim;provisioning;http</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Identity.Foundation\Schemata.Identity.Foundation.csproj" />
+    <ProjectReference Include="..\Schemata.Scim\Schemata.Scim.csproj" />
+  </ItemGroup>
+
+</Project>
