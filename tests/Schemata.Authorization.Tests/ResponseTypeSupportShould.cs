@@ -45,9 +45,9 @@ public class ResponseTypeSupportShould
         var advertised = document.ResponseTypesSupported;
 
         Assert.NotNull(advertised);
-        Assert.Equal(
-            ResponseTypeGrantTypes.Requirements.Keys.Order(StringComparer.Ordinal),
-            advertised.Order(StringComparer.Ordinal));
+        var expected = Configured.Select(value => string.Join(' ', value.Split(' ', StringSplitOptions.RemoveEmptyEntries).Order(StringComparer.Ordinal)))
+                                 .Order(StringComparer.Ordinal);
+        Assert.Equal(expected, advertised.Order(StringComparer.Ordinal));
 
         foreach (var responseType in advertised) {
             Assert.True(await AcceptsAsync(options, responseType), $"the authorization endpoint rejected {responseType}");

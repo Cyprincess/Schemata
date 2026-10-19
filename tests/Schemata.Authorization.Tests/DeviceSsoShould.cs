@@ -928,6 +928,7 @@ public class DeviceSsoShould
             RequestedTokenType = TokenTypeUris.AccessToken,
             Audience          = [Issuer],
             Scope             = "openid profile",
+            Scopes            = ScopeParser.Parse("openid profile"),
         };
         return new(handler, tokens, source, target, request, created, services);
     }

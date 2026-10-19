@@ -41,6 +41,16 @@ public class OAuthBinderHelpersShould
     }
 
     [Fact]
+    public void BuildMap_UsesHumanizerUnderscoreForAcronyms() {
+        var map = OAuthBinderHelpers.BuildMap(typeof(AuthorizeRequest))
+                                   .ToDictionary(entry => entry.Prop.Name, entry => entry.Param);
+
+        Assert.Equal(Parameters.ClientId, map[nameof(AuthorizeRequest.ClientId)]);
+        Assert.Equal(Parameters.ResponseType, map[nameof(AuthorizeRequest.ResponseType)]);
+        Assert.Equal(Parameters.DpopJkt, map[nameof(AuthorizeRequest.DpopJkt)]);
+    }
+
+    [Fact]
     public void Bind_LeavesPropertyDefault_WhenParameterAbsentOrEmpty() {
         var request = new AuthorizeRequest();
         var property = typeof(AuthorizeRequest).GetProperty(nameof(AuthorizeRequest.CodeChallenge));

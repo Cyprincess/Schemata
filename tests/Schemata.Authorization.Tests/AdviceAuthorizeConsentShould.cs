@@ -91,10 +91,9 @@ public class AdviceAuthorizeConsentShould
             SetupAuthzMgr(authorization).Object, new ExplicitConsentModelProvider(), Details());
         var ctx = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var authz = new AuthorizeContext<SchemataApplication> {
-            Application         = CreateApplication(),
-            Request             = new() { Scope = "openid" },
-            Principal           = CreatePrincipal("users/u-1"),
-            AuthorizationDetails = details,
+            Application = CreateApplication(),
+            Request     = new() { Scope = "openid", AuthorizationDetails = details },
+            Principal   = CreatePrincipal("users/u-1"),
         };
 
         await advisor.AdviseAsync(ctx, authz);
@@ -113,10 +112,9 @@ public class AdviceAuthorizeConsentShould
             SetupAuthzMgr(authorization).Object, new ExplicitConsentModelProvider(), Details());
         var ctx = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var authz = new AuthorizeContext<SchemataApplication> {
-            Application         = CreateApplication(),
-            Request             = new() { Scope = "openid" },
-            Principal           = CreatePrincipal("users/u-1"),
-            AuthorizationDetails = """[{"type":"payment_initiation","actions":["list"]}]""",
+            Application = CreateApplication(),
+            Request     = new() { Scope = "openid", AuthorizationDetails = """[{"type":"payment_initiation","actions":["list"]}]""" },
+            Principal   = CreatePrincipal("users/u-1"),
         };
 
         await advisor.AdviseAsync(ctx, authz);
@@ -134,10 +132,9 @@ public class AdviceAuthorizeConsentShould
             SetupAuthzMgr(authorization).Object, new ExplicitConsentModelProvider(), Details());
         var ctx = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var authz = new AuthorizeContext<SchemataApplication> {
-            Application         = CreateApplication(),
-            Request             = new() { Scope = "openid" },
-            Principal           = CreatePrincipal("users/u-1"),
-            AuthorizationDetails = """[{"type":"payment_initiation","actions":["list"]}]""",
+            Application = CreateApplication(),
+            Request     = new() { Scope = "openid", AuthorizationDetails = """[{"type":"payment_initiation","actions":["list"]}]""" },
+            Principal   = CreatePrincipal("users/u-1"),
         };
 
         await advisor.AdviseAsync(ctx, authz);
@@ -156,10 +153,9 @@ public class AdviceAuthorizeConsentShould
             SetupAuthzMgr(authorization).Object, new ExplicitConsentModelProvider(), Details());
         var ctx = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var authz = new AuthorizeContext<SchemataApplication> {
-            Application         = CreateApplication(),
-            Request             = new() { Scope = "openid" },
-            Principal           = CreatePrincipal("users/u-1"),
-            AuthorizationDetails = """[{"type":"payment_initiation","actions":["list","write"]}]""",
+            Application = CreateApplication(),
+            Request     = new() { Scope = "openid", AuthorizationDetails = """[{"type":"payment_initiation","actions":["list","write"]}]""" },
+            Principal   = CreatePrincipal("users/u-1"),
         };
 
         await advisor.AdviseAsync(ctx, authz);

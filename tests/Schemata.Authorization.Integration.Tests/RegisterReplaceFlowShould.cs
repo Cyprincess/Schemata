@@ -171,7 +171,10 @@ public class RegisterReplaceFlowShould(WebAppFactory factory) : IClassFixture<We
     [Fact]
     public async Task Advertise_And_Register_An_Enabled_Hybrid_Response_Type() {
         using var host = factory.WithEnvironment("Testing").WithServices(services =>
-            services.Configure<SchemataAuthorizationOptions>(options => options.AllowedResponseTypes.Add("id_token token")));
+            services.Configure<SchemataAuthorizationOptions>(options => {
+                options.AllowedResponseTypes.Add("id_token token");
+                options.AllowedResponseModes.Add(ResponseModes.Fragment);
+            }));
         using var client = host.CreateClient(new() { AllowAutoRedirect = false });
 
         using var response = await client.GetAsync("/.well-known/openid-configuration");

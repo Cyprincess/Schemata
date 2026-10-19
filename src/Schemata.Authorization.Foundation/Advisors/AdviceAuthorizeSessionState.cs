@@ -59,18 +59,16 @@ internal sealed class AdviceAuthorizeSessionState<TApp>(
         var subject    = authz.Principal?.FindFirst(Abstractions.SchemataConstants.IdentityClaims.Subject)?.Value;
         var issuedSid = await sessions.IssueAsync(authz.Principal, subject, ct);
         if (!string.IsNullOrWhiteSpace(issuedSid)) {
-            authz.SessionId = issuedSid;
-            authz.SessionSubject = subject;
+            request.OpSessionId      = issuedSid;
+            request.OpSessionSubject = subject;
         }
 
         var opUa = OpState.GetOrCreate(http, http.RequestServices.GetRequiredService<BrowserCookieNames>()
                                                  .Get(options.Value.OpStateCookieName));
         var salt = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(8));
-        authz.ResponseMode ??= "query";
         // Only the salt crosses the interaction; the success callback recomputes session_state
         // from the final browser/session state after sign-in, so a pre-login hash never persists.
         request.SessionStateSalt = salt;
-        authz.SessionStateSalt = salt;
         // The initial value serves same-request error callbacks (OAuthExceptionFilter).
         SessionStateContext.Set(http, formul.Build(client.ClientId ?? string.Empty, origin, opUa, salt));
         return AdviseResult.Continue;

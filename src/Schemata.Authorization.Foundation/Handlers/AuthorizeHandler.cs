@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
@@ -58,15 +59,16 @@ public sealed class AuthorizeHandler<TApp, TSecurity, TToken>(
         CancellationToken ct
     ) {
         var authz = new AuthorizeContext<TApp> {
-            Request      = request,
-            Principal    = principal,
-            ResponseMode = ResponseModeService.ResolveMode(request.ResponseMode, request.ResponseType),
+            Request   = request,
+            Principal = principal,
         };
 
+        ClearServerFields(request);
+
         // Central response finalization: once the request advisors have normalized PAR/JAR input
-        // and the client/redirect advisor has validated the callback, every later failure —
+        // and the client/redirect advisor has validated the redirect, every later failure —
         // advisor throws (PKCE, grant, scope, response-type policy) and block results alike —
-        // inherits the captured callback here instead of decorating each throw site.
+        // inherits the validated request facts here instead of decorating each throw site.
         AdviseResult stage;
         try {
             stage = await Advisor.For<IAuthorizeRequestAdvisor<TApp>>().RunAsync(context, authz, ct);
@@ -82,6 +84,17 @@ public sealed class AuthorizeHandler<TApp, TSecurity, TToken>(
             case AdviseResult.Block:
             default:
                 throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.INVALID_REQUEST).WithCallback(authz);
+        }
+
+        // PAR/JAR normalization may have replaced the request object; server-owned fields never
+        // survive from client input, and an uninstalled RAR capability cannot leak the raw parameter.
+        if (authz.Request is null) {
+            throw new InvalidOperationException("The authorization request is missing after request normalization.");
+        }
+
+        ClearServerFields(authz.Request);
+        if (context.ServiceProvider.GetService<AuthorizationDetailsService>() is null) {
+            authz.Request.AuthorizationDetails = null;
         }
 
         try {
@@ -104,21 +117,7 @@ public sealed class AuthorizeHandler<TApp, TSecurity, TToken>(
             throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS).WithCallback(authz);
         }
 
-        // Persist the resolved OP session lineage into the interaction payload. The field is
-        // always overwritten from the advisor-resolved fact — a client-supplied value never
-        // survives — and the approval leg restores it on the continuation principal.
-        authz.Request.OpSessionId = authz.SessionId;
-        authz.Request.OpSessionSubject = authz.SessionSubject;
-
-        // Same overwrite-or-clear discipline as the session lineage: a client-supplied salt never
-        // survives; only the advisor-minted salt crosses the interaction.
-        authz.Request.SessionStateSalt = authz.SessionStateSalt;
-        // Same overwrite-or-clear discipline for the RAR grant set: only the validating
-        // advisor's normalized set crosses the interaction; without the installed capability the
-        // context carries null and the raw parameter never reaches the payload.
-        authz.Request.AuthorizationDetails = authz.AuthorizationDetails;
-        if (!authz.RequireReauthentication && authz.Authentication is not null) {
-            authz.Request.Authentication        = authz.Authentication;
+        if (!authz.RequireReauthentication && authz.Request.Authentication is not null) {
             authz.Request.AuthenticationSubject = authz.Principal?.FindFirstValue(SchemataConstants.IdentityClaims.Subject);
         } else {
             // A step-up/account-selection continuation resolves the authentication event from the
@@ -126,7 +125,6 @@ public sealed class AuthorizeHandler<TApp, TSecurity, TToken>(
             authz.Request.Authentication        = null;
             authz.Request.AuthenticationSubject = null;
         }
-        authz.Request.Claims = authz.RequestedClaims is not null ? authz.Request.Claims : null;
         authz.Request.AuthenticationRequiredAfter = authz.RequireReauthentication
             ? _time.GetUtcNow().ToUnixTimeSeconds()
             : null;
@@ -154,5 +152,15 @@ public sealed class AuthorizeHandler<TApp, TSecurity, TToken>(
         });
 
         return AuthorizationResult.Redirect($"{options.Value.InteractionUri}{query.ToUriComponent()}");
+    }
+
+    private static void ClearServerFields(AuthorizeRequest request) {
+        request.OpSessionId                 = null;
+        request.OpSessionSubject            = null;
+        request.SessionStateSalt            = null;
+        request.Authentication              = null;
+        request.AuthenticationSubject       = null;
+        request.AuthenticationRequiredAfter = null;
+        request.GrantProfile                = null;
     }
 }

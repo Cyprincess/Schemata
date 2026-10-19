@@ -152,7 +152,7 @@ public sealed class RefreshTokenHandler<TApp, TSecurity, TToken>(
         }
 
         var scope = original.Scope;
-        if (!string.IsNullOrWhiteSpace(request.Scope) && !ScopeParser.IsSubset(request.Scope, scope)) {
+        if (!string.IsNullOrWhiteSpace(request.Scope) && !request.Scopes.IsSubsetOf(ScopeParser.Parse(scope))) {
             throw new OAuthException(OAuthErrors.InvalidScope, SchemataResources.INVALID_SCOPE);
         }
         var issuedScope = string.IsNullOrWhiteSpace(request.Scope) ? scope : request.Scope;

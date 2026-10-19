@@ -142,7 +142,7 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
 
         var scope = payload.Scope;
         if (!string.IsNullOrWhiteSpace(request.Scope)) {
-            if (!ScopeParser.IsSubset(request.Scope, payload.Scope)) {
+            if (!request.Scopes.IsSubsetOf(ScopeParser.Parse(payload.Scope))) {
                 throw new OAuthException(OAuthErrors.InvalidScope, SchemataResources.INVALID_SCOPE);
             }
 

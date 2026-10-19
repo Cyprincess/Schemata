@@ -93,10 +93,9 @@ public sealed class ParHandler<TApp, TToken>(
             request.ClientId = application.ClientId;
 
             var authz = new AuthorizeContext<TApp> {
-                Request      = request,
-                Application  = application,
-                ResponseMode = ResponseModeService.ResolveMode(request.ResponseMode, request.ResponseType),
-                Stage = AuthorizationRequestStage.Pushed,
+                Request   = request,
+                Application = application,
+                Stage     = AuthorizationRequestStage.Pushed,
                 DpopProof = DpopProof.FromHeaders(headers).Value,
             };
 

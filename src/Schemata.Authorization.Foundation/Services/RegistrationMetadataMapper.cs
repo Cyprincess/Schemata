@@ -11,6 +11,7 @@ using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Foundation.Managers;
@@ -351,7 +352,7 @@ public static class RegistrationMetadataMapper
             return true;
         }
 
-        if (request.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries).Contains(Scopes.OpenId) == true) {
+        if (ScopeParser.Contains(request.Scope, Scopes.OpenId)) {
             return true;
         }
 

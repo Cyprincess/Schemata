@@ -103,15 +103,19 @@ public sealed class AdviceAuthorizeClaims<TApp>(
         AuthorizeContext<TApp> authz,
         CancellationToken      ct = default
     ) {
+        if (authz.Request is null) {
+            return AdviseResult.Continue;
+        }
+
         ClaimsRequest? request;
         try {
-            request = authz.RequestedClaims ?? ClaimsRequest.Parse(authz.Request?.Claims);
+            request = ClaimsRequest.Parse(authz.Request.Claims);
         } catch (InvalidOperationException) {
             throw Redirect(authz, OAuthErrors.InvalidRequest, SchemataResources.CLAIMS_PARAMETER_NOT_VALID);
         }
         if (request is null) return AdviseResult.Continue;
-        authz.RequestedClaims = request;
-        if (authz.Request?.GrantProfile == GrantProfiles.OAuth && request.IdToken is not null) {
+        authz.Request.RequestedClaims = request;
+        if (authz.Request.GrantProfile == GrantProfiles.OAuth && request.IdToken is not null) {
             throw Redirect(authz, OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED);
         }
 
@@ -134,15 +138,15 @@ public sealed class AdviceAuthorizeClaims<TApp>(
 
         var essentialAcr = request.EssentialAcrValues();
         if (essentialAcr is { Count: > 0 }) {
-            var sid = authz.SessionId;
+            var sid = authz.Request.OpSessionId;
             var context = await AuthenticationContextExtensions.ResolveAsync(
                 authz.Principal,
-                authz.Authentication,
+                authz.Request.Authentication,
                 sid,
                 options?.Value.SessionIdClaimType ?? Claims.SessionId,
                 contexts,
                 ct);
-            authz.Authentication = context;
+            authz.Request.Authentication = context;
             var current = context?.Acr;
             var satisfied = current is not null && essentialAcr.Contains(current, StringComparer.Ordinal);
 
@@ -156,12 +160,12 @@ public sealed class AdviceAuthorizeClaims<TApp>(
 
             // Forward the essential values to the login pipeline through acr_values; the
             // voluntary acr_values semantics (§5.5.1.1) apply once the user re-authenticates.
-            var existing = authz.Request?.AcrValues?
-                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                .ToList() ?? [];
-            existing.AddRange(essentialAcr.Where(v => !existing.Contains(v, StringComparer.Ordinal)));
-            if (authz.Request is not null && existing.Count > 0) {
-                authz.Request.AcrValues = string.Join(' ', existing);
+            var existing = authz.Request.AcrValueTokens.ToList();
+            var added    = essentialAcr.Where(v => !existing.Contains(v, StringComparer.Ordinal)).ToList();
+            if (added.Count > 0) {
+                existing.AddRange(added);
+                authz.Request.AcrValues      = string.Join(' ', existing);
+                authz.Request.AcrValueTokens = new(existing, StringComparer.Ordinal);
             }
         }
 
@@ -179,9 +183,7 @@ public sealed class AdviceAuthorizeClaims<TApp>(
     }
 
     private static bool IsSilent(AuthorizeContext<TApp> authz) {
-        return authz.Request?.Prompt?
-                   .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                   .Contains(PromptValues.None, StringComparer.Ordinal) == true;
+        return authz.Request?.Prompts.Contains(PromptValues.None) == true;
     }
 
 

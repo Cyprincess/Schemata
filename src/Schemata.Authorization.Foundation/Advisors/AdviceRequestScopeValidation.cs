@@ -49,6 +49,7 @@ public sealed class AdviceRequestScopeValidation<TApp>(IApplicationManager<TApp>
         }
 
         var requested = ScopeParser.Parse(payloadRequest.Scope);
+        payloadRequest.Scopes = requested;
         if (requested.Count == 0) {
             return AdviseResult.Continue;
         }

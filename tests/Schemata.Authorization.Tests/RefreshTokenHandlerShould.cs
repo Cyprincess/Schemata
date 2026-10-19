@@ -102,6 +102,7 @@ public class RefreshTokenHandlerShould
             ClientId     = "test",
             RefreshToken = refresh,
             Scope        = scope,
+            Scopes       = ScopeParser.Parse(scope),
         };
     }
 

@@ -83,9 +83,8 @@ public sealed class DiscoveryHandler<TScope, TSecurity>(
         };
 
         var discovery = new DiscoveryContext {
-            Issuer                           = issuer,
-            Document                         = document,
-            SupportsAuthorizationResponseIss = !string.IsNullOrWhiteSpace(issuer),
+            Issuer   = issuer,
+            Document = document,
         };
 
         switch (await Advisor.For<IDiscoveryAdvisor>()

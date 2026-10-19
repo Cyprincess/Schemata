@@ -95,7 +95,7 @@ public sealed class NativeSsoTokenExchangeHandler<TApp, TAuth, TSecurity, TToken
             throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
-        if (!string.IsNullOrWhiteSpace(request.Scope) && !ScopeParser.Contains(request.Scope, Scopes.OpenId)) {
+        if (!string.IsNullOrWhiteSpace(request.Scope) && !request.Scopes.Contains(Scopes.OpenId)) {
             throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED, new Dictionary<string, string?> { ["value"] = Parameters.Scope });
         }
 
@@ -178,7 +178,7 @@ public sealed class NativeSsoTokenExchangeHandler<TApp, TAuth, TSecurity, TToken
         }
 
         var requestedScope = string.IsNullOrWhiteSpace(request.Scope) ? sourceContext.Scope : request.Scope;
-        var requestedScopes = ScopeParser.Parse(requestedScope);
+        var requestedScopes = string.IsNullOrWhiteSpace(request.Scope) ? ScopeParser.Parse(sourceContext.Scope) : request.Scopes;
         if (!requestedScopes.IsSubsetOf(ScopeParser.Parse(application.Scope))) {
             throw new OAuthException(OAuthErrors.InvalidScope, SchemataResources.INVALID_SCOPE);
         }

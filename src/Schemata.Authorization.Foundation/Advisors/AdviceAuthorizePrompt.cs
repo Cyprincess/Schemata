@@ -82,26 +82,36 @@ public sealed class AdviceAuthorizePrompt<TApp>(
         AuthorizeContext<TApp> authz,
         CancellationToken      ct = default
     ) {
+        if (authz.Request is null) {
+            return AdviseResult.Continue;
+        }
+
         // Registered authentication defaults (OIDC Registration §2): default_max_age and
         // default_acr_values apply when the request omits the parameter; an explicit request
         // always wins. Applied here - before the PAR shortcut and the max_age handling below -
         // so the whole existing pipeline enforces the defaulted value.
-        if (string.IsNullOrWhiteSpace(authz.Request?.MaxAge)
+        if (string.IsNullOrWhiteSpace(authz.Request.MaxAge)
          && !string.IsNullOrWhiteSpace(authz.Application?.DefaultMaxAge)) {
-            authz.Request!.MaxAge = authz.Application.DefaultMaxAge;
+            authz.Request.MaxAge = authz.Application.DefaultMaxAge;
         }
 
-        if (string.IsNullOrWhiteSpace(authz.Request?.AcrValues)
-         && authz.Application?.DefaultAcrValues is { Count: > 0 }) {
-            authz.Request!.AcrValues = string.Join(' ', authz.Application.DefaultAcrValues);
+        if (string.IsNullOrWhiteSpace(authz.Request.AcrValues)
+         && authz.Application?.DefaultAcrValues is { Count: > 0 } defaultAcrValues) {
+            authz.Request.AcrValues = string.Join(' ', defaultAcrValues);
         }
+
+        authz.Request.Prompts = new(
+            authz.Request.Prompt?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [],
+            StringComparer.Ordinal);
+        authz.Request.AcrValueTokens = new(
+            authz.Request.AcrValues?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [],
+            StringComparer.Ordinal);
 
         var none  = false;
         var login = false;
 
-        if (!string.IsNullOrWhiteSpace(authz.Request?.Prompt)) {
-            var values = authz.Request.Prompt.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
+        var values = authz.Request.Prompts;
+        if (values.Count > 0) {
             foreach (var v in values) {
                 if (!AdviceAuthorizePrompt.KnownValues.Contains(v, StringComparer.Ordinal)) {
                     throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED, new Dictionary<string, string?> { ["value"] = v });
@@ -112,7 +122,7 @@ public sealed class AdviceAuthorizePrompt<TApp>(
             login = values.Contains(PromptValues.Login);
 
             switch (none) {
-                case true when values.Length > 1:
+                case true when values.Count > 1:
                     throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.INVALID_PROMPT_COMBINATION, new Dictionary<string, string?> { ["value"] = PromptValues.None });
                 case true when authz.Stage != AuthorizationRequestStage.Pushed && authz.Principal?.Identity?.IsAuthenticated != true:
                     throw new OAuthException(OAuthErrors.LoginRequired, SchemataResources.USER_AUTHENTICATION_REQUIRED);
@@ -124,7 +134,7 @@ public sealed class AdviceAuthorizePrompt<TApp>(
         }
 
         int? age = null;
-        if (!string.IsNullOrWhiteSpace(authz.Request?.MaxAge)) {
+        if (!string.IsNullOrWhiteSpace(authz.Request.MaxAge)) {
             if (!int.TryParse(authz.Request.MaxAge, out var parsed) || parsed < 0) {
                 throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED, new Dictionary<string, string?> { ["value"] = Parameters.MaxAge });
             }
@@ -136,15 +146,15 @@ public sealed class AdviceAuthorizePrompt<TApp>(
             return AdviseResult.Continue;
         }
 
-        var sid = authz.SessionId;
+        var sid = authz.Request.OpSessionId;
         var context = await AuthenticationContextExtensions.ResolveAsync(
             authz.Principal,
-            authz.Authentication,
+            authz.Request.Authentication,
             sid,
             options?.Value.SessionIdClaimType ?? Claims.SessionId,
             _contexts,
             ct);
-        authz.Authentication = context;
+        authz.Request.Authentication = context;
 
         // require_auth_time (OIDC Registration §2): the ID token must carry auth_time, whether or
         // not the request also constrains max_age. Evidence comes from the authentication context

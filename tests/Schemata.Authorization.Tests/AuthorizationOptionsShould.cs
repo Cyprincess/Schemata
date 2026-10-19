@@ -20,6 +20,11 @@ namespace Schemata.Authorization.Tests;
 [Trait("Category", "Integration")]
 public class AuthorizationOptionsShould
 {
+    [Fact]
+    public void Options_Do_Not_Expose_An_Interaction_Token_Format() {
+        Assert.Null(typeof(SchemataAuthorizationOptions).GetProperty("InteractionTokenFormat"));
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

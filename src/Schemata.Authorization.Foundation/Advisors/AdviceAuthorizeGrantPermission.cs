@@ -43,12 +43,16 @@ public sealed class AdviceAuthorizeGrantPermission<TApp>(IApplicationManager<TAp
         AuthorizeContext<TApp> authz,
         CancellationToken      ct = default
     ) {
-        var tokens = authz.Request?.ResponseType?.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                         ?? [];
+        var request = authz.Request;
+        if (request is null) {
+            return AdviseResult.Continue;
+        }
 
-        var hasCode  = tokens.Contains(ResponseTypes.Code, StringComparer.Ordinal);
-        var hasToken = tokens.Contains(ResponseTypes.Token, StringComparer.Ordinal)
-                    || tokens.Contains(ResponseTypes.IdToken, StringComparer.Ordinal);
+        var tokens = request.ResponseTypes;
+
+        var hasCode  = tokens.Contains(ResponseTypes.Code);
+        var hasToken = tokens.Contains(ResponseTypes.Token)
+                    || tokens.Contains(ResponseTypes.IdToken);
 
         if (hasCode) {
             await Permissions.RequireTrueAsync(

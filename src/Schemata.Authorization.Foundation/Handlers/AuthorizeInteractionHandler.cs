@@ -271,12 +271,16 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
             AdviceAuthorizeClaims.ValidateApproval(authorize.Claims, authentication?.Acr, subject);
         }
 
+        var responseTypes = new HashSet<string>(
+            authorize.ResponseType?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [],
+            StringComparer.Ordinal);
+        var grantType = AuthorizationGrantContexts.SourceForResponseTypes(responseTypes);
         var grant = AuthorizationGrantContexts.Create(
-            subject, authorize.Scope, sid, GrantTypes.AuthorizationCode, authentication,
+            subject, authorize.Scope, sid, grantType, authentication,
             authorize.GrantProfile);
 
         var properties = new Dictionary<string, string?> {
-            [Properties.GrantType]           = GrantTypes.AuthorizationCode,
+            [Properties.GrantType]           = grantType,
             [Properties.Scope]               = authorize.Scope,
             [Properties.Resources]           = authorize.Resource is { Count: > 0 } ? string.Join(" ", authorize.Resource) : null,
             [Properties.ResponseType]        = authorize.ResponseType,

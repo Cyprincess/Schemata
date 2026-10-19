@@ -65,13 +65,18 @@ public sealed class AdviceAuthorizeConsent<TApp, TAuth>(
             return AdviseResult.Continue;
         }
 
-        var prompts = authz.Request?.Prompt?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [];
+        var request = authz.Request;
+        if (request is null) {
+            return AdviseResult.Continue;
+        }
+
+        var prompts = request.Prompts;
         var consentPrompt = prompts.Contains(PromptValues.Consent);
         var none    = prompts.Contains(PromptValues.None);
 
         var subject = authz.Principal?.FindFirstValue(IdentityClaims.Subject);
 
-        var scopes = ScopeParser.Parse(authz.Request?.Scope);
+        var scopes = request.Scopes;
 
         var authorized = false;
         if (!string.IsNullOrWhiteSpace(subject) && !string.IsNullOrWhiteSpace(authz.Application?.CanonicalName)) {
@@ -89,19 +94,19 @@ public sealed class AdviceAuthorizeConsent<TApp, TAuth>(
                     continue;
                 }
 
-                if (authz.Request?.RedirectUri != a.RedirectUri) {
+                if (request.RedirectUri != a.RedirectUri) {
                     continue;
                 }
 
-                if (!ScopeParser.IsSubset(authz.Request?.ResponseType, a.ResponseType)) {
+                if (!request.ResponseTypes.IsSubsetOf(ScopeParser.Parse(a.ResponseType))) {
                     continue;
                 }
 
-                if (authz.Request?.CodeChallengeMethod != a.CodeChallengeMethod) {
+                if (request.CodeChallengeMethod != a.CodeChallengeMethod) {
                     continue;
                 }
 
-                if (!ScopeParser.IsSubset(authz.Request?.AcrValues, a.AcrValues)) {
+                if (!request.AcrValueTokens.IsSubsetOf(ScopeParser.Parse(a.AcrValues))) {
                     continue;
                 }
                 if (details is not null) {
@@ -109,7 +114,7 @@ public sealed class AdviceAuthorizeConsent<TApp, TAuth>(
                     // requested detail narrows from the granted set under the type descriptor's
                     // own comparison; an expanded or different set must take the consent path.
                     try {
-                        details.Narrow(a.AuthorizationDetails, authz.AuthorizationDetails, ct);
+                        details.Narrow(a.AuthorizationDetails, request.AuthorizationDetails, ct);
                     } catch (OAuthException) {
                         continue;
                     }

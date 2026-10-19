@@ -45,6 +45,56 @@ public static class SchemataAuthorizationBuilderExtensions
     }
 
     /// <summary>
+    ///     Enables the implicit response types <c>token</c>, <c>id_token</c>, and
+    ///     <c>id_token token</c> after <c>UseAuthorizationCodeFlow</c>.
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    /// <seealso cref="ImplicitFlowFeature" />
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseImplicitFlow<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
+    )
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        builder.AddFlowFeature<ImplicitFlowFeature>();
+        return builder;
+    }
+
+    /// <summary>
+    ///     Enables the hybrid response types <c>code id_token</c>, <c>code token</c>, and
+    ///     <c>code id_token token</c> after <c>UseAuthorizationCodeFlow</c>.
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    /// <seealso cref="HybridFlowFeature" />
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseHybridFlow<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
+    )
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        builder.AddFlowFeature<HybridFlowFeature>();
+        return builder;
+    }
+
+    /// <summary>
+    ///     Enables the exclusive <c>none</c> response type after <c>UseAuthorizationCodeFlow</c>.
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    /// <seealso cref="NoneFlowFeature" />
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseNoneFlow<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
+    )
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        builder.AddFlowFeature<NoneFlowFeature>();
+        return builder;
+    }
+
+    /// <summary>
     ///     Enables the OAuth 2.0 Client Credentials flow,
     ///     per
     ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.4">

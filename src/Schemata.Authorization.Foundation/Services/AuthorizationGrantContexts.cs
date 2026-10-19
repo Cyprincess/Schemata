@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text.Json;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Services;
@@ -67,9 +68,19 @@ internal static class AuthorizationGrantContexts
         if (string.IsNullOrWhiteSpace(subject)) {
             return null;
         }
-        return source is GrantTypes.AuthorizationCode or GrantTypes.DeviceCode
+        return source is GrantTypes.AuthorizationCode or GrantTypes.DeviceCode or GrantTypes.Implicit
             ? GrantSubjectKinds.EndUser
             : GrantSubjectKinds.Application;
+    }
+
+    internal static string? SourceForResponseTypes(IReadOnlySet<string> responseTypes) {
+        if (responseTypes.Contains(ResponseTypes.Code)) {
+            return GrantTypes.AuthorizationCode;
+        }
+
+        return responseTypes.Contains(ResponseTypes.Token) || responseTypes.Contains(ResponseTypes.IdToken)
+            ? GrantTypes.Implicit
+            : null;
     }
 
     private static string? ResolveNativeSession(string? scope) {

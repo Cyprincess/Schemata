@@ -120,6 +120,35 @@ public class ResponseModeServiceShould
     }
 
     [Fact]
+    public void ResolveAllowedMode_OmittedCodeMode_UsesFormPostWhenOnlyFormPostIsAllowed() {
+        var allowed = new HashSet<string> { ResponseModes.FormPost };
+
+        Assert.Equal(ResponseModes.FormPost, ResponseModeService.ResolveAllowedMode(null, "code", allowed));
+    }
+
+    [Fact]
+    public void ResolveAllowedMode_OmittedTokenMode_UsesFragmentWhenFragmentIsAllowed() {
+        var allowed = new HashSet<string> { ResponseModes.FormPost, ResponseModes.Fragment };
+
+        Assert.Equal(ResponseModes.Fragment, ResponseModeService.ResolveAllowedMode(null, "token", allowed));
+    }
+
+    [Fact]
+    public void ResolveAllowedMode_ExplicitModeOutsideAllowList_ReturnsNull() {
+        var allowed = new HashSet<string> { ResponseModes.FormPost };
+
+        Assert.Null(ResponseModeService.ResolveAllowedMode("query", "code", allowed));
+    }
+
+    [Fact]
+    public void ResolveAllowedMode_EmptyAllowList_UsesInferredMode() {
+        Assert.Equal(ResponseModes.Query,
+                     ResponseModeService.ResolveAllowedMode(null, "code", new HashSet<string>()));
+        Assert.Equal(ResponseModes.Fragment,
+                     ResponseModeService.ResolveAllowedMode(null, "token", new HashSet<string>()));
+    }
+
+    [Fact]
     public void CreateCallback_Query_UrlEncodesSpecialChars() {
         var result = ResponseModeService.CreateCallback("https://client.example.com/cb",
                                                         Params(("state", "hello world+test")), "query");

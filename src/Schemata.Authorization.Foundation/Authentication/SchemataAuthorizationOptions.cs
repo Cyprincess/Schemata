@@ -37,9 +37,6 @@ public class SchemataAuthorizationOptions
     /// <summary>Serialization format for refresh tokens (JWT, JWE, or opaque reference).</summary>
     public string RefreshTokenFormat { get; set; } = TokenFormats.Reference;
 
-    /// <summary>Serialization format for interaction tokens used during consent flows.</summary>
-    public string InteractionTokenFormat { get; set; } = TokenFormats.Reference;
-
     /// <summary>Validity duration of access tokens issued by the token endpoint.</summary>
     public TimeSpan AccessTokenLifetime { get; set; } = TimeSpan.FromHours(1);
 

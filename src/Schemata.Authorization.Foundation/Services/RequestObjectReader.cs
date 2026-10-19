@@ -13,6 +13,7 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Security.Foundation;
 using Schemata.Security.Skeleton;
+using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Caching.Skeleton;
@@ -150,10 +151,8 @@ public sealed class RequestObjectReader<TApp, TSecurity>(
 
         var objectScope = jwt.TryGetPayloadValue<string>(Parameters.Scope, out var jarScope) ? jarScope : null;
         if (enforceOidcOuterParameters
-            && objectScope?.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                           .Contains(Scopes.OpenId, StringComparer.Ordinal) == true) {
-            var queryHasOpenId = target.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                                              .Contains(Scopes.OpenId, StringComparer.Ordinal) == true;
+            && ScopeParser.Contains(objectScope, Scopes.OpenId)) {
+            var queryHasOpenId = ScopeParser.Contains(target.Scope, Scopes.OpenId);
             var objectResponseType = jwt.TryGetPayloadValue<string>(Parameters.ResponseType, out var jarResponseType)
                 ? jarResponseType
                 : null;

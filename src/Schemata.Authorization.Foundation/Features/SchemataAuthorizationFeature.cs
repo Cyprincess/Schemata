@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using Schemata.Authorization.Foundation.Controllers;
 using System.Threading.Tasks;
@@ -8,6 +9,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Commands;
@@ -76,26 +78,30 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TSubjectMa
         IWebHostEnvironment   environment
     ) {
         var server = app.ApplicationServices.GetRequiredService<IOptions<SchemataAuthorizationOptions>>().Value;
-        var issuer = CanonicalIssuer.Validate(server.Issuer);
+        if (server.Issuer is null) {
+            throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_CONFIGURED), nameof(server.Issuer)));
+        }
+
+        var issuerValue = server.Issuer;
+        var issuer      = new Uri(issuerValue, UriKind.Absolute);
 
         // OIDC Discovery §4.2 and RFC 8414 §3.1 share one composer; OIDC additionally
         // requires ID-token signing metadata.
         async Task<IResult> Discover(
-            DiscoveryHandler<TScope, TSecurity>     handler,
-            IOptions<SchemataAuthorizationOptions> options,
-            HttpContext                            http,
-            bool                                   oidc,
-            CancellationToken                      ct
+            DiscoveryHandler<TScope, TSecurity> handler,
+            HttpContext                         http,
+            bool                                oidc,
+            CancellationToken                   ct
         ) {
             var result = await handler.GetDiscoveryDocumentAsync(
-                             options.Value.Issuer!, oidc, new(http.RequestServices), ct);
+                             issuerValue, oidc, new(http.RequestServices), ct);
             return Results.Json(result.Data);
         }
 
-        var oidc = (DiscoveryHandler<TScope, TSecurity> handler, IOptions<SchemataAuthorizationOptions> options,
-                    HttpContext http, CancellationToken ct) => Discover(handler, options, http, true, ct);
-        var oauth = (DiscoveryHandler<TScope, TSecurity> handler, IOptions<SchemataAuthorizationOptions> options,
-                     HttpContext http, CancellationToken ct) => Discover(handler, options, http, false, ct);
+        var oidc = (DiscoveryHandler<TScope, TSecurity> handler, HttpContext http, CancellationToken ct) =>
+                       Discover(handler, http, true, ct);
+        var oauth = (DiscoveryHandler<TScope, TSecurity> handler, HttpContext http, CancellationToken ct) =>
+                        Discover(handler, http, false, ct);
 
         var jwks = async (JwksHandler<TSecurity> handler, CancellationToken ct) => {
             var result = await handler.ExecuteAsync(ct);

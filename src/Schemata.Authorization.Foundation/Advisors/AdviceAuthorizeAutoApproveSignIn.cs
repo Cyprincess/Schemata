@@ -63,7 +63,13 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
             return AdviseResult.Continue;
         }
 
-        if (string.IsNullOrWhiteSpace(authz.Application?.ClientId)) {
+        var application = authz.Application;
+        if (application is null || string.IsNullOrWhiteSpace(application.ClientId)) {
+            return AdviseResult.Continue;
+        }
+
+        var request = authz.Request;
+        if (request is null) {
             return AdviseResult.Continue;
         }
 
@@ -77,11 +83,11 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
 
         var claims = new List<Claim> {
             new(IdentityClaims.Subject, subject),
-            new(Claims.ClientId, authz.Application.ClientId!),
+            new(Claims.ClientId, application.ClientId),
         };
 
         var sid = authz.Principal?.FindFirstValue(authOptions.Value.SessionIdClaimType)
-                  ?? authz.SessionId;
+                  ?? request.OpSessionId;
         if (string.IsNullOrWhiteSpace(sid) && sessions is not null) {
             // The host principal is authenticated and consent covers the request, so the OP
             // session is established here rather than minting a synthetic principal without one.
@@ -91,17 +97,17 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
 
         // The validating advisor owns the parameter: without its accepted grant set on the
         // context, the request carries no authorization details.
-        var json = authz.AuthorizationDetails;
+        var json = request.AuthorizationDetails;
         var authorization = new TAuth {
-            Application          = authz.Application!.CanonicalName,
+            Application          = application.CanonicalName,
             Subject              = subject,
             Type                 = AuthorizationTypes.AdHoc,
             Status               = TokenStatuses.Valid,
-            Scopes               = authz.Request?.Scope,
-            RedirectUri          = authz.Request?.RedirectUri,
-            ResponseType         = authz.Request?.ResponseType,
-            CodeChallengeMethod  = authz.Request?.CodeChallengeMethod,
-            AcrValues            = authz.Request?.AcrValues,
+            Scopes               = request.Scope,
+            RedirectUri          = request.RedirectUri,
+            ResponseType         = request.ResponseType,
+            CodeChallengeMethod  = request.CodeChallengeMethod,
+            AcrValues            = request.AcrValues,
             AuthorizationDetails = json,
         };
 
@@ -109,35 +115,36 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
 
         var authentication = await AuthenticationContextExtensions.ResolveAsync(
             authz.Principal,
-            authz.Authentication,
+            request.Authentication,
             sid,
             authOptions.Value.SessionIdClaimType,
             contexts,
             ct);
-        authz.Authentication = authentication;
+        request.Authentication = authentication;
+        var grantType = AuthorizationGrantContexts.SourceForResponseTypes(request.ResponseTypes);
         var grant = AuthorizationGrantContexts.Create(
-            subject, authz.Request?.Scope, sid, GrantTypes.AuthorizationCode, authentication,
-            authz.Request?.GrantProfile);
+            subject, request.Scope, sid, grantType, authentication,
+            request.GrantProfile);
 
         var properties = new Dictionary<string, string?> {
-            [Properties.GrantType]            = GrantTypes.AuthorizationCode,
-            [Properties.Scope]                = authz.Request?.Scope,
-            [Properties.Resources]            = authz.Request?.Resource is { Count: > 0 } ? string.Join(" ", authz.Request.Resource) : null,
-            [Properties.ResponseType]         = authz.Request?.ResponseType,
-            [Properties.Nonce]                = authz.Request?.Nonce,
-            [Properties.RedirectUri]          = authz.Request?.RedirectUri,
+            [Properties.GrantType]            = grantType,
+            [Properties.Scope]                = request.Scope,
+            [Properties.Resources]            = request.Resource is { Count: > 0 } ? string.Join(" ", request.Resource) : null,
+            [Properties.ResponseType]         = request.ResponseType,
+            [Properties.Nonce]                = request.Nonce,
+            [Properties.RedirectUri]          = request.RedirectUri,
             [Properties.ResponseMode]         = authz.ResponseMode,
-            [Properties.State]                = authz.Request?.State,
-            [Properties.CodeChallenge]        = authz.Request?.CodeChallenge,
-            [Properties.CodeChallengeMethod]  = authz.Request?.CodeChallengeMethod,
-            [Properties.DpopJkt]              = authz.Request?.DpopJkt,
+            [Properties.State]                = request.State,
+            [Properties.CodeChallenge]        = request.CodeChallenge,
+            [Properties.CodeChallengeMethod]  = request.CodeChallengeMethod,
+            [Properties.DpopJkt]              = request.DpopJkt,
             [Properties.AuthorizationName]    = authorization.CanonicalName,
             [Properties.SessionId]            = sid,
             [Properties.GrantContext]         = AuthorizationGrantContexts.Serialize(grant),
             [Properties.GrantProfile]         = grant.Profile,
-            [Properties.MaxAge]               = authz.Request?.MaxAge,
-            [Properties.ClaimsRequest]        = authz.RequestedClaims is not null ? authz.Request?.Claims : null,
-            [Properties.SessionStateSalt]     = authz.Request?.SessionStateSalt,
+            [Properties.MaxAge]               = request.MaxAge,
+            [Properties.ClaimsRequest]        = request.RequestedClaims is not null ? request.Claims : null,
+            [Properties.SessionStateSalt]     = request.SessionStateSalt,
             [Properties.AuthorizationDetails] = json,
         };
 

@@ -11,6 +11,7 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Foundation.Services;
+using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Advisors;
@@ -79,6 +80,7 @@ public class DeviceCodeHandlerShould
             ClientId   = "test-client",
             DeviceCode = deviceCode,
             Scope      = scope,
+            Scopes     = ScopeParser.Parse(scope),
         };
     }
 

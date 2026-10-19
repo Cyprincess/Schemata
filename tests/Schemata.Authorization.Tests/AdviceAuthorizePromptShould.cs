@@ -160,9 +160,8 @@ public class AdviceAuthorizePromptShould
         using var provider = new ServiceCollection().BuildServiceProvider();
         var ctx = new AdviceContext(provider);
         var authz = new AuthorizeContext<SchemataApplication> {
-            SessionId = "sid-resolved",
             Principal = Authenticated(),
-            Request   = new() { MaxAge = "900" },
+            Request   = new() { MaxAge = "900", OpSessionId = "sid-resolved" },
         };
 
         await advisor.AdviseAsync(ctx, authz);

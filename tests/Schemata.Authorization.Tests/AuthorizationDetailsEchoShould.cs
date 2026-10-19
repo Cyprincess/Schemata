@@ -77,11 +77,10 @@ public class AuthorizationDetailsEchoShould
             authzMgr.Object);
         var ctx   = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var authz = new AuthorizeContext<SchemataApplication> {
-            AuthorizationDetails = Grant,
             Application     = new() {
                 Uid = Guid.NewGuid(), ClientId = "app-1", Name = "app-1", CanonicalName = "applications/app-1",
             },
-            Request         = new() { Scope = "openid" },
+            Request         = new() { Scope = "openid", AuthorizationDetails = Grant },
             Principal       = CreatePrincipal(),
             ConsentDecision = ConsentDecision.Granted,
         };

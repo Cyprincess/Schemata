@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace Schemata.Authorization.Skeleton.Models;
 
@@ -75,6 +77,10 @@ public class TokenRequest
     ///     </seealso>
     /// </summary>
     public string? Scope { get; set; }
+
+    /// <summary>The parsed <see cref="Scope" /> tokens, published by the token request scope validator.</summary>
+    [JsonIgnore]
+    public HashSet<string> Scopes { get; set; } = new(StringComparer.Ordinal);
 
     /// <summary>
     ///     Refresh token for the <c>refresh_token</c> grant.

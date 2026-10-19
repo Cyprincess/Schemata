@@ -88,8 +88,9 @@ public class SessionStateShould
         using var provider = new ServiceCollection().BuildServiceProvider();
         var       ctx      = new AdviceContext(provider);
         var authz = new AuthorizeContext<SchemataApplication> {
-            Application = new() { ClientId = "client-1" },
-            Request     = new() {
+            Application  = new() { ClientId = "client-1" },
+            ResponseMode = AuthorizationConstants.ResponseModes.Query,
+            Request      = new() {
                 RedirectUri  = "https://client.example/callback?x=1",
                 GrantProfile = AuthorizationConstants.GrantProfiles.OpenIdConnect,
             },
@@ -107,7 +108,7 @@ public class SessionStateShould
         // response cookie carries; the success callback recomputes it after sign-in.
         var opstate = cookie["opstate=".Length..].Split(';', 2)[0];
         Assert.True(SessionStateContext.TryGet(http, out var initial));
-        Assert.Equal(new SessionStateFormulator().Build("client-1", "https://client.example", opstate, authz.SessionStateSalt!), initial);
+        Assert.Equal(new SessionStateFormulator().Build("client-1", "https://client.example", opstate, authz.Request.SessionStateSalt!), initial);
     }
 
     [Fact]

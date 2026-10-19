@@ -60,6 +60,7 @@ public sealed class AuthorizationCodeFlowFeature<TApp, TAuth, TScope, TSecurity,
 
         services.Configure<SchemataAuthorizationOptions>(o => {
             o.AllowedResponseTypes.Add(ResponseTypes.Code);
+            o.AllowedResponseModes.Add(ResponseModes.Query);
             o.AllowedResponseModes.Add(ResponseModes.FormPost);
         });
 

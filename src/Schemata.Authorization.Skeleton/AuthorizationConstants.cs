@@ -1828,6 +1828,9 @@ public static class AuthorizationConstants
 
         /// <summary>ID token response type (implicit / hybrid flow).</summary>
         public const string IdToken = "id_token";
+
+        /// <summary>Response type requesting no authorization artifacts; it is exclusive.</summary>
+        public const string None = "none";
     }
 
     #endregion
@@ -1857,6 +1860,7 @@ public static class AuthorizationConstants
         public static readonly IReadOnlyDictionary<string, string[]> Requirements =
             new Dictionary<string, string[]>(StringComparer.Ordinal) {
                 [ResponseTypes.Code] = [GrantTypes.AuthorizationCode],
+                [ResponseTypes.None] = [],
                 [ResponseTypes.Token] = [GrantTypes.Implicit],
                 [ResponseTypes.IdToken] = [GrantTypes.Implicit],
                 [ResponseTypes.IdToken + " " + ResponseTypes.Token] = [GrantTypes.Implicit],

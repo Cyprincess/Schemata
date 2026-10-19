@@ -45,11 +45,12 @@ public sealed class AdviceAuthorizeAuthorizationDetails<TApp>(
     public int Order => AdviceAuthorizeAuthorizationDetails.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(AdviceContext ctx, AuthorizeContext<TApp> authz, CancellationToken ct = default) {
-        var raw = authz.Request?.AuthorizationDetails;
-        if (string.IsNullOrWhiteSpace(raw)) {
+        var request = authz.Request;
+        if (request is null || string.IsNullOrWhiteSpace(request.AuthorizationDetails)) {
             return AdviseResult.Continue;
         }
 
+        var raw    = request.AuthorizationDetails;
         var parsed = details.Parse(raw, ct);
 
         // §10 client metadata: every requested type must be among the client's registered types.
@@ -70,9 +71,7 @@ public sealed class AdviceAuthorizeAuthorizationDetails<TApp>(
             }
         }
 
-        if (parsed.Count > 0) {
-            authz.AuthorizationDetails = parsed.ToJsonString();
-        }
+        request.AuthorizationDetails = parsed.Count > 0 ? parsed.ToJsonString() : null;
 
         return AdviseResult.Continue;
     }

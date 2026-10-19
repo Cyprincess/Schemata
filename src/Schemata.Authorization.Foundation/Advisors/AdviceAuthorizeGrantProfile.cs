@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions;
@@ -47,7 +48,11 @@ public sealed class AdviceAuthorizeGrantProfile<TApp>(
             return AdviseResult.Continue;
         }
 
-        var scopes = ScopeParser.Parse(request.Scope);
+        var scopes = new HashSet<string>(
+            request.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [],
+            StringComparer.Ordinal);
+        request.Scopes = scopes;
+
         foreach (var scope in scopes) {
             await Permissions.RequireTrueAsync(await apps.HasScopeAsync(authz.Application, scope, ct),
                 OAuthErrors.InvalidScope, SchemataResources.INVALID_SCOPE,
@@ -55,7 +60,7 @@ public sealed class AdviceAuthorizeGrantProfile<TApp>(
         }
 
         var oidc = scopes.Contains(Scopes.OpenId);
-        var responses = ScopeParser.Parse(request.ResponseType);
+        var responses = request.ResponseTypes;
         if (responses.Contains(ResponseTypes.IdToken) && !oidc) {
             throw Configure(new(OAuthErrors.InvalidScope, SchemataResources.INVALID_SCOPE), authz);
         }

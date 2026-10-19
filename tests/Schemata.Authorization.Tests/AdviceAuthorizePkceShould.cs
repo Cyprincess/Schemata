@@ -1,3 +1,4 @@
+﻿using System;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Errors;
 using System.Collections.Generic;
@@ -48,7 +49,8 @@ public class AdviceAuthorizePkceShould
     [Fact]
     public async Task ThrowsInvalidRequest_WhenPkceRequired_AndNoChallengeProvided() {
         var (advisor, ctx, authz) = Create();
-        authz.Request             = new();
+        authz.Request             = new() { ResponseType = ResponseTypes.Code };
+        SetResponseType(authz, ResponseTypes.Code);
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(ctx, authz));
         Assert.Equal(OAuthErrors.InvalidRequest, ex.Status);
@@ -122,6 +124,40 @@ public class AdviceAuthorizePkceShould
         Assert.Equal(AdviseResult.Continue, result);
     }
 
+
+    [Theory]
+    [InlineData("token", false)]
+    [InlineData("id_token", false)]
+    [InlineData("id_token token", false)]
+    [InlineData("code", true)]
+    [InlineData("code id_token", true)]
+    [InlineData("code token", true)]
+    [InlineData("code id_token token", true)]
+    public async Task RequiresChallenge_OnlyWhenResponseTypeContainsCode(string responseType, bool required) {
+        var (advisor, ctx, authz) = Create();
+        authz.Request             = new() { ResponseType = responseType };
+        SetResponseType(authz, responseType);
+
+        if (!required) {
+            var result = await advisor.AdviseAsync(ctx, authz);
+            Assert.Equal(AdviseResult.Continue, result);
+            return;
+        }
+
+        var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(ctx, authz));
+        Assert.Equal(OAuthErrors.InvalidRequest, ex.Status);
+        Assert.Equal(SchemataResources.NOT_EMPTY, ErrorInfo(ex).Reason);
+    }
+
+    private static void SetResponseType(AuthorizeContext<SchemataApplication> authz, string responseType) {
+        var components = responseType.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var request    = authz.Request;
+        if (request is null) {
+            return;
+        }
+
+        request.ResponseTypes = new(components, StringComparer.Ordinal);
+    }
 
     private static ErrorInfoDetail ErrorInfo(OAuthException ex) {
         return Assert.Single(ex.Details!.OfType<ErrorInfoDetail>());

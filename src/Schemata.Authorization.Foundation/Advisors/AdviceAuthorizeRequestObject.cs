@@ -83,7 +83,6 @@ public sealed class AdviceAuthorizeRequestObject<TApp, TSecurity>(
         }
 
         authz.ResolvedRequestObject = request.Request;
-        authz.ResponseMode = ResponseModeService.ResolveMode(request.ResponseMode, request.ResponseType);
 
         return AdviseResult.Continue;
     }

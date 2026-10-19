@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace Schemata.Authorization.Skeleton.Models;
 
@@ -232,4 +234,28 @@ public class AuthorizeRequest
     ///     references a stored request object.
     /// </summary>
     public string? RequestUri { get; set; }
+
+    #region Pipeline-derived typed views
+
+    /// <summary>The canonical <c>response_type</c> components.</summary>
+    [JsonIgnore]
+    public HashSet<string> ResponseTypes { get; set; } = new(StringComparer.Ordinal);
+
+    /// <summary>The requested <c>scope</c> tokens.</summary>
+    [JsonIgnore]
+    public HashSet<string> Scopes { get; set; } = new(StringComparer.Ordinal);
+
+    /// <summary>The requested <c>prompt</c> values.</summary>
+    [JsonIgnore]
+    public HashSet<string> Prompts { get; set; } = new(StringComparer.Ordinal);
+
+    /// <summary>The effective <c>acr_values</c> values.</summary>
+    [JsonIgnore]
+    public HashSet<string> AcrValueTokens { get; set; } = new(StringComparer.Ordinal);
+
+    /// <summary>The parsed <c>claims</c> request parameter, published by its validating advisor.</summary>
+    [JsonIgnore]
+    public ClaimsRequest? RequestedClaims { get; set; }
+
+    #endregion
 }

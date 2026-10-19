@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
@@ -37,7 +39,8 @@ public static class AdviceAuthorizePkce
 /// <typeparam name="TApp">The application entity type.</typeparam>
 /// <remarks>
 ///     When PKCE is required at the server level via
-///     <see cref="CodeFlowOptions.RequirePkce" />, the <c>code_challenge</c> must be present.
+///     <see cref="CodeFlowOptions.RequirePkce" /> and the response type contains <c>code</c>, the
+///     <c>code_challenge</c> must be present.
 ///     If <c>code_challenge_method</c> is omitted, <c>plain</c> is assumed per RFC 7636.
 ///     When <see cref="CodeFlowOptions.RequirePkceS256" /> is true, only <c>S256</c> is accepted.
 /// </remarks>
@@ -56,11 +59,11 @@ public sealed class AdviceAuthorizePkce<TApp>(IOptions<CodeFlowOptions> options)
     ) {
         var required = options.Value.RequirePkce;
 
-        // An absent or empty challenge is only a violation when PKCE is required. A present
-        // value — including whitespace-only input that older IsNullOrWhiteSpace checks erased —
-        // must satisfy the RFC 7636 §4.2 grammar either way, so malformed-present input is
-        // reported as a grammar failure rather than folded into the required/absent fact.
-        if (required && string.IsNullOrEmpty(authz.Request?.CodeChallenge)) {
+        var codeFlow = authz.Request?.ResponseTypes.Contains(ResponseTypes.Code) == true;
+
+        // PKCE applies to the authorization code flow. A challenge supplied for another
+        // response type is still checked for RFC 7636 grammar when present.
+        if (required && codeFlow && string.IsNullOrEmpty(authz.Request?.CodeChallenge)) {
             throw new OAuthException(
                 OAuthErrors.InvalidRequest,
                 SchemataResources.NOT_EMPTY,

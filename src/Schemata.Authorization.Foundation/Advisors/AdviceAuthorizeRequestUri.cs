@@ -113,7 +113,6 @@ public sealed class AdviceAuthorizeRequestUri<TApp, TToken>(
 
         parsed.RequestUri  = raw;
         authz.Request      = parsed;
-        authz.ResponseMode = ResponseModeService.ResolveMode(parsed.ResponseMode, parsed.ResponseType);
         authz.ResolvedRequestUri = raw;
 
         return AdviseResult.Continue;

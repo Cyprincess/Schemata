@@ -52,9 +52,8 @@ public class AuthorizeCallbackFinalizationShould
         });
 
         var authz = new AuthorizeContext<SchemataApplication> {
-            Application  = app,
-            ResponseMode = ResponseModeService.ResolveMode(responseMode, responseType),
-            Request      = new() {
+            Application = app,
+            Request     = new() {
                 ClientId     = app.ClientId,
                 RedirectUri  = "https://localhost/callback",
                 State        = "the-state",
@@ -77,6 +76,38 @@ public class AuthorizeCallbackFinalizationShould
         }
         return await Assert.ThrowsAsync<OAuthException>(
             () => advisor.AdviseAsync(ctx, authz, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Code_OmittedMode_UsesFormPostWhenOnlyFormPostIsAllowed() {
+        var app = App(ResponseTypes.Code);
+        var manager = new Mock<IApplicationManager<SchemataApplication>>();
+        manager.Setup(m => m.FindByClientIdAsync(app.ClientId, It.IsAny<CancellationToken>())).ReturnsAsync(app);
+        manager.Setup(m => m.ValidateRedirectUriAsync(app, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(true);
+        manager.Setup(m => m.HasResponseTypeAsync(app, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(true);
+
+        var options = Options.Create(new Foundation.Authentication.SchemataAuthorizationOptions {
+            AllowedResponseTypes = { ResponseTypes.Code },
+            AllowedResponseModes = { ResponseModes.FormPost },
+        });
+        var authz = new AuthorizeContext<SchemataApplication> {
+            Application = app,
+            Request     = new() {
+                ClientId     = app.ClientId,
+                RedirectUri  = "https://localhost/callback",
+                State        = "the-state",
+                ResponseType = ResponseTypes.Code,
+            },
+        };
+        var advisor = new AdviceAuthorizeClientAndRedirect<SchemataApplication>(manager.Object, options);
+        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+
+        var result = await advisor.AdviseAsync(ctx, authz, CancellationToken.None);
+
+        Assert.Equal(AdviseResult.Continue, result);
+        Assert.Equal(ResponseModes.FormPost, authz.ResponseMode);
     }
 
     [Fact]
@@ -132,9 +163,8 @@ public class AuthorizeCallbackFinalizationShould
             AllowedResponseTypes = { ResponseTypes.Code },
         });
         var authz = new AuthorizeContext<SchemataApplication> {
-            Application  = app,
-            ResponseMode = ResponseModes.Query,
-            Request      = new() {
+            Application = app,
+            Request     = new() {
                 ClientId = app.ClientId, RedirectUri = "https://evil.example/cb", ResponseType = ResponseTypes.Code,
             },
         };
@@ -145,13 +175,14 @@ public class AuthorizeCallbackFinalizationShould
             () => advisor.AdviseAsync(ctx, authz, CancellationToken.None).GetAwaiter().GetResult());
 
         Assert.Null(ex.RedirectUri);
-        Assert.Null(authz.Callback);
+        Assert.Null(authz.ResponseMode);
     }
 
     [Fact]
     public void WithCallback_Leaves_Already_Resolved_Delivery_Untouched() {
         var authz = new AuthorizeContext<SchemataApplication> {
-            Callback = new("https://localhost/callback", "the-state", ResponseModes.Fragment),
+            ResponseMode = ResponseModes.Fragment,
+            Request      = new() { RedirectUri = "https://localhost/callback", State = "the-state" },
         };
         var ex = new OAuthException(OAuthErrors.AccessDenied, "denied") {
             RedirectUri = "https://elsewhere.example/cb",

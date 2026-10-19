@@ -50,11 +50,16 @@ public sealed class AdviceAuthorizeResponseMode<TApp>(IOptions<CodeFlowOptions> 
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        if (string.IsNullOrWhiteSpace(authz.Request?.ResponseType)) {
+        var request = authz.Request;
+        if (request is null) {
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        var responseTypes = authz.Request.ResponseType.Split(' ');
+        if (string.IsNullOrWhiteSpace(request.ResponseType)) {
+            return Task.FromResult(AdviseResult.Continue);
+        }
+
+        var responseTypes = request.ResponseTypes;
 
         if ((responseTypes.Contains(ResponseTypes.Token) || responseTypes.Contains(ResponseTypes.IdToken))
          && authz.ResponseMode == ResponseModes.Query) {
