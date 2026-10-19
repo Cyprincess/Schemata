@@ -1,4 +1,5 @@
-using System.Linq;
+using System.Collections.Generic;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
@@ -6,6 +7,7 @@ using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Foundation.Managers;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
@@ -45,8 +47,8 @@ public static class AdviceAuthorizeClientAndRedirect
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
 /// <remarks>
-///     Response types are sorted alphabetically so that <c>"id_token token"</c> and <c>"token id_token"</c>
-///     are treated identically.
+///     Response type combinations are canonicalized to ordinal component order so that
+///     <c>"id_token token"</c> and <c>"token id_token"</c> are treated identically.
 /// </remarks>
 /// <seealso cref="AdviceAuthorizeEndpointPermission{TApp}" />
 public sealed class AdviceAuthorizeClientAndRedirect<TApp>(
@@ -65,52 +67,56 @@ public sealed class AdviceAuthorizeClientAndRedirect<TApp>(
         CancellationToken      ct = default
     ) {
         if (string.IsNullOrWhiteSpace(authz.Request?.ClientId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.ClientId)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.NOT_EMPTY, new Dictionary<string, string?> { ["value"] = Parameters.ClientId });
+        }
+
+        if (!string.IsNullOrWhiteSpace(authz.Request.ResponseMode)
+         && !options.Value.AllowedResponseModes.Contains(authz.Request.ResponseMode)) {
+            // OIDC Core §3.1.2.6: on the interactive authorization endpoint an unsupported
+            // response mode has no legal delivery encoding, so the wire answer is the bare 400
+            // status. Under PAR validation the RFC 9126 §2.3 JSON error response carries the
+            // error instead. Validated BEFORE the callback is captured so the central
+            // finalizer cannot inherit one.
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED, new Dictionary<string, string?> { ["value"] = Parameters.ResponseMode }) {
+                OmitErrorParameters = true,
+            };
         }
 
         var application = await apps.FindByClientIdAsync(authz.Request.ClientId, ct);
         if (application is null) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
         authz.Application = application;
 
         if (!await apps.ValidateRedirectUriAsync(authz.Application, authz.Request.RedirectUri, ct)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidRedirectUri,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_REDIRECT_URI)
-            );
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.INVALID_REDIRECT_URI);
         }
 
-        var type = authz.Request.ResponseType?.Split(' ').OrderBy(x => x).ToList() ?? [];
-        authz.Request.ResponseType = string.Join(' ', type);
+        // The redirect is now trusted: every later failure — success and error alike — finalizes
+        // from this single captured callback (legal effective mode included), never from raw input.
+        authz.Callback = new(authz.Request.RedirectUri!, authz.Request.State, authz.ResponseMode!);
 
-        if (!options.Value.AllowedResponseTypes.Contains(authz.Request.ResponseType)) {
-            throw new OAuthException(
-                OAuthErrors.UnsupportedResponseType,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), Parameters.ResponseType)
-            ) {
-                RedirectUri  = authz.Request.RedirectUri,
-                State        = authz.Request.State,
-                ResponseMode = authz.Request.ResponseMode,
+        authz.Request.ResponseType = string.IsNullOrWhiteSpace(authz.Request.ResponseType)
+            ? string.Empty
+            : SchemataApplicationMetadata.CanonicalizeResponseType(authz.Request.ResponseType);
+
+        if (!SchemataApplicationMetadata.IsSupportedResponseType(options.Value.AllowedResponseTypes, authz.Request.ResponseType)) {
+            throw new OAuthException(OAuthErrors.UnsupportedResponseType, SchemataResources.NOT_SUPPORTED, new Dictionary<string, string?> { ["value"] = Parameters.ResponseType }) {
+                RedirectUri  = authz.Callback.RedirectUri,
+                State        = authz.Callback.State,
+                ResponseMode = authz.Callback.ResponseMode,
             };
         }
 
-        if (!string.IsNullOrWhiteSpace(authz.Request.ResponseMode)
-         && !options.Value.AllowedResponseModes.Contains(authz.Request.ResponseMode)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), Parameters.ResponseMode)
-            ) {
-                RedirectUri  = authz.Request.RedirectUri,
-                State        = authz.Request.State,
-                ResponseMode = ResponseModes.Query,
+        // Per-client response-type check: the full normalized combination must appear in the
+        // client's registered response_types metadata. Token order is insignificant on both
+        // sides ("code id_token" and "id_token code" are the same entry).
+        if (!await apps.HasResponseTypeAsync(authz.Application, authz.Request.ResponseType, ct)) {
+            throw new OAuthException(OAuthErrors.UnauthorizedClient, SchemataResources.NOT_SUPPORTED, new Dictionary<string, string?> { ["value"] = Parameters.ResponseType }) {
+                RedirectUri  = authz.Callback.RedirectUri,
+                State        = authz.Callback.State,
+                ResponseMode = authz.Callback.ResponseMode,
             };
         }
 
@@ -118,4 +124,5 @@ public sealed class AdviceAuthorizeClientAndRedirect<TApp>(
     }
 
     #endregion
+
 }

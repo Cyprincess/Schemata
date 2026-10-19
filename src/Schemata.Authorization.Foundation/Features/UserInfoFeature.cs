@@ -2,9 +2,17 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Handlers;
+using Schemata.Authorization.Foundation.Queries;
+using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Advisors;
+using Schemata.Authorization.Skeleton;
+using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Messaging.Skeleton;
 using Schemata.Authorization.Skeleton.Handlers;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Core;
+
+using Schemata.Authorization.Foundation.Controllers;
 
 namespace Schemata.Authorization.Foundation.Features;
 
@@ -15,23 +23,61 @@ namespace Schemata.Authorization.Foundation.Features;
 ///         UserInfo Endpoint
 ///     </seealso>
 ///     :
-///     handler, <c>openid</c> scope requirement advisor, and discovery metadata.
+///     handler, end-user provenance advisor, discovery metadata, and the
+///     §5.3.2 response protector. Clients that registered
+///     <c>userinfo_signed_response_alg</c> / <c>userinfo_encrypted_response_alg</c>
+///     receive their claim set as a signed and/or encrypted JWT; other clients receive plain
+///     JSON. DI presence activates the feature.
 /// </summary>
+/// <typeparam name="TApp">The application entity type.</typeparam>
+/// <typeparam name="TSecurity">The security entity type.</typeparam>
 /// <remarks>
-///     Installed via <c>UseUserInfo()</c> on <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope, TToken}" />.
+///     Installed via <c>UseUserInfo()</c> on
+///     <c>SchemataAuthorizationBuilder</c>.
 /// </remarks>
-/// <seealso cref="IntrospectionFeature{TApp, TToken}" />
-public sealed class UserInfoFeature : IAuthorizationFlowFeature
+public sealed class UserInfoFeature<TApp, TSecurity> : IAuthorizationFlowFeature
+    where TApp : SchemataApplication
+    where TSecurity : SchemataSecurity, new()
 {
     #region IAuthorizationFlowFeature Members
 
-    public int Order => 3_000;
+    /// <summary>The default feature ordering value (chained after its predecessor).</summary>
+    public const int DefaultOrder = InteractionFeature.DefaultOrder + 100;
+
+    public int Order => DefaultOrder;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
+
+        // The same activation fact that keeps the Profile actions routable registers their
+        // authorization policy and the endpoint's discovery metadata. The bearer scheme follows
+        // the configured options at request time, matching the base scheme registration.
+        services.AddOptions<Microsoft.AspNetCore.Authorization.AuthorizationOptions>()
+                .PostConfigure<Microsoft.Extensions.Options.IOptions<Authentication.SchemataAuthorizationOptions>>((auth, options) => {
+
+                    auth.AddPolicy(Authentication.SchemataAuthorizationPolicies.Profile, p => {
+                        p.RequireAuthenticatedUser();
+                        p.AddAuthenticationSchemes(options.Value.BearerScheme);
+                    });
+                });
+
         services.TryAddScoped<UserInfoEndpoint, UserInfoHandler>();
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IUserInfoAdvisor, AdviceUserInfoOpenIdRequirement>());
+        services.TryAddScoped<IUserInfoResponseProtector, UserInfoResponseProtector<TApp, TSecurity>>();
+        services.TryAddScoped<
+            IRequestHandler<UserInfoEndpointQuery, AuthorizationResult>,
+            EndpointDispatchHandler<UserInfoEndpointQuery, UserInfoEndpoint, AuthorizationResult>>();
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IUserInfoAdvisor, AdviceUserInfoEndUserRequirement>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryUserInfo>());
     }
 
     #endregion
+}
+
+/// <summary>
+///     Ordering anchor for <see cref="UserInfoFeature" /> so successor features can chain
+///     off its <c>DefaultOrder</c> without naming type arguments.
+/// </summary>
+internal static class UserInfoFeature
+{
+    /// <summary>The default feature ordering value.</summary>
+    public const int DefaultOrder = InteractionFeature.DefaultOrder + 100;
 }

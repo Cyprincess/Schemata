@@ -1,16 +1,22 @@
+using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Security.Claims;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
+using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
+using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Handlers;
+using Schemata.Authorization.Skeleton.Services;
 using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
@@ -29,11 +35,13 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     and finally filters claims by <see cref="IDestinationAdvisor" /> to
 ///     only include those allowed for the <c>userinfo</c> destination.
 /// </summary>
-public sealed class UserInfoHandler : UserInfoEndpoint
+public sealed class UserInfoHandler(IUserInfoResponseProtector? protector) : UserInfoEndpoint
 {
-    public override async Task<AuthorizationResult> HandleAsync(ClaimsPrincipal principal, CancellationToken ct) {
-        var ctx = AdviceContext.Require();
-
+    public override async Task<AuthorizationResult> HandleAsync(
+        ClaimsPrincipal   principal,
+        AdviceContext     context,
+        CancellationToken ct
+    ) {
         var sub    = principal.FindFirstValue(IdentityClaims.Subject);
         var scope  = principal.FindFirstValue(Claims.Scope);
         var client = principal.FindFirstValue(Claims.ClientId);
@@ -43,21 +51,20 @@ public sealed class UserInfoHandler : UserInfoEndpoint
             Principal       = principal,
             InternalSubject = sub,
             GrantedScopes   = scopes,
-            IsEndUserToken  = !string.IsNullOrWhiteSpace(sub),
+            IsEndUserToken  = string.Equals(
+                principal.FindFirstValue(Claims.GrantSubjectKind), GrantSubjectKinds.EndUser,
+                StringComparison.Ordinal),
         };
 
         switch (await Advisor.For<IUserInfoAdvisor>()
-                             .RunAsync(ctx, info, ct)) {
+                             .RunAsync(context, info, ct)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<AuthorizationResult>(out var result):
-                return result!;
+            case AdviseResult.Handle when info.Result is { } result:
+                return result;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(
-                    OAuthErrors.AccessDenied,
-                    SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED)
-                );
+                throw new OAuthException(OAuthErrors.AccessDenied, SchemataResources.ACCESS_DENIED);
         }
 
         var claims = new List<Claim>();
@@ -69,19 +76,17 @@ public sealed class UserInfoHandler : UserInfoEndpoint
         if (!string.IsNullOrWhiteSpace(client)) {
             claims.Add(new(Claims.ClientId, client));
         }
+        var issuance = new AuthorizationClaimContext();
 
         switch (await Advisor.For<IClaimsAdvisor>()
-                             .RunAsync(ctx, claims, ct)) {
+                             .RunAsync(context, claims, issuance, ct)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<AuthorizationResult>(out var result):
-                return result!;
+            case AdviseResult.Handle when issuance.Result is { } result:
+                return result;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(
-                    OAuthErrors.AccessDenied,
-                    SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED)
-                );
+                throw new OAuthException(OAuthErrors.AccessDenied, SchemataResources.ACCESS_DENIED);
         }
 
         
@@ -89,7 +94,7 @@ public sealed class UserInfoHandler : UserInfoEndpoint
             var destinations = new HashSet<string>();
 
             switch (await Advisor.For<IDestinationAdvisor>()
-                                 .RunAsync(ctx, claim, destinations, principal, ct)) {
+                                 .RunAsync(context, claim, destinations, principal, issuance, ct)) {
                 case AdviseResult.Continue:
                 case AdviseResult.Handle:
                     break;
@@ -112,8 +117,23 @@ public sealed class UserInfoHandler : UserInfoEndpoint
         var dict = list.GroupBy(c => c.Type)
                        .ToDictionary(
                             g => g.Key,
-                            g => g.Count() == 1 ? (object)g.First().Value : g.Select(c => c.Value).ToArray());
+                            g => g.Count() == 1 ? ReadValue(g.First()) : g.Select(ReadValue).ToArray());
 
-        return AuthorizationResult.Content(dict);
+        // Core 1.0 §5.3.2: a client that registered userinfo_signed_response_alg (and/or the
+        // encryption parameters) receives the claim set as a JWT instead of plain JSON.
+        var jwt = protector is null ? null : await protector.ProtectAsync(client, dict, ct);
+
+        return AuthorizationResult.Content(jwt is null ? dict : jwt);
     }
+
+    private static object ReadValue(Claim claim) => claim.ValueType switch {
+        "JSON" or "JSON_ARRAY" => JsonSerializer.Deserialize<JsonElement>(claim.Value),
+        ClaimValueTypes.Boolean => bool.Parse(claim.Value),
+        ClaimValueTypes.Integer or ClaimValueTypes.Integer32 or ClaimValueTypes.Integer64 =>
+            long.Parse(claim.Value, CultureInfo.InvariantCulture),
+        ClaimValueTypes.UInteger32 or ClaimValueTypes.UInteger64 =>
+            ulong.Parse(claim.Value, CultureInfo.InvariantCulture),
+        ClaimValueTypes.Double => double.Parse(claim.Value, CultureInfo.InvariantCulture),
+        _ => claim.Value,
+    };
 }

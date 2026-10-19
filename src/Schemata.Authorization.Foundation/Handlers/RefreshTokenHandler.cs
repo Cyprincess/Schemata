@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,13 +11,15 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Foundation.Commands;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
-using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
 using static Schemata.Abstractions.SchemataConstants;
@@ -28,9 +31,9 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     Handles the <c>refresh_token</c> grant type.
 ///     Validates the refresh token via JWT signature verification (skipping
 ///     lifetime checks), runs the <see cref="ITokenRequestAdvisor{TApp}" />
-///     and <see cref="IRefreshTokenAdvisor{TApp, TToken}" /> pipelines,
+///     and <see cref="IRefreshTokenAdvisor{TApp}" /> pipelines,
 ///     validates subject existence, enforces optional refresh token rotation,
-///     and re-issues tokens with the stored scope,
+///     and re-issues tokens with the stored scope, enforcing RFC 8707 §2.2 resource subsetting,
 ///     per
 ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9700.html#section-2.1.3">
 ///         RFC 9700: The OAuth 2.0 Authorization
@@ -38,16 +41,20 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     </seealso>
 ///     .
 /// </summary>
-public sealed class RefreshTokenHandler<TApp, TToken>(
+public sealed class RefreshTokenHandler<TApp, TSecurity, TToken>(
     IClientAuthenticationService<TApp> client,
-    ITokenManager<TToken>              tokens,
-    TokenService                       issuer,
+    ITokenStore<TToken>         tokens,
+    TokenService<TSecurity>            issuer,
     IOptions<RefreshTokenFlowOptions>  options,
-    IServiceProvider                   sp
+    IServiceProvider                   sp,
+    TimeProvider?                      time = null
 ) : IGrantHandler
     where TApp : SchemataApplication
-    where TToken : SchemataToken
+    where TSecurity : SchemataSecurity, new()
+    where TToken : SchemataToken, new()
 {
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
+
     #region IGrantHandler Members
 
     public string GrantType => GrantTypes.RefreshToken;
@@ -68,125 +75,169 @@ public sealed class RefreshTokenHandler<TApp, TToken>(
     /// </summary>
     /// <param name="request">Token request containing the refresh token.</param>
     /// <param name="headers">HTTP request headers for client authentication.</param>
+    /// <param name="proof">The raw DPoP proof header value extracted by the endpoint.</param>
+    /// <param name="context">The dispatch's advisor context, shared with the request pipeline.</param>
     /// <param name="ct">A cancellation token.</param>
     public async Task<AuthorizationResult> HandleAsync(
         TokenRequest                       request,
         Dictionary<string, List<string?>>? headers,
+        string?                            proof,
+        AdviceContext                      context,
         CancellationToken                  ct
     ) {
         if (string.IsNullOrWhiteSpace(request.RefreshToken)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.RefreshToken)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.NOT_EMPTY, new Dictionary<string, string?> { ["value"] = Parameters.RefreshToken });
         }
 
-        var application = await client.AuthenticateAsync(null, new(){
-            [Parameters.ClientId]     = [request.ClientId],
-            [Parameters.ClientSecret] = [request.ClientSecret],
-        }, headers, ct);
+        var application = (await client.AuthenticateAsync(null, ClientAuthenticationForm.Build(
+                                                              request.ClientId, request.ClientSecret,
+                                                              request.ClientAssertion, request.ClientAssertionType), headers, ct))?.Application;
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
-        var ctx = AdviceContext.Require();
+
+        var tokenContext = new TokenRequestContext<TApp> {
+            Request     = request,
+            Application = application,
+            Proof       = proof,
+        };
 
         switch (await Advisor.For<ITokenRequestAdvisor<TApp>>()
-                             .RunAsync(ctx, application, request, ct)) {
+                             .RunAsync(context, tokenContext, ct)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<AuthorizationResult>(out var result):
-                return result!;
+            case AdviseResult.Handle when tokenContext.Result is { } granted:
+                GrantCredentials.Attach(granted, tokenContext.Binding, null);
+                return granted;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(
-                    OAuthErrors.InvalidClient,
-                    SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-                );
+                throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
         var token = await tokens.FindByReferenceIdAsync(request.RefreshToken, ct);
-        if (string.IsNullOrWhiteSpace(token?.Payload)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+        if (string.IsNullOrWhiteSpace(token?.Payload) || token.Type != TokenTypes.RefreshToken) {
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
+        }
+        if (token.Status == TokenStatuses.Redeemed) {
+            if (!string.IsNullOrWhiteSpace(token.Application)
+                && !string.Equals(token.Application, application.CanonicalName, StringComparison.Ordinal)) {
+                throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
+            }
+            if (string.IsNullOrWhiteSpace(token.Family)) {
+                throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
+            }
+
+            await tokens.InvalidateFamilyAsync(token.Family, ct);
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
+        }
+
+        if (token.ExpireTime is { } expiredAt && expiredAt <= _time.GetUtcNow().UtcDateTime) {
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
+        }
+
+        // Client binding precedes every destructive action: a token presented by a different
+        // client fails as invalid_grant and must never trigger the replay revocation below.
+        if (!string.IsNullOrWhiteSpace(token.Application)
+         && !string.Equals(token.Application, application.CanonicalName, StringComparison.Ordinal)) {
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         var principal = await issuer.Validate(token.Payload, lifetime: false);
-        if (principal is null) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+        var original = AuthorizationGrantContexts.Deserialize(token.GrantContext);
+        if (principal is null
+         || original is null
+         || !string.Equals(original.Subject, token.Parent, StringComparison.Ordinal)) {
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
-        var exchange = new RefreshTokenContext<TApp, TToken> {
+        var scope = original.Scope;
+        if (!string.IsNullOrWhiteSpace(request.Scope) && !ScopeParser.IsSubset(request.Scope, scope)) {
+            throw new OAuthException(OAuthErrors.InvalidScope, SchemataResources.INVALID_SCOPE);
+        }
+        var issuedScope = string.IsNullOrWhiteSpace(request.Scope) ? scope : request.Scope;
+        var grant = AuthorizationGrantContexts.Narrow(original, issuedScope, token.SessionId);
+        grant.ExpiresAt = original.ExpiresAt ?? (token.ExpireTime is { } deadline
+            ? new DateTimeOffset(DateTime.SpecifyKind(deadline, DateTimeKind.Utc))
+            : null);
+
+        var exchange = new RefreshTokenContext<TApp> {
             Request     = request,
             Application = application,
             Token       = token,
             Principal   = principal,
+            Grant       = grant,
+            Dpop        = tokenContext.Binding,
         };
 
-        switch (await Advisor.For<IRefreshTokenAdvisor<TApp, TToken>>()
-                             .RunAsync(ctx, exchange, ct)) {
+        switch (await Advisor.For<IRefreshTokenAdvisor<TApp>>()
+                             .RunAsync(context, exchange, ct)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<AuthorizationResult>(out var result):
-                return result!;
+            case AdviseResult.Handle when exchange.Result is { } granted:
+                GrantCredentials.Attach(granted, exchange.Dpop, exchange.DeviceSecret);
+                return granted;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(
-                    OAuthErrors.AccessDenied,
-                    SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED)
-                );
+                throw new OAuthException(OAuthErrors.AccessDenied, SchemataResources.ACCESS_DENIED);
         }
 
-        var scope = principal.FindFirstValue(Claims.Scope);
-
-        if (!string.IsNullOrWhiteSpace(request.Scope)) {
-            if (!ScopeParser.IsSubset(request.Scope, scope)) {
-                throw new OAuthException(
-                    OAuthErrors.InvalidScope,
-                    SchemataResources.GetResourceString(SchemataResources.INVALID_SCOPE)
-                );
+        // RFC 8707 §2.2: a refresh request may narrow the token to any subset of the resources of
+        // the original grant ("...or a subset thereof"); values outside the original set are
+        // invalid_target, and an omitted parameter adopts the original set. The original set rides
+        // the refresh token's space-joined `resources` claim.
+        var grantedResources = principal.FindFirstValue(Claims.Resources)?
+                                        .Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [];
+        if (request.Resource is { Count: > 0 }) {
+            var requested = new HashSet<string>(request.Resource, StringComparer.Ordinal);
+            if (!requested.IsSubsetOf(grantedResources)) {
+                throw new OAuthException(OAuthErrors.InvalidTarget, SchemataResources.INVALID_TARGET);
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(token.Subject)) {
+        var resources = request.Resource is { Count: > 0 } ? request.Resource : grantedResources;
+
+        if (!string.IsNullOrWhiteSpace(token.Parent)) {
             var provider = sp.GetService<ISubjectProvider>();
-            if (provider is not null && !await provider.ValidateAsync(token.Subject, ct)) {
-                throw new OAuthException(
-                    OAuthErrors.InvalidGrant,
-                    SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-                );
+            if (provider is not null && !await provider.ValidateAsync(token.Parent, ct)) {
+                throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
             }
-        }
-
-        if (options.Value.RequireRefreshTokenRotation) {
-            await tokens.RevokeAsync(token, ct);
         }
 
         var claims = new List<Claim> {
             new(Claims.ClientId, application.ClientId),
         };
 
-        if (!string.IsNullOrWhiteSpace(token.Subject)) {
-            claims.Add(new(IdentityClaims.Subject, token.Subject));
+        if (!string.IsNullOrWhiteSpace(token.Parent)) {
+            claims.Add(new(IdentityClaims.Subject, token.Parent));
         }
 
-        var issuedScope = string.IsNullOrWhiteSpace(request.Scope) ? scope : request.Scope;
+        AuthenticationContextExtensions.Apply(claims, grant.Authentication, destinations: false);
 
         var identity = new ClaimsPrincipal(new ClaimsIdentity(claims, SchemataAuthorizationSchemes.Bearer));
-        return AuthorizationResult.SignIn(identity, new() {
-            [Properties.GrantType]         = GrantTypes.RefreshToken,
-            [Properties.Scope]             = issuedScope,
+
+        // RFC 9396 §6.1: the token advisor publishes the actual set — the request's narrowing
+        // of the presented token's details, or the retained prior actual set when omitted.
+        var result = AuthorizationResult.SignIn(identity, new() {
+            [Properties.GrantType]      = GrantTypes.RefreshToken,
+            [Properties.RefreshPredecessor] = options.Value.RequireRefreshTokenRotation
+                ? System.Text.Json.JsonSerializer.Serialize(token, Common.SchemataJson.Default)
+                : null,
+            [Properties.Scope]          = issuedScope,
+            [Properties.Resources]      = grantedResources.Length > 0 ? string.Join(" ", grantedResources) : null,
+            [Properties.AccessResources] = resources.Count > 0 ? string.Join(" ", resources) : null,
             [Properties.AuthorizationName] = token.Authorization,
-            [Properties.SessionId]         = token.SessionId,
+            [Properties.SessionId]      = token.SessionId,
+            [Properties.AuthorizationDetails] = exchange.AuthorizationDetails,
+
+            [Properties.GrantContext]   = AuthorizationGrantContexts.Serialize(grant),
+
+            // §5.5: republish the UserInfo claim names persisted on the refresh token so the
+            // claim advisors keep carrying them onto the renewed access token.
+            [Properties.UserinfoClaims] = principal.FindFirstValue(Claims.UserinfoRequest),
         });
+        GrantCredentials.Attach(result, exchange.Dpop, exchange.DeviceSecret);
+        return result;
     }
 
     #endregion

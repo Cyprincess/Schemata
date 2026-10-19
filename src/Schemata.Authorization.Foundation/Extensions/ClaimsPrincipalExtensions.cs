@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Security.Claims;
+using System.Text.Json;
 using Schemata.Authorization.Skeleton;
 
 namespace Schemata.Authorization.Foundation.Extensions;
@@ -25,11 +26,33 @@ internal static class ClaimsPrincipalExtensions
     /// <param name="scope">The scope name to check (e.g. <c>"openid"</c>, <c>"profile"</c>).</param>
     /// <returns><c>true</c> if the scope was granted; otherwise <c>false</c>.</returns>
     internal static bool HasScope(this ClaimsPrincipal principal, string scope) {
-        var value = principal.FindFirstValue(ScopeClaim);
-        if (value is not null) {
-            return ScopeParser.Contains(value, scope);
+        return principal.FindAll(ScopeClaim).Any(claim => ScopeParser.Contains(claim.Value, scope));
+    }
+
+    /// <summary>
+    ///     Returns the JWK thumbprint bound to the principal's access token through the <c>cnf</c>
+    ///     member
+    ///     (<seealso href="https://www.rfc-editor.org/rfc/rfc9449.html#section-6.1">
+    ///         RFC 9449 §6.1: JWK Thumbprint Confirmation
+    ///     </seealso>
+    ///     ); returns <see langword="null" /> when the claim is absent or carries no jkt object.
+    /// </summary>
+    internal static string? ReadDpopThumbprint(this ClaimsPrincipal principal) {
+        var json = principal.FindFirstValue(AuthorizationConstants.Claims.Cnf);
+        if (string.IsNullOrWhiteSpace(json)) {
+            return null;
         }
 
-        return principal.FindAll(ScopeClaim).Any(c => c.Value == scope);
+        try {
+            using var document = JsonDocument.Parse(json);
+            return document.RootElement.ValueKind == JsonValueKind.Object
+                && document.RootElement.TryGetProperty(AuthorizationConstants.Claims.Jkt, out var jkt)
+                && jkt.ValueKind == JsonValueKind.String
+                    ? jkt.GetString()
+                    : null;
+        } catch (JsonException) {
+            // A cnf claim that is not a JSON object carries no jkt binding.
+            return null;
+        }
     }
 }

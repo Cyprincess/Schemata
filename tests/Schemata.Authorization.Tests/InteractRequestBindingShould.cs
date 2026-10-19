@@ -13,7 +13,7 @@ namespace Schemata.Authorization.Tests;
 public class InteractRequestBindingShould
 {
     [Fact]
-    public async Task BindTheDeviceUserCodeFromItsRfc8628ParameterName() {
+    public async Task Bind_The_Device_User_Code_From_Its_Rfc8628_Parameter_Name() {
         var request = await BindAsync(new() { ["user_code"] = "WDJB-MJHT", ["code_type"] = "urn:user_code" });
 
         Assert.Equal("WDJB-MJHT", request.UserCode);
@@ -22,7 +22,7 @@ public class InteractRequestBindingShould
     }
 
     [Fact]
-    public async Task BindTheInteractionCodeFromItsOwnParameterName() {
+    public async Task Bind_The_Interaction_Code_From_Its_Own_Parameter_Name() {
         var request = await BindAsync(new() { ["code"] = "abc123", ["code_type"] = "urn:interaction" });
 
         Assert.Equal("abc123", request.Code);
@@ -30,8 +30,7 @@ public class InteractRequestBindingShould
     }
 
     private static async Task<InteractRequest> BindAsync(Dictionary<string, StringValues> query) {
-        var context = new DefaultHttpContext();
-        context.Request.Query = new QueryCollection(query);
+        var context = new DefaultHttpContext { Request = { Query = new QueryCollection(query) } };
 
         var binding = new Mock<ModelBindingContext>();
         binding.SetupGet(b => b.HttpContext).Returns(context);

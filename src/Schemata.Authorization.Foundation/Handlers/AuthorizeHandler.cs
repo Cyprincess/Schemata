@@ -8,18 +8,19 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
-using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
+using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
-using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Models;
-using Schemata.Common;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
@@ -36,14 +37,16 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     </seealso>
 ///     .
 /// </summary>
-public sealed class AuthorizeHandler<TApp, TToken>(
-    ITokenManager<TToken>                  tokens,
-    TokenService                           issuer,
+public sealed class AuthorizeHandler<TApp, TSecurity, TToken>(
+    Schemata.Authorization.Skeleton.Managers.IApplicationManager<TApp> applications,
+    ITokenStore<TToken>                    tokens,
+    TokenService<TSecurity>                issuer,
     IOptions<SchemataAuthorizationOptions> options,
     IOptions<JsonSerializerOptions>        json,
     TimeProvider?                          time = null
 ) : AuthorizeEndpoint
     where TApp : SchemataApplication
+    where TSecurity : SchemataSecurity, new()
     where TToken : SchemataToken, new()
 {
     private readonly TimeProvider _time = time ?? TimeProvider.System;
@@ -51,47 +54,89 @@ public sealed class AuthorizeHandler<TApp, TToken>(
     public override async Task<AuthorizationResult> AuthorizeAsync(
         AuthorizeRequest  request,
         ClaimsPrincipal   principal,
+        AdviceContext     context,
         CancellationToken ct
     ) {
-        var ctx = AdviceContext.Require();
         var authz = new AuthorizeContext<TApp> {
             Request      = request,
             Principal    = principal,
             ResponseMode = ResponseModeService.ResolveMode(request.ResponseMode, request.ResponseType),
         };
 
-        switch (await Advisor.For<IAuthorizeAdvisor<TApp>>()
-                             .RunAsync(ctx, authz, ct)) {
+        // Central response finalization: once the request advisors have normalized PAR/JAR input
+        // and the client/redirect advisor has validated the callback, every later failure —
+        // advisor throws (PKCE, grant, scope, response-type policy) and block results alike —
+        // inherits the captured callback here instead of decorating each throw site.
+        AdviseResult stage;
+        try {
+            stage = await Advisor.For<IAuthorizeRequestAdvisor<TApp>>().RunAsync(context, authz, ct);
+        } catch (OAuthException ex) {
+            throw ex.WithCallback(authz);
+        }
+
+        switch (stage) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<AuthorizationResult>(out var endpoint):
-                return endpoint!;
+            case AdviseResult.Handle when authz.Result is { } normalized:
+                return normalized;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(
-                    OAuthErrors.AccessDenied,
-                    SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED)
-                ) {
-                    RedirectUri  = authz.Request.RedirectUri,
-                    State        = authz.Request.State,
-                    ResponseMode = authz.ResponseMode,
-                };
+                throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.INVALID_REQUEST).WithCallback(authz);
+        }
+
+        try {
+            stage = await Advisor.For<IAuthorizeAdvisor<TApp>>().RunAsync(context, authz, ct);
+        } catch (OAuthException ex) {
+            throw ex.WithCallback(authz);
+        }
+
+        switch (stage) {
+            case AdviseResult.Continue:
+                break;
+            case AdviseResult.Handle when authz.Result is { } endpoint:
+                return endpoint;
+            case AdviseResult.Block:
+            default:
+                throw new OAuthException(OAuthErrors.AccessDenied, SchemataResources.ACCESS_DENIED).WithCallback(authz);
         }
 
         if (authz.Application is null) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-            ) {
-                RedirectUri = authz.Request.RedirectUri, State = authz.Request.State, ResponseMode = authz.ResponseMode,
-            };
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS).WithCallback(authz);
         }
+
+        // Persist the resolved OP session lineage into the interaction payload. The field is
+        // always overwritten from the advisor-resolved fact — a client-supplied value never
+        // survives — and the approval leg restores it on the continuation principal.
+        authz.Request.OpSessionId = authz.SessionId;
+        authz.Request.OpSessionSubject = authz.SessionSubject;
+
+        // Same overwrite-or-clear discipline as the session lineage: a client-supplied salt never
+        // survives; only the advisor-minted salt crosses the interaction.
+        authz.Request.SessionStateSalt = authz.SessionStateSalt;
+        // Same overwrite-or-clear discipline for the RAR grant set: only the validating
+        // advisor's normalized set crosses the interaction; without the installed capability the
+        // context carries null and the raw parameter never reaches the payload.
+        authz.Request.AuthorizationDetails = authz.AuthorizationDetails;
+        if (!authz.RequireReauthentication && authz.Authentication is not null) {
+            authz.Request.Authentication        = authz.Authentication;
+            authz.Request.AuthenticationSubject = authz.Principal?.FindFirstValue(SchemataConstants.IdentityClaims.Subject);
+        } else {
+            // A step-up/account-selection continuation resolves the authentication event from the
+            // approving principal; pre-login evidence is never persisted as the new event.
+            authz.Request.Authentication        = null;
+            authz.Request.AuthenticationSubject = null;
+        }
+        authz.Request.Claims = authz.RequestedClaims is not null ? authz.Request.Claims : null;
+        authz.Request.AuthenticationRequiredAfter = authz.RequireReauthentication
+            ? _time.GetUtcNow().ToUnixTimeSeconds()
+            : null;
+
+
 
         var reference = issuer.CreateReference();
         var payload   = JsonSerializer.Serialize(authz.Request, json.Value);
 
         var interaction = new TToken {
-            Name        = Guid.NewGuid().ToString("n"),
             Application = authz.Application.CanonicalName,
             Type        = TokenTypes.Interaction,
             Status      = TokenStatuses.Valid,
@@ -100,7 +145,8 @@ public sealed class AuthorizeHandler<TApp, TToken>(
             ExpireTime  = _time.GetUtcNow().UtcDateTime + options.Value.InteractionTokenLifetime,
         };
 
-        await tokens.CreateAsync(interaction, ct);
+        await tokens.CreateAsync(interaction, ct,
+            (transaction, cancellation) => applications.EnlistTokenPublicationAsync(transaction, [interaction], cancellation));
 
         var query = QueryString.Create(new Dictionary<string, string?> {
             { Parameters.Code, reference },

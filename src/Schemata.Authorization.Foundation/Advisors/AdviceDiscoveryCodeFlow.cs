@@ -42,7 +42,7 @@ public sealed class AdviceDiscoveryCodeFlow(IOptions<CodeFlowOptions> codeOption
         discovery.Document                               ??= new();
         discovery.Document.GrantTypesSupported           ??= [];
         discovery.Document.CodeChallengeMethodsSupported ??= [];
-        discovery.Document.AuthorizationEndpoint         =   $"{issuer}{Endpoints.Authorize}";
+        discovery.Document.AuthorizationEndpoint         =   CanonicalIssuer.Combine(issuer, Endpoints.Authorize);
         discovery.Document.GrantTypesSupported.Add(GrantTypes.AuthorizationCode);
         discovery.Document.CodeChallengeMethodsSupported.Add(PkceMethods.S256);
         if (!codeOptions.Value.RequirePkceS256) {

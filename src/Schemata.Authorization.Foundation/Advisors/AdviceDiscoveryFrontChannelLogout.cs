@@ -21,7 +21,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 public sealed class AdviceDiscoveryFrontChannelLogout : IDiscoveryAdvisor
 {
     /// <summary>The default advisor ordering value.</summary>
-    public const int DefaultOrder = AdviceDiscoveryRevocation.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = AdviceDiscoveryEndSession.DefaultOrder + 10_000_000;
 
     #region IDiscoveryAdvisor Members
 

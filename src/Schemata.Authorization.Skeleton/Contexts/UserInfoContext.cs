@@ -23,4 +23,10 @@ public sealed class UserInfoContext
     ///     Some claims are returned only for end-user tokens.
     /// </summary>
     public bool IsEndUserToken { get; set; }
+
+    /// <summary>
+    ///     The response written by an advisor returning
+    ///     <see cref="Schemata.Abstractions.Advisors.AdviseResult.Handle" />.
+    /// </summary>
+    public AuthorizationResult? Result { get; set; }
 }

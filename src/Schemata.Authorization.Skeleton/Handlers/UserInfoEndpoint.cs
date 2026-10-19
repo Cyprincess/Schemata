@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Authorization.Skeleton.Handlers;
 
@@ -16,5 +17,9 @@ namespace Schemata.Authorization.Skeleton.Handlers;
 public abstract class UserInfoEndpoint
 {
     /// <summary>Processes a UserInfo request and returns claims for the authenticated principal.</summary>
-    public abstract Task<AuthorizationResult> HandleAsync(ClaimsPrincipal principal, CancellationToken ct);
+    public abstract Task<AuthorizationResult> HandleAsync(
+        ClaimsPrincipal   principal,
+        AdviceContext     context,
+        CancellationToken ct
+    );
 }

@@ -7,12 +7,14 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
-/// <summary>Order constants for <see cref="AdviceCodeExchangeValidation{TApp,TToken}" />.</summary>
+/// <summary>Order constants for <see cref="AdviceCodeExchangeValidation" />.</summary>
 public static class AdviceCodeExchangeValidation
 {
     /// <summary>The default advisor ordering value.</summary>
@@ -34,72 +36,65 @@ public static class AdviceCodeExchangeValidation
 ///     belong to the authenticated application, and not be expired or revoked. Application references use the
 ///     application's canonical name because persisted tokens store canonical references.
 /// </remarks>
-/// <seealso cref="AdviceCodeExchangePkce{TApp, TToken}" />
-public sealed class AdviceCodeExchangeValidation<TApp, TToken>(TimeProvider? time = null) : ICodeExchangeAdvisor<TApp, TToken>
+public sealed class AdviceCodeExchangeValidation<TApp, TToken>(
+    ITokenStore<TToken>   tokens,
+    TimeProvider?         time = null
+) : ICodeExchangeAdvisor<TApp>
     where TApp : SchemataApplication
-    where TToken : SchemataToken
+    where TToken : SchemataToken, new()
 {
     private readonly TimeProvider _time = time ?? TimeProvider.System;
 
-    #region ICodeExchangeAdvisor<TApp,TToken> Members
+    #region ICodeExchangeAdvisor<TApp> Members
 
     public int Order => AdviceCodeExchangeValidation.DefaultOrder;
 
-    public Task<AdviseResult> AdviseAsync(
+    public async Task<AdviseResult> AdviseAsync(
         AdviceContext                     ctx,
-        CodeExchangeContext<TApp, TToken> exchange,
+        CodeExchangeContext<TApp> exchange,
         CancellationToken                 ct = default
     ) {
         if (exchange.CodeToken?.Type != TokenTypes.AuthorizationCode) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         if (exchange.CodeToken.Application != exchange.Application?.CanonicalName) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
-        }
-
-        if (exchange.CodeToken.ExpireTime.HasValue && exchange.CodeToken.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         if (exchange.CodeToken.Status != TokenStatuses.Valid) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            // A redeemed code presented again is a replay: revoke every token derived
+            // from the same authorization grant before rejecting the exchange, even when
+            // the code has also expired. See RFC 6749 §4.1.2 and §10.5.
+            if (exchange.CodeToken.Status == TokenStatuses.Redeemed) {
+                if (!string.IsNullOrWhiteSpace(exchange.CodeToken.Family)) {
+                    await tokens.InvalidateFamilyAsync(exchange.CodeToken.Family, ct);
+                }
+                if (!string.IsNullOrWhiteSpace(exchange.CodeToken.Authorization)) {
+                    await tokens.RevokeByAuthorizationAsync(exchange.CodeToken.Authorization, ct);
+                }
+            }
+
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
+        }
+
+        if (exchange.CodeToken.ExpireTime.HasValue && exchange.CodeToken.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime) {
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         if (string.IsNullOrWhiteSpace(exchange.Payload?.ClientId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         if (exchange.Application?.ClientId != exchange.Payload.ClientId) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         if (exchange.Request?.RedirectUri != exchange.Payload.RedirectUri) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
-        return Task.FromResult(AdviseResult.Continue);
+        return AdviseResult.Continue;
     }
 
     #endregion

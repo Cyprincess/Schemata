@@ -31,31 +31,85 @@ public class SchemataApplication : IIdentifier, ICanonicalName, IDescriptive, IC
     public virtual string? ClientId { get; set; }
 
     /// <summary>
-    ///     Hashed client secret for confidential clients.
-    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-2.3.1">
-    ///         RFC 6749: The OAuth 2.0 Authorization
-    ///         Framework §2.3.1: Client Password
+    ///     <c>token_endpoint_auth_method</c>, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-registration-1_0.html">
+    ///         OpenID Connect Dynamic Client
+    ///         Registration 1.0 §2: Client Metadata
     ///     </seealso>
+    ///     .
     /// </summary>
-    public virtual string? ClientSecret { get; set; }
+    /// <remarks><see langword="null" /> on legacy rows leaves the authentication channel unconstrained.</remarks>
+    public virtual string? TokenEndpointAuthMethod { get; set; }
 
     /// <summary>
-    ///     OAuth 2.0 client type: <c>"confidential"</c> or <c>"public"</c>.
-    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-2.1">
-    ///         RFC 6749: The OAuth 2.0 Authorization
-    ///         Framework §2.1: Client Types
+    ///     <c>token_endpoint_auth_signing_alg</c>, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-registration-1_0.html">
+    ///         OpenID Connect Dynamic Client
+    ///         Registration 1.0 §2: Client Metadata
     ///     </seealso>
+    ///     .
     /// </summary>
-    public virtual string? ClientType { get; set; } = ClientTypes.Confidential;
+    public virtual string? TokenEndpointAuthSigningAlg { get; set; }
+    /// <summary>
+    ///     <c>grant_types</c> - the OAuth 2.0 grant types the client may use, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7591.html#section-2">
+    ///         RFC 7591: OAuth 2.0 Dynamic Client
+    ///         Registration Protocol §2: Client Metadata
+    ///     </seealso>
+    ///     . This field is the runtime authority for grant enforcement; it is not mirrored into
+    ///     <see cref="Permissions" />.
+    /// </summary>
+    public virtual ICollection<string>? GrantTypes { get; set; }
+
+    /// <summary>
+    ///     <c>response_types</c> - the response type combinations the client may request, per
+    ///     RFC 7591 §2. Each entry is a space-separated combination (<c>code id_token</c>);
+    ///     token order is normalized on registration. This field is the runtime authority for
+    ///     response-type enforcement; it is not mirrored into <see cref="Permissions" />.
+    /// </summary>
+    public virtual ICollection<string>? ResponseTypes { get; set; }
+
+    /// <summary>
+    ///     <c>scope</c> - the scopes the client may request, as a space-delimited string per
+    ///     RFC 7591 §2. This field is the runtime authority for scope enforcement; it is not
+    ///     mirrored into <see cref="Permissions" />.
+    /// </summary>
+    public virtual string? Scope { get; set; }
+
+    /// <summary>
+    ///     <c>id_token_signed_response_alg</c> - the JWS algorithm the client requires for ID
+    ///     Tokens issued to it, per OIDC Dynamic Client Registration 1.0 §2.
+    ///     <see langword="null" /> defaults to the server's RS256.
+    /// </summary>
+    public virtual string? IdTokenSignedResponseAlg { get; set; }
+
+    /// <summary>
+    ///     Whether the client can actually keep a credential secret: only a web application
+    ///     authenticating with a credential method is confidential. A native application's static
+    ///     secret is by definition public knowledge and never confers confidentiality
+    ///     (RFC 8252 §8; RFC 6749 §2.1). Derived from registration facts, never persisted, so it
+    ///     cannot contradict them.
+    /// </summary>
+    [NotMapped]
+    public bool IsConfidential
+        => ApplicationType != ApplicationTypes.Native
+        && TokenEndpointAuthMethod != ClientAuthMethods.None;
 
     /// <summary>Application type: <c>"web"</c> or <c>"native"</c>.</summary>
     public virtual string? ApplicationType { get; set; } = ApplicationTypes.Web;
 
-    /// <summary>Consent model: <c>"explicit"</c>, <c>"implicit"</c>, or <c>"external"</c>.</summary>
-    public virtual string? ConsentType { get; set; } = ConsentTypes.Explicit;
-
-    /// <summary>Application-specific PKCE requirement override.</summary>
-    public virtual bool? RequirePkce { get; set; }
+    /// <summary>
+    ///     <c>dpop_bound_access_tokens</c> — whether the client always uses DPoP for token
+    ///     requests; when <see langword="true" />, token requests without a DPoP proof are
+    ///     rejected, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9449.html#section-5.2">
+    ///         RFC 9449: OAuth 2.0 Demonstrating Proof
+    ///         of Possession (DPoP) §5.2: Client Registration
+    ///         Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public virtual bool DpopBoundAccessTokens { get; set; }
 
     /// <summary>
     ///     Registered redirect URIs.
@@ -66,7 +120,11 @@ public class SchemataApplication : IIdentifier, ICanonicalName, IDescriptive, IC
     /// </summary>
     public virtual ICollection<string>? RedirectUris { get; set; }
 
-    /// <summary>Granted permissions, e.g. <c>"ept:token"</c>, <c>"gt:authorization_code"</c>.</summary>
+    /// <summary>
+    ///     Administrator-granted permission entries (e.g. <c>e:/Connect/Token</c>). Protocol
+    ///     metadata - grant types, response types, scopes - lives in its own typed fields and is
+    ///     never mirrored here.
+    /// </summary>
     public virtual ICollection<string>? Permissions { get; set; }
 
     /// <summary>Allowed post-logout redirect URIs for RP-Initiated Logout.</summary>
@@ -94,13 +152,190 @@ public class SchemataApplication : IIdentifier, ICanonicalName, IDescriptive, IC
     /// <summary><c>backchannel_logout_session_required</c>.</summary>
     public virtual bool BackChannelLogoutSessionRequired { get; set; }
 
+    /// <summary>
+    ///     <c>contacts</c> — e-mail addresses of people responsible for the client, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-registration-1_0.html">
+    ///         OpenID Connect Dynamic Client
+    ///         Registration 1.0 §2: Client Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public virtual ICollection<string>? Contacts { get; set; }
+
+    /// <summary>
+    ///     <c>logo_uri</c> — URL referencing the client's logo image, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-registration-1_0.html">
+    ///         OpenID Connect Dynamic Client
+    ///         Registration 1.0 §2: Client Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public virtual string? LogoUri { get; set; }
+
+    /// <summary>
+    ///     <c>client_uri</c> — URL of the client's home page, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-registration-1_0.html">
+    ///         OpenID Connect Dynamic Client
+    ///         Registration 1.0 §2: Client Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public virtual string? ClientUri { get; set; }
+
+    /// <summary>
+    ///     <c>policy_uri</c> — URL of the client's policy on how it uses profile data, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-registration-1_0.html">
+    ///         OpenID Connect Dynamic Client
+    ///         Registration 1.0 §2: Client Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public virtual string? PolicyUri { get; set; }
+
+    /// <summary>
+    ///     <c>tos_uri</c> — URL of the client's terms of service, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-registration-1_0.html">
+    ///         OpenID Connect Dynamic Client
+    ///         Registration 1.0 §2: Client Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public virtual string? TosUri { get; set; }
+
+    /// <summary>
+    ///     <c>require_auth_time</c> — whether the <c>auth_time</c> claim is required in ID Tokens
+    ///     issued to the client, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-registration-1_0.html">
+    ///         OpenID Connect Dynamic Client
+    ///         Registration 1.0 §2: Client Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public virtual bool RequireAuthTime { get; set; }
+
+    /// <summary>
+    ///     <c>default_max_age</c> — default maximum authentication age in integer seconds, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-registration-1_0.html">
+    ///         OpenID Connect Dynamic Client
+    ///         Registration 1.0 §2: Client Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    /// <remarks>The wire form is integer seconds; the value is carried as a string to align with
+    ///     <see cref="Schemata.Authorization.Skeleton.Models.AuthorizeRequest.MaxAge" />.</remarks>
+    public virtual string? DefaultMaxAge { get; set; }
+
+    /// <summary>
+    ///     <c>default_acr_values</c> — default Authentication Context Class Reference values
+    ///     requested by the client, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-registration-1_0.html">
+    ///         OpenID Connect Dynamic Client
+    ///         Registration 1.0 §2: Client Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public virtual ICollection<string>? DefaultAcrValues { get; set; }
+
+    /// <summary>
+    ///     <c>initiate_login_uri</c> — URI a third party can use to initiate a login by the client,
+    ///     per
+    ///     <seealso href="https://openid.net/specs/openid-connect-registration-1_0.html">
+    ///         OpenID Connect Dynamic Client
+    ///         Registration 1.0 §2: Client Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public virtual string? InitiateLoginUri { get; set; }
+
+    /// <summary>
+    ///     <c>software_id</c> — unique identifier assigned by the client developer to the client
+    ///     software, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7591.html#section-2">
+    ///         RFC 7591: OAuth 2.0 Dynamic Client
+    ///         Registration Protocol §2: Client Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public virtual string? SoftwareId { get; set; }
+
+    /// <summary>
+    ///     <c>software_version</c> — version identifier for the client software identified by
+    ///     <see cref="SoftwareId" />, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7591.html#section-2">
+    ///         RFC 7591: OAuth 2.0 Dynamic Client
+    ///         Registration Protocol §2: Client Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public virtual string? SoftwareVersion { get; set; }
+
+    /// <summary>
+    ///     <c>software_statement</c> — signed software statement JWT asserting client metadata, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7591.html#section-2.3">
+    ///         RFC 7591: OAuth 2.0 Dynamic Client
+    ///         Registration Protocol §2.3: Software Statement
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public virtual string? SoftwareStatement { get; set; }
+
+    /// <summary>
+    ///     <c>authorization_details_types</c> — authorization details types the client will use in
+    ///     <c>authorization_details</c> objects, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9396.html#section-10">
+    ///         RFC 9396: OAuth 2.0 Rich Authorization
+    ///         Requests §10: Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public virtual ICollection<string>? AuthorizationDetailsTypes { get; set; }
+
+    /// <summary>
+    ///     <c>userinfo_signed_response_alg</c> — JWS algorithm the UserInfo response is signed
+    ///     with, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse">
+    ///         OpenID Connect Core 1.0 §5.3.2: Successful UserInfo Response
+    ///     </seealso>
+    ///     . <see langword="null" /> leaves the response as plain JSON.
+    /// </summary>
+    public virtual string? UserinfoSignedResponseAlg { get; set; }
+
+    /// <summary>
+    ///     <c>userinfo_encrypted_response_alg</c> — JWE key management algorithm encrypting the
+    ///     UserInfo response with the client's registered public key (Core 1.0 §5.3.2).
+    ///     <see langword="null" /> leaves the response unencrypted.
+    /// </summary>
+    public virtual string? UserinfoEncryptedResponseAlg { get; set; }
+
+    /// <summary>
+    ///     <c>userinfo_encrypted_response_enc</c> — JWE content encryption algorithm
+    ///     (Core 1.0 §5.3.2); defaults to the server's content encryption algorithm.
+    /// </summary>
+    public virtual string? UserinfoEncryptedResponseEnc { get; set; }
+
+    /// <summary>
+    ///     <c>require_pushed_authorization_requests</c>, per RFC 9126 §6.
+    /// </summary>
+    public virtual bool? RequirePushedAuthorizationRequests { get; set; }
+
+    /// <summary>
+    ///     <c>request_object_signing_alg</c>, per RFC 9101 §4.
+    /// </summary>
+    public virtual string? RequestObjectSigningAlg { get; set; }
+
+    /// <summary>
+    ///     <c>require_signed_request_object</c>, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9101.html#section-10.5">
+    ///         RFC 9101 §10.5
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public virtual bool? RequireSignedRequestObject { get; set; }
+
+
     #region ICanonicalName Members
 
-    public virtual string? Name
-    {
-        get => ClientId;
-        set => ClientId = value;
-    }
+    public virtual string? Name { get; set; }
 
     public virtual string? CanonicalName { get; set; }
 
@@ -115,9 +350,25 @@ public class SchemataApplication : IIdentifier, ICanonicalName, IDescriptive, IC
 
     #region IDescriptive Members
 
-    public virtual string? DisplayName { get; set; }
+    /// <summary>
+    ///     <c>client_name</c>, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-registration-1_0.html">
+    ///         OpenID Connect Dynamic Client
+    ///         Registration 1.0 §2: Client Metadata
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    /// <remarks>The <see cref="DisplayNames" /> dictionary carries the <c>client_name#lang</c> variants.</remarks>
+    public virtual string? ClientName { get; set; }
+
+    string? IDescriptive.DisplayName {
+        get => ClientName;
+        set => ClientName = value;
+    }
 
     public virtual Dictionary<string, string?>? DisplayNames { get; set; }
+
+    public virtual Dictionary<string, string>? LocalizedMetadata { get; set; }
 
     public virtual string? Description { get; set; }
 

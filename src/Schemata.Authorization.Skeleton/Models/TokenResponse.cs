@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Schemata.Authorization.Skeleton.Models;
 
 /// <summary>
@@ -57,4 +59,25 @@ public sealed class TokenResponse
     ///     </seealso>
     /// </summary>
     public string? IssuedTokenType { get; set; }
+
+    /// <summary>
+    ///     Native SSO device secret issued alongside <c>id_token</c> on code exchange or
+    ///     refresh, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-native-sso-1_0.html#RefreshResponse">
+    ///         OpenID Connect Native SSO for Mobile Apps 1.0 §3.4: Native SSO and Refresh
+    ///     </seealso>
+    ///     . Same-issue / same-omit as the <c>id_token</c>.
+    /// </summary>
+    public string? DeviceSecret { get; set; }
+
+    /// <summary>
+    ///     Actual authorization details the access token was issued with, serialized as a JSON
+    ///     array, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9396.html#section-7">
+    ///         RFC 9396: OAuth 2.0 Rich Authorization Requests §7: Token Response
+    ///     </seealso>
+    ///     . Reflects any narrowing requested on the token request; absent when the grant
+    ///     carries no authorization details.
+    /// </summary>
+    public JsonElement? AuthorizationDetails { get; set; }
 }

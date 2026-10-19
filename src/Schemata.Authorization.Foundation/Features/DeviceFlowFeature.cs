@@ -4,12 +4,18 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions;
 using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Foundation.Commands;
 using Schemata.Authorization.Foundation.Handlers;
+using Schemata.Messaging.Skeleton;
+using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Core;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
+
+using Schemata.Authorization.Foundation.Controllers;
 
 namespace Schemata.Authorization.Foundation.Features;
 
@@ -24,10 +30,9 @@ namespace Schemata.Authorization.Foundation.Features;
 /// <typeparam name="TScope">The scope entity type.</typeparam>
 /// <typeparam name="TToken">The token entity type.</typeparam>
 /// <remarks>
-///     Installed via <c>UseDeviceFlow()</c> on <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope, TToken}" />.
+///     Installed via <c>UseDeviceFlow()</c> on <c>SchemataAuthorizationBuilder</c>.
 ///     Requires <see cref="SchemataAuthorizationOptions.DeviceVerificationUri" /> to be set.
 /// </remarks>
-/// <seealso cref="AuthorizationCodeFlowFeature{TApp, TAuth, TScope, TToken}" />
 public sealed class DeviceFlowFeature<TApp, TAuth, TScope, TToken> : IAuthorizationFlowFeature
     where TApp : SchemataApplication
     where TAuth : SchemataAuthorization, new()
@@ -36,9 +41,10 @@ public sealed class DeviceFlowFeature<TApp, TAuth, TScope, TToken> : IAuthorizat
 {
     #region IAuthorizationFlowFeature Members
 
-    public int Order => 10_400;
+    public int Order => DeviceFlowFeature.DefaultOrder;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
+
         services.PostConfigure<SchemataAuthorizationOptions>(o => {
             if (string.IsNullOrWhiteSpace(o.DeviceVerificationUri)) {
                 throw new InvalidOperationException(string.Format(SchemataResources.GetResourceString(SchemataResources.REQUIRED_SETTING_MISSING), "Device flow", nameof(o.DeviceVerificationUri)));
@@ -50,15 +56,29 @@ public sealed class DeviceFlowFeature<TApp, TAuth, TScope, TToken> : IAuthorizat
         });
 
         services.TryAddScoped<DeviceAuthorizeEndpoint, DeviceAuthorizeHandler<TApp, TToken>>();
-        services.TryAddKeyedScoped<IGrantHandler, DeviceCodeHandler<TApp, TToken>>(GrantTypes.DeviceCode);
+        services.TryAddScoped<
+            IRequestHandler<DeviceAuthorizeEndpointRequest, AuthorizationResult>,
+            EndpointDispatchHandler<DeviceAuthorizeEndpointRequest, DeviceAuthorizeEndpoint, AuthorizationResult>>();
         services.TryAddKeyedScoped<IInteractionHandler, DeviceInteractionHandler<TApp, TAuth, TScope, TToken>>(TokenTypeUris.UserCode);
+        services.TryAddKeyedScoped<IGrantHandler, DeviceCodeHandler<TApp, TToken>>(GrantTypes.DeviceCode);
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryDeviceFlow>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDeviceAuthorizeAdvisor<TApp>, AdviceDeviceAuthorizeEndpointPermission<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDeviceAuthorizeAdvisor<TApp>, AdviceDeviceAuthorizeGrantPermission<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDeviceAuthorizeAdvisor<TApp>, AdviceDeviceAuthorizeScopeValidation<TApp>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDeviceCodeExchangeAdvisor<TApp, TToken>, AdviceDeviceCodeExchangeValidation<TApp, TToken>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceRequestDeviceCodePolling<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDeviceCodeExchangeAdvisor<TApp>, AdviceDeviceCodeExchangeValidation<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITokenRequestAdvisor<TApp>, AdviceRequestDeviceCodePolling<TApp, TToken>>());
     }
 
     #endregion
+}
+
+
+/// <summary>
+///     Ordering anchor for <see cref="DeviceFlowFeature" /> so successor features can chain
+///     off its <c>DefaultOrder</c> without naming type arguments.
+/// </summary>
+internal static class DeviceFlowFeature
+{
+    /// <summary>The default feature ordering value (chained after its predecessor).</summary>
+    public const int DefaultOrder = ClientCredentialsFlowFeature.DefaultOrder + 100;
 }

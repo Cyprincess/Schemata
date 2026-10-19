@@ -4,6 +4,7 @@ using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
+using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
@@ -28,7 +29,7 @@ public static class AdviceRequestScopeValidation
 ///     .
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
-/// <seealso cref="AdviceAuthorizeScopeValidation{TApp}" />
+/// <seealso cref="AdviceAuthorizeGrantProfile{TApp}" />
 public sealed class AdviceRequestScopeValidation<TApp>(IApplicationManager<TApp> apps) : ITokenRequestAdvisor<TApp>
     where TApp : SchemataApplication
 {
@@ -37,22 +38,23 @@ public sealed class AdviceRequestScopeValidation<TApp>(IApplicationManager<TApp>
     public int Order => AdviceRequestScopeValidation.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(
-        AdviceContext     ctx,
-        TApp              application,
-        TokenRequest      request,
-        CancellationToken ct = default
+        AdviceContext             ctx,
+        TokenRequestContext<TApp> request,
+        CancellationToken         ct = default
     ) {
-        if (string.IsNullOrWhiteSpace(request.Scope)) {
+        var application = request.Application;
+        var payloadRequest = request.Request;
+        if (application is null || payloadRequest is null || string.IsNullOrWhiteSpace(payloadRequest.Scope)) {
             return AdviseResult.Continue;
         }
 
-        var requested = ScopeParser.Parse(request.Scope);
+        var requested = ScopeParser.Parse(payloadRequest.Scope);
         if (requested.Count == 0) {
             return AdviseResult.Continue;
         }
 
         foreach (var s in requested) {
-            await PermissionAdvice.RequireAsync(apps, application, PermissionPrefixes.Scope + s, ct,
+            await Permissions.RequireTrueAsync(await apps.HasScopeAsync(application, s, ct),
                 OAuthErrors.InvalidScope, SchemataResources.INVALID_SCOPE);
         }
 

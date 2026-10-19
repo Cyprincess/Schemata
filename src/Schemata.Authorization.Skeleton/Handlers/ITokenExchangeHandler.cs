@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Models;
 
@@ -22,6 +23,7 @@ public interface ITokenExchangeHandler<TApplication>
         TApplication      application,
         TokenRequest      request,
         ClaimsPrincipal?  principal,
+        AdviceContext     context,
         CancellationToken ct
     );
 }

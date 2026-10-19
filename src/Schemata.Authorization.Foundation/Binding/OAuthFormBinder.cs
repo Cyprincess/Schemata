@@ -32,11 +32,10 @@ public sealed class OAuthFormBinder<T> : IModelBinder
         if (request.HasFormContentType) {
             var form = await request.ReadFormAsync();
 
+            OAuthBinderHelpers.ThrowIfDuplicateParameters(request.Query, Map);
+            OAuthBinderHelpers.ThrowIfDuplicateParameters(form, Map);
             foreach (var (prop, param) in Map) {
-                var value = form[param].ToString();
-                if (!string.IsNullOrWhiteSpace(value)) {
-                    prop.SetValue(model, value);
-                }
+                OAuthBinderHelpers.Bind(prop, form[param], model);
             }
         }
 

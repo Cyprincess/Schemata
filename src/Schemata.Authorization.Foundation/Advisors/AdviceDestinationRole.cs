@@ -29,6 +29,7 @@ public sealed class AdviceDestinationRole : IDestinationAdvisor
         Claim             claim,
         HashSet<string>   destinations,
         ClaimsPrincipal   principal,
+        Schemata.Authorization.Skeleton.Models.AuthorizationClaimContext issuance,
         CancellationToken ct = default
     ) {
         if (claim.Type != IdentityClaims.Role) {

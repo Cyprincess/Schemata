@@ -33,7 +33,7 @@ public sealed class AdviceDiscoveryUserInfo : IDiscoveryAdvisor
     ) {
         var issuer = discovery.Issuer;
         discovery.Document                  ??= new();
-        discovery.Document.UserinfoEndpoint =   $"{issuer}{Endpoints.Profile}";
+        discovery.Document.UserinfoEndpoint =   CanonicalIssuer.Combine(issuer, Endpoints.Profile);
         return Task.FromResult(AdviseResult.Continue);
     }
 

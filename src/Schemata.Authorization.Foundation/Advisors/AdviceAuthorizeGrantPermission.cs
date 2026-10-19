@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
@@ -16,7 +18,13 @@ public static class AdviceAuthorizeGrantPermission
     public const int DefaultOrder = AdviceAuthorizeResponseMode.DefaultOrder + 10_000_000;
 }
 
-/// <summary>Checks that the application has the <c>grant_type:authorization_code</c> permission at the authorize endpoint.</summary>
+/// <summary>
+///     Checks the grant permissions the requested <c>response_type</c> actually needs:
+///     <c>code</c> requires <c>g:authorization_code</c>; <c>token</c> / <c>id_token</c> require
+///     <c>g:implicit</c>; hybrids that combine <c>code</c> with a direct token or id_token require
+///     both, per the OAuth 2.0 Multiple Response Type Encoding Practices and OIDC Core hybrid
+///     grant-response mapping.
+/// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
 /// <remarks>
 ///     Even though the grant permission is also checked at the token endpoint, this advisor validates it at
@@ -35,16 +43,26 @@ public sealed class AdviceAuthorizeGrantPermission<TApp>(IApplicationManager<TAp
         AuthorizeContext<TApp> authz,
         CancellationToken      ct = default
     ) {
-        await PermissionAdvice.RequireAsync(
-            manager, authz.Application, PermissionPrefixes.GrantType + GrantTypes.AuthorizationCode, ct,
-            configure: exception => {
-                exception.RedirectUri  = authz.Request?.RedirectUri;
-                exception.State        = authz.Request?.State;
-                exception.ResponseMode = authz.ResponseMode;
-            });
+        var tokens = authz.Request?.ResponseType?.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                         ?? [];
+
+        var hasCode  = tokens.Contains(ResponseTypes.Code, StringComparer.Ordinal);
+        var hasToken = tokens.Contains(ResponseTypes.Token, StringComparer.Ordinal)
+                    || tokens.Contains(ResponseTypes.IdToken, StringComparer.Ordinal);
+
+        if (hasCode) {
+            await Permissions.RequireTrueAsync(
+                await manager.HasGrantTypeAsync(authz.Application, GrantTypes.AuthorizationCode, ct));
+        }
+
+        if (hasToken) {
+            await Permissions.RequireTrueAsync(
+                await manager.HasGrantTypeAsync(authz.Application, GrantTypes.Implicit, ct));
+        }
 
         return AdviseResult.Continue;
     }
 
     #endregion
+
 }

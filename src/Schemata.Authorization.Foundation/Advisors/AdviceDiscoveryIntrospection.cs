@@ -34,7 +34,7 @@ public sealed class AdviceDiscoveryIntrospection : IDiscoveryAdvisor
         var issuer = discovery.Issuer;
 
         discovery.Document                       ??= new();
-        discovery.Document.IntrospectionEndpoint =   $"{issuer}{Endpoints.Introspect}";
+        discovery.Document.IntrospectionEndpoint =   CanonicalIssuer.Combine(issuer, Endpoints.Introspect);
 
         return Task.FromResult(AdviseResult.Continue);
     }

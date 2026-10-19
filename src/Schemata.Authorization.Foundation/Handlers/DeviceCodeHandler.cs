@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Text.Json;
@@ -9,12 +10,14 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
-using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
 using static Schemata.Abstractions.SchemataConstants;
@@ -25,7 +28,7 @@ namespace Schemata.Authorization.Foundation.Handlers;
 /// <summary>
 ///     Handles the <c>urn:ietf:params:oauth:grant-type:device_code</c> grant type.
 ///     Validates the device code token, runs the
-///     <see cref="IDeviceCodeExchangeAdvisor{TApp,TToken}" /> pipeline, enforces
+///     <see cref="IDeviceCodeExchangeAdvisor{TApp}" /> pipeline, enforces
 ///     scope constraints, and revokes the device code on success,
 ///     per
 ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8628.html#section-3.4">
@@ -36,11 +39,11 @@ namespace Schemata.Authorization.Foundation.Handlers;
 /// </summary>
 public sealed class DeviceCodeHandler<TApp, TToken>(
     IClientAuthenticationService<TApp> client,
-    ITokenManager<TToken>              tokens,
+    ITokenStore<TToken>                tokens,
     IOptions<JsonSerializerOptions>    json
 ) : IGrantHandler
     where TApp : SchemataApplication
-    where TToken : SchemataToken
+    where TToken : SchemataToken, new()
 {
     #region IGrantHandler Members
 
@@ -59,96 +62,88 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
     /// </summary>
     /// <param name="request">Token request containing the device code.</param>
     /// <param name="headers">HTTP request headers for client authentication.</param>
+    /// <param name="proof">The raw DPoP proof header value extracted by the endpoint.</param>
+    /// <param name="context">The dispatch's advisor context, shared with the request pipeline.</param>
     /// <param name="ct">A cancellation token.</param>
     public async Task<AuthorizationResult> HandleAsync(
         TokenRequest                       request,
         Dictionary<string, List<string?>>? headers,
+        string?                            proof,
+        AdviceContext                      context,
         CancellationToken                  ct
     ) {
         if (string.IsNullOrWhiteSpace(request.DeviceCode)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.DeviceCode)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.NOT_EMPTY, new Dictionary<string, string?> { ["value"] = Parameters.DeviceCode });
         }
 
-        var application = await client.AuthenticateAsync(null, new(){
-            [Parameters.ClientId]     = [request.ClientId],
-            [Parameters.ClientSecret] = [request.ClientSecret],
-        }, headers, ct);
+        var application = (await client.AuthenticateAsync(null, ClientAuthenticationForm.Build(
+                                                              request.ClientId, request.ClientSecret,
+                                                              request.ClientAssertion, request.ClientAssertionType), headers, ct))?.Application;
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
-        var ctx = AdviceContext.Require();
+        var tokenContext = new TokenRequestContext<TApp> {
+            Request     = request,
+            Application = application,
+            Proof       = proof,
+        };
 
         switch (await Advisor.For<ITokenRequestAdvisor<TApp>>()
-                             .RunAsync(ctx, application, request, ct)) {
+                             .RunAsync(context, tokenContext, ct)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<AuthorizationResult>(out var result):
-                return result!;
+            case AdviseResult.Handle when tokenContext.Result is { } granted:
+                GrantCredentials.Attach(granted, tokenContext.Binding, null);
+                return granted;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(
-                    OAuthErrors.InvalidClient,
-                    SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-                );
+                throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
         var token = await tokens.FindByReferenceIdAsync(request.DeviceCode, ct);
         if (token is null) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
-        var exchange = new DeviceCodeExchangeContext<TApp, TToken> {
+
+        var exchange = new DeviceCodeExchangeContext<TApp> {
             Request     = request,
             Application = application,
             Token       = token,
         };
 
-        switch (await Advisor.For<IDeviceCodeExchangeAdvisor<TApp, TToken>>()
-                             .RunAsync(ctx, exchange, ct)) {
+        switch (await Advisor.For<IDeviceCodeExchangeAdvisor<TApp>>()
+                             .RunAsync(context, exchange, ct)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<AuthorizationResult>(out var result):
-                return result!;
+            case AdviseResult.Handle when exchange.Result is { } granted:
+                GrantCredentials.Attach(granted, tokenContext.Binding, null);
+                return granted;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(
-                    OAuthErrors.AccessDenied,
-                    SchemataResources.GetResourceString(SchemataResources.ACCESS_DENIED)
-                );
+                throw new OAuthException(OAuthErrors.AccessDenied, SchemataResources.ACCESS_DENIED);
+        }
+        var original = AuthorizationGrantContexts.Deserialize(token.GrantContext);
+        if (original is null || !string.Equals(original.Subject, token.Parent, StringComparison.Ordinal)) {
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         if (string.IsNullOrWhiteSpace(token.Payload)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
-        var payload = JsonSerializer.Deserialize<DeviceCodePayload>(token.Payload, json.Value);
+        var clear = token.Payload;
+
+        var payload = JsonSerializer.Deserialize<DeviceCodePayload>(clear, json.Value);
         if (payload is null) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         var scope = payload.Scope;
         if (!string.IsNullOrWhiteSpace(request.Scope)) {
             if (!ScopeParser.IsSubset(request.Scope, payload.Scope)) {
-                throw new OAuthException(
-                    OAuthErrors.InvalidScope,
-                    SchemataResources.GetResourceString(SchemataResources.INVALID_SCOPE)
-                );
+                throw new OAuthException(OAuthErrors.InvalidScope, SchemataResources.INVALID_SCOPE);
             }
 
             scope = request.Scope;
@@ -158,18 +153,29 @@ public sealed class DeviceCodeHandler<TApp, TToken>(
         // See RFC 8628 §3.4.
         await tokens.RevokeAsync(token, ct);
 
+        var subject = token.Parent;
+        if (string.IsNullOrWhiteSpace(subject)) {
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
+        }
+
+        var grant = AuthorizationGrantContexts.Narrow(original, scope, token.SessionId);
+
         var claims = new List<Claim> {
-            new(IdentityClaims.Subject, token.Subject!),
+            new(IdentityClaims.Subject, subject),
             new(Claims.ClientId, application.ClientId),
         };
 
         var identity = new ClaimsPrincipal(new ClaimsIdentity(claims, SchemataAuthorizationSchemes.Bearer));
-        return AuthorizationResult.SignIn(identity, new() {
+        var result = AuthorizationResult.SignIn(identity, new() {
             [Properties.GrantType]         = GrantTypes.DeviceCode,
             [Properties.Scope]             = scope,
+            [Properties.Resources]         = request.Resource is { Count: > 0 } ? string.Join(" ", request.Resource) : null,
             [Properties.AuthorizationName] = token.Authorization,
             [Properties.SessionId]         = token.SessionId,
+            [Properties.GrantContext]      = AuthorizationGrantContexts.Serialize(grant),
         });
+        GrantCredentials.Attach(result, tokenContext.Binding, null);
+        return result;
     }
 
     #endregion

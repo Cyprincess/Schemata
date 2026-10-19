@@ -1,7 +1,10 @@
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Skeleton.Advisors;
+using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
@@ -28,12 +31,13 @@ public sealed class AdviceRequestEndpointPermission<TApp>(IApplicationManager<TA
     public int Order => AdviceRequestEndpointPermission.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(
-        AdviceContext     ctx,
-        TApp              application,
-        TokenRequest      request,
-        CancellationToken ct = default
+        AdviceContext             ctx,
+        TokenRequestContext<TApp> request,
+        CancellationToken         ct = default
     ) {
-        await PermissionAdvice.RequireAsync(manager, application, PermissionPrefixes.Endpoint + Endpoints.Token, ct, code: 403);
+        var application = request.Application
+            ?? throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
+        await Permissions.RequireAsync(manager, application, PermissionPrefixes.Endpoint + Endpoints.Token, ct, code: 403);
 
         return AdviseResult.Continue;
     }

@@ -1,9 +1,21 @@
+using System.Threading;
+using Schemata.Authorization.Foundation.Controllers;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Schemata.Abstractions.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Foundation.Commands;
+using Schemata.Authorization.Foundation.Handlers;
+using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Messaging.Skeleton;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Transport.Http.Features;
@@ -15,19 +27,28 @@ namespace Schemata.Authorization.Foundation.Features;
 ///     Configures the Schemata Authorization server: options validation, managers,
 ///     authentication schemes, claim advisors, the discovery handler, the OAuth
 ///     model binder, and delegates to registered <see cref="IAuthorizationFlowFeature" />s.
+///     Maps the OIDC/OAuth authorization-server metadata and JWKS endpoints at the paths the
+///     configured issuer derives, per
+///     <seealso href="https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig">
+///         OpenID Connect Discovery 1.0 §§4-4.1: OpenID Provider Configuration Request
+///     </seealso>
+///     and
+///     <seealso href="https://www.rfc-editor.org/rfc/rfc8414.html#section-3.1">
+///         RFC 8414: OAuth 2.0 Authorization Server Metadata §3.1: Authorization Server Metadata Request
+///     </seealso>
+///     .
 /// </summary>
 [DependsOn<SchemataAuthenticationFeature>]
 [DependsOn<SchemataTransportHttpFeature>]
-[DependsOn<SchemataWellKnownFeature>]
-public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : FeatureBase
-    where TApp : SchemataApplication
-    where TAuth : SchemataAuthorization
+public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TSubjectMapping, TSecurity, TToken> : FeatureBase
+    where TApp : SchemataApplication, new()
+    where TAuth : SchemataAuthorization, new()
     where TScope : SchemataScope
+    where TSubjectMapping : SchemataSubjectMapping, new()
+    where TSecurity : SchemataSecurity, new()
     where TToken : SchemataToken, new()
 {
-    public const int DefaultPriority = Orders.Extension + 60_000_000;
-
-    public override int Priority => DefaultPriority;
+    public override int Priority => SchemataAuthorizationOrders.Feature;
 
     public override void ConfigureServices(
         IServiceCollection  services,
@@ -37,12 +58,68 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken> : 
         IWebHostEnvironment environment
     ) {
         var configure = configurators.PopOrDefault<SchemataAuthorizationOptions>();
-        var options   = new SchemataAuthorizationOptions();
-        configure(options);
 
         services.AddSchemataAuthorizationOptions(configure);
         services.AddSchemataAuthorizationFlows(schemata, configurators);
-        services.AddSchemataApplicationPart<SchemataAuthorizationFeature<TApp, TAuth, TScope, TToken>>();
-        services.AddSchemataAuthorization<TApp, TAuth, TScope, TToken>(options);
+        services.AddSchemataApplicationPart<SchemataAuthorizationFeature<TApp, TAuth, TScope, TSubjectMapping, TSecurity, TToken>>();
+        services.AddSchemataAuthorization<TApp, TAuth, TScope, TSubjectMapping, TSecurity, TToken>();
+
+        IAuthorizationResourceRegistration resources =
+            new AuthorizationResourceRegistration<TApp, TScope, TToken>();
+        schemata.Set(SchemataAuthorizationBuilder.ResourceRegistrationKey, resources);
     }
+
+    public override void ConfigureEndpoints(
+        IApplicationBuilder   app,
+        IEndpointRouteBuilder endpoints,
+        IConfiguration        configuration,
+        IWebHostEnvironment   environment
+    ) {
+        var server = app.ApplicationServices.GetRequiredService<IOptions<SchemataAuthorizationOptions>>().Value;
+        var issuer = CanonicalIssuer.Validate(server.Issuer);
+
+        // OIDC Discovery §4.2 and RFC 8414 §3.1 share one composer; OIDC additionally
+        // requires ID-token signing metadata.
+        async Task<IResult> Discover(
+            DiscoveryHandler<TScope, TSecurity>     handler,
+            IOptions<SchemataAuthorizationOptions> options,
+            HttpContext                            http,
+            bool                                   oidc,
+            CancellationToken                      ct
+        ) {
+            var result = await handler.GetDiscoveryDocumentAsync(
+                             options.Value.Issuer!, oidc, new(http.RequestServices), ct);
+            return Results.Json(result.Data);
+        }
+
+        var oidc = (DiscoveryHandler<TScope, TSecurity> handler, IOptions<SchemataAuthorizationOptions> options,
+                    HttpContext http, CancellationToken ct) => Discover(handler, options, http, true, ct);
+        var oauth = (DiscoveryHandler<TScope, TSecurity> handler, IOptions<SchemataAuthorizationOptions> options,
+                     HttpContext http, CancellationToken ct) => Discover(handler, options, http, false, ct);
+
+        var jwks = async (JwksHandler<TSecurity> handler, CancellationToken ct) => {
+            var result = await handler.ExecuteAsync(ct);
+            return Results.Json(result.Data);
+        };
+
+        // The OIDC metadata profile requires an authorize endpoint; the OAuth profile and JWKS
+        // stand alone. Handler registration is the same installation fact the MVC convention
+        // uses to keep the Authorize actions routable.
+        if (app.ApplicationServices.GetRequiredService<IServiceProviderIsService>()
+               .IsService(typeof(IRequestHandler<AuthorizeEndpointRequest, AuthorizationResult>))) {
+            endpoints.MapGet(CanonicalIssuer.OpenIdConfiguration(issuer), oidc).AllowAnonymous();
+        }
+        endpoints.MapGet(CanonicalIssuer.OAuthAuthorizationServer(issuer), oauth).AllowAnonymous();
+        endpoints.MapGet(CanonicalIssuer.Jwks(issuer), jwks).AllowAnonymous();
+    }
+}
+
+/// <summary>
+///     Ordering constants shared by the authorization feature set and the transport and bridge
+///     features layered on it.
+/// </summary>
+public static class SchemataAuthorizationOrders
+{
+    /// <summary>Base priority for authorization feature startup.</summary>
+    public const int Feature = Orders.Extension + 60_000_000;
 }

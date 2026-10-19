@@ -1,14 +1,16 @@
 using System;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Authorization.Foundation;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Features;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
-///     Extension methods on <see cref="SchemataAuthorizationBuilder{TApp,TAuth,TScope,TToken}" /> for registering
+///     Extension methods on <c>SchemataAuthorizationBuilder</c> for registering
 ///     OAuth 2.0 / OIDC flow features,
 ///     per
 ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html">RFC 6749: The OAuth 2.0 Authorization Framework</seealso>
@@ -31,23 +33,15 @@ public static class SchemataAuthorizationBuilderExtensions
     ///     .
     /// </summary>
     /// <returns>The builder for chaining.</returns>
-    /// <seealso cref="AuthorizationCodeFlowFeature{TApp,TAuth,TScope,TToken}" />
-    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseCodeFlow<TApp, TAuth, TScope, TToken>(
-        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder,
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseAuthorizationCodeFlow<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder,
         Action<CodeFlowOptions>?                                       configure = null
     )
-        where TApp : SchemataApplication
+        where TApp : SchemataApplication, new()
         where TAuth : SchemataAuthorization, new()
         where TScope : SchemataScope
-        where TToken : SchemataToken, new() {
-        if (configure is not null) {
-            builder.Configurators.Set(configure);
-        }
-
-        builder.AddFlowFeature<TokenFeature>();
-        builder.AddFlowFeature<InteractionFeature>();
-        builder.AddFlowFeature<AuthorizationCodeFlowFeature<TApp, TAuth, TScope, TToken>>();
-        return builder;
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddAuthorizationCodeFlow(configure);
     }
 
     /// <summary>
@@ -61,13 +55,13 @@ public static class SchemataAuthorizationBuilderExtensions
     /// </summary>
     /// <returns>The builder for chaining.</returns>
     /// <seealso cref="ClientCredentialsFlowFeature{TApp}" />
-    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseClientCredentialsFlow<TApp, TAuth, TScope, TToken>(
-        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseClientCredentialsFlow<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
     )
-        where TApp : SchemataApplication
-        where TAuth : SchemataAuthorization
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
         where TScope : SchemataScope
-        where TToken : SchemataToken, new() {
+        where TSubjectMapping : SchemataSubjectMapping, new() {
         builder.AddFlowFeature<TokenFeature>();
         builder.AddFlowFeature<ClientCredentialsFlowFeature<TApp>>();
         return builder;
@@ -83,22 +77,15 @@ public static class SchemataAuthorizationBuilderExtensions
     ///     .
     /// </summary>
     /// <returns>The builder for chaining.</returns>
-    /// <seealso cref="RefreshTokenFlowFeature{TApp, TToken}" />
-    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseRefreshTokenFlow<TApp, TAuth, TScope, TToken>(
-        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder,
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseRefreshTokenFlow<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder,
         Action<RefreshTokenFlowOptions>?                               configure = null
     )
-        where TApp : SchemataApplication
-        where TAuth : SchemataAuthorization
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
         where TScope : SchemataScope
-        where TToken : SchemataToken, new() {
-        if (configure is not null) {
-            builder.Configurators.Set(configure);
-        }
-
-        builder.AddFlowFeature<TokenFeature>();
-        builder.AddFlowFeature<RefreshTokenFlowFeature<TApp, TToken>>();
-        return builder;
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddRefreshTokenFlow(configure);
     }
 
     /// <summary>
@@ -108,18 +95,14 @@ public static class SchemataAuthorizationBuilderExtensions
     ///     .
     /// </summary>
     /// <returns>The builder for chaining.</returns>
-    /// <seealso cref="DeviceFlowFeature{TApp, TAuth, TScope, TToken}" />
-    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseDeviceFlow<TApp, TAuth, TScope, TToken>(
-        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseDeviceFlow<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
     )
-        where TApp : SchemataApplication
+        where TApp : SchemataApplication, new()
         where TAuth : SchemataAuthorization, new()
         where TScope : SchemataScope
-        where TToken : SchemataToken, new() {
-        builder.AddFlowFeature<TokenFeature>();
-        builder.AddFlowFeature<InteractionFeature>();
-        builder.AddFlowFeature<DeviceFlowFeature<TApp, TAuth, TScope, TToken>>();
-        return builder;
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddDeviceFlow();
     }
 
     /// <summary>
@@ -128,16 +111,179 @@ public static class SchemataAuthorizationBuilderExtensions
     /// </summary>
     /// <returns>The builder for chaining.</returns>
     /// <seealso cref="TokenExchangeFeature{TApp}" />
-    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseTokenExchange<TApp, TAuth, TScope, TToken>(
-        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseTokenExchange<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
     )
-        where TApp : SchemataApplication
-        where TAuth : SchemataAuthorization
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
         where TScope : SchemataScope
-        where TToken : SchemataToken, new() {
+        where TSubjectMapping : SchemataSubjectMapping, new() {
         builder.AddFlowFeature<TokenFeature>();
         builder.AddFlowFeature<TokenExchangeFeature<TApp>>();
         return builder;
+    }
+
+    /// <summary>
+    ///     Enables the RFC 7523 jwt-bearer grant, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7523.html">RFC 7523: JSON Web Token (JWT) Profile for OAuth 2.0 Client Authentication and Authorization Grants</seealso>
+    ///     . The grant stays unusable until
+    ///     <see cref="SchemataAuthorizationOptions.JwtBearerTrustedIssuers" /> holds at least one
+    ///     trusted issuer.
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    /// <seealso cref="JwtBearerGrantFeature" />
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseJwtBearerGrant<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
+    )
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddJwtBearerGrant();
+    }
+
+    /// <summary>
+    ///     Enables JWT-Secured Authorization Requests passed by value, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9101.html">
+    ///         RFC 9101: JWT-Secured Authorization Request (JAR)
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    /// <seealso cref="JwtSecuredAuthorizationRequestsFeature" />
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseJwtSecuredAuthorizationRequests<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder,
+        Action<JwtSecuredAuthorizationRequestsOptions>? configure = null
+    )
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddJwtSecuredAuthorizationRequests(configure);
+    }
+
+    /// <summary>
+    ///     Enables Pushed Authorization Requests, including signed request objects pushed through
+    ///     the PAR endpoint, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9126.html">
+    ///         RFC 9126: OAuth 2.0 Pushed Authorization Requests
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    /// <seealso cref="PushedAuthorizationRequestsFeature" />
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UsePushedAuthorizationRequests<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder,
+        Action<PushedAuthorizationRequestsOptions>? configure = null
+    )
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddPushedAuthorizationRequests(configure);
+    }
+
+    /// <summary>
+    ///     Enables OpenID Connect Native SSO device secrets and their token-exchange profile.
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseNativeSingleSignOn<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder,
+        Action<NativeSingleSignOnOptions>? configure = null
+    )
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddNativeSingleSignOn(configure);
+    }
+
+    /// <summary>Enables OpenID Connect Session Management and the OP check-session iframe.</summary>
+    /// <returns>The builder for chaining.</returns>
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseSessionManagement<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder,
+        Action<SessionManagementOptions>? configure = null
+    )
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        if (configure is not null) {
+            builder.Configurators.Set(configure);
+        }
+
+        builder.AddFlowFeature<SessionManagementFeature<TApp>>();
+        return builder;
+    }
+
+    /// <summary>
+    ///     Enables resource indicators, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc8707.html">
+    ///         RFC 8707: Resource Indicators for OAuth 2.0
+    ///     </seealso>
+    ///     : the <c>resource</c> parameter is validated at the authorize endpoint and
+    ///     adopted at the token endpoint, audience-restricting issued tokens. Without the
+    ///     feature the parameter is ignored and audiences fall back to
+    ///     <c>DefaultResource ?? Issuer</c>.
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    /// <seealso cref="ResourceIndicatorsFeature{TApp}" />
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseResourceIndicators<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
+    )
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        builder.AddFlowFeature<ResourceIndicatorsFeature<TApp>>();
+        return builder;
+    }
+
+    /// <summary>
+    ///     Enables the OIDC <c>claims</c> request parameter, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter">
+    ///         OpenID Connect Core 1.0 §5.5: Requesting Claims using the "claims" Request
+    ///         Parameter
+    ///     </seealso>
+    ///     : parameter validation at the authorize endpoint, requested claims joining the
+    ///     ID Token and widening the UserInfo output, and the
+    ///     <c>claims_parameter_supported</c> discovery metadata. Without the feature the
+    ///     parameter is ignored (§5.5 leaves support OPTIONAL).
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    /// <seealso cref="ClaimsParameterFeature{TApp}" />
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseClaimsParameter<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
+    )
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        builder.AddFlowFeature<ClaimsParameterFeature<TApp>>();
+        return builder;
+    }
+
+    /// <summary>
+    ///     Enables JWT assertion client authentication, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7523.html#section-2">
+    ///         RFC 7523: JSON Web Token (JWT) Profile for OAuth 2.0 Client
+    ///         Authentication and Authorization Grants §2: Client Authentication
+    ///     </seealso>
+    ///     : the <c>client_secret_jwt</c> and <c>private_key_jwt</c> channels join the
+    ///     client authentication chain. Without the feature only the RFC 6749 baseline
+    ///     channels are registered; add the assertion method names to
+    ///     <see cref="SchemataAuthorizationOptions.AllowedClientAuthMethods" /> when enabled.
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    /// <seealso cref="ClientAssertionAuthenticationFeature" />
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseClientAssertionAuthentication<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
+    )
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddClientAssertionAuthentication();
     }
 
     /// <summary>
@@ -146,16 +292,92 @@ public static class SchemataAuthorizationBuilderExtensions
     ///     .
     /// </summary>
     /// <returns>The builder for chaining.</returns>
-    /// <seealso cref="IntrospectionFeature{TApp, TToken}" />
-    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseIntrospection<TApp, TAuth, TScope, TToken>(
-        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder
+    /// <summary>
+    ///     Enables rich authorization requests, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9396.html">RFC 9396: OAuth 2.0 Rich Authorization Requests</seealso>
+    ///     .
+    /// </summary>
+    /// <remarks>
+    ///     Detail-type descriptors are host-registered <c>IAuthorizationDetailTypeDescriptor</c> services.
+    ///     Without the feature, authorize requests carrying <c>authorization_details</c> are ignored
+    ///     (RFC 6749 §3.1 unrecognized-parameter posture) and reach no grant.
+    /// </remarks>
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseRichAuthorizationRequests<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
     )
-        where TApp : SchemataApplication
-        where TAuth : SchemataAuthorization
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
         where TScope : SchemataScope
-        where TToken : SchemataToken, new() {
-        builder.AddFlowFeature<IntrospectionFeature<TApp, TToken>>();
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        builder.AddFlowFeature<RichAuthorizationRequestsFeature<TApp>>();
         return builder;
+    }
+
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseIntrospection<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
+    )
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddIntrospection();
+    }
+
+    /// <summary>
+    ///     Enables dynamic client registration creation and read-back, per
+    ///     <seealso href="https://openid.net/specs/openid-connect-registration-1_0.html">OpenID Connect Dynamic Client Registration 1.0</seealso>
+    ///     and
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7592.html#section-2.1">RFC 7592 §2.1: Client Read Request</seealso>
+    ///     .
+    /// </summary>
+    /// <remarks>
+    ///     Registration requests are denied with 401 until the host registers an
+    ///     <c>IInitialAccessTokenValidator</c>; anonymous registration is never accepted. The
+    ///     replace and delete management capabilities install separately through
+    ///     <see cref="UseRegistrationReplace{TApp, TAuth, TScope, TSubjectMapping}" /> and
+    ///     <see cref="UseRegistrationDelete{TApp, TAuth, TScope, TSubjectMapping}" />.
+    /// </remarks>
+    /// <returns>The builder for chaining.</returns>
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseDynamicClientRegistration<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
+    )
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddDynamicClientRegistration();
+    }
+
+    /// <summary>
+    ///     Enables the dynamic client registration replace operation, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7592.html#section-3">RFC 7592 §3: Client Update Request</seealso>
+    ///     .
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseRegistrationReplace<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
+    )
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddRegistrationReplace();
+    }
+
+    /// <summary>
+    ///     Enables the dynamic client registration delete operation, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7592.html#section-2.3">RFC 7592 §2.3: Client Delete Request</seealso>
+    ///     .
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseRegistrationDelete<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
+    )
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddRegistrationDelete();
     }
 
     /// <summary>
@@ -163,16 +385,14 @@ public static class SchemataAuthorizationBuilderExtensions
     ///     per <seealso href="https://www.rfc-editor.org/rfc/rfc7009.html">RFC 7009: OAuth 2.0 Token Revocation</seealso>.
     /// </summary>
     /// <returns>The builder for chaining.</returns>
-    /// <seealso cref="RevocationFeature{TApp, TToken}" />
-    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseRevocation<TApp, TAuth, TScope, TToken>(
-        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseRevocation<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
     )
-        where TApp : SchemataApplication
-        where TAuth : SchemataAuthorization
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
         where TScope : SchemataScope
-        where TToken : SchemataToken, new() {
-        builder.AddFlowFeature<RevocationFeature<TApp, TToken>>();
-        return builder;
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddRevocation();
     }
 
     /// <summary>
@@ -186,14 +406,37 @@ public static class SchemataAuthorizationBuilderExtensions
     /// </summary>
     /// <returns>The builder for chaining.</returns>
     /// <seealso cref="UserInfoFeature" />
-    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseUserInfo<TApp, TAuth, TScope, TToken>(
-        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseUserInfo<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
     )
-        where TApp : SchemataApplication
-        where TAuth : SchemataAuthorization
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
         where TScope : SchemataScope
-        where TToken : SchemataToken, new() {
-        builder.AddFlowFeature<UserInfoFeature>();
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddUserInfo();
+    }
+
+    /// <summary>
+    ///     <seealso href="https://openid.net/specs/openid-connect-core-1_0.html#SubjectIDTypes">
+    ///         OpenID Connect Core 1.0 §8: Subject Identifier Types
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    /// <remarks>
+    ///     Without the feature every subject is public; <see cref="SchemataAuthorizationOptions.SubjectType" />
+    ///     (global default or per application) and <see cref="SchemataAuthorizationOptions.PairwiseSalt" />
+    ///     configure the feature but never enable it.
+    /// </remarks>
+    /// <returns>The builder for chaining.</returns>
+    /// <seealso cref="PairwiseSubjectsFeature" />
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UsePairwiseSubjects<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
+    )
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        builder.AddFlowFeature<PairwiseSubjectsFeature<TApp, TSubjectMapping>>();
         return builder;
     }
 
@@ -207,16 +450,14 @@ public static class SchemataAuthorizationBuilderExtensions
     ///     .
     /// </summary>
     /// <returns>The builder for chaining.</returns>
-    /// <seealso cref="FrontChannelLogoutFeature{TApp, TToken}" />
-    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseFrontChannelLogout<TApp, TAuth, TScope, TToken>(
-        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseFrontChannelLogout<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
     )
-        where TApp : SchemataApplication
-        where TAuth : SchemataAuthorization
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
         where TScope : SchemataScope
-        where TToken : SchemataToken, new() {
-        builder.AddFlowFeature<FrontChannelLogoutFeature<TApp, TToken>>();
-        return builder;
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddFrontChannelLogout();
     }
 
     /// <summary>
@@ -226,16 +467,14 @@ public static class SchemataAuthorizationBuilderExtensions
     ///     .
     /// </summary>
     /// <returns>The builder for chaining.</returns>
-    /// <seealso cref="BackChannelLogoutFeature{TApp, TToken}" />
-    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseBackChannelLogout<TApp, TAuth, TScope, TToken>(
-        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseBackChannelLogout<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
     )
-        where TApp : SchemataApplication
-        where TAuth : SchemataAuthorization
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
         where TScope : SchemataScope
-        where TToken : SchemataToken, new() {
-        builder.AddFlowFeature<BackChannelLogoutFeature<TApp, TToken>>();
-        return builder;
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddBackChannelLogout();
     }
 
     /// <summary>
@@ -245,15 +484,34 @@ public static class SchemataAuthorizationBuilderExtensions
     ///     .
     /// </summary>
     /// <returns>The builder for chaining.</returns>
-    /// <seealso cref="EndSessionFeature{TApp}" />
-    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> UseEndSession<TApp, TAuth, TScope, TToken>(
-        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TToken> builder
+    /// <seealso cref="EndSessionFeature" />
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseEndSession<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
     )
-        where TApp : SchemataApplication
-        where TAuth : SchemataAuthorization
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
         where TScope : SchemataScope
-        where TToken : SchemataToken, new() {
-        builder.AddFlowFeature<EndSessionFeature<TApp>>();
-        return builder;
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddEndSession();
+    }
+
+    /// <summary>
+    ///     Offers OAuth 2.0 Demonstrating Proof-of-Possession (DPoP),
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9449.html">RFC 9449: OAuth 2.0 Demonstrating Proof of Possession (DPoP)</seealso>
+    ///     : the <c>DPoP</c> authentication scheme, proof validation at the token endpoint,
+    ///     <c>dpop_jkt</c> binding at the authorize endpoint, discovery metadata, host-wide
+    ///     proof enforcement, and proof/nonce configuration.
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseDemonstratingProofOfPossession<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder,
+        Action<DPopOptions>?                                           configure = null
+    )
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddDemonstratingProofOfPossession(configure);
     }
 }

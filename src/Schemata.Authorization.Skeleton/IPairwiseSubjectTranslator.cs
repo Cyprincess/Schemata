@@ -59,12 +59,12 @@ public interface IPairwiseSubjectTranslator
     ///     Translates a canonical subject identifier to wire form: pairwise hash when the
     ///     caller's client is <c>pairwise</c>, otherwise canonical pass-through.
     /// </summary>
-    /// <param name="canonicalSubject">The canonical resource name of the subject.</param>
+    /// <param name="subject">The canonical resource name of the subject.</param>
     /// <param name="caller">
     ///     The caller's <see cref="ClaimsPrincipal" /> (typically the current HTTP request principal);
     ///     <c>Claims.ClientId</c> on the principal identifies the OAuth client whose
     ///     <c>subject_type</c> drives pairwise selection.
     /// </param>
     /// <param name="ct">Cancellation token.</param>
-    Task<string?> ToPairwiseAsync(string? canonicalSubject, ClaimsPrincipal? caller, CancellationToken ct = default);
+    Task<string?> ToPairwiseAsync(string? subject, ClaimsPrincipal? caller, CancellationToken ct = default);
 }

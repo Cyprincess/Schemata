@@ -7,12 +7,15 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Foundation.Services;
+using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Authorization.Skeleton.Services;
+using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Handlers;
@@ -41,48 +44,66 @@ public sealed class ClientCredentialsHandler<TApp>(IClientAuthenticationService<
     /// </summary>
     /// <param name="request">Token request containing client credentials.</param>
     /// <param name="headers">HTTP request headers for client authentication.</param>
+    /// <param name="proof">The raw DPoP proof header value extracted by the endpoint.</param>
+    /// <param name="context">The dispatch's advisor context, shared with the request pipeline.</param>
     /// <param name="ct">A cancellation token.</param>
     public async Task<AuthorizationResult> HandleAsync(
         TokenRequest                       request,
         Dictionary<string, List<string?>>? headers,
+        string?                            proof,
+        AdviceContext                      context,
         CancellationToken                  ct
     ) {
-        var application = await client.AuthenticateAsync(null, new(){
-            [Parameters.ClientId]     = [request.ClientId],
-            [Parameters.ClientSecret] = [request.ClientSecret],
-        }, headers, ct);
-        if (string.IsNullOrWhiteSpace(application?.ClientId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-            );
+        var authentication = await client.AuthenticateAsync(null, ClientAuthenticationForm.Build(
+                                                              request.ClientId, request.ClientSecret,
+                                                              request.ClientAssertion, request.ClientAssertionType), headers, ct);
+        var application = authentication?.Application;
+        // RFC 6749 §4.4.2: the client credentials grant requires a confidential client whose
+        // credential was actually verified; a public client — identified through none or
+        // presenting no secret at all — is never admitted as an authenticated authority.
+        if (application is null || !application.IsConfidential || authentication is not { Authenticated: true }) {
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
-        var ctx = AdviceContext.Require();
+        var tokenContext = new TokenRequestContext<TApp> {
+            Request     = request,
+            Application = application,
+            Proof       = proof,
+        };
 
         switch (await Advisor.For<ITokenRequestAdvisor<TApp>>()
-                             .RunAsync(ctx, application, request, ct)) {
+                             .RunAsync(context, tokenContext, ct)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when ctx.TryGet<AuthorizationResult>(out var result):
-                return result!;
+            case AdviseResult.Handle when tokenContext.Result is { } granted:
+                GrantCredentials.Attach(granted, tokenContext.Binding, null);
+                return granted;
             case AdviseResult.Block:
             default:
-                throw new OAuthException(
-                    OAuthErrors.InvalidClient,
-                    SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-                );
+                throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
         var claims = new List<Claim> {
-            new(Claims.ClientId, application.ClientId),
+            new(Claims.ClientId, application.ClientId!),
         };
 
+        // RFC 9068 §5: a JWT access token always carries a sub; for grants without a resource
+        // owner - client credentials - it identifies the client itself. The framework's subject
+        // space is canonical resource names (the token row's Parent is a resource reference), so
+        // the application's canonical name is the client subject, kept distinct from user
+        // subjects (users/{x}) by its applications/{x} form.
+        if (!string.IsNullOrWhiteSpace(application.CanonicalName)) {
+            claims.Add(new(IdentityClaims.Subject, application.CanonicalName));
+        }
+
         var identity = new ClaimsPrincipal(new ClaimsIdentity(claims, SchemataAuthorizationSchemes.Bearer));
-        return AuthorizationResult.SignIn(identity, new() {
+        var result = AuthorizationResult.SignIn(identity, new() {
             [Properties.GrantType] = GrantTypes.ClientCredentials,
             [Properties.Scope]     = request.Scope,
+            [Properties.Resources] = request.Resource is { Count: > 0 } ? string.Join(" ", request.Resource) : null,
         });
+        GrantCredentials.Attach(result, tokenContext.Binding, null);
+        return result;
     }
 
     #endregion

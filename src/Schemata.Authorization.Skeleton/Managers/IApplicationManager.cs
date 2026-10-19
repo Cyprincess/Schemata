@@ -3,17 +3,30 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Entity.Repository;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Entities;
 
 namespace Schemata.Authorization.Skeleton.Managers;
 
 /// <summary>
 ///     Manages <see cref="SchemataApplication" /> entities.
-///     Handles CRUD and property validation for OAuth 2.0 clients.
+///     Handles CRUD and property validation for OAuth 2.0 clients. Writes adapt the injected
+///     <see cref="IResourceMutation{TApplication}" /> owner; this interface carries no parallel
+///     mutation contract.
 /// </summary>
 public interface IApplicationManager<TApplication>
     where TApplication : SchemataApplication
 {
+    /// <summary>Creates an application.</summary>
+    Task<TApplication?> CreateAsync(TApplication? application, CancellationToken ct = default);
+
+    /// <summary>Updates an application.</summary>
+    Task UpdateAsync(TApplication? application, CancellationToken ct = default);
+
+    /// <summary>Deletes an application.</summary>
+    Task DeleteAsync(TApplication? application, CancellationToken ct = default);
+
     /// <summary>Lists applications matching the optional predicate.</summary>
     IAsyncEnumerable<TApplication> ListAsync(
         Func<IQueryable<TApplication>, IQueryable<TApplication>>? predicate,
@@ -22,15 +35,6 @@ public interface IApplicationManager<TApplication>
 
     /// <summary>Finds an application by its client_id.</summary>
     Task<TApplication?> FindByClientIdAsync(string? clientId, CancellationToken ct = default);
-
-    /// <summary>
-    ///     Validates a client secret against the stored hash.
-    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-2.3.1">
-    ///         RFC 6749: The OAuth 2.0 Authorization
-    ///         Framework §2.3.1: Client Password
-    ///     </seealso>
-    /// </summary>
-    Task<bool> ValidateClientSecretAsync(TApplication? application, string? secret, CancellationToken ct = default);
 
     /// <summary>
     ///     Validates that a redirect URI is registered for the application.
@@ -51,11 +55,8 @@ public interface IApplicationManager<TApplication>
     /// <summary>Checks whether the application has a specific permission.</summary>
     Task<bool> HasPermissionAsync(TApplication? application, string? permission, CancellationToken ct = default);
 
-    /// <summary>Stores a hashed client secret for the application.</summary>
-    Task SetClientSecretAsync(TApplication? application, string? secret, CancellationToken ct = default);
-
-    /// <summary>Sets the display name for the application.</summary>
-    Task SetDisplayNameAsync(TApplication? application, string? name, CancellationToken ct = default);
+    /// <summary>Sets the <c>client_name</c> for the application.</summary>
+    Task SetClientNameAsync(TApplication? application, string? name, CancellationToken ct = default);
 
     /// <summary>Sets localized display names for the application.</summary>
     Task SetDisplayNamesAsync(
@@ -92,6 +93,15 @@ public interface IApplicationManager<TApplication>
     );
 
     /// <summary>Permits a grant type for the application.</summary>
+    /// <summary>Whether the client's registered <c>grant_types</c> include <paramref name="grantType" />.</summary>
+    Task<bool> HasGrantTypeAsync(TApplication? application, string? grantType, CancellationToken ct = default);
+
+    /// <summary>Whether the client's registered <c>response_types</c> include <paramref name="responseType" /> (token order insignificant).</summary>
+    Task<bool> HasResponseTypeAsync(TApplication? application, string? responseType, CancellationToken ct = default);
+
+    /// <summary>Whether the client's registered <c>scope</c> includes <paramref name="scope" />.</summary>
+    Task<bool> HasScopeAsync(TApplication? application, string? scope, CancellationToken ct = default);
+
     Task PermitGrantTypeAsync(TApplication? application, string? grantType, CancellationToken ct = default);
 
     /// <summary>Permits an endpoint for the application.</summary>
@@ -103,23 +113,8 @@ public interface IApplicationManager<TApplication>
     /// <summary>Removes a permission from the application.</summary>
     Task RemovePermissionAsync(TApplication? application, string? permission, CancellationToken ct = default);
 
-    /// <summary>
-    ///     Sets the OAuth 2.0 client type.
-    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-2.1">
-    ///         RFC 6749: The OAuth 2.0 Authorization
-    ///         Framework §2.1: Client Types
-    ///     </seealso>
-    /// </summary>
-    Task SetClientTypeAsync(TApplication? application, string? type, CancellationToken ct = default);
-
     /// <summary>Sets the application type.</summary>
     Task SetApplicationTypeAsync(TApplication? application, string? type, CancellationToken ct = default);
-
-    /// <summary>Sets the consent type.</summary>
-    Task SetConsentTypeAsync(TApplication? application, string? type, CancellationToken ct = default);
-
-    /// <summary>Sets whether PKCE is required for this application.</summary>
-    Task SetRequirePkceAsync(TApplication? application, bool? require, CancellationToken ct = default);
 
     /// <summary>Sets the subject identifier type.</summary>
     Task SetSubjectTypeAsync(TApplication? application, string? type, CancellationToken ct = default);
@@ -143,12 +138,9 @@ public interface IApplicationManager<TApplication>
         CancellationToken ct = default
     );
 
-    /// <summary>Creates a new application.</summary>
-    Task<TApplication?> CreateAsync(TApplication? application, CancellationToken ct = default);
+    /// <summary>Joins a current application concurrency check to the caller-owned publication transaction.</summary>
+    Task EnlistPublicationAsync(IUnitOfWork transaction, string application, CancellationToken ct = default);
 
-    /// <summary>Updates an existing application.</summary>
-    Task UpdateAsync(TApplication? application, CancellationToken ct = default);
-
-    /// <summary>Deletes an application.</summary>
-    Task DeleteAsync(TApplication? application, CancellationToken ct = default);
+    /// <summary>Joins the canonical application owners of a token batch to its publication transaction.</summary>
+    Task EnlistTokenPublicationAsync(IUnitOfWork transaction, IReadOnlyCollection<SchemataToken> tokens, CancellationToken ct = default);
 }

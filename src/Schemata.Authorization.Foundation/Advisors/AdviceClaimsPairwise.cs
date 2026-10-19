@@ -14,7 +14,7 @@ using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
-/// <summary>Order constants for <see cref="AdviceClaimsPairwise{TApp}" />.</summary>
+/// <summary>Order constants for <see cref="AdviceClaimsPairwise" />.</summary>
 public static class AdviceClaimsPairwise
 {
     /// <summary>The default advisor ordering value.</summary>
@@ -31,21 +31,23 @@ public static class AdviceClaimsPairwise
 ///     .
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
+/// <typeparam name="TSubjectMapping">The pairwise subject-mapping entity type.</typeparam>
 /// <remarks>
 ///     Pairwise subject identifiers prevent correlation of users across different clients.
 ///     The projection is delegated to <see cref="ISubjectIdentifierService" /> and applied only when
 ///     the sectored identifier or subject type requires it.
 /// </remarks>
-/// <seealso cref="AdviceClaimsAudience{TApp}" />
-public sealed class AdviceClaimsPairwise<TApp> : IClaimsAdvisor
-    where TApp : SchemataApplication
+/// <seealso cref="AdviceClaimsAudience" />
+public sealed class AdviceClaimsPairwise<TApp, TSubjectMapping> : IClaimsAdvisor
+    where TApp : SchemataApplication, new()
+    where TSubjectMapping : SchemataSubjectMapping, new()
 {
-    private readonly IApplicationManager<TApp>       _apps;
-    private readonly PairwiseSubjectTranslator<TApp> _translator;
+    private readonly IApplicationManager<TApp>                        _apps;
+    private readonly PairwiseSubjectTranslator<TApp, TSubjectMapping> _translator;
 
     public AdviceClaimsPairwise(
-        IApplicationManager<TApp>       apps,
-        PairwiseSubjectTranslator<TApp> translator
+        IApplicationManager<TApp>                        apps,
+        PairwiseSubjectTranslator<TApp, TSubjectMapping> translator
     ) {
         _apps       = apps;
         _translator = translator;
@@ -55,7 +57,7 @@ public sealed class AdviceClaimsPairwise<TApp> : IClaimsAdvisor
 
     public int Order => AdviceClaimsPairwise.DefaultOrder;
 
-    public async Task<AdviseResult> AdviseAsync(AdviceContext ctx, List<Claim> claims, CancellationToken ct = default) {
+    public async Task<AdviseResult> AdviseAsync(AdviceContext ctx, List<Claim> claims, Schemata.Authorization.Skeleton.Models.AuthorizationClaimContext issuance, CancellationToken ct = default) {
         var sub    = claims.FirstOrDefault(c => c.Type == IdentityClaims.Subject)?.Value;
         var client = claims.FirstOrDefault(c => c.Type == Claims.ClientId)?.Value;
 
@@ -76,9 +78,18 @@ public sealed class AdviceClaimsPairwise<TApp> : IClaimsAdvisor
         }
 
         for (var i = 0; i < claims.Count; i++) {
-            if (claims[i].Type == IdentityClaims.Subject) {
-                claims[i] = new(IdentityClaims.Subject, projected);
+            if (claims[i] is not { Type: IdentityClaims.Subject } claim) {
+                continue;
             }
+
+            // The projection keeps the original claim's issuer, value type, and properties —
+            // including consumer-selected destinations — and replaces only the value.
+            var replacement = new Claim(claim.Type, projected, claim.ValueType, claim.Issuer, claim.OriginalIssuer);
+            foreach (var property in claim.Properties) {
+                replacement.Properties[property.Key] = property.Value;
+            }
+
+            claims[i] = replacement;
         }
 
         return AdviseResult.Continue;

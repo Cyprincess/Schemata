@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Filters;
+using Schemata.Core.Filters;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
@@ -24,12 +26,14 @@ namespace Schemata.Authorization.Foundation.Controllers;
 public partial class ConnectController(
     IOptions<SchemataAuthorizationOptions> options,
     IAuthorizationSignInService            signIns,
-    IOptions<JsonSerializerOptions>        json,
     IRequestDispatcher                    dispatcher
 ) : ControllerBase
 {
     private Dictionary<string, List<string?>> CollectHeaders() {
-        return HttpContext.Request.Headers.ToDictionary(h => h.Key, h => h.Value.Select(v => v).ToList());
+        // HTTP field names are case-insensitive; the map keeps that semantics for every
+        // downstream consumer.
+        return HttpContext.Request.Headers.ToDictionary(
+            h => h.Key, h => h.Value.Select(v => v).ToList(), StringComparer.OrdinalIgnoreCase);
     }
 
     private async Task<IActionResult> MapResult(
@@ -42,7 +46,7 @@ public partial class ConnectController(
                 : AuthorizationSignInResponseKind.Token;
             var issued = await signIns.IssueAsync(result.Principal, result.Properties, kind, ct);
             if (issued.Token is not null) {
-                return new JsonResult(issued.Token, json.Value);
+                return new JsonResult(issued.Token);
             }
 
             if (issued.Callback is not null) {
@@ -58,6 +62,10 @@ public partial class ConnectController(
         return result.Status switch {
             AuthorizationStatus.Redirect when !string.IsNullOrWhiteSpace(result.RedirectUri) =>
                 Redirect(result.RedirectUri),
+            AuthorizationStatus.Content when result.Data is UserInfoJwt jwt =>
+                Content(jwt.Value, UserInfoJwt.ContentType),
+            AuthorizationStatus.Content when result.Data is LogoutPage page =>
+                Content(page.Html, "text/html; charset=utf-8"),
             AuthorizationStatus.Content   => new JsonResult(result.Data),
             AuthorizationStatus.Challenge => result.Data is string scheme ? Challenge(scheme) : Challenge(),
             var _                         => throw new NoContentException(),

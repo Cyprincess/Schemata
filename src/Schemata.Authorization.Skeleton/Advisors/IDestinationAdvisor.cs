@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Security.Claims;
 using Schemata.Abstractions.Advisors;
+using Schemata.Authorization.Skeleton.Models;
 
 namespace Schemata.Authorization.Skeleton.Advisors;
 
@@ -14,4 +15,4 @@ namespace Schemata.Authorization.Skeleton.Advisors;
 ///     the set. <c>Handle</c> short-circuits remaining advisors; <c>Continue</c> lets the next
 ///     advisor try. <c>Block</c> excludes the claim from all destinations.
 /// </remarks>
-public interface IDestinationAdvisor : IAdvisor<Claim, HashSet<string>, ClaimsPrincipal>;
+public interface IDestinationAdvisor : IAdvisor<Claim, HashSet<string>, ClaimsPrincipal, AuthorizationClaimContext>;

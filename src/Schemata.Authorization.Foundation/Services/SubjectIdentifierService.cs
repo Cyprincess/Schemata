@@ -20,8 +20,8 @@ namespace Schemata.Authorization.Foundation.Services;
 ///     </seealso>
 ///     .
 ///     When the subject type is <c>public</c>, returns the internal user ID
-///     unchanged.  When <c>pairwise</c>, computes a deterministic SHA-256 hash
-///     over <c>{sector_host} + {userId} + {pairwise_salt}</c> and returns the
+///     unchanged.  When <c>pairwise</c>, computes a deterministic SHA-256 hash over the
+///     length-framed <c>{sector_host} + {userId} + {pairwise_salt}</c> tuple and returns the
 ///     Base64URL-encoded result.  The sector identifier is derived from the
 ///     application's <c>sector_identifier_uri</c>, falling back to the host
 ///     of the first registered redirect URI.
@@ -50,9 +50,31 @@ public class SubjectIdentifierService(IOptions<SchemataAuthorizationOptions> opt
 
         var sector = GetSector(application);
         var salt   = _options.PairwiseSalt;
-        var hash   = SHA256.HashData(Encoding.UTF8.GetBytes(sector + userId + salt));
+        var hash   = SHA256.HashData(Frame(sector, userId, salt));
 
         return Base64UrlEncoder.Encode(hash);
+    }
+
+    /// <summary>
+    ///     Length-prefixes every component so distinct accepted tuples cannot collapse onto
+    ///     identical preimage bytes (sector <c>a.example</c> + user <c>x123</c> versus sector
+    ///     <c>a.examplex</c> + user <c>123</c>).
+    /// </summary>
+    private static byte[] Frame(string sector, string userId, string? salt) {
+        var length = sizeof(int) * 3 + Encoding.UTF8.GetByteCount(sector)
+                   + Encoding.UTF8.GetByteCount(userId) + Encoding.UTF8.GetByteCount(salt ?? string.Empty);
+        var preimage = new byte[length];
+        var offset = Write(preimage, 0, sector);
+        offset = Write(preimage, offset, userId);
+        Write(preimage, offset, salt ?? string.Empty);
+        return preimage;
+
+        static int Write(byte[] buffer, int offset, string value) {
+            var bytes = Encoding.UTF8.GetBytes(value);
+            BitConverter.TryWriteBytes(buffer.AsSpan(offset, sizeof(int)), bytes.Length);
+            bytes.CopyTo(buffer, offset + sizeof(int));
+            return offset + sizeof(int) + bytes.Length;
+        }
     }
 
     #endregion

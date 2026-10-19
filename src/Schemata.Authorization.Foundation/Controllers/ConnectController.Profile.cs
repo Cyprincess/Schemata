@@ -12,7 +12,7 @@ public partial class ConnectController
 {
     [HttpGet("Profile")]
     [HttpPost("Profile")]
-    [Authorize(AuthenticationSchemes = SchemataAuthorizationSchemes.Bearer)]
+    [Authorize(Policy = SchemataAuthorizationPolicies.Profile)]
     public async Task<IActionResult> Profile(CancellationToken ct) {
         var result = await dispatcher.SendAsync<UserInfoEndpointQuery, AuthorizationResult>(
             new(HttpContext.User), ct);

@@ -37,6 +37,7 @@ public sealed class AdviceDestinationProfile : IDestinationAdvisor
         Claim             claim,
         HashSet<string>   destinations,
         ClaimsPrincipal   principal,
+        Schemata.Authorization.Skeleton.Models.AuthorizationClaimContext issuance,
         CancellationToken ct = default
     ) {
         switch (claim.Type) {
