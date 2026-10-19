@@ -18,6 +18,7 @@
   <ItemGroup>
     <None Include="..\..\artifacts\bin\Schemata.Advice.Generator\$(Configuration)\netstandard2.0\Schemata.Advice.Generator.dll"
           Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="_._" Pack="true" PackagePath="lib/$(TargetFramework)" Visible="false" />
   </ItemGroup>
 
 </Project>
