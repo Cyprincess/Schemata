@@ -194,7 +194,9 @@ internal static partial class Parser
         var rbracket = Terms.Char(']');
 
         // An option entry is one or more identifiers (space-separated words)
-        // collected until we hit ',' or ']'.
+        // collected until we hit ',' or ']'. The absolute source offset travels
+        // with the normalized text so an unclassifiable entry can be diagnosed
+        // at its position.
         var entry = OneOrMany(Identifier)
            .Then(spans => {
                 var words = new string[spans.Count];
@@ -202,7 +204,7 @@ internal static partial class Parser
                     words[i] = spans[i].ToString();
                 }
 
-                return NormalizeOption(string.Join(" ", words));
+                return new OptionEntry(NormalizeOption(string.Join(" ", words)), spans[0].Offset);
             });
 
         var options = Separated(comma, entry);
@@ -211,7 +213,7 @@ internal static partial class Parser
            .Then(list => {
                 var builder = ImmutableArray.CreateBuilder<FieldOption>(list.Count);
                 foreach (var t in list) {
-                    builder.Add(ParseFieldOption(t));
+                    builder.Add(ParseFieldOption(t.Normalized, t.Offset));
                 }
 
                 return (EquatableArray<FieldOption>)builder.MoveToImmutable();
@@ -221,7 +223,7 @@ internal static partial class Parser
            .Then(list => {
                 var builder = ImmutableArray.CreateBuilder<ViewOption>(list.Count);
                 foreach (var t in list) {
-                    builder.Add(ParseViewOption(t));
+                    builder.Add(ParseViewOption(t.Normalized, t.Offset));
                 }
 
                 return (EquatableArray<ViewOption>)builder.MoveToImmutable();
@@ -231,7 +233,7 @@ internal static partial class Parser
            .Then(list => {
                 var builder = ImmutableArray.CreateBuilder<PointerOption>(list.Count);
                 foreach (var t in list) {
-                    builder.Add(ParsePointerOption(t));
+                    builder.Add(ParsePointerOption(t.Normalized, t.Offset));
                 }
 
                 return (EquatableArray<PointerOption>)builder.MoveToImmutable();
@@ -239,7 +241,15 @@ internal static partial class Parser
 
         // ── Use ───────────────────────────────────────────────────────
 
-        var names = Separated(comma, QualifiedName);
+        var contract = Deferred<string>();
+        var typeArguments = Between(Terms.Char('<'), Separated(comma, contract), Terms.Char('>'))
+            .Then(arguments => "<" + string.Join(", ", arguments) + ">");
+        var contractSegment = Identifier.And(ZeroOrOne(typeArguments)).Then(pair => pair.Item1.ToString() + pair.Item2);
+        var suffix = Terms.Char('?').Then(_ => "?")
+            .Or(Between(Terms.Char('['), ZeroOrMany(comma), Terms.Char(']')).Then(commas => "[" + new string(',', commas.Count) + "]"));
+        contract.Parser = Separated(dot, contractSegment).And(ZeroOrMany(suffix))
+            .Then(pair => string.Join(".", pair.Item1) + string.Concat(pair.Item2));
+        var names = Separated(comma, contract);
 
         Use = Terms.Text("Use", true)
                    .SkipAnd(names)
@@ -401,36 +411,18 @@ internal static partial class Parser
                                     });
 
         // Body context (conservative): nullable -> typed -> untyped.
-        // The typed variant checks that after consuming qualifiedName + identifier,
-        // the scanner is NOT at another identifier character. This prevents
-        // "id name" (two fields) from being consumed as one typed field.
+        // Typed requires the next significant token after qualifiedName + identifier to be
+        // [, {, =, or end of input; any other token leaves the typed match invalid.
         var bodyTyped = QualifiedName.And(Identifier)
                                      .When((ctx, _) => {
-                                          // After consuming qualifiedName + identifier, peek at the scanner.
-                                          // If the next non-whitespace char starts an identifier (letter/underscore),
-                                          // then the second "identifier" is actually the start of the next field,
-                                          // so this typed match is invalid.
-                                          var scanner = ctx.Scanner;
-                                          var cursor  = scanner.Cursor;
-                                          var saved   = cursor.Position;
+                                          var cursor = ctx.Scanner.Cursor;
+                                          var saved  = cursor.Position;
 
-                                          // Skip whitespace to find next meaningful character
-                                          while (!cursor.Eof && char.IsWhiteSpace(cursor.Current)) {
-                                              cursor.Advance();
-                                          }
+                                          // Skip the configured whitespace and comments, like Terms do.
+                                          ctx.SkipWhiteSpace();
 
-                                          bool result;
-                                          if (cursor.Eof) {
-                                              result = true; // end of input, typed is valid
-                                          } else {
-                                              var c = cursor.Current;
-                                              // Valid typed-field continuation chars: [, {, =
-                                              // These unambiguously confirm the second identifier is the
-                                              // field name, not the start of the next field.
-                                              result = c is '[' or '{' or '=';
-                                          }
+                                          var result = cursor.Eof || cursor.Current is '[' or '{' or '=';
 
-                                          // Restore cursor position (we were just peeking)
                                           cursor.ResetPosition(saved);
                                           return result;
                                       })
@@ -758,12 +750,18 @@ internal static partial class Parser
                        return new Document(ns, entities.ToImmutable(), traits.ToImmutable(),
                                            enums.ToImmutable());
                    })
+                  .AndSkip(ZeroOrOne(Terms.WhiteSpace()))
                   .WithComments(comments => {
                        comments.WithWhiteSpaceOrNewLine();
                        comments.WithSingleLine("//");
                        comments.WithMultiLine("/*", "*/");
                    })
+                  .Eof()
                   .Compile();
     }
+
+    // Shared by the field, pointer, and view option parsers so an entry that no
+    // classifier accepts can be reported with its absolute source offset.
+    internal readonly record struct OptionEntry(string Normalized, int Offset);
 
 }

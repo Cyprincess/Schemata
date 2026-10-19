@@ -7,10 +7,7 @@ using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Skeleton.Utilities;
 
-/// <summary>
-///     Indexes a process definition's nested sub-process scopes for runtime token routing.
-///     Scope keys are the process instance name at the root and sub-process element names below it.
-/// </summary>
+/// <summary>Indexes structural scopes and resolves their token activation lineage.</summary>
 public sealed record ProcessScopeMap(
     IReadOnlyDictionary<string, List<FlowElement>> ChildrenByScope,
     IReadOnlyDictionary<string, string>            ParentScope,
@@ -22,101 +19,106 @@ public sealed record ProcessScopeMap(
         ArgumentNullException.ThrowIfNull(process);
 
         var childrenByScope = new Dictionary<string, List<FlowElement>>(StringComparer.Ordinal) {
-            [process.Name!] = definition.Elements.ToList(),
+            [string.Empty] = definition.Elements.ToList(),
         };
-        var parentScope    = new Dictionary<string, string>(StringComparer.Ordinal);
+        var parentScope = new Dictionary<string, string>(StringComparer.Ordinal);
         var elementsByName = definition.Elements.ToDictionary(e => e.Name, StringComparer.Ordinal);
-
         foreach (var subProcess in definition.Elements.OfType<SubProcess>()) {
-            parentScope[subProcess.Name] = process.Name!;
-            AddSubProcess(subProcess, process.Name!, childrenByScope, parentScope, elementsByName);
+            AddSubProcess(subProcess, string.Empty, childrenByScope, parentScope, elementsByName);
         }
-
         return new(childrenByScope, parentScope, elementsByName, [..definition.AllElements]);
     }
 
     public IEnumerable<string> ScopeChain(SchemataProcess process, string? scopeName) {
         ArgumentNullException.ThrowIfNull(process);
-
-        var current = string.IsNullOrEmpty(scopeName) ? process.Name : scopeName;
-        while (!string.IsNullOrEmpty(current)) {
+        var current = scopeName ?? string.Empty;
+        while (true) {
             yield return current;
-            if (string.Equals(current, process.Name, StringComparison.Ordinal)) {
+            if (current.Length == 0) {
                 yield break;
             }
-
-            current = ParentScope.TryGetValue(current, out var parent) ? parent : process.Name;
+            current = ParentScope.TryGetValue(current, out var parent) ? parent : string.Empty;
         }
     }
 
     public bool IsInScope(SchemataProcess process, string? tokenScopeName, string parentScopeName) {
-        ArgumentNullException.ThrowIfNull(process);
-        ArgumentException.ThrowIfNullOrEmpty(parentScopeName);
+        return ScopeChain(process, tokenScopeName).Contains(parentScopeName, StringComparer.Ordinal);
+    }
 
-        if (string.IsNullOrEmpty(tokenScopeName)) {
-            return false;
+    public static SchemataProcessToken? ScopeOwner(SchemataProcessToken token, IReadOnlyList<SchemataProcessToken> working) {
+        if (string.IsNullOrEmpty(token.ScopeName)) {
+            return null;
         }
-
-        if (string.Equals(parentScopeName, process.Name, StringComparison.Ordinal)) {
-            return true;
+        var current = token;
+        while (current.Spawner is { } spawner) {
+            var parent = working.FirstOrDefault(candidate => candidate.CanonicalName == spawner);
+            if (parent is null) {
+                return null;
+            }
+            if (parent.ScopeName != token.ScopeName) {
+                return parent;
+            }
+            current = parent;
         }
+        return null;
+    }
 
-        var current = tokenScopeName;
-        while (!string.IsNullOrEmpty(current)) {
-            if (string.Equals(current, parentScopeName, StringComparison.Ordinal)) {
+    public static bool SameActivation(SchemataProcessToken token, SchemataProcessToken other, IReadOnlyList<SchemataProcessToken> working) {
+        return token.ScopeName == other.ScopeName
+            && ScopeOwner(token, working)?.CanonicalName == ScopeOwner(other, working)?.CanonicalName;
+    }
+
+    public static bool IsDescendant(SchemataProcessToken token, SchemataProcessToken owner, IReadOnlyList<SchemataProcessToken> working) {
+        var current = token;
+        while (current.Spawner is { } spawner) {
+            if (spawner == owner.CanonicalName) {
                 return true;
             }
-
-            if (!ParentScope.TryGetValue(current, out current)) {
+            var parent = working.FirstOrDefault(candidate => candidate.CanonicalName == spawner);
+            if (parent is null) {
                 return false;
             }
+            current = parent;
         }
-
         return false;
     }
 
     public IEnumerable<SchemataProcessToken> ParentScopeTokens(
-        SchemataProcess                   process,
-        IEnumerable<SchemataProcessToken> working,
-        string                            parentScopeName
+        SchemataProcess process,
+        IReadOnlyList<SchemataProcessToken> working,
+        string parentScopeName,
+        SchemataProcessToken addressed
     ) {
-        ArgumentNullException.ThrowIfNull(process);
-        ArgumentNullException.ThrowIfNull(working);
-        ArgumentException.ThrowIfNullOrEmpty(parentScopeName);
-
+        var owner = addressed;
+        while (owner.ScopeName != parentScopeName && ScopeOwner(owner, working) is { } parent) {
+            owner = parent;
+        }
+        var activation = ScopeOwner(owner, working);
         foreach (var token in working) {
-            if (token.State is null || !TokenStates.Live.Contains(token.State)) {
-                continue;
-            }
-
-            if (IsInScope(process, token.ScopeName, parentScopeName)) {
+            if (token.State is { } state && TokenStates.Live.Contains(state)
+             && IsInScope(process, token.ScopeName, parentScopeName)
+             && (activation is null || IsDescendant(token, activation, working))) {
                 yield return token;
             }
         }
     }
 
     public IEnumerable<EventSubProcess> EventSubProcessesInScope(string scopeName) {
-        ArgumentException.ThrowIfNullOrEmpty(scopeName);
-
-        return ChildrenByScope.TryGetValue(scopeName, out var children)
-            ? children.OfType<EventSubProcess>()
-            : [];
+        return ChildrenByScope.TryGetValue(scopeName, out var children) ? children.OfType<EventSubProcess>() : [];
     }
 
     private static void AddSubProcess(
-        SubProcess                            subProcess,
-        string                                parentScopeName,
+        SubProcess subProcess,
+        string parentScopeName,
         Dictionary<string, List<FlowElement>> childrenByScope,
-        Dictionary<string, string>            parentScope,
-        Dictionary<string, FlowElement>       elementsByName
+        Dictionary<string, string> parentScope,
+        Dictionary<string, FlowElement> elementsByName
     ) {
         childrenByScope[subProcess.Name] = subProcess.Children.ToList();
-        parentScope[subProcess.Name]     = parentScopeName;
-
+        parentScope[subProcess.Name] = parentScopeName;
         foreach (var child in subProcess.Children) {
             elementsByName[child.Name] = child;
         }
-
         foreach (var child in subProcess.Children.OfType<SubProcess>()) {
             AddSubProcess(child, subProcess.Name, childrenByScope, parentScope, elementsByName);
         }

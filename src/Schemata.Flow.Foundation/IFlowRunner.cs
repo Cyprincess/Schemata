@@ -12,10 +12,14 @@ namespace Schemata.Flow.Foundation;
 ///     Programmatic entry point for driving registered Flow processes: starting instances and
 ///     advancing, correlating, signalling, terminating, and cancelling tokens on them.
 /// </summary>
-public interface IFlowRunner
+/// <typeparam name="TProcess">The persisted process entity type registered by the host.</typeparam>
+/// <typeparam name="TToken">The persisted token entity type registered by the host.</typeparam>
+public interface IFlowRunner<TProcess, TToken>
+    where TProcess : SchemataProcess
+    where TToken : SchemataProcessToken
 {
     /// <summary>Starts a registered process definition and binds a source entity to the new instance.</summary>
-    ValueTask<SchemataProcess> StartAsync<TState>(
+    ValueTask<TProcess> StartAsync<TState>(
         string               definitionName,
         TState               source,
         StartProcessOptions? options = null,
@@ -23,7 +27,7 @@ public interface IFlowRunner
     ) where TState : class, ICanonicalName;
 
     /// <summary>Starts a registered process definition without binding a source entity.</summary>
-    ValueTask<SchemataProcess> StartAsync(
+    ValueTask<TProcess> StartAsync(
         string               definitionName,
         StartProcessOptions? options = null,
         CancellationToken    ct      = default
@@ -36,7 +40,7 @@ public interface IFlowRunner
     /// <param name="principal">The principal the request runs as.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The persisted process instance.</returns>
-    ValueTask<SchemataProcess> StartAsync(
+    ValueTask<TProcess> StartAsync(
         string               definitionName,
         string?              source,
         StartProcessOptions? options,
@@ -50,7 +54,7 @@ public interface IFlowRunner
     /// <param name="principal">The principal the request runs as.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The persisted process instance.</returns>
-    ValueTask<SchemataProcess> StartAsync(
+    ValueTask<TProcess> StartAsync(
         string               definitionName,
         StartProcessOptions? options,
         ClaimsPrincipal?     principal,
@@ -65,7 +69,7 @@ public interface IFlowRunner
     /// <param name="principal">The principal the request runs as.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The persisted process instance.</returns>
-    ValueTask<SchemataProcess> StartAsync<TState>(
+    ValueTask<TProcess> StartAsync<TState>(
         string               definitionName,
         TState               source,
         StartProcessOptions? options,
@@ -80,7 +84,7 @@ public interface IFlowRunner
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The post-operation snapshot persisted by the runner.</returns>
     ValueTask<ProcessSnapshot> CompleteAsync(
-        SchemataProcess   process,
+        TProcess          process,
         string?           token,
         ClaimsPrincipal?  principal,
         CancellationToken ct
@@ -95,7 +99,7 @@ public interface IFlowRunner
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The post-operation snapshot persisted by the runner.</returns>
     ValueTask<ProcessSnapshot> CorrelateAsync(
-        SchemataProcess   process,
+        TProcess          process,
         string            messageName,
         string?           payload,
         string?           token,
@@ -112,7 +116,7 @@ public interface IFlowRunner
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The post-operation snapshot persisted by the runner.</returns>
     ValueTask<ProcessSnapshot> CorrelateAsync(
-        SchemataProcess   process,
+        TProcess          process,
         string            messageName,
         object?           payload,
         string?           token,
@@ -162,7 +166,7 @@ public interface IFlowRunner
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The post-operation snapshot persisted by the runner.</returns>
     ValueTask<ProcessSnapshot> TerminateAsync(
-        SchemataProcess   process,
+        TProcess          process,
         ClaimsPrincipal?  principal,
         CancellationToken ct
     );
@@ -173,8 +177,8 @@ public interface IFlowRunner
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The post-operation snapshot persisted by the runner.</returns>
     ValueTask<ProcessSnapshot> CancelTokenAsync(
-        SchemataProcessToken token,
-        ClaimsPrincipal?     principal,
-        CancellationToken    ct
+        TToken            token,
+        ClaimsPrincipal?  principal,
+        CancellationToken ct
     );
 }

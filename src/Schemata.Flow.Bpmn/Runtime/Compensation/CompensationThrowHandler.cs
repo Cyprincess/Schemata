@@ -11,7 +11,13 @@ using Schemata.Flow.Skeleton.Runtime;
 namespace Schemata.Flow.Bpmn.Runtime.Compensation;
 
 /// <summary>Dispatches BPMN compensation throw events against the current scope stack.</summary>
-public sealed class CompensationThrowHandler
+/// <typeparam name="TProcess">The persisted process entity type registered by the host.</typeparam>
+/// <typeparam name="TToken">The persisted token entity type registered by the host.</typeparam>
+/// <typeparam name="TTransition">The persisted transition entity type registered by the host.</typeparam>
+public sealed class CompensationThrowHandler<TProcess, TToken, TTransition>
+    where TProcess : SchemataProcess, new()
+    where TToken : SchemataProcessToken, new()
+    where TTransition : SchemataProcessTransition, new()
 {
     /// <summary>Fires a BPMN compensation throw in targeted or global mode.</summary>
     /// <param name="engine">The BPMN engine that owns per-scope compensation stacks.</param>
@@ -25,11 +31,11 @@ public sealed class CompensationThrowHandler
     /// <param name="ct">Cancellation token for observer and handler calls.</param>
     /// <returns>Compensation transitions written by invoked handlers.</returns>
     public async ValueTask<IReadOnlyList<SchemataProcessTransition>> FireAsync(
-        BpmnEngine                             engine,
+        BpmnEngine<TProcess, TToken, TTransition> engine,
         ProcessDefinition                      definition,
         SchemataProcess                        process,
         SchemataProcessToken                   throwing,
-        IReadOnlyList<SchemataProcessToken>    working,
+        List<SchemataProcessToken> working,
         CompensationDefinition                 compensation,
         FlowExecutionContext                   execution,
         IEnumerable<ICompensationLifecycleObserver> observers,
@@ -51,11 +57,11 @@ public sealed class CompensationThrowHandler
     }
 
     internal async ValueTask<CompensationThrowResult> FireForEngineAsync(
-        BpmnEngine                             engine,
+        BpmnEngine<TProcess, TToken, TTransition> engine,
         ProcessDefinition                      definition,
         SchemataProcess                        process,
         SchemataProcessToken                   throwing,
-        IReadOnlyList<SchemataProcessToken>    working,
+        List<SchemataProcessToken> working,
         CompensationDefinition                 compensation,
         FlowExecutionContext                   execution,
         IEnumerable<ICompensationLifecycleObserver> observers,
@@ -73,7 +79,7 @@ public sealed class CompensationThrowHandler
             throw new InvalidOperationException($"Compensation binding is missing for scope '{throwing.ScopeName}'.");
         }
 
-        var context = new CompensationInvocationContext(process, definition, throwing, execution);
+        var context = new CompensationInvocationContext(process, definition, throwing, execution, working);
         return compensation.Activity is { } target
             ? await FireTargetedAsync(stack, context, target, execution, observers, ct)
             : await FireGlobalAsync(stack, context, execution, observers, ct);
@@ -87,26 +93,33 @@ public sealed class CompensationThrowHandler
         IEnumerable<ICompensationLifecycleObserver> observers,
         CancellationToken                           ct) {
         var snapshot = stack.Snapshot();
-        for (var i = snapshot.Count - 1; i >= 0; i--) {
+        var matched  = false;
+        // A targeted compensation drains every boundary registered for the activity in
+        // registration order; the stack snapshot is bottom-to-top registration order.
+        for (var i = 0; i < snapshot.Count; i++) {
             var handler = snapshot[i];
             if (!ReferenceEquals(handler.Activity, target)) {
                 continue;
             }
 
+            matched = true;
             await NotifyStartedAsync(observers, context, execution, ct);
             try {
                 await handler.InvokeAsync(context, ct);
             }
-            catch (Exception ex) {
+            catch (Exception ex) when (ex is not OperationCanceledException) {
                 return CompensationThrowResult.FromFailure([.. context.Transitions], handler, ex);
             }
 
             await NotifyCompletedAsync(observers, context, execution, ct);
             stack.Remove(handler);
-            return CompensationThrowResult.Completed([.. context.Transitions]);
         }
 
-        throw new InvalidOperationException($"Compensation binding is missing for activity '{target.Name}'.");
+        if (!matched) {
+            throw new InvalidOperationException($"Compensation binding is missing for activity '{target.Name}'.");
+        }
+
+        return CompensationThrowResult.Completed([.. context.Transitions]);
     }
 
     private static async ValueTask<CompensationThrowResult> FireGlobalAsync(
@@ -141,11 +154,11 @@ public sealed class CompensationThrowHandler
         CompensationInvocationContext               context,
         FlowExecutionContext                        execution,
         CancellationToken                           ct) {
-        var logger = execution.Services.GetService<ILogger<CompensationThrowHandler>>();
+        var logger = execution.Services.GetService<ILogger<CompensationThrowHandler<TProcess, TToken, TTransition>>>();
         foreach (var observer in observers) {
             try {
                 await observer.OnCompensationStartedAsync(context.Process, context.Scope, ct);
-            } catch (Exception ex) {
+            } catch (Exception ex) when (ex is not OperationCanceledException) {
                 logger?.LogWarning(ex, "Compensation lifecycle observer failed while notifying compensation start.");
             }
         }
@@ -156,11 +169,11 @@ public sealed class CompensationThrowHandler
         CompensationInvocationContext               context,
         FlowExecutionContext                        execution,
         CancellationToken                           ct) {
-        var logger = execution.Services.GetService<ILogger<CompensationThrowHandler>>();
+        var logger = execution.Services.GetService<ILogger<CompensationThrowHandler<TProcess, TToken, TTransition>>>();
         foreach (var observer in observers) {
             try {
                 await observer.OnCompensationCompletedAsync(context.Process, context.Scope, ct);
-            } catch (Exception ex) {
+            } catch (Exception ex) when (ex is not OperationCanceledException) {
                 logger?.LogWarning(ex, "Compensation lifecycle observer failed while notifying compensation completion.");
             }
         }

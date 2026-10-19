@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Flow.Skeleton.Builders;
 using Schemata.Flow.Skeleton.Models;
@@ -17,7 +18,8 @@ public sealed class OwnedTaskProcess : ProcessDefinition
     public UserTask Review { get; } = null!;
     public UserTask Apply  { get; } = null!;
 
-    private static ValueTask Mutate(FlowTaskContext _, OwnedOrder order) {
+    private static ValueTask Mutate(FlowTaskContext _, OwnedOrder order, CancellationToken ct) {
+        ct.ThrowIfCancellationRequested();
         order.TaskValue = "touched";
         return ValueTask.CompletedTask;
     }

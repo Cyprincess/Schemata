@@ -11,6 +11,8 @@ public sealed class ProcessFailedEvent : IEvent
     /// <summary>Registered process definition name.</summary>
     public string DefinitionName { get; init; } = null!;
 
+    public string DefinitionVersion { get; init; } = null!;
+
     /// <summary>Error message reported by the failing operation.</summary>
     public string ErrorMessage { get; init; } = null!;
 }

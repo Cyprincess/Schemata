@@ -39,6 +39,13 @@ public class SchemataProcessTransition : IIdentifier, ICanonicalName, IConcurren
     /// <summary>The posterior element <see cref="FlowElement.Name" /> after the transition.</summary>
     public virtual string? Posterior { get; set; }
 
+    /// <summary>
+    ///     Call activation this spawn belongs to: one invocation of a call activity. Set only on
+    ///     <see cref="TransitionKind.Spawn" /> rows written by a call activity; scope and gateway
+    ///     activation counters are separate state.
+    /// </summary>
+    public virtual string? Activation { get; set; }
+
     #region ICanonicalName Members
 
     public virtual string? Name { get; set; }

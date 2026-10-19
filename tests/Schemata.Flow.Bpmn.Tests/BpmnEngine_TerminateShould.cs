@@ -3,12 +3,70 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Flow.Skeleton.Utilities;
 using Xunit;
 
 namespace Schemata.Flow.Bpmn.Tests;
 
 public class BpmnEngine_TerminateShould
 {
+    [Trait("Layer", "Unit")]
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Fork_FirstAutomaticTerminate_PreventsLaterBranchEffects(bool fromToken) {
+        var calls = 0;
+        var start = new FlowEvent { Name = "start", Position = EventPosition.Start };
+        var setup = new NoneTask { Name = "setup" };
+        var fork = new ParallelGateway { Name = "fork" };
+        var first = new ProcedureTask { Name = "first", Body = (_, _) => ValueTask.CompletedTask };
+        var later = new ProcedureTask { Name = "later", Body = (_, _) => { calls++; return ValueTask.CompletedTask; } };
+        var end = new FlowEvent { Name = "terminate", Position = EventPosition.End, IsTerminate = true };
+        var definition = new ProcessDefinition { Name = "fork-terminate", Elements = { start, setup, fork, first, later, end }, Flows = {
+            new() { Source = start, Target = fromToken ? setup : fork },
+            new() { Source = fork, Target = first }, new() { Source = fork, Target = later },
+            new() { Source = first, Target = end },
+        } };
+        if (fromToken) {
+            definition.Flows.Add(new() { Source = setup, Target = fork });
+        }
+        var engine = new BpmnEngine();
+        var snapshot = await engine.StartAsync(definition, NewProcess(definition.Name), CancellationToken.None);
+        if (fromToken) {
+            snapshot = await engine.AdvanceAsync(definition, snapshot.Process, snapshot.Tokens, snapshot.Tokens.Single().CanonicalName, CancellationToken.None);
+        }
+        Assert.Equal(0, calls);
+        Assert.Equal("Terminated", snapshot.Process.State);
+        Assert.DoesNotContain(snapshot.Tokens, token => token.State is "Active" or "Waiting");
+        Assert.Equal("Cancelled", snapshot.Tokens.Single(token => token.StateName == "later").State);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task ScopedFork_AutomaticTerminate_CancelsStagedSiblingAndResumesParent() {
+        var calls = 0;
+        var definition = SubProcessTerminateDefinition();
+        var sub = (SubProcess)definition.FindElementByName("sub")!;
+        var fork = sub.Children.OfType<ParallelGateway>().Single();
+        var terminate = sub.Children.OfType<FlowEvent>().Single(value => value.IsTerminate);
+        var first = new ProcedureTask { Name = "auto-first", Body = (_, _) => ValueTask.CompletedTask };
+        var later = new ProcedureTask { Name = "auto-later", Body = (_, _) => { calls++; return ValueTask.CompletedTask; } };
+        sub.Children.Add(first);
+        sub.Children.Add(later);
+        var branches = sub.ChildFlows.Where(flow => flow.Source == fork).ToArray();
+        branches[0].Target = first;
+        branches[1].Target = later;
+        sub.ChildFlows.Add(new() { Source = first, Target = terminate });
+        var engine = new BpmnEngine();
+        var snapshot = await engine.StartAsync(definition, NewProcess(definition.Name), CancellationToken.None);
+        snapshot = await engine.AdvanceAsync(definition, snapshot.Process, snapshot.Tokens, snapshot.Tokens.Single(token => token.StateName == "setup").CanonicalName, CancellationToken.None);
+        snapshot = await engine.AdvanceAsync(definition, snapshot.Process, snapshot.Tokens, snapshot.Tokens.Single(token => token.StateName == "inner-prep").CanonicalName, CancellationToken.None);
+        Assert.Equal(0, calls);
+        Assert.Equal("Cancelled", snapshot.Tokens.Single(token => token.StateName == "auto-later").State);
+        Assert.Equal("Active", snapshot.Tokens.Single(token => token.StateName == "after-sub").State);
+        Assert.Equal("Running", snapshot.Process.State);
+    }
+
     [Fact]
     public async Task EndEvent_ProcessLevelTerminate_CancelsParallelSiblingTokens() {
         var definition = ProcessLevelTerminateDefinition();
@@ -25,6 +83,43 @@ public class BpmnEngine_TerminateShould
         Assert.Contains(snapshot.Transitions, t => t is { Kind: TransitionKind.Cancel, Posterior: "terminate" });
         Assert.DoesNotContain(snapshot.Transitions, t => t.Kind == TransitionKind.Compensate);
         Assert.DoesNotContain(snapshot.Tokens, t => t.StateName == "boundary-handler" || t.StateName == "event-handler");
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task ProcedureToTerminate_CancelsParallelSiblingTokens() {
+        var definition = ProcessLevelTerminateDefinition();
+        var killer = definition.FindElementByName("killer")!;
+        var terminate = definition.FindElementByName("terminate")!;
+        var procedure = new ProcedureTask { Name = "procedure", Body = (_, _) => ValueTask.CompletedTask };
+        definition.Elements.Add(procedure);
+        definition.Flows.Single(flow => flow.Source == killer).Target = procedure;
+        definition.Flows.Add(new() { Source = procedure, Target = terminate });
+        var engine = new BpmnEngine();
+        var snapshot = await engine.StartAsync(definition, NewProcess(definition.Name), CancellationToken.None);
+        snapshot = await engine.AdvanceAsync(definition, snapshot.Process, snapshot.Tokens, snapshot.Tokens.Single(token => token.StateName == "killer").CanonicalName, CancellationToken.None);
+        Assert.Equal("Terminated", snapshot.Process.State);
+        Assert.Equal("Cancelled", snapshot.Tokens.Single(token => token.StateName == "sibling").State);
+        Assert.Contains(snapshot.Transitions, transition => transition.Previous == "procedure" && transition.Posterior == "terminate");
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task CatchToTerminate_CancelsParallelSiblingTokens() {
+        var definition = ProcessLevelTerminateDefinition();
+        var killer = definition.FindElementByName("killer")!;
+        var signal = new Signal { Name = "stop" };
+        var catchEvent = new FlowEvent { Name = "stop-catch", Position = EventPosition.IntermediateCatch, Definition = signal };
+        definition.Elements.Add(catchEvent);
+        definition.Flows.Single(flow => flow.Target == killer).Target = catchEvent;
+        definition.Flows.Single(flow => flow.Source == killer).Source = catchEvent;
+        var engine = new BpmnEngine();
+        var snapshot = await engine.StartAsync(definition, NewProcess(definition.Name), CancellationToken.None);
+        var waiting = snapshot.Tokens.Single(token => token.WaitingAtName == catchEvent.Name);
+        snapshot = await engine.TriggerAsync(definition, snapshot.Process, snapshot.Tokens, signal, null, waiting.CanonicalName, CancellationToken.None);
+        Assert.Equal("Terminated", snapshot.Process.State);
+        Assert.Equal("Cancelled", snapshot.Tokens.Single(token => token.StateName == "sibling").State);
+        Assert.Contains(snapshot.Transitions, transition => transition.Kind == TransitionKind.Cancel && transition.Posterior == "terminate");
     }
 
     [Fact]
@@ -45,7 +140,7 @@ public class BpmnEngine_TerminateShould
         Assert.Equal("Completed", snapshot.Tokens.Single(t => t.StateName == "inner-terminate").State);
         Assert.Equal("Cancelled", snapshot.Tokens.Single(t => t.StateName == "inner-sibling").State);
 
-        var parent = snapshot.Tokens.Single(t => t.ScopeName == process.Name);
+        var parent = snapshot.Tokens.Single(t => string.IsNullOrEmpty(t.ScopeName));
         Assert.Equal("after-sub", parent.StateName);
         Assert.Equal("Active", parent.State);
         Assert.DoesNotContain(snapshot.Tokens, t => t.StateName == "boundary-handler" || t.StateName == "event-handler");

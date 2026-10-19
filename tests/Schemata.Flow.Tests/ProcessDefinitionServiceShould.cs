@@ -20,12 +20,10 @@ public class ProcessDefinitionServiceShould
             Name          = "orders",
             Engine        = "StateMachine",
             Definition    = definition,
-            Configuration = new() { Name = "orders" },
         };
 
         var registry = new Mock<IProcessRegistry>();
-        registry.Setup(r => r.GetRegisteredProcesses()).Returns(["orders"]);
-        registry.Setup(r => r.GetRegistration("orders")).Returns(registration);
+        registry.Setup(r => r.GetRegisteredProcesses()).Returns([registration]);
 
         await using var services = new ServiceCollection()
                                   .AddSingleton(registry.Object)
@@ -37,7 +35,8 @@ public class ProcessDefinitionServiceShould
         var result = await service.ListProcessDefinitionsAsync(new());
 
         var info = Assert.Single(result.Entities!);
-        Assert.Equal("definitions/orders", info.CanonicalName);
+        Assert.Equal("definitions/orders/versions/1", info.CanonicalName);
+        Assert.Equal("1", info.Version);
         Assert.Equal("Orders", info.DisplayName);
         Assert.Equal("Order fulfilment flow", info.Description);
     }

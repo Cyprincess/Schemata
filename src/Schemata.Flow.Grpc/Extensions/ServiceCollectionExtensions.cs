@@ -17,38 +17,45 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    ///     Declares process, token and transition as gRPC resources with the Flow method set, and
-    ///     registers the process-definition service plus its proto contributor.
+    ///     Declares process, token and transition as gRPC resources with the Flow method set for the
+    ///     host-selected entity types, and registers the process-definition service plus its proto
+    ///     contributor.
     /// </summary>
+    /// <typeparam name="TProcess">The persisted process entity type registered by the host.</typeparam>
+    /// <typeparam name="TToken">The persisted token entity type registered by the host.</typeparam>
+    /// <typeparam name="TTransition">The persisted transition entity type registered by the host.</typeparam>
     /// <param name="services">The service collection.</param>
     /// <param name="schemata">The Schemata options bag the resource registry lives on.</param>
     /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddSchemataFlowGrpcResources(
+    public static IServiceCollection AddSchemataFlowGrpcResources<TProcess, TToken, TTransition>(
         this IServiceCollection services,
         SchemataOptions         schemata
-    ) {
+    )
+        where TProcess : SchemataProcess
+        where TToken : SchemataProcessToken
+        where TTransition : SchemataProcessTransition {
         var resources = new SchemataResourceBuilder(schemata, services) {
-            AuthenticationScheme = schemata.Get<string>(FlowResourceRegistration.AuthenticationSchemeKey),
+            AuthenticationScheme = schemata.Get<string>(FlowResourceRegistration<TProcess, TToken>.AuthenticationSchemeKey),
         };
-        resources.Use<SchemataProcess, SchemataProcess, SchemataProcess, SchemataProcess>(
+        resources.Use<TProcess, TProcess, TProcess, TProcess>(
             [GrpcResourceAttribute.Name],
             resource => {
-                resource.Operations = FlowResourceRegistration.ProcessOperations;
-                resource.Methods    = FlowResourceRegistration.ProcessMethods;
+                resource.Operations = FlowResourceRegistration<TProcess, TToken>.ProcessOperations;
+                resource.Methods    = FlowResourceRegistration<TProcess, TToken>.ProcessMethods;
             });
-        resources.Use<SchemataProcessToken, SchemataProcessToken, SchemataProcessToken, SchemataProcessToken>(
+        resources.Use<TToken, TToken, TToken, TToken>(
             [GrpcResourceAttribute.Name],
             resource => {
-                resource.Operations = FlowResourceRegistration.TokenOperations;
-                resource.Methods    = FlowResourceRegistration.TokenMethods;
+                resource.Operations = FlowResourceRegistration<TProcess, TToken>.TokenOperations;
+                resource.Methods    = FlowResourceRegistration<TProcess, TToken>.TokenMethods;
             });
-        resources.Use<SchemataProcessTransition, SchemataProcessTransition, SchemataProcessTransition, SchemataProcessTransition>(
+        resources.Use<TTransition, TTransition, TTransition, TTransition>(
             [GrpcResourceAttribute.Name],
-            resource => resource.Operations = FlowResourceRegistration.TransitionOperations);
+            resource => resource.Operations = FlowResourceRegistration<TProcess, TToken>.TransitionOperations);
 
         services.TryAddScoped<ProcessDefinitionService>();
 
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTypeContributor, FlowProtoTypeContributor>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTypeContributor, FlowProtoTypeContributor<TProcess, TToken, TTransition>>());
 
         return services;
     }

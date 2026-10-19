@@ -23,7 +23,7 @@ public class BpmnEngineEmbeddedShould
         var parent = entered.Tokens.Single(t => t.StateName == "sub");
         Assert.Equal("Waiting", parent.State);
         Assert.Equal("sub", parent.WaitingAtName);
-        Assert.Equal(process.Name, parent.ScopeName);
+        Assert.Equal(string.Empty, parent.ScopeName);
 
         var child = entered.Tokens.Single(t => t.StateName == "inner-task");
         Assert.Equal("Active", child.State);
@@ -43,11 +43,11 @@ public class BpmnEngineEmbeddedShould
         var child = snapshot.Tokens.First(t => t.StateName == "inner-task");
         snapshot = await engine.AdvanceAsync(definition, snapshot.Process, snapshot.Tokens, child.CanonicalName, CancellationToken.None);
 
-        var resumed = snapshot.Tokens.First(t => string.Equals(t.ScopeName, process.Name, StringComparison.Ordinal));
+        var resumed = snapshot.Tokens.First(t => string.IsNullOrEmpty(t.ScopeName));
         Assert.Contains(resumed.StateName, new[] { "after-sub", "end" });
 
         snapshot = await engine.AdvanceAsync(definition, snapshot.Process, snapshot.Tokens, resumed.CanonicalName, CancellationToken.None);
-        var finalToken = snapshot.Tokens.First(t => string.Equals(t.ScopeName, process.Name, StringComparison.Ordinal));
+        var finalToken = snapshot.Tokens.First(t => string.IsNullOrEmpty(t.ScopeName));
 
         Assert.Equal("Completed", finalToken.State);
         Assert.Equal("Completed", snapshot.Process.State);

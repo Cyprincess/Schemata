@@ -18,11 +18,15 @@ using ThrowProcessSignalRequest = Schemata.Flow.Foundation.Commands.ThrowSignalR
 namespace Schemata.Flow.Foundation;
 
 /// <summary>Facade that converts Flow operations into request-handler invocations.</summary>
-public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
+/// <typeparam name="TProcess">The persisted process entity type registered by the host.</typeparam>
+/// <typeparam name="TToken">The persisted token entity type registered by the host.</typeparam>
+public sealed class FlowRunner<TProcess, TToken>(IServiceProvider services) : IFlowRunner<TProcess, TToken>
+    where TProcess : SchemataProcess
+    where TToken : SchemataProcessToken
 {
     #region IFlowRunner Members
 
-    public ValueTask<SchemataProcess> StartAsync<TState>(
+    public ValueTask<TProcess> StartAsync<TState>(
         string               definitionName,
         TState               source,
         StartProcessOptions? options = null,
@@ -40,11 +44,10 @@ public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
             source.CanonicalName,
             options,
             Principal: null);
-        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>, SchemataProcess>(
-            new(FlowOperations.Start, null, inner, null), ct));
+        return StartResultAsync(dispatcher, inner, null, ct);
     }
 
-    public ValueTask<SchemataProcess> StartAsync(
+    public ValueTask<TProcess> StartAsync(
         string               definitionName,
         StartProcessOptions? options = null,
         CancellationToken    ct      = default
@@ -57,106 +60,105 @@ public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
             SourceCanonicalName: null,
             options,
             Principal: null);
-        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>, SchemataProcess>(
-            new(FlowOperations.Start, null, inner, null), ct));
+        return StartResultAsync(dispatcher, inner, null, ct);
     }
 
     public ValueTask<ProcessSnapshot> CompleteAsync(
-        SchemataProcess    process,
-        string?            token,
-        ClaimsPrincipal?   principal,
-        CancellationToken  ct
+        TProcess          process,
+        string?           token,
+        ClaimsPrincipal?  principal,
+        CancellationToken ct
     ) {
         var canonicalName = RequireCanonicalName(process.CanonicalName, nameof(process));
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, CompleteProcessRequest, ProcessSnapshot>, ProcessSnapshot>(
+        return new(dispatcher.SendAsync<ResourceMethodRequest<TProcess, CompleteProcessRequest, ProcessSnapshot>, ProcessSnapshot>(
             new(FlowOperations.Complete, canonicalName, new(canonicalName, token, principal), principal), ct));
     }
 
     public ValueTask<ProcessSnapshot> CorrelateAsync(
-        SchemataProcess    process,
-        string             messageName,
-        string?            payload,
-        string?            token,
-        ClaimsPrincipal?   principal,
-        CancellationToken  ct
+        TProcess          process,
+        string            messageName,
+        string?           payload,
+        string?           token,
+        ClaimsPrincipal?  principal,
+        CancellationToken ct
     ) {
         var canonicalName = RequireCanonicalName(process.CanonicalName, nameof(process));
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, CorrelateProcessRequest, ProcessSnapshot>, ProcessSnapshot>(
+        return new(dispatcher.SendAsync<ResourceMethodRequest<TProcess, CorrelateProcessRequest, ProcessSnapshot>, ProcessSnapshot>(
             new(FlowOperations.Correlate, canonicalName, new(canonicalName, messageName, payload, token, principal), principal), ct));
     }
 
     public ValueTask<ProcessSnapshot> CorrelateAsync(
-        SchemataProcess    process,
-        string             messageName,
-        object?            payload,
-        string?            token,
-        ClaimsPrincipal?   principal,
-        CancellationToken  ct
+        TProcess          process,
+        string            messageName,
+        object?           payload,
+        string?           token,
+        ClaimsPrincipal?  principal,
+        CancellationToken ct
     ) {
         var canonicalName = RequireCanonicalName(process.CanonicalName, nameof(process));
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, CorrelateProcessRequest, ProcessSnapshot>, ProcessSnapshot>(
+        return new(dispatcher.SendAsync<ResourceMethodRequest<TProcess, CorrelateProcessRequest, ProcessSnapshot>, ProcessSnapshot>(
             new(FlowOperations.Correlate,
                 canonicalName,
-                new(canonicalName, messageName, FlowHandlerSupport.PreserveTypedPayload(payload), token, principal),
+                new(canonicalName, messageName, FlowPayload.Preserve(payload), token, principal),
                 principal), ct));
     }
 
     public ValueTask<IReadOnlyList<SignalDeliveryResult>> ThrowSignalAsync(
-        string             signalName,
-        string?            payload,
-        string?            token,
-        ClaimsPrincipal?   principal,
-        CancellationToken  ct
+        string            signalName,
+        string?           payload,
+        string?           token,
+        ClaimsPrincipal?  principal,
+        CancellationToken ct
     ) {
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, ThrowProcessSignalRequest, IReadOnlyList<SignalDeliveryResult>>, IReadOnlyList<SignalDeliveryResult>>(
+        return new(dispatcher.SendAsync<ResourceMethodRequest<TProcess, ThrowProcessSignalRequest, IReadOnlyList<SignalDeliveryResult>>, IReadOnlyList<SignalDeliveryResult>>(
             new(FlowOperations.Signal, null, new(signalName, payload, token, principal), principal), ct));
     }
 
     public ValueTask<IReadOnlyList<SignalDeliveryResult>> ThrowSignalAsync(
-        string             signalName,
-        object?            payload,
-        string?            token,
-        ClaimsPrincipal?   principal,
-        CancellationToken  ct
+        string            signalName,
+        object?           payload,
+        string?           token,
+        ClaimsPrincipal?  principal,
+        CancellationToken ct
     ) {
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, ThrowProcessSignalRequest, IReadOnlyList<SignalDeliveryResult>>, IReadOnlyList<SignalDeliveryResult>>(
+        return new(dispatcher.SendAsync<ResourceMethodRequest<TProcess, ThrowProcessSignalRequest, IReadOnlyList<SignalDeliveryResult>>, IReadOnlyList<SignalDeliveryResult>>(
             new(FlowOperations.Signal,
                 null,
-                new(signalName, FlowHandlerSupport.PreserveTypedPayload(payload), token, principal),
+                new(signalName, FlowPayload.Preserve(payload), token, principal),
                 principal), ct));
     }
 
     public ValueTask<ProcessSnapshot> TerminateAsync(
-        SchemataProcess    process,
-        ClaimsPrincipal?   principal,
-        CancellationToken  ct
+        TProcess          process,
+        ClaimsPrincipal?  principal,
+        CancellationToken ct
     ) {
         var canonicalName = RequireCanonicalName(process.CanonicalName, nameof(process));
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, TerminateProcessRequest, ProcessSnapshot>, ProcessSnapshot>(
+        return new(dispatcher.SendAsync<ResourceMethodRequest<TProcess, TerminateProcessRequest, ProcessSnapshot>, ProcessSnapshot>(
             new(FlowOperations.Terminate, canonicalName, new(canonicalName, principal), principal), ct));
     }
 
     public ValueTask<ProcessSnapshot> CancelTokenAsync(
-        SchemataProcessToken token,
-        ClaimsPrincipal?     principal,
-        CancellationToken    ct
+        TToken            token,
+        ClaimsPrincipal?  principal,
+        CancellationToken ct
     ) {
         var tokenCanonicalName = RequireCanonicalName(token.CanonicalName, nameof(token));
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcessToken, CancelTokenRequest, ProcessSnapshot>, ProcessSnapshot>(
+        return new(dispatcher.SendAsync<ResourceMethodRequest<TToken, CancelTokenRequest, ProcessSnapshot>, ProcessSnapshot>(
             new(FlowOperations.Cancel, tokenCanonicalName, new($"processes/{token.Process}", tokenCanonicalName, principal), principal), ct));
     }
 
     #endregion
 
     /// <summary>Starts a process from a resource request.</summary>
-    public ValueTask<SchemataProcess> StartAsync(
+    public ValueTask<TProcess> StartAsync(
         string               definitionName,
         string?              source,
         StartProcessOptions? options,
@@ -171,12 +173,11 @@ public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
             SourceCanonicalName: source,
             options,
             principal);
-        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>, SchemataProcess>(
-            new(FlowOperations.Start, null, inner, principal), ct));
+        return StartResultAsync(dispatcher, inner, principal, ct);
     }
 
     /// <summary>Starts a process from a resource request without a source entity.</summary>
-    public ValueTask<SchemataProcess> StartAsync(
+    public ValueTask<TProcess> StartAsync(
         string               definitionName,
         StartProcessOptions? options,
         ClaimsPrincipal?     principal,
@@ -190,12 +191,11 @@ public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
             SourceCanonicalName: null,
             options,
             principal);
-        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>, SchemataProcess>(
-            new(FlowOperations.Start, null, inner, principal), ct));
+        return StartResultAsync(dispatcher, inner, principal, ct);
     }
 
     /// <summary>Starts a process from a resource request and binds a loaded source entity.</summary>
-    public ValueTask<SchemataProcess> StartAsync<TState>(
+    public ValueTask<TProcess> StartAsync<TState>(
         string               definitionName,
         TState               source,
         StartProcessOptions? options,
@@ -214,8 +214,7 @@ public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
             source.CanonicalName,
             options,
             principal);
-        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>, SchemataProcess>(
-            new(FlowOperations.Start, null, inner, principal), ct));
+        return StartResultAsync(dispatcher, inner, principal, ct);
     }
 
     /// <summary>Triggers an addressed internal event through the process request handler.</summary>
@@ -227,8 +226,19 @@ public sealed class FlowRunner(IServiceProvider services) : IFlowRunner
         CancellationToken ct
     ) {
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
-        return new(dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, RunEventRequest, ProcessSnapshot>, ProcessSnapshot>(
+        return new(dispatcher.SendAsync<ResourceMethodRequest<TProcess, RunEventRequest, ProcessSnapshot>, ProcessSnapshot>(
             new(FlowOperations.RunEvent, processName, new(processName, tokenName, trigger, payload), null), ct));
+    }
+
+    private static async ValueTask<TProcess> StartResultAsync(
+        IRequestDispatcher  dispatcher,
+        StartProcessRequest inner,
+        ClaimsPrincipal?    principal,
+        CancellationToken   ct
+    ) {
+        var started = await dispatcher.SendAsync<ResourceMethodRequest<TProcess, StartProcessRequest, SchemataProcess>, SchemataProcess>(
+            new(FlowOperations.Start, null, inner, principal), ct);
+        return (TProcess)started;
     }
 
     private static string RequireCanonicalName(string? canonicalName, string parameterName) {

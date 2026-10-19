@@ -7,7 +7,7 @@ using Schemata.Messaging.Skeleton;
 namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>Request body for broadcasting a signal to all waiting process instances.</summary>
-public sealed class ThrowSignalRequest : ICanonicalName, IRequestIdentification, ICommand<EmptyResourceResponse>, IRequestPrincipal
+public sealed class ThrowSignalRequest : ICanonicalName, IRequestIdentification, ICommand<EmptyResourceResponse>, IRequestPrincipal, IResourceDispatchCarrier
 {
     /// <summary>The <see cref="Models.Signal.Name" /> of the signal definition to throw.</summary>
     public string SignalName { get; set; } = null!;
@@ -40,6 +40,14 @@ public sealed class ThrowSignalRequest : ICanonicalName, IRequestIdentification,
 
     [JsonIgnore]
     public ClaimsPrincipal? Principal { get; set; }
+
+    #endregion
+
+    #region IResourceDispatchCarrier Members
+
+    /// <summary>The identified dispatch execution attached by the idempotency wrap.</summary>
+    [JsonIgnore]
+    public ResourceDispatchExecution? Dispatch { get; set; }
 
     #endregion
 }

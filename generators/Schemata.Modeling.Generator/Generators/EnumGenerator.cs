@@ -27,13 +27,7 @@ internal static class EnumGenerator
             if (value.Assignment is null) {
                 sb.AppendLine($"        {value.Name},");
             } else {
-                var body = value.Assignment switch {
-                    NumberLiteral n => n.Raw,
-                    Literal s       => $"\"{s.Value}\"",
-                    Reference r     => r.QualifiedName,
-                    var _           => value.Assignment.ToString(),
-                };
-                sb.AppendLine($"        {value.Name} = {body},");
+                sb.AppendLine($"        {value.Name} = {((NumberLiteral)value.Assignment).Raw},");
             }
         }
     }

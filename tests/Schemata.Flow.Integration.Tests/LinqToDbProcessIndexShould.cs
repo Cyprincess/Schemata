@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Entity.Repository;
@@ -26,18 +27,22 @@ public sealed class LinqToDbProcessIndexShould : IClassFixture<LinqToDbFlowFixtu
 
         using var duplicateScope = _fixture.CreateScope();
         var       duplicate      = duplicateScope.ServiceProvider.GetRequiredService<IRepository<SchemataProcess>>();
-        var       error          = await Assert.ThrowsAnyAsync<Exception>(() => duplicate.AddAsync(Process(key)));
-        Assert.Contains("UNIQUE", error.ToString(), StringComparison.OrdinalIgnoreCase);
+        var error = await Assert.ThrowsAsync<Abstractions.Exceptions.AlreadyExistsException>(
+            () => duplicate.AddAsync(Process(key)));
+        var detail = Assert.Single(error.Details!.OfType<Abstractions.Errors.ErrorInfoDetail>());
+        Assert.Equal(Abstractions.SchemataConstants.ErrorReasons.ResourceAlreadyExists,
+                     detail.Reason);
     }
 
     private static SchemataProcess Process(string key) {
         var name = Guid.NewGuid().ToString("n");
         return new() {
-            Name           = name,
-            CanonicalName  = $"processes/{name}",
-            DefinitionName = nameof(IdempotencyProcess),
-            IdempotencyKey = key,
-            State          = "Waiting",
+            Name              = name,
+            CanonicalName     = $"processes/{name}",
+            DefinitionName    = nameof(IdempotencyProcess),
+            DefinitionVersion = "1",
+            IdempotencyKey    = key,
+            State             = "Waiting",
         };
     }
 }

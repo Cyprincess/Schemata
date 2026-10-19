@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Moq;
@@ -8,6 +8,8 @@ using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
 using Xunit;
 
+using Schemata.Abstractions.Advisors;
+using Microsoft.Extensions.DependencyInjection;
 namespace Schemata.Flow.Tests;
 
 public class ProcessDefinitionGraphProjectionShould
@@ -15,7 +17,7 @@ public class ProcessDefinitionGraphProjectionShould
     private const string ConditionText = "amount > 1000 /* guard-sentinel */";
 
     [Fact]
-    public async Task PlaceEveryElementInItsOwnScope() {
+    public async Task Place_Every_Element_In_Its_Own_Scope() {
         var info = await Project();
 
         Assert.Null(Element(info, "start").Scope);
@@ -26,7 +28,7 @@ public class ProcessDefinitionGraphProjectionShould
     }
 
     [Fact]
-    public async Task AttachBoundaryEventsToTheirHost() {
+    public async Task Attach_Boundary_Events_To_Their_Host() {
         var info = await Project();
 
         Assert.Equal("sub", Element(info, "onTimeout").AttachedTo);
@@ -37,7 +39,7 @@ public class ProcessDefinitionGraphProjectionShould
     }
 
     [Fact]
-    public async Task ReportTheEventDefinitionShapeNotOnlyItsName() {
+    public async Task Report_The_Event_Definition_Shape_Not_Only_Its_Name() {
         var info = await Project();
 
         Assert.Equal("TimerDefinition", Element(info, "onTimeout").TriggerKind);
@@ -48,7 +50,7 @@ public class ProcessDefinitionGraphProjectionShould
     }
 
     [Fact]
-    public async Task ReportTerminationAndLoopAndEventSubProcessShapes() {
+    public async Task Report_Termination_And_Loop_And_Event_Sub_Process_Shapes() {
         var info = await Project();
 
         Assert.True(Element(info, "abort").IsTerminate);
@@ -63,7 +65,7 @@ public class ProcessDefinitionGraphProjectionShould
     }
 
     [Fact]
-    public async Task MarkConditionalAndDefaultEdges() {
+    public async Task Mark_Conditional_And_Default_Edges() {
         var info = await Project();
 
         var conditional = Flow(info, "decide", "abort");
@@ -76,7 +78,7 @@ public class ProcessDefinitionGraphProjectionShould
     }
 
     [Fact]
-    public async Task RenderEveryNodeEventDefinitionMessageAndEdgeWithoutAClientDictionary() {
+    public async Task Render_Every_Node_Event_Definition_Message_And_Edge_Without_A_Client_Dictionary() {
         var info = await Project();
 
         Assert.All(info.Elements, element => Assert.False(string.IsNullOrEmpty(element.DisplayName)));
@@ -89,14 +91,14 @@ public class ProcessDefinitionGraphProjectionShould
     }
 
     [Fact]
-    public async Task KeepConditionExpressionsOffTheWire() {
+    public async Task Keep_Condition_Expressions_Off_The_Wire() {
         var json = JsonSerializer.Serialize(await Project());
 
         Assert.DoesNotContain("guard-sentinel", json);
     }
 
     [Fact]
-    public async Task KeepElementNamesStableWhenLabelsChange() {
+    public async Task Keep_Element_Names_Stable_When_Labels_Change() {
         var before = (await Project()).Elements.Select(e => e.Name).ToArray();
 
         var definition = Definition();
@@ -121,14 +123,12 @@ public class ProcessDefinitionGraphProjectionShould
             Name          = "orders",
             Engine        = "StateMachine",
             Definition    = definition ?? Definition(),
-            Configuration = new() { Name = "orders" },
         };
 
         var registry = new Mock<IProcessRegistry>();
-        registry.Setup(r => r.GetRegisteredProcesses()).Returns(["orders"]);
-        registry.Setup(r => r.GetRegistration("orders")).Returns(registration);
+        registry.Setup(r => r.GetRegisteredProcesses()).Returns([registration]);
 
-        return Assert.Single(await new DefaultListProcessDefinitionsHandler(registry.Object).HandleAsync(new()));
+        return Assert.Single(await new DefaultListProcessDefinitionsHandler(registry.Object).HandleAsync(new(), EmptyAdvice()));
     }
 
     private static ProcessDefinition Definition() {
@@ -220,4 +220,6 @@ public class ProcessDefinitionGraphProjectionShould
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
     }
+
+    private static AdviceContext EmptyAdvice() => new(new ServiceCollection().BuildServiceProvider());
 }

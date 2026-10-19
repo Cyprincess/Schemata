@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Messaging.Skeleton;
 
@@ -13,4 +14,7 @@ public sealed record RunEventRequest(
     string?          Token,
     IEventDefinition Trigger,
     object?          Payload
-) : ICommand<ProcessSnapshot>, IProcessScoped;
+) : ICommand<ProcessSnapshot>, IProcessScoped, IRequestPrincipal
+{
+    public ClaimsPrincipal? Principal { get; set; }
+}

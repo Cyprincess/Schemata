@@ -64,7 +64,7 @@ Entities map to database tables. They generate a C# entity class and one C# reco
 Entity Book {
   Use Entity, SoftDelete
 
-  string title [not null] { Length: 500 }
+  string title [not null] { Length 500 }
   string? author
   string? isbn [unique]
   int page_count

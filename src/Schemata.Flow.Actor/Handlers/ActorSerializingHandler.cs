@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Schemata.Actor.Skeleton;
 using Schemata.Flow.Foundation;
 using Schemata.Messaging.Skeleton;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Flow.Actor.Handlers;
 
@@ -30,9 +31,9 @@ internal sealed class ActorSerializingHandler<TRequest, TResult>(
     IActorSystem actors, IServiceProvider caller) : IRequestHandler<TRequest, TResult>
     where TRequest : IRequest<TResult>, IProcessScoped
 {
-    public async Task<TResult> HandleAsync(TRequest request, CancellationToken ct = default) {
+    public async Task<TResult> HandleAsync(TRequest request, AdviceContext advice, CancellationToken ct = default) {
         var context = MessageContexts.Capture(caller);
-        var actor   = await actors.GetAsync(new ActorId("flow", request.ProcessCanonicalName));
+        var actor   = await actors.GetAsync(new("flow", request.ProcessCanonicalName));
         return await actor.AskAsync<TRequest, TResult>(request, context, ct: ct);
     }
 }

@@ -3,17 +3,27 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Entity.Repository;
 using Schemata.Flow.Foundation.Commands;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Messaging.Skeleton;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Flow.Foundation.Handlers;
 
-internal sealed class DefaultDeliverSignalHandler(FlowHandlerSupport support)
+internal sealed class DefaultDeliverSignalHandler<TProcess, TToken, TTransition, TCompensation, TParticipant, TSource>(
+    FlowHandlerSupport<TProcess, TToken, TTransition, TCompensation, TParticipant, TSource> support
+)
     : IRequestHandler<DeliverSignalRequest, SignalDeliveryResult>
+    where TProcess : SchemataProcess, new()
+    where TToken : SchemataProcessToken, new()
+    where TTransition : SchemataProcessTransition, new()
+    where TCompensation : SchemataProcessCompensation, new()
+    where TParticipant : SchemataProcessParticipant, new()
+    where TSource : SchemataProcessSource, new()
 {
-    public async Task<SignalDeliveryResult> HandleAsync(DeliverSignalRequest request, CancellationToken ct = default) {
+    public async Task<SignalDeliveryResult> HandleAsync(DeliverSignalRequest request, AdviceContext advice, CancellationToken ct = default) {
         var              delivered = false;
         var              committed = new List<ProcessSnapshot>();
         SchemataProcess? target    = null;
@@ -24,35 +34,45 @@ internal sealed class DefaultDeliverSignalHandler(FlowHandlerSupport support)
                 delivered = false;
 
                 var process = await scope.Processes.FirstOrDefaultAsync(
-                    query => query.Where(candidate => candidate.CanonicalName == request.ProcessCanonicalName), current);
+                    query => query.Where(candidate => candidate.CanonicalName == request.ProcessCanonicalName),
+                    current,
+                    new QueryOptions(IgnoreOwner: true));
                 if (process is null) {
                     return;
                 }
 
                 target = process;
-                var registration = support.FindRegistration(process.DefinitionName);
-                var signal = registration?.Definition.Signals
-                                          .FirstOrDefault(currentSignal => currentSignal.Name == request.SignalName);
-                if (registration is null || signal is null) {
+                var registration = support.ResolveRegistration(process);
+                var signal = registration.Definition.Signals
+                                         .FirstOrDefault(currentSignal => currentSignal.Name == request.SignalName);
+                if (signal is null) {
                     return;
                 }
 
                 var engine  = support.ResolveEngine(registration);
-                var payload = FlowHandlerSupport.DeserializePayload(
+                var payload = FlowPayload.Deserialize(
                     request.Payload,
                     registration.SignalPayloadTypes.GetValueOrDefault(request.SignalName));
-                var tokens  = await FlowHandlerSupport.LoadTokensAsync(scope, process.Name!, current);
-                var context = await support.CreateExecutionContextAsync(scope, process, request.Principal, current);
+                var tokens  = await FlowHandlerSupport<TProcess, TToken, TTransition, TCompensation, TParticipant, TSource>.LoadTokensAsync(scope, process.Name!, current);
+                var context = await support.CreateExecutionContextAsync(scope, process, request.Principal, advice, current);
                 var targets = await engine.FindTriggerTargetsAsync(
                     registration.Definition, process, tokens, context, signal, current);
-                foreach (var token in FlowHandlerSupport.FilterTargets(targets, request.Token)) {
-                    var before   = FlowHandlerSupport.WaitingMap(tokens);
+                foreach (var token in FlowHandlerSupport<TProcess, TToken, TTransition, TCompensation, TParticipant, TSource>.FilterTargets(targets, request.Token)) {
+                    if (support.Access is { } access && request.Principal is not null) {
+                        await access.RequireEligibilityAsync(FlowOperations.Signal, process,
+                            tokens.Where(candidate => candidate.CanonicalName == token).ToArray(), request.Principal, scope.UnitOfWork, current);
+                    }
+                    var before   = FlowHandlerSupport<TProcess, TToken, TTransition, TCompensation, TParticipant, TSource>.WaitingMap(tokens);
                     var snapshot = await engine.TriggerAsync(
                         registration.Definition, process, tokens, context, signal, payload, token, current);
                     support.EnsureCatchesHaveHandlers(registration.Definition, snapshot);
-                    await support.RunAdvisorsAsync(registration, scope, context, snapshot, before, current);
+                    await support.RunAdvisorsAsync(registration, scope, context, snapshot, before, advice, current);
                     await support.Persistence.PersistSnapshotAsync(scope, snapshot, current);
+                    if (support.Access is { } history) await history.RecordParticipationAsync(process, request.Principal, scope.UnitOfWork, current);
                     committed.Add(snapshot);
+                    // The next boundary delivery must see the tokens this delivery routed, so adopt
+                    // the committed snapshot's inventory instead of the originally loaded rows.
+                    tokens    = snapshot.Tokens.OfType<TToken>().ToList();
                     delivered = true;
                 }
             }, ct);

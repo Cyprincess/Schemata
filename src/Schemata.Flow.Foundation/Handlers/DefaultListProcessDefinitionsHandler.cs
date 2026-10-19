@@ -7,6 +7,7 @@ using Schemata.Flow.Foundation.Commands;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Messaging.Skeleton;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Flow.Foundation.Handlers;
 
@@ -16,6 +17,7 @@ internal sealed class DefaultListProcessDefinitionsHandler(IProcessRegistry regi
 {
     public Task<IReadOnlyList<ProcessDefinitionInfo>> HandleAsync(
         ListProcessDefinitionsQuery request,
+        AdviceContext               context,
         CancellationToken           ct = default
     ) {
         return Task.FromResult<IReadOnlyList<ProcessDefinitionInfo>>(ListProcessDefinitions());
@@ -23,10 +25,11 @@ internal sealed class DefaultListProcessDefinitionsHandler(IProcessRegistry regi
 
     private List<ProcessDefinitionInfo> ListProcessDefinitions() {
         return registry.GetRegisteredProcesses()
-                       .Select(n => {
-                           var definition = registry.GetRegistration(n)?.Definition;
+                       .Select(registration => {
+                           var definition = registration.Definition;
                            var info = new ProcessDefinitionInfo {
-                               CanonicalName = $"definitions/{n}",
+                               CanonicalName = $"definitions/{registration.Name}/versions/{registration.Version}",
+                               Version       = registration.Version,
                                Elements      = ProjectElements(definition),
                                Flows         = definition?.AllFlows.Select(ProjectFlow).ToList() ?? [],
                                Messages      = definition?.Messages.Select(ProjectMessage).ToList() ?? [],
@@ -65,7 +68,11 @@ internal sealed class DefaultListProcessDefinitionsHandler(IProcessRegistry regi
 
         var info = new ProcessDefinitionElementInfo {
             Name             = element.Name,
-            Kind             = element.GetType().Name,
+            Kind             = element switch {
+                ScriptTask => nameof(ScriptTask),
+                BusinessRuleTask => nameof(BusinessRuleTask),
+                _ => element.GetType().Name,
+            },
             Position         = flowEvent?.Position,
             Trigger          = flowEvent?.Definition?.Name,
             TriggerKind      = flowEvent?.Definition?.GetType().Name,

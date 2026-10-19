@@ -13,7 +13,6 @@ using Schemata.Entity.Repository;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Integration.Tests.Fixtures;
 using Schemata.Flow.Skeleton.Entities;
-using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
 using Xunit;
 
@@ -43,6 +42,7 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
         // The handler persists subscriptions, so a host without a persistence provider must still
         // supply the repository it depends on.
         builder.Services.AddSingleton(Mock.Of<IRepository<SchemataEventSubscription>>());
+        builder.Services.AddSingleton(Mock.Of<IResourceMutation<SchemataEventSubscription>>());
         using var services = builder.Services.BuildServiceProvider();
 
         var handlers = services.GetServices<IFlowCatchHandler>().ToList();
@@ -213,7 +213,7 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
         using var scope = _fixture.CreateScope();
         var registry = scope.ServiceProvider.GetRequiredService<IProcessRegistry>();
         var name     = $"{definition.Name}-{Guid.NewGuid():n}";
-        await registry.RegisterAsync(new ProcessConfiguration {
+        await registry.RegisterAsync(new() {
             Name           = name,
             Engine         = engine,
             DefinitionType = definition,
@@ -238,6 +238,6 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
         var       repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataProcessToken>>();
         var token = await repository.FirstOrDefaultAsync(query => query.Where(current => current.Process == process));
         Assert.NotNull(token);
-        return token!;
+        return token;
     }
 }

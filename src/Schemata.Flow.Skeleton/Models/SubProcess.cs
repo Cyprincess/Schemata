@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>
@@ -10,11 +8,19 @@ namespace Schemata.Flow.Skeleton.Models;
 /// </summary>
 public abstract class SubProcess : Activity
 {
+    private bool _triggeredByEvent;
+
     /// <summary>
     ///     When <c>true</c>, the sub-process activates from an event trigger
     ///     (Event Sub-Process).
     /// </summary>
-    public bool TriggeredByEvent { get; set; }
+    public bool TriggeredByEvent {
+        get => _triggeredByEvent;
+        set {
+            EnsureMutable();
+            _triggeredByEvent = value;
+        }
+    }
 
     /// <summary>
     ///     Inner BPMN elements scoped to this sub-process. The sub-process must contain at least
@@ -22,8 +28,15 @@ public abstract class SubProcess : Activity
     ///     <see cref="FlowEvent" /> with <see cref="EventPosition.End" />; intermediate gateways,
     ///     activities, and nested sub-processes are allowed.
     /// </summary>
-    public List<FlowElement> Children { get; } = [];
+    public FlowGraphCollection<FlowElement> Children { get; } = new();
 
     /// <summary>Sequence flows wiring up <see cref="Children" />.</summary>
-    public List<SequenceFlow> ChildFlows { get; } = [];
+    public FlowGraphCollection<SequenceFlow> ChildFlows { get; } = new();
+
+    /// <inheritdoc />
+    protected internal override void FreezeCore() {
+        base.FreezeCore();
+        Children.Freeze();
+        ChildFlows.Freeze();
+    }
 }

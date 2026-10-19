@@ -9,17 +9,55 @@ namespace Schemata.Flow.Skeleton.Models;
 ///     <see cref="Source" /> and <see cref="Target" /> hold direct object
 ///     references so the engine matches by identity during graph traversal.
 /// </summary>
-public sealed class SequenceFlow : IDescriptive
+public sealed class SequenceFlow : FlowGraphNode, IDescriptive
 {
-    public FlowElement Source { get; set; } = null!;
+    private FlowElement _source = null!;
+    private FlowElement _target = null!;
+    private IConditionExpression? _condition;
+    private bool _isDefault;
 
-    public FlowElement Target { get; set; } = null!;
+    public FlowElement Source {
+        get => _source;
+        set {
+            EnsureMutable();
+            _source = value;
+        }
+    }
+
+    public FlowElement Target {
+        get => _target;
+        set {
+            EnsureMutable();
+            _target = value;
+        }
+    }
 
     /// <summary>Optional guard expression; when present, the flow is only taken if the condition evaluates to true.</summary>
-    public IConditionExpression? Condition { get; set; }
+    public IConditionExpression? Condition {
+        get => _condition;
+        set {
+            EnsureMutable();
+            _condition = value;
+        }
+    }
 
     /// <summary>Indicates that this flow is the gateway fallback after sibling conditions fail.</summary>
-    public bool IsDefault { get; set; }
+    public bool IsDefault {
+        get => _isDefault;
+        set {
+            EnsureMutable();
+            _isDefault = value;
+        }
+    }
+
+    /// <inheritdoc />
+    protected internal override void FreezeCore() {
+        Source?.Freeze();
+        Target?.Freeze();
+        if (Condition is FlowGraphNode node) {
+            node.Freeze();
+        }
+    }
 
     #region IDescriptive Members
 

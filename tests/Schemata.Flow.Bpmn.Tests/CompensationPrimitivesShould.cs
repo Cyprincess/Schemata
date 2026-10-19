@@ -125,12 +125,12 @@ public class CompensationPrimitivesShould
             new() { Name           = "process" },
             new() {
                 CanonicalName = "processes/1/tokens/root",
-                ScopeName       = "scope",
-                StateName       = "scope",
+                ScopeName     = "scope",
+                StateName     = "scope",
                 State         = "Compensating",
-                Bookkeeping   = new Dictionary<string, int> { ["scope"] = 1 },
+                Bookkeeping   = new() { ["scope"] = 1 },
             },
-            BpmnEngineTestExtensions.Context([]));
+            BpmnEngineTestExtensions.Context([]), []);
     }
 
     private static CompensationStack NewStack(IEnumerable<ICompensationHandler> handlers) {

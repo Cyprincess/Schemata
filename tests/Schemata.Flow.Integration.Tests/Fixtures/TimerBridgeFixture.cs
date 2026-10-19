@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Moq;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,6 +42,7 @@ public sealed class TimerBridgeFixture : IAsyncLifetime
 
     public async Task InitializeAsync() {
         var services = new ServiceCollection();
+        Schemata.Flow.Tests.FlowTestCreation.Register(services);
         _connection = new(_connectionString);
         await _connection.OpenAsync();
 
@@ -62,11 +64,14 @@ public sealed class TimerBridgeFixture : IAsyncLifetime
         services.AddLogging();
         services.AddSchemataFlow();
 
-        services.TryAddKeyedSingleton<IFlowRuntime, BpmnEngine>(FlowConstants.Engines.Bpmn);
+        services.TryAddKeyedSingleton<IFlowRuntime<SchemataProcess, SchemataProcessToken, SchemataProcessTransition>, BpmnEngine>(FlowConstants.Engines.Bpmn);
+        services.TryAddKeyedSingleton<IFlowRuntime>(FlowConstants.Engines.Bpmn,
+            (sp, _) => sp.GetRequiredKeyedService<IFlowRuntime<SchemataProcess, SchemataProcessToken, SchemataProcessTransition>>(FlowConstants.Engines.Bpmn));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowEngineValidator, BpmnFlowEngineValidator>());
 
-        ConfigureFeature(new SchemataSchedulingFeature(), services);
-        ConfigureFeature(new SchemataFlowSchedulingFeature(), services);
+        ConfigureFeature(new SchemataSchedulingFeature<SchemataJob, SchemataJobExecution>(), services);
+        services.AddSchemataSchedulingRepositoryStore();
+        ConfigureFeature(new SchemataFlowSchedulingFeature<SchemataJob, SchemataJobExecution>(), services);
         // Claims no catch kind, so it never satisfies the has-an-owner check: it is here only to
         // record the transitions the timer path produces.
         var spy = new Mock<IFlowCatchHandler>();
@@ -78,6 +83,14 @@ public sealed class TimerBridgeFixture : IAsyncLifetime
                return ValueTask.CompletedTask;
            });
         services.AddSingleton(spy.Object);
+        // Claims message catches so gateway fixtures mixing message and timer branches satisfy the
+        // has-an-owner check.
+        var messages = new Mock<IFlowCatchHandler>();
+        messages.Setup(handler => handler.Handles(It.IsAny<FlowCatchKind>()))
+                .Returns((FlowCatchKind kind) => kind is FlowCatchKind.Message);
+        messages.Setup(handler => handler.ArmAsync(It.IsAny<FlowTransitionContext>(), It.IsAny<CancellationToken>()))
+                .Returns(ValueTask.CompletedTask);
+        services.AddSingleton(messages.Object);
 
         _root = services.BuildServiceProvider();
 
@@ -89,7 +102,7 @@ public sealed class TimerBridgeFixture : IAsyncLifetime
         var jobs = _root.GetRequiredService<IScheduledJobRegistry>();
         var options = _root.GetRequiredService<IOptions<SchemataSchedulingOptions>>();
         jobs.RegisterAll(options.Value.Jobs.Select(job => job.JobType));
-        await _root.GetRequiredService<IScheduler>().StartAsync(default);
+        await _root.GetRequiredService<IScheduler<SchemataJob, SchemataJobExecution>>().StartAsync(default);
 
         var registry = _root.GetRequiredService<IProcessRegistry>();
         await registry.RegisterAsync<ParallelTimerProcess>(FlowConstants.Engines.Bpmn);
@@ -98,7 +111,7 @@ public sealed class TimerBridgeFixture : IAsyncLifetime
 
     public async Task DisposeAsync() {
         if (_root is not null) {
-            await _root.GetRequiredService<IScheduler>().StopAsync(default);
+            await _root.GetRequiredService<IScheduler<SchemataJob, SchemataJobExecution>>().StopAsync(default);
 
             using (var scope = _root.CreateScope()) {
                 var db = scope.ServiceProvider.GetRequiredService<TestDbContext>();
@@ -118,7 +131,7 @@ public sealed class TimerBridgeFixture : IAsyncLifetime
     public IServiceScope CreateScope() { return _root!.CreateScope(); }
 
     public Task DispatchPendingAsync() {
-        return _root!.GetRequiredService<JobExecutionDispatcher>().DispatchPendingAsync(default);
+        return _root!.GetRequiredService<JobExecutionDispatcher<SchemataJob, SchemataJobExecution>>().DispatchPendingAsync(default);
     }
 
     private static void ConfigureFeature(FeatureBase feature, IServiceCollection services) {

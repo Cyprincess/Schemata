@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Entities;
 using Schemata.Common;
@@ -42,8 +43,8 @@ public sealed class EventBehavior
 
     /// <summary>Splices a procedure task running <paramref name="body" /> in front of the event.</summary>
     /// <param name="body">The delegate executed by the inserted procedure task.</param>
-    public EventBehavior OnEnter(Func<FlowTaskContext, ValueTask> body) {
-        _definition.InsertEnterTask(_event, new ProcedureTask { Name = $"Enter_{_event.Name}", Body = body });
+    public EventBehavior OnEnter(Func<FlowTaskContext, CancellationToken, ValueTask> body) {
+        _definition.InsertEnterTask(_event, new() { Name = $"Enter_{_event.Name}", Body = body });
         return this;
     }
 
@@ -53,7 +54,7 @@ public sealed class EventBehavior
     /// </summary>
     /// <typeparam name="TSource">The source entity type resolved from the flow task context.</typeparam>
     /// <param name="body">The delegate executed with the task context and the resolved source.</param>
-    public EventBehavior OnEnter<TSource>(Func<FlowTaskContext, TSource, ValueTask> body)
+    public EventBehavior OnEnter<TSource>(Func<FlowTaskContext, TSource, CancellationToken, ValueTask> body)
         where TSource : class, ICanonicalName {
         return OnEnter(FlowSourceDescriptor.DefaultBindingName<TSource>(), body);
     }
@@ -65,7 +66,7 @@ public sealed class EventBehavior
     /// <typeparam name="TSource">The source entity type resolved from the flow task context.</typeparam>
     /// <param name="source">The source binding name; disambiguates multiple bindings of the same CLR type.</param>
     /// <param name="body">The delegate executed with the task context and the resolved source.</param>
-    public EventBehavior OnEnter<TSource>(string source, Func<FlowTaskContext, TSource, ValueTask> body)
+    public EventBehavior OnEnter<TSource>(string source, Func<FlowTaskContext, TSource, CancellationToken, ValueTask> body)
         where TSource : class, ICanonicalName {
         ArgumentException.ThrowIfNullOrEmpty(source);
         return OnEnter(FlowSourceBody.Bind(source, body));

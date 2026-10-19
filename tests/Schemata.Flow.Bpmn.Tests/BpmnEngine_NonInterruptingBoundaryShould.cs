@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Flow.Skeleton.Utilities;
 using Xunit;
 
 namespace Schemata.Flow.Bpmn.Tests;
@@ -10,7 +11,7 @@ namespace Schemata.Flow.Bpmn.Tests;
 public class BpmnEngine_NonInterruptingBoundaryShould
 {
     [Fact]
-    public async Task Trigger_NonInterruptingBoundary_KeepsHostTokenActive() {
+    public async Task Trigger_NonInterruptingBoundary_FirstFire_SpawnsSiblingAndKeepsHostActive() {
         var scenario = SignalScenario();
         var engine   = new BpmnEngine();
         var started  = await engine.StartAsync(scenario.Definition, NewProcess(scenario.Definition.Name), CancellationToken.None);
@@ -29,49 +30,14 @@ public class BpmnEngine_NonInterruptingBoundaryShould
         Assert.Equal("Active", stillActiveHost.State);
         Assert.Equal("task", stillActiveHost.StateName);
         Assert.Null(stillActiveHost.WaitingAtName);
-    }
 
-    [Fact]
-    public async Task Trigger_NonInterruptingBoundary_SpawnsSiblingWithSpawnerSet() {
-        var scenario = SignalScenario();
-        var engine   = new BpmnEngine();
-        var started  = await engine.StartAsync(scenario.Definition, NewProcess(scenario.Definition.Name), CancellationToken.None);
-        var host     = started.Tokens.Single(t => t.StateName == "task");
-
-        var fired = await engine.TriggerAsync(
-            scenario.Definition,
-            started.Process,
-            started.Tokens,
-            scenario.Trigger,
-            null,
-            host.CanonicalName,
-            CancellationToken.None);
-
-        var added = fired.Tokens.Where(t => started.Tokens.All(existing => existing.CanonicalName != t.CanonicalName)).ToList();
+        var added   = fired.Tokens.Where(t => started.Tokens.All(existing => existing.CanonicalName != t.CanonicalName)).ToList();
         var spawned = Assert.Single(added);
         Assert.Equal(host.CanonicalName, spawned.Spawner);
         Assert.Equal("Active", spawned.State);
         Assert.Equal("side-handler", spawned.StateName);
         Assert.Null(spawned.WaitingAtName);
-    }
 
-    [Fact]
-    public async Task Trigger_NonInterruptingBoundary_WritesExactlyOneKindSpawnTransition() {
-        var scenario = SignalScenario();
-        var engine   = new BpmnEngine();
-        var started  = await engine.StartAsync(scenario.Definition, NewProcess(scenario.Definition.Name), CancellationToken.None);
-        var host     = started.Tokens.Single(t => t.StateName == "task");
-
-        var fired = await engine.TriggerAsync(
-            scenario.Definition,
-            started.Process,
-            started.Tokens,
-            scenario.Trigger,
-            null,
-            host.CanonicalName,
-            CancellationToken.None);
-
-        var spawned = fired.Tokens.Single(t => t.Spawner == host.CanonicalName);
         var spawn = Assert.Single(fired.Transitions, t => t.Kind == TransitionKind.Spawn);
         Assert.Equal(spawned.CanonicalName, spawn.Token);
         Assert.Equal("boundary", spawn.Previous);
@@ -212,6 +178,33 @@ public class BpmnEngine_NonInterruptingBoundaryShould
         Assert.Equal(spawned.CanonicalName, spawn.Token);
         Assert.Equal(scenario.Trigger.Name, spawn.Event);
         Assert.DoesNotContain(fired.Transitions, t => t.Kind == TransitionKind.Cancel);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task NonInterruptingBoundary_EnteringSubProcess_StagesEachChildOnce() {
+        var scenario = SignalScenario();
+        var innerStart = new FlowEvent { Name = "inner-start", Position = EventPosition.Start };
+        var innerTask = new NoneTask { Name = "inner-task" };
+        var innerEnd = new FlowEvent { Name = "inner-end", Position = EventPosition.End };
+        var sub = new EmbeddedSubProcess { Name = "side-sub", Children = { innerStart, innerTask, innerEnd }, ChildFlows = {
+            new() { Source = innerStart, Target = innerTask }, new() { Source = innerTask, Target = innerEnd },
+        } };
+        scenario.Definition.Elements.Add(sub);
+        scenario.Definition.Flows.Single(flow => flow.Source.Name == "boundary").Target = sub;
+        scenario.Definition.Flows.Add(new() { Source = sub, Target = scenario.Definition.FindElementByName("end-side")! });
+        var engine = new BpmnEngine();
+        var snapshot = await engine.StartAsync(scenario.Definition, NewProcess(scenario.Definition.Name));
+        var host = snapshot.Tokens.Single();
+        snapshot = await engine.TriggerAsync(scenario.Definition, snapshot.Process, snapshot.Tokens, scenario.Trigger, null, host.CanonicalName);
+        var child = Assert.Single(snapshot.Tokens, token => token.StateName == "inner-task");
+        var parent = Assert.Single(snapshot.Tokens, token => token.WaitingAtName == "side-sub");
+        Assert.Equal(parent.CanonicalName, child.Spawner);
+        Assert.Equal(snapshot.Tokens.Count, snapshot.Tokens.Select(token => token.CanonicalName).Distinct().Count());
+        snapshot = await engine.AdvanceAsync(scenario.Definition, snapshot.Process, snapshot.Tokens, child.CanonicalName);
+        Assert.Equal("Completed", parent.State);
+        Assert.Equal("Active", host.State);
+        Assert.Single(snapshot.Transitions, row => row.Event == "ExitSubProcess");
     }
 
     private static BoundaryScenario SignalScenario() {

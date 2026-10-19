@@ -64,7 +64,7 @@ public static class StateMachineValidator
     private static void ValidateUnsupportedShapes(ProcessDefinition definition) {
         foreach (var element in definition.AllElements) {
             var unsupported = element is AdHocSubProcess
-                           || element is FlowEvent { Definition: LinkDefinition or MultipleDefinition };
+                           || element is FlowEvent { Definition: LinkDefinition or MultipleDefinition or ParallelDefinition };
             if (unsupported) {
                 throw new InvalidOperationException($"State machine definition shape '{element.GetType().Name}' is not supported.");
             }

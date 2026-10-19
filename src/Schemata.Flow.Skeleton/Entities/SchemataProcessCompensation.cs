@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
@@ -8,8 +9,11 @@ namespace Schemata.Flow.Skeleton.Entities;
 [Table("SchemataProcessCompensations")]
 [PrimaryKey(nameof(Uid))]
 [CanonicalName("process-compensations/{process_compensation}")]
-public class SchemataProcessCompensation : IIdentifier, ICanonicalName, ITimestamp
+public class SchemataProcessCompensation : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
+    [ConcurrencyCheck]
+    public virtual Guid Timestamp { get; set; }
+
     /// <summary>Canonical name of the process that owns this compensation binding.</summary>
     public virtual string Process { get; set; } = null!;
 
@@ -18,6 +22,9 @@ public class SchemataProcessCompensation : IIdentifier, ICanonicalName, ITimesta
 
     /// <summary>Name of the activity invoked when this binding is compensated.</summary>
     public virtual string ActivityName { get; set; } = null!;
+
+    /// <summary>Graph name of the compensation boundary event this binding was registered for.</summary>
+    public virtual string BoundaryName { get; set; } = null!;
 
     /// <summary>Stable registration order within the owning compensation scope.</summary>
     public virtual int RegistrationOrder { get; set; }

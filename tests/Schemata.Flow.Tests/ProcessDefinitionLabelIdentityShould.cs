@@ -18,11 +18,6 @@ public class ProcessDefinitionLabelIdentityShould
         Assert.Equal("Routes the request to an approver.", approval.Description);
         Assert.Equal("审批", approval.DisplayNames!["zh-Hans"]);
         Assert.Equal("把请求路由给审批人。", approval.Descriptions!["zh-Hans"]);
-    }
-
-    [Fact]
-    public void LabelEventDefinitionsDeclaredAsMagicProperties() {
-        var definition = new LabelledProcess();
 
         var message = Assert.Single(definition.Messages);
 

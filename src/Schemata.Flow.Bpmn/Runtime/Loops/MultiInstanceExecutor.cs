@@ -17,7 +17,13 @@ namespace Schemata.Flow.Bpmn.Runtime.Loops;
 ///     <see cref="MIEventBehavior.All" /> aggregation; <see cref="MIEventBehavior.One" /> and
 ///     <see cref="MIEventBehavior.Complex" /> throw <see cref="NotSupportedException" />.
 /// </summary>
-public sealed class MultiInstanceExecutor
+/// <typeparam name="TProcess">The persisted process entity type registered by the host.</typeparam>
+/// <typeparam name="TToken">The persisted token entity type registered by the host.</typeparam>
+/// <typeparam name="TTransition">The persisted transition entity type registered by the host.</typeparam>
+public sealed class MultiInstanceExecutor<TProcess, TToken, TTransition>
+    where TProcess : SchemataProcess, new()
+    where TToken : SchemataProcessToken, new()
+    where TTransition : SchemataProcessTransition, new()
 {
     private const string NrOfInstancesName          = "nrOfInstances";
     private const string NrOfActiveInstancesName    = "nrOfActiveInstances";
@@ -29,7 +35,7 @@ public sealed class MultiInstanceExecutor
     ///     sequential instances in place or parks the parent while parallel sibling tokens run.
     /// </summary>
     public async ValueTask<ProcessSnapshot> ExecuteAsync(
-        BpmnEngine                       engine,
+        BpmnEngine<TProcess, TToken, TTransition>                       engine,
         ProcessDefinition                definition,
         SchemataProcess                  process,
         SchemataProcessToken             token,
@@ -63,7 +69,7 @@ public sealed class MultiInstanceExecutor
     ///     resumes the parked parent when completion conditions or all-instance completion allow it.
     /// </summary>
     public async ValueTask<ProcessSnapshot> CompleteParallelInstanceAsync(
-        BpmnEngine                       engine,
+        BpmnEngine<TProcess, TToken, TTransition>                       engine,
         ProcessDefinition                definition,
         SchemataProcess                  process,
         SchemataProcessToken             instance,
@@ -89,8 +95,10 @@ public sealed class MultiInstanceExecutor
                                              && t.State == "Waiting"
                                              && t.WaitingAtName == activity.Name);
         if (parent is null) {
-            return BpmnEngine.Snapshot(process, working, [], context);
+            return BpmnEngine<TProcess, TToken, TTransition>.Snapshot(process, working, [], context);
         }
+
+        await engine.InvokeActivityBodyAsync(definition, process, instance, activity, context, ct);
 
         instance.State         = "Completed";
         instance.StateName     = activity.Name;
@@ -103,7 +111,7 @@ public sealed class MultiInstanceExecutor
         parentBookkeeping[NrOfActiveInstancesName]    = active;
 
         var transitions = new List<SchemataProcessTransition> {
-            BpmnEngine.NewTransition(
+            BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
                 process.Name!,
                 instance.CanonicalName,
                 activity.Name,
@@ -118,9 +126,10 @@ public sealed class MultiInstanceExecutor
         if (completedEarly || completed >= total) {
             if (completedEarly) {
                 foreach (var sibling in working.Where(t => t.Spawner == parent.CanonicalName && t.State == "Active")) {
-                    sibling.State         = "Cancelled";
-                    sibling.WaitingAtName = null;
-                    transitions.Add(BpmnEngine.NewTransition(
+                    sibling.State                 = "Cancelled";
+                    sibling.WaitingAtName         = null;
+                    sibling.CurrentCallActivation = null;
+                    transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
                         process.Name!,
                         sibling.CanonicalName,
                         activity.Name,
@@ -132,18 +141,31 @@ public sealed class MultiInstanceExecutor
                 parentBookkeeping[NrOfActiveInstancesName] = 0;
             }
 
-            var join = await ExitParentAsync(engine, definition, process, parent, working, activity, "JoinMultiInstance", transitions, context);
+            engine.RegisterCompensationBoundaries(definition, process, parent, working, activity, context);
+            var join = await ExitParentAsync(engine, definition, process, parent, working, activity, "JoinMultiInstance", transitions, context, ct: ct);
             if (join is not null) {
                 transitions.Add(join);
             }
         }
 
-        BpmnEngine.ApplyAggregateState(process, working);
-        return BpmnEngine.Snapshot(process, working, transitions, context);
+        BpmnEngine<TProcess, TToken, TTransition>.ApplyAggregateState(process, working);
+        return BpmnEngine<TProcess, TToken, TTransition>.Snapshot(process, working, transitions, context);
+    }
+
+    internal async ValueTask<ProcessSnapshot> ResumeAsync(BpmnEngine<TProcess, TToken, TTransition> engine, ProcessDefinition definition, SchemataProcess process, SchemataProcessToken parent, List<SchemataProcessToken> working, Activity activity, FlowExecutionContext context, CancellationToken ct) {
+        var transitions = new List<SchemataProcessTransition>();
+        if (ReadInt(parent.Bookkeeping, NrOfActiveInstancesName) == 0 && ReadInt(parent.Bookkeeping, NrOfCompletedInstancesName) > 0) {
+            var transition = await ExitParentAsync(engine, definition, process, parent, working, activity, "JoinMultiInstance", transitions, context, ct: ct);
+            if (transition is not null) {
+                transitions.Add(transition);
+            }
+        }
+        BpmnEngine<TProcess, TToken, TTransition>.ApplyAggregateState(process, working);
+        return BpmnEngine<TProcess, TToken, TTransition>.Snapshot(process, working, transitions, context);
     }
 
     private async ValueTask<ProcessSnapshot> ExecuteSequentialAsync(
-        BpmnEngine                       engine,
+        BpmnEngine<TProcess, TToken, TTransition>                       engine,
         ProcessDefinition                definition,
         SchemataProcess                  process,
         SchemataProcessToken             token,
@@ -158,7 +180,7 @@ public sealed class MultiInstanceExecutor
     ) {
         var transitions = new List<SchemataProcessTransition>();
         if (includeArrival) {
-            transitions.Add(BpmnEngine.NewTransition(
+            transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
                 process.Name!,
                 token.CanonicalName,
                 previousState,
@@ -171,7 +193,7 @@ public sealed class MultiInstanceExecutor
         WriteAggregate(token, total, total == 0 ? 0 : 1, 0);
 
         if (total == 0) {
-            return await ExitSequentialAsync(engine, definition, process, token, working, activity, previousState, "SkipMultiInstance", transitions, context);
+            return await ExitSequentialAsync(engine, definition, process, token, working, activity, previousState, "SkipMultiInstance", transitions, context, ct);
         }
 
         var completed = 0;
@@ -181,7 +203,7 @@ public sealed class MultiInstanceExecutor
             WriteLoopCounter(token, i);
             WriteAggregate(token, total, 1, completed);
 
-            var transition = BpmnEngine.NewTransition(
+            var transition = BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
                 process.Name!,
                 token.CanonicalName,
                 activity.Name,
@@ -191,6 +213,8 @@ public sealed class MultiInstanceExecutor
             transition.Note = i.ToString(CultureInfo.InvariantCulture);
             transitions.Add(transition);
 
+            await engine.InvokeActivityBodyAsync(definition, process, token, activity, context, ct);
+
             completed++;
             WriteAggregate(token, total, 0, completed);
 
@@ -199,11 +223,11 @@ public sealed class MultiInstanceExecutor
             }
         }
 
-        return await ExitSequentialAsync(engine, definition, process, token, working, activity, activity.Name, "ExitMultiInstance", transitions, context);
+        return await ExitSequentialAsync(engine, definition, process, token, working, activity, activity.Name, "ExitMultiInstance", transitions, context, ct);
     }
 
     private async ValueTask<ProcessSnapshot> EnterParallelAsync(
-        BpmnEngine                       engine,
+        BpmnEngine<TProcess, TToken, TTransition>                       engine,
         ProcessDefinition                definition,
         SchemataProcess                  process,
         SchemataProcessToken             parent,
@@ -222,7 +246,7 @@ public sealed class MultiInstanceExecutor
         if (total == 0) {
             var skipTransitions = new List<SchemataProcessTransition>();
             if (includeArrival) {
-                skipTransitions.Add(BpmnEngine.NewTransition(
+                skipTransitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
                     process.Name!,
                     parent.CanonicalName,
                     previousState,
@@ -231,7 +255,7 @@ public sealed class MultiInstanceExecutor
                     arrivalEvent));
             }
 
-            return await ExitSequentialAsync(engine, definition, process, parent, working, activity, previousState, "SkipMultiInstance", skipTransitions, context);
+            return await ExitSequentialAsync(engine, definition, process, parent, working, activity, previousState, "SkipMultiInstance", skipTransitions, context, ct);
         }
 
         parent.State         = "Waiting";
@@ -240,7 +264,7 @@ public sealed class MultiInstanceExecutor
 
         var transitions = new List<SchemataProcessTransition>();
         if (includeArrival) {
-            transitions.Add(BpmnEngine.NewTransition(
+            transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
                 process.Name!,
                 parent.CanonicalName,
                 previousState,
@@ -249,7 +273,7 @@ public sealed class MultiInstanceExecutor
                 arrivalEvent));
         }
 
-        transitions.Add(BpmnEngine.NewTransition(
+        transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
             process.Name!,
             parent.CanonicalName,
             previousState,
@@ -261,8 +285,9 @@ public sealed class MultiInstanceExecutor
             ct.ThrowIfCancellationRequested();
 
             var child = NewInstanceToken(process, parent, activity, i);
+            await context.CreateTokenAsync(child, ct);
             working.Add(child);
-            transitions.Add(BpmnEngine.NewTransition(
+            transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
                 process.Name!,
                 child.CanonicalName,
                 activity.Name,
@@ -271,55 +296,60 @@ public sealed class MultiInstanceExecutor
                 "MultiInstanceSpawn"));
         }
 
-        BpmnEngine.ApplyAggregateState(process, working);
-        return BpmnEngine.Snapshot(process, working, transitions, context);
+        BpmnEngine<TProcess, TToken, TTransition>.ApplyAggregateState(process, working);
+        return BpmnEngine<TProcess, TToken, TTransition>.Snapshot(process, working, transitions, context);
     }
 
     private async ValueTask<ProcessSnapshot> ExitSequentialAsync(
-        BpmnEngine                         engine,
+        BpmnEngine<TProcess, TToken, TTransition>                         engine,
         ProcessDefinition                  definition,
         SchemataProcess                    process,
         SchemataProcessToken               token,
-        IReadOnlyList<SchemataProcessToken> working,
+        List<SchemataProcessToken> working,
         Activity                           activity,
         string?                            previousState,
         string                             eventName,
         List<SchemataProcessTransition>    transitions,
-        FlowExecutionContext               execution
+        FlowExecutionContext               execution,
+        CancellationToken                  ct
     ) {
-        var join = await ExitParentAsync(engine, definition, process, token, working, activity, eventName, transitions, execution, previousState);
+        engine.RegisterCompensationBoundaries(definition, process, token, working, activity, execution);
+        var join = await ExitParentAsync(engine, definition, process, token, working, activity, eventName, transitions, execution, previousState, ct: ct);
         if (join is not null) {
             transitions.Add(join);
         }
 
-        BpmnEngine.ApplyAggregateState(process, working);
-        return BpmnEngine.Snapshot(process, working, transitions, execution);
+        BpmnEngine<TProcess, TToken, TTransition>.ApplyAggregateState(process, working);
+        return BpmnEngine<TProcess, TToken, TTransition>.Snapshot(process, working, transitions, execution);
     }
 
     private static async ValueTask<SchemataProcessTransition?> ExitParentAsync(
-        BpmnEngine                         engine,
+        BpmnEngine<TProcess, TToken, TTransition>                         engine,
         ProcessDefinition                  definition,
         SchemataProcess                    process,
         SchemataProcessToken               token,
-        IReadOnlyList<SchemataProcessToken> working,
+        List<SchemataProcessToken> working,
         Activity                           activity,
         string                             eventName,
         List<SchemataProcessTransition>    transitions,
         FlowExecutionContext               execution,
-        string?                            previousState = null
+        string?                            previousState = null,
+        CancellationToken                  ct = default
     ) {
-        var outFlow = definition.FirstOutgoing(activity);
+        var outFlow = await engine.ResolveOutgoingAsync(definition, activity, BpmnEngine<TProcess, TToken, TTransition>.TokenView(token), token.Bookkeeping, execution, process, token);
         if (outFlow is null) {
-            token.State         = "Completed";
-            token.WaitingAtName = null;
+            if (definition.Outgoing(activity).Count == 0) {
+                token.State = "Completed";
+                token.WaitingAtName = null;
+            }
             return null;
         }
 
         var variables = new Dictionary<string, int>();
-        var resolved  = await engine.ResolveTargetAsync(definition, outFlow.Target, variables, BpmnEngine.TokenView(token), execution, process, token);
-        BpmnEngine.ApplyResolvedToToken(token, resolved);
+        var resolved = await engine.ResolveTargetAsync(definition, outFlow.Target, variables, BpmnEngine<TProcess, TToken, TTransition>.TokenView(token), execution, working, process, token, ct: ct);
+        BpmnEngine<TProcess, TToken, TTransition>.ApplyResolvedToToken(token, resolved);
 
-        return BpmnEngine.NewTransition(
+        return BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
             process.Name!,
             token.CanonicalName,
             previousState ?? activity.Name,
@@ -329,7 +359,7 @@ public sealed class MultiInstanceExecutor
     }
 
     private async ValueTask<int> ResolveCardinalityAsync(
-        BpmnEngine                       engine,
+        BpmnEngine<TProcess, TToken, TTransition>                       engine,
         ProcessDefinition                definition,
         SchemataProcess                  process,
         SchemataProcessToken             token,
@@ -343,7 +373,7 @@ public sealed class MultiInstanceExecutor
 
         var ctx       = engine.BuildConditionContext(
             definition,
-            BpmnEngine.TokenView(token),
+            BpmnEngine<TProcess, TToken, TTransition>.TokenView(token),
             activity.Name,
             context,
             token.Bookkeeping,
@@ -363,7 +393,7 @@ public sealed class MultiInstanceExecutor
     private static string LoopCardinalityKey() { return "loopCardinality"; }
 
     private async ValueTask<bool> CompletionConditionSatisfiedAsync(
-        BpmnEngine                       engine,
+        BpmnEngine<TProcess, TToken, TTransition>                       engine,
         ProcessDefinition                definition,
         SchemataProcess                  process,
         SchemataProcessToken             parent,
@@ -384,7 +414,7 @@ public sealed class MultiInstanceExecutor
 
         var ctx = engine.BuildConditionContext(
             definition,
-            BpmnEngine.TokenView(completedInstance),
+            BpmnEngine<TProcess, TToken, TTransition>.TokenView(completedInstance),
             activity.Name,
             context,
             bookkeeping,
@@ -399,7 +429,7 @@ public sealed class MultiInstanceExecutor
         Activity             activity,
         int                  counter
     ) {
-        var token = TokenFactory.NewChildToken(process, new(activity.Name, null, false), parent);
+        var token = TokenFactory<TProcess, TToken>.NewChildToken((TProcess)process, new(activity.Name, null, false), (TToken)parent);
         token.Bookkeeping[LoopCounterName] = counter;
         return token;
     }

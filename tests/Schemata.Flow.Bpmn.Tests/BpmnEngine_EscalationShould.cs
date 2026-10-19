@@ -4,12 +4,57 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Flow.Skeleton.Utilities;
 using Xunit;
 
 namespace Schemata.Flow.Bpmn.Tests;
 
 public class BpmnEngine_EscalationShould
 {
+    [Trait("Layer", "Unit")]
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Escalation_InterruptingCatch_PreventsOutgoingProcedure(bool interrupting) {
+        var scenario = ThreeLevelScenario(ThrowEscalation("effect", "Effect"), catches => {
+            catches.A = BoundaryCatch("a-boundary", "a-boundary", catches.AHost, CatchEscalation("effect", "Effect"), interrupting, "a-handler", "a-handler");
+        });
+        var sub = (SubProcess)scenario.Definition.FindElementByName("c")!;
+        var outgoing = sub.ChildFlows.Single(flow => flow.Source.Name == "throw");
+        var runs = 0;
+        var procedure = new ProcedureTask { Name = "effect", Body = (_, _) => { runs++; return ValueTask.CompletedTask; } };
+        sub.Children.Add(procedure);
+        sub.ChildFlows.Add(new() { Source = procedure, Target = outgoing.Target });
+        outgoing.Target = procedure;
+        var snapshot = await AdvanceIntoThrowAsync(scenario);
+
+        Assert.Equal(interrupting ? 0 : 1, runs);
+        Assert.Equal(interrupting ? "Cancelled" : "Active", ThrowToken(snapshot).State);
+        if (interrupting) {
+            Assert.Equal("c-setup", ThrowToken(snapshot).StateName);
+            Assert.DoesNotContain(snapshot.Transitions, row => row.Previous == "throw" && row.Kind == TransitionKind.Move);
+        }
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task ProcedureToEscalationEnd_FiresBoundary() {
+        var scenario = ThreeLevelScenario(ThrowEscalation("end", "EndEscalation"), catches => {
+            catches.A = BoundaryCatch("a-boundary", "a-boundary", catches.AHost, CatchEscalation("end", "EndEscalation"), false, "a-handler", "a-handler");
+        }, true);
+        var sub = (SubProcess)scenario.Definition.FindElementByName("c")!;
+        var flow = sub.ChildFlows.Single(value => value.Source.Name == "c-setup");
+        var end = flow.Target;
+        var procedure = new ProcedureTask { Name = "before-end", Body = (_, _) => ValueTask.CompletedTask };
+        sub.Children.Add(procedure);
+        flow.Target = procedure;
+        sub.ChildFlows.Add(new() { Source = procedure, Target = end });
+        var snapshot = await AdvanceIntoThrowAsync(scenario);
+        Assert.Single(snapshot.Tokens, token => token.StateName == "a-handler");
+        Assert.Contains(snapshot.Transitions, transition => transition.Kind == TransitionKind.Spawn && transition.Previous == "a-boundary");
+        Assert.Equal("Completed", snapshot.Tokens.Single(token => token.StateName == "throw-end").State);
+    }
+
     [Fact]
     public async Task Throw_IntermediateThrowEscalationWithMatchingBoundaryOnHost_FiresBoundary() {
         var scenario = ThreeLevelScenario(ThrowEscalation("order", "OrderEscalation"), catches => {
@@ -156,6 +201,37 @@ public class BpmnEngine_EscalationShould
         Assert.DoesNotContain(snapshot.Transitions, t => t.Kind == TransitionKind.Cancel);
     }
 
+    [Fact]
+    public async Task Throw_ReachThroughExclusiveGateway_RoutesThroughTheSharedResolver() {
+        // The throw is not the advance's immediate outgoing target: the gateway's recursive target
+        // resolution must dispatch it through the same owner as a direct advance into the throw.
+        var scenario = ThreeLevelScenario(ThrowEscalation("side", "SideEscalation"), catches => {
+            catches.C = BoundaryCatch("c-boundary", "c-boundary", catches.CHost, CatchEscalation("side", "SideEscalation"), false, "c-handler", "c-handler");
+        }, beforeThrow: new ExclusiveGateway { Name = "decide" });
+        var before   = await AdvanceToCSetupAsync(scenario);
+        var snapshot = await AdvanceAsync(scenario, before, ThrowToken(before));
+
+        Assert.Equal("Active", Assert.Single(snapshot.Tokens, t => t.StateName == "after-throw").State);
+        Assert.Single(snapshot.Tokens, t => t.StateName == "c-handler");
+        Assert.Contains(snapshot.Transitions, t => t is { Kind: TransitionKind.Spawn, Previous: "c-boundary", Posterior: "c-handler" });
+        Assert.Contains(snapshot.Transitions, t => t is { Kind: TransitionKind.Move, Previous: "throw", Posterior: "after-throw" });
+    }
+
+    [Fact]
+    public async Task Throw_ReachThroughProcedureContinuation_RunsTheBodyThenRoutesThroughTheSharedResolver() {
+        var runs = 0;
+        var scenario = ThreeLevelScenario(ThrowEscalation("side", "SideEscalation"), catches => {
+            catches.C = BoundaryCatch("c-boundary", "c-boundary", catches.CHost, CatchEscalation("side", "SideEscalation"), false, "c-handler", "c-handler");
+        }, beforeThrow: new ProcedureTask { Name = "before-throw", Body = (_, _) => { runs++; return ValueTask.CompletedTask; } });
+        var before   = await AdvanceToCSetupAsync(scenario);
+        var snapshot = await AdvanceAsync(scenario, before, ThrowToken(before));
+
+        Assert.Equal(1, runs);
+        Assert.Single(snapshot.Tokens, t => t.StateName == "after-throw");
+        Assert.Single(snapshot.Tokens, t => t.StateName == "c-handler");
+        Assert.Contains(snapshot.Transitions, t => t is { Kind: TransitionKind.Spawn, Previous: "c-boundary" });
+    }
+
     private static async Task<ProcessSnapshot> AdvanceIntoThrowAsync(EscalationScenario scenario) {
         var before = await AdvanceToCSetupAsync(scenario);
         return await AdvanceAsync(scenario, before, ThrowToken(before));
@@ -236,7 +312,8 @@ public class BpmnEngine_EscalationShould
     private static EscalationScenario ThreeLevelScenario(
         EscalationDefinition thrown,
         Action<CatchBuilder> configure,
-        bool throwAtEnd = false
+        bool throwAtEnd = false,
+        FlowElement? beforeThrow = null
     ) {
         var start     = new FlowEvent { Name = "start", Position = EventPosition.Start };
         var rootSetup = new NoneTask { Name = "root-setup" };
@@ -264,14 +341,20 @@ public class BpmnEngine_EscalationShould
         c.Children.Add(cStart);
         c.Children.Add(cSetup);
         c.Children.Add(throwNode);
+        c.ChildFlows.Add(new() { Source = cStart, Target = cSetup });
+        if (beforeThrow is not null) {
+            c.Children.Add(beforeThrow);
+            c.ChildFlows.Add(new() { Source = cSetup, Target = beforeThrow });
+            c.ChildFlows.Add(new() { Source = beforeThrow, Target = throwNode });
+        } else {
+            c.ChildFlows.Add(new() { Source = cSetup, Target = throwNode });
+        }
         if (!throwAtEnd) {
             c.Children.Add(afterThrow);
             c.Children.Add(cEnd);
             c.ChildFlows.Add(new() { Source = throwNode, Target = afterThrow });
             c.ChildFlows.Add(new() { Source = afterThrow, Target = cEnd });
         }
-        c.ChildFlows.Add(new() { Source = cStart, Target = cSetup });
-        c.ChildFlows.Add(new() { Source = cSetup, Target = throwNode });
 
         b.Children.Add(bStart);
         b.Children.Add(bSetup);
@@ -319,7 +402,7 @@ public class BpmnEngine_EscalationShould
         var boundary = spec.ToBoundary();
         var handler  = new NoneTask { Name = spec.HandlerId };
         var end      = new FlowEvent { Name = $"{spec.HandlerId}-end", Position = EventPosition.End };
-        parent!.Children.Add(boundary);
+        parent.Children.Add(boundary);
         parent.Children.Add(handler);
         parent.Children.Add(end);
         parent.ChildFlows.Add(new() { Source = boundary, Target = handler });

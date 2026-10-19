@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Errors;
@@ -11,6 +12,54 @@ namespace Schemata.Flow.Bpmn.Tests;
 
 public class BpmnValidatorShould
 {
+    [Fact]
+    public void Validate_ParallelEventDefinition_Throws() {
+        var start = new FlowEvent {
+            Name = "start", Position = EventPosition.Start,
+            Definition = new ParallelDefinition { Name = "parallel" },
+        };
+        var end = new FlowEvent { Name = "end", Position = EventPosition.End };
+        var definition = new ProcessDefinition {
+            Elements = { start, end },
+            Flows = { new() { Source = start, Target = end } },
+        };
+
+        var error = Assert.Throws<InvalidOperationException>(() => BpmnValidator.Validate(definition));
+        Assert.Contains("not supported", error.Message);
+    }
+
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(1, false)]
+    [InlineData(2, true)]
+    public void Validate_NestedExclusiveGateway_EnforcesOutgoingDefaults(int defaults, bool rejected) {
+        var start = new FlowEvent { Name = "start", Position = EventPosition.Start };
+        var end = new FlowEvent { Name = "end", Position = EventPosition.End };
+        var innerStart = new FlowEvent { Name = "inner-start", Position = EventPosition.Start };
+        var first = new FlowEvent { Name = "first-end", Position = EventPosition.End };
+        var second = new FlowEvent { Name = "second-end", Position = EventPosition.End };
+        var gateway = new ExclusiveGateway { Name = "choice" };
+        var sub = new EmbeddedSubProcess {
+            Name = "sub",
+            Children = { innerStart, gateway, first, second },
+            ChildFlows = {
+                new() { Source = innerStart, Target = gateway },
+                new() { Source = gateway, Target = first, IsDefault = defaults > 0 },
+                new() { Source = gateway, Target = second, IsDefault = defaults > 1 },
+            },
+        };
+        var definition = new ProcessDefinition {
+            Elements = { start, sub, end },
+            Flows = { new() { Source = start, Target = sub }, new() { Source = sub, Target = end } },
+        };
+
+        if (rejected) {
+            Assert.Throws<FailedPreconditionException>(() => BpmnValidator.Validate(definition));
+        } else {
+            Assert.Null(Record.Exception(() => BpmnValidator.Validate(definition)));
+        }
+    }
+
     [Fact]
     public void Validate_LinearDefinition_Passes() {
         var start    = new FlowEvent { Name = "start", Position = EventPosition.Start };
@@ -149,31 +198,6 @@ public class BpmnValidatorShould
         };
 
         Assert.Throws<FailedPreconditionException>(() => BpmnValidator.Validate(definition));
-    }
-
-    [Fact]
-    public void Validate_ParallelGatewayValid_Passes() {
-        var start = new FlowEvent { Name = "start", Position = EventPosition.Start };
-        var fork  = new ParallelGateway { Name = "fork" };
-        var a     = new NoneTask { Name = "a" };
-        var b     = new NoneTask { Name = "b" };
-        var endA  = new FlowEvent { Name = "end-a", Position = EventPosition.End };
-        var endB  = new FlowEvent { Name = "end-b", Position = EventPosition.End };
-
-        var definition = new ProcessDefinition {
-            Name     = "parallel",
-            Elements = { start, fork, a, b, endA, endB },
-            Flows = {
-                new() { Source = start, Target = fork },
-                new() { Source = fork, Target = a },
-                new() { Source = fork, Target = b },
-                new() { Source = a, Target = endA },
-                new() { Source = b, Target = endB },
-            },
-        };
-
-        var ex = Record.Exception(() => BpmnValidator.Validate(definition));
-        Assert.Null(ex);
     }
 
     [Fact]
@@ -488,7 +512,7 @@ public class BpmnValidatorShould
     private sealed class EnteredProcess : ProcessDefinition
     {
         public EnteredProcess() {
-            this.During(Target).OnEnter(_ => ValueTask.CompletedTask).End();
+            this.During(Target).OnEnter((_, ct) => { ct.ThrowIfCancellationRequested(); return ValueTask.CompletedTask; }).End();
             this.During(Waiting).Await(this.On(Go).Go(Target));
             this.Start().Go(Waiting);
         }
@@ -553,6 +577,47 @@ public class BpmnValidatorShould
                 new() { Source = element, Target = endEvent },
             },
         };
+    }
+
+    [Fact]
+    public void Validate_CyclicWaitingLoopWithMatchingTypedCatch_Passes() {
+        var definition = CyclicTypedCatchDefinition(new Message<int> { Name = "work-item" }, new ProcedureTask<int> { Name = "task" });
+
+        var ex = Record.Exception(() => BpmnValidator.Validate(definition));
+
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public void Validate_CyclicWaitingLoopWithMismatchedTypedCatch_ThrowsPayloadMismatch() {
+        var definition = CyclicTypedCatchDefinition(new Message<string> { Name = "work-item" }, new ProcedureTask<int> { Name = "task" });
+
+        var ex = Assert.Throws<InvalidOperationException>(() => BpmnValidator.Validate(definition));
+
+        Assert.Contains("payload mismatch", ex.Message, StringComparison.Ordinal);
+    }
+
+    private static ProcessDefinition CyclicTypedCatchDefinition(Message message, ProcedureTaskBase task) {
+        var start      = new FlowEvent { Name = "start", Position = EventPosition.Start };
+        var catchEvent = new FlowEvent { Name = "catch", Position = EventPosition.IntermediateCatch, Definition = message };
+        var review     = new UserTask { Name = "review" };
+        var decide     = new ExclusiveGateway { Name = "decide" };
+        var endEvent   = new FlowEvent { Name = "end", Position = EventPosition.End };
+
+        var definition = new ProcessDefinition {
+            Name     = "cyclic-typed",
+            Elements = { start, catchEvent, task, review, decide, endEvent },
+            Flows = {
+                new() { Source = start, Target = catchEvent },
+                new() { Source = catchEvent, Target = task },
+                new() { Source = task, Target = review },
+                new() { Source = review, Target = decide },
+                new() { Source = decide, Target = catchEvent, Condition = new LambdaConditionExpression { Lambda = _ => new(true) } },
+                new() { Source = decide, Target = endEvent, IsDefault = true },
+            },
+        };
+        definition.Messages.Add(message);
+        return definition;
     }
 
     private static ProcessDefinition DefinitionWithEventSubProcess(EventSubProcess eventSub) {

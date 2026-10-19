@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -19,15 +18,9 @@ using Schemata.Flow.Skeleton.Runtime;
 namespace Schemata.Flow.Foundation.Advisors;
 
 /// <summary>Projects Flow lifecycle and business state onto declared source binding members.</summary>
-public sealed class AdviceSourceProjection<TSource>(
-    IRepository<TSource>               sources,
-    IRepository<SchemataProcessSource> bindings,
-    IProcessRegistry                    registry
-) : IFlowSourceAdvisor<TSource>
+public sealed class AdviceSourceProjection<TSource>(IProcessRegistry registry) : IFlowSourceAdvisor<TSource>
     where TSource : class, ICanonicalName
 {
-    private static readonly ConcurrentDictionary<(string Process, string Binding), byte> ProjectionWarnings = new();
-
     #region IAdvisor Members
 
     public int Order => 0;
@@ -52,20 +45,22 @@ public sealed class AdviceSourceProjection<TSource>(
             return AdviseResult.Continue;
         }
 
-        var registration = registry.GetRegistration(context.Snapshot.Process.DefinitionName);
-        if (registration is null) {
-            return AdviseResult.Continue;
+        var instance = context.Snapshot.Process;
+        if (string.IsNullOrWhiteSpace(instance.DefinitionVersion) || instance.DefinitionVersion == "latest") {
+            throw new FailedPreconditionException(SchemataResources.FLOW_DEFINITION_VERSION_UNBOUND);
         }
+        var registration = registry.GetRegistration(instance.DefinitionName, instance.DefinitionVersion)
+            ?? throw new FailedPreconditionException(SchemataResources.FLOW_DEFINITION_VERSION_NOT_REGISTERED,
+                new Dictionary<string, string?> { ["name"] = instance.DefinitionName, ["version"] = instance.DefinitionVersion });
 
+        var sources = ctx.ServiceProvider.GetRequiredService<IRepository<TSource>>();
         sources.Join(context.UnitOfWork);
-        bindings.Join(context.UnitOfWork);
 
         var type = FlowSourceTypeNames.ToName(typeof(TSource));
+        var listBindings = context.Execution.ListSourceBindingsAsync
+            ?? throw new InvalidOperationException("Source binding persistence is not configured for this execution.");
         var allRows = new List<SchemataProcessSource>();
-        await foreach (var row in bindings.ListAsync<SchemataProcessSource>(
-                           q => q.Where(s => s.Process == process
-                                          && s.Source == canonical
-                                          && s.SourceType == type), ct)) {
+        await foreach (var row in listBindings(process, canonical, type, ct)) {
             allRows.Add(row);
         }
 
@@ -74,16 +69,6 @@ public sealed class AdviceSourceProjection<TSource>(
             return AdviseResult.Continue;
         }
 
-        var marked = ctx.TryGet<FlowSourceWriteBack>(out var writeBack);
-        if (!marked && source is IConcurrency concurrent) {
-            foreach (var row in allRows) {
-                if (row.SourceTimestamp is { } expected && concurrent.Timestamp != expected) {
-                    throw new FailedPreconditionException(
-                        SchemataResources.FLOW_SOURCE_MODIFIED_CONCURRENTLY,
-                        new Dictionary<string, string?> { ["name"] = canonical });
-                }
-            }
-        }
 
         var logger = ctx.ServiceProvider.GetService<ILogger<AdviceSourceProjection<TSource>>>();
         var dirty = false;
@@ -115,19 +100,7 @@ public sealed class AdviceSourceProjection<TSource>(
             return AdviseResult.Continue;
         }
 
-        if (writeBack is not null) {
-            writeBack.Touch(source);
-            return AdviseResult.Continue;
-        }
-
-        await sources.UpdateAsync(source, ct);
-
-        if (source is IConcurrency stamped) {
-            foreach (var row in allRows) {
-                row.SourceTimestamp = stamped.Timestamp;
-                await bindings.UpdateAsync(row, ct);
-            }
-        }
+        context.Execution.TouchedSources[(typeof(TSource), canonical)] = source;
 
         return AdviseResult.Continue;
     }
@@ -190,12 +163,10 @@ public sealed class AdviceSourceProjection<TSource>(
 
         var active = context.Snapshot.Tokens.Where(token => IsLive(token.State)).ToList();
         if (active.Count > 1) {
-            if (ProjectionWarnings.TryAdd((process, row.Name), 0)) {
-                logger?.LogWarning(
-                    "Source binding '{BindingName}' on process '{Process}' has multiple active tokens and cannot project one business state.",
-                    row.Name,
-                    process);
-            }
+            logger?.LogWarning(
+                "Source binding '{BindingName}' on process '{Process}' has multiple active tokens and cannot project one business state.",
+                row.Name,
+                process);
 
             return false;
         }

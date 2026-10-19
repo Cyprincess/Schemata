@@ -57,8 +57,9 @@ public sealed class BoundaryCatch : IDescriptive
         };
 
         this.CopyLabels(boundaryEvent);
-        _definition.Elements.Add(boundaryEvent);
-        _definition.Flows.Add(new() { Source = boundaryEvent, Target = _definition.ResolveEntry(target) });
+        var (elements, flows) = _definition.ScopeFor(_activity);
+        elements.Add(boundaryEvent);
+        flows.Add(new() { Source = boundaryEvent, Target = _definition.ResolveEntry(target) });
 
         return _behavior;
     }

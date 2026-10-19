@@ -8,10 +8,12 @@ using Schemata.Messaging.Skeleton;
 namespace Schemata.Flow.Skeleton.Models;
 
 /// <summary>Request body for starting a new process instance.</summary>
-public sealed class StartProcessInstanceRequest : ICanonicalName, IRequestIdentification, ICommand<SchemataProcess>, IRequestPrincipal
+public sealed class StartProcessInstanceRequest : ICanonicalName, IRequestIdentification, ICommand<SchemataProcess>, IRequestPrincipal, IResourceDispatchCarrier
 {
     /// <summary>The <see cref="Models.ProcessDefinition.Name" /> of the definition to instantiate.</summary>
     public string DefinitionName { get; set; } = null!;
+
+    public string DefinitionVersion { get; set; } = "1";
 
     /// <summary>Optional display name for the new process instance.</summary>
     public string? DisplayName { get; set; }
@@ -46,6 +48,14 @@ public sealed class StartProcessInstanceRequest : ICanonicalName, IRequestIdenti
 
     [JsonIgnore]
     public ClaimsPrincipal? Principal { get; set; }
+
+    #endregion
+
+    #region IResourceDispatchCarrier Members
+
+    /// <summary>The identified dispatch execution attached by the idempotency wrap.</summary>
+    [JsonIgnore]
+    public ResourceDispatchExecution? Dispatch { get; set; }
 
     #endregion
 }

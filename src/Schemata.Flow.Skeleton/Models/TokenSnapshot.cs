@@ -10,7 +10,7 @@ public sealed class TokenSnapshot
     /// <summary>Full AIP canonical name, e.g. <c>processes/{p}/tokens/{t}</c>.</summary>
     public required string CanonicalName { get; init; }
 
-    /// <summary>Owning scope key: the process instance name at root, or the SubProcess / Transaction / EventSubProcess element name for BPMN sub-scopes.</summary>
+    /// <summary>Empty for the structural root; otherwise the BPMN sub-process element name.</summary>
     public required string ScopeName { get; init; }
 
     /// <summary>Name of the element the token sits on.</summary>

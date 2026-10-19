@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,8 +10,9 @@ namespace Schemata.Modeling.Generator;
 
 internal static class EntityGenerator
 {
-    public static void Generate(SourceProductionContext spc, Entity entity, Document doc) {
+    public static void Generate(SourceProductionContext spc, Entity entity, Document doc, Compilation compilation, Location location) {
         var sb = new StringBuilder();
+        sb.AppendLine("#nullable enable");
 
         if (!string.IsNullOrWhiteSpace(doc.Namespace)) {
             sb.AppendLine($"namespace {doc.Namespace} {{");
@@ -22,9 +24,9 @@ internal static class EntityGenerator
 
         sb.AppendLine("{");
 
-        GenerateEnums(sb, entity);
+        GenerateEnums(spc, sb, entity, location);
 
-        GenerateFields(sb, entity.Fields);
+        if (!InterfaceProperties.Generate(spc, sb, entity, doc, compilation, location)) return;
 
         sb.AppendLine("    }");
 
@@ -32,7 +34,7 @@ internal static class EntityGenerator
             sb.AppendLine("}");
         }
 
-        spc.AddSource($"{entity.Name}", sb.ToString());
+        spc.AddSource(SourceIdentity.Hint("record", doc.Namespace, entity.Name), sb.ToString());
     }
 
     internal static void GenerateUses(
@@ -41,29 +43,28 @@ internal static class EntityGenerator
         EquatableArray<string> bases,
         Document               doc
     ) {
-        // Collect all base type names from Uses and Bases
+        // Every Use and Bases reference resolves through this single dedup owner:
+        // duplicate references are legal input and must emit each base type once.
+        // Resolving before deduping also collapses a trait reference and a direct
+        // reference to its generated interface into one entry.
         var names = new List<string>();
+        var seen  = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var use in uses) {
-            foreach (var name in use.QualifiedNames) {
-                var resolved = name;
-                if (doc.Traits.Any(t => t.Name == name)) {
-                    resolved = $"I{name}";
-                }
-
+        void Add(string name) {
+            var resolved = doc.Traits.Any(t => t.Name == name) ? $"I{name}" : name;
+            if (seen.Add(resolved)) {
                 names.Add(resolved);
             }
         }
 
-        foreach (var name in bases) {
-            var resolved = name;
-            if (doc.Traits.Any(t => t.Name == name)) {
-                resolved = $"I{name}";
+        foreach (var use in uses) {
+            foreach (var name in use.QualifiedNames) {
+                Add(name);
             }
+        }
 
-            if (!names.Contains(resolved)) {
-                names.Add(resolved);
-            }
+        foreach (var name in bases) {
+            Add(name);
         }
 
         if (names.Count == 0) {
@@ -78,13 +79,25 @@ internal static class EntityGenerator
         }
     }
 
-    private static void GenerateEnums(StringBuilder sb, Entity entity) {
+    private static void GenerateEnums(SourceProductionContext spc, StringBuilder sb, Entity entity, Location location) {
         foreach (var @enum in entity.Enumerations) {
+            var supported = true;
+            foreach (var value in @enum.Values) {
+                if (DocumentGenerator.IsSupportedEnumAssignment(value.Assignment)) {
+                    continue;
+                }
+                supported = false;
+                spc.ReportDiagnostic(Diagnostic.Create(DocumentGenerator.UnsupportedEnumAssignment, location, @enum.Name, value.Name, value.Assignment));
+            }
+            if (!supported) {
+                continue;
+            }
+
             EnumGenerator.Generate(sb, @enum, null);
         }
     }
 
-    private static void GenerateFields(StringBuilder sb, EquatableArray<Field> fields) {
+    internal static void GenerateFields(StringBuilder sb, IEnumerable<Field> fields) {
         foreach (var field in fields) {
             var type  = field.Type;
             var name  = field.Name;

@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Event.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
@@ -26,12 +29,6 @@ namespace Schemata.Flow.Event.Handlers;
 /// </remarks>
 public sealed class FlowEventCatchHandler : IFlowCatchHandler
 {
-    private readonly IRepository<SchemataEventSubscription> _subscriptions;
-
-    /// <summary>Creates a handler that persists Flow event subscriptions through the supplied repository.</summary>
-    public FlowEventCatchHandler(IRepository<SchemataEventSubscription> subscriptions) {
-        _subscriptions = subscriptions;
-    }
 
     #region IFlowCatchHandler Members
 
@@ -40,7 +37,16 @@ public sealed class FlowEventCatchHandler : IFlowCatchHandler
     }
 
     public async ValueTask ArmAsync(FlowTransitionContext context, CancellationToken ct = default) {
-        _subscriptions.Join(context.UnitOfWork!);
+        if (context.UnitOfWork is null) {
+            throw new FailedPreconditionException(
+                SchemataResources.FLOW_EVENT_SUBSCRIPTION_REQUIRES_UNIT_OF_WORK,
+                new Dictionary<string, string?> { ["token"] = context.Token.CanonicalName });
+        }
+
+        var services = context.Execution.Services;
+        var subscriptions = services.GetRequiredService<IRepository<SchemataEventSubscription>>();
+        var mutations = services.GetRequiredService<IResourceMutation<SchemataEventSubscription>>();
+        subscriptions.Join(context.UnitOfWork);
 
         var token       = context.Token;
         var definition  = context.Definition;
@@ -55,28 +61,31 @@ public sealed class FlowEventCatchHandler : IFlowCatchHandler
         if (!string.IsNullOrEmpty(context.PreviousWaitingAtName)
          && context.PreviousWaitingAtName != token.WaitingAtName) {
             var oldElement = definition.AllElements.FirstOrDefault(e => e.Name == context.PreviousWaitingAtName);
-            foreach (var elementName in ResolveCatchElementNames(oldElement, definition)) {
-                await RemoveSubscriptionAsync(SubscriptionId(processName, elementName, token.CanonicalName), ct);
+            foreach (var (elementName, eventDef) in ResolveCatchEventDefinitions(oldElement, definition)) {
+                await RemoveOwnedSubscriptionAsync(subscriptions, mutations, context, elementName, eventDef, null, context.UnitOfWork, ct);
             }
         }
 
         // Boundary subscriptions follow the host activity rather than a waiting element, so they are
-        // removed when the token leaves the host — by completion, boundary fire, or termination. The
-        // previous state comes from the transition row, since the token rows in the snapshot already
-        // carry the new state.
+        // removed when the token leaves the host — by completion, boundary fire, or termination. A
+        // token that turned terminal while keeping its host name (e.g. a terminate that changed no
+        // position) left the host the same way; the previous state comes from the transition row,
+        // since the snapshot token rows already carry the new state.
         var previousState = PreviousStateOf(context);
-        if (!string.IsNullOrEmpty(previousState)
-         && previousState != token.StateName
+        var leftHost = !string.IsNullOrEmpty(previousState)
+                    && (previousState != token.StateName
+                     || !string.Equals(token.Status, "Active", StringComparison.Ordinal));
+        if (leftHost
          && definition.AllElements.FirstOrDefault(e => e.Name == previousState) is Activity previousHost) {
-            foreach (var (elementName, _) in ResolveBoundaryCatchEventDefinitions(previousHost, definition)) {
-                await RemoveSubscriptionAsync(SubscriptionId(processName, elementName, token.CanonicalName), ct);
+            foreach (var (elementName, eventDef) in ResolveBoundaryCatchEventDefinitions(previousHost, definition)) {
+                await RemoveOwnedSubscriptionAsync(subscriptions, mutations, context, elementName, eventDef, previousHost.Name, context.UnitOfWork, ct);
             }
         }
 
         if (!string.IsNullOrEmpty(token.WaitingAtName)) {
             var newElement = definition.AllElements.FirstOrDefault(e => e.Name == token.WaitingAtName);
             foreach (var (elementName, eventDef) in ResolveCatchEventDefinitions(newElement, definition)) {
-                await UpsertAsync(processName, elementName, eventDef, token.CanonicalName, ct);
+                await UpsertAsync(subscriptions, mutations, processName, elementName, eventDef, token.CanonicalName, context.UnitOfWork, ct);
             }
 
             return;
@@ -87,74 +96,138 @@ public sealed class FlowEventCatchHandler : IFlowCatchHandler
         if (string.Equals(token.Status, "Active", StringComparison.Ordinal)
          && definition.AllElements.FirstOrDefault(e => e.Name == token.StateName) is Activity host) {
             foreach (var (elementName, eventDef) in ResolveBoundaryCatchEventDefinitions(host, definition)) {
-                await UpsertAsync(processName, elementName, eventDef, token.CanonicalName, ct);
+                await UpsertAsync(subscriptions, mutations, processName, elementName, eventDef, token.CanonicalName, context.UnitOfWork, ct);
             }
         }
     }
 
     #endregion
 
-    private async Task UpsertAsync(
+    private static async Task UpsertAsync(
+        IRepository<SchemataEventSubscription> subscriptions,
+        IResourceMutation<SchemataEventSubscription> mutations,
         string            processName,
         string            elementName,
         IEventDefinition  eventDef,
         string            tokenCanonical,
+        IUnitOfWork       unitOfWork,
         CancellationToken ct
     ) {
         // Messages correlate to one token; signals stay process-level broadcasts.
         var subscriptionToken = eventDef is Message ? tokenCanonical : null;
         await UpsertSubscriptionAsync(
+            subscriptions, mutations,
             SubscriptionId(processName, elementName, subscriptionToken),
             eventDef.Name,
             eventDef is Message ? processName : null,
             processName,
             subscriptionToken,
+            unitOfWork,
             ct);
     }
 
-    private async Task RemoveSubscriptionAsync(string subscriptionId, CancellationToken ct) {
-        var existing = await _subscriptions.FirstOrDefaultAsync(
+    private static async Task RemoveSubscriptionAsync(IRepository<SchemataEventSubscription> subscriptions,
+        IResourceMutation<SchemataEventSubscription> mutations, string subscriptionId, IUnitOfWork unitOfWork, CancellationToken ct) {
+        var existing = await subscriptions.FirstOrDefaultAsync(
             q => q.Where(s => s.SubscriptionId == subscriptionId), ct);
         if (existing is null) {
             return;
         }
 
-        await _subscriptions.RemoveAsync(existing, ct);
+        await mutations.DeleteAsync(existing, unitOfWork, ct: ct);
     }
 
-    private async Task UpsertSubscriptionAsync(
+    private static async Task UpsertSubscriptionAsync(
+        IRepository<SchemataEventSubscription> subscriptions,
+        IResourceMutation<SchemataEventSubscription> mutations,
         string            subscriptionId,
         string            eventType,
         string?           correlationKey,
         string            target,
         string?           token,
+        IUnitOfWork       unitOfWork,
         CancellationToken ct
     ) {
-        var existing = await _subscriptions.FirstOrDefaultAsync(
+        var existing = await subscriptions.FirstOrDefaultAsync(
             q => q.Where(s => s.SubscriptionId == subscriptionId), ct);
 
         if (existing is null) {
-            await _subscriptions.AddAsync(new() {
-                Name           = subscriptionId,
-                CanonicalName  = $"event-subscriptions/{subscriptionId}",
+            await mutations.CreateAsync(new() {
                 SubscriptionId = subscriptionId,
                 EventType      = eventType,
                 CorrelationKey = correlationKey,
                 Target         = target,
                 Token          = token,
-            }, ct);
+            }, unitOfWork, ct);
         } else {
             existing.EventType      = eventType;
             existing.CorrelationKey = correlationKey;
             existing.Target         = target;
             existing.Token          = token;
-            await _subscriptions.UpdateAsync(existing, ct);
+            await mutations.UpdateAsync(existing, unitOfWork, ct: ct);
         }
     }
 
     private static string SubscriptionId(string processName, string elementName, string? token) {
         return $"flow:{processName}:{elementName}:{token ?? "broadcast"}";
     }
+    private static async Task RemoveOwnedSubscriptionAsync(
+        IRepository<SchemataEventSubscription> subscriptions,
+        IResourceMutation<SchemataEventSubscription> mutations,
+        FlowTransitionContext context,
+        string            elementName,
+        IEventDefinition  eventDef,
+        string?           hostName,
+        IUnitOfWork       unitOfWork,
+        CancellationToken ct
+    ) {
+        // Identity must match UpsertAsync: messages are token-scoped, signals are the shared
+        // process-level broadcast row, which survives until its last owning catch leaves.
+        var subscriptionToken = eventDef is Message ? context.Token.CanonicalName : null;
+        if (subscriptionToken is null && HasOtherLiveOwner(context, elementName, hostName)) {
+            return;
+        }
+
+        await RemoveSubscriptionAsync(subscriptions, mutations, SubscriptionId(context.Snapshot.Process.CanonicalName!, elementName, subscriptionToken), unitOfWork, ct);
+    }
+
+    private static bool HasOtherLiveOwner(FlowTransitionContext context, string elementName, string? hostName) {
+        foreach (var other in context.Snapshot.Tokens) {
+            if (string.Equals(other.CanonicalName, context.Token.CanonicalName, StringComparison.Ordinal)) {
+                continue;
+            }
+
+            if (!TokenStates.Live.Contains(other.State ?? string.Empty)) {
+                continue;
+            }
+
+            if (hostName is not null) {
+                if (other.WaitingAtName is null && other.StateName == hostName) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (other.WaitingAtName == elementName) {
+                return true;
+            }
+
+            // A token waiting at an event-based gateway co-owns the broadcast rows of the
+            // gateway's outgoing signal catches: its waiting element is the gateway, not the catch.
+            if (context.Definition is { } definition
+             && other.WaitingAtName is { } waitingAt
+             && definition.AllElements.FirstOrDefault(e => e.Name == waitingAt) is EventBasedGateway gateway
+             && definition.Flows.Any(flow => flow.Source == gateway
+                                          && flow.Target is FlowEvent { Position: EventPosition.IntermediateCatch } outgoing
+                                          && outgoing.Name == elementName)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
 
     private static string? PreviousStateOf(FlowTransitionContext context) {
         return context.Snapshot.Transitions
@@ -163,9 +236,6 @@ public sealed class FlowEventCatchHandler : IFlowCatchHandler
                       .FirstOrDefault();
     }
 
-    private static IEnumerable<string> ResolveCatchElementNames(FlowElement? element, ProcessDefinition definition) {
-        return ResolveCatchEventDefinitions(element, definition).Select(t => t.ElementName);
-    }
 
     private static IEnumerable<(string ElementName, IEventDefinition Definition)> ResolveBoundaryCatchEventDefinitions(
         Activity          host,

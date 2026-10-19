@@ -1,43 +1,44 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Bpmn.Runtime.Boundary;
 
 /// <summary>
-///     Handles BPMN non-interrupting boundary events by spawning a sibling token on the boundary
-///     branch while leaving the attached host token unchanged.
+///     Creates the spawn transition for a staged non-interrupting boundary branch.
 /// </summary>
-public sealed class NonInterruptingBoundaryHandler
+/// <typeparam name="TProcess">The persisted process entity type registered by the host.</typeparam>
+/// <typeparam name="TToken">The persisted token entity type registered by the host.</typeparam>
+/// <typeparam name="TTransition">The persisted transition entity type registered by the host.</typeparam>
+public sealed class NonInterruptingBoundaryHandler<TProcess, TToken, TTransition>
+    where TProcess : SchemataProcess, new()
+    where TToken : SchemataProcessToken, new()
+    where TTransition : SchemataProcessTransition, new()
 {
     /// <summary>
-    ///     Spawns a boundary-branch sibling token and returns the corresponding spawn transition.
+    ///     Creates the boundary branch's spawn transition.
     /// </summary>
-    internal SchemataProcessTransition Handle(
+    internal ValueTask<SchemataProcessTransition> HandleAsync(
         SchemataProcess            process,
-        SchemataProcessToken       hostToken,
-        List<SchemataProcessToken> working,
+        SchemataProcessToken       spawned,
         FlowEvent                  boundary,
         TargetState     resolved,
         IEventDefinition           trigger
     ) {
         ArgumentNullException.ThrowIfNull(process);
-        ArgumentNullException.ThrowIfNull(hostToken);
-        ArgumentNullException.ThrowIfNull(working);
+        ArgumentNullException.ThrowIfNull(spawned);
         ArgumentNullException.ThrowIfNull(boundary);
         ArgumentNullException.ThrowIfNull(resolved);
         ArgumentNullException.ThrowIfNull(trigger);
 
-        var spawned = BpmnEngine.NewChildToken(process, resolved, hostToken);
-        working.Add(spawned);
-
-        return BpmnEngine.NewTransition(
+        return ValueTask.FromResult<SchemataProcessTransition>(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
             process.Name!,
             spawned.CanonicalName,
             boundary.Name,
             resolved.StateName,
             TransitionKind.Spawn,
-            trigger.Name);
+            trigger.Name));
     }
 }

@@ -6,16 +6,31 @@ namespace Schemata.Flow.Skeleton.Models;
 ///     A BPMN Escalation event definition that may be interrupting or non-interrupting
 ///     and is typically handled by a parent scope.
 /// </summary>
-public sealed class EscalationDefinition : IEventDefinition
+public sealed class EscalationDefinition : FlowGraphNode, IEventDefinition
 {
+    private string? _escalationCode;
+    private string _name = null!;
+
     /// <summary>
     ///     An optional escalation code for matching.
     /// </summary>
-    public string? EscalationCode { get; set; }
+    public string? EscalationCode {
+        get => _escalationCode;
+        set {
+            EnsureMutable();
+            _escalationCode = value;
+        }
+    }
 
     #region IEventDefinition Members
 
-    public string Name { get; set; } = null!;
+    public string Name {
+        get => _name;
+        set {
+            EnsureMutable();
+            _name = value;
+        }
+    }
 
     #endregion
 

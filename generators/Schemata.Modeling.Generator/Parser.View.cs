@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using Schemata.Modeling.Generator.Expressions;
@@ -35,11 +34,11 @@ internal static partial class Parser
                    children.ToImmutable(), assignment);
     }
 
-    private static ViewOption ParseViewOption(string normalized) {
+    private static ViewOption ParseViewOption(string normalized, int offset) {
         return normalized switch {
             "omit"    => ViewOption.Omit,
             "omitall" => ViewOption.OmitAll,
-            var _     => throw new InvalidOperationException($"Unknown view option: {normalized}"),
+            var _     => throw new UnknownOptionException("view", normalized, offset),
         };
     }
 }

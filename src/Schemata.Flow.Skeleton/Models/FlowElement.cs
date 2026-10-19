@@ -8,15 +8,23 @@ namespace Schemata.Flow.Skeleton.Models;
 ///     <see cref="Name" /> is the element's identity; the <see cref="IDescriptive" /> members carry
 ///     the labels a renderer shows, and editing them never moves a token.
 /// </summary>
-public abstract class FlowElement : IDescriptive
+public abstract class FlowElement : FlowGraphNode, IDescriptive
 {
+    private string _name = null!;
+
     /// <summary>
     ///     Canonical element name: the element's identity within its process definition.
     ///     Unique across the definition and deterministic across definition rebuilds, so it is
     ///     the resume key persisted on process tokens. Audit rows and error payloads surface it
     ///     as the element label.
     /// </summary>
-    public string Name { get; set; } = null!;
+    public string Name {
+        get => _name;
+        set {
+            EnsureMutable();
+            _name = value;
+        }
+    }
 
     #region IDescriptive Members
 

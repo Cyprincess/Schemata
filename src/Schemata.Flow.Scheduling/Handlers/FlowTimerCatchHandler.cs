@@ -1,4 +1,4 @@
-using Schemata.Flow.Scheduling.Runtime;
+﻿using Schemata.Flow.Scheduling.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Common;
+using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
@@ -23,7 +24,11 @@ namespace Schemata.Flow.Scheduling.Handlers;
 ///     and boundary timer catches as instances transition; a transition that touches no timer catch
 ///     never reaches the scheduler.
 /// </summary>
-public sealed class FlowTimerCatchHandler : IFlowCatchHandler
+/// <typeparam name="TJob">The persisted job entity type registered by the host.</typeparam>
+/// <typeparam name="TExecution">The persisted execution entity type registered by the host.</typeparam>
+public sealed class FlowTimerCatchHandler<TJob, TExecution> : IFlowCatchHandler
+    where TJob : SchemataJob, new()
+    where TExecution : SchemataJobExecution, new()
 {
     private readonly IServiceProvider _services;
 
@@ -44,32 +49,34 @@ public sealed class FlowTimerCatchHandler : IFlowCatchHandler
         var previousTimerJobs = new List<string>();
         if (!string.IsNullOrEmpty(context.PreviousWaitingAtName)
          && context.PreviousWaitingAtName != token.WaitingAtName
-         && definition is not null
-         && definition.AllElements.FirstOrDefault(e => e.Name == context.PreviousWaitingAtName) is FlowEvent {
-                Position: EventPosition.IntermediateCatch, Definition: TimerDefinition,
-            }) {
-            previousTimerJobs.Add(JobName(process, context.PreviousWaitingAtName, token.CanonicalName));
+         && definition is not null) {
+            var previousElement = definition.AllElements.FirstOrDefault(e => e.Name == context.PreviousWaitingAtName);
+            foreach (var (elementName, _) in ResolveWaitingTimers(previousElement, definition)) {
+                previousTimerJobs.Add(JobName(process, elementName, token.CanonicalName));
+            }
         }
 
+        var previousState = PreviousStateOf(context);
+        var leftActiveHost = !string.IsNullOrEmpty(previousState)
+                          && (previousState != token.StateName
+                           || !string.Equals(token.Status, "Active", StringComparison.Ordinal));
         if (definition is not null
-         && !string.IsNullOrEmpty(PreviousStateOf(context))
-         && PreviousStateOf(context) != token.StateName
-         && definition.AllElements.FirstOrDefault(e => e.Name == PreviousStateOf(context)) is Activity previousHost) {
+         && leftActiveHost
+         && definition.AllElements.FirstOrDefault(e => e.Name == previousState) is Activity previousHost) {
             foreach (var (elementName, _) in ResolveBoundaryTimers(previousHost, definition)) {
                 previousTimerJobs.Add(JobName(process, elementName, token.CanonicalName));
             }
         }
 
         var timers = new List<(string ElementName, TimerDefinition Definition)>();
-        if (!string.IsNullOrEmpty(token.WaitingAtName)
+        if (!string.IsNullOrEmpty(token.WaitingAtName) && definition is not null) {
+            var waitingElement = definition.AllElements.FirstOrDefault(e => e.Name == token.WaitingAtName);
+            timers.AddRange(ResolveWaitingTimers(waitingElement, definition));
+        }
+        if (timers.Count == 0
          && definition is not null
-         && definition.AllElements.FirstOrDefault(e => e.Name == token.WaitingAtName) is FlowEvent {
-                Position: EventPosition.IntermediateCatch, Definition: TimerDefinition timerDef,
-            }) {
-            timers.Add((token.WaitingAtName, timerDef));
-        } else if (definition is not null
-                && string.Equals(token.Status, "Active", StringComparison.Ordinal)
-                && definition.AllElements.FirstOrDefault(e => e.Name == token.StateName) is Activity host) {
+         && string.Equals(token.Status, "Active", StringComparison.Ordinal)
+         && definition.AllElements.FirstOrDefault(e => e.Name == token.StateName) is Activity host) {
             timers.AddRange(ResolveBoundaryTimers(host, definition));
         }
 
@@ -79,19 +86,27 @@ public sealed class FlowTimerCatchHandler : IFlowCatchHandler
 
         // The scheduler is this handler's own dependency, so its absence is reported here rather than
         // inferred by the runtime from which packages happen to be installed.
-        var scheduler = _services.GetService<IScheduler>();
+        var scheduler = _services.GetService<IScheduler<TJob, TExecution>>();
         if (scheduler is null) {
             throw new FailedPreconditionException(
                 SchemataResources.FLOW_TIMER_REQUIRES_SCHEDULING,
                 new Dictionary<string, string?> { ["name"] = process.CanonicalName });
         }
 
-        var collection = ResourceNameDescriptor.ForType<SchemataJob>().Collection;
-        foreach (var previousTimerJob in previousTimerJobs.Distinct(StringComparer.Ordinal)) {
-            await scheduler.UnscheduleAsync($"{collection}/{previousTimerJob}", ct);
+        if (previousTimerJobs.Count > 0) {
+            var jobs = _services.GetRequiredService<IRepository<TJob>>();
+            if (context.UnitOfWork is { } unitOfWork) {
+                jobs.Join(unitOfWork);
+            }
+            foreach (var previousTimerJob in previousTimerJobs.Distinct(StringComparer.Ordinal)) {
+                var job = await jobs.FirstOrDefaultAsync(query => query.Where(row => row.Key == previousTimerJob), ct);
+                if (job is not null) {
+                    await scheduler.UnscheduleAsync(job.CanonicalName!, ct);
+                }
+            }
         }
 
-        var jobKey = _services.GetRequiredService<IScheduledJobRegistry>().ResolveKey(typeof(FlowTimerJob));
+        var jobKey = _services.GetRequiredService<IScheduledJobRegistry>().ResolveKey(typeof(FlowTimerJob<TJob>));
         foreach (var (elementName, timerDefinition) in timers) {
             var (timerJob, timerVariables) = CreateTimerJob(process, token.CanonicalName, elementName, timerDefinition, jobKey);
             await scheduler.ScheduleAsync(timerJob, timerVariables, ct);
@@ -101,21 +116,20 @@ public sealed class FlowTimerCatchHandler : IFlowCatchHandler
     #endregion
 
     private static string JobName(SchemataProcess process, string elementName, string tokenCanonical) {
-        // Resource-name segments cannot contain '/'; the full canonical remains in Variables["processName"].
         var processLeaf = process.CanonicalName![(process.CanonicalName!.LastIndexOf('/') + 1)..];
         var token       = tokenCanonical[(tokenCanonical.LastIndexOf('/') + 1)..];
         return $"flow-{processLeaf}-{elementName}-{token}";
     }
 
-    private static (SchemataJob Job, Dictionary<string, string?> Variables) CreateTimerJob(
+    private static (TJob Job, Dictionary<string, string?> Variables) CreateTimerJob(
         SchemataProcess process,
         string          token,
         string          elementName,
         TimerDefinition timerDefinition,
         string?         jobKey
     ) {
-        var job = new SchemataJob {
-            Name   = JobName(process, elementName, token),
+        var job = new TJob {
+            Key    = JobName(process, elementName, token),
             JobKey = jobKey,
             State  = JobState.Active,
         };
@@ -123,6 +137,7 @@ public sealed class FlowTimerCatchHandler : IFlowCatchHandler
         return (job, new() {
             ["processName"] = process.CanonicalName,
             ["tokenName"]   = token,
+            ["elementName"] = elementName,
             ["timerDef"]    = JsonSerializer.Serialize(timerDefinition, SchemataJson.Default),
         });
     }
@@ -145,6 +160,28 @@ public sealed class FlowTimerCatchHandler : IFlowCatchHandler
                 } && ReferenceEquals(evt.AttachedTo, host)) {
                 yield return (evt.Name, timerDefinition);
             }
+        }
+    }
+    private static IEnumerable<(string ElementName, TimerDefinition Definition)> ResolveWaitingTimers(
+        FlowElement?      element,
+        ProcessDefinition definition
+    ) {
+        // A token waiting at an event-based gateway is armed for the gateway's outgoing
+        // intermediate timer catches, matching the event bridge's catch resolution.
+        switch (element) {
+            case FlowEvent { Position: EventPosition.IntermediateCatch, Definition: TimerDefinition timer } catchEvent:
+                yield return (catchEvent.Name, timer);
+                yield break;
+            case EventBasedGateway gateway:
+                foreach (var flow in definition.Flows.Where(flow => flow.Source == gateway)) {
+                    if (flow.Target is FlowEvent {
+                            Position: EventPosition.IntermediateCatch, Definition: TimerDefinition gatewayTimer,
+                        } gatewayCatch) {
+                        yield return (gatewayCatch.Name, gatewayTimer);
+                    }
+                }
+
+                yield break;
         }
     }
 }

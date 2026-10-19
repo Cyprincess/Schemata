@@ -15,7 +15,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Schemata.Caching.Distributed\Schemata.Caching.Distributed.csproj" />
+    <Compile Include="..\Schemata.Flow.Tests\FlowTestCreation.cs" Link="FlowTestCreation.cs" />
+    <ProjectReference Include="..\..\src\Schemata.Actor.Event\Schemata.Actor.Event.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Caching.Memory\Schemata.Caching.Memory.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Entity.EntityFrameworkCore\Schemata.Entity.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Entity.LinqToDB\Schemata.Entity.LinqToDB.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Expressions.Cel\Schemata.Expressions.Cel.csproj" />
@@ -26,11 +28,14 @@
     <ProjectReference Include="..\..\src\Schemata.Flow.Foundation\Schemata.Flow.Foundation.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Flow.Grpc\Schemata.Flow.Grpc.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Flow.Http\Schemata.Flow.Http.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Flow.Repository\Schemata.Flow.Repository.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Flow.Scheduling\Schemata.Flow.Scheduling.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Flow.StateMachine\Schemata.Flow.StateMachine.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Mapping.Mapster\Schemata.Mapping.Mapster.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Scheduling.Grpc\Schemata.Scheduling.Grpc.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Scheduling.Repository\Schemata.Scheduling.Repository.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Scheduling.Http\Schemata.Scheduling.Http.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Tenancy.Foundation\Schemata.Tenancy.Foundation.csproj" />
   </ItemGroup>
 
 </Project>

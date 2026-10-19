@@ -4,12 +4,83 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Flow.Skeleton.Runtime;
 using Xunit;
 
 namespace Schemata.Flow.Bpmn.Tests;
 
 public class BpmnEngine_TransactionSubProcessShould
 {
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task FailedCompensation_RoutesOnlyErrorBoundary() {
+        var scenario = TransactionScenario(true, true, true, true);
+        var boundary = scenario.Definition.AllElements.OfType<FlowEvent>().Single(value => value.Definition is CompensationDefinition && value.AttachedTo?.Name == "B");
+        var flow = scenario.Definition.Flows.Single(value => value.Source == boundary);
+        var failure = new ProcedureTask { Name = "undo-fails", Body = (_, _) => throw new InvalidOperationException("undo failed") };
+        scenario.Definition.Elements.Add(failure);
+        flow.Target = failure;
+
+        var snapshot = await RunToTransactionExitAsync(scenario);
+
+        Assert.Single(snapshot.Tokens, token => token.StateName == "error-handler");
+        Assert.DoesNotContain(snapshot.Tokens, token => token.StateName == "cancel-handler" || token.StateName == "after-tx");
+        Assert.DoesNotContain(snapshot.Transitions, row => row.Previous == "cancel-boundary" || row.Event == "ExitTransaction");
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task CancelWithoutBoundary_SelectsDefaultInsteadOfFalseGuard() {
+        var scenario = TransactionScenario(false, true, true);
+        var transaction = scenario.Definition.AllElements.OfType<TransactionSubProcess>().Single();
+        var guard = new Moq.Mock<IConditionExpression>();
+        guard.Setup(value => value.Evaluate(Moq.It.IsAny<FlowConditionContext>())).Returns(new ValueTask<bool>(false));
+        scenario.Definition.Flows.Single(flow => flow.Source == transaction).Condition = guard.Object;
+        var fallback = new NoneTask { Name = "default-after" };
+        scenario.Definition.Elements.Add(fallback);
+        scenario.Definition.Flows.Add(new() { Source = transaction, Target = fallback, IsDefault = true });
+        var snapshot = await RunToTransactionExitAsync(scenario);
+        Assert.Contains(snapshot.Tokens, token => token.StateName == "default-after" && token.State == "Active");
+        Assert.DoesNotContain(snapshot.Tokens, token => token.StateName == "after-tx");
+        Assert.Equal(2, snapshot.Transitions.Count(transition => transition.Kind == TransitionKind.Compensate));
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task CancelWithoutBoundary_GuardRetryDoesNotRepeatCompensation() {
+        var scenario = TransactionScenario(false, true, true);
+        var transaction = scenario.Definition.AllElements.OfType<TransactionSubProcess>().Single();
+        var allowed = false;
+        var guard = new Moq.Mock<IConditionExpression>();
+        guard.Setup(value => value.Evaluate(Moq.It.IsAny<FlowConditionContext>())).Returns(() => new ValueTask<bool>(allowed));
+        scenario.Definition.Flows.Single(flow => flow.Source == transaction).Condition = guard.Object;
+        var snapshot = await RunToTransactionExitAsync(scenario);
+        var parent = snapshot.Tokens.Single(token => token.StateName == transaction.Name);
+        Assert.Equal("Active", parent.State);
+        Assert.Equal(2, snapshot.Transitions.Count(transition => transition.Kind == TransitionKind.Compensate));
+        allowed = true;
+        snapshot = await scenario.Engine.AdvanceAsync(scenario.Definition, snapshot.Process, snapshot.Tokens, parent.CanonicalName, CancellationToken.None);
+        Assert.Equal("after-tx", parent.StateName);
+        Assert.DoesNotContain(snapshot.Transitions, transition => transition.Kind == TransitionKind.Compensate);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task ProcedureToCancel_InvokesCompensationAndBoundary() {
+        var scenario = TransactionScenario(true, true, true);
+        var transaction = scenario.Definition.AllElements.OfType<TransactionSubProcess>().Single();
+        var flow = transaction.ChildFlows.Single(value => value.Source.Name == "cancel-task");
+        var cancel = flow.Target;
+        var procedure = new ProcedureTask { Name = "before-cancel", Body = (_, _) => ValueTask.CompletedTask };
+        transaction.Children.Add(procedure);
+        flow.Target = procedure;
+        transaction.ChildFlows.Add(new() { Source = procedure, Target = cancel });
+        var snapshot = await RunToTransactionExitAsync(scenario);
+        Assert.Equal(2, snapshot.Transitions.Count(transition => transition.Kind == TransitionKind.Compensate));
+        Assert.Contains(snapshot.Tokens, token => token.StateName == "cancel-handler" && token.State == "Active");
+        Assert.DoesNotContain(snapshot.Tokens, token => token.StateName == "after-tx");
+    }
+
     [Fact]
     public async Task Execute_TransactionWithNormalEnd_CompletesAndClearsStack() {
         var scenario = TransactionScenario(false, true, false);

@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Data.Sqlite;
@@ -7,6 +8,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Actor.Skeleton;
 using Schemata.Core;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
@@ -48,6 +50,7 @@ public sealed class ActorConcurrencyHarness : IAsyncDisposable
         connection.Open();
 
         var services = new ServiceCollection();
+        Schemata.Flow.Tests.FlowTestCreation.Register(services);
         services.AddLogging();
         services.AddDbContextFactory<TestDbContext>(options => options
                      .UseSqlite(connectionString)
@@ -86,8 +89,17 @@ public sealed class ActorConcurrencyHarness : IAsyncDisposable
     #region IAsyncDisposable Members
 
     public async ValueTask DisposeAsync() {
-        await Root.DisposeAsync();
-        await Connection.DisposeAsync();
+        Exception? failure = null;
+        try {
+            if (Root.GetService<IActorSystem>() is IActorSystemLifetime lifetime) {
+                await lifetime.ShutdownAsync(default);
+            }
+        } catch (Exception error) { failure = error; }
+        try { await Root.DisposeAsync(); }
+        catch (Exception error) { failure = failure is null ? error : new AggregateException(failure, error); }
+        try { await Connection.DisposeAsync(); }
+        catch (Exception error) { failure = failure is null ? error : new AggregateException(failure, error); }
+        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
     #endregion

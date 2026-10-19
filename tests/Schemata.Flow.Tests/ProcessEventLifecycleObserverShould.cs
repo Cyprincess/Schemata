@@ -15,8 +15,9 @@ public class ProcessEventLifecycleObserverShould
     public async Task OnStartedAsync_MissingEventBus_Throws() {
         var observer = new ProcessEventLifecycleObserver(new ServiceCollection().BuildServiceProvider());
         var process = new SchemataProcess {
-            CanonicalName  = "processes/p1",
-            DefinitionName = "approval",
+            CanonicalName     = "processes/p1",
+            DefinitionName    = "approval",
+            DefinitionVersion = "1",
         };
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(

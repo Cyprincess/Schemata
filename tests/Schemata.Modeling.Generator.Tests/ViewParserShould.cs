@@ -140,4 +140,81 @@ public class ViewParserShould
         Assert.Single(result.Children[0].Notes);
         Assert.Equal("Nested Object field", result.Children[0].Notes[0].Text);
     }
+
+    [Fact]
+    public void ViewField_WithNoteBeforeOptions_RemainsTyped() {
+        var expected = ParseViewField("timestamp expiration_date [omit]");
+        var actual   = ParseViewField("timestamp expiration_date /* note */ [omit]");
+
+        Assert.Equal(expected, actual);
+        Assert.Equal("timestamp", actual.Type);
+        Assert.Equal("expiration_date", actual.Name);
+        Assert.False(actual.Nullable);
+        Assert.Equal(0, actual.Notes.Length);
+        Assert.Contains(ViewOption.Omit, actual.Options);
+    }
+
+    [Fact]
+    public void ViewField_WithNoteBeforeBody_RemainsUntyped() {
+        var expected = ParseViewField("category {\n      id\n    }");
+        var actual   = ParseViewField("category /* note */ {\n      id\n    }");
+
+        Assert.Equal(expected, actual);
+        Assert.Null(actual.Type);
+        Assert.Equal("category", actual.Name);
+        Assert.False(actual.Nullable);
+        Assert.Equal(0, actual.Notes.Length);
+        Assert.Single(actual.Children);
+        Assert.Equal("id", actual.Children[0].Name);
+    }
+
+    [Fact]
+    public void ViewField_WithNoteBeforeAssignment_RemainsTyped() {
+        var expected = ParseViewField("timestamp expiration_date = now()");
+        var actual   = ParseViewField("timestamp expiration_date /* note */ = now()");
+
+        Assert.Equal(expected, actual);
+        Assert.Equal("timestamp", actual.Type);
+        Assert.Equal("expiration_date", actual.Name);
+        Assert.False(actual.Nullable);
+        Assert.Equal(0, actual.Notes.Length);
+        Assert.IsType<FunctionCall>(actual.Assignment);
+    }
+
+    [Fact]
+    public void ViewField_WithNoteBeforeTypedBody_RemainsTyped() {
+        var expected = ParseViewField("Category.response category {\n      id\n    }");
+        var actual   = ParseViewField("Category.response category /* note */ {\n      id\n    }");
+
+        Assert.Equal(expected, actual);
+        Assert.Equal("Category.response", actual.Type);
+        Assert.Equal("category", actual.Name);
+        Assert.False(actual.Nullable);
+        Assert.Equal(0, actual.Notes.Length);
+        Assert.Single(actual.Children);
+        Assert.Equal("id", actual.Children[0].Name);
+    }
+
+    [Fact]
+    public void ViewField_WithLineNoteBeforeOptions_RemainsTyped() {
+        var expected = ParseViewField("timestamp expiration_date [omit]");
+        var actual   = ParseViewField("timestamp expiration_date // note\n    [omit]");
+
+        Assert.Equal(expected, actual);
+        Assert.Equal("timestamp", actual.Type);
+        Assert.Equal("expiration_date", actual.Name);
+        Assert.False(actual.Nullable);
+        Assert.Equal(0, actual.Notes.Length);
+        Assert.Contains(ViewOption.Omit, actual.Options);
+    }
+
+    private static ViewField ParseViewField(string field) {
+        var doc = Parser.Document.Parse("Entity Example {\n  Object response {\n    " + field + "\n  }\n}");
+        Assert.NotNull(doc);
+        Assert.Single(doc.Entities);
+        Assert.Single(doc.Entities[0].Views);
+        Assert.Single(doc.Entities[0].Views[0].Fields);
+
+        return doc.Entities[0].Views[0].Fields[0];
+    }
 }

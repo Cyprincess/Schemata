@@ -57,13 +57,12 @@ internal static class BpmnEngineTestExtensions
     }
 
     private static FlowExecutionContext Context(SchemataProcess process) {
-        return new(Mock.Of<IUnitOfWork>(), Services) {
-            LoadedCompensationBindings = CompensationBindings.TryGetValue(process, out var state) ? state.Bindings : [],
-        };
+        return Schemata.Flow.Tests.FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), Services,
+            CompensationBindings.TryGetValue(process, out var state) ? state.Bindings : []);
     }
 
     internal static FlowExecutionContext Context(IReadOnlyList<ProcessCompensationBinding> bindings) {
-        return new(Mock.Of<IUnitOfWork>(), Services) { LoadedCompensationBindings = bindings };
+        return Schemata.Flow.Tests.FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), Services, bindings);
     }
 
     private static void Store(ProcessSnapshot snapshot) {

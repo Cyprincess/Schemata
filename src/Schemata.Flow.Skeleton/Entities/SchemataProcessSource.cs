@@ -11,7 +11,8 @@ namespace Schemata.Flow.Skeleton.Entities;
 /// </summary>
 [Table("SchemataProcessSources")]
 [PrimaryKey(nameof(Uid))]
-[Index(nameof(Process), nameof(Token), nameof(Name), IsUnique = true)]
+[Index(nameof(Process), nameof(Token), nameof(Name), IsUnique = true, Filter = "Token IS NOT NULL")]
+[Index(nameof(Process), nameof(Name), IsUnique = true, Filter = "Token IS NULL")]
 public class SchemataProcessSource : IIdentifier, IConcurrency, ITimestamp
 {
     /// <summary>Canonical name of the owning process.</summary>

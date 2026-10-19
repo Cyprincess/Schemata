@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Flow.Skeleton.Runtime;
 
@@ -10,5 +11,6 @@ public abstract class ProcedureTaskBase : Activity
 {
     /// <summary>Invokes the procedure body for the current token.</summary>
     /// <param name="context">The flow task context supplied by the runtime.</param>
-    protected internal abstract ValueTask InvokeAsync(FlowTaskContext context);
+    /// <param name="ct">The operation token propagated to task bindings and resource mutations.</param>
+    protected internal abstract ValueTask InvokeAsync(FlowTaskContext context, CancellationToken ct);
 }

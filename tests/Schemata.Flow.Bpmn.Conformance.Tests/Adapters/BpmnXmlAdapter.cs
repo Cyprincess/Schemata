@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using Schemata.Flow.Skeleton.Models;
@@ -115,11 +116,11 @@ public static class BpmnXmlAdapter
             "task"                    => Activity<NoneTask>(element),
             "userTask"                => Activity<UserTask>(element),
             "serviceTask"             => Activity<ServiceTask>(element),
-            "scriptTask"              => Activity<ScriptTask>(element),
+            "scriptTask"              => Script(element),
             "manualTask"              => Activity<ManualTask>(element),
             "sendTask"                => Activity<SendTask>(element),
             "receiveTask"             => Activity<ReceiveTask>(element),
-            "businessRuleTask"        => Activity<BusinessRuleTask>(element),
+            "businessRuleTask"        => Rule(element),
             "callActivity"            => CallActivity(element),
             "exclusiveGateway"        => Element<ExclusiveGateway>(element),
             "parallelGateway"         => Element<ParallelGateway>(element),
@@ -151,6 +152,42 @@ public static class BpmnXmlAdapter
             ? !string.Equals(cancelActivity, "false", StringComparison.OrdinalIgnoreCase)
             : flowEvent.Definition is not EscalationDefinition;
         return flowEvent;
+    }
+
+    private static ScriptTask<IReadOnlyDictionary<string, object?>, object> Script(XElement element) {
+        var task = Activity<ScriptTask<IReadOnlyDictionary<string, object?>, object>>(element);
+        task.Language = element.Attribute("scriptFormat")?.Value;
+        task.Script = element.Element(Bpmn + "script")?.Value;
+        task.Input = Input;
+        task.Output = (context, result, ct) => {
+            ct.ThrowIfCancellationRequested();
+            if (result is IReadOnlyDictionary<string, object?> fields) {
+                foreach (var (name, value) in fields) context.Token.Annotations[name] = Convert.ToString(value, CultureInfo.InvariantCulture);
+            } else {
+                context.Token.Annotations["result"] = Convert.ToString(result, CultureInfo.InvariantCulture);
+            }
+            return ValueTask.CompletedTask;
+        };
+        return task;
+    }
+
+    private static BusinessRuleTask<IReadOnlyDictionary<string, object?>, IReadOnlyDictionary<string, object?>> Rule(XElement element) {
+        var task = Activity<BusinessRuleTask<IReadOnlyDictionary<string, object?>, IReadOnlyDictionary<string, object?>>>(element);
+        task.Key = element.Attribute("implementation")?.Value;
+        task.Version = "1";
+        task.Input = Input;
+        task.Output = (context, result, ct) => {
+            ct.ThrowIfCancellationRequested();
+            foreach (var (name, value) in result) context.Token.Annotations[name] = Convert.ToString(value, CultureInfo.InvariantCulture);
+            return ValueTask.CompletedTask;
+        };
+        return task;
+    }
+
+    private static ValueTask<IReadOnlyDictionary<string, object?>> Input(FlowTaskContext context, CancellationToken ct) {
+        ct.ThrowIfCancellationRequested();
+        IReadOnlyDictionary<string, object?> input = context.Token.Annotations.ToDictionary(pair => pair.Key, pair => (object?)pair.Value, StringComparer.Ordinal);
+        return ValueTask.FromResult(input);
     }
 
     private static T Activity<T>(XElement element) where T : Activity, new() {

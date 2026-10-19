@@ -1,5 +1,8 @@
+using System;
+using System.Threading.Tasks;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Flow.StateMachine;
 using Xunit;
 
@@ -7,6 +10,22 @@ namespace Schemata.Flow.Tests;
 
 public class StateMachineValidatorShould
 {
+    [Fact]
+    public void Validate_ParallelEventDefinition_Throws() {
+        var start = new FlowEvent {
+            Name = "start", Position = EventPosition.Start,
+            Definition = new ParallelDefinition { Name = "parallel" },
+        };
+        var end = new FlowEvent { Name = "end", Position = EventPosition.End };
+        var definition = new ProcessDefinition {
+            Elements = { start, end },
+            Flows = { new() { Source = start, Target = end } },
+        };
+
+        var error = Assert.Throws<InvalidOperationException>(() => StateMachineValidator.Validate(definition));
+        Assert.Contains("not supported", error.Message);
+    }
+
     [Fact]
     public void Validate_ValidDefinition_Passes() {
         var startEvent = new FlowEvent { Name = "Start", Position = EventPosition.Start };
@@ -333,5 +352,75 @@ public class StateMachineValidatorShould
 
         var ex = Assert.Throws<FailedPreconditionException>(() => StateMachineValidator.Validate(definition));
         Assert.Contains("outgoing", ex.Message);
+    }
+
+    [Fact]
+    public void Validate_Typed_Procedure_With_A_Payload_Free_Incoming_Path_Throws() {
+        // The typed catch branch alone used to satisfy the check; the branch that reaches the task
+        // straight from the start delivers no payload and must reject the graph.
+        var definition = PayloadFreeBranchProcess();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => StateMachineValidator.Validate(definition));
+
+        Assert.Contains("Typed procedure task payload mismatch", ex.Message);
+    }
+
+    [Fact]
+    public void Validate_Typed_Procedure_Reached_Only_Through_A_Typed_Catch_Passes() {
+        var start   = new FlowEvent { Name = "Start", Position = EventPosition.Start };
+        var wait    = new UserTask { Name  = "Wait" };
+        var gateway = new EventBasedGateway { Name = "Await" };
+        var catchEv = new FlowEvent {
+            Name       = "Submitted",
+            Position   = EventPosition.IntermediateCatch,
+            Definition = new Message<int> { Name = "submit" },
+        };
+        var handle = new ProcedureTask<int> { Name = "Handle", Body = (_, _, _) => ValueTask.CompletedTask };
+        var end    = new FlowEvent { Name = "End", Position = EventPosition.End };
+
+        var definition = new ProcessDefinition {
+            Name     = "typed-happy-path",
+            Elements = { start, wait, gateway, catchEv, handle, end },
+            Flows = {
+                new() { Source = start,    Target = wait },
+                new() { Source = wait,     Target = gateway },
+                new() { Source = gateway,  Target = catchEv },
+                new() { Source = catchEv,  Target = handle },
+                new() { Source = handle,   Target = end },
+            },
+        };
+        definition.Messages.Add((Message)catchEv.Definition!);
+
+        var ex = Record.Exception(() => StateMachineValidator.Validate(definition));
+
+        Assert.Null(ex);
+    }
+
+    private static ProcessDefinition PayloadFreeBranchProcess() {
+        var start   = new FlowEvent { Name = "Start", Position = EventPosition.Start };
+        var decide  = new ExclusiveGateway { Name = "Decide" };
+        var awaitGw = new EventBasedGateway { Name = "AwaitGw" };
+        var catchEv = new FlowEvent {
+            Name       = "Submitted",
+            Position   = EventPosition.IntermediateCatch,
+            Definition = new Message<int> { Name = "submit" },
+        };
+        var handle = new ProcedureTask<int> { Name = "Handle", Body = (_, _, _) => ValueTask.CompletedTask };
+        var end    = new FlowEvent { Name = "End", Position = EventPosition.End };
+
+        var definition = new ProcessDefinition {
+            Name     = "payload-free-branch",
+            Elements = { start, decide, awaitGw, catchEv, handle, end },
+            Flows = {
+                new() { Source = start, Target   = decide },
+                new() { Source = decide, Target   = handle },
+                new() { Source = decide, Target   = awaitGw, Condition = new LambdaConditionExpression { Lambda = _ => new(true) } },
+                new() { Source = awaitGw, Target  = catchEv },
+                new() { Source = catchEv, Target  = handle },
+                new() { Source = handle, Target   = end },
+            },
+        };
+        definition.Messages.Add((Message)catchEv.Definition!);
+        return definition;
     }
 }

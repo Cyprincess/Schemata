@@ -8,21 +8,43 @@ namespace Schemata.Flow.Skeleton.Models;
 ///     Matched by <see cref="ExceptionType" /> during <see cref="Schemata.Flow.Skeleton.Builders.BoundaryCatch" />
 ///     resolution.
 /// </summary>
-public sealed class ErrorDefinition : IEventDefinition
+public sealed class ErrorDefinition : FlowGraphNode, IEventDefinition
 {
+    private string? _errorCode;
+    private Type _exceptionType = null!;
+    private string _name = null!;
+
     /// <summary>
     ///     An optional BPMN error code used alongside the exception type for matching.
     /// </summary>
-    public string? ErrorCode { get; set; }
+    public string? ErrorCode {
+        get => _errorCode;
+        set {
+            EnsureMutable();
+            _errorCode = value;
+        }
+    }
 
     /// <summary>
     ///     The CLR exception type that triggers this error boundary event.
     /// </summary>
-    public Type ExceptionType { get; set; } = null!;
+    public Type ExceptionType {
+        get => _exceptionType;
+        set {
+            EnsureMutable();
+            _exceptionType = value;
+        }
+    }
 
     #region IEventDefinition Members
 
-    public string Name { get; set; } = null!;
+    public string Name {
+        get => _name;
+        set {
+            EnsureMutable();
+            _name = value;
+        }
+    }
 
     #endregion
 

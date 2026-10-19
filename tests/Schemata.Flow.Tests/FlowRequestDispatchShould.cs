@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
-using Schemata.Core;
+using Schemata.Abstractions.Advisors;
 using Schemata.Core.Features;
 using Schemata.Entity.Repository;
 using Schemata.Event.Skeleton;
@@ -59,6 +59,7 @@ public sealed class FlowRequestDispatchShould
 
         var services = new ServiceCollection()
                       .AddLogging()
+                      .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                       .AddSingleton(processes.Object)
                       .AddSingleton(tokens.Object)
                       .AddSingleton(transitions.Object)
@@ -83,8 +84,8 @@ public sealed class FlowRequestDispatchShould
     private static void Configure(FeatureBase feature, IServiceCollection services) {
         feature.ConfigureServices(
             services,
-            new SchemataOptions(),
-            new Configurators(),
+            new(),
+            new(),
             new ConfigurationBuilder().Build(),
             Mock.Of<IWebHostEnvironment>()
         );
@@ -94,30 +95,32 @@ public sealed class FlowRequestDispatchShould
         where TEntity : class {
         var data       = new List<TEntity>();
         var repository = new Mock<IRepository<TEntity>>();
+        repository.Setup(current => current.AdviceContext).Returns(new AdviceContext(new ServiceCollection().BuildServiceProvider()));
         repository.Setup(current => current.Join(It.IsAny<IUnitOfWork>()));
         repository.Setup(current => current.Begin()).Returns(Mock.Of<IUnitOfWork>());
-        repository.Setup(current => current.AddAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
-                  .Returns((TEntity entity, CancellationToken _) => {
+        repository.Setup(current => current.AddAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
+                  .ReturnsAsync((TEntity entity, CancellationToken _, MutationOptions _) => {
+                      FlowTestCreation.Assign(entity);
                       data.Add(entity);
-                      return Task.CompletedTask;
+                      return MutationResult.Applied;
                   });
-        repository.Setup(current => current.UpdateAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
+        repository.Setup(current => current.UpdateAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
+                  .ReturnsAsync(MutationResult.Applied);
         repository.Setup(current => current.ListAsync<TEntity>(
                              It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
-                             It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>> query, CancellationToken _) =>
+                             It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>> query, CancellationToken _, QueryOptions _) =>
                                AsAsyncEnumerable(query(data.AsQueryable()).ToList()));
         repository.Setup(current => current.SingleOrDefaultAsync(
                              It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
-                             It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>> query, CancellationToken _) =>
-                               new ValueTask<TEntity?>(query(data.AsQueryable()).SingleOrDefault()));
+                             It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>> query, CancellationToken _, QueryOptions _) =>
+                               new(query(data.AsQueryable()).SingleOrDefault()));
         repository.Setup(current => current.FirstOrDefaultAsync(
                              It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
-                             It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>> query, CancellationToken _) =>
-                               new ValueTask<TEntity?>(query(data.AsQueryable()).FirstOrDefault()));
+                             It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>> query, CancellationToken _, QueryOptions _) =>
+                               new(query(data.AsQueryable()).FirstOrDefault()));
         return repository;
     }
 

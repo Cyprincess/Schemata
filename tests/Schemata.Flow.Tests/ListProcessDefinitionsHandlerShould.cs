@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using System.Threading.Tasks;
 using Moq;
 using Schemata.Flow.Foundation.Handlers;
@@ -6,6 +6,8 @@ using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
 using Xunit;
 
+using Schemata.Abstractions.Advisors;
+using Microsoft.Extensions.DependencyInjection;
 namespace Schemata.Flow.Tests;
 
 public class ListProcessDefinitionsHandlerShould
@@ -37,17 +39,17 @@ public class ListProcessDefinitionsHandlerShould
             Name          = "orders",
             Engine        = "StateMachine",
             Definition    = definition,
-            Configuration = new() { Name = "orders" },
         };
 
         var registry = new Mock<IProcessRegistry>();
-        registry.Setup(r => r.GetRegisteredProcesses()).Returns(["orders"]);
-        registry.Setup(r => r.GetRegistration("orders")).Returns(registration);
+        registry.Setup(r => r.GetRegisteredProcesses()).Returns([registration]);
 
         var handler = new DefaultListProcessDefinitionsHandler(registry.Object);
 
-        var info = Assert.Single(await handler.HandleAsync(new()));
+        var info = Assert.Single(await handler.HandleAsync(new(), EmptyAdvice()));
 
+        Assert.Equal("definitions/orders/versions/1", info.CanonicalName);
+        Assert.Equal("1", info.Version);
         Assert.Equal(5, info.Elements.Count);
         Assert.Equal(new[] { "begin", "review", "Await_review", "Catch_Await_review_approve", "done" },
                      info.Elements.Select(e => e.Name).ToArray());
@@ -66,17 +68,5 @@ public class ListProcessDefinitionsHandlerShould
                      info.Flows.Select(f => (f.Source, f.Target)).ToArray());
     }
 
-    [Fact]
-    public async Task ListDefinitions_LeavesGraphEmptyWhenRegistrationIsMissing() {
-        var registry = new Mock<IProcessRegistry>();
-        registry.Setup(r => r.GetRegisteredProcesses()).Returns(["orders"]);
-        registry.Setup(r => r.GetRegistration("orders")).Returns((ProcessRegistration?)null);
-
-        var handler = new DefaultListProcessDefinitionsHandler(registry.Object);
-
-        var info = Assert.Single(await handler.HandleAsync(new()));
-        Assert.Equal("definitions/orders", info.CanonicalName);
-        Assert.Empty(info.Elements);
-        Assert.Empty(info.Flows);
-    }
+    private static AdviceContext EmptyAdvice() => new(new ServiceCollection().BuildServiceProvider());
 }

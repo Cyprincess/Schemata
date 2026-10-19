@@ -18,30 +18,34 @@ namespace Schemata.Flow.Bpmn.Runtime.SubProcesses;
 ///     registered child <see cref="ProcessDefinition" /> from the same <see cref="IProcessRegistry" />.
 ///     Uses the flow unit of work when starting and resuming the called process.
 /// </summary>
-public sealed class CallActivityExecutor
+/// <typeparam name="TProcess">The persisted process entity type registered by the host.</typeparam>
+/// <typeparam name="TToken">The persisted token entity type registered by the host.</typeparam>
+/// <typeparam name="TTransition">The persisted transition entity type registered by the host.</typeparam>
+public sealed class CallActivityExecutor<TProcess, TToken, TTransition>
+    where TProcess : SchemataProcess, new()
+    where TToken : SchemataProcessToken, new()
+    where TTransition : SchemataProcessTransition, new()
 {
     private readonly IServiceProvider _services;
-    private readonly IUnitOfWork      _unitOfWork;
 
     /// <summary>Creates an executor that resolves registry and repositories from <paramref name="services" />.</summary>
-    public CallActivityExecutor(IServiceProvider services, IUnitOfWork unitOfWork) {
+    public CallActivityExecutor(IServiceProvider services) {
         _services    = services;
-        _unitOfWork  = unitOfWork;
     }
 
     /// <summary>
     ///     Enters a call activity by parking the parent token, starting the called process with the
-    ///     same BPMN engine, and persisting the spawned child process rows and parent spawn transition.
+    ///     engine keyed on the child registration, and persisting the spawned child process rows and
+    ///     parent spawn transition.
     /// </summary>
     public async ValueTask<SchemataProcessTransition> EnterAsync(
-        BpmnEngine           engine,
         SchemataProcess      parentProcess,
         SchemataProcessToken parentToken,
+        List<SchemataProcessToken> working,
         CallActivity         callActivity,
         FlowExecutionContext context,
         CancellationToken    ct
     ) {
-        ArgumentNullException.ThrowIfNull(engine);
         ArgumentNullException.ThrowIfNull(parentProcess);
         ArgumentNullException.ThrowIfNull(parentToken);
         ArgumentNullException.ThrowIfNull(callActivity);
@@ -53,7 +57,7 @@ public sealed class CallActivityExecutor
                 new Dictionary<string, string?> { ["name"] = callActivity.Name });
         }
 
-        var registration = registry.GetRegistration(callActivity.CalledElement);
+        var registration = registry.GetRegistration(callActivity.CalledElement, callActivity.DefinitionVersion);
         if (registration is null) {
             throw new NotFoundException(
                 SchemataResources.PROCESS_NOT_REGISTERED,
@@ -61,65 +65,101 @@ public sealed class CallActivityExecutor
             );
         }
 
-        parentToken.State       = "Waiting";
-        parentToken.StateName     = callActivity.Name;
-        parentToken.WaitingAtName = callActivity.Name;
+        var waiter = TokenFactory<TProcess, TToken>.NewChildToken((TProcess)parentProcess, new(callActivity.Name, callActivity.Name, false), (TToken)parentToken);
+        waiter.Bookkeeping = new(parentToken.Bookkeeping, StringComparer.Ordinal);
+        await context.CreateTokenAsync(waiter, ct);
+        working.Add(waiter);
+        parentToken.State = "Completed";
+        parentToken.StateName = callActivity.Name;
+        parentToken.WaitingAtName = null;
 
-        var leaf = Guid.NewGuid().ToString("n");
-        var childProcess = new SchemataProcess {
-            Name           = leaf,
-            CanonicalName  = $"processes/{leaf}",
+        var childProcess = new TProcess {
             DefinitionName = registration.Name,
+            DefinitionVersion = registration.Version,
         };
+        await context.CreateProcessAsync(childProcess, ct);
 
-        var childSnapshot = await engine.StartAsync(registration.Definition, childProcess, context, ct);
+        var childContext = new FlowExecutionContext(context.UnitOfWork, context.Services) {
+            CreateProcessAsync = context.CreateProcessAsync,
+            CreateTokenAsync = context.CreateTokenAsync,
+            PersistSnapshotAsync = context.PersistSnapshotAsync,
+            Principal = context.Principal,
+            FindTokenAsync = context.FindTokenAsync,
+            FindSourceBinding = context.FindSourceBinding,
+            NewSourceBinding = context.NewSourceBinding,
+            FindPersistedSourceAsync = context.FindPersistedSourceAsync,
+            ListSourceBindingsAsync = context.ListSourceBindingsAsync,
+            CreateSourceBindingAsync = context.CreateSourceBindingAsync,
+            UpdateSourceBindingAsync = context.UpdateSourceBindingAsync,
+            TrackSourceBinding = context.TrackSourceBinding,
+            ValidateSourceAsync = context.ValidateSourceAsync,
+            InitialSourceStamps = context.InitialSourceStamps,
+            TouchedSources = context.TouchedSources,
+        };
+        var childEngine = _services.GetKeyedService<IFlowRuntime<TProcess, TToken, TTransition>>(registration.Engine);
+        if (childEngine is null) {
+            throw new FailedPreconditionException(
+                SchemataResources.FLOW_RUNTIME_NOT_REGISTERED,
+                new Dictionary<string, string?> { ["engine"] = registration.Engine });
+        }
+
+        var childSnapshot = await childEngine.StartAsync(registration.Definition, childProcess, childContext, ct);
         var spawn = NewTransition(
             parentProcess.Name!,
-            parentToken.CanonicalName,
+            waiter.CanonicalName,
             callActivity.Name,
             childProcess.CanonicalName,
             TransitionKind.Spawn,
             "CallActivity");
         spawn.Note = callActivity.Name;
 
-        await PersistSpawnAsync(childSnapshot, spawn, ct);
+        var activation               = Guid.NewGuid().ToString("n");
+        spawn.Activation             = activation;
+        waiter.CurrentCallActivation = activation;
+
+        await context.PersistSnapshotAsync(childSnapshot, ct);
 
         return spawn;
     }
 
     /// <summary>
-    ///     Reads the parent spawn transition and returns terminal child completion details when the
-    ///     child process has no live tokens left.
+    ///     Reads the parent spawn transition identified by the call <paramref name="activation" /> and
+    ///     returns terminal child completion details when the child process has no live tokens left. A
+    ///     completion naming a call activation other than the token's current one is rejected.
     /// </summary>
     public async ValueTask<CallActivityCompletion?> TryCompleteAsync(
         SchemataProcess      parentProcess,
         SchemataProcessToken parentToken,
-        CallActivity         callActivity,
+        string?              activation,
         CancellationToken    ct
     ) {
         ArgumentNullException.ThrowIfNull(parentProcess);
         ArgumentNullException.ThrowIfNull(parentToken);
-        ArgumentNullException.ThrowIfNull(callActivity);
 
-        var transitions = _services.GetRequiredService<IRepository<SchemataProcessTransition>>();
+        if (string.IsNullOrEmpty(activation)
+         || !string.Equals(parentToken.CurrentCallActivation, activation, StringComparison.Ordinal)) {
+            return null;
+        }
+
+        var transitions = _services.GetRequiredService<IRepository<TTransition>>();
         var spawn = await transitions.FirstOrDefaultAsync(
             q => q.Where(t => t.Process == parentProcess.Name
                            && t.Token == parentToken.CanonicalName
                            && t.Kind == TransitionKind.Spawn
-                           && t.Note == callActivity.Name), ct);
+                           && t.Activation == activation), ct);
         if (spawn?.Posterior is null) {
             return null;
         }
 
-        var processes = _services.GetRequiredService<IRepository<SchemataProcess>>();
+        var processes = _services.GetRequiredService<IRepository<TProcess>>();
         var child = await processes.FirstOrDefaultAsync(q => q.Where(p => p.CanonicalName == spawn.Posterior), ct);
         if (child is null || !TokenStates.IsTerminal(child.State)) {
             return null;
         }
 
-        var tokens = _services.GetRequiredService<IRepository<SchemataProcessToken>>();
+        var tokens = _services.GetRequiredService<IRepository<TToken>>();
         var childTokens = new List<SchemataProcessToken>();
-        await foreach (var token in tokens.ListAsync<SchemataProcessToken>(q => q.Where(t => t.Process == child.Name), ct)) {
+        await foreach (var token in tokens.ListAsync<TToken>(q => q.Where(t => t.Process == child.Name), ct)) {
             childTokens.Add(token);
         }
 
@@ -130,74 +170,14 @@ public sealed class CallActivityExecutor
         var failed = string.Equals(child.State, "Failed", StringComparison.OrdinalIgnoreCase)
                   || childTokens.Any(t => string.Equals(t.State, "Failed", StringComparison.OrdinalIgnoreCase));
 
+        parentToken.CurrentCallActivation = null;
+
         return new(
             child.CanonicalName ?? string.Empty,
             failed ? "Failed" : child.State!,
             failed);
     }
 
-    private async Task PersistSpawnAsync(
-        ProcessSnapshot            childSnapshot,
-        SchemataProcessTransition  parentSpawn,
-        CancellationToken          ct
-    ) {
-        var processes   = _services.GetRequiredService<IRepository<SchemataProcess>>();
-        var tokens      = _services.GetRequiredService<IRepository<SchemataProcessToken>>();
-        var transitions = _services.GetRequiredService<IRepository<SchemataProcessTransition>>();
-
-        processes.Join(_unitOfWork);
-        tokens.Join(_unitOfWork);
-        transitions.Join(_unitOfWork);
-
-        await UpsertProcessAsync(processes, childSnapshot.Process, ct);
-
-        foreach (var token in childSnapshot.Tokens) {
-            await UpsertTokenAsync(tokens, token, ct);
-        }
-
-        foreach (var transition in childSnapshot.Transitions) {
-            await transitions.AddAsync(transition, ct);
-        }
-
-        await transitions.AddAsync(parentSpawn, ct);
-    }
-
-    private static async Task UpsertProcessAsync(
-        IRepository<SchemataProcess> processes,
-        SchemataProcess              process,
-        CancellationToken            ct
-    ) {
-        var existing = await processes.FirstOrDefaultAsync(q => q.Where(p => p.CanonicalName == process.CanonicalName), ct);
-        if (existing is null) {
-            await processes.AddAsync(process, ct);
-            return;
-        }
-
-        existing.DefinitionName = process.DefinitionName;
-        existing.State          = process.State;
-        await processes.UpdateAsync(existing, ct);
-    }
-
-    private static async Task UpsertTokenAsync(
-        IRepository<SchemataProcessToken> tokens,
-        SchemataProcessToken              token,
-        CancellationToken                 ct
-    ) {
-        var existing = await tokens.FirstOrDefaultAsync(q => q.Where(t => t.CanonicalName == token.CanonicalName), ct);
-        if (existing is null) {
-            await tokens.AddAsync(token, ct);
-            return;
-        }
-
-        existing.Process     = token.Process;
-        existing.Spawner     = token.Spawner;
-        existing.ScopeName     = token.ScopeName;
-        existing.StateName     = token.StateName;
-        existing.WaitingAtName = token.WaitingAtName;
-        existing.Bookkeeping = new(token.Bookkeeping);
-        existing.State       = token.State;
-        await tokens.UpdateAsync(existing, ct);
-    }
 
     private static SchemataProcessTransition NewTransition(
         string         processName,
@@ -206,5 +186,5 @@ public sealed class CallActivityExecutor
         string?        posterior,
         TransitionKind kind,
         string         eventName
-    ) => TransitionFactory.New(processName, tokenCanonical, previous, posterior, kind, eventName);
+    ) => TransitionFactory<TTransition>.New(processName, tokenCanonical, previous, posterior, kind, eventName);
 }

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Skeleton.Observers;
 
@@ -39,6 +40,8 @@ public class FlowTransitionContext
     ///     Set by the runtime just before the advisor pipeline runs.
     /// </summary>
     public IUnitOfWork? UnitOfWork { get; set; }
+
+    public FlowExecutionContext Execution { get; set; } = null!;
 
     /// <summary>
     ///     The principal that initiated the operation producing this transition, or

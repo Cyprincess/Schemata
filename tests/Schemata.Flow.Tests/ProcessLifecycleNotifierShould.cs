@@ -52,7 +52,7 @@ public class ProcessLifecycleNotifierShould
     }
 
     private static SchemataProcess Process() {
-        return new() { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "definition" };
+        return new() { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "definition", DefinitionVersion = "1" };
     }
 
     private static ProcessSnapshot Snapshot(
