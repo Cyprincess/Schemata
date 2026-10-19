@@ -8,7 +8,7 @@ using Schemata.Messaging.Skeleton.Advisors;
 
 namespace Schemata.Security.Skeleton.Advisors;
 
-public sealed class AuthenticationPipelineAdvisor<TRequest, TResponse>(Func<TRequest, (string Operation, Type? Entity)> resolve)
+public sealed class AuthenticationPipelineAdvisor<TRequest, TResponse>(Func<TRequest, ResourceTarget> resolve)
     : IRequestPipelineAdvisor<TRequest, TResponse>
     where TRequest : IRequest<TResponse>, IRequestPrincipal
 {
@@ -20,8 +20,8 @@ public sealed class AuthenticationPipelineAdvisor<TRequest, TResponse>(Func<TReq
         RequestHandlerContinuation<TResponse> next,
         CancellationToken                  ct = default
     ) {
-        var (operation, entity) = resolve(request);
-        if (entity is null || AnonymousAccess.IsAnonymous(entity, operation)) {
+        var target = resolve(request);
+        if (target.Entity is null || AnonymousAccess.IsAnonymous(target.Entity, target.Operation)) {
             return next(ct);
         }
 

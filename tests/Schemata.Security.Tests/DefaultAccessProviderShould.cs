@@ -19,13 +19,13 @@ public class DefaultAccessProviderShould
     private static ClaimsPrincipal CreatePrincipal() { return new(new ClaimsIdentity("Test")); }
 
     [Fact]
-    public async Task HasAccess_NoPrincipal_ReturnsFalse() {
+    public async Task HasAccess_NoPrincipal_ReturnsDenied() {
         var provider = CreateProvider();
         var context  = new AccessContext<object> { Operation = "Create" };
 
         var result = await provider.HasAccessAsync(null, context, null);
 
-        Assert.False(result);
+        Assert.Equal(AccessDecision.Denied, result);
         _matcher.Verify(m => m.IsMatch(It.IsAny<ClaimsPrincipal>(), It.IsAny<string>()), Times.Never);
     }
 
@@ -33,20 +33,20 @@ public class DefaultAccessProviderShould
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public async Task HasAccess_NullOrEmptyOperation_ReturnsFalse(string? operation) {
+    public async Task HasAccess_NullOrEmptyOperation_ReturnsIndeterminate(string? operation) {
         var provider  = CreateProvider();
         var principal = CreatePrincipal();
         var context   = new AccessContext<object> { Operation = operation };
 
         var result = await provider.HasAccessAsync(null, context, principal);
 
-        Assert.False(result);
+        Assert.Equal(AccessDecision.Indeterminate, result);
         _resolver.Verify(r => r.Resolve(It.IsAny<string>(), It.IsAny<Type>()), Times.Never);
         _matcher.Verify(m => m.IsMatch(It.IsAny<ClaimsPrincipal>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
-    public async Task HasAccess_MatchingPermission_ReturnsTrue() {
+    public async Task HasAccess_MatchingPermission_ReturnsAllowed() {
         _resolver.Setup(r => r.Resolve("Create", typeof(Product))).Returns("product.create");
         _matcher.Setup(m => m.IsMatch(It.IsAny<ClaimsPrincipal>(), "product.create")).Returns(true);
 
@@ -56,13 +56,13 @@ public class DefaultAccessProviderShould
 
         var result = await provider.HasAccessAsync(null, context, principal);
 
-        Assert.True(result);
+        Assert.Equal(AccessDecision.Allowed, result);
         _resolver.Verify(r => r.Resolve("Create", typeof(Product)), Times.Once);
         _matcher.Verify(m => m.IsMatch(principal, "product.create"), Times.Once);
     }
 
     [Fact]
-    public async Task HasAccess_NoMatchingPermission_ReturnsFalse() {
+    public async Task HasAccess_NoMatchingPermission_ReturnsDenied() {
         _resolver.Setup(r => r.Resolve("Delete", typeof(Product))).Returns("product.delete");
         _matcher.Setup(m => m.IsMatch(It.IsAny<ClaimsPrincipal>(), "product.delete")).Returns(false);
 
@@ -72,8 +72,42 @@ public class DefaultAccessProviderShould
 
         var result = await provider.HasAccessAsync(null, context, principal);
 
-        Assert.False(result);
+        Assert.Equal(AccessDecision.Denied, result);
         _resolver.Verify(r => r.Resolve("Delete", typeof(Product)), Times.Once);
         _matcher.Verify(m => m.IsMatch(principal, "product.delete"), Times.Once);
+    }
+
+    [Fact]
+    public async Task HasAccess_MissingStage_MatchingPermission_ReturnsAllowed() {
+        // A matched operation permission proves the caller may learn the target is absent; the
+        // default provider never fabricates a parent read-children check from it.
+        _resolver.Setup(r => r.Resolve("Get", typeof(Product))).Returns("product.get");
+        _matcher.Setup(m => m.IsMatch(It.IsAny<ClaimsPrincipal>(), "product.get")).Returns(true);
+
+        var provider  = CreateProvider();
+        var principal = CreatePrincipal();
+        var context = new AccessContext<object> {
+            Operation = "Get", Stage = AccessStage.Missing, Name = "products/p1",
+        };
+
+        var result = await provider.HasAccessAsync(null, context, principal);
+
+        Assert.Equal(AccessDecision.Allowed, result);
+    }
+
+    [Fact]
+    public async Task HasAccess_MissingStage_NoPermission_ReturnsDenied() {
+        _resolver.Setup(r => r.Resolve("Get", typeof(Product))).Returns("product.get");
+        _matcher.Setup(m => m.IsMatch(It.IsAny<ClaimsPrincipal>(), "product.get")).Returns(false);
+
+        var provider  = CreateProvider();
+        var principal = CreatePrincipal();
+        var context = new AccessContext<object> {
+            Operation = "Get", Stage = AccessStage.Missing, Name = "products/p1",
+        };
+
+        var result = await provider.HasAccessAsync(null, context, principal);
+
+        Assert.Equal(AccessDecision.Denied, result);
     }
 }

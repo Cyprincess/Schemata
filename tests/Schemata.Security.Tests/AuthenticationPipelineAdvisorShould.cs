@@ -17,7 +17,7 @@ public class AuthenticationPipelineAdvisorShould
 {
     [Fact]
     public void Expose_The_Authentication_Order() {
-        var advisor = new AuthenticationPipelineAdvisor<TestRequest, string>(_ => (nameof(Operations.Get), typeof(Product)));
+        var advisor = new AuthenticationPipelineAdvisor<TestRequest, string>(_ => ResourceTarget.Collection(nameof(Operations.Get), typeof(Product)));
 
         Assert.Equal(SecurityOrders.Authentication, advisor.Order);
     }
@@ -26,56 +26,59 @@ public class AuthenticationPipelineAdvisorShould
     public async Task Continue_An_Authenticated_Request_Once_With_Its_Cancellation_Token() {
         var principal = AuthenticatedPrincipal();
         var request   = new TestRequest(principal);
-        var advisor   = new AuthenticationPipelineAdvisor<TestRequest, string>(_ => (nameof(Operations.Get), typeof(Product)));
+        var advisor   = new AuthenticationPipelineAdvisor<TestRequest, string>(_ => ResourceTarget.Collection(nameof(Operations.Get), typeof(Product)));
         using var cancellation = new CancellationTokenSource();
         var calls = 0;
         var received = default(CancellationToken);
-
-        Task<string> Next(CancellationToken ct) {
-            calls++;
-            received = ct;
-            return Task.FromResult("completed");
-        }
 
         var result = await advisor.AdviseAsync(Context(), request, Next, cancellation.Token);
 
         Assert.Equal("completed", result);
         Assert.Equal(1, calls);
         Assert.Equal(cancellation.Token, received);
+        return;
+
+        Task<string> Next(CancellationToken ct) {
+            calls++;
+            received = ct;
+            return Task.FromResult("completed");
+        }
     }
 
     [Fact]
     public async Task Reject_An_Unauthenticated_Request_Before_The_Continuation() {
-        var advisor = new AuthenticationPipelineAdvisor<TestRequest, string>(_ => (nameof(Operations.Get), typeof(Product)));
+        var advisor = new AuthenticationPipelineAdvisor<TestRequest, string>(_ => ResourceTarget.Collection(nameof(Operations.Get), typeof(Product)));
         var calls = 0;
 
-        Task<string> Next(CancellationToken _) {
-            calls++;
-            return Task.FromResult("completed");
-        }
-
         var exception = await Assert.ThrowsAsync<UnauthenticatedException>(() =>
-            advisor.AdviseAsync(Context(), new TestRequest(null), Next, CancellationToken.None));
+                                                                               advisor.AdviseAsync(Context(), new(null), Next, CancellationToken.None));
 
         Assert.Equal(401, exception.Code);
         Assert.Equal("UNAUTHENTICATED", exception.Status);
         Assert.Equal(0, calls);
-    }
-
-    [Fact]
-    public async Task Bypass_Authentication_For_An_Anonymous_Entity_Operation() {
-        var advisor = new AuthenticationPipelineAdvisor<TestRequest, string>(_ => (nameof(Operations.Create), typeof(PublicProduct)));
-        var calls = 0;
+        return;
 
         Task<string> Next(CancellationToken _) {
             calls++;
             return Task.FromResult("completed");
         }
+    }
 
-        var result = await advisor.AdviseAsync(Context(), new TestRequest(null), Next, CancellationToken.None);
+    [Fact]
+    public async Task Bypass_Authentication_For_An_Anonymous_Entity_Operation() {
+        var advisor = new AuthenticationPipelineAdvisor<TestRequest, string>(_ => ResourceTarget.Collection(nameof(Operations.Create), typeof(PublicProduct)));
+        var calls = 0;
+
+        var result = await advisor.AdviseAsync(Context(), new(null), Next, CancellationToken.None);
 
         Assert.Equal("completed", result);
         Assert.Equal(1, calls);
+        return;
+
+        Task<string> Next(CancellationToken _) {
+            calls++;
+            return Task.FromResult("completed");
+        }
     }
 
     [Fact]
@@ -87,7 +90,7 @@ public class AuthenticationPipelineAdvisorShould
         var advisor = new AuthenticationPipelineAdvisor<TestRequest, string>(value => {
             calls++;
             resolved = value;
-            return (nameof(Operations.Get), typeof(Product));
+            return ResourceTarget.Collection(nameof(Operations.Get), typeof(Product));
         });
 
         var result = await advisor.AdviseAsync(Context(), request, _ => Task.FromResult("completed"), CancellationToken.None);
@@ -99,9 +102,9 @@ public class AuthenticationPipelineAdvisorShould
 
     [Fact]
     public async Task Bypass_Authentication_When_The_Resolver_Has_No_Entity() {
-        var advisor = new AuthenticationPipelineAdvisor<TestRequest, string>(_ => ("Lookup", null));
+        var advisor = new AuthenticationPipelineAdvisor<TestRequest, string>(_ => new() { Operation = "Lookup" });
 
-        var result = await advisor.AdviseAsync(Context(), new TestRequest(null), _ => Task.FromResult("completed"), CancellationToken.None);
+        var result = await advisor.AdviseAsync(Context(), new(null), _ => Task.FromResult("completed"), CancellationToken.None);
 
         Assert.Equal("completed", result);
     }
