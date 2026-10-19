@@ -11,7 +11,6 @@ using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Runtime;
 using Schemata.Report.Foundation.Commands;
 using Schemata.Report.Foundation.Jobs;
-using Schemata.Report.Foundation.Runtime;
 using Schemata.Report.Skeleton;
 using Schemata.Report.Skeleton.Entities;
 using Schemata.Report.Skeleton.Models;
@@ -28,7 +27,6 @@ namespace Schemata.Report.Foundation.Handlers;
 /// </remarks>
 public sealed class GenerateHandler<TReport, TSnapshot, TChunk>(
     InProcessRequestDispatcher dispatcher,
-    ReportExecutionContext execution,
     IServiceProvider       services
 ) : IRequestHandler<GenerateReportRequest, Operation>
     where TReport : SchemataReport, new()
@@ -57,16 +55,12 @@ public sealed class GenerateHandler<TReport, TSnapshot, TChunk>(
             return OperationMapper.FromExecution(scheduled);
         }
 
-        try {
-            return await operationService.ExecuteAsync(Verbs.Generate, async (operation, token) => {
-                execution.Operation = operation.CanonicalName;
-                var result = await dispatcher.SendAsync<RunReportRequest, ReportResult>(
-                    new(reportRequest, request.Principal), ReportConstants.Handlers.Default, token);
-                return JsonSerializer.Serialize(Output(result), SchemataJson.Default);
-            }, ct);
-        } finally {
-            execution.Operation = null;
-        }
+        return await operationService.ExecuteAsync(Verbs.Generate, async (operation, token) => {
+            var result = await dispatcher.SendAsync<RunReportRequest, ReportResult>(
+                new(reportRequest, request.Principal) { Operation = operation.CanonicalName },
+                ReportConstants.Handlers.Default, token);
+            return JsonSerializer.Serialize(Output(result), SchemataJson.Default);
+        }, ct);
     }
 
     private static ReportOperationOutput Output(ReportResult result) {

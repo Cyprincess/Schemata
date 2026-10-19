@@ -16,7 +16,6 @@ using Schemata.Insight.Skeleton.Queries;
 using Schemata.Messaging.Skeleton;
 using Schemata.Report.Foundation.Commands;
 using Schemata.Report.Foundation.Definitions;
-using Schemata.Report.Foundation.Runtime;
 using Schemata.Report.Foundation.Snapshots;
 using Schemata.Report.Skeleton;
 using Schemata.Report.Skeleton.Advisors;
@@ -32,7 +31,6 @@ public sealed class RunReportHandler<TReport, TSnapshot, TChunk>(
     InsightPlanBuilder                                plans,
     PlanExecutor                                      executor,
     ReportSnapshotWriter<TReport, TSnapshot, TChunk> writer,
-    ReportExecutionContext                            execution,
     IOptions<SchemataReportOptions>                   options
 ) : IRequestHandler<RunReportRequest, ReportResult>
     where TReport : SchemataReport, new()
@@ -49,7 +47,7 @@ public sealed class RunReportHandler<TReport, TSnapshot, TChunk>(
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.Request);
         var generation = new ReportGenerateContext(
-            request.Request, request.Request.Name, execution.Kind, request.Principal);
+            request.Request, request.Request.Name, request.Kind, request.Principal);
         await Advisor.For<IReportGenerateAdvisor>().RunAsync(context, generation, ct);
 
         var (report, query) = await ResolveAsync(generation.Request, ct);
@@ -65,11 +63,11 @@ public sealed class RunReportHandler<TReport, TSnapshot, TChunk>(
 
         return await writer.WriteAsync(
                    report,
-                   execution.Kind,
+                   request.Kind,
                    token => executor.MaterializeAsync(rewrite.Plan, query, generation.Principal, context, ct: token),
                    context,
-                   execution.Operation,
-                   execution.IsCancelled,
+                   request.Operation,
+                   request.IsCancelled,
                    ct);
     }
 

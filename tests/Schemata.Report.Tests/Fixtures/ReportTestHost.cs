@@ -17,7 +17,6 @@ using Schemata.Insight.Skeleton.Plan;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Runtime;
 using Schemata.Report.Foundation;
-using Schemata.Report.Foundation.Runtime;
 using Schemata.Report.Skeleton;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -65,7 +64,6 @@ internal static class ReportTestHost
         services.AddKeyedSingleton(TestDriverName, driver.Object);
         services.AddSingleton<LocalPipelineExecutor>();
         services.AddSingleton<PlanExecutor>();
-        services.AddScoped<ReportExecutionContext>();
         services.AddSingleton<IReportDefinitionStore>(CreateDefinitionStore(report).Object);
         services.AddSingleton(state);
         services.TryAddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>));

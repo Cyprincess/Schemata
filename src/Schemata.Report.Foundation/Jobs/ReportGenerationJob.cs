@@ -8,7 +8,6 @@ using Microsoft.Extensions.Options;
 using Schemata.Common;
 using Schemata.Messaging.Skeleton;
 using Schemata.Report.Foundation.Commands;
-using Schemata.Report.Foundation.Runtime;
 using Schemata.Report.Skeleton;
 using Schemata.Report.Skeleton.Entities;
 using Schemata.Report.Skeleton.Enums;
@@ -42,15 +41,18 @@ public sealed class ReportGenerationJob<TReport, TSnapshot, TChunk>(
         try {
             entered = scope.Enter();
             await scope.RestoreAsync(message, ct);
-            var execution = scope.Services.GetRequiredService<ReportExecutionContext>();
-            execution.Kind      = kind;
-            execution.Operation = context.Execution?.CanonicalName;
+            Func<CancellationToken, ValueTask<bool>>? isCancelled = null;
             if (context.ExecutionUid is { } uid && scope.Services.GetService<IJobExecutionState>() is { } state) {
-                execution.IsCancelled = token => state.IsCancelledAsync(uid, message, token);
+                isCancelled = token => state.IsCancelledAsync(uid, message, token);
             }
 
             var dispatcher = scope.Services.GetRequiredService<IRequestDispatcher>();
-            var result = await dispatcher.SendAsync<RunReportRequest, ReportResult>(new(request, null), ct);
+            var runRequest = new RunReportRequest(request, null) {
+                Kind        = kind,
+                Operation   = context.Execution?.CanonicalName,
+                IsCancelled = isCancelled,
+            };
+            var result = await dispatcher.SendAsync<RunReportRequest, ReportResult>(runRequest, ct);
             if (context.Execution is { } scheduled) {
                 scheduled.Output = JsonSerializer.Serialize(Output(result), SchemataJson.Default);
             }

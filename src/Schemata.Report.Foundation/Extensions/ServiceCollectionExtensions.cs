@@ -14,7 +14,6 @@ using Schemata.Report.Foundation.Definitions;
 using Schemata.Report.Foundation.Handlers;
 using Schemata.Report.Foundation.Jobs;
 using Schemata.Report.Foundation.Queries;
-using Schemata.Report.Foundation.Runtime;
 using Schemata.Report.Foundation.Snapshots;
 using Schemata.Report.Skeleton;
 using Schemata.Report.Skeleton.Entities;
@@ -114,7 +113,6 @@ public static class ServiceCollectionExtensions
 
         services.TryAddSingleton(registration);
         services.AddInProcessRequestDispatcher();
-        services.TryAddScoped<ReportExecutionContext>();
 
         services.TryAddScoped<GenerateHandler<TReport, TSnapshot, TChunk>>();
         AddHandler<RunReportRequest, ReportResult, RunReportHandler<TReport, TSnapshot, TChunk>>(services);

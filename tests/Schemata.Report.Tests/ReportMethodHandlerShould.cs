@@ -219,7 +219,6 @@ public class ReportMethodHandlerShould
         using var services = new ServiceCollection().BuildServiceProvider();
         var handler = new GenerateHandler<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
             new Schemata.Messaging.Skeleton.Runtime.InProcessRequestDispatcher(services),
-            new(),
             services);
         var request = GenerateRequest();
         request.Name = "reports/daily";
@@ -234,7 +233,6 @@ public class ReportMethodHandlerShould
         using var services = new ServiceCollection().BuildServiceProvider();
         var handler = new GenerateHandler<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
             new Schemata.Messaging.Skeleton.Runtime.InProcessRequestDispatcher(services),
-            new(),
             services);
 
         var exception = await Assert.ThrowsAsync<FailedPreconditionException>(async () => {
