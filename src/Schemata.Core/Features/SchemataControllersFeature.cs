@@ -15,6 +15,9 @@ namespace Schemata.Core.Features;
 [DependsOn<SchemataRoutingFeature>]
 public sealed class SchemataControllersFeature : FeatureBase
 {
+    /// <summary>Key under which the framework's native controller factory is registered.</summary>
+    public const string ControllerFactoryServiceKey = "Schemata.Controllers.ControllerFactory";
+
     /// <summary>
     ///     Default middleware priority for MVC controller endpoints.
     /// </summary>
@@ -28,9 +31,12 @@ public sealed class SchemataControllersFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) => services.AddSchemataControllers(
-        configurators.PopOrDefault<MvcOptions>(),
-        configurators.PopOrDefault<IMvcBuilder>());
+    ) {
+        services.AddSchemataControllers(
+            configurators.PopOrDefault<MvcOptions>(),
+            configurators.PopOrDefault<IMvcBuilder>());
+        services.AddSchemataControllerFactory();
+    }
 
     public override void ConfigureEndpoints(
         IApplicationBuilder   app,

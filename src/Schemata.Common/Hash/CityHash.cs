@@ -583,13 +583,13 @@ public class CityHash {
         var y   = seed.High;
         var z   = (ulong)len * K1;
         var v = new Uint128 {
-            Low = Rotate(seed.High ^ K1, 49)*K1 + Fetch64(value, offset)
+            Low = Rotate(seed.High ^ K1, 49)*K1 + Fetch64(value, offset),
         };
         v.High = Rotate(v.Low, 42) * K1 + Fetch64(value, offset + 8);
 
         var w = new Uint128 {
             Low  = Rotate(y + z, 35)*K1 + x,
-            High = Rotate(seed.Low + Fetch64(value, offset + 88), 53)*K1
+            High = Rotate(seed.Low + Fetch64(value, offset + 88), 53)*K1,
         };
 
 
@@ -650,7 +650,7 @@ public class CityHash {
 
         return new() {
             Low  = HashLen16(x + v.High, w.High) + y,
-            High = HashLen16(x + w.High, y + v.High)
+            High = HashLen16(x + w.High, y + v.High),
         };
     }
 

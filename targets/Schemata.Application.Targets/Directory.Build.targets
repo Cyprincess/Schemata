@@ -1,0 +1,87 @@
+<Project>
+
+  <Import Project="$(MSBuildThisFileDirectory)..\..\Directory.Build.targets" />
+
+  <!--
+    Single composition owner for variant-dependent items (Use* composition switches);
+    variant-independent defaults stay in Directory.Build.props. Item conditions here see
+    the final property table regardless of import position. Item removals in this file
+    (None Remove) run after the SDK default item globs because item groups evaluate in
+    document order.
+  -->
+
+  <ItemGroup Condition=" '$(UseDSLTargets)' == 'true' ">
+    <None Include="..\..\artifacts\bin\Schemata.Modeling.Generator\$(Configuration)\netstandard2.0\Parlot.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="..\..\artifacts\bin\Schemata.Modeling.Generator\$(Configuration)\netstandard2.0\Schemata.Modeling.Generator.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <ProjectReference Include="..\..\generators\Schemata.Modeling.Generator\Schemata.Modeling.Generator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseModularTargets)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Modular\Schemata.Modular.csproj" />
+    <None Include="$(MSBuildThisFileDirectory)Schemata.Application.Modular.Targets.targets" Pack="true">
+      <PackagePath>build\$(AssemblyName).targets</PackagePath>
+    </None>
+  </ItemGroup>
+  <ItemGroup Condition=" '$(UseModularTargets)' == '' ">
+    <None Remove="Schemata.Application.Modular.Targets.targets" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseTenancy)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Tenancy.Foundation\Schemata.Tenancy.Foundation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseTenantActor)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Tenancy.Actor\Schemata.Tenancy.Actor.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseAuthorization)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Authorization.Foundation\Schemata.Authorization.Foundation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseIdentity)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Identity.Foundation\Schemata.Identity.Foundation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseMapster)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Mapping.Mapster\Schemata.Mapping.Mapster.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseRepository)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseResourceGrpc)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Resource.Grpc\Schemata.Resource.Grpc.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseResourceHttp)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Resource.Http\Schemata.Resource.Http.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseFlow)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Flow.Foundation\Schemata.Flow.Foundation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseInsight)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Insight.Foundation\Schemata.Insight.Foundation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UsePush)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Push.Foundation\Schemata.Push.Foundation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseReport)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Report.Foundation\Schemata.Report.Foundation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseSecurity)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Security.Foundation\Schemata.Security.Foundation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseValidation)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Validation.FluentValidation\Schemata.Validation.FluentValidation.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -17,4 +17,6 @@ public sealed class IndexAttribute(params string[] properties) : Attribute
     ///     Gets or sets whether the index enforces uniqueness.
     /// </summary>
     public bool IsUnique { get; set; }
+
+    public string? Filter { get; set; }
 }

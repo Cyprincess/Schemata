@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Reflection;
 using Microsoft.AspNetCore.Builder;
@@ -50,8 +51,10 @@ public sealed class DefaultModulesRunner : IModulesRunner
         }
 
         var startups = modules
-                      .Select(m => Utilities.CreateInstance<IModule>(m.EntryType, _schemata.CreateLogger(m.EntryType))!)
-                      .ToList();
+                       .Select(m => Utilities.CreateInstance<IModule>(m.EntryType, _schemata.CreateLogger(m.EntryType))
+                               ?? throw new InvalidOperationException(
+                                   $"Module type {m.EntryType.FullName} has no public constructor."))
+                       .ToList();
 
         startups.Sort((a, b) => a.Order.CompareTo(b.Order));
 

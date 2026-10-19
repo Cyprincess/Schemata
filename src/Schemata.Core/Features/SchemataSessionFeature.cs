@@ -4,13 +4,15 @@ using Microsoft.AspNetCore.Session;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Core.State;
 
 namespace Schemata.Core.Features;
 
 /// <summary>
-///     Configures session middleware with a pluggable <typeparamref name="T" />
-///     session store. Depends on <see cref="SchemataCookiePolicyFeature" /> because
-///     session typically requires cookies.
+///     Configures session services with a pluggable <typeparamref name="T" />
+///     session store and wires the session state branch. Depends on
+///     <see cref="SchemataCookiePolicyFeature" /> because session typically
+///     requires cookies.
 /// </summary>
 /// <typeparam name="T">A concrete <see cref="ISessionStore" /> implementation.</typeparam>
 [DependsOn<SchemataCookiePolicyFeature>]
@@ -34,6 +36,7 @@ public sealed class SchemataSessionFeature<T> : FeatureBase
         var configure = configurators.Pop<SessionOptions>();
         services.TryAddTransient<ISessionStore, T>();
         services.AddSession(configure);
+        services.AddStatePipelineProvider();
     }
 
     public override void ConfigureApplication(
@@ -41,6 +44,6 @@ public sealed class SchemataSessionFeature<T> : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        app.UseSession();
+        app.UseStatePipeline(StatePipeline.Session);
     }
 }

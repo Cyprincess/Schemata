@@ -10,10 +10,18 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Modular.Features;
 
 /// <summary>
-///     Feature that bootstraps the modular system by discovering modules and running their lifecycle methods.
+///     Feature that commits one module selection and runs its lifecycle phases exactly once.
 /// </summary>
 /// <typeparam name="TProvider">The module provider type.</typeparam>
 /// <typeparam name="TRunner">The module runner type.</typeparam>
+/// <remarks>
+///     The <see cref="ConfigureServices" /> phase commits the selection — recording the runner
+///     instance, provider, and configured module snapshot — and registers that runner instance as
+///     the <see cref="IModulesRunner" /> singleton. Repeat registrations are idempotent: discovery
+///     and <see cref="IModulesRunner.ConfigureServices" /> do not run again. The later phases
+///     resolve the committed runner from the application services, so the instance configured
+///     during <see cref="ConfigureServices" /> is the same owner that runs them.
+/// </remarks>
 public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
     where TProvider : class, IModulesProvider
     where TRunner : class, IModulesRunner
@@ -31,15 +39,17 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) => services.AddSchemataModules<TProvider, TRunner>(schemata, configuration, environment);
+    ) {
+        var runner = schemata.Get<TRunner>(ModularConstants.PendingRunnerKey);
+        services.AddSchemataModules<TProvider, TRunner>(schemata, configuration, environment, runner);
+    }
 
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        var runner = app.ApplicationServices.GetRequiredService<IModulesRunner>();
-        runner.ConfigureApplication(app, configuration, environment);
+        app.ApplicationServices.GetRequiredService<IModulesRunner>().ConfigureApplication(app, configuration, environment);
     }
 
     public override void ConfigureEndpoints(
@@ -48,7 +58,6 @@ public sealed class SchemataModulesFeature<TProvider, TRunner> : FeatureBase
         IConfiguration        configuration,
         IWebHostEnvironment   environment
     ) {
-        var runner = app.ApplicationServices.GetRequiredService<IModulesRunner>();
-        runner.ConfigureEndpoints(app, endpoints, configuration, environment);
+        app.ApplicationServices.GetRequiredService<IModulesRunner>().ConfigureEndpoints(app, endpoints, configuration, environment);
     }
 }

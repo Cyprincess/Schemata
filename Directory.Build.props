@@ -6,14 +6,15 @@
     <LangVersion>preview</LangVersion>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>preview</AnalysisLevel>
-    <NoWarn>$(NoWarn);CS1591;NU5118;NU5128;AD0001</NoWarn>
     <Nullable>enable</Nullable>
     <ImplicitUsings>false</ImplicitUsings>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>portable</DebugType>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <SuppressSymbolPackageFormatValidation>true</SuppressSymbolPackageFormatValidation>
-    <EnableXlfLocalization>false</EnableXlfLocalization>
+    <!-- Produce satellite assemblies from xlf without rewriting the xlf files on dev builds. -->
+    <EnableXlfLocalization>true</EnableXlfLocalization>
+    <UpdateXlfOnBuild>false</UpdateXlfOnBuild>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>

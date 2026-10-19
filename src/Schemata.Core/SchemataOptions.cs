@@ -53,7 +53,10 @@ public sealed class SchemataOptions
     ///     through <see cref="SchemataOptions" />.
     /// </summary>
     /// <param name="factory">The replacement <see cref="ILoggerFactory" />.</param>
-    public void ReplaceLoggerFactory(ILoggerFactory factory) { Logging = factory; }
+    public void ReplaceLoggerFactory(ILoggerFactory factory) {
+        Logging = factory;
+        _logger = null;
+    }
 
     /// <summary>
     ///     Retrieves and removes a named option. Returns <see langword="null" /> when

@@ -36,7 +36,11 @@ public class ListRequest
     public virtual bool? ShowDeleted { get; set; }
 
     /// <summary>
-    ///     Maximum number of items per page. The server may cap this value.
+    ///     Maximum number of items per page. On an initial request, omitted or zero adopts the
+    ///     effective default (25 unless configured otherwise); on a continuation, omitted keeps
+    ///     the previous page's effective size. Values above the effective maximum coerce to it;
+    ///     negative values are rejected as invalid arguments. The effective policy comes from
+    ///     the global resource options and optional per-resource overrides.
     /// </summary>
     public virtual int? PageSize { get; set; }
 
@@ -46,9 +50,8 @@ public class ListRequest
     public virtual int? Skip { get; set; }
 
     /// <summary>
-    ///     An opaque token returned from a previous <see cref="ListResultBase{TSummary}.NextPageToken" />
+    ///     An opaque token returned from a previous <see cref="ListResultBase{TEntity,TSummary}.NextPageToken" />
     ///     to continue pagination.
     /// </summary>
     public virtual string? PageToken { get; set; }
-
 }

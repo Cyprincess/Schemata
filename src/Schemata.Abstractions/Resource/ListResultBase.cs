@@ -7,8 +7,9 @@ namespace Schemata.Abstractions.Resource;
 ///     <seealso href="https://google.aip.dev/132">AIP-132: Standard methods: List</seealso>,
 ///     carrying matched items, total count, and a continuation token.
 /// </summary>
+/// <typeparam name="TEntity">The entity type carrying the resource identity.</typeparam>
 /// <typeparam name="TSummary">The type of each item in the list.</typeparam>
-public class ListResultBase<TSummary> : IEntitiesResult<TSummary>
+public class ListResultBase<TEntity, TSummary> : IEntitiesResult<TEntity, TSummary>
 {
     /// <summary>
     ///     The matched resource summaries for the current page.
@@ -16,8 +17,9 @@ public class ListResultBase<TSummary> : IEntitiesResult<TSummary>
     public virtual IList<TSummary>? Entities { get; set; }
 
     /// <summary>
-    ///     Total number of matching resources across all pages.
-    ///     <see langword="null" /> indicates the server skipped total computation.
+    ///     Total number of matching resources across all pages, optionally estimated by the repository.
+    ///     <see langword="null" /> indicates total computation was skipped or an estimate was unavailable.
+    ///     Estimated values are capped at <see cref="int.MaxValue" />; pagination follows <see cref="NextPageToken" />.
     /// </summary>
     public virtual int? TotalSize { get; set; }
 

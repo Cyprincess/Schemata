@@ -7,8 +7,8 @@ namespace Schemata.Core.Features;
 
 /// <summary>
 ///     Configures <see cref="JsonSerializerOptions" /> with snake_case naming, string-number coercion,
-///     kebab-case enums, and polymorphic type resolution. MVC JSON options are configured only when
-///     controllers are present.
+///     kebab-case enums, and polymorphic type resolution. Minimal-API and MVC options receive the
+///     same shape through their options registrations, which stay inert until those options resolve.
 /// </summary>
 public sealed class SchemataJsonSerializerFeature : FeatureBase
 {
@@ -25,7 +25,5 @@ public sealed class SchemataJsonSerializerFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) => services.AddSchemataJsonSerializer(
-        configurators.PopOrDefault<JsonSerializerOptions>(),
-        schemata.HasFeature<SchemataControllersFeature>());
+    ) => services.AddSchemataJsonSerializer(configurators.PopOrDefault<JsonSerializerOptions>());
 }

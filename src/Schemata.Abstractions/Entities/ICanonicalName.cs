@@ -14,8 +14,8 @@ public interface ICanonicalName
     string? Name { get; set; }
 
     /// <summary>
-    ///     The collection-relative resource name
-    ///     (e.g., <c>"publishers/acme/books/les-miserables"</c>).
+    ///     The framework-derived resource name, unique among currently active instances.
+    ///     Resource associations use this name; reconstruction may reuse it.
     /// </summary>
     string? CanonicalName { get; set; }
 }

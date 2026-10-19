@@ -177,18 +177,28 @@ public sealed class Configurators
     }
 
     /// <summary>
-    ///     Wraps every outstanding configurator as a
+    ///     Wraps every outstanding options configurator as a
     ///     <see cref="ConfigureNamedOptions{TOptions}" /> singleton registered in the
     ///     service collection, then clears the registry.
     /// </summary>
     /// <param name="services">The service collection to register into.</param>
     /// <returns>The given service collection for chaining.</returns>
+    /// <exception cref="InvalidOperationException">
+    ///     A two-parameter delegate is still registered: those are consumed by their owning
+    ///     feature via <see cref="Pop{T1,T2}" /> and have no options equivalent.
+    /// </exception>
     internal IServiceCollection Invoke(IServiceCollection services) {
         services.AddOptions();
 
         var ic = typeof(IConfigureOptions<>);
         var tc = typeof(ConfigureNamedOptions<>);
         foreach (var (type, configure) in _configurators) {
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(ValueTuple<,>)) {
+                var arguments = type.GetGenericArguments();
+                throw new InvalidOperationException(
+                    $"The two-parameter configurator for ({arguments[0]}, {arguments[1]}) was never consumed by its owning feature.");
+            }
+
             var icg = ic.MakeGenericType(type);
             var tcg = tc.MakeGenericType(type);
 

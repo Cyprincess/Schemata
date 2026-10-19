@@ -168,16 +168,14 @@ public sealed class SchemataBuilder
         Services.Clear();
 
         var modules = Options.GetFeatures();
-        if (modules is null) {
-            return this;
-        }
+        if (modules is not null) {
+            // OrderBy is a stable sort: features with equal Order keep their registration order,
+            // which List.Sort's unstable ordering would reshuffle.
+            var features = modules.Values.OrderBy(f => f.Order).ToList();
 
-        var features = modules.Values.ToList();
-
-        features.Sort((a, b) => a.Order.CompareTo(b.Order));
-
-        foreach (var feature in features) {
-            feature.ConfigureServices(services, Options, Configurators, Configuration, Environment);
+            foreach (var feature in features) {
+                feature.ConfigureServices(services, Options, Configurators, Configuration, Environment);
+            }
         }
 
         Configurators.Invoke(services);

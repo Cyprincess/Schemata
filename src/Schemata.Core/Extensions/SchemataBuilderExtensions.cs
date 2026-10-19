@@ -1,5 +1,6 @@
 using System;
 using System.Text.Json;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
@@ -102,6 +103,12 @@ public static class SchemataBuilderExtensions
     ///     headers from reverse proxies. See <seealso href="https://google.aip.dev/196">AIP-196: Regional endpoints</seealso>.
     ///     See <see cref="SchemataForwardedHeadersFeature" /> for details.
     /// </summary>
+    /// <remarks>
+    ///     The default configuration processes <c>X-Forwarded-For</c> and
+    ///     <c>X-Forwarded-Proto</c> and trusts loopback proxies. A supplied
+    ///     <paramref name="configure" /> replaces that configuration and must set
+    ///     <c>ForwardedHeaders</c> as well as the trusted proxies or networks.
+    /// </remarks>
     /// <param name="builder">The <see cref="SchemataBuilder" />.</param>
     /// <param name="configure">Optional configuration delegate for <see cref="ForwardedHeadersOptions" />.</param>
     /// <returns>The builder for chaining.</returns>
@@ -110,13 +117,7 @@ public static class SchemataBuilderExtensions
         Action<ForwardedHeadersOptions>? configure = null
     ) {
         configure ??= options => {
-            options.ForwardedHeaders = ForwardedHeaders.All;
-#if NET10_0_OR_GREATER
-            options.KnownIPNetworks.Clear();
-#else
-            options.KnownNetworks.Clear();
-#endif
-            options.KnownProxies.Clear();
+            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
         };
         builder.Configure(configure);
 
@@ -361,6 +362,7 @@ public static class SchemataBuilderExtensions
         builder.Configure(authorize);
 
         builder.AddFeature<SchemataAuthenticationFeature>();
+        builder.AddFeature<SchemataAuthorizationFeature>();
 
         return builder;
     }
@@ -392,6 +394,23 @@ public static class SchemataBuilderExtensions
         builder.Configure(configure);
 
         builder.AddFeature<SchemataSessionFeature<T>>();
+
+        return builder;
+    }
+
+    /// <summary>
+    ///     Enables <c>Antiforgery</c>, which validates antiforgery tokens after
+    ///     authentication, authorization, and tenant execution.
+    ///     See <see cref="SchemataAntiforgeryFeature" /> for details.
+    /// </summary>
+    /// <param name="builder">The <see cref="SchemataBuilder" />.</param>
+    /// <param name="configure">Optional configuration delegate for <see cref="AntiforgeryOptions" />.</param>
+    /// <returns>The builder for chaining.</returns>
+    public static SchemataBuilder UseAntiforgery(this SchemataBuilder builder, Action<AntiforgeryOptions>? configure = null) {
+        configure ??= _ => { };
+        builder.Configure(configure);
+
+        builder.AddFeature<SchemataAntiforgeryFeature>();
 
         return builder;
     }

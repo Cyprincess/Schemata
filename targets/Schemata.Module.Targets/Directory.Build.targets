@@ -1,0 +1,58 @@
+<Project>
+
+  <Import Project="$(MSBuildThisFileDirectory)..\..\Directory.Build.targets" />
+
+  <!--
+    Single composition owner for variant-dependent items (Use* composition switches);
+    variant-independent defaults stay in Directory.Build.props (including the
+    unconditional build-file pack items). Item conditions here see the final property
+    table regardless of import position.
+  -->
+
+  <ItemGroup Condition=" '$(UseDSLTargets)' == 'true' ">
+    <None Include="..\..\artifacts\bin\Schemata.Modeling.Generator\$(Configuration)\netstandard2.0\Parlot.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="..\..\artifacts\bin\Schemata.Modeling.Generator\$(Configuration)\netstandard2.0\Schemata.Modeling.Generator.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <ProjectReference Include="..\..\generators\Schemata.Modeling.Generator\Schemata.Modeling.Generator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseAuthorization)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Authorization.Skeleton\Schemata.Authorization.Skeleton.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseIdentity)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Identity.Skeleton\Schemata.Identity.Skeleton.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseMapping)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Mapping.Skeleton\Schemata.Mapping.Skeleton.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseRepository)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseFlow)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Flow.Skeleton\Schemata.Flow.Skeleton.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseInsight)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Insight.Skeleton\Schemata.Insight.Skeleton.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UsePush)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Push.Skeleton\Schemata.Push.Skeleton.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseReport)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Report.Skeleton\Schemata.Report.Skeleton.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseSecurity)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Security.Skeleton\Schemata.Security.Skeleton.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseValidation)' == 'true' ">
+    <ProjectReference Include="..\..\src\Schemata.Validation.FluentValidation\Schemata.Validation.FluentValidation.csproj" />
+  </ItemGroup>
+
+</Project>

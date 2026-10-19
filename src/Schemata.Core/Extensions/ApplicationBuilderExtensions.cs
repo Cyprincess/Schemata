@@ -39,9 +39,8 @@ public static class ApplicationBuilderExtensions
             return app;
         }
 
-        var features = modules.Values.ToList();
-
-        features.Sort((a, b) => a.Priority.CompareTo(b.Priority));
+        // OrderBy is a stable sort: features with equal Priority keep their registration order.
+        var features = modules.Values.OrderBy(f => f.Priority).ToList();
 
         foreach (var feature in features) {
             feature.ConfigureApplication(app, configuration, environment);
