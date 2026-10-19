@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Schemata.Insight.Grpc\Schemata.Insight.Grpc.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Insight.Http\Schemata.Insight.Http.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Expressions.Aip\Schemata.Expressions.Aip.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Expressions.Cel\Schemata.Expressions.Cel.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Expressions.Order\Schemata.Expressions.Order.csproj" />

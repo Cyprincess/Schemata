@@ -20,9 +20,9 @@ public class WebAppFactory : WebApplicationFactory<Program>
         _configure   = configure;
     }
 
-    public WebAppFactory WithAuthentication() { return new WebAppFactory("Authenticated", _configure); }
+    public WebAppFactory WithAuthentication() { return new("Authenticated", _configure); }
 
-    public WebAppFactory WithServices(Action<IServiceCollection> configure) { return new WebAppFactory(_environment, configure); }
+    public WebAppFactory WithServices(Action<IServiceCollection> configure) { return new(_environment, configure); }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder) {
         builder.UseEnvironment(_environment);

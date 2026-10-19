@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Schemata.Report.Skeleton.Entities;
 using Schemata.Scheduling.Skeleton.Entities;
+using Schemata.Tenancy.Skeleton.Entities;
 
 namespace Schemata.Report.Integration.Tests.Fixtures;
 
@@ -17,6 +18,10 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options) : DbC
     public DbSet<SchemataJob> Jobs { get; set; } = null!;
 
     public DbSet<SchemataJobExecution> JobExecutions { get; set; } = null!;
+
+    public DbSet<SchemataTenant> Tenants { get; set; } = null!;
+
+    public DbSet<SchemataTenantHost> TenantHosts { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder) {
         builder.Entity<SchemataReport>(entity => {

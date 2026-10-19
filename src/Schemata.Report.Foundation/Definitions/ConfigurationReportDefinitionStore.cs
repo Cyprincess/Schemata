@@ -42,8 +42,8 @@ public sealed class ConfigurationReportDefinitionStore : IReportDefinitionSource
 
         var report = ToReport(registration);
         if (registration.SourceKind is ReportSourceKind.Expression) {
-            return registration.Query is { } query
-                ? (report, query)
+            return report.Definition is { } definition
+                ? (report, Materialize(definition, name))
                 : throw new InvalidOperationException($"Report '{name}' has no expression definition.");
         }
 
@@ -80,7 +80,6 @@ public sealed class ConfigurationReportDefinitionStore : IReportDefinitionSource
     private static SchemataReport ToReport(ReportDefinitionRegistration registration) {
         return new() {
             Name           = registration.Name,
-            CanonicalName  = $"reports/{registration.Name}",
             SourceKind     = registration.SourceKind,
             Provider       = registration.Provider,
             Periodic       = registration.Periodic,
@@ -92,5 +91,10 @@ public sealed class ConfigurationReportDefinitionStore : IReportDefinitionSource
                 ? null
                 : JsonSerializer.Serialize(registration.Query, SchemataJson.Default),
         };
+    }
+
+    private static QueryInsightRequest Materialize(string definition, string name) {
+        return JsonSerializer.Deserialize<QueryInsightRequest>(definition, SchemataJson.Default)
+               ?? throw new InvalidOperationException($"Report '{name}' has an invalid expression definition.");
     }
 }

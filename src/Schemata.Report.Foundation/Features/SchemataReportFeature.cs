@@ -27,5 +27,5 @@ public sealed class SchemataReportFeature<TReport, TSnapshot, TChunk> : FeatureB
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) => services.AddSchemataReport<TReport, TSnapshot, TChunk>();
+    ) => services.AddSchemataReport<TReport, TSnapshot, TChunk>(schemata);
 }

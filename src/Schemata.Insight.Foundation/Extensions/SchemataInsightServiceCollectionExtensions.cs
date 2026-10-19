@@ -9,7 +9,6 @@ using Schemata.Insight.Skeleton.Catalog;
 using Schemata.Insight.Skeleton.Queries;
 using Schemata.Insight.Skeleton.Models;
 using Schemata.Messaging.Skeleton;
-using Schemata.Messaging.Skeleton.Runtime;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -21,13 +20,28 @@ public static class SchemataInsightServiceCollectionExtensions
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddSchemataInsight(this IServiceCollection services) {
-        services.TryAddScoped<InProcessRequestDispatcher>();
-        services.TryAddScoped<IRequestDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<ICommandDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<IQueryDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+        services.AddDataProtection();
 
         services.AddOptions<SchemataInsightOptions>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IInsightSourceCatalog, InMemoryInsightSourceCatalog>());
+
+        AddInsightExecution(services);
+
+        return services;
+    }
+
+    /// <summary>
+    ///     Registers the closed Insight execution graph — the in-process dispatcher, the planning
+    ///     and execution pipeline, the facade, and the request handler slots — into
+    ///     <paramref name="services" />. The global registration calls this entry, and a tenant
+    ///     execution configure calls the same entry so tenant requests resolve these services from
+    ///     the tenant boundary; the source catalog, options, and data protection stay host-owned
+    ///     because they are shared collaborators, not per-tenant executions.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddInsightExecution(this IServiceCollection services) {
+        services.AddInProcessRequestDispatcher();
 
         services.TryAddSingleton<InsightPlanBuilder>();
         services.TryAddSingleton<LocalPipelineExecutor>();

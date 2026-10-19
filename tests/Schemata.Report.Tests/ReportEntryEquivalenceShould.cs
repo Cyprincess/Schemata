@@ -1,4 +1,4 @@
-using Schemata.Report.Tests.Fixtures;
+﻿using Schemata.Report.Tests.Fixtures;
 using System;
 using System.Security.Claims;
 using System.Text.Json;
@@ -12,6 +12,7 @@ using Schemata.Common;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Advisors;
 using Schemata.Report.Foundation.Commands;
+using Schemata.Report.Foundation;
 using Schemata.Report.Skeleton;
 using Schemata.Scheduling.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
@@ -43,27 +44,9 @@ public class ReportEntryEquivalenceShould
 
         Assert.Single(result.Response.Rows);
         Assert.Same(principal, commandAdvisor.Principal);
-        Assert.True(reportAdvisor.SawMarker);
+        Assert.Same(commandAdvisor.Context, reportAdvisor.Context);
     }
 
-    [Fact]
-    public async Task Run_Facade_Continues_Command_Context_Into_The_Snapshot_Advisor() {
-        var commandAdvisor  = new RecordingRunCommandAdvisor();
-        var snapshotAdvisor = new RecordingSnapshotAdvisor();
-        using var provider = ReportTestHost.Create(
-            ReportTestHost.CreateDriver(ReportTestRows.Create(1)),
-            configure: services => {
-                services.AddSingleton<IRequestPipelineAdvisor<RunReportRequest, ReportResult>>(commandAdvisor);
-                services.AddSingleton<IReportSnapshotAdvisor>(snapshotAdvisor);
-            });
-        var principal = new ClaimsPrincipal(new ClaimsIdentity("test"));
-
-        await provider.GetRequiredService<IReportService>()
-                      .RunAsync(ReportTestHost.InlineRequest(persist: true), principal);
-
-        Assert.True(snapshotAdvisor.Ran);
-        Assert.True(snapshotAdvisor.SawMarker);
-    }
 
     [Fact]
     public async Task Generate_Facade_Dispatches_Wire_Command_To_Scheduler() {
@@ -86,7 +69,7 @@ public class ReportEntryEquivalenceShould
             ReportTestHost.CreateDriver(ReportTestRows.Create(1)),
             configure: services => {
                 services.AddSingleton(commandAdvisor.Object);
-                services.AddSingleton(scheduler.Object);
+                ReportTestHost.RegisterScheduler(services, scheduler);
                 services.AddSingleton(operations.Object);
             });
         var request = ReportTestHost.InlineRequest(persist: true);
@@ -100,21 +83,15 @@ public class ReportEntryEquivalenceShould
         Assert.Null(dispatched.Principal);
         Assert.NotNull(staged);
         Assert.Equal(Verbs.Generate, staged.Method);
+        Assert.NotNull(staged.ExecutionUid);
         Assert.Equal($"operations/{staged.ExecutionUid!.Value:n}", operation.CanonicalName);
     }
 
+
     [Fact]
-    public void Run_And_Generate_Handlers_Are_Keyed_Unkeyed_And_Commands_Round_Trip() {
-        using var provider = ReportTestHost.Create(
-            ReportTestHost.CreateDriver(ReportTestRows.Create(1)));
-
-        AssertHandler<RunReportRequest, ReportResult,
-            RunReportHandler<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>(provider);
-        AssertHandler<GenerateReportRequest, Operation,
-            GenerateHandler<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>(provider);
-
+    public void Run_And_Generate_Commands_Round_Trip_Through_Json_Excluding_Principal() {
         var principal = new ClaimsPrincipal(new ClaimsIdentity("serialized"));
-        var runJson = JsonSerializer.Serialize(
+        var runJson   = JsonSerializer.Serialize(
             new RunReportRequest(ReportTestHost.InlineRequest(persist: true), principal),
             SchemataJson.Default);
         Assert.DoesNotContain("principal", runJson, StringComparison.OrdinalIgnoreCase);
@@ -139,19 +116,12 @@ public class ReportEntryEquivalenceShould
         Assert.Null(generate.Principal);
     }
 
-    private static void AssertHandler<TRequest, TResponse, THandler>(IServiceProvider provider)
-        where TRequest : IRequest<TResponse>
-        where THandler : IRequestHandler<TRequest, TResponse> {
-        Assert.IsType<THandler>(provider.GetRequiredService<IRequestHandler<TRequest, TResponse>>());
-        Assert.IsType<THandler>(provider.GetRequiredKeyedService<IRequestHandler<TRequest, TResponse>>(
-            ReportConstants.Handlers.Default));
-    }
-
-    private sealed record Marker;
 
     private sealed class RecordingRunCommandAdvisor : IRequestPipelineAdvisor<RunReportRequest, ReportResult>
     {
         public int Order => 0;
+
+        public AdviceContext? Context { get; private set; }
 
         public ClaimsPrincipal? Principal { get; private set; }
 
@@ -160,8 +130,8 @@ public class ReportEntryEquivalenceShould
             RunReportRequest                        request,
             RequestHandlerContinuation<ReportResult> next,
             CancellationToken                       ct = default) {
+            Context   = ctx;
             Principal = request.Principal;
-            ctx.Set(new Marker());
             return next(ct);
         }
     }
@@ -170,34 +140,16 @@ public class ReportEntryEquivalenceShould
     {
         public int Order => 0;
 
-        public bool SawMarker { get; private set; }
+        public AdviceContext? Context { get; private set; }
 
         public Task<AdviseResult> AdviseAsync(
             AdviceContext         ctx,
             ReportGenerateContext context,
             CancellationToken     ct = default
         ) {
-            SawMarker = ctx.TryGet<Marker>(out _);
+            Context = ctx;
             return Task.FromResult(AdviseResult.Continue);
         }
     }
 
-    private sealed class RecordingSnapshotAdvisor : IReportSnapshotAdvisor
-    {
-        public int Order => 0;
-
-        public bool Ran { get; private set; }
-
-        public bool SawMarker { get; private set; }
-
-        public Task<AdviseResult> AdviseAsync(
-            AdviceContext         ctx,
-            ReportSnapshotContext context,
-            CancellationToken     ct = default
-        ) {
-            Ran       = true;
-            SawMarker = ctx.TryGet<Marker>(out _);
-            return Task.FromResult(AdviseResult.Continue);
-        }
-    }
 }

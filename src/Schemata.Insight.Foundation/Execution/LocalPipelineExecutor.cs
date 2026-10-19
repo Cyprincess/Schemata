@@ -35,16 +35,24 @@ public sealed partial class LocalPipelineExecutor
     /// <param name="sourceAlias">The single source alias the rows belong to.</param>
     /// <param name="stages">The local stages, in plan order.</param>
     /// <param name="ct">A cancellation token.</param>
-    public async IAsyncEnumerable<IReadOnlyDictionary<string, object?>> RunAsync(
+    public IAsyncEnumerable<IReadOnlyDictionary<string, object?>> RunAsync(
         IAsyncEnumerable<IReadOnlyDictionary<string, object?>> source,
-        string                                                 sourceAlias,
-        IReadOnlyList<PlanNode>                                stages,
-        [EnumeratorCancellation] CancellationToken             ct
+        string sourceAlias,
+        IReadOnlyList<PlanNode> stages,
+        CancellationToken ct
+    ) => RunLocalAsync(source, sourceAlias, stages, ct, null);
+
+    private async IAsyncEnumerable<IReadOnlyDictionary<string, object?>> RunLocalAsync(
+        IAsyncEnumerable<IReadOnlyDictionary<string, object?>> source,
+        string sourceAlias,
+        IReadOnlyList<PlanNode> stages,
+        [EnumeratorCancellation] CancellationToken ct,
+        string? groupedAlias
     ) {
         var rows = Normalize(source, sourceAlias, ct);
 
         foreach (var stage in stages) {
-            rows = Apply(stage, rows, ct);
+            rows = Apply(stage, rows, ct, groupedAlias);
         }
 
         await foreach (var row in rows.WithCancellation(ct)) {
@@ -73,8 +81,8 @@ public sealed partial class LocalPipelineExecutor
     /// <summary>
     ///     Joins two canonical row streams on a predicate over the merged row. Nested-loop over the
     ///     compiled predicate (the predicate is opaque, so equi-key extraction for a hash join is not
-    ///     possible); the buffered side is bounded by the residual scan cap. An unmatched outer row
-    ///     carries only its own alias, so the absent side's fields resolve to null.
+    ///     possible); both sides are bounded by the residual scan cap of the join language. An
+    ///     unmatched outer row carries only its own alias, so the absent side's fields resolve to null.
     /// </summary>
     public async IAsyncEnumerable<IReadOnlyDictionary<string, object?>> JoinAsync(
         IAsyncEnumerable<IReadOnlyDictionary<string, object?>> left,
@@ -86,9 +94,10 @@ public sealed partial class LocalPipelineExecutor
         var predicate = ExpressionCache.GetOrAddDelegate(
             Compiler(on.Language).Compile<IReadOnlyDictionary<string, object?>, bool>(on.Tree));
 
+        var cap       = MaxScan(on.Language);
         var buildRight = kind is JoinKind.Inner or JoinKind.Left or JoinKind.Full;
-        var probe      = buildRight ? left : right;
-        var buffered   = await Buffer(buildRight ? right : left, ct);
+        var probe      = Scan(buildRight ? left : right, cap, ct);
+        var buffered   = await Buffer(buildRight ? right : left, cap, ct);
         var matched    = new bool[buffered.Count];
 
         await foreach (var outer in probe.WithCancellation(ct)) {

@@ -4,11 +4,27 @@ using Schemata.Scheduling.Skeleton;
 
 namespace Schemata.Report.Foundation.Jobs;
 
-/// <summary>Stable scheduler key shared by every closed <see cref="ReportJobKeyResolver{TReport, TSnapshot, TChunk}" />.</summary>
+/// <summary>Stable scheduler keys shared by every closed <see cref="ReportJobKeyResolver{TReport, TSnapshot, TChunk}" />.</summary>
 public static class ReportJobKeyResolver
 {
     /// <summary>Stable report-generation scheduler key.</summary>
     public const string Key = "schemata.report.generate";
+
+    /// <summary>
+    ///     The scheduler slot key of a report's schedule. The canonical name is unique among active
+    ///     reports; a configuration-only definition falls back to its public name.
+    /// </summary>
+    /// <param name="canonicalName">The persisted canonical name, or <see langword="null" />.</param>
+    /// <param name="name">The public report name, or <see langword="null" />.</param>
+    /// <returns>The slot key.</returns>
+    public static string Slot(string? canonicalName, string? name) => $"report:{canonicalName ?? name}";
+
+    /// <summary>
+    ///     The scheduler slot key of <paramref name="report" />.
+    /// </summary>
+    /// <param name="report">The report definition.</param>
+    /// <returns>The slot key.</returns>
+    public static string Slot(SchemataReport report) => Slot(report.CanonicalName, report.Name);
 }
 
 /// <summary>Maps the stable report-generation scheduler key to the configured closed job type.</summary>

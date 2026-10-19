@@ -1,12 +1,11 @@
 using System;
-using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Common;
-using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Report.Foundation.Commands;
 using Schemata.Report.Foundation.Runtime;
@@ -16,7 +15,6 @@ using Schemata.Report.Skeleton.Enums;
 using Schemata.Report.Skeleton.Models;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Attributes;
-using Schemata.Scheduling.Skeleton.Entities;
 
 namespace Schemata.Report.Foundation.Jobs;
 
@@ -26,27 +24,47 @@ namespace Schemata.Report.Foundation.Jobs;
 /// <typeparam name="TChunk">Persisted snapshot-chunk entity type.</typeparam>
 [ScheduledJob("schemata.report.generate")]
 public sealed class ReportGenerationJob<TReport, TSnapshot, TChunk>(
-    IServiceScopeFactory            scopes,
-    IOptions<SchemataReportOptions> options
+    IMessageExecutionScopeFactory  scopes,
+    IOptions<SchemataReportOptions> options,
+    ReportRegistration             registration
 ) : IScheduledJob
     where TReport : SchemataReport, new()
     where TSnapshot : SchemataReportSnapshot, new()
     where TChunk : SchemataReportSnapshotChunk, new()
 {
     public async Task ExecuteAsync(JobContext context, CancellationToken ct) {
+        registration.EnsureSingleTriple<TReport>();
         var (request, kind) = ReadRequest(context);
-        await using var scope = scopes.CreateAsyncScope();
-        var execution = scope.ServiceProvider.GetRequiredService<ReportExecutionContext>();
-        execution.Kind      = kind;
-        execution.Operation = OperationName(context);
-        if (context.ExecutionUid is { } uid) {
-            execution.IsCancelled = token => IsCancelledAsync(uid, token);
-        }
+        var message = new MessageContext(context.Execution?.MessageContext ?? new());
+        var scope = await scopes.CreateAsync(message, ct);
+        IDisposable? entered = null;
+        Exception? failure = null;
+        try {
+            entered = scope.Enter();
+            await scope.RestoreAsync(message, ct);
+            var execution = scope.Services.GetRequiredService<ReportExecutionContext>();
+            execution.Kind      = kind;
+            execution.Operation = context.Execution?.CanonicalName;
+            if (context.ExecutionUid is { } uid && scope.Services.GetService<IJobExecutionState>() is { } state) {
+                execution.IsCancelled = token => state.IsCancelledAsync(uid, message, token);
+            }
 
-        var dispatcher = scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
-        var result = await dispatcher.SendAsync<RunReportRequest, ReportResult>(new(request, null), ct);
-        if (context.Execution is { } scheduled) {
-            scheduled.Output = JsonSerializer.Serialize(Output(result), SchemataJson.Default);
+            var dispatcher = scope.Services.GetRequiredService<IRequestDispatcher>();
+            var result = await dispatcher.SendAsync<RunReportRequest, ReportResult>(new(request, null), ct);
+            if (context.Execution is { } scheduled) {
+                scheduled.Output = JsonSerializer.Serialize(Output(result), SchemataJson.Default);
+            }
+        } catch (Exception error) {
+            failure = error;
+            throw;
+        } finally {
+            Exception? cleanup = null;
+            try { await scope.DisposeAsync(); } catch (Exception error) { cleanup = error; }
+            try { entered?.Dispose(); } catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
+            if (cleanup is not null) {
+                if (failure is not null) throw new AggregateException(failure, cleanup);
+                ExceptionDispatchInfo.Capture(cleanup).Throw();
+            }
         }
     }
 
@@ -60,13 +78,6 @@ public sealed class ReportGenerationJob<TReport, TSnapshot, TChunk>(
         }
 
         return new() { Response = result.Response };
-    }
-
-    private async ValueTask<bool> IsCancelledAsync(Guid uid, CancellationToken ct) {
-        await using var scope = scopes.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
-        var execution = await repository.FirstOrDefaultAsync(query => query.Where(row => row.Uid == uid), ct);
-        return execution?.State is ExecutionState.Cancelled;
     }
 
     private static (ReportRequest Request, ReportRunKind Kind) ReadRequest(JobContext context) {
@@ -83,8 +94,4 @@ public sealed class ReportGenerationJob<TReport, TSnapshot, TChunk>(
         throw new JsonException("Report generation arguments are missing.");
     }
 
-    private static string? OperationName(JobContext context) {
-        return context.Execution?.CanonicalName
-               ?? (context.ExecutionUid is { } uid ? $"operations/{uid:n}" : null);
-    }
 }

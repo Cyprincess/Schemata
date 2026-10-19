@@ -4,10 +4,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Report.Foundation;
 using Schemata.Report.Foundation.Definitions;
+using Schemata.Insight.Skeleton.Queries;
 using Schemata.Report.Skeleton;
 using Xunit;
-
-using Schemata.Report.Skeleton.Models;
 using Schemata.Report.Skeleton.Entities;
 
 namespace Schemata.Report.Tests;
@@ -22,7 +21,7 @@ public class ReportRepositoryDependencyShould
 
         var result = await service.RunAsync(ReportTestHost.InlineRequest());
 
-        Assert.Equal(2, result.Response!.Rows.Count);
+        Assert.Equal(2, result.Response.Rows.Count);
     }
 
     [Fact]
@@ -41,9 +40,42 @@ public class ReportRepositoryDependencyShould
             });
         var service = provider.GetRequiredService<IReportService>();
 
-        var result = await service.RunAsync(new ReportRequest { Name = "daily" });
+        var result = await service.RunAsync(new() { Name = "daily" });
 
-        Assert.Single(result.Response!.Rows);
+        Assert.Single(result.Response.Rows);
+    }
+
+    [Fact]
+    public async Task Resolve_Materializes_Fresh_Query_Per_Dispatch() {
+        var driver = ReportTestHost.CreateDriver(ReportTestRows.Create(1));
+        var template = new QueryInsightRequest {
+            Sources     = [new("r", "rows")],
+            Selections  = [new() { Field = "r.value" }],
+        };
+        using var provider = ReportTestHost.Create(
+            driver,
+            registerRepositories: false,
+            configure: services => {
+                services.Configure<SchemataReportOptions>(options => options.Definitions.Add(new() {
+                    Name  = "daily",
+                    Query = template,
+                }));
+                services.AddSingleton<IReportDefinitionSource, ConfigurationReportDefinitionStore>();
+                services.AddSingleton<IReportDefinitionStore, CompositeReportDefinitionStore>();
+            });
+        var store = provider.GetRequiredService<IReportDefinitionStore>();
+
+        var first  = (await store.ResolveAsync("daily"))!.Value.Query;
+        var second = (await store.ResolveAsync("daily"))!.Value.Query;
+
+        Assert.NotSame(template, first);
+        Assert.NotSame(first, second);
+        first.Sources.Add(new("mutated", "rows"));
+        first.Selections.Clear();
+        Assert.Single(template.Sources);
+        Assert.Single(template.Selections);
+        Assert.Single(second.Sources);
+        Assert.Single(second.Selections);
     }
 
     [Fact]
@@ -59,7 +91,7 @@ public class ReportRepositoryDependencyShould
         var service = provider.GetRequiredService<IReportService>();
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await service.RunAsync(new ReportRequest { Name = "missing" }));
+            async () => await service.RunAsync(new() { Name = "missing" }));
 
         Assert.Contains("IRepository", exception.Message);
     }

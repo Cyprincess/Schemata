@@ -11,11 +11,13 @@ using Schemata.Insight.Skeleton.Entities;
 namespace Schemata.Insight.Foundation.Catalog;
 
 /// <summary>
-///     A source catalog backed by <see cref="IRepository{TEntity}" /> over
-///     <see cref="SchemataInsightSource" />, so sources can be added, changed, and removed at runtime.
-///     The repository is resolved per call from a fresh scope because the catalog is a singleton.
+///     A source catalog backed by <see cref="IRepository{TEntity}" /> over the host-selected source
+///     entity, so sources can be added, changed, and removed at runtime. The repository is resolved
+///     per call from a fresh scope because the catalog is a singleton.
 /// </summary>
-public sealed class DatabaseInsightSourceCatalog : IInsightSourceCatalog
+/// <typeparam name="TInsightSource">The persisted source entity type.</typeparam>
+public sealed class DatabaseInsightSourceCatalog<TInsightSource> : IInsightSourceCatalog
+    where TInsightSource : SchemataInsightSource
 {
     private readonly IServiceScopeFactory _scopes;
 
@@ -29,10 +31,10 @@ public sealed class DatabaseInsightSourceCatalog : IInsightSourceCatalog
 
     public async ValueTask<SourceConfig?> ResolveAsync(string name, CancellationToken ct) {
         await using var scope = _scopes.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataInsightSource>>();
+        var repository = scope.ServiceProvider.GetRequiredService<IRepository<TInsightSource>>();
 
         var record = await repository
-                          .FirstOrDefaultAsync<SchemataInsightSource>(q => Queryable.Where(q, s => s.Name == name), ct)
+                          .FirstOrDefaultAsync<TInsightSource>(q => Queryable.Where(q, s => s.Name == name), ct)
                           ;
 
         return record?.Driver is { } driver
@@ -42,10 +44,10 @@ public sealed class DatabaseInsightSourceCatalog : IInsightSourceCatalog
 
     public async ValueTask<IReadOnlyList<string>> ListNamesAsync(CancellationToken ct) {
         await using var scope = _scopes.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataInsightSource>>();
+        var repository = scope.ServiceProvider.GetRequiredService<IRepository<TInsightSource>>();
 
         var names = new List<string>();
-        await foreach (var record in repository.ListAsync<SchemataInsightSource>(null, ct)) {
+        await foreach (var record in repository.ListAsync<TInsightSource>(null, ct)) {
             if (record.Name is { } name) {
                 names.Add(name);
             }
@@ -74,7 +76,9 @@ public sealed class DatabaseInsightSourceCatalog : IInsightSourceCatalog
     private static object? ToValue(JsonElement element) {
         return element.ValueKind switch {
             JsonValueKind.String => element.GetString(),
-            JsonValueKind.Number => element.TryGetInt64(out var value) ? value : element.GetDouble(),
+            // The conditional's natural type must not coerce the integer branch: box it as object
+            // so parameters beyond double's exact range survive.
+            JsonValueKind.Number => element.TryGetInt64(out var value) ? (object)value : element.GetDouble(),
             JsonValueKind.True   => true,
             JsonValueKind.False  => false,
             JsonValueKind.Null   => null,

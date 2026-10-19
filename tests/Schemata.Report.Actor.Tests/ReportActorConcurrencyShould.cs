@@ -2,9 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
+using Schemata.Core;
+using Schemata.Report.Skeleton;
+using Schemata.Abstractions.Entities;
 using Schemata.Report.Actor.Tests.Fixtures;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Report.Foundation.Commands;
@@ -19,16 +25,17 @@ using Xunit;
 namespace Schemata.Report.Actor.Tests;
 
 /// <summary>
-///     Concurrency acceptance for the Report.Actor bridge (spec §7.2). N tasks fire the real
-///     scheduled generation job (<see cref="ReportGenerationJob{TReport,TSnapshot,TChunk}" /> →
-///     dispatcher → the wrapped <c>RunReportRequest</c> handler) at the same report name
-///     simultaneously, each from its own DI scope. The report retains one snapshot, so the retention
-///     "list all snapshots then trim" step races. With the bridge installed the per-name actor
-///     serializes every generation, no concurrency conflict is raised, and retention converges
-///     to exactly one succeeded snapshot; the control group without the bridge raises concurrency
-///     conflicts or leaves excess succeeded snapshots behind, proving the harness manufactures
-///     genuine contention.
+///     Concurrency acceptance for the Report.Actor bridge (spec §7.2). With the bridge installed,
+///     N tasks fire the real scheduled generation job
+///     (<see cref="ReportGenerationJob{TReport,TSnapshot,TChunk}" /> → dispatcher → the wrapped
+///     <c>RunReportRequest</c> handler) at the same report name simultaneously, each from its own
+///     DI scope; the per-name actor serializes every generation, no concurrency conflict is
+///     raised, and retention converges to exactly one succeeded snapshot. The control group
+///     parks the first ungated generation mid-write through
+///     <see cref="SnapshotFinalizationGate" />, proving a second generation of the same report
+///     runs to completion inside that window — the overlap the bridge makes impossible.
 /// </summary>
+[Trait("Category", "Integration")]
 public class ReportActorConcurrencyShould
 {
     private const int Concurrency = 16;
@@ -44,6 +51,43 @@ public class ReportActorConcurrencyShould
         Assert.Single(succeeded);
     }
 
+    [Trait("Layer", "Component")]
+    [Fact]
+    public async Task Configured_Report_Uses_Its_Declared_Name_Without_Rewriting_The_Request() {
+        await using var harness = await ReportActorConcurrencyHarness.BuildAsync(withActor: true);
+        await using var scope = harness.Root.CreateAsyncScope();
+        var request = new ReportRequest { Name = ReportActorConcurrencyHarness.ReportName, Persist = true };
+        var result = await scope.ServiceProvider.GetRequiredService<IReportService>().RunAsync(request);
+        Assert.Equal(ReportActorConcurrencyHarness.ReportName, request.Name);
+        var store = scope.ServiceProvider.GetRequiredService<IReportSnapshotStore>();
+        var snapshot = await store.GetAsync(result.Snapshot!);
+        Assert.NotNull(snapshot);
+        Assert.Equal(ReportActorConcurrencyHarness.ReportName, snapshot.Report);
+        Assert.Equal(3, snapshot.RowCount);
+    }
+
+    [Trait("Layer", "Component")]
+    [Fact]
+    public async Task Conflicting_Selection_Rejects_Before_Definition_Store_Construction_With_Actor() {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var builder = new SchemataBuilder(new ConfigurationBuilder().Build(), null!);
+        builder.UseReport().UseActor();
+        builder.UseReport<ConflictingReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>().UseActor();
+        builder.Invoke(services);
+        services.AddSingleton<IReportDefinitionStore>(_ => throw new InvalidOperationException("Definition store constructed before selection guard."));
+        await using var root = services.BuildServiceProvider();
+        await using var scope = root.CreateAsyncScope();
+        var dispatcher = scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
+        await Assert.ThrowsAsync<FailedPreconditionException>(() => dispatcher.SendAsync<RunReportRequest, ReportResult>(
+            new(new() { Name = "reports/daily", Persist = true }, null)));
+        await Assert.ThrowsAsync<FailedPreconditionException>(() => dispatcher.SendAsync<GenerateReportRequest, Schemata.Abstractions.Resource.Operation>(
+            new() { Name = "reports/daily", Persist = true, Sync = true }));
+    }
+
+    [CanonicalName("reports/{report}")]
+    public sealed class ConflictingReport : SchemataReport;
+
     [Fact]
     public async Task Inline_Request_Bypasses_The_Actor_And_Still_Runs_With_Bridge_Installed() {
         await using var harness = await ReportActorConcurrencyHarness.BuildAsync(withActor: true);
@@ -51,7 +95,7 @@ public class ReportActorConcurrencyShould
 
         var dispatcher = scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
         var request    = new RunReportRequest(
-            new ReportRequest {
+            new() {
                 Persist = false,
                 Query   = new() { Sources = { new("record", "source-records") } },
             },
@@ -63,17 +107,48 @@ public class ReportActorConcurrencyShould
     }
 
     [Fact]
-    public async Task Concurrent_Scheduled_Generations_Without_Actor_Produce_Contention() {
-        await using var harness = await ReportActorConcurrencyHarness.BuildAsync(withActor: false);
+    public async Task Second_Ungated_Generation_Completes_While_The_First_Is_Mid_Write_And_Retention_Converges() {
+        var gate = new SnapshotFinalizationGate();
+        await using var harness = await ReportActorConcurrencyHarness.BuildAsync(withActor: false, snapshotAdvisor: gate);
 
-        var outcome    = await RunConcurrentGenerationsAsync(harness);
-        var succeeded  = await SucceededSnapshotsAsync(harness);
+        var first = Task.Run(() => ExecuteGenerationAsync(harness));
+        Task? second = null;
+        List<Exception>? failures = null;
+        try {
+            // The first generation is parked at finalization: chunks committed, header not yet Succeeded.
+            var ready = await Task.WhenAny(gate.Holding, first).WaitAsync(TimeSpan.FromSeconds(30));
+            if (ready == first) {
+                await first;
+                Assert.Fail("The first generation completed before reaching snapshot finalization.");
+            }
 
-        Assert.True(
-            outcome.Conflicts.Count > 0 || succeeded.Count > 1,
-            $"Control group raised {outcome.Conflicts.Count} concurrency conflicts and retained " +
-            $"{succeeded.Count} succeeded snapshots: the harness is not manufacturing genuine retention " +
-            "contention, so the actor-enabled case proves nothing.");
+            second = ExecuteGenerationAsync(harness);
+            await second;
+            var overlapped = await SucceededSnapshotsAsync(harness);
+            var secondUid  = Assert.Single(overlapped).Uid;
+
+            gate.Release();
+            await first.WaitAsync(TimeSpan.FromSeconds(30));
+
+            var retained = Assert.Single(await SucceededSnapshotsAsync(harness));
+            Assert.NotEqual(secondUid, retained.Uid);
+        } catch (Exception error) {
+            (failures ??= []).Add(error);
+        } finally {
+            gate.Release();
+            try { await first; }
+            catch (Exception error) {
+                if (failures?.Contains(error) is not true) (failures ??= []).Add(error);
+            }
+            if (second is not null) {
+                try { await second; }
+                catch (Exception error) {
+                    if (failures?.Contains(error) is not true) (failures ??= []).Add(error);
+                }
+            }
+        }
+        if (failures is { Count: 1 }) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures is not null) throw new AggregateException(failures);
     }
 
     private static async Task<ConcurrencyOutcome> RunConcurrentGenerationsAsync(ReportActorConcurrencyHarness harness) {
@@ -106,5 +181,14 @@ public class ReportActorConcurrencyShould
                             .Where(snapshot => snapshot.Report == ReportActorConcurrencyHarness.ReportName
                                             && snapshot.State == SnapshotState.Succeeded)
                             .ToListAsync();
+    }
+
+    private static async Task ExecuteGenerationAsync(ReportActorConcurrencyHarness harness) {
+        var job = harness.Root.GetRequiredService<
+            ReportGenerationJob<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>();
+        var context = new JobContext {
+            Variables = new Dictionary<string, string?> { ["report"] = ReportActorConcurrencyHarness.ReportName },
+        };
+        await job.ExecuteAsync(context, CancellationToken.None);
     }
 }

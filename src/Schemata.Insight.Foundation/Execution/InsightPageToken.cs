@@ -1,28 +1,92 @@
 using System;
+using System.IO;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text.Json;
+using Microsoft.AspNetCore.DataProtection;
+using Schemata.Abstractions;
+using Schemata.Common;
 using Schemata.Insight.Foundation.Planning;
+using Schemata.Insight.Skeleton.Queries;
 
 namespace Schemata.Insight.Foundation.Execution;
 
-/// <summary>
-///     Encodes the next-page skip offset as an opaque token. This phase uses plain offset paging;
-///     token signing and query binding are deferred.
-/// </summary>
-internal static class InsightPageToken
+internal sealed record InsightPageToken(string Binding, ProtectedContinuationCaller? Caller, int Skip, int PageSize, int Origin)
 {
-    public static string Encode(int skip) {
-        return Convert.ToBase64String(BitConverter.GetBytes(skip));
+    internal const string ProtectionPurpose = "Schemata.Insight.Foundation.PageToken";
+
+    internal static InsightPageToken Bind(QueryInsightRequest request, ClaimsPrincipal? principal,
+        int skip, int pageSize, SchemataInsightOptions options) {
+        var binding = JsonSerializer.Serialize(new {
+            request.Sources,
+            request.Joins,
+            request.Transformations,
+            request.Selections,
+            request.Language,
+            Skip = skip,
+            PageSize = pageSize,
+            options.TotalSize,
+            options.Expressions,
+        }, SchemataJson.Default);
+        return new(binding, ProtectedContinuationCaller.Bind(principal), 0, pageSize, skip);
     }
 
-    public static int Decode(string token) {
+    internal string Encode(IDataProtector protector, int skip) {
+        ValidateCaller();
+        ValidateOffset(skip);
+        return ProtectedContinuation.Encode(protector, this with { Skip = skip });
+    }
+
+    internal int Decode(IDataProtector protector, string token) {
+        ValidateCaller();
         try {
-            var bytes = Convert.FromBase64String(token);
-            if (bytes.Length == sizeof(int)) {
-                return BitConverter.ToInt32(bytes);
+            var payload = ProtectedContinuation.Decode<InsightPageToken>(protector, token);
+            if (payload.Binding != Binding || payload.Caller != Caller) {
+                throw Invalid();
             }
-        } catch (FormatException) {
-            // Falls through to the validation error below.
+
+            ValidateOffset(payload.Skip);
+            if (payload.PageSize <= 0 || payload.Origin < 0) {
+                throw Invalid();
+            }
+
+            return payload.Skip;
+        } catch (Exception ex) when (ex is FormatException or CryptographicException or JsonException or IOException or InvalidDataException) {
+            throw new InsightValidationException(InsightReasons.InvalidArgument,
+                SchemataResources.INVALID_PAGE_TOKEN, innerException: ex);
+        }
+    }
+
+    internal static void ValidateOffset(int skip) {
+        if (skip < 0) throw Invalid();
+    }
+
+    internal static int Advance(int skip, int pageSize) {
+        try {
+            return checked(skip + pageSize);
+        } catch (OverflowException ex) {
+            throw new InsightValidationException(InsightReasons.InvalidArgument,
+                SchemataResources.INVALID_PAGE_TOKEN, innerException: ex);
+        }
+    }
+
+    internal static string? EncodePrevious(IDataProtector protector, string currentToken) {
+        var payload = ProtectedContinuation.Decode<InsightPageToken>(protector, currentToken);
+        payload.ValidateCaller();
+        if (payload.PageSize <= 0 || payload.Origin < 0) {
+            throw Invalid();
         }
 
-        throw new InsightValidationException(InsightReasons.InvalidArgument, "Invalid page token.");
+        var previous = (long)payload.Skip - payload.PageSize;
+        return previous < payload.Origin ? null : payload.Encode(protector, (int)previous);
     }
+
+    private void ValidateCaller() {
+        if (Caller is not { } caller || caller.IsAuthenticated && string.IsNullOrWhiteSpace(caller.Subject)) {
+            throw Invalid();
+        }
+    }
+
+    private static InsightValidationException Invalid() => new(InsightReasons.InvalidArgument,
+        SchemataResources.INVALID_PAGE_TOKEN);
 }

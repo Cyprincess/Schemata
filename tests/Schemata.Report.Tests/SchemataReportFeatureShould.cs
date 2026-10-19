@@ -1,7 +1,11 @@
 using System;
 using System.ComponentModel;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Exceptions;
+using Schemata.Core;
+using Schemata.Report.Foundation;
 using Xunit;
 using Schemata.Report.Skeleton.Entities;
 
@@ -21,18 +25,21 @@ public class SchemataReportFeatureShould
     }
 
     [Fact]
-    public void Second_UseReport_With_Different_Types_Throws() {
-        var builder = WebApplication.CreateBuilder();
+    public void Second_UseReport_With_Different_Types_Builds_But_Disables_Report_Operations() {
+        var services = new ServiceCollection();
+        var schemata  = new SchemataOptions();
 
-        var exception = Assert.Throws<InvalidOperationException>(() => {
-            builder.UseSchemata(schema => {
-                schema.UseReport();
-                schema.UseReport<AlternateReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>();
-            });
-        });
+        services.AddSchemataReport<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(schemata);
+        // A different triple adds no second set of closures and does not fail the host build.
+        services.AddSchemataReport<AlternateReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(schemata);
 
-        Assert.Contains("only one UseReport per host", exception.Message, StringComparison.Ordinal);
+        using var provider     = services.BuildServiceProvider();
+        var       registration = provider.GetRequiredService<ReportRegistration>();
+
+        Assert.Throws<FailedPreconditionException>(
+            () => registration.EnsureSingleTriple<SchemataReport>());
     }
+
 
     private sealed class ReportWithoutCanonicalName : SchemataReport;
 

@@ -6,22 +6,20 @@ using Schemata.Actor.Skeleton;
 using Schemata.Messaging.Skeleton;
 using Schemata.Report.Foundation;
 using Schemata.Report.Skeleton;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Report.Actor.Handlers;
 
 /// <summary>
 ///     Replaces the unkeyed default handler for a report-scoped command, redirecting a named
-///     generation to the report's per-name actor so concurrent generations of the same report
-///     serialize instead of racing on double snapshots and retention.
+///     generation to the resolved report's actor so concurrent generations of the same report
+///     serialize across canonical and leaf targets.
 /// </summary>
 /// <remarks>
-///     Mirrors Flow.Actor's handler: constructed with only <see cref="IActorSystem" /> and the
-///     caller's <see cref="IServiceProvider" /> — it never injects the keyed inner handler. The
-///     caller's provider is read exactly once, synchronously, to capture the ambient
-///     <see cref="MessageContext" />; only the request and the flattened context cross the mailbox
-///     boundary. An inline request (<see cref="IReportScoped.ReportKey" /> is empty) carries no
-///     report identity, so it bypasses the mailbox and resolves the keyed default handler directly
-///     on the caller's own scope — no actor, exactly as without the bridge.
+///     The command pipeline checks Report selection before constructing this handler. Definition
+///     lookup runs in the caller's scope before actor activation; the request keeps its original
+///     name and only the resolved identity and flattened message context determine routing.
+///     Inline requests resolve the keyed default handler in the caller's scope.
 /// </remarks>
 /// <typeparam name="TRequest">The report-scoped command type.</typeparam>
 /// <typeparam name="TResult">The command's result type.</typeparam>
@@ -29,16 +27,20 @@ internal sealed class ActorSerializingHandler<TRequest, TResult>(
     IActorSystem actors, IServiceProvider caller) : IRequestHandler<TRequest, TResult>
     where TRequest : IRequest<TResult>, IReportScoped
 {
-    public async Task<TResult> HandleAsync(TRequest request, CancellationToken ct = default) {
+    public async Task<TResult> HandleAsync(TRequest request, AdviceContext advice, CancellationToken ct = default) {
         var key = request.ReportKey;
         if (string.IsNullOrWhiteSpace(key)) {
             return await caller.GetRequiredKeyedService<IRequestHandler<TRequest, TResult>>(
                               ReportConstants.Handlers.Default)
-                          .HandleAsync(request, ct);
+                          .HandleAsync(request, advice, ct);
         }
 
         var context = MessageContexts.Capture(caller);
-        var actor   = await actors.GetAsync(new ActorId("report", key));
+        var definition = await caller.GetRequiredService<IReportDefinitionStore>().ResolveAsync(key, ct);
+        if (definition is { } resolved) {
+            key = resolved.Report.CanonicalName ?? resolved.Report.Name ?? key;
+        }
+        var actor = await actors.GetAsync(new("report", key));
         return await actor.AskAsync<TRequest, TResult>(request, context, ct: ct);
     }
 }

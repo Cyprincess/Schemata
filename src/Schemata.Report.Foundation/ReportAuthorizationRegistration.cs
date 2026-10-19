@@ -20,9 +20,9 @@ internal static class ReportAuthorizationRegistration
         where TReport : SchemataReport, new()
         where TSnapshot : SchemataReportSnapshot, new()
         where TChunk : SchemataReportSnapshotChunk, new() {
-        AddAuthentication<ResourceMethodRequest<TReport, RunReportRequest, ReportResult>, ReportResult>(services, static request => (request.Verb, typeof(TReport)));
-        AddAuthentication<ResourceMethodRequest<TReport, GenerateReportRequest, Operation>, Operation>(services, static request => (request.Verb, typeof(TReport)));
-        AddAuthentication<ReadSnapshotRequest, ReadSnapshotResponse>(services, static _ => (ReportOperations.Read, typeof(TSnapshot)));
+        AddAuthentication<ResourceMethodRequest<TReport, RunReportRequest, ReportResult>, ReportResult>(services, static request => ResourceTarget.Instance(request.Verb, typeof(TReport), request.Name));
+        AddAuthentication<ResourceMethodRequest<TReport, GenerateReportRequest, Operation>, Operation>(services, static request => ResourceTarget.Instance(request.Verb, typeof(TReport), request.Name));
+        AddAuthentication<ReadSnapshotRequest, ReadSnapshotResponse>(services, static request => ResourceTarget.Instance(ReportOperations.Read, typeof(TSnapshot), request.CanonicalName ?? request.Name));
         return services;
     }
 
@@ -30,21 +30,21 @@ internal static class ReportAuthorizationRegistration
         where TReport : SchemataReport, new()
         where TSnapshot : SchemataReportSnapshot, new()
         where TChunk : SchemataReportSnapshotChunk, new() {
-        AddAuthorization<ResourceMethodRequest<TReport, RunReportRequest, ReportResult>, ReportResult>(services, static request => (request.Verb, typeof(TReport)));
-        AddAuthorization<ResourceMethodRequest<TReport, GenerateReportRequest, Operation>, Operation>(services, static request => (request.Verb, typeof(TReport)));
-        AddAuthorization<ReadSnapshotRequest, ReadSnapshotResponse>(services, static _ => (ReportOperations.Read, typeof(TSnapshot)));
+        AddAuthorization<ResourceMethodRequest<TReport, RunReportRequest, ReportResult>, ReportResult>(services, static request => ResourceTarget.Instance(request.Verb, typeof(TReport), request.Name));
+        AddAuthorization<ResourceMethodRequest<TReport, GenerateReportRequest, Operation>, Operation>(services, static request => ResourceTarget.Instance(request.Verb, typeof(TReport), request.Name));
+        AddAuthorization<ReadSnapshotRequest, ReadSnapshotResponse>(services, static request => ResourceTarget.Instance(ReportOperations.Read, typeof(TSnapshot), request.CanonicalName ?? request.Name));
         return services;
     }
 
-    private static void AddAuthentication<TRequest, TResponse>(IServiceCollection services, Func<TRequest, (string Operation, Type? Entity)> resolve)
+    private static void AddAuthentication<TRequest, TResponse>(IServiceCollection services, Func<TRequest, ResourceTarget> resolve)
         where TRequest : IRequest<TResponse>, IRequestPrincipal {
-        services.TryAddScoped<Func<TRequest, (string Operation, Type? Entity)>>(_ => resolve);
+        services.TryAddScoped<Func<TRequest, ResourceTarget>>(_ => resolve);
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<TRequest, TResponse>), typeof(AuthenticationPipelineAdvisor<TRequest, TResponse>)));
     }
 
-    private static void AddAuthorization<TRequest, TResponse>(IServiceCollection services, Func<TRequest, (string Operation, Type? Entity)> resolve)
+    private static void AddAuthorization<TRequest, TResponse>(IServiceCollection services, Func<TRequest, ResourceTarget> resolve)
         where TRequest : IRequest<TResponse>, IRequestPrincipal {
-        services.TryAddScoped<Func<TRequest, (string Operation, Type? Entity)>>(_ => resolve);
+        services.TryAddScoped<Func<TRequest, ResourceTarget>>(_ => resolve);
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRequestPipelineAdvisor<TRequest, TResponse>), typeof(AuthorizationPipelineAdvisor<TRequest, TResponse>)));
     }
 }

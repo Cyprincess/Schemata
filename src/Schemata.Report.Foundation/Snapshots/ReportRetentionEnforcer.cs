@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository;
 using Schemata.Report.Skeleton.Entities;
 using Schemata.Report.Skeleton.Enums;
@@ -25,18 +26,22 @@ public sealed class ReportRetentionEnforcer<TSnapshot, TChunk>
 {
     private readonly TimeSpan             _incompleteGracePeriod;
     private readonly IServiceScopeFactory _scopes;
+    private readonly ReportRegistration   _registration;
     private readonly TimeProvider         _time;
 
     /// <summary>Creates a write-path retention enforcer.</summary>
     /// <param name="scopes">Factory creating isolated cleanup scopes.</param>
     /// <param name="options">Retention cleanup settings.</param>
+    /// <param name="registration">Shared entity-triple selection checked before cleanup I/O.</param>
     /// <param name="time">Clock used to evaluate retention ages.</param>
     public ReportRetentionEnforcer(
         IServiceScopeFactory            scopes,
         IOptions<SchemataReportOptions> options,
+        ReportRegistration             registration,
         TimeProvider?                   time = null
     ) {
         _scopes                 = scopes;
+        _registration           = registration;
         _incompleteGracePeriod  = options.Value.IncompleteSnapshotGracePeriod;
         _time                   = time ?? TimeProvider.System;
     }
@@ -45,6 +50,8 @@ public sealed class ReportRetentionEnforcer<TSnapshot, TChunk>
     /// <param name="report">Parent definition of the newly persisted snapshot.</param>
     /// <param name="ct">Cancellation token observed before each victim cleanup starts.</param>
     public async ValueTask EnforceAsync(SchemataReport? report, CancellationToken ct = default) {
+        _registration.EnsureSingleTriple<SchemataReport>();
+
         if (report?.Retention is null || string.IsNullOrWhiteSpace(report.Name)) {
             return;
         }
@@ -114,8 +121,13 @@ public sealed class ReportRetentionEnforcer<TSnapshot, TChunk>
                 related.Add(chunk);
             }
 
-            await chunks.RemoveRangeAsync(related, CancellationToken.None);
-            await snapshots.RemoveRangeAsync([snapshot], CancellationToken.None);
+            var chunkMutation = scope.ServiceProvider.GetRequiredService<IResourceMutation<TChunk>>();
+            foreach (var chunk in related) {
+                await chunkMutation.DeleteAsync(chunk, unit, Operations.Delete, CancellationToken.None);
+            }
+
+            await scope.ServiceProvider.GetRequiredService<IResourceMutation<TSnapshot>>()
+                         .DeleteAsync(snapshot, unit, Operations.Delete, CancellationToken.None);
             await unit.CommitAsync(CancellationToken.None);
         } catch {
             await unit.RollbackAsync(CancellationToken.None);

@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using ProtoBuf;
+using Schemata.Transport.Grpc.Wire;
+using Schemata.Insight.Skeleton.Models;
 
 namespace Schemata.Insight.Grpc.Wire;
 
@@ -7,9 +9,9 @@ namespace Schemata.Insight.Grpc.Wire;
 [ProtoContract]
 public sealed class QueryInsightGrpcResponse
 {
-    [ProtoMember(1)] public List<InsightStruct> Rows { get; set; } = new();
+    [ProtoMember(1)] public List<DynamicStruct> Rows { get; set; } = new();
 
-    [ProtoMember(2)] public List<FieldDescriptorMessage> Schema { get; set; } = new();
+    [ProtoMember(2)] public List<DynamicFieldDescriptor<FieldType>> Schema { get; set; } = new();
 
     [ProtoMember(3)] public string? NextPageToken { get; set; }
 

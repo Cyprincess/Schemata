@@ -5,10 +5,14 @@ using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Resource;
+using Schemata.Insight.Foundation.Materialization;
 using Schemata.Advice;
 using Schemata.Expressions.Skeleton;
 using Schemata.Insight.Foundation.Planning;
@@ -39,10 +43,13 @@ public sealed class PlanExecutor
     private readonly SchemataInsightOptions _options;
     private readonly IServiceProvider       _services;
 
+    private IDataProtector Protector => _services.GetRequiredService<IDataProtectionProvider>()
+        .CreateProtector(InsightPageToken.ProtectionPurpose);
+
     /// <summary>Wires the plan executor with keyed-driver resolution, the local pipeline fallback, and the configured Insight options.</summary>
     /// <param name="services">The provider resolving keyed source drivers.</param>
     /// <param name="local">The local pipeline executor for stages the driver cannot push.</param>
-    /// <param name="options">The Insight options (total-size mode, scan cap).</param>
+    /// <param name="options">The Insight options (total-size mode, language profile).</param>
     public PlanExecutor(
         IServiceProvider                 services,
         LocalPipelineExecutor            local,
@@ -58,8 +65,10 @@ public sealed class PlanExecutor
         PlanNode            plan,
         QueryInsightRequest request,
         ClaimsPrincipal?    principal,
+        AdviceContext       context,
         CancellationToken   ct
     ) {
+        new PublicPlanValidator(_services).Validate(plan);
         int? requestedSkip = null;
         int? requestedTake = null;
         var  root          = plan;
@@ -70,14 +79,21 @@ public sealed class PlanExecutor
         }
 
         var pageSize = ClampPageSize(requestedTake);
-        var skip = request.PageToken is { Length: > 0 } token
-            ? InsightPageToken.Decode(token)
-            : Math.Max(0, requestedSkip ?? 0);
+        InsightPageToken.ValidateOffset(request.Skip ?? 0);
+        var initialSkip = requestedSkip ?? 0;
+        InsightPageToken.ValidateOffset(initialSkip);
+        InsightPageToken? continuation = null;
+        var skip = initialSkip;
+        if (request.PageToken is { Length: > 0 } token) {
+            continuation = InsightPageToken.Bind(request, principal, initialSkip, pageSize, _options);
+            skip = continuation.Decode(Protector, token);
+        }
+        InsightPageToken.Advance(skip, pageSize);
         var mode = _options.TotalSize is TotalSizeMode.Default ? TotalSizeMode.Exact : _options.TotalSize;
 
         return root.SourceSet.Count > 1
-            ? await ExecuteJoinAsync(root, request, principal, true, skip, pageSize, mode, ct)
-            : await ExecuteSingleAsync(root, request, principal, true, skip, pageSize, mode, ct);
+            ? await ExecuteJoinAsync(root, request, principal, true, skip, initialSkip, pageSize, mode, continuation, context, ct)
+            : await ExecuteSingleAsync(root, request, principal, true, skip, initialSkip, pageSize, mode, continuation, context, ct);
     }
 
     /// <summary>
@@ -87,6 +103,7 @@ public sealed class PlanExecutor
     /// <param name="plan">The logical plan to execute.</param>
     /// <param name="request">The source request context.</param>
     /// <param name="principal">The execution principal, when security is enforced.</param>
+    /// <param name="context">The dispatch's advisor context, shared with the request pipeline.</param>
     /// <param name="enforceSecurity">Whether source drivers enforce their security checks.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The opened schema and unpaged row stream.</returns>
@@ -94,18 +111,20 @@ public sealed class PlanExecutor
         PlanNode            plan,
         QueryInsightRequest request,
         ClaimsPrincipal?    principal,
+        AdviceContext       context,
         bool                enforceSecurity = true,
         CancellationToken   ct = default
     ) {
+        new PublicPlanValidator(_services).Validate(plan);
         var root = plan is LimitNode limit ? limit.Input : plan;
         if (root.SourceSet.Count > 1) {
             return ValueTask.FromResult(new MaterializedQuery(
                 TerminalSchema(root),
-                Evaluate(root, request, principal, enforceSecurity, ct)
+                Evaluate(root, request, principal, enforceSecurity, context, ct)
             ));
         }
 
-        return MaterializeSingleAsync(root, request, principal, enforceSecurity, ct);
+        return MaterializeSingleAsync(root, request, principal, enforceSecurity, context, ct);
     }
 
     private async ValueTask<QueryInsightResponse> ExecuteSingleAsync(
@@ -114,20 +133,25 @@ public sealed class PlanExecutor
         ClaimsPrincipal?    principal,
         bool                enforceSecurity,
         int                 skip,
+        int                 initialSkip,
         int                 pageSize,
         TotalSizeMode       mode,
+        InsightPageToken?   continuation,
+        AdviceContext       context,
         CancellationToken   ct
     ) {
         var source = FindSource(root);
         if (source is null) {
-            throw new InsightValidationException(InsightReasons.InvalidArgument, "The plan has no source.");
+            throw new InsightValidationException(InsightReasons.InvalidArgument, SchemataResources.INSIGHT_SOURCE_REQUIRED);
         }
 
-        var driver = await OpenSourceAsync(source, request, principal, ct);
+        var driver = await OpenSourceAsync(source, request, principal, context, ct);
         var (pushable, localStages) = Split(root, driver.Capabilities);
         var subPlan = new SubPlan(pushable, source.Alias, source.Config) { EnforceSecurity = enforceSecurity };
 
         await using var result = await driver.ExecuteAsync(subPlan, request, principal, ct);
+        var scanCap    = LocalScanCap(localStages);
+        var sourceRows = SourceRows(result.Rows, result.Schema, scanCap, ct);
 
         // An Estimated total over a local pipeline is the pushed-superset size: an upper bound on the
         // post-local row count, never the exact final count. The driver rows are buffered once so the
@@ -137,17 +161,14 @@ public sealed class PlanExecutor
         IAsyncEnumerable<IReadOnlyDictionary<string, object?>> rows;
         int?                                                   estimate = null;
         if (estimateSuperset) {
-            var buffer = new List<IReadOnlyDictionary<string, object?>>();
-            await foreach (var row in TaskAsyncEnumerableExtensions.WithCancellation<IReadOnlyDictionary<string, object?>>(result.Rows, ct)) {
-                buffer.Add(row);
-            }
+            var buffer = await LocalPipelineExecutor.Buffer(sourceRows, scanCap!.Value, ct);
 
             estimate = buffer.Count;
             rows     = _local.RunAsync(ToAsync(buffer, ct), source.Alias, localStages, ct);
         } else {
             rows = localStages.Count == 0
-                ? result.Rows
-                : _local.RunAsync(result.Rows, source.Alias, localStages, ct);
+                ? sourceRows
+                : _local.RunAsync(sourceRows, source.Alias, localStages, ct);
         }
 
         var countExact = mode is TotalSizeMode.Exact || (mode is TotalSizeMode.Estimated && !estimateSuperset);
@@ -157,16 +178,18 @@ public sealed class PlanExecutor
                                                static _ => true,
                                                skip,
                                                pageSize,
-                                               _options.MaxResidualScanRows,
+                                               int.MaxValue,
                                                countExact,
                                                ct);
 
-        return new() {
+        return SchemaBuilder.Complete(new QueryInsightResponse {
             Rows          = page,
-            Schema        = ResultSchema(result.Schema, localStages),
-            NextPageToken = hasMore ? InsightPageToken.Encode(skip + pageSize) : null,
+            Schema        = SchemaBuilder.Transform(result.Schema, localStages),
+            NextPageToken = hasMore
+                ? (continuation ?? InsightPageToken.Bind(request, principal, initialSkip, pageSize, _options))
+                    .Encode(Protector, InsightPageToken.Advance(skip, pageSize)) : null,
             TotalSize     = mode is TotalSizeMode.None ? null : estimate ?? total,
-        };
+        });
     }
 
     private async ValueTask<MaterializedQuery> MaterializeSingleAsync(
@@ -174,23 +197,24 @@ public sealed class PlanExecutor
         QueryInsightRequest request,
         ClaimsPrincipal?    principal,
         bool                enforceSecurity,
+        AdviceContext       context,
         CancellationToken   ct
     ) {
         var source = FindSource(root);
         if (source is null) {
-            throw new InsightValidationException(InsightReasons.InvalidArgument, "The plan has no source.");
+            throw new InsightValidationException(InsightReasons.InvalidArgument, SchemataResources.INSIGHT_SOURCE_REQUIRED);
         }
 
-        var driver = await OpenSourceAsync(source, request, principal, ct);
+        var driver = await OpenSourceAsync(source, request, principal, context, ct);
         var (pushable, localStages) = Split(root, driver.Capabilities);
         var subPlan = new SubPlan(pushable, source.Alias, source.Config) { EnforceSecurity = enforceSecurity };
         var result = await driver.ExecuteAsync(subPlan, request, principal, ct);
         try {
             var rows = localStages.Count == 0
-                ? result.Rows
-                : _local.RunAsync(result.Rows, source.Alias, localStages, ct);
+                ? SourceRows(result.Rows, result.Schema, null, ct)
+                : _local.RunAsync(SourceRows(result.Rows, result.Schema, LocalScanCap(localStages), ct), source.Alias, localStages, ct);
 
-            return new(ResultSchema(result.Schema, localStages), rows, result);
+            return new(SchemaBuilder.Transform(result.Schema, localStages), rows, result);
         } catch {
             await result.DisposeAsync();
             throw;
@@ -203,11 +227,14 @@ public sealed class PlanExecutor
         ClaimsPrincipal?    principal,
         bool                enforceSecurity,
         int                 skip,
+        int                 initialSkip,
         int                 pageSize,
         TotalSizeMode       mode,
+        InsightPageToken?   continuation,
+        AdviceContext       context,
         CancellationToken   ct
     ) {
-        var rows       = Evaluate(root, request, principal, enforceSecurity, ct);
+        var rows       = Evaluate(root, request, principal, enforceSecurity, context, ct);
         var countExact = mode is not TotalSizeMode.None;
 
         var (page, hasMore, total) = await ResidualPage.ScanAsync(
@@ -215,16 +242,18 @@ public sealed class PlanExecutor
                                                static _ => true,
                                                skip,
                                                pageSize,
-                                               _options.MaxResidualScanRows,
+                                               int.MaxValue,
                                                countExact,
                                                ct);
 
-        return new() {
+        return SchemaBuilder.Complete(new QueryInsightResponse {
             Rows          = page,
             Schema        = TerminalSchema(root),
-            NextPageToken = hasMore ? InsightPageToken.Encode(skip + pageSize) : null,
+            NextPageToken = hasMore
+                ? (continuation ?? InsightPageToken.Bind(request, principal, initialSkip, pageSize, _options))
+                    .Encode(Protector, InsightPageToken.Advance(skip, pageSize)) : null,
             TotalSize     = mode is TotalSizeMode.None ? null : total,
-        };
+        });
     }
 
     /// <summary>
@@ -237,10 +266,11 @@ public sealed class PlanExecutor
         QueryInsightRequest                       request,
         ClaimsPrincipal?                          principal,
         bool                                      enforceSecurity,
+        AdviceContext                             context,
         [EnumeratorCancellation] CancellationToken ct
     ) {
         if (node.SourceSet.Count <= 1) {
-            await foreach (var row in DriveSubtree(node, request, principal, enforceSecurity, ct)) {
+            await foreach (var row in DriveSubtree(node, request, principal, enforceSecurity, context, ct)) {
                 yield return row;
             }
 
@@ -248,8 +278,8 @@ public sealed class PlanExecutor
         }
 
         if (node is JoinNode join) {
-            var left  = Evaluate(join.Left, request, principal, enforceSecurity, ct);
-            var right = Evaluate(join.Right, request, principal, enforceSecurity, ct);
+            var left  = Evaluate(join.Left, request, principal, enforceSecurity, context, ct);
+            var right = Evaluate(join.Right, request, principal, enforceSecurity, context, ct);
             await foreach (var row in _local.JoinAsync(left, right, join.On, join.Kind, ct)) {
                 yield return row;
             }
@@ -257,7 +287,7 @@ public sealed class PlanExecutor
             yield break;
         }
 
-        var input = Evaluate(Child(node), request, principal, enforceSecurity, ct);
+        var input = Evaluate(Child(node), request, principal, enforceSecurity, context, ct);
         await foreach (var row in _local.RunStagesAsync(input, [node], ct)) {
             yield return row;
         }
@@ -268,22 +298,68 @@ public sealed class PlanExecutor
         QueryInsightRequest                       request,
         ClaimsPrincipal?                          principal,
         bool                                      enforceSecurity,
+        AdviceContext                             context,
         [EnumeratorCancellation] CancellationToken ct
     ) {
         var source = FindSource(node);
         if (source is null) {
-            throw new InsightValidationException(InsightReasons.InvalidArgument, "A join input has no source.");
+            throw new InsightValidationException(InsightReasons.InvalidArgument, SchemataResources.INSIGHT_JOIN_SOURCE_REQUIRED);
         }
 
-        var driver = await OpenSourceAsync(source, request, principal, ct);
+        var driver = await OpenSourceAsync(source, request, principal, context, ct);
         var (pushable, localStages) = Split(node, driver.Capabilities);
         var subPlan = new SubPlan(pushable, source.Alias, source.Config) { EnforceSecurity = enforceSecurity };
 
         await using var result = await driver.ExecuteAsync(subPlan, request, principal, ct);
 
-        await foreach (var row in _local.RunAsync(result.Rows, source.Alias, localStages, ct)) {
+        await foreach (var row in _local.RunAsync(SourceRows(result.Rows, result.Schema, LocalScanCap(localStages), ct), source.Alias, localStages, ct)) {
             yield return row;
         }
+    }
+
+    // The residual scan cap bounds the rows feeding local pipeline work; a fully pushed stream
+    // passes through uncapped for residual pagination and backend-driven totals.
+    private static async IAsyncEnumerable<IReadOnlyDictionary<string, object?>> SourceRows(
+        IAsyncEnumerable<IReadOnlyDictionary<string, object?>> rows,
+        IReadOnlyList<FieldDescriptor> schema,
+        int?                                               scanCap,
+        [EnumeratorCancellation] CancellationToken ct
+    ) {
+        var source = scanCap is { } cap ? LocalPipelineExecutor.Scan(rows, cap, ct) : rows;
+        await foreach (var row in source.WithCancellation(ct)) {
+            yield return RowMaterializer.NormalizeRow(row, schema);
+        }
+    }
+
+    // The languages a chain of local stages evaluates, for resolving its scan cap.
+    private static IEnumerable<string> StageLanguages(IReadOnlyList<PlanNode> stages) {
+        foreach (var stage in stages) {
+            switch (stage) {
+                case FilterNode filter:
+                    yield return filter.Predicate.Language;
+                    break;
+                case ComputeNode compute:
+                    foreach (var field in compute.Fields) {
+                        yield return field.Expression.Language;
+                    }
+
+                    break;
+                case SelectionNode selection:
+                    foreach (var item in selection.Items) {
+                        if (item.Expression is { } expression) {
+                            yield return expression.Language;
+                        }
+                    }
+
+                    break;
+            }
+        }
+    }
+
+    private int? LocalScanCap(IReadOnlyList<PlanNode> localStages) {
+        return localStages.Count == 0
+            ? null
+            : InsightLanguagePolicy.StrictestCap(_options, _services, StageLanguages(localStages));
     }
 
     // Resolves the keyed driver for a source, then gives every registered IInsightSourceAdvisor a
@@ -294,19 +370,19 @@ public sealed class PlanExecutor
         SourceNode           source,
         QueryInsightRequest  request,
         ClaimsPrincipal?     principal,
+        AdviceContext        context,
         CancellationToken    ct
     ) {
         var driver = _services.GetKeyedService<ISourceDriver>(source.Config.DriverName);
         if (driver is null) {
             throw new InsightValidationException(
                 InsightReasons.Unimplemented,
-                $"No driver '{source.Config.DriverName}' is registered."
+                SchemataResources.INSIGHT_DRIVER_UNREGISTERED, new Dictionary<string, string?> { ["driver"] = source.Config.DriverName }
             );
         }
 
         var binding = FindBinding(request, source.Alias);
-        var ctx = AdviceContext.Current ?? new AdviceContext(_services);
-        await Advisor.For<IInsightSourceAdvisor>().RunAsync(ctx, binding, source.Config, principal, ct);
+        await Advisor.For<IInsightSourceAdvisor>().RunAsync(context, binding, source.Config, principal, ct);
 
         return driver;
     }
@@ -330,10 +406,7 @@ public sealed class PlanExecutor
             return [];
         }
 
-        var fields = ImmutableArray.CreateBuilder<FieldDescriptor>(selection.Items.Length);
-        AddSelectionFields(selection.Items, false, [], fields);
-        AddSelectionFields(selection.Items, true, [], fields);
-        return fields.ToImmutable();
+        return SchemaBuilder.Transform([], [selection]);
     }
 
     private static SelectionNode? FindSelection(PlanNode node) {
@@ -431,7 +504,7 @@ public sealed class PlanExecutor
             OrderNode   => DriverCapabilities.Order,
             var stage   => throw new InsightValidationException(
                                InsightReasons.Unimplemented,
-                               $"Plan node '{stage.GetType().Name}' is not a single-source stage."),
+                               SchemataResources.INSIGHT_SINGLE_SOURCE_STAGE_REQUIRED, new Dictionary<string, string?> { ["stage"] = stage.GetType().Name }),
         };
 
         return capabilities.HasFlag(required);
@@ -478,58 +551,6 @@ public sealed class PlanExecutor
         return nested.ToImmutable();
     }
 
-    private static ImmutableArray<FieldDescriptor> ResultSchema(
-        IReadOnlyList<FieldDescriptor> driverSchema,
-        IReadOnlyList<PlanNode>        localStages
-    ) {
-        if (localStages.Count == 0 || localStages[^1] is not SelectionNode selection || selection.Items.IsDefaultOrEmpty) {
-            return [..driverSchema];
-        }
-
-        var fields = ImmutableArray.CreateBuilder<FieldDescriptor>(selection.Items.Length);
-        AddSelectionFields(selection.Items, false, driverSchema, fields);
-        AddSelectionFields(selection.Items, true, driverSchema, fields);
-        return fields.ToImmutable();
-    }
-
-    private static void AddSelectionFields(
-        ImmutableArray<SelectionItem>                   items,
-        bool                                            expressions,
-        IReadOnlyList<FieldDescriptor>                  driverSchema,
-        ImmutableArray<FieldDescriptor>.Builder         fields
-    ) {
-        foreach (var item in items) {
-            if ((item.Kind is SelectionKind.Expression) != expressions) {
-                continue;
-            }
-
-            fields.Add(FieldFor(item, driverSchema));
-        }
-    }
-
-    private static FieldDescriptor FieldFor(SelectionItem item, IReadOnlyList<FieldDescriptor> driverSchema) {
-        if (item.Kind is SelectionKind.Expression) {
-            return new(item.Alias, FieldType.Object, null, false, []);
-        }
-
-        var path = item.FieldPath;
-        var name = path is null ? null : LastSegment(path);
-        foreach (var field in driverSchema) {
-            if (string.Equals(field.Name, item.Alias, StringComparison.Ordinal)
-             || (name is not null && string.Equals(field.Name, name, StringComparison.Ordinal))) {
-                return field with { Name = item.Alias };
-            }
-        }
-
-        return item.Kind is SelectionKind.Nested
-            ? new(item.Alias, FieldType.Object, null, true, [])
-            : new(item.Alias, FieldType.Object, null, false, []);
-    }
-
-    private static string LastSegment(string path) {
-        var index = path.LastIndexOf('.');
-        return index < 0 ? path : path[(index + 1)..];
-    }
 
     private static PlanNode WithInput(PlanNode node, PlanNode input) {
         return node switch {
@@ -541,7 +562,7 @@ public sealed class PlanExecutor
             SelectionNode selection => selection with { Input = input },
             var stage               => throw new InsightValidationException(
                                            InsightReasons.Unimplemented,
-                                           $"Plan node '{stage.GetType().Name}' is not a single-source stage."),
+                                           SchemataResources.INSIGHT_SINGLE_SOURCE_STAGE_REQUIRED, new Dictionary<string, string?> { ["stage"] = stage.GetType().Name }),
         };
     }
 
@@ -566,7 +587,7 @@ public sealed class PlanExecutor
             ComputeNode compute     => compute.Input,
             GroupNode group         => group.Input,
             var _ => throw new InsightValidationException(InsightReasons.Unimplemented,
-                                                         $"Plan node '{node.GetType().Name}' is not a single-source stage."),
+                                                         SchemataResources.INSIGHT_SINGLE_SOURCE_STAGE_REQUIRED, new Dictionary<string, string?> { ["stage"] = node.GetType().Name }),
         };
     }
 

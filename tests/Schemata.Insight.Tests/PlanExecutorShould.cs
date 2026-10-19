@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -25,6 +25,7 @@ using Schemata.Insight.Skeleton.Queries;
 using Schemata.Security.Skeleton;
 using Xunit;
 
+using Schemata.Abstractions.Advisors;
 namespace Schemata.Insight.Tests;
 
 public class PlanExecutorShould
@@ -33,13 +34,13 @@ public class PlanExecutorShould
 
     [Fact]
     public async Task ExecuteAsync_WhenLimitSpecifiesSkipAndPageSize_ReturnsRangedRowsTotalAndPageToken() {
-        var driver = CreateDriver(DriverCapabilities.None, ValueRows(250));
+        var             driver   = CreateDriver(DriverCapabilities.None, ValueRows(250));
         await using var services = CreateServices(driver);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
-        var plan     = new LimitNode(Source(), 5, 250);
-        var request  = new QueryInsightRequest { PageSize = 250, Skip = 99 };
+        var             executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
+        var             plan     = new LimitNode(Source(), 5, 250);
+        var             request  = new QueryInsightRequest { PageSize = 250, Skip = 99 };
 
-        var response = await executor.ExecuteAsync(plan, request, null, CancellationToken.None);
+        var response = await executor.ExecuteAsync(plan, request, null,new AdviceContext(services),  CancellationToken.None);
 
         Assert.Equal(100, response.Rows.Count);
         Assert.Equal(5, response.Rows[0]["value"]);
@@ -50,29 +51,30 @@ public class PlanExecutorShould
 
     [Fact]
     public async Task Materializes_All_Rows_Beyond_Page_Cap() {
-        var driver = CreateDriver(DriverCapabilities.None, ValueRows(250));
+        var             driver   = CreateDriver(DriverCapabilities.None, ValueRows(250));
         await using var services = CreateServices(driver);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
-        var plan     = new LimitNode(Source(), 20, 1);
-        var request  = new QueryInsightRequest { PageSize = 1, Skip = 200, PageToken = "not-a-page-token" };
+        var             executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
+        var             plan     = new LimitNode(Source(), 20, 1);
+        var             request  = new QueryInsightRequest { PageSize = 1, Skip = 200, PageToken = "not-a-page-token" };
 
-        await using var materialized = await executor.MaterializeAsync(plan, request, null);
+        await using var materialized = await executor.MaterializeAsync(plan, request, null, new AdviceContext(services));
 
         Assert.Equal(250, await CountAsync(materialized.Rows));
     }
 
     [Fact]
     public async Task Keeps_Nested_Limit_Local_After_Stripping_Top_Level_Pagination() {
-        SubPlan? received = null;
-        var driver = CreateDriver(DriverCapabilities.None, ValueRows(5), onExecute: plan => received = plan);
+        SubPlan?        received = null;
+        var             driver   = CreateDriver(DriverCapabilities.None, ValueRows(5), onExecute: plan => received = plan);
         await using var services = CreateServices(driver);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
-        var plan     = new LimitNode(new LimitNode(Source(), 1, 3), 10, 20);
+        var             executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
+        var             plan     = new LimitNode(new LimitNode(Source(), 1, 3), 10, 20);
 
-        await using var materialized = await executor.MaterializeAsync(plan, new(), null);
+        await using var materialized = await executor.MaterializeAsync(plan, new(), null, new AdviceContext(services));
         var rows = await ReadAsync(materialized.Rows);
 
-        Assert.IsType<SourceNode>(received!.Root);
+        Assert.NotNull(received);
+        Assert.IsType<SourceNode>(received.Root);
         Assert.Equal(
             [1, 2, 3],
             rows.Select(row => Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(row["p"])["value"])
@@ -84,9 +86,9 @@ public class PlanExecutorShould
         var sourceCompleted = false;
         var driver = CreateDriver(DriverCapabilities.None, ValueRows(2), onCompleted: () => sourceCompleted = true);
         await using var services = CreateServices(driver);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
+        var executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
 
-        await using var materialized = await executor.MaterializeAsync(Source(), new(), null);
+        await using var materialized = await executor.MaterializeAsync(Source(), new(), null, new AdviceContext(services));
         await using var rows = materialized.Rows.GetAsyncEnumerator();
 
         Assert.True(await rows.MoveNextAsync());
@@ -110,17 +112,18 @@ public class PlanExecutorShould
             plan => received = plan
         );
         await using var services = CreateServices(driver);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
+        var executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
         var plan = new GroupNode(
             new ComputeNode(Source(), [new("computed", ValueExpression())]),
             ["p.computed"],
             [new("count", AggregationFunction.Count, "p.computed")]
         );
 
-        await using var materialized = await executor.MaterializeAsync(plan, new(), null);
+        await using var materialized = await executor.MaterializeAsync(plan, new(), null, new AdviceContext(services));
         var grouped = Assert.Single(await ReadAsync(materialized.Rows));
 
-        Assert.IsType<ComputeNode>(received!.Root);
+        Assert.NotNull(received);
+        Assert.IsType<ComputeNode>(received.Root);
         Assert.Equal("ready", grouped["computed"]);
         Assert.Equal(2, grouped["count"]);
     }
@@ -139,7 +142,7 @@ public class PlanExecutorShould
             _ => { }
         );
         await using var services = CreateServices(driver);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
+        var executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
         var plan = new GroupNode(
             Source(),
             ["p.bucket"],
@@ -149,11 +152,30 @@ public class PlanExecutorShould
             ]
         );
 
-        var response = await executor.ExecuteAsync(plan, new(), null, CancellationToken.None);
+        var response = await executor.ExecuteAsync(plan, new(), null,new AdviceContext(services),  CancellationToken.None);
         var row = Assert.Single(response.Rows);
 
         Assert.Equal(3, row["smallest"]);
         Assert.Equal(5L, row["largest"]);
+    }
+
+    [Fact]
+    [Trait("Layer", "Integration")]
+    public async Task Replaces_Source_Field_Type_When_Aggregate_Reuses_The_Field_Name() {
+        var driver = CreateDriver(DriverCapabilities.None,
+            [new Dictionary<string, object?> { ["amount"] = 1.25m },
+             new Dictionary<string, object?> { ["amount"] = 2.75m }],
+            [new("amount", FieldType.String, "p", false, [])]);
+        await using var services = CreateServices(driver);
+        var executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
+        var plan = new SelectionNode(
+            new GroupNode(Source(), [], [new("amount", AggregationFunction.Sum, "p.amount")]),
+            [new("amount", SelectionKind.Field, "amount", null, [], null)]);
+
+        var response = await executor.ExecuteAsync(plan, new(), null,new AdviceContext(services),  CancellationToken.None);
+
+        Assert.Equal(4d, Assert.IsType<double>(Assert.Single(response.Rows)["amount"]));
+        Assert.Equal(FieldType.Double, Assert.Single(response.Schema).Type);
     }
 
     [Fact]
@@ -166,15 +188,16 @@ public class PlanExecutorShould
             plan => received = plan
         );
         await using var services = CreateServices(driver);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
-        var plan = new SelectionNode(Source(), [NestedItem()]);
+        var             executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
+        var             plan     = new SelectionNode(Source(), [NestedItem()]);
 
-        var response = await executor.ExecuteAsync(plan, new(), null, CancellationToken.None);
+        var response = await executor.ExecuteAsync(plan, new(), null,new AdviceContext(services),  CancellationToken.None);
         var row = Assert.Single(response.Rows);
         var children = Assert.IsAssignableFrom<IReadOnlyList<IReadOnlyDictionary<string, object?>>>(row["children"]);
         var child = Assert.Single(children);
+        Assert.NotNull(received);
+        var pushed = Assert.IsType<SelectionNode>(received.Root);
 
-        var pushed = Assert.IsType<SelectionNode>(received!.Root);
         Assert.Collection(pushed.Items, item => Assert.Equal(SelectionKind.Nested, item.Kind));
         Assert.Equal("first", child["name"]);
         AssertSchemaMatchesRows(response, ["children"]);
@@ -191,14 +214,15 @@ public class PlanExecutorShould
             plan => received = plan
         );
         await using var services = CreateServices(driver, compiler.Object);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
-        var plan = new SelectionNode(Source(), [ExpressionItem()]);
+        var             executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
+        var             plan     = new SelectionNode(Source(), [ExpressionItem()]);
 
-        await using var materialized = await executor.MaterializeAsync(plan, new(), null);
+        await using var materialized = await executor.MaterializeAsync(plan, new(), null, new AdviceContext(services));
         var rows = await ReadAsync(materialized.Rows);
         var row = Assert.Single(rows);
+        Assert.NotNull(received);
+        Assert.IsType<SourceNode>(received.Root);
 
-        Assert.IsType<SourceNode>(received!.Root);
         Assert.Equal("computed-0", row["computed"]);
         AssertSchemaMatchesRows(materialized.Schema, rows, ["computed"]);
     }
@@ -214,14 +238,15 @@ public class PlanExecutorShould
             plan => received = plan
         );
         await using var services = CreateServices(driver, compiler.Object);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
-        var plan = new SelectionNode(Source(), [ExpressionItem(), NestedItem()]);
+        var             executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
+        var             plan     = new SelectionNode(Source(), [ExpressionItem(), NestedItem()]);
 
-        var response = await executor.ExecuteAsync(plan, new(), null, CancellationToken.None);
+        var response = await executor.ExecuteAsync(plan, new(), null,new AdviceContext(services),  CancellationToken.None);
         var row = Assert.Single(response.Rows);
         var children = Assert.IsAssignableFrom<IReadOnlyList<IReadOnlyDictionary<string, object?>>>(row["children"]);
 
-        var pushed = Assert.IsType<SelectionNode>(received!.Root);
+        Assert.NotNull(received);
+        var pushed = Assert.IsType<SelectionNode>(received.Root);
         Assert.Collection(pushed.Items, item => Assert.Equal(SelectionKind.Nested, item.Kind));
         Assert.Equal("computed-7", row["computed"]);
         Assert.Equal("first", Assert.Single(children)["name"]);
@@ -255,20 +280,20 @@ public class PlanExecutorShould
                                   ct).Object));
 
         await using var services = CreateServices(driver, compiler.Object);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
-        var left  = Source() with { SourceSet = ["p"] };
-        var right = new SourceNode("q", new(DriverName, new Dictionary<string, object?>())) { SourceSet = ["q"] };
-        var join = new JoinNode(left, right, JoinKind.Inner, ValueExpression()) { SourceSet = ["p", "q"] };
+        var             executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
+        var             left     = Source() with { SourceSet = ["p"] };
+        var             right    = new SourceNode("q", new(DriverName, new Dictionary<string, object?>())) { SourceSet = ["q"] };
+        var             join     = new JoinNode(left, right, JoinKind.Inner, ValueExpression()) { SourceSet            = ["p", "q"] };
         var plan = new SelectionNode(join, [
             new("value", SelectionKind.Field, "p.value", null, [], null),
             ExpressionItem(),
             NestedItem(),
         ]) { SourceSet = ["p", "q"] };
 
-        var response = await executor.ExecuteAsync(plan, new(), null, CancellationToken.None);
+        var response = await executor.ExecuteAsync(plan, new(), null, new AdviceContext(services), CancellationToken.None);
         AssertSchemaMatchesRows(response, ["value", "children", "computed"]);
 
-        await using var materialized = await executor.MaterializeAsync(plan, new(), null);
+        await using var materialized = await executor.MaterializeAsync(plan, new(), null, new AdviceContext(services));
         Assert.Equal(["value", "children", "computed"], materialized.Schema.Select(field => field.Name));
     }
 
@@ -288,14 +313,15 @@ public class PlanExecutorShould
             plan => received = plan
         );
         await using var services = CreateServices(driver, compiler.Object);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
-        var plan = new SelectionNode(Source(), [NestedItem("children", "p.children", 2, ValueExpression())]);
+        var             executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
+        var             plan     = new SelectionNode(Source(), [NestedItem("children", "p.children", 2, ValueExpression())]);
 
-        var response = await executor.ExecuteAsync(plan, new(), null, CancellationToken.None);
+        var response = await executor.ExecuteAsync(plan, new(), null,new AdviceContext(services),  CancellationToken.None);
         var row = Assert.Single(response.Rows);
         var children = Assert.IsAssignableFrom<IReadOnlyList<IReadOnlyDictionary<string, object?>>>(row["children"]);
 
-        Assert.IsType<SourceNode>(received!.Root);
+        Assert.NotNull(received);
+        Assert.IsType<SourceNode>(received.Root);
         Assert.Equal("first", Assert.Single(children)["name"]);
     }
 
@@ -307,10 +333,10 @@ public class PlanExecutorShould
             NestedSchema()
         );
         await using var services = CreateServices(driver);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
-        var plan = new SelectionNode(Source(), [NestedItem("children", "p.children", 10)]);
+        var             executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
+        var             plan     = new SelectionNode(Source(), [NestedItem("children", "p.children", 10)]);
 
-        var response = await executor.ExecuteAsync(plan, new(), null, CancellationToken.None);
+        var response = await executor.ExecuteAsync(plan, new(), null,new AdviceContext(services),  CancellationToken.None);
         var row = Assert.Single(response.Rows);
         var children = Assert.IsAssignableFrom<IReadOnlyList<IReadOnlyDictionary<string, object?>>>(row["children"]);
 
@@ -328,10 +354,10 @@ public class PlanExecutorShould
             NestedSchema()
         );
         await using var services = CreateServices(driver);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
-        var plan = new SelectionNode(Source(), [NestedItem()]);
+        var             executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
+        var             plan     = new SelectionNode(Source(), [NestedItem()]);
 
-        var response = await executor.ExecuteAsync(plan, new(), null, CancellationToken.None);
+        var response = await executor.ExecuteAsync(plan, new(), null,new AdviceContext(services),  CancellationToken.None);
 
         Assert.Equal(2, response.Rows.Count);
         Assert.All(
@@ -347,11 +373,11 @@ public class PlanExecutorShould
             NestedSchema()
         );
         await using var services = CreateServices(driver);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
-        var plan = new SelectionNode(Source(), [NestedItem()]);
+        var             executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
+        var             plan     = new SelectionNode(Source(), [NestedItem()]);
 
         var exception = await Assert.ThrowsAsync<InsightValidationException>(
-            async () => await executor.ExecuteAsync(plan, new(), null, CancellationToken.None));
+            async () => await executor.ExecuteAsync(plan, new(), null,new AdviceContext(services),  CancellationToken.None));
 
         Assert.Equal(InsightReasons.Unimplemented, exception.Reason);
         Assert.Contains(DriverName, exception.Message, StringComparison.Ordinal);
@@ -367,11 +393,11 @@ public class PlanExecutorShould
                 NestedSchema()
             );
             await using var services = CreateServices(driver);
-            var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
-            var plan = new SelectionNode(Source(), [NestedItem()]);
+            var             executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
+            var             plan     = new SelectionNode(Source(), [NestedItem()]);
 
             var exception = await Assert.ThrowsAsync<InsightValidationException>(
-                async () => await executor.ExecuteAsync(plan, new(), null, CancellationToken.None));
+                async () => await executor.ExecuteAsync(plan, new(), null,new AdviceContext(services),  CancellationToken.None));
 
             Assert.Equal(InsightReasons.InvalidArgument, exception.Reason);
         }
@@ -388,14 +414,15 @@ public class PlanExecutorShould
             plan => received = plan
         );
         await using var services = CreateServices(driver, compiler.Object);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
-        var plan = new SelectionNode(Source(), [ExpressionItem(), NestedItem()]);
+        var             executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
+        var             plan     = new SelectionNode(Source(), [ExpressionItem(), NestedItem()]);
 
-        var response = await executor.ExecuteAsync(plan, new(), null, CancellationToken.None);
+        var response = await executor.ExecuteAsync(plan, new(), null,new AdviceContext(services),  CancellationToken.None);
         var row = Assert.Single(response.Rows);
         var children = Assert.IsAssignableFrom<IReadOnlyList<IReadOnlyDictionary<string, object?>>>(row["children"]);
 
-        Assert.IsType<SourceNode>(received!.Root);
+        Assert.NotNull(received);
+        Assert.IsType<SourceNode>(received.Root);
         Assert.Equal("computed-7", row["computed"]);
         Assert.Equal("first", Assert.Single(children)["name"]);
     }
@@ -438,13 +465,13 @@ public class PlanExecutorShould
                                   ct).Object));
 
         await using var services = CreateServices(driver, compiler.Object);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
-        var left  = Source() with { SourceSet = ["p"] };
-        var right = new SourceNode("q", new(DriverName, new Dictionary<string, object?>())) { SourceSet = ["q"] };
-        var join = new JoinNode(left, right, JoinKind.Inner, ValueExpression()) { SourceSet = ["p", "q"] };
-        var plan = new SelectionNode(join, [NestedItem()]) { SourceSet = ["p", "q"] };
+        var             executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
+        var             left     = Source() with { SourceSet = ["p"] };
+        var             right    = new SourceNode("q", new(DriverName, new Dictionary<string, object?>())) { SourceSet = ["q"] };
+        var             join     = new JoinNode(left, right, JoinKind.Inner, ValueExpression()) { SourceSet            = ["p", "q"] };
+        var             plan     = new SelectionNode(join, [NestedItem()]) { SourceSet                                 = ["p", "q"] };
 
-        var response = await executor.ExecuteAsync(plan, new(), null, CancellationToken.None);
+        var response = await executor.ExecuteAsync(plan, new(), null,new AdviceContext(services),  CancellationToken.None);
         var row = Assert.Single(response.Rows);
         var children = Assert.IsAssignableFrom<IReadOnlyList<IReadOnlyDictionary<string, object?>>>(row["children"]);
 
@@ -459,10 +486,10 @@ public class PlanExecutorShould
             NestedSchema()
         );
         await using var services = CreateServices(driver);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
-        var plan = new SelectionNode(Source(), [NestedItem("kids", "children", 2)]);
+        var             executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
+        var             plan     = new SelectionNode(Source(), [NestedItem("kids", "children", 2)]);
 
-        var response = await executor.ExecuteAsync(plan, new(), null, CancellationToken.None);
+        var response = await executor.ExecuteAsync(plan, new(), null,new AdviceContext(services),  CancellationToken.None);
         var row = Assert.Single(response.Rows);
         var children = Assert.IsAssignableFrom<IReadOnlyList<IReadOnlyDictionary<string, object?>>>(row["kids"]);
 
@@ -473,15 +500,15 @@ public class PlanExecutorShould
     public async Task Skips_Security_Gate_When_Disabled() {
         var access = new Mock<IAccessProvider<SchemataInsightSource, QueryInsightRequest>>(MockBehavior.Strict);
         await using var services = CreateRepositoryDriverServices(access);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
+        var executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
 
-        await using (var materialized = await executor.MaterializeAsync(RepositorySource(), new(), null, enforceSecurity: false)) {
+        await using (var materialized = await executor.MaterializeAsync(RepositorySource(), new(), null,new AdviceContext(services),  enforceSecurity: false)) {
             await CountAsync(materialized.Rows);
         }
 
         // Negative control: with security enforced the gate really does reach the provider, so the
         // strict mock rejects the un-setup call. Without this the pass above could be vacuous.
-        await Assert.ThrowsAsync<MockException>(async () => await executor.MaterializeAsync(RepositorySource(), new(), null));
+        await Assert.ThrowsAsync<MockException>(async () => await executor.MaterializeAsync(RepositorySource(), new(), null, new AdviceContext(services)));
     }
 
     [Fact]
@@ -492,21 +519,21 @@ public class PlanExecutorShould
                                      It.IsAny<AccessContext<QueryInsightRequest>>(),
                                      It.IsAny<ClaimsPrincipal?>(),
                                      It.IsAny<CancellationToken>()))
-              .ReturnsAsync(false);
+              .ReturnsAsync(AccessDecision.Denied);
         await using var services = CreateRepositoryDriverServices(access);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
+        var executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
 
-        await Assert.ThrowsAsync<PermissionDeniedException>(async () => await executor.MaterializeAsync(RepositorySource(), new(), null));
+        await Assert.ThrowsAsync<PermissionDeniedException>(async () => await executor.MaterializeAsync(RepositorySource(), new(), null, new AdviceContext(services)));
     }
 
     [Fact]
     public async Task Disposes_Source_Result_After_Stream_Cancellation() {
-        using var cts = new CancellationTokenSource();
-        var disposed = false;
-        var driver = CreateDriver(DriverCapabilities.None, ValueRows(2), onDispose: () => disposed = true);
-        await using var services = CreateServices(driver);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
-        var materialized = await executor.MaterializeAsync(Source(), new(), null, ct: cts.Token);
+        using var       cts          = new CancellationTokenSource();
+        var             disposed     = false;
+        var             driver       = CreateDriver(DriverCapabilities.None, ValueRows(2), onDispose: () => disposed = true);
+        await using var services     = CreateServices(driver);
+        var             executor     = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
+        var             materialized = await executor.MaterializeAsync(Source(), new(), null,new AdviceContext(services),  ct: cts.Token);
 
         try {
             await using var rows = materialized.Rows.GetAsyncEnumerator();
@@ -524,15 +551,15 @@ public class PlanExecutorShould
     public async Task Creates_And_Disposes_Scoped_Repository_Dependency_Per_Execution() {
         var tracker = new ScopeTracker();
         await using var services = CreateScopeValidatingRepositoryDriverServices(tracker);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
+        var executor = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
 
-        var response = await executor.ExecuteAsync(RepositorySource(), new(), null, CancellationToken.None);
+        var response = await executor.ExecuteAsync(RepositorySource(), new(), null, new AdviceContext(services), CancellationToken.None);
 
         Assert.Single(response.Rows);
         Assert.Equal(1, tracker.Created);
         Assert.Equal(1, tracker.Disposed);
 
-        await using (var materialized = await executor.MaterializeAsync(RepositorySource(), new(), null, enforceSecurity: false)) {
+        await using (var materialized = await executor.MaterializeAsync(RepositorySource(), new(), null,new AdviceContext(services),  enforceSecurity: false)) {
             Assert.Equal(1, await CountAsync(materialized.Rows));
             Assert.Equal(2, tracker.Created);
             Assert.Equal(1, tracker.Disposed);
@@ -543,11 +570,11 @@ public class PlanExecutorShould
 
     [Fact]
     public async Task Disposes_Scoped_Repository_Dependency_After_Cancelled_Materialized_Stream() {
-        var tracker = new ScopeTracker();
-        await using var services = CreateScopeValidatingRepositoryDriverServices(tracker, 2);
-        var executor = new PlanExecutor(services, new LocalPipelineExecutor(services), Options.Create(new SchemataInsightOptions()));
-        using var cts = new CancellationTokenSource();
-        var materialized = await executor.MaterializeAsync(RepositorySource(), new(), null, enforceSecurity: false, ct: cts.Token);
+        var             tracker      = new ScopeTracker();
+        await using var services     = CreateScopeValidatingRepositoryDriverServices(tracker, 2);
+        var             executor     = new PlanExecutor(services, new(services), Options.Create(new SchemataInsightOptions()));
+        using var       cts          = new CancellationTokenSource();
+        var             materialized = await executor.MaterializeAsync(RepositorySource(), new(), null, new AdviceContext(services), enforceSecurity: false, ct: cts.Token);
 
         try {
             await using var rows = materialized.Rows.GetAsyncEnumerator();
@@ -565,6 +592,7 @@ public class PlanExecutorShould
     private static ServiceProvider CreateServices(Mock<ISourceDriver> driver, IExpressionCompiler? compiler = null) {
         var services = new ServiceCollection()
                       .AddKeyedSingleton<ISourceDriver>(DriverName, driver.Object);
+        services.AddDataProtection();
         if (compiler is not null) {
             services.AddKeyedSingleton<IExpressionCompiler>("test", compiler);
         }
@@ -577,7 +605,7 @@ public class PlanExecutorShould
     }
 
     private static SourceNode RepositorySource() {
-        return new("r", new(RepositoryDriver.DriverName, new Dictionary<string, object?> { ["resource"] = "insightSources" }));
+        return new("r", new(RepositoryDriver.DriverName, new Dictionary<string, object?> { ["binding"] = "insightSources" }));
     }
 
     private static ServiceProvider CreateRepositoryDriverServices(
@@ -586,12 +614,16 @@ public class PlanExecutorShould
         var repository = new Mock<IRepository<SchemataInsightSource>>();
         repository.Setup(r => r.ListAsync<SchemataInsightSource>(
                               It.IsAny<Func<IQueryable<SchemataInsightSource>, IQueryable<SchemataInsightSource>>>(),
-                              It.IsAny<CancellationToken>()))
+                              It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
                   .Returns((Func<IQueryable<SchemataInsightSource>, IQueryable<SchemataInsightSource>> query,
-                            CancellationToken                                                         ct)
+                            CancellationToken                                                         ct, QueryOptions _)
                            => EntityRows(query(new[] { new SchemataInsightSource { Name = "source" } }.AsQueryable()), ct));
 
-        return new ServiceCollection()
+        var services = new ServiceCollection();
+        services.AddDataProtection();
+        new Schemata.Insight.Foundation.SchemataInsightBuilder(new Schemata.Core.SchemataOptions(), services)
+            .AddRepositorySource<SchemataInsightSource, SchemataInsightSource>("insightSources", s => s);
+        return services
               .AddSingleton(repository.Object)
               .AddSingleton(access.Object)
               .AddKeyedSingleton<ISourceDriver>(RepositoryDriver.DriverName, static (services, _) => new RepositoryDriver(services))
@@ -602,16 +634,20 @@ public class PlanExecutorShould
         var repository = new Mock<IRepository<SchemataInsightSource>>();
         repository.Setup(r => r.ListAsync<SchemataInsightSource>(
                               It.IsAny<Func<IQueryable<SchemataInsightSource>, IQueryable<SchemataInsightSource>>>(),
-                              It.IsAny<CancellationToken>()))
+                              It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
                   .Returns((Func<IQueryable<SchemataInsightSource>, IQueryable<SchemataInsightSource>> query,
-                            CancellationToken                                                         ct)
+                            CancellationToken                                                         ct, QueryOptions _)
                            => EntityRows(
                                query(Enumerable.Range(0, rowCount)
                                                .Select(value => new SchemataInsightSource { Name = $"source-{value}" })
                                                .AsQueryable()),
                                ct));
 
-        return new ServiceCollection()
+        var registrations = new ServiceCollection();
+        registrations.AddDataProtection();
+        new Schemata.Insight.Foundation.SchemataInsightBuilder(new Schemata.Core.SchemataOptions(), registrations)
+            .AddRepositorySource<SchemataInsightSource, SchemataInsightSource>("insightSources", s => s);
+        return registrations
               .AddScoped<IDisposable>(_ => {
                   tracker.Created++;
                   var probe = new Mock<IDisposable>();

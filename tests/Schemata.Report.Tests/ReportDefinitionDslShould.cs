@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Common;
-using Schemata.Core;
 using Schemata.Expressions.Skeleton;
 using Schemata.Report.Foundation;
 using Schemata.Report.Skeleton;
@@ -133,11 +132,11 @@ public class ReportDefinitionDslShould
         Assert.Contains("name", empty.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static Foundation.SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk> CreateBuilder(
+    private static SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk> CreateBuilder(
         IServiceCollection services
     ) {
-        var builder = new Foundation.SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
-            new SchemataOptions(),
+        var builder = new SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
+            new(),
             services
         );
         return builder;

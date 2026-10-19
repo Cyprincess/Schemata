@@ -10,13 +10,13 @@ namespace Microsoft.AspNetCore.Builder;
 public static class SchemataInsightBuilderExtensions
 {
     /// <summary>
-    ///     Exposes the Insight query endpoint over HTTP and returns the same builder so registration
-    ///     chains.
+    ///     Exposes the Insight query endpoint over HTTP for the selected source entity and returns the
+    ///     same builder so registration chains.
     /// </summary>
     /// <param name="builder">The Insight builder.</param>
     /// <returns>The Insight builder for chaining.</returns>
     public static SchemataInsightBuilder MapHttp(this SchemataInsightBuilder builder) {
-        builder.AddFeature<SchemataInsightHttpFeature>();
+        builder.AddFeature(typeof(SchemataInsightHttpFeature<>).MakeGenericType(builder.SourceType));
 
         return builder;
     }

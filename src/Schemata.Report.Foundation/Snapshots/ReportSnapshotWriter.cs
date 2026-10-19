@@ -10,6 +10,7 @@ using Schemata.Advice;
 using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Insight.Foundation.Execution;
+using Schemata.Insight.Foundation.Materialization;
 using Schemata.Insight.Skeleton.Models;
 using Schemata.Report.Skeleton.Advisors;
 using Schemata.Report.Skeleton.Entities;
@@ -28,23 +29,27 @@ public sealed class ReportSnapshotWriter<TReport, TSnapshot, TChunk>
     where TChunk : SchemataReportSnapshotChunk, new()
 {
     private readonly SchemataReportOptions                 _options;
+    private readonly ReportRegistration                    _registration;
     private readonly ReportRetentionEnforcer<TSnapshot, TChunk> _retention;
     private readonly IServiceScopeFactory                  _scopes;
     private readonly TimeProvider                          _time;
 
     /// <summary>Creates a bounded snapshot writer.</summary>
     /// <param name="scopes">Factory creating independent repositories for every persisted write.</param>
+    /// <param name="registration">Shared entity-triple selection checked before header persistence.</param>
     /// <param name="options">Limits for each persisted chunk.</param>
     /// <param name="retention">Write-path cleanup for snapshots governed by parent retention.</param>
     /// <param name="time">Clock stamping snapshot capture times; defaults to the system clock.</param>
     public ReportSnapshotWriter(
         IServiceScopeFactory                         scopes,
+        ReportRegistration                          registration,
         IOptions<SchemataReportOptions>             options,
         ReportRetentionEnforcer<TSnapshot, TChunk> retention,
         TimeProvider?                                time = null
     ) {
-        _scopes    = scopes;
-        _options   = options.Value;
+        _scopes      = scopes;
+        _registration = registration;
+        _options     = options.Value;
         _retention = retention;
         _time      = time ?? TimeProvider.System;
     }
@@ -53,34 +58,56 @@ public sealed class ReportSnapshotWriter<TReport, TSnapshot, TChunk>
     /// <param name="report">Resolved report definition, or null for an inline persisted request.</param>
     /// <param name="kind">Whether the snapshot is immediate or scheduled.</param>
     /// <param name="materialize">Callback opening the source stream after the header is durable.</param>
+    /// <param name="context">The dispatch's advisor context.</param>
     /// <param name="operation">Optional canonical operation name stored on the header at creation.</param>
-    /// <param name="isCancelled">Optional durable cancellation check run at every chunk boundary.</param>
-    /// <param name="ct">Cancellation token checked before each chunk is committed.</param>
+    /// <param name="isCancelled">Optional durable cancellation check run at every chunk boundary and at finalization.</param>
+    /// <param name="ct">Cancellation token for source materialization and snapshot writes.</param>
     /// <returns>Snapshot reference and response metadata.</returns>
     public async ValueTask<ReportResult> WriteAsync(
         SchemataReport?                                          report,
         ReportRunKind                                            kind,
         Func<CancellationToken, ValueTask<MaterializedQuery>>    materialize,
+        AdviceContext                                               context,
         string?                                                     operation = null,
         Func<CancellationToken, ValueTask<bool>>?                  isCancelled = null,
         CancellationToken                                           ct = default
     ) {
+        _registration.EnsureSingleTriple<TReport>();
+
         if (_options.ChunkSize <= 0) {
             throw new InvalidOperationException("Report ChunkSize must be greater than zero.");
         }
 
         var header = CreateHeader(report, kind, operation);
         await CreateHeaderAsync(header, ct);
-        header.State = SnapshotState.Running;
-        await UpdateHeaderAsync(header, ct);
 
         var response = new QueryInsightResponse();
         var rows     = new List<IReadOnlyDictionary<string, object?>>(_options.ChunkSize);
+        response.Rows = rows;
         var rowCount = 0;
         var chunks   = 0;
+        ReportResult result;
         try {
+            header.State = SnapshotState.Running;
+            await UpdateHeaderAsync(header, ct);
+
             await using var materialized = await materialize(ct);
             response.Schema = materialized.Schema;
+            header.Schema = JsonSerializer.Serialize(materialized.Schema, SchemataJson.Default);
+            await UpdateHeaderAsync(header, ct);
+            var persistedSchema = response.Schema;
+
+            async Task PublishChunkAsync() {
+                SchemaBuilder.Complete(response);
+                if (response.Schema != persistedSchema) {
+                    header.Schema = JsonSerializer.Serialize(response.Schema, SchemataJson.Default);
+                    await UpdateHeaderAsync(header, ct);
+                    persistedSchema = response.Schema;
+                }
+                var encoded = new List<IReadOnlyDictionary<string, object?>>(rows.Count);
+                foreach (var row in rows) encoded.Add(InsightValueModel.EncodeRow(row, response.Schema));
+                await WriteChunkAsync(header, encoded, chunks, ct);
+            }
             await foreach (var row in materialized.Rows.WithCancellation(ct)) {
                 rows.Add(row);
                 if (rows.Count < _options.ChunkSize) {
@@ -92,27 +119,28 @@ public sealed class ReportSnapshotWriter<TReport, TSnapshot, TChunk>
                     return await CancelAsync(header, response, rowCount, chunks);
                 }
 
-                await WriteChunkAsync(header, rows, chunks, ct);
+                await PublishChunkAsync();
                 rowCount += rows.Count;
                 chunks++;
                 rows.Clear();
             }
 
-            if (rows.Count > 0) {
-                ct.ThrowIfCancellationRequested();
-                if (await IsCancelledAsync(isCancelled, ct)) {
-                    return await CancelAsync(header, response, rowCount, chunks);
-                }
+            ct.ThrowIfCancellationRequested();
+            if (await IsCancelledAsync(isCancelled, ct)) {
+                return await CancelAsync(header, response, rowCount, chunks);
+            }
 
-                await WriteChunkAsync(header, rows, chunks, ct);
+            if (rows.Count > 0) {
+                await PublishChunkAsync();
                 rowCount += rows.Count;
                 chunks++;
+                rows.Clear();
             }
 
             response.TotalSize = rowCount;
             await Advisor.For<IReportSnapshotAdvisor>().RunAsync(
-                AdviceContext.Require(),
-                new ReportSnapshotContext(header, response),
+                context,
+                new(header, response),
                 ct);
 
             header.State      = SnapshotState.Succeeded;
@@ -120,14 +148,23 @@ public sealed class ReportSnapshotWriter<TReport, TSnapshot, TChunk>
             header.ChunkCount = chunks;
             header.CapturedAt = _time.GetUtcNow().UtcDateTime;
             await UpdateHeaderAsync(header, ct);
-            await _retention.EnforceAsync(report, ct);
-            return Result(header, response);
+            result = Result(header, response);
+        } catch (OperationCanceledException) {
+            // The token aborted the run: the committed chunk counts stay on the header and the
+            // cancellation keeps propagating to the caller.
+            await CancelAsync(header, response, rowCount, chunks);
+            throw;
         } catch (Exception exception) {
             header.State = SnapshotState.Failed;
             header.Error = exception.Message;
             await UpdateHeaderAsync(header, CancellationToken.None);
             throw;
         }
+
+        // Retention reclaims only after the header finalized successfully; its own failure must
+        // not flip a settled snapshot to Failed.
+        await _retention.EnforceAsync(report, ct);
+        return result;
     }
 
     private static async ValueTask<bool> IsCancelledAsync(
@@ -146,11 +183,8 @@ public sealed class ReportSnapshotWriter<TReport, TSnapshot, TChunk>
 
     private static TSnapshot CreateHeader(SchemataReport? report, ReportRunKind kind, string? operation) {
         var reportName = report?.Name ?? "inline";
-        var name       = Guid.NewGuid().ToString("n");
         return new() {
-            Name          = name,
             Report        = reportName,
-            CanonicalName = $"reports/{reportName}/snapshots/{name}",
             RunKind       = kind,
             State         = SnapshotState.Pending,
             Operation     = operation,
@@ -166,22 +200,21 @@ public sealed class ReportSnapshotWriter<TReport, TSnapshot, TChunk>
         header.State      = SnapshotState.Cancelled;
         header.RowCount   = rowCount;
         header.ChunkCount = chunks;
+        response.Rows.Clear();
         await UpdateHeaderAsync(header, CancellationToken.None);
         return Result(header, response);
     }
 
     private async Task CreateHeaderAsync(TSnapshot header, CancellationToken ct) {
         await using var scope = _scopes.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IRepository<TSnapshot>>();
-        await repository.AddAsync(header, ct);
-        await repository.CommitAsync(ct);
+        var mutation = scope.ServiceProvider.GetRequiredService<IResourceMutation<TSnapshot>>();
+        await mutation.CreateAsync(header, null, ct);
     }
 
     private async Task UpdateHeaderAsync(TSnapshot header, CancellationToken ct) {
         await using var scope = _scopes.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IRepository<TSnapshot>>();
-        await repository.UpdateAsync(header, ct);
-        await repository.CommitAsync(ct);
+        var mutation = scope.ServiceProvider.GetRequiredService<IResourceMutation<TSnapshot>>();
+        await mutation.UpdateAsync(header, null, ct: ct);
     }
 
     private async Task WriteChunkAsync(
@@ -191,18 +224,14 @@ public sealed class ReportSnapshotWriter<TReport, TSnapshot, TChunk>
         CancellationToken                                     ct
     ) {
         await using var scope = _scopes.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IRepository<TChunk>>();
-        var chunkName  = $"chunk-{index}";
+        var mutation = scope.ServiceProvider.GetRequiredService<IResourceMutation<TChunk>>();
         var chunk = new TChunk {
-            Name          = chunkName,
             Report        = header.Report,
             Snapshot      = header.Name,
-            CanonicalName = $"{header.CanonicalName}/chunks/{chunkName}",
             Index         = index,
             RowCount      = rows.Count,
             Rows          = JsonSerializer.Serialize(rows, SchemataJson.Default),
         };
-        await repository.AddAsync(chunk, ct);
-        await repository.CommitAsync(ct);
+        await mutation.CreateAsync(chunk, null, ct);
     }
 }

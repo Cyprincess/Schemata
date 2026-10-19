@@ -1,24 +1,28 @@
 using System;
 using System.Security.Claims;
+using System.Collections.Generic;
+using Schemata.Abstractions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
-using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Insight.Foundation.Execution;
 using Schemata.Insight.Foundation.Planning;
+using Schemata.Insight.Skeleton.Advisors;
 using Schemata.Insight.Skeleton.Models;
 using Schemata.Insight.Skeleton.Plan;
 using Schemata.Insight.Skeleton.Queries;
 using Schemata.Messaging.Skeleton;
 using Schemata.Report.Foundation.Commands;
+using Schemata.Report.Foundation.Definitions;
 using Schemata.Report.Foundation.Runtime;
 using Schemata.Report.Foundation.Snapshots;
 using Schemata.Report.Skeleton;
 using Schemata.Report.Skeleton.Advisors;
 using Schemata.Report.Skeleton.Entities;
 using Schemata.Report.Skeleton.Models;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Report.Foundation.Handlers;
 
@@ -39,29 +43,31 @@ public sealed class RunReportHandler<TReport, TSnapshot, TChunk>(
 
     public async Task<ReportResult> HandleAsync(
         RunReportRequest  request,
+        AdviceContext     context,
         CancellationToken ct = default
     ) {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.Request);
-        var ctx = AdviceContext.Require();
         var generation = new ReportGenerateContext(
             request.Request, request.Request.Name, execution.Kind, request.Principal);
-        await Advisor.For<IReportGenerateAdvisor>().RunAsync(ctx, generation, ct);
+        await Advisor.For<IReportGenerateAdvisor>().RunAsync(context, generation, ct);
 
         var (report, query) = await ResolveAsync(generation.Request, ct);
         var definitionContext = new ReportDefinitionContext(query, report);
-        await Advisor.For<IReportDefinitionAdvisor>().RunAsync(ctx, definitionContext, ct);
+        await Advisor.For<IReportDefinitionAdvisor>().RunAsync(context, definitionContext, ct);
         query = definitionContext.Query;
 
-        var plan = await plans.BuildAsync(query, ct);
+        var rewrite = new InsightPlanContext(query, await plans.BuildAsync(query, ct));
+        await Advisor.For<IInsightPlanAdvisor>().RunAsync(context, rewrite, ct);
         if (!generation.Request.Persist) {
-            return await CollectInlineAsync(plan, query, generation.Principal, ct);
+            return await CollectInlineAsync(rewrite.Plan, query, generation.Principal, context, ct);
         }
 
         return await writer.WriteAsync(
                    report,
                    execution.Kind,
-                   token => executor.MaterializeAsync(plan, query, generation.Principal, ct: token),
+                   token => executor.MaterializeAsync(rewrite.Plan, query, generation.Principal, context, ct: token),
+                   context,
                    execution.Operation,
                    execution.IsCancelled,
                    ct);
@@ -71,9 +77,10 @@ public sealed class RunReportHandler<TReport, TSnapshot, TChunk>(
         PlanNode            plan,
         QueryInsightRequest query,
         ClaimsPrincipal?    principal,
+        AdviceContext       context,
         CancellationToken   ct
     ) {
-        await using var materialized = await executor.MaterializeAsync(plan, query, principal, ct: ct);
+        await using var materialized = await executor.MaterializeAsync(plan, query, principal, context, ct: ct);
         var response = new QueryInsightResponse { Schema = materialized.Schema };
         await foreach (var row in materialized.Rows.WithCancellation(ct)) {
             if (response.Rows.Count >= _options.MaxInlineRows) {
@@ -95,13 +102,15 @@ public sealed class RunReportHandler<TReport, TSnapshot, TChunk>(
             var definition = await definitions.ResolveAsync(request.Name, ct);
             return definition is not null
                 ? definition.Value
-                : throw new NotFoundException(message: $"Report '{request.Name}' was not found.");
+                : throw new NotFoundException(
+                    SchemataResources.REPORT_NOT_FOUND,
+                    new Dictionary<string, string?> { ["name"] = request.Name });
         }
 
         if (string.IsNullOrWhiteSpace(request.Name) && request.Query is not null) {
             return (null, request.Query);
         }
 
-        throw new InvalidArgumentException(message: "Specify exactly one report name or inline query.");
+        throw new InvalidArgumentException(SchemataResources.REPORT_NAME_OR_QUERY_REQUIRED);
     }
 }

@@ -42,7 +42,7 @@ public static class InsightSecurityGate
         var context = new AccessContext<QueryInsightRequest> { Operation = Operation, Request = request };
 
         var access = services.GetService<IAccessProvider<TEntity, QueryInsightRequest>>();
-        if (access is not null && !await access.HasAccessAsync(null, context, principal, ct)) {
+        if (access is not null && await access.HasAccessAsync(null, context, principal, ct) != AccessDecision.Allowed) {
             throw new PermissionDeniedException(
                 SchemataResources.INSIGHT_ACCESS_DENIED,
                 new Dictionary<string, string?> { ["name"] = typeof(TEntity).Name });

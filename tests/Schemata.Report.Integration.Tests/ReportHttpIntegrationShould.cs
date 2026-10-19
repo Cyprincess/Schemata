@@ -23,6 +23,29 @@ public class ReportHttpIntegrationShould : IClassFixture<WebAppFactory>
 
     public ReportHttpIntegrationShould(WebAppFactory factory) { _factory = factory; }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RejectHiddenPublicField_BeforeInlineOrSnapshotGeneration(bool persist) {
+        using var client = _factory.CreateClient();
+        var definition = JsonSerializer.Serialize(new {
+            sources = new[] { new { alias = "record", name = "source-records" } },
+            selections = new[] { new { field = "record.secret" } },
+        });
+        using var created = await client.PostAsJsonAsync("/v1/reports", new { definition, source_kind = 0 });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var name = (await Json(created)).GetProperty("name").GetString()!.Split('/').Last();
+        using var generated = await GenerateAsync(client, JsonSerializer.Serialize(new { name, persist, sync = true }));
+        var result = await Json(generated);
+        Assert.Equal(HttpStatusCode.OK, generated.StatusCode);
+        Assert.True(result.GetProperty("done").GetBoolean());
+        Assert.Contains("public query model", result.GetProperty("error").GetProperty("message").GetString());
+        Assert.False(result.TryGetProperty("response", out _));
+        using var snapshots = await client.GetAsync($"/v1/reports/{name}/snapshots");
+        Assert.Equal(HttpStatusCode.OK, snapshots.StatusCode);
+        Assert.Empty((await Json(snapshots)).GetProperty("snapshots").EnumerateArray());
+    }
+
     [Fact]
     public async Task Create_Generate_Sync_And_Read_Persisted_Expression_Report() {
         using var client = _factory.CreateClient();
@@ -32,7 +55,8 @@ public class ReportHttpIntegrationShould : IClassFixture<WebAppFactory>
         Assert.True(generated.IsSuccessStatusCode, await generated.Content.ReadAsStringAsync());
         var operation = await Json(generated);
         Assert.True(operation.GetProperty("done").GetBoolean());
-        var operationName = operation.GetProperty("name").GetString()!;
+        var operationName = operation.GetProperty("name").GetString();
+        Assert.NotNull(operationName);
 
         var found = await client.GetAsync("/v1/" + operationName);
         Assert.Equal(HttpStatusCode.OK, found.StatusCode);
@@ -43,7 +67,8 @@ public class ReportHttpIntegrationShould : IClassFixture<WebAppFactory>
         Assert.Equal(HttpStatusCode.OK, snapshots.StatusCode);
         var snapshot = (await Json(snapshots)).GetProperty("snapshots")[0];
         Assert.Equal(operationName, snapshot.GetProperty("operation").GetString());
-        var snapshotName = snapshot.GetProperty("name").GetString()!;
+        var snapshotName = snapshot.GetProperty("name").GetString();
+        Assert.NotNull(snapshotName);
 
         var get = await client.GetAsync("/v1/" + snapshotName);
         Assert.Equal(HttpStatusCode.OK, get.StatusCode);
@@ -65,7 +90,8 @@ public class ReportHttpIntegrationShould : IClassFixture<WebAppFactory>
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
         var pending = await Json(response);
         Assert.False(pending.GetProperty("done").GetBoolean());
-        var operationName = pending.GetProperty("name").GetString()!;
+        var operationName = pending.GetProperty("name").GetString();
+        Assert.NotNull(operationName);
 
         var complete = await WaitForDoneAsync(client, operationName);
         Assert.True(complete.GetProperty("done").GetBoolean());
@@ -99,7 +125,9 @@ public class ReportHttpIntegrationShould : IClassFixture<WebAppFactory>
         });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var created = await Json(response);
-        return created.GetProperty("name").GetString()!.Split('/').Last();
+        var name = created.GetProperty("name").GetString();
+        Assert.NotNull(name);
+        return name.Split('/').Last();
     }
 
     private static Task<HttpResponseMessage> GenerateAsync(HttpClient client, string body) {

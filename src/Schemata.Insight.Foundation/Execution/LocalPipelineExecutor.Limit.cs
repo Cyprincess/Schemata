@@ -16,20 +16,25 @@ public sealed partial class LocalPipelineExecutor
     ) {
         var skip    = Math.Max(0, limit.Skip ?? 0);
         var take    = limit.Take;
-        var emitted = 0;
-        var seen    = 0;
 
+        // A nonpositive take yields nothing, so the upstream is never opened; a reached take stops
+        // after the row is handed over, before the loop pulls one more.
+        if (take is { } max && max <= 0) {
+            yield break;
+        }
+
+        var seen    = 0;
+        var emitted = 0;
         await foreach (var row in rows.WithCancellation(ct)) {
             if (seen++ < skip) {
                 continue;
             }
 
-            if (take is { } max && emitted >= max) {
+            yield return row;
+
+            if (++emitted >= take) {
                 yield break;
             }
-
-            emitted++;
-            yield return row;
         }
     }
 }

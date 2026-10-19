@@ -32,7 +32,8 @@ public class SchemataReportGrpcFeatureShould
         using var app      = builder.Build();
         var       registry = app.Services.GetRequiredService<ResourceRegistry>();
 
-        Assert.True(schemata!.HasFeature<SchemataReportGrpcFeature<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>());
+        Assert.NotNull(schemata);
+        Assert.True(schemata.HasFeature<SchemataReportGrpcFeature<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>());
         Assert.Equal(
             SchemataReportFeature<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>.DefaultPriority + 200_000,
             new SchemataReportGrpcFeature<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>().Priority);

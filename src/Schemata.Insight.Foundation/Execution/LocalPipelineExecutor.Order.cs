@@ -18,10 +18,7 @@ public sealed partial class LocalPipelineExecutor
     ) {
         var keys = _services.GetRequiredService<IOrderCompiler>().Parse(order.OrderBy);
 
-        var buffer = new List<IReadOnlyDictionary<string, object?>>();
-        await foreach (var row in rows.WithCancellation(ct)) {
-            buffer.Add(row);
-        }
+        var buffer = await Buffer(rows, MaxScan(), ct);
 
         IOrderedEnumerable<IReadOnlyDictionary<string, object?>>? sorted = null;
         foreach (var key in keys) {
