@@ -13,6 +13,7 @@ public sealed class GatedActor(ManualGate gate) : IActor
         switch (envelope.Payload) {
             case GateAndWait:
                 await gate.WaitForReleaseAsync();
+                gate.NotifyTurnCompleted();
                 await ctx.ReplyAsync("released");
                 break;
             case Increment:

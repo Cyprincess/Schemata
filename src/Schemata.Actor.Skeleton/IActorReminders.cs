@@ -27,11 +27,10 @@ public interface IActorReminders
     ///     cancel it later with <see cref="CancelAsync" />.
     /// </param>
     /// <param name="ct">A cancellation token.</param>
-    Task ScheduleAsync(ActorId target, IMessage payload, TimeSpan delay, string reminderName, CancellationToken ct = default);
+    Task<ActorReminder> ScheduleAsync(ActorId target, IMessage payload, TimeSpan delay, string reminderName, CancellationToken ct = default);
 
-    /// <summary>Cancels a previously scheduled reminder before it fires.</summary>
-    /// <param name="target">The actor the reminder was scheduled against.</param>
-    /// <param name="reminderName">The name passed to the corresponding <see cref="ScheduleAsync" /> call.</param>
+    /// <summary>Suppresses pending deliveries; an already executing delivery is allowed to finish.</summary>
+    /// <param name="reminder">The tenant/actor-bound reminder slot.</param>
     /// <param name="ct">A cancellation token.</param>
-    Task CancelAsync(ActorId target, string reminderName, CancellationToken ct = default);
+    Task CancelAsync(ActorReminder reminder, CancellationToken ct = default);
 }

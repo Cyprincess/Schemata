@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
@@ -18,6 +19,13 @@ public class SchemataEventSubscription : IIdentifier, ICanonicalName, IConcurren
 
     /// <summary>Optional correlation key for one-to-one delivery.</summary>
     public virtual string? CorrelationKey { get; set; }
+
+    /// <summary>
+    ///     Optional business correlation filter. When set, the subscription matches only events whose
+    ///     <see cref="Schemata.Event.Skeleton.EventContext.Correlation" /> metadata contains every pair here (ordinal
+    ///     comparison); a null or empty filter matches every event of <see cref="EventType" />.
+    /// </summary>
+    public virtual Dictionary<string, string>? CorrelationFilter { get; set; }
 
     /// <summary>Subscription target identifier consumed by the delivering handler.</summary>
     public virtual string Target { get; set; } = null!;

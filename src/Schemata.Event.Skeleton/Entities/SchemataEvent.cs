@@ -33,9 +33,6 @@ public class SchemataEvent : IIdentifier, ICanonicalName, IConcurrency, ISourceR
     /// <summary>Last error reported by a failed handler dispatch.</summary>
     public virtual string? RecentError { get; set; }
 
-    /// <summary>Number of dispatch retries the host has performed.</summary>
-    public virtual int RetryCount { get; set; }
-
     #region ICanonicalName Members
 
     public virtual string? Name { get; set; }

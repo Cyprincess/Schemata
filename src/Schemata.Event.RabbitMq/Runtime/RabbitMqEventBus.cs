@@ -1,21 +1,29 @@
+using Schemata.Messaging.Skeleton;
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using RabbitMQ.Client;
 using Schemata.Abstractions.Advisors;
 using Schemata.Advice;
-using Schemata.Event.Foundation;
+using Schemata.Event.Foundation.Observers;
 using Schemata.Event.Skeleton;
 using Schemata.Event.Skeleton.Advisors;
 using Schemata.Transport.RabbitMq;
 
 namespace Schemata.Event.RabbitMq.Runtime;
 
-/// <summary>RabbitMQ-backed <see cref="IEventBus"/> for cross-process broadcast.</summary>
+/// <summary>
+///     RabbitMQ-backed <see cref="IEventBus" /> for cross-process broadcast. Each publish writes a
+///     persistent message to the configured exchange and completes once the broker confirms it.
+/// </summary>
 /// <remarks>
 ///     Broadcast only. Cross-process request/reply lives in <c>Schemata.Messaging.RabbitMq</c>,
 ///     which owns its own reply queue and correlation handling.
@@ -23,7 +31,6 @@ namespace Schemata.Event.RabbitMq.Runtime;
 public sealed class RabbitMqEventBus : IEventBus
 {
     private readonly IRabbitMqConnectionProvider    _connections;
-    private readonly EventOutboxDispatcher?         _dispatcher;
     private readonly JsonSerializerOptions          _json;
     private readonly ILogger<RabbitMqEventBus>?     _logger;
     private readonly IOptions<RabbitMqEventOptions> _options;
@@ -32,13 +39,12 @@ public sealed class RabbitMqEventBus : IEventBus
 
     /// <summary>Initializes a new <see cref="RabbitMqEventBus" />.</summary>
     public RabbitMqEventBus(
-        IOptions<RabbitMqEventOptions> options,
-        IRabbitMqConnectionProvider    connections,
-        IEventTypeRegistry             registry,
-        IServiceProvider               services,
+        IOptions<RabbitMqEventOptions>  options,
+        IRabbitMqConnectionProvider     connections,
+        IEventTypeRegistry              registry,
+        IServiceProvider                services,
         IOptions<JsonSerializerOptions> json,
-        ILogger<RabbitMqEventBus>?     logger     = null,
-        EventOutboxDispatcher?         dispatcher = null
+        ILogger<RabbitMqEventBus>?      logger = null
     ) {
         _options     = options;
         _connections = connections;
@@ -46,57 +52,130 @@ public sealed class RabbitMqEventBus : IEventBus
         _services    = services;
         _json        = json.Value;
         _logger      = logger;
-        _dispatcher  = dispatcher;
     }
 
     #region IEventBus Members
 
     public Task PublishAsync<TEvent>(TEvent @event, CancellationToken ct = default)
         where TEvent : IEvent {
-        return PublishCoreAsync(@event, null, ct);
+        return PublishCoreAsync(@event, null, null, ct);
+    }
+
+    public Task PublishAsync<TEvent>(TEvent @event, IReadOnlyDictionary<string, string> correlation, CancellationToken ct = default)
+        where TEvent : IEvent {
+        return PublishCoreAsync(@event, null, correlation, ct);
     }
 
     public async Task PublishAsync<TEvent>(TEvent @event, object sourceEntity, CancellationToken ct = default)
         where TEvent : IEvent {
         EventSourceContract.Ensure(sourceEntity);
-        await PublishCoreAsync(@event, sourceEntity, ct);
+        await PublishCoreAsync(@event, sourceEntity, null, ct);
+    }
+
+    public async Task PublishAsync<TEvent>(
+        TEvent                              @event,
+        object                              sourceEntity,
+        IReadOnlyDictionary<string, string> correlation,
+        CancellationToken                   ct = default
+    )
+        where TEvent : IEvent {
+        EventSourceContract.Ensure(sourceEntity);
+        await PublishCoreAsync(@event, sourceEntity, correlation, ct);
     }
 
     #endregion
 
-    private async Task PublishCoreAsync<TEvent>(TEvent @event, object? source, CancellationToken ct)
+    private async Task PublishCoreAsync<TEvent>(
+        TEvent                               @event,
+        object?                              source,
+        IReadOnlyDictionary<string, string>? correlation,
+        CancellationToken                    ct
+    )
         where TEvent : IEvent {
         // Resolve by the runtime type so a derived event published through a base/interface
         // static type keeps its registered name and serialized derived members.
-        var type       = @event!.GetType();
+        var type       = @event.GetType();
         var routingKey = _registry.RequireName(type);
 
-        using var scope = _services.CreateScope();
+        var message = MessageContexts.Capture(_services);
+        var scope = await _services.GetRequiredService<IMessageExecutionScopeFactory>().CreateAsync(message, ct);
+        IDisposable? execution = null;
+        Exception? failure = null;
+        try {
+            execution = scope.Enter();
+        await scope.RestoreAsync(message, ct);
         var eventCtx = new EventContext(@event, routingKey) {
-            Payload                = JsonSerializer.Serialize(@event, type, _json),
-            CorrelationId          = Guid.NewGuid().ToString("n"),
-            RequiresOutboxDelivery = true,
-            Source                 = source,
+            Payload       = JsonSerializer.Serialize(@event, type, _json),
+            CorrelationId = Guid.NewGuid().ToString("n"),
+            Correlation   = correlation,
+            Source        = source,
         };
-        var adviceCtx = new AdviceContext(scope.ServiceProvider);
-        using var _ = AdviceContext.Establish(adviceCtx);
+        var adviceCtx = new AdviceContext(scope.Services);
 
         switch (await Advisor.For<IEventPublishAdvisor>()
                              .RunAsync(adviceCtx, eventCtx, ct)) {
             case AdviseResult.Continue:
                 break;
-            case AdviseResult.Handle when adviceCtx.TryGet<object>(out var r):
-                eventCtx.Result = r;
+            case AdviseResult.Handle:
                 return;
             case AdviseResult.Block:
             default:
                 throw new InvalidOperationException("Event publish blocked by advisor.");
         }
 
-        var observers = scope.ServiceProvider.GetServices<IEventLifecycleObserver>().ToList();
+        var observers = scope.Services.GetServices<IEventLifecycleObserver>().ToList();
         foreach (var observer in observers) {
             await observer.OnPublishedAsync(eventCtx, ct);
         }
-        _dispatcher?.NotifyPending();
+
+        // Publisher confirms hold BasicPublishAsync until the broker accepts the message, so a
+        // completed publish is durable.
+        var connection = await _connections.GetConnectionAsync(ct);
+        await using var channel = await connection.CreateChannelAsync(new(true, true), ct);
+
+        var exchange = _options.Value.ExchangeName;
+        var body     = Encoding.UTF8.GetBytes(eventCtx.Payload ?? string.Empty);
+
+        var props = new BasicProperties {
+            ContentType   = "application/json",
+            DeliveryMode  = DeliveryModes.Persistent,
+            CorrelationId = eventCtx.CorrelationId,
+            Headers       = WriteHeaders(message.Items, eventCtx.Correlation),
+        };
+
+        await channel.ExchangeDeclareAsync(exchange, _options.Value.ExchangeType, true, cancellationToken: ct);
+        await channel.BasicPublishAsync(exchange, routingKey, true, props, body, ct);
+
+        // The audit observer runs last so the audit row reflects the application observers' outcome.
+        foreach (var observer in observers.OrderBy(observer => observer is SchemataEventAuditObserver)) {
+            await observer.OnDeliveredAsync(eventCtx, ct);
+        }
+        } catch (Exception error) {
+            failure = error;
+            throw;
+        } finally {
+            Exception? cleanup = null;
+            try { await scope.DisposeAsync(); }
+            catch (Exception error) { cleanup = error; }
+            try { execution?.Dispose(); }
+            catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
+            if (cleanup is not null) {
+                ExceptionDispatchInfo.Capture(failure is null ? cleanup : new AggregateException(failure, cleanup)).Throw();
+            }
+        }
+    }
+
+    private static IDictionary<string, object?>? WriteHeaders(
+        IReadOnlyDictionary<string, string?>  items,
+        IReadOnlyDictionary<string, string>?  correlation
+    ) {
+        var headers = MessageContextHeaders.Write(items);
+        if (correlation is null || correlation.Count == 0) {
+            return headers;
+        }
+
+        headers ??= new Dictionary<string, object?>(StringComparer.Ordinal);
+        EventCorrelationHeaders.Write(headers, correlation);
+        return headers;
     }
 }

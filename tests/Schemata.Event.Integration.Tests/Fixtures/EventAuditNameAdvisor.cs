@@ -15,6 +15,7 @@ internal sealed class EventAuditNameAdvisor : IRepositoryAddAdvisor<SchemataEven
         AdviceContext                  ctx,
         IRepository<SchemataEvent>     repository,
         SchemataEvent                  entity,
+        MutationOptions      options,
         CancellationToken              ct
     ) {
         entity.Name = entity.EventType;

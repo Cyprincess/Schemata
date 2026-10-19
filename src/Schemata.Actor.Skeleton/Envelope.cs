@@ -21,4 +21,11 @@ public sealed record Envelope(
     IMessage        Payload,
     IActorRef?      Sender        = null,
     MessageContext? Context       = null,
-    Guid            CorrelationId = default);
+    Guid            CorrelationId = default)
+{
+    /// <summary>The sender's declared request type, preserved across mailbox delivery.</summary>
+    public Type? RequestType { get; init; }
+
+    /// <summary>The response type declared by an Ask; null for a Tell.</summary>
+    public Type? ResponseType { get; init; }
+}

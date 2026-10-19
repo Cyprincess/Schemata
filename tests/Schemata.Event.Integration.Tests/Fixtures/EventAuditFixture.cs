@@ -33,7 +33,7 @@ public sealed class EventAuditFixture : IAsyncLifetime
     public Mock<ILogger<InProcessEventBus>> BusLogger => _busLogger;
 
     public async Task InitializeAsync() {
-        _connection = new SqliteConnection("Data Source=:memory:");
+        _connection = new("Data Source=:memory:");
         await _connection.OpenAsync();
 
         var services = new ServiceCollection();
@@ -42,10 +42,11 @@ public sealed class EventAuditFixture : IAsyncLifetime
                                                               .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
 
         services.AddRepository<SchemataEvent, EfCoreRepository<EventAuditDbContext, SchemataEvent>>();
+        services.AddRepository<SchemataEventSubscription, EfCoreRepository<EventAuditDbContext, SchemataEventSubscription>>();
         services.AddScoped<IUnitOfWork<EventAuditDbContext>, EfCoreUnitOfWork<EventAuditDbContext>>();
 
         services.AddLogging();
-        _busLogger = new Mock<ILogger<InProcessEventBus>>();
+        _busLogger = new();
         services.AddSingleton<ILogger<InProcessEventBus>>(_busLogger.Object);
 
         var builder = new SchemataBuilder(new ConfigurationBuilder().Build(), null!);

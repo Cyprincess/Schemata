@@ -20,7 +20,7 @@ public class EventAuditNameAdvisorShould
             var row = await fixture.SingleOrDefaultAsync();
 
             Assert.NotNull(row);
-            Assert.Equal("students/student-created", row!.EventType);
+            Assert.Equal("students/student-created", row.EventType);
             Assert.Equal("students/student-created", row.Name);
             Assert.Equal("events/students/student-created", row.CanonicalName);
             Assert.NotEqual(default, row.Uid);

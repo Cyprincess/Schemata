@@ -1,3 +1,4 @@
+using Schemata.Messaging.Skeleton;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -82,6 +83,7 @@ public sealed class RabbitMqConsumerHost : BackgroundService
         // window reaches PrefetchCount, providing per-consumer backpressure.
         await channel.BasicQosAsync(0, _options.Value.PrefetchCount, false, ct);
 
+        var failure = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var consumer = new AsyncEventingBasicConsumer(channel);
         consumer.ReceivedAsync += async (_, ea) => {
             var deliveryTag = ea.DeliveryTag;
@@ -104,7 +106,8 @@ public sealed class RabbitMqConsumerHost : BackgroundService
                     await channel.BasicNackAsync(deliveryTag, false, false, ct);
                 }
             } catch (Exception ex) {
-                _logger?.LogError(ex, "Failed to acknowledge delivery '{DeliveryTag}' on the broker.", deliveryTag);
+                failure.TrySetException(ex);
+                throw;
             } finally {
                 _channelLock.Release();
             }
@@ -112,31 +115,27 @@ public sealed class RabbitMqConsumerHost : BackgroundService
 
         await channel.BasicConsumeAsync(queue, false, consumer, ct);
 
-        await Task.Delay(Timeout.Infinite, ct);
+        await failure.Task.WaitAsync(ct);
     }
 
     private async Task<bool> HandleMessageAsync(IChannel channel, BasicDeliverEventArgs ea, CancellationToken ct) {
         var eventTypeName = ea.RoutingKey;
         var correlationId = ea.BasicProperties.CorrelationId;
-        var replyTo       = ea.BasicProperties.ReplyTo;
         var body          = Encoding.UTF8.GetString(ea.Body.Span);
 
-        using var scope         = _services.CreateScope();
-        var       subscriptions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataEventSubscription>>();
-        var       resolver      = scope.ServiceProvider.GetRequiredService<HandlerResolver>();
-        var       registry      = scope.ServiceProvider.GetRequiredService<IEventTypeRegistry>();
-        var       tracker       = scope.ServiceProvider.GetService<CorrelationTracker>();
+        var message = new MessageContext(MessageContextHeaders.Read(ea.BasicProperties.Headers));
+        var scope = await _services.GetRequiredService<IMessageExecutionScopeFactory>().CreateAsync(message, ct);
+        IDisposable? execution = null;
+        Exception? failure = null;
+        try {
+            execution = scope.Enter();
+        await scope.RestoreAsync(message, ct);
+        var       subscriptions = scope.Services.GetRequiredService<IRepository<SchemataEventSubscription>>();
+        var       resolver      = new HandlerResolver(scope.Services);
+        var       registry      = scope.Services.GetRequiredService<IEventTypeRegistry>();
 
-        // Reply correlation comes first because reply payloads bypass subscription matching.
-        if (!string.IsNullOrEmpty(correlationId) && tracker != null) {
-            var responseType = registry.Resolve(eventTypeName);
-            if (responseType != null) {
-                var response = JsonSerializer.Deserialize(body, responseType, _json);
-                if (tracker.Complete(correlationId, response)) {
-                    return true;
-                }
-            }
-        }
+        // Request replies settle on Messaging's reply queue, never here: the event consumer treats a
+        // correlation id as ordinary event metadata and keeps matching subscriptions.
 
         // Routing-key -> registered Type. Unregistered names are poison messages.
         var eventType = registry.Resolve(eventTypeName);
@@ -147,8 +146,9 @@ public sealed class RabbitMqConsumerHost : BackgroundService
             return false;
         }
 
-        var matched = new List<SchemataEventSubscription>();
-        await foreach (var sub in subscriptions.ListMatchingAsync(eventTypeName, ct: ct)) {
+        var correlation = EventCorrelationHeaders.Read(ea.BasicProperties.Headers);
+        var matched     = new List<SchemataEventSubscription>();
+        await foreach (var sub in subscriptions.ListMatchingAsync(eventTypeName, correlation, ct)) {
             matched.Add(sub);
         }
 
@@ -158,7 +158,7 @@ public sealed class RabbitMqConsumerHost : BackgroundService
             return true;
         }
 
-        var context = scope.ServiceProvider.GetRequiredService<IEventDispatchContext>();
+        var context = scope.Services.GetRequiredService<IEventDispatchContext>();
         context.SetSubscriptions(matched);
 
         var eventInstance = JsonSerializer.Deserialize(body, eventType, _json);
@@ -166,15 +166,19 @@ public sealed class RabbitMqConsumerHost : BackgroundService
             return false;
         }
 
-        var method        = typeof(HandlerResolver).GetMethod(nameof(HandlerResolver.InvokeEventHandlersAsync))!;
+        var method = typeof(HandlerResolver).GetMethods()
+                                            .Single(candidate => candidate.Name == nameof(HandlerResolver.InvokeEventHandlersAsync)
+                                                              && candidate.GetParameters().Length == 3);
+
         var genericMethod = method.MakeGenericMethod(eventType);
 
         var routing = registry.GetRouting(eventType);
 
         var eventForCtx = (IEvent)eventInstance;
         var eventCtx = new EventContext(eventForCtx, eventTypeName) {
-            Payload = body,
+            Payload       = body,
             CorrelationId = correlationId ?? Guid.NewGuid().ToString("n"),
+            Correlation   = correlation,
         };
 
         try {
@@ -197,21 +201,31 @@ public sealed class RabbitMqConsumerHost : BackgroundService
             eventCtx.Exception = ex;
             throw;
         } finally {
-            var consumeAdviceCtx = new AdviceContext(scope.ServiceProvider);
-            using var _ = AdviceContext.Establish(consumeAdviceCtx);
-            switch (await Advisor.For<IEventConsumeAdvisor>()
-                                 .RunAsync(consumeAdviceCtx, eventCtx, ct)) {
-                case AdviseResult.Continue:
-                case AdviseResult.Handle:
-                case AdviseResult.Block:
-                default:
-                    break;
+            // The outcome advisors and observers see is the failure recorded by handler dispatch, if
+            // any; later finalize failures attach to it instead of replacing it.
+            var outcome = eventCtx.Exception;
+            Exception? advisorFailure = null;
+            var consumeAdviceCtx = new AdviceContext(scope.Services);
+            try {
+                switch (await Advisor.For<IEventConsumeAdvisor>()
+                                     .RunAsync(consumeAdviceCtx, eventCtx, ct)) {
+                    case AdviseResult.Continue:
+                    case AdviseResult.Handle:
+                    case AdviseResult.Block:
+                    default:
+                        break;
+                }
+            } catch (Exception ex) {
+                // A throwing advisor joins finalization: every observer still runs, and when the
+                // handler succeeded the advisor failure becomes the recorded outcome.
+                advisorFailure = ex;
+                eventCtx.Exception ??= ex;
             }
 
             Exception? observerFailure = null;
             // Audit-last ordering is enforced here regardless of DI registration order: application
             // observers run before SchemataEventAuditObserver so the audit record sees their outcome.
-            var observers = scope.ServiceProvider.GetServices<IEventLifecycleObserver>()
+            var observers = scope.Services.GetServices<IEventLifecycleObserver>()
                                  .OrderBy(observer => observer is SchemataEventAuditObserver);
             foreach (var observer in observers) {
                 try {
@@ -226,11 +240,36 @@ public sealed class RabbitMqConsumerHost : BackgroundService
                 }
             }
 
-            if (observerFailure is not null) {
-                ExceptionDispatchInfo.Capture(observerFailure).Throw();
+            // Finalize failures escape without swallowing each other or the original outcome.
+            List<Exception>? finalize = null;
+            if (advisorFailure is not null) (finalize ??= []).Add(advisorFailure);
+            if (observerFailure is not null) (finalize ??= []).Add(observerFailure);
+            if (finalize is not null) {
+                Exception escaped;
+                if (outcome is null) {
+                    escaped = finalize.Count == 1 ? finalize[0] : new AggregateException(finalize);
+                } else {
+                    finalize.Insert(0, outcome);
+                    escaped = new AggregateException(finalize);
+                }
+
+                ExceptionDispatchInfo.Capture(escaped).Throw();
             }
         }
 
         return true;
+        } catch (Exception error) {
+            failure = error;
+            throw;
+        } finally {
+            Exception? cleanup = null;
+            try { await scope.DisposeAsync(); }
+            catch (Exception error) { cleanup = error; }
+            try { execution?.Dispose(); }
+            catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
+            if (cleanup is not null) {
+                ExceptionDispatchInfo.Capture(failure is null ? cleanup : new AggregateException(failure, cleanup)).Throw();
+            }
+        }
     }
 }

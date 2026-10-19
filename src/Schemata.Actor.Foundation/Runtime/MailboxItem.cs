@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using System.Threading.Tasks;
 using Schemata.Actor.Skeleton;
 
 namespace Schemata.Actor.Foundation.Runtime;
@@ -9,13 +10,16 @@ namespace Schemata.Actor.Foundation.Runtime;
 ///     Canceled</c> state bit, so a caller who gave up waiting on a still-queued <c>Ask</c> can
 ///     mark it canceled instead of the message being run for no listener.
 /// </summary>
-internal sealed class MailboxItem(Envelope envelope) : IDisposable
+internal sealed class MailboxItem(Envelope envelope, Action? released = null) : IAsyncDisposable
 {
     private const int Queued    = 0;
     private const int Executing = 1;
     private const int Canceled  = 2;
 
     private readonly CancellationTokenSource _cancellation = new();
+    private readonly object _gate = new();
+    private Task? _cancellationTask;
+    private bool _disposed;
 
     private int _state;
 
@@ -38,13 +42,23 @@ internal sealed class MailboxItem(Envelope envelope) : IDisposable
 
     /// <summary>Signals a still-executing turn that the caller waiting on this item has given up.</summary>
     public void CancelDelivery() {
-        try {
-            _cancellation.Cancel();
-        } catch (ObjectDisposedException) {
-            // The turn already finished (and this item was already disposed) between the caller
-            // losing the TryCancel race and calling this - nothing left to signal.
+        lock (_gate) {
+            if (!_disposed) _cancellationTask ??= _cancellation.CancelAsync();
         }
     }
 
-    public void Dispose() => _cancellation.Dispose();
+    public async ValueTask DisposeAsync() {
+        Task? cancellation;
+        lock (_gate) {
+            if (_disposed) return;
+            _disposed = true;
+            cancellation = _cancellationTask;
+        }
+        try {
+            if (cancellation is not null) await cancellation;
+        } finally {
+            _cancellation.Dispose();
+            released?.Invoke();
+        }
+    }
 }
