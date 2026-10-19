@@ -1,5 +1,11 @@
+using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Exceptions;
+using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Managers;
 using Schemata.Identity.Skeleton.Services;
@@ -11,26 +17,49 @@ namespace Schemata.Identity.Foundation.Handlers;
 internal sealed partial class IdentityOperationHandler<TUser>
     where TUser : SchemataUser, new()
 {
-    private readonly IMailSender<TUser>         _mail;
-    private readonly IMessageSender<TUser>      _message;
-    private readonly SignInManager<TUser>       _sign;
-    private readonly SchemataUserManager<TUser> _users;
+    private readonly IEnumerable<Skeleton.IHostSignInObserver> _hostObservers;
+
+    private readonly IServiceProvider                _services;
+    private readonly SignInManager<TUser>            _sign;
+    private readonly TimeProvider                    _time;
+    private readonly SchemataUserManager<TUser>      _users;
 
     /// <summary>Creates an identity operation handler.</summary>
     /// <param name="users">User manager for account operations.</param>
     /// <param name="sign">Sign-in manager for credential operations.</param>
-    /// <param name="mail">Mail sender for email codes.</param>
-    /// <param name="message">Message sender for phone codes.</param>
+    /// <param name="services">Service provider for channel senders.</param>
+    /// <param name="time">Clock for authentication timestamps; defaults to the system clock.</param>
+    /// <param name="hostObservers">Observers of host authentication renewal.</param>
     public IdentityOperationHandler(
-        SchemataUserManager<TUser> users,
-        SignInManager<TUser>       sign,
-        IMailSender<TUser>         mail,
-        IMessageSender<TUser>      message
+        SchemataUserManager<TUser>                 users,
+        SignInManager<TUser>                       sign,
+        IServiceProvider                           services,
+        TimeProvider?                              time          = null,
+        IEnumerable<Skeleton.IHostSignInObserver>? hostObservers = null
     ) {
-        _users   = users;
-        _sign    = sign;
-        _mail    = mail;
-        _message = message;
+        _users         = users;
+        _sign          = sign;
+        _services      = services;
+        _time          = time ?? TimeProvider.System;
+        _hostObservers = hostObservers ?? [];
+    }
+
+    /// <summary>
+    ///     Runs one advisor stage over the operation's single carrier. A stage that continues
+    ///     leaves no handled response, so a response written without
+    ///     <see cref="AdviseResult.Handle" /> cannot reach a later stage of the same operation.
+    /// </summary>
+    private static async Task<IdentityResult<TResponse>?> RunStageAsync<TResponse>(
+        IdentityOperationExecution<IdentityResult<TResponse>> execution,
+        Func<Task<AdviseResult>>                              advise
+    ) where TResponse : class {
+        var handled = await HandledResponseRunner.RunAsync(
+            execution, advise, static () => new PermissionDeniedException());
+        if (handled is null) {
+            execution.Response = null;
+        }
+
+        return handled;
     }
 
     private async Task<TUser?> GetUserAsync(string? email, string? phone) {
@@ -45,14 +74,19 @@ internal sealed partial class IdentityOperationHandler<TUser>
         switch (user) {
             case var _ when !string.IsNullOrWhiteSpace(email):
             {
-                var code = await _users.GenerateChangeEmailTokenAsync(user, email);
-                await _mail.SendConfirmationCodeAsync(user, email, code);
+                // Delivery channels are optional capabilities: the sender resolves only on the
+                // operation path that needs it, and an unconfigured channel fails at its use
+                // instead of reporting a fabricated delivery.
+                var sender = _services.GetRequiredService<IMailSender<TUser>>();
+                var code   = await _users.GenerateChangeEmailTokenAsync(user, email);
+                await sender.SendConfirmationCodeAsync(user, email, code);
                 break;
             }
             case var _ when !string.IsNullOrWhiteSpace(phone):
             {
-                var code = await _users.GenerateChangePhoneNumberTokenAsync(user, phone);
-                await _message.SendConfirmationCodeAsync(user, phone, code);
+                var sender = _services.GetRequiredService<IMessageSender<TUser>>();
+                var code   = await _users.GenerateChangePhoneNumberTokenAsync(user, phone);
+                await sender.SendConfirmationCodeAsync(user, phone, code);
                 break;
             }
         }

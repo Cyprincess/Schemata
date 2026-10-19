@@ -1,7 +1,7 @@
 using System;
-using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Identity.Skeleton;
@@ -16,30 +16,29 @@ namespace Schemata.Identity.Foundation.Advisors;
 public static class AdviceRequestEmailValidation
 {
     /// <summary>Default order for email-change request validation.</summary>
-    public const int DefaultOrder = AdviceRequestFeature.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = Schemata.Abstractions.SchemataConstants.Orders.Base + 10_000_000;
 }
 
 /// <summary>Validates email-change profile requests.</summary>
 /// <typeparam name="TUser">User entity type handled by the user manager.</typeparam>
-public sealed class AdviceRequestEmailValidation<TUser>(SchemataUserManager<TUser> users) : IIdentityRequestAdvisor<ProfileRequest>
+public sealed class AdviceRequestEmailValidation<TUser>(SchemataUserManager<TUser> users) : IIdentityRequestAdvisor<ProfileRequest, IdentityResult<Unit>>
     where TUser : SchemataUser, new()
 {
-    #region IIdentityRequestAdvisor<ProfileRequest> Members
+    #region IIdentityRequestAdvisor<ProfileRequest, IdentityResult<Unit>> Members
 
     public int Order => AdviceRequestEmailValidation.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(
-        AdviceContext     ctx,
-        ProfileRequest    request,
-        IdentityOperation op,
-        ClaimsPrincipal   principal,
-        CancellationToken ct = default
+        AdviceContext                                    ctx,
+        ProfileRequest                                   request,
+        IdentityOperationExecution<IdentityResult<Unit>> execution,
+        CancellationToken                                ct = default
     ) {
-        if (op is not IdentityOperation.ChangeEmail) {
+        if (execution.Operation is not IdentityOperation.ChangeEmail) {
             return AdviseResult.Continue;
         }
 
-        var user = await IdentityValidation.RequireUserAsync(users, principal);
+        var user = await IdentityValidation.RequireUserAsync(users, execution.Principal);
 
         IdentityValidation.RequireNotEmpty(request.EmailAddress, nameof(request.EmailAddress));
 

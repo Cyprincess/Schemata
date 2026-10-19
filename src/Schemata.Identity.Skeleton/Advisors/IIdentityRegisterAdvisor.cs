@@ -8,5 +8,5 @@ namespace Schemata.Identity.Skeleton.Advisors;
 ///     Advises registration requests before user creation.
 /// </summary>
 /// <typeparam name="TUser">The user entity type.</typeparam>
-public interface IIdentityRegisterAdvisor<TUser> : IAdvisor<TUser, RegisterRequest>
+public interface IIdentityRegisterAdvisor<TUser> : IAdvisor<TUser, RegisterRequest, IHandledResponse<IdentityResult<System.Security.Claims.ClaimsPrincipal>>>
     where TUser : SchemataUser;

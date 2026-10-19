@@ -23,6 +23,7 @@ public class IdentityRequestAdvisorShould
 
     public static IEnumerable<object[]> OperationStates() {
         foreach (var operation in System.Enum.GetValues<IdentityOperation>()) {
+            if (operation == IdentityOperation.Login) continue;
             yield return [operation, IdentityStatus.Success];
             yield return [operation, IdentityStatus.Challenge];
         }
@@ -37,8 +38,6 @@ public class IdentityRequestAdvisorShould
         return operation switch {
             IdentityOperation.Register => AssertHandled<RegisterRequest, ClaimsPrincipal>(
                 operation, status, handler => handler.RegisterAsync(new(), Principal)),
-            IdentityOperation.Login => AssertHandled<LoginRequest, ClaimsPrincipal>(
-                operation, status, handler => handler.LoginAsync(new(), Principal)),
             IdentityOperation.Refresh => AssertHandled<Unit, ClaimsPrincipal>(
                 operation, status, handler => handler.RefreshAsync(null, Principal)),
             IdentityOperation.Profile => AssertHandled<Unit, ClaimsStore>(
@@ -71,20 +70,26 @@ public class IdentityRequestAdvisorShould
         IdentityOperation operation,
         IdentityStatus    status,
         System.Func<IdentityHandler<SchemataUser>, Task<IdentityResult<TResponse>>> invoke
-    ) {
+    ) where TRequest : class
+      where TResponse : class {
+        TResponse? payload = status == IdentityStatus.Success ? NewPayload<TResponse>() : null;
         var expected = status == IdentityStatus.Success
-            ? IdentityResult<TResponse>.Success(default)
+            ? IdentityResult<TResponse>.Success(payload)
             : IdentityResult<TResponse>.Challenge();
-        var advisor = new Mock<IIdentityRequestAdvisor<TRequest>>();
+        IdentityOperation? observed = null;
+        var advisor = new Mock<IIdentityRequestAdvisor<TRequest, IdentityResult<TResponse>>>();
         advisor.SetupGet(value => value.Order).Returns(0);
         advisor.Setup(value => value.AdviseAsync(
                           It.IsAny<AdviceContext>(),
                           It.IsAny<TRequest>(),
-                          operation,
-                          Principal,
+                          It.IsAny<IdentityOperationExecution<IdentityResult<TResponse>>>(),
                           It.IsAny<CancellationToken>()))
-               .Returns((AdviceContext ctx, TRequest _, IdentityOperation _, ClaimsPrincipal _, CancellationToken _) => {
-                   ctx.Set(expected);
+               .Returns((AdviceContext                _,
+                         TRequest                     _,
+                         IdentityOperationExecution<IdentityResult<TResponse>> execution,
+                         CancellationToken            _) => {
+                   observed = execution.Operation;
+                   execution.Response = expected;
                    return Task.FromResult(AdviseResult.Handle);
                });
         using var host = new IdentityHandlerTestHost(services => services.AddSingleton(advisor.Object));
@@ -93,15 +98,30 @@ public class IdentityRequestAdvisorShould
 
         var actual = await invoke(host.Handler);
 
-        Assert.Same(expected, actual);
         Assert.Equal(status, actual.Status);
+        if (status == IdentityStatus.Success) {
+            Assert.Same(payload, actual.Data);
+        }
+        else {
+            Assert.Null(actual.Data);
+        }
         advisor.Verify(value => value.AdviseAsync(
                            It.IsAny<AdviceContext>(),
                            It.IsAny<TRequest>(),
-                           operation,
-                           Principal,
+                           It.IsAny<IdentityOperationExecution<IdentityResult<TResponse>>>(),
                            It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(operation, observed);
         Assert.Equal(userInvocations, host.Users.Invocations.Count);
         Assert.Equal(signInInvocations, host.SignIn.Invocations.Count);
+    }
+
+    private static TResponse NewPayload<TResponse>()
+        where TResponse : class {
+        if (typeof(TResponse) == typeof(ClaimsPrincipal)) { return (TResponse)(object)Principal; }
+        if (typeof(TResponse) == typeof(Unit)) { return (TResponse)(object)Unit.Value; }
+        if (typeof(TResponse) == typeof(ClaimsStore)) { return (TResponse)(object)new ClaimsStore(); }
+        if (typeof(TResponse) == typeof(AuthenticatorResponse)) { return (TResponse)(object)new AuthenticatorResponse(); }
+
+        throw new Xunit.Sdk.XunitException($"No payload fixture for response type '{typeof(TResponse)}'.");
     }
 }

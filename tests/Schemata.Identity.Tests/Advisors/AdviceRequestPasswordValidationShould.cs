@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Identity.Foundation.Advisors;
@@ -26,6 +27,13 @@ public class AdviceRequestPasswordValidationShould
     private static readonly ClaimsPrincipal Alice = new(
         new ClaimsIdentity([new(ClaimTypes.NameIdentifier, "42")], "test"));
 
+    private static IdentityOperationExecution<IdentityResult<Unit>> Execution(
+        IdentityOperation operation,
+        ClaimsPrincipal?  principal = null
+    ) {
+        return new() { Operation = operation, Principal = principal ?? Anonymous };
+    }
+
     private static SchemataUserManager<SchemataUser> MockUserManager() {
         var store = new Mock<ICompositeUserStore>();
         store.Setup(s => s.FindByIdAsync("42", It.IsAny<CancellationToken>()))
@@ -42,7 +50,7 @@ public class AdviceRequestPasswordValidationShould
         var request = new ProfileRequest { OldPassword = "old", NewPassword = "new" };
 
         await Assert.ThrowsAsync<NotFoundException>(() => advisor.AdviseAsync(
-                                                        ctx, request, IdentityOperation.ChangePassword, Anonymous));
+                                                        ctx, request, Execution(IdentityOperation.ChangePassword)));
     }
 
     [Fact]
@@ -52,7 +60,7 @@ public class AdviceRequestPasswordValidationShould
         var request = new ProfileRequest { NewPassword = "new" };
 
         await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(
-                                                          ctx, request, IdentityOperation.ChangePassword, Alice));
+                                                          ctx, request, Execution(IdentityOperation.ChangePassword, Alice)));
     }
 
     [Fact]
@@ -62,7 +70,7 @@ public class AdviceRequestPasswordValidationShould
         var request = new ProfileRequest { OldPassword = "old" };
 
         await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(
-                                                          ctx, request, IdentityOperation.ChangePassword, Alice));
+                                                          ctx, request, Execution(IdentityOperation.ChangePassword, Alice)));
     }
 
     [Fact]
@@ -72,7 +80,7 @@ public class AdviceRequestPasswordValidationShould
         var request = new ProfileRequest { OldPassword = "same", NewPassword = "same" };
 
         await Assert.ThrowsAsync<NoContentException>(() => advisor.AdviseAsync(
-                                                         ctx, request, IdentityOperation.ChangePassword, Alice));
+                                                         ctx, request, Execution(IdentityOperation.ChangePassword, Alice)));
     }
 
     [Fact]
@@ -81,7 +89,7 @@ public class AdviceRequestPasswordValidationShould
         var ctx     = new AdviceContext(null!);
         var request = new ProfileRequest { OldPassword = "Password", NewPassword = "password" };
 
-        var result = await advisor.AdviseAsync(ctx, request, IdentityOperation.ChangePassword, Alice);
+        var result = await advisor.AdviseAsync(ctx, request, Execution(IdentityOperation.ChangePassword, Alice));
 
         Assert.Equal(AdviseResult.Continue, result);
     }
@@ -92,7 +100,7 @@ public class AdviceRequestPasswordValidationShould
         var ctx     = new AdviceContext(null!);
         var request = new ProfileRequest();
 
-        var result = await advisor.AdviseAsync(ctx, request, IdentityOperation.Login, Anonymous);
+        var result = await advisor.AdviseAsync(ctx, request, Execution(IdentityOperation.Login));
 
         Assert.Equal(AdviseResult.Continue, result);
     }

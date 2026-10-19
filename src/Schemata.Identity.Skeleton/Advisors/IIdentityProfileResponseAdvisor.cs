@@ -9,5 +9,6 @@ namespace Schemata.Identity.Skeleton.Advisors;
 ///     Advises the claims returned with an identity profile response.
 /// </summary>
 /// <typeparam name="TUser">The user entity type.</typeparam>
-public interface IIdentityProfileResponseAdvisor<TUser> : IAdvisor<TUser, ClaimsStore, ClaimsPrincipal>
+public interface IIdentityProfileResponseAdvisor<TUser>
+    : IAdvisor<TUser, ClaimsStore, ClaimsPrincipal, IHandledResponse<IdentityResult<ClaimsStore>>>
     where TUser : SchemataUser;

@@ -3,7 +3,6 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Identity.Foundation.Commands;
@@ -11,9 +10,7 @@ using Schemata.Identity.Foundation.Queries;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Claims;
 using Schemata.Identity.Skeleton.Entities;
-using Schemata.Identity.Skeleton.Managers;
 using Schemata.Identity.Skeleton.Models;
-using Schemata.Identity.Skeleton.Services;
 using Schemata.Messaging.Skeleton;
 
 namespace Schemata.Identity.Foundation.Handlers;
@@ -26,17 +23,7 @@ public sealed class IdentityHandler<TUser>
     private readonly IRequestDispatcher _dispatcher;
 
     /// <summary>Creates a dispatcher-backed identity facade.</summary>
-    public IdentityHandler(
-        SchemataUserManager<TUser> users,
-        SignInManager<TUser>       sign,
-        IMailSender<TUser>         mail,
-        IMessageSender<TUser>      message,
-        IServiceProvider           sp
-    ) {
-        _ = users;
-        _ = sign;
-        _ = mail;
-        _ = message;
+    public IdentityHandler(IServiceProvider sp) {
         _dispatcher = sp.GetRequiredService<IRequestDispatcher>();
     }
 
@@ -48,12 +35,12 @@ public sealed class IdentityHandler<TUser>
     ) => _dispatcher.SendAsync<RegisterUserRequest<TUser>, IdentityResult<ClaimsPrincipal>>(
         new(request, principal), ct);
 
-    /// <summary>Authenticates a user and builds the sign-in principal.</summary>
-    public Task<IdentityResult<ClaimsPrincipal>> LoginAsync(
+    /// <summary>Authenticates a user and writes sign-in credentials.</summary>
+    public Task<IdentityResult<Unit>> LoginAsync(
         LoginRequest      request,
         ClaimsPrincipal   principal,
         CancellationToken ct = default
-    ) => _dispatcher.SendAsync<LoginUserRequest<TUser>, IdentityResult<ClaimsPrincipal>>(
+    ) => _dispatcher.SendAsync<LoginUserRequest<TUser>, IdentityResult<Unit>>(
         new(request, principal), ct);
 
     /// <summary>Refreshes a sign-in principal from an authentication ticket.</summary>

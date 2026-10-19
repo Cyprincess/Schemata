@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Identity;
 using Schemata.Abstractions.Entities;
@@ -10,13 +11,17 @@ namespace Schemata.Identity.Skeleton.Entities;
 /// </summary>
 [Table("SchemataUserTokens")]
 [PrimaryKey(nameof(UserId), nameof(LoginProvider), nameof(Name))]
-public class SchemataUserToken : IdentityUserToken<Guid>, ITimestamp
+public class SchemataUserToken : IdentityUserToken<string>, IConcurrency, ITimestamp
 {
-    public override Guid UserId { get; set; }
+    public override string UserId { get; set; } = null!;
 
     public override string LoginProvider { get; set; } = null!;
 
     public override string Name { get; set; } = null!;
+
+    /// <summary>Optimistic-lock register fencing concurrent redemptions of the code list.</summary>
+    [ConcurrencyCheck]
+    public virtual Guid Timestamp { get; set; }
 
     #region ITimestamp Members
 

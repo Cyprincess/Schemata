@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
@@ -42,23 +43,39 @@ internal sealed partial class IdentityOperationHandler<TUser>
         return builder.ToString();
     }
 
+    /// <summary>
+    ///     Translates a rejected ASP.NET Identity mutation into the shared validation error
+    ///     shape, so a failed store/user-validator write surfaces instead of reporting the
+    ///     requested account state.
+    /// </summary>
+    private static void RequireSucceeded(Microsoft.AspNetCore.Identity.IdentityResult result) {
+        if (!result.Succeeded) {
+            throw new ValidationException(result.Errors.Select(e => new ErrorFieldViolation {
+                Reason      = NormalizeIdentityCode(e.Code),
+                Description = e.Description,
+            }));
+        }
+    }
+
     /// <summary>Registers a user and builds the sign-in principal.</summary>
     public async Task<IdentityResult<ClaimsPrincipal>> RegisterAsync(
         RegisterRequest   request,
         ClaimsPrincipal   principal,
+        AdviceContext     context,
         CancellationToken ct = default
     ) {
-        var ctx = AdviceContext.Require();
 
-        switch (await Advisor.For<IIdentityRequestAdvisor<RegisterRequest>>()
-                             .RunAsync(ctx, request, IdentityOperation.Register, principal, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<ClaimsPrincipal>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        var execution = new IdentityOperationExecution<IdentityResult<ClaimsPrincipal>> {
+            Operation = IdentityOperation.Register,
+            Principal = principal,
+        };
+
+        var handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityRequestAdvisor<RegisterRequest, IdentityResult<ClaimsPrincipal>>>()
+                         .RunAsync(context, request, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         var user = new TUser {
@@ -67,15 +84,12 @@ internal sealed partial class IdentityOperationHandler<TUser>
             PhoneNumber = request.PhoneNumber,
         };
 
-        switch (await Advisor.For<IIdentityRegisterUserAdvisor>()
-                             .RunAsync(ctx, user, request, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<ClaimsPrincipal>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityRegisterUserAdvisor>()
+                         .RunAsync(context, user, request, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         var result = await _users.CreateAsync(user, request.Password);
@@ -86,15 +100,12 @@ internal sealed partial class IdentityOperationHandler<TUser>
             }));
         }
 
-        switch (await Advisor.For<IIdentityRegisterAdvisor<TUser>>()
-                             .RunAsync(ctx, user, request, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<ClaimsPrincipal>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityRegisterAdvisor<TUser>>()
+                         .RunAsync(context, user, request, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         if (_users.Options.SignIn.RequireConfirmedAccount) {
@@ -102,69 +113,7 @@ internal sealed partial class IdentityOperationHandler<TUser>
         }
 
         var claims = await _sign.CreateUserPrincipalAsync(user);
-
-        return IdentityResult<ClaimsPrincipal>.Success(claims);
-    }
-
-    /// <summary>Authenticates a user and builds the sign-in principal.</summary>
-    public async Task<IdentityResult<ClaimsPrincipal>> LoginAsync(
-        LoginRequest      request,
-        ClaimsPrincipal   principal,
-        CancellationToken ct = default
-    ) {
-        var ctx = AdviceContext.Require();
-
-        switch (await Advisor.For<IIdentityRequestAdvisor<LoginRequest>>()
-                             .RunAsync(ctx, request, IdentityOperation.Login, principal, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<ClaimsPrincipal>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
-        }
-
-        var found = await _users.FindByNameAsync(request.Username);
-        if (found is null) {
-            throw new UnauthenticatedException();
-        }
-
-        var check = await _sign.CheckPasswordSignInAsync(found, request.Password, true);
-
-        if (check.RequiresTwoFactor) {
-            if (!string.IsNullOrWhiteSpace(request.TwoFactorCode)) {
-                var valid = await _users.VerifyTwoFactorTokenAsync(
-                    found, _sign.Options.Tokens.AuthenticatorTokenProvider, request.TwoFactorCode);
-                if (!valid) {
-                    throw new UnauthenticatedException();
-                }
-            } else if (!string.IsNullOrWhiteSpace(request.TwoFactorRecoveryCode)) {
-                var redeem = await _users.RedeemTwoFactorRecoveryCodeAsync(found, request.TwoFactorRecoveryCode);
-                if (!redeem.Succeeded) {
-                    throw new UnauthenticatedException();
-                }
-            } else {
-                return IdentityResult<ClaimsPrincipal>.Challenge();
-            }
-
-            await _users.ResetAccessFailedCountAsync(found);
-        } else if (!check.Succeeded) {
-            throw new UnauthenticatedException();
-        }
-
-        switch (await Advisor.For<IIdentityLoginAdvisor>()
-                             .RunAsync(ctx, found, request, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<ClaimsPrincipal>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
-        }
-
-        var claims = await _sign.CreateUserPrincipalAsync(found);
+        AuthenticationClaims.Stamp(claims, null, false, _time);
 
         return IdentityResult<ClaimsPrincipal>.Success(claims);
     }
@@ -173,47 +122,53 @@ internal sealed partial class IdentityOperationHandler<TUser>
     public async Task<IdentityResult<ClaimsPrincipal>> RefreshAsync(
         AuthenticationTicket? ticket,
         ClaimsPrincipal       principal,
+        AdviceContext         context,
         CancellationToken     ct = default
     ) {
-        var ctx = AdviceContext.Require();
+        var execution = new IdentityOperationExecution<IdentityResult<ClaimsPrincipal>> {
+            Operation = IdentityOperation.Refresh,
+            Principal = principal,
+        };
 
-        switch (await Advisor.For<IIdentityRequestAdvisor<Unit>>()
-                             .RunAsync(ctx, Unit.Value, IdentityOperation.Refresh, principal, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<ClaimsPrincipal>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        var handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityRequestAdvisor<Unit, IdentityResult<ClaimsPrincipal>>>()
+                         .RunAsync(context, Unit.Value, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
-        if (ticket?.Principal is null || await _sign.ValidateSecurityStampAsync(ticket.Principal) is not { } found) {
+        // Ticket unprotection authenticates the payload; refresh admission enforces its expiry.
+        if (ticket?.Principal is null
+         || ticket.Properties?.ExpiresUtc is not { } expiresUtc
+         || _time.GetUtcNow() >= expiresUtc
+         || await _sign.ValidateSecurityStampAsync(ticket.Principal) is not { } found) {
             return IdentityResult<ClaimsPrincipal>.Challenge();
         }
 
-        switch (await Advisor.For<IIdentityRefreshUserAdvisor<TUser>>()
-                             .RunAsync(ctx, found, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<ClaimsPrincipal>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityRefreshUserAdvisor<TUser>>()
+                         .RunAsync(context, found, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         var claims = await _sign.CreateUserPrincipalAsync(found);
+        AuthenticationClaims.Carry(ticket.Principal, claims);
 
-        switch (await Advisor.For<IIdentityRefreshAdvisor>()
-                             .RunAsync(ctx, claims, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<ClaimsPrincipal>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        // Ticket-bound session identity survives the rebuild through the observers; renewal
+        // never mints a fresh session.
+        foreach (var observer in _hostObservers) {
+            await observer.OnRenewingAsync(claims, ticket.Principal, ct);
+        }
+
+        handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityRefreshAdvisor>()
+                         .RunAsync(context, claims, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         return IdentityResult<ClaimsPrincipal>.Success(claims);

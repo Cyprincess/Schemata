@@ -7,4 +7,4 @@ namespace Schemata.Identity.Skeleton.Advisors;
 /// <summary>
 ///     Advises login requests before authentication completes.
 /// </summary>
-public interface IIdentityLoginAdvisor : IAdvisor<SchemataUser, LoginRequest>;
+public interface IIdentityLoginAdvisor : IAdvisor<SchemataUser, LoginRequest, IHandledResponse<IdentityResult<System.Security.Claims.ClaimsPrincipal>>>;

@@ -5,6 +5,7 @@ using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Claims;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Messaging.Skeleton;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Identity.Foundation.Handlers;
 
@@ -14,6 +15,13 @@ internal sealed class GetUserProfileHandler<TUser>(IdentityOperationHandler<TUse
 {
     public Task<IdentityResult<ClaimsStore>> HandleAsync(
         GetUserProfileQuery<TUser> request,
+        AdviceContext              context,
         CancellationToken          ct = default
-    ) => operations.ProfileAsync(IdentityRequestHandler.Require(request).Principal!, ct);
+    ) {
+        if (request.Principal is null) {
+            return Task.FromResult(IdentityResult<ClaimsStore>.Challenge());
+        }
+
+        return operations.ProfileAsync(request.Principal, context, ct);
+    }
 }

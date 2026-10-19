@@ -19,24 +19,31 @@ internal sealed partial class IdentityOperationHandler<TUser>
     public async Task<IdentityResult<Unit>> ConfirmAsync(
         ConfirmRequest    request,
         ClaimsPrincipal   principal,
+        AdviceContext     context,
         CancellationToken ct = default
     ) {
-        var ctx = AdviceContext.Require();
 
-        switch (await Advisor.For<IIdentityRequestAdvisor<ConfirmRequest>>()
-                             .RunAsync(ctx, request, IdentityOperation.Confirm, principal, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<Unit>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        var execution = new IdentityOperationExecution<IdentityResult<Unit>> {
+            Operation = IdentityOperation.Confirm,
+            Principal = principal,
+        };
+
+        var handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityRequestAdvisor<ConfirmRequest, IdentityResult<Unit>>>()
+                         .RunAsync(context, request, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
-        // Missing accounts and invalid confirmation codes share one response shape for
-        // unauthenticated callers.
-        var found = await GetUserAsync(request.EmailAddress, request.PhoneNumber);
+        // A signed-in initiator confirms against their own account: the change code binds the
+        // initiating user and the requested contact through the UserManager's purpose-specific
+        // verification, never a contact-side lookup that could resolve a different account.
+        // Anonymous callers keep the current-contact confirmation path, whose uniform
+        // missing-account/invalid-code shape resists account enumeration.
+        var found = principal.Identity is ClaimsIdentity { IsAuthenticated: true }
+            ? await _users.GetUserAsync(principal)
+            : await GetUserAsync(request.EmailAddress, request.PhoneNumber);
         if (found is null) {
             throw new NoContentException();
         }
@@ -51,15 +58,12 @@ internal sealed partial class IdentityOperationHandler<TUser>
             throw new NoContentException();
         }
 
-        switch (await Advisor.For<IIdentityRecoveryAdvisor>()
-                             .RunAsync(ctx, found, IdentityOperation.Confirm, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<Unit>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityRecoveryAdvisor>()
+                         .RunAsync(context, found, IdentityOperation.Confirm, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         return IdentityResult<Unit>.Success(null);
@@ -69,19 +73,21 @@ internal sealed partial class IdentityOperationHandler<TUser>
     public async Task<IdentityResult<Unit>> CodeAsync(
         ForgetRequest     request,
         ClaimsPrincipal   principal,
+        AdviceContext     context,
         CancellationToken ct = default
     ) {
-        var ctx = AdviceContext.Require();
 
-        switch (await Advisor.For<IIdentityRequestAdvisor<ForgetRequest>>()
-                             .RunAsync(ctx, request, IdentityOperation.Code, principal, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<Unit>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        var execution = new IdentityOperationExecution<IdentityResult<Unit>> {
+            Operation = IdentityOperation.Code,
+            Principal = principal,
+        };
+
+        var handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityRequestAdvisor<ForgetRequest, IdentityResult<Unit>>>()
+                         .RunAsync(context, request, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         var found = await GetUserAsync(request.EmailAddress, request.PhoneNumber);

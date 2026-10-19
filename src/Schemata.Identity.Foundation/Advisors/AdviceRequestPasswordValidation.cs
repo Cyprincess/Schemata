@@ -1,6 +1,6 @@
-using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Identity.Skeleton;
@@ -20,25 +20,24 @@ public static class AdviceRequestPasswordValidation
 
 /// <summary>Validates password-change profile requests.</summary>
 /// <typeparam name="TUser">User entity type handled by the user manager.</typeparam>
-public sealed class AdviceRequestPasswordValidation<TUser>(SchemataUserManager<TUser> users) : IIdentityRequestAdvisor<ProfileRequest>
+public sealed class AdviceRequestPasswordValidation<TUser>(SchemataUserManager<TUser> users) : IIdentityRequestAdvisor<ProfileRequest, IdentityResult<Unit>>
     where TUser : SchemataUser, new()
 {
-    #region IIdentityRequestAdvisor<ProfileRequest> Members
+    #region IIdentityRequestAdvisor<ProfileRequest, IdentityResult<Unit>> Members
 
     public int Order => AdviceRequestPasswordValidation.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(
-        AdviceContext     ctx,
-        ProfileRequest    request,
-        IdentityOperation op,
-        ClaimsPrincipal   principal,
-        CancellationToken ct = default
+        AdviceContext                                    ctx,
+        ProfileRequest                                   request,
+        IdentityOperationExecution<IdentityResult<Unit>> execution,
+        CancellationToken                                ct = default
     ) {
-        if (op is not IdentityOperation.ChangePassword) {
+        if (execution.Operation is not IdentityOperation.ChangePassword) {
             return AdviseResult.Continue;
         }
 
-        await IdentityValidation.RequireUserAsync(users, principal);
+        await IdentityValidation.RequireUserAsync(users, execution.Principal);
 
         IdentityValidation.RequireNotEmpty(request.OldPassword, nameof(request.OldPassword));
         IdentityValidation.RequireNotEmpty(request.NewPassword, nameof(request.NewPassword));

@@ -10,11 +10,11 @@ namespace Schemata.Identity.Skeleton.Entities;
 /// </summary>
 [Table("SchemataUserRole")]
 [PrimaryKey(nameof(UserId), nameof(RoleId))]
-public class SchemataUserRole : IdentityUserRole<Guid>, ITimestamp
+public class SchemataUserRole : IdentityUserRole<string>, ITimestamp
 {
-    public override Guid UserId { get; set; }
+    public override string UserId { get; set; } = null!;
 
-    public override Guid RoleId { get; set; }
+    public override string RoleId { get; set; } = null!;
 
     #region ITimestamp Members
 

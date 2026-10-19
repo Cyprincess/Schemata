@@ -15,6 +15,7 @@
     <ProjectReference Include="..\..\src\Schemata.Identity.Grpc\Schemata.Identity.Grpc.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Identity.Http\Schemata.Identity.Http.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Tenancy.Foundation\Schemata.Tenancy.Foundation.csproj" />
   </ItemGroup>
 
 </Project>

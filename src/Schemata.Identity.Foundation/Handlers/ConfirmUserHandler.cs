@@ -5,6 +5,7 @@ using Schemata.Identity.Foundation.Commands;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Messaging.Skeleton;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Identity.Foundation.Handlers;
 
@@ -14,6 +15,13 @@ internal sealed class ConfirmUserHandler<TUser>(IdentityOperationHandler<TUser> 
 {
     public Task<IdentityResult<Unit>> HandleAsync(
         ConfirmUserRequest<TUser> request,
+        AdviceContext             context,
         CancellationToken         ct = default
-    ) => operations.ConfirmAsync(IdentityRequestHandler.Require(request).Request, request.Principal!, ct);
+    ) {
+        if (request.Principal is null) {
+            return Task.FromResult(IdentityResult<Unit>.Challenge());
+        }
+
+        return operations.ConfirmAsync(IdentityRequestHandler.Require(request).Request, request.Principal, context, ct);
+    }
 }

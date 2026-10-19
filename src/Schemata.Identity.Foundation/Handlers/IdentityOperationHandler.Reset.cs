@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
@@ -8,6 +9,7 @@ using Schemata.Advice;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Advisors;
 using Schemata.Identity.Skeleton.Entities;
+using Schemata.Identity.Skeleton.Services;
 using Schemata.Identity.Skeleton.Models;
 
 namespace Schemata.Identity.Foundation.Handlers;
@@ -19,19 +21,21 @@ internal sealed partial class IdentityOperationHandler<TUser>
     public async Task<IdentityResult<Unit>> ForgotAsync(
         ForgetRequest     request,
         ClaimsPrincipal   principal,
+        AdviceContext     context,
         CancellationToken ct = default
     ) {
-        var ctx = AdviceContext.Require();
 
-        switch (await Advisor.For<IIdentityRequestAdvisor<ForgetRequest>>()
-                             .RunAsync(ctx, request, IdentityOperation.Forgot, principal, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<Unit>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        var execution = new IdentityOperationExecution<IdentityResult<Unit>> {
+            Operation = IdentityOperation.Forgot,
+            Principal = principal,
+        };
+
+        var handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityRequestAdvisor<ForgetRequest, IdentityResult<Unit>>>()
+                         .RunAsync(context, request, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         var found = await GetUserAsync(request.EmailAddress, request.PhoneNumber);
@@ -43,15 +47,17 @@ internal sealed partial class IdentityOperationHandler<TUser>
             case var _ when !string.IsNullOrWhiteSpace(request.EmailAddress)
                          && await _users.IsEmailConfirmedAsync(found):
             {
-                var code = await _users.GeneratePasswordResetTokenAsync(found);
-                await _mail.SendPasswordResetCodeAsync(found, request.EmailAddress, code);
+                var code   = await _users.GeneratePasswordResetTokenAsync(found);
+                var sender = _services.GetRequiredService<IMailSender<TUser>>();
+                await sender.SendPasswordResetCodeAsync(found, request.EmailAddress, code);
                 break;
             }
             case var _ when !string.IsNullOrWhiteSpace(request.PhoneNumber)
                          && await _users.IsPhoneNumberConfirmedAsync(found):
             {
-                var code = await _users.GeneratePasswordResetTokenAsync(found);
-                await _message.SendPasswordResetCodeAsync(found, request.PhoneNumber, code);
+                var code   = await _users.GeneratePasswordResetTokenAsync(found);
+                var sender = _services.GetRequiredService<IMessageSender<TUser>>();
+                await sender.SendPasswordResetCodeAsync(found, request.PhoneNumber, code);
                 break;
             }
         }
@@ -63,19 +69,21 @@ internal sealed partial class IdentityOperationHandler<TUser>
     public async Task<IdentityResult<Unit>> ResetAsync(
         ResetRequest      request,
         ClaimsPrincipal   principal,
+        AdviceContext     context,
         CancellationToken ct = default
     ) {
-        var ctx = AdviceContext.Require();
 
-        switch (await Advisor.For<IIdentityRequestAdvisor<ResetRequest>>()
-                             .RunAsync(ctx, request, IdentityOperation.Reset, principal, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<Unit>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        var execution = new IdentityOperationExecution<IdentityResult<Unit>> {
+            Operation = IdentityOperation.Reset,
+            Principal = principal,
+        };
+
+        var handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityRequestAdvisor<ResetRequest, IdentityResult<Unit>>>()
+                         .RunAsync(context, request, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         // Unauthenticated reset and confirm flows share one failure shape for missing accounts,
@@ -102,15 +110,12 @@ internal sealed partial class IdentityOperationHandler<TUser>
             throw new NoContentException();
         }
 
-        switch (await Advisor.For<IIdentityRecoveryAdvisor>()
-                             .RunAsync(ctx, found, IdentityOperation.Reset, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<Unit>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityRecoveryAdvisor>()
+                         .RunAsync(context, found, IdentityOperation.Reset, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         return IdentityResult<Unit>.Success(null);

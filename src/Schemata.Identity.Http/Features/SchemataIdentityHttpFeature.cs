@@ -13,13 +13,13 @@ using Schemata.Resource.Http.Features;
 
 namespace Schemata.Identity.Http.Features;
 
-[DependsOn(typeof(SchemataIdentityFeature<,,,>))]
+[DependsOn<SchemataIdentityFeature>]
 [DependsOn<SchemataHttpResourceFeature>]
 public sealed class SchemataIdentityHttpFeature<TUser, TRole> : FeatureBase
     where TUser : SchemataUser, new()
     where TRole : SchemataRole
 {
-    public const int DefaultPriority = SchemataIdentityFeature<TUser, TRole, Skeleton.Stores.SchemataUserStore<TUser>, Skeleton.Stores.SchemataRoleStore<TRole>>.DefaultPriority + 100_000;
+    public const int DefaultPriority = SchemataIdentityFeature.DefaultPriority + 100_000;
 
     public override int Priority => DefaultPriority;
     public override void ConfigureServices(

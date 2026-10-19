@@ -1,10 +1,16 @@
-using System.Security.Claims;
 using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Identity.Skeleton.Advisors;
 
 /// <summary>
-///     Advises an identity request model with the requested operation and caller principal.
+///     Advises an identity request with the requested operation and caller. An advisor that
+///     short-circuits the operation writes its result to
+///     <see cref="IdentityOperationExecution{TResponse}.Response" /> and returns
+///     <see cref="Schemata.Abstractions.Advisors.AdviseResult.Handle" />.
 /// </summary>
-/// <typeparam name="T">The request model type.</typeparam>
-public interface IIdentityRequestAdvisor<in T> : IAdvisor<T, IdentityOperation, ClaimsPrincipal>;
+/// <typeparam name="TRequest">The request model type.</typeparam>
+/// <typeparam name="TResponse">The operation's result payload type.</typeparam>
+public interface IIdentityRequestAdvisor<in TRequest, TResponse>
+    : IAdvisor<TRequest, IdentityOperationExecution<TResponse>>
+    where TRequest : class
+    where TResponse : class;

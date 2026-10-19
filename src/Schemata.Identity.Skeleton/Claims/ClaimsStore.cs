@@ -17,9 +17,9 @@ public sealed class ClaimsStore : Dictionary<string, ClaimStore>
             return;
         }
 
-        if (!TryGetValue(type!, out var store)) {
+        if (!TryGetValue(type, out var store)) {
             store       = [];
-            this[type!] = store;
+            this[type] = store;
         }
 
         store.Add(value);

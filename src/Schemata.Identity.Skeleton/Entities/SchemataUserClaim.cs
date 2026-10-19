@@ -10,7 +10,7 @@ namespace Schemata.Identity.Skeleton.Entities;
 /// </summary>
 [Table("SchemataUserClaims")]
 [PrimaryKey(nameof(Uid))]
-public class SchemataUserClaim : IdentityUserClaim<Guid>, IIdentifier, ITimestamp
+public class SchemataUserClaim : IdentityUserClaim<string>, IIdentifier, ITimestamp
 {
     #region IIdentifier Members
     public virtual Guid Uid { get; set; }
