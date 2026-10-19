@@ -139,6 +139,20 @@ public class AdviceCommittedEvictCacheShould
     }
 
     [Fact]
+    public async Task Commit_WhenEvictionSuppressed_DoesNotSuppressTheNextCommit() {
+        using var cache = new QueryCacheTestContext();
+        var query = cache.Query<int>(QueryOperation.Count);
+        await cache.Read(query);
+        await cache.Fill(query, 7);
+        await cache.Commit(new MutationOptions(IgnoreCacheEviction: true));
+        Assert.Equal(AdviseResult.Handle, await cache.Read(cache.Query<int>(QueryOperation.Count)));
+
+        await cache.Commit();
+
+        Assert.Equal(AdviseResult.Continue, await cache.Read(cache.Query<int>(QueryOperation.Count)));
+    }
+
+    [Fact]
     public async Task Commit_WithoutIgnoreCacheEviction_InvalidatesCachedResult() {
         using var cache = new QueryCacheTestContext();
         var query = cache.Query<int>(QueryOperation.Count);

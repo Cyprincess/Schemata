@@ -132,9 +132,9 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     private bool _completed;
     private bool _disposed;
 
-    // Commit-scoped fact, like _writeSequence: any operation in the current work may request that
-    // the repository's committed notification skips cache eviction. It resets when that work ends.
-    private bool _ignoreCacheEviction;
+    // The scope of the current enlistment; its sinks read the cache-eviction request when that one
+    // enlistment completes, so a request never reaches a later commit.
+    private CommitScope? _commitScope;
 
     private IUnitOfWork? _uow;
     private IUnitOfWork? _writeUnitOfWork;
@@ -477,7 +477,6 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     public abstract Task<MutationResult> AddAsync(TEntity entity, CancellationToken ct = default, MutationOptions options = default);
 
     public virtual async Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default, MutationOptions options = default) {
-        TrackEvictionSuppression(options.IgnoreCacheEviction);
         foreach (var entity in entities) {
             ct.ThrowIfCancellationRequested();
             await AddAsync(entity, ct, options);
@@ -489,7 +488,6 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     public abstract Task<MutationResult> RemoveAsync(TEntity entity, CancellationToken ct = default, MutationOptions options = default);
 
     public virtual async Task RemoveRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default, MutationOptions options = default) {
-        TrackEvictionSuppression(options.IgnoreCacheEviction);
         foreach (var entity in entities) {
             ct.ThrowIfCancellationRequested();
             await RemoveAsync(entity, ct, options);
@@ -666,11 +664,14 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     ///     enlistment staged at least one write; a pure-read or fully handled enlistment completes
     ///     without notifying.
     /// </summary>
-    private async Task DispatchCommittedAsync(CancellationToken ct) {
+    private async Task DispatchCommittedAsync(CommitScope scope, CancellationToken ct) {
         _completed = true;
 
-        var ignoreCacheEviction = _ignoreCacheEviction;
-        _ignoreCacheEviction = false;
+        var ignoreCacheEviction = scope.IgnoreCacheEviction;
+        scope.IgnoreCacheEviction = false;
+        if (ReferenceEquals(_commitScope, scope)) {
+            _commitScope = null;
+        }
 
         if (_writeSequence == _enlistmentStart) {
             return;
@@ -706,12 +707,12 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     ///     and the next write replaces it with a fresh unit-of-work context.
     /// </summary>
     private void Reopen() {
-        _uow                 = null;
-        _writeUnitOfWork     = null;
-        _enlistmentStart     = _writeSequence;
-        _completed           = false;
-        _ignoreCacheEviction = false;
-        OwnsContext          = true;
+        _uow             = null;
+        _writeUnitOfWork = null;
+        _enlistmentStart = _writeSequence;
+        _completed       = false;
+        _commitScope     = null;
+        OwnsContext      = true;
     }
 
     private void Enlist(IUnitOfWork uow) {
@@ -719,13 +720,21 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         _writeUnitOfWork = uow;
         _enlistmentStart = _writeSequence;
 
+        // One scope per enlistment: the sinks registered below read the request this enlistment
+        // collected, and clearing it on completion keeps a later commit unaffected.
+        var scope = new CommitScope();
+        _commitScope = scope;
+
         // Enlistment completion is registered independently of any staged write: a pure-read or
         // fully handled enlistment must still observe the outer commit and complete, while the
         // type-level notification stays gated on the write-sequence delta inside the sink.
-        uow.AddCommitSink(CommitOrders.Repository, DispatchCommittedAsync);
+        uow.AddCommitSink(CommitOrders.Repository, ct => DispatchCommittedAsync(scope, ct));
         uow.AddRollbackSink(() => {
-            _completed           = true;
-            _ignoreCacheEviction = false;
+            _completed = true;
+            scope.IgnoreCacheEviction = false;
+            if (ReferenceEquals(_commitScope, scope)) {
+                _commitScope = null;
+            }
         });
 
         OwnsContext = false;
@@ -736,7 +745,6 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     ///     returns its advise result, so callers skip persistence unless the chain continues.
     /// </summary>
     protected async Task<AdviseResult> RunAddAdvisorsAsync(TEntity entity, MutationOptions options, CancellationToken ct) {
-        TrackEvictionSuppression(options.IgnoreCacheEviction);
         return await Advisor.For<IRepositoryAddAdvisor<TEntity>>()
                             .RunAsync(AdviceContext, this, entity, options, ct);
     }
@@ -748,12 +756,15 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     protected abstract IQueryable<TEntity> AsQueryable();
 
     /// <summary>
-    ///     Records a caller's explicit cache-eviction suppression for the current work.
+    ///     Records the caller's cache-eviction suppression on the current enlistment. A read
+    ///     contributes to work already in progress; a write tracks after enlisting, so its request
+    ///     reaches the unit of work that write opens. With no enlistment there is no commit to
+    ///     suppress.
     /// </summary>
     /// <param name="ignore">Whether the operation requested eviction suppression.</param>
     protected void TrackEvictionSuppression(bool ignore) {
         if (ignore) {
-            _ignoreCacheEviction = true;
+            _commitScope?.IgnoreCacheEviction = true;
         }
     }
 
@@ -865,4 +876,17 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         DisposeContext();
         return ValueTask.CompletedTask;
     }
+
+    #region Nested type: CommitScope
+
+    /// <summary>
+    ///     Carries the cache-eviction request of exactly one enlistment from the operations inside
+    ///     that enlistment to its commit and rollback sinks.
+    /// </summary>
+    private sealed class CommitScope
+    {
+        public bool IgnoreCacheEviction { get; set; }
+    }
+
+    #endregion
 }

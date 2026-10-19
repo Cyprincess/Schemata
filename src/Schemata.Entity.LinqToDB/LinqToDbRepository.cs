@@ -81,6 +81,7 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQ
         }
 
         EnsureWriteUnitOfWork();
+        TrackEvictionSuppression(options.IgnoreCacheEviction);
 
         try {
             await Context.InsertAsync(entity, TableName, token: ct);
@@ -100,7 +101,6 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQ
     ///     bulk-copy round trip instead of one insert per entity.
     /// </summary>
     public override async Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default, MutationOptions options = default) {
-        TrackEvictionSuppression(options.IgnoreCacheEviction);
         var staged = new List<TEntity>();
         foreach (var entity in entities) {
             ct.ThrowIfCancellationRequested();
@@ -114,6 +114,7 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQ
         }
 
         EnsureWriteUnitOfWork();
+        TrackEvictionSuppression(options.IgnoreCacheEviction);
 
         try {
             await Context.GetTable<TEntity>().TableName(TableName).BulkCopyAsync(new BulkCopyOptions { BulkCopyType = BulkCopyType.ProviderSpecific }, staged, ct);
@@ -129,7 +130,6 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQ
 
     public override async Task<MutationResult> UpdateAsync(TEntity entity, CancellationToken ct = default, MutationOptions options = default) {
         ct.ThrowIfCancellationRequested();
-        TrackEvictionSuppression(options.IgnoreCacheEviction);
 
         var mark = WriteSequence;
 
@@ -140,6 +140,7 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQ
         }
 
         EnsureWriteUnitOfWork();
+        TrackEvictionSuppression(options.IgnoreCacheEviction);
 
         if (IsConcurrencyControlled) {
             int rows;
@@ -173,7 +174,6 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQ
 
     public override async Task<MutationResult> RemoveAsync(TEntity entity, CancellationToken ct = default, MutationOptions options = default) {
         ct.ThrowIfCancellationRequested();
-        TrackEvictionSuppression(options.IgnoreCacheEviction);
 
         var mark = WriteSequence;
 
@@ -184,6 +184,7 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQ
         }
 
         EnsureWriteUnitOfWork();
+        TrackEvictionSuppression(options.IgnoreCacheEviction);
 
         if (IsConcurrencyControlled) {
             var rows = await Context.GetTable<TEntity>().TableName(TableName).DeleteOptimisticAsync(entity, ct);

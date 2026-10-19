@@ -63,6 +63,7 @@ public class EfCoreRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQue
         }
 
         EnsureWriteUnitOfWork();
+        TrackEvictionSuppression(options.IgnoreCacheEviction);
 
         var entry = await Context.AddAsync(entity, ct);
 
@@ -93,7 +94,6 @@ public class EfCoreRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQue
 
     public override async Task<MutationResult> UpdateAsync(TEntity entity, CancellationToken ct = default, MutationOptions options = default) {
         ct.ThrowIfCancellationRequested();
-        TrackEvictionSuppression(options.IgnoreCacheEviction);
 
         var mark = WriteSequence;
 
@@ -104,6 +104,7 @@ public class EfCoreRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQue
         }
 
         EnsureWriteUnitOfWork();
+        TrackEvictionSuppression(options.IgnoreCacheEviction);
 
         var entry = Context.Entry(entity);
 
@@ -134,7 +135,6 @@ public class EfCoreRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQue
 
     public override async Task<MutationResult> RemoveAsync(TEntity entity, CancellationToken ct = default, MutationOptions options = default) {
         ct.ThrowIfCancellationRequested();
-        TrackEvictionSuppression(options.IgnoreCacheEviction);
 
         var mark = WriteSequence;
 
@@ -145,6 +145,7 @@ public class EfCoreRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQue
         }
 
         EnsureWriteUnitOfWork();
+        TrackEvictionSuppression(options.IgnoreCacheEviction);
 
         Context.Remove(entity);
 
