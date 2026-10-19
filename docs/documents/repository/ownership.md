@@ -1,20 +1,19 @@
 # Repository Ownership
 
-The `Schemata.Entity.Owner` package adds automatic owner assignment and owner-scoped query filtering to the repository layer. Entities implementing `IOwnable` are automatically stamped with the current principal's canonical name on create, and queries are automatically filtered to include only entities owned by that principal.
+The repository layer adds automatic owner assignment and owner-scoped query filtering. Entities implementing `IOwnable` are automatically stamped with the current principal's canonical name on create, and queries are automatically filtered to include only entities owned by that principal. The ownership contracts and advisors ship in `Schemata.Entity.Repository`.
 
 Ownership is opt-in. Call `UseOwner()` on the repository builder to enable the advisors.
 
 ## Where the code lives
 
-| Item                                            | Path                                                                                     |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `IOwnerResolver<TEntity>`                       | `src/Schemata.Entity.Owner/IOwnerResolver.cs`                                            |
-| `SchemataOwnerOptions`                          | `src/Schemata.Entity.Owner/SchemataOwnerOptions.cs`                                      |
-| `AdviceAddOwner<TEntity>`                       | `src/Schemata.Entity.Owner/Advisors/AdviceAddOwner.cs`                                   |
-| `AdviceBuildQueryOwner<TEntity>`                | `src/Schemata.Entity.Owner/Advisors/AdviceBuildQueryOwner.cs`                            |
-| `AdviceValidateResourceReferenceExistence<TEntity>` | `src/Schemata.Entity.Owner/Advisors/AdviceValidateResourceReferenceExistence.cs`     |
-| `UseOwner` extension                            | `src/Schemata.Entity.Owner/Extensions/SchemataRepositoryBuilderExtensions.cs`            |
-| Resource query-container extensions             | `src/Schemata.Entity.Owner/Extensions/OwnerResourceRequestContainerExtensions.cs`         |
+| Item                                              | Path                                                                                       |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `IOwnerResolver<TEntity>`                         | `src/Schemata.Entity.Repository/IOwnerResolver.cs`                                         |
+| `SchemataOwnerOptions`                            | `src/Schemata.Entity.Repository/SchemataOwnerOptions.cs`                                   |
+| `AdviceAddOwner<TEntity>`                         | `src/Schemata.Entity.Repository/Advisors/AdviceAddOwner.cs`                                |
+| `AdviceBuildQueryOwner<TEntity>`                  | `src/Schemata.Entity.Repository/Advisors/AdviceBuildQueryOwner.cs`                         |
+| `AdviceValidateResourceReferenceExistence<TEntity>` | `src/Schemata.Entity.Repository/Advisors/AdviceValidateResourceReferenceExistence.cs`    |
+| `UseOwner` extension                              | `src/Schemata.Entity.Repository/Extensions/SchemataRepositoryBuilderOwnerExtensions.cs`    |
 
 ## IOwnerResolver
 
@@ -37,11 +36,10 @@ public interface IOwnerResolver<TEntity>
 
 **Behavior:**
 
-1. If `OwnerSuppressed` is in the advice context, skips.
-2. If the entity does not implement `IOwnable`, skips.
-3. If `IOwnable.Owner` is already non-null/non-empty, skips — callers can override the default by pre-setting the owner.
-4. Calls `IOwnerResolver<TEntity>.ResolveAsync`. If the result is non-empty, assigns it to `IOwnable.Owner` and returns `Continue`.
-5. When the resolver returns `null`, behavior is governed by `SchemataOwnerOptions.OnNullOwner`:
+1. If the entity does not implement `IOwnable`, skips.
+2. If `IOwnable.Owner` is already non-null/non-empty, skips — callers can override the default by pre-setting the owner.
+3. Calls `IOwnerResolver<TEntity>.ResolveAsync`. If the result is non-empty, assigns it to `IOwnable.Owner` and returns `Continue`.
+4. When the resolver returns `null`, behavior is governed by `SchemataOwnerOptions.OnNullOwner`:
    - `Reject` (default) — throws `PermissionDeniedException`.
    - `EmptyResult` — returns `Block`.
    - `AllowAll` — returns `Continue`.
@@ -54,17 +52,18 @@ public interface IOwnerResolver<TEntity>
 
 **Behavior:**
 
-1. If `QueryOwnerSuppressed` is in the advice context, skips.
+1. If the query passes `QueryOptions.IgnoreOwner`, skips.
 2. If `TEntity` does not implement `IOwnable`, skips.
 3. Calls `IOwnerResolver<TEntity>.ResolveAsync`. If non-empty, appends `.OfType<IOwnable>().Where(e => e.Owner == owner).OfType<TEntity>()`.
 4. When the resolver returns `null`, applies `SchemataOwnerOptions.OnNullOwner` (same policy as `AdviceAddOwner`).
 
 ### AdviceValidateResourceReferenceExistence
 
-`AdviceValidateResourceReferenceExistence<TEntity>` implements both `IRepositoryAddAdvisor<TEntity>` and
-`IRepositoryUpdateAdvisor<TEntity>`. It lives in the ownership package because its existence queries
-must suppress the owner filter (`QueryOwnerSuppressed`), which `Schemata.Entity.Repository` cannot
-reference without a dependency cycle.
+`AdviceValidateResourceReferenceExistence<TEntity>` belongs to Repository and is registered by
+`AddRepository` for add/update operations. Each property opts in with `ValidateExistence = true`.
+Its target query passes `QueryOptions(IgnoreOwner: true)`; ownership installation is independent.
+The validation creates no database foreign keys or cascades and
+cannot prevent a target from being deleted after the check.
 
 **Order:** `AdviceValidateResourceReferences.DefaultOrder + 10_000_000` = 150,000,000, on both the add
 and update pipelines. Type resolvability is established before any existence query executes.
@@ -78,7 +77,7 @@ and update pipelines. Type resolvability is established before any existence que
    `ICanonicalName` are skipped; an unregistered `IResourceTypeResolver` throws
    `InvalidOperationException`.
 3. Queries the target's `IRepository<TTarget>` for any row with the matching `CanonicalName`, with
-   `QueryOwnerSuppressed` applied so cross-owner references resolve.
+   `QueryOptions(IgnoreOwner: true)` so cross-owner references resolve.
 4. A missing row throws `NotFoundException` (`SchemataResourceErrors.NotFound(target, value)`).
 
 ## Registration
@@ -88,7 +87,7 @@ services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
         .UseOwner();
 ```
 
-`UseOwner()` registers `SchemataOwnerOptions`, `AdviceBuildQueryOwner<>` as `IRepositoryBuildQueryAdvisor<>`, `AdviceAddOwner<>` as `IRepositoryAddAdvisor<>`, and `AdviceValidateResourceReferenceExistence<>` as both `IRepositoryAddAdvisor<>` and `IRepositoryUpdateAdvisor<>`. All registrations use `TryAddEnumerable` so they don't displace custom advisors.
+`UseOwner()` registers `SchemataOwnerOptions`, `AdviceBuildQueryOwner<>` and `AdviceAddOwner<>`. Registrations use `TryAddEnumerable`; logical reference existence validation is registered independently by Repository.
 
 You must also register a concrete `IOwnerResolver<TEntity>`. A typical implementation reads the current principal from `IHttpContextAccessor`:
 
@@ -111,39 +110,28 @@ public sealed class PrincipalOwnerResolver<TEntity> : IOwnerResolver<TEntity>
 }
 ```
 
-## Suppression
+## Per-operation owner options
 
-| Entry point                                  | Marker                 | Effect                                                       |
-| -------------------------------------------- | ---------------------- | ------------------------------------------------------------ |
-| `repository.SuppressOwner()`                 | `OwnerSuppressed`      | Skips `AdviceAddOwner` for this repository instance.         |
-| `repository.SuppressQueryOwner()`            | `QueryOwnerSuppressed` | Skips `AdviceBuildQueryOwner` for this repository scope.     |
+Ownership is controlled per call. A query that must include every owner passes
+`QueryOptions(IgnoreOwner: true)`, and `AdviceBuildQueryOwner` skips the filter for that call only.
+Insert stamping has no bypass: `AdviceAddOwner` assigns the owner only while `Owner` is unset, so
+pre-assign the value the seed or import needs.
 
 ```csharp
-// Add without assigning ownership
-using (repository.SuppressOwner())
-{
-    await repository.AddAsync(entity, ct);
-}
-
-// List all entities regardless of owner
-using (repository.SuppressQueryOwner())
-{
-    var all = await repository.ListAsync<Document>(null, ct).ToListAsync(ct);
-}
+var all = await repository.ListAsync<Document>(
+    null, ct, new QueryOptions(IgnoreOwner: true)).ToListAsync(ct);
 ```
 
-Suppression is repository-scoped only. The resource handler queries through its own
-`IRepository<TEntity>` instance, which request advisors never see, so a request advisor cannot
-suppress the owner filter for a handler-initiated read. A consumer that needs owner-free reads
-of its own resource registers a scoped `IRepositoryBuildQueryAdvisor<TEntity>` that marks the
-query advice context with `QueryOwnerSuppressed`; the marker skips `AdviceBuildQueryOwner` for
-that repository query.
+The option travels with the call, so the resource handler's own `IRepository<TEntity>` follows the
+same rule. A consumer that needs owner-free reads of its own resource passes the option at that
+call site; a request advisor cannot affect the handler's repository because the two instances are
+separate.
 
 ## Override and bypass
 
-`AdviceAddOwner` leaves an already-set `Owner` untouched, so a caller that pre-assigns ownership keeps
-control. To create an entity with no owner stamping at all, scope `SuppressOwner()`. `AdviceAddOwner`
-fires whether the entity reaches the repository through the resource layer or directly.
+`AdviceAddOwner` leaves an already-set `Owner` untouched, so a caller that pre-assigns ownership
+keeps control. The advisor fires whether the entity reaches the repository through the resource
+layer or directly.
 
 ## Extension points
 

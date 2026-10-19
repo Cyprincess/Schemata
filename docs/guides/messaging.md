@@ -1,4 +1,4 @@
-# Messaging
+﻿# Messaging
 
 This guide shows how an application defines a request, registers its one handler, and uses the dispatcher wrap pipeline for request-wide behavior.
 
@@ -7,13 +7,14 @@ This guide shows how an application defines a request, registers its one handler
 ```csharp
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Advisors;
 using Schemata.Messaging.Skeleton;
 
 public sealed record PriceQuery(string Product) : IQuery<decimal>;
 
 public sealed class PriceQueryHandler : IRequestHandler<PriceQuery, decimal>
 {
-    public Task<decimal> HandleAsync(PriceQuery request, CancellationToken ct = default)
+    public Task<decimal> HandleAsync(PriceQuery request, AdviceContext context, CancellationToken ct = default)
         => Task.FromResult(9.99m);
 }
 ```
@@ -65,11 +66,11 @@ services.TryAddEnumerable(ServiceDescriptor.Scoped<
 
 The dispatcher sorts registered wraps by `Order`. A wrap can return a response without calling its continuation or throw an exception to terminate the request. Plain `IRequest<TResponse>` requests invoke their handler without a wrap chain.
 
-## Ambient context
+## Dispatch context
 
-The dispatcher establishes `AdviceContext` for one in-process dispatch. Wrap advisors and the handler share it. Use it for pipeline coordination markers; keep request and response business data in typed envelopes or local variables.
+The dispatcher constructs one `AdviceContext` for an in-process dispatch and passes it to every wrap advisor and to the handler. The context exposes the dispatch's service provider; keep request and response business data in typed envelopes or local variables.
 
-Nested dispatch restores the outer ambient context after the inner request returns. A handler-stage advisor reads the existing context with `AdviceContext.Require()`.
+A nested dispatch constructs its own `AdviceContext`; the outer dispatch keeps the instance it was given. Handler-stage advisors receive the context as a parameter.
 
 ## RabbitMQ dispatch
 

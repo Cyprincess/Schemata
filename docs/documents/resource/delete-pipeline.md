@@ -4,11 +4,11 @@ A Delete request enters the dispatcher as `DeleteResourceRequest<TEntity,TDetail
 
 ## Request and entity stages
 
-The handler binds the URI name into a `ResourceRequestContainer<TEntity>`. Handler-stage entitlement adds a predicate. It loads the target under soft-delete suppression. A missing target throws `ResourceNotFound` unless `AllowMissing` is true.
+The handler binds the URI name into a `ResourceRequestContainer<TEntity>`. Handler-stage entitlement adds a predicate. It loads the target with `QueryOptions(IgnoreSoftDelete: true)`. A missing target throws `ResourceNotFound` unless `AllowMissing` is true. A loaded row with a set `DeleteTime` is an already-deleted target: it returns the empty success of `AllowMissing` or throws `ResourceNotFound` otherwise, keeping the original `DeleteTime` because the row is never deleted again. The decision runs after the entity-stage advisors, so authorization and freshness still apply per AIP-211 and AIP-164.
 
 After the load, the instance access advisor evaluates `IAccessProvider<TEntity,TRequest>` with the entity. `AdviceDeleteFreshness` validates an ETag when the request supplies one. A mismatch throws `AbortedException` with `CONCURRENCY_MISMATCH`.
 
-The handler removes and commits the entity. A soft-delete repository advisor writes `DeleteTime`; a hard delete has no detail. The detail response wrap shapes a soft-delete detail by deriving `IChild.Parent` and creating an ETag when the response implements the corresponding traits.
+The handler removes and commits the entity. A soft-delete repository advisor writes `DeleteTime`; a hard delete has no detail. A removal an advisor blocked or handled without staging returns `MutationResult.NoWrite` and the handler answers with an empty result. The detail response wrap shapes a soft-delete detail by deriving `IChild.Parent` and creating an ETag when the response implements the corresponding traits.
 
 ## Authorization
 

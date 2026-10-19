@@ -62,10 +62,13 @@ in-place overloads delegate through the foundation helpers:
 
 ```csharp
 public void Map<TSource, TDestination>(TSource source, TDestination destination)
-    => SimpleMapperHelper.MapMerging(source, destination, (s, d) => _mapper.Map(s, d));
+    => SimpleMapperHelper.MapMerging(source, destination,
+        (s, d) => SimpleMapperHelper.ReconcileReplacement(_mapper.Map(s, d), d));
 
 public void Map<TSource, TDestination>(TSource source, TDestination destination, IEnumerable<string> fields)
-    => SimpleMapperHelper.MapWithMask(source, destination, fields, (s, d) => _mapper.Map(s, d));
+    => SimpleMapperHelper.MapWithMask(source, destination, fields,
+        (s, d) => SimpleMapperHelper.ReconcileReplacement(_mapper.Map(s, d), d),
+        s => _mapper.Map<TSource, TDestination>(s));
 ```
 
 ## Declaring mappings

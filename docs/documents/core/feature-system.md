@@ -158,7 +158,7 @@ A feature declares prerequisites with two attribute forms, processed during
   `SchemataRoutingFeature` this way.
 - **`[DependsOn(typeof(SomeFeature))]`** (`DependsOnAttribute(Type)`) — type-reference dependency
   for cases where the generic form is awkward, including open generics such as
-  `[DependsOn(typeof(SchemataAuthorizationFeature<,,,>))]`. The attribute exposes the reference
+  `[DependsOn(typeof(SchemataAuthorizationFeature<,,,,,>))]`. The attribute exposes the reference
   through its `Type` property and falls back to the type's full name for `Name`. Like the string
   form, `AddFeature` only checks `HasFeature(dependency)`; it does **not** auto-register.
 - **`[DependsOn("Fully.Qualified.Name")]`** (`DependsOnAttribute(string)`) — string dependency for
@@ -206,12 +206,13 @@ instantiation.
 Sorting `Order` and `Priority` independently lets a feature register its services at one point in
 the DI graph and insert its middleware at another point in the pipeline. The tenancy feature uses
 this: `Order` is `Orders.Max` (900M, services register last, after every store is set up) while
-`Priority` is 160M (middleware runs early, before routing).
+`Priority` is 205M (middleware runs before authentication, after CORS).
 
 ## Caveats
 
 - `AddFeature` deduplicates by `RuntimeTypeHandle`. `SchemataSessionFeature<MyStore>` and
-  `SchemataSessionFeature<OtherStore>` are distinct features; both register.
+  `SchemataSessionFeature<OtherStore>` are distinct features; both register — and two session
+  features conflict at pipeline build, since the state branch point accepts one Session wiring.
 - `SchemataControllersFeature` removes every `Schemata.*` `AssemblyPart` from MVC's
   `ApplicationPartManager`. Expose a controller from a `Schemata.*` assembly by registering a
   `SchemataExtensionPart<T>` for it.

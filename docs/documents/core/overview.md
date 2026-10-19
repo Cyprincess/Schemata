@@ -68,8 +68,8 @@ directly.
 | --------------------------- | -------------------------------------------------------------------------------------------------- |
 | `Schemata.Core`             | Builder, startup, built-in features                                                                |
 | `Schemata.Abstractions`     | Contracts: `IFeature`, `IAdvisor`, `AdviceContext`, `SchemataConstants`, error and exception types |
-| `Schemata.Advice`           | Runtime: the `AdviceRunner` family, `AdvicePipeline<TAdvisor>`, the `Advisor` entry point          |
-| `Schemata.Advice.Generator` | Roslyn source generator emitting `RunAsync` extension methods                                      |
+| `Schemata.Advice`           | Runtime: `AdvicePipeline<TAdvisor>`, the `Advisor` entry point, the generated `AdviceRunner` family |
+| `Schemata.Advice.Generator` | Roslyn source generator emitting the `RunAsync` extension methods and the `AdviceRunner` classes    |
 
 `Schemata.Core` references `Schemata.Abstractions`. `Schemata.Advice` references
 `Schemata.Abstractions`. The generator references only `Microsoft.CodeAnalysis.CSharp` and is

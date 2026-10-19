@@ -155,11 +155,13 @@ The response is a `StudentDetail`:
   "full_name": "Alice",
   "age": 20,
   "name": "students/a1b2c3d4e5f6a7b8",
-  "entity_tag": null,
   "create_time": "2026-06-04T12:00:00Z",
   "update_time": "2026-06-04T12:00:00Z"
 }
 ```
+
+The wire field for `IFreshness.EntityTag` is `etag` (`ResourceWireNameRules`), and the shared MVC
+JSON options omit null fields, so a response without a minted tag carries no `etag` entry.
 
 List responses return `StudentSummary` items; its contract omits timestamps and ETags.
 

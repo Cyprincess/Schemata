@@ -1,4 +1,4 @@
-# Scheduling
+﻿# Scheduling
 
 The scheduling subsystem runs `IScheduledJob` implementations on cron, periodic, or one-time schedules and records every fire as a durable execution row. Jobs are registered through `SchedulingBuilder`, keyed by `IScheduledJobRegistry`, materialized by `DefaultScheduler`, and executed by `JobExecutionDispatcher`. Schedule definitions persist as `SchemataJob` rows; each occurrence persists as a `SchemataJobExecution` row before any job body runs.
 
@@ -6,8 +6,9 @@ The scheduling subsystem runs `IScheduledJob` implementations on cron, periodic,
 
 | Package                                                 | Key files                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Schemata.Scheduling.Skeleton`                          | `IScheduler.cs`, `IScheduledJob.cs`, `IScheduledJobRegistry.cs`, `IScheduledJobKeyResolver.cs`, `IScheduleDefinition.cs`, `CronSchedule.cs`, `PeriodicSchedule.cs`, `OneTimeSchedule.cs`, `ScheduleDefinitionMapper.cs`, `JobContext.cs`, `JobRegistration.cs`, `MissedFirePolicy.cs`, `SchemataSchedulingOptions.cs`, `IJobLifecycleObserver.cs`, `Advisors/IJobExecutionAdvisor.cs`, `Attributes/ScheduledJobAttribute.cs`, `Extensions/ScheduledJobServiceCollectionExtensions.cs`, `Entities/SchemataJob.cs`, `Entities/SchemataJobExecution.cs`, `Entities/ScheduleType.cs`, `Entities/JobState.cs`, `Entities/ExecutionState.cs` |
-| `Schemata.Scheduling.Foundation`                        | `Features/SchemataSchedulingFeature.cs`, `Builders/SchedulingBuilder.cs`, `Extensions/SchemataBuilderExtensions.cs`, `SchedulingInitializer.cs`, `JobExecutionDispatcher.cs`, `SchedulingResourceRegistration.cs`, `RunJobHandler.cs`, `CancelOperationHandler.cs`, `WaitOperationHandler.cs`, `Internal/SchemataJobWriteGate.cs`, `Handlers/DefaultStageJobExecutionResultHandler.cs`, `Commands/StageJobExecutionResultRequest.cs`, `Internal/DefaultScheduler.cs`, `Internal/DefaultScheduler.Schedule.cs`, `Internal/DefaultScheduler.Trigger.cs`, `Internal/DefaultScheduledJobRegistry.cs`                                                                                             |
+| `Schemata.Scheduling.Skeleton`                          | `IScheduler.cs`, `IScheduledJob.cs`, `IScheduledJobRegistry.cs`, `IScheduledJobKeyResolver.cs`, `IScheduleDefinition.cs`, `CronSchedule.cs`, `PeriodicSchedule.cs`, `OneTimeSchedule.cs`, `ScheduleDefinitionMapper.cs`, `JobContext.cs`, `JobRegistration.cs`, `MissedFirePolicy.cs`, `SchemataSchedulingOptions.cs`, `IJobExecutionStore.cs`, `IJobLifecycleObserver.cs`, `Advisors/IJobExecutionAdvisor.cs`, `Attributes/ScheduledJobAttribute.cs`, `Extensions/ScheduledJobServiceCollectionExtensions.cs`, `Entities/SchemataJob.cs`, `Entities/SchemataJobExecution.cs`, `Entities/ScheduleType.cs`, `Entities/JobState.cs`, `Entities/ExecutionState.cs` |
+| `Schemata.Scheduling.Foundation`                        | `Features/SchemataSchedulingFeature.cs`, `Builders/SchedulingBuilder.cs`, `Extensions/SchemataBuilderExtensions.cs`, `SchedulingInitializer.cs`, `JobExecutionDispatcher.cs`, `JobExecutionLease.cs`, `JobExecutionScopes.cs`, `DefaultOperationService.cs`, `Settlement/IJobSettlement.cs`, `Settlement/JobSettlement.cs`, `Settlement/MissedFireWindow.cs`, `SchedulingResourceRegistration.cs`, `RunJobHandler.cs`, `CancelOperationHandler.cs`, `WaitOperationHandler.cs`, `Runtime/SchemataJobWriteGate.cs`, `Runtime/DefaultScheduler.cs`, `Runtime/DefaultScheduler.Schedule.cs`, `Runtime/DefaultScheduler.Trigger.cs`, `Runtime/DefaultScheduledJobRegistry.cs` |
+| `Schemata.Scheduling.Repository`                        | `RepositoryJobExecutionStore.cs`, `Extensions/SchemataSchedulingRepositoryServiceCollectionExtensions.cs`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `Schemata.Scheduling.Event`                             | `Features/SchemataSchedulingEventFeature.cs`, `Internal/EventPublishingJobLifecycleObserver.cs`, `Events/*.cs`, `Attributes/PublishEventAttribute.cs`, `SchemataSchedulingEventOptions.cs`, `Extensions/SchedulingEventBuilderExtensions.cs`, `Extensions/SchedulingBuilderEventExtensions.cs`                                                                                                                                                                                                                                                                                                                                                                 |
 | `Schemata.Scheduling.Http` / `Schemata.Scheduling.Grpc` | `Features/SchemataSchedulingHttpFeature.cs`, `Features/SchemataSchedulingGrpcFeature.cs`, `Extensions/SchemataBuilderExtensions.cs`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
@@ -22,15 +23,26 @@ builder.UseSchemata(schema => {
 });
 ```
 
+The dispatcher claims and settles execution rows through the `IJobExecutionStore` contract (lease, retry ceiling, crash recovery). Install a backend before the host starts; the default repository-backed store ships in `Schemata.Scheduling.Repository`:
+
+```csharp
+builder.Services.AddSchemataSchedulingRepositoryStore();
+```
+
+The store rides on the application's `IRepository<SchemataJobExecution>` registration, so the persistence engine stays the one the application chose. `SchedulingInitializer` validates the store at startup and the host fails fast when no `IJobExecutionStore` is registered. An application replaces the backend by registering its own `IJobExecutionStore` implementation; job registrations and handlers are unaffected.
+
 `SchemataSchedulingFeature.ConfigureServices` registers:
 
 1. `DefaultScheduledJobRegistry` as `IScheduledJobRegistry` (singleton, `TryAdd`).
 2. `JobExecutionDispatcher` as a singleton and hosted service.
 3. `DefaultScheduler` as `IScheduler` (singleton, `TryAdd`).
-4. `SchemataJobWriteGate` as a singleton, and the five scheduling request handlers (`DefaultScheduleJobHandler`, `DefaultUnscheduleJobHandler`, `DefaultTriggerJobHandler`, `DefaultRescheduleJobHandler`, `DefaultStageJobExecutionResultHandler`) as keyed `IRequestHandler<,>` services with unkeyed aliases.
+4. `SchemataJobWriteGate` as a singleton, and the four scheduling request handlers (`DefaultScheduleJobHandler`, `DefaultUnscheduleJobHandler`, `DefaultTriggerJobHandler`, `DefaultRescheduleJobHandler`) as keyed `IRequestHandler<,>` services with unkeyed aliases.
 5. `SchedulingInitializer` as a hosted service.
 
-`SchedulingInitializer` populates the registry from `SchemataSchedulingOptions.Jobs`, starts the scheduler, fails orphaned `Running` rows left by a restart, arms configured scheduled jobs, and reloads persisted `Active` jobs.
+`SchedulingInitializer` populates the registry, starts the scheduler, fails expired inline ownership,
+arms configured schedules using the selected `TimeProvider`, and reloads persisted `Active` jobs.
+Scheduled executions recover after their leases expire. Inline callbacks use renewable leases but
+cannot be replayed; live leases remain owned and lease-less rows remain unclassified.
 
 ## Resource security
 
@@ -103,9 +115,21 @@ record — `ScheduleAsync` sends `ScheduleJobRequest` (`ICommand`), `UnscheduleA
 `IRequestHandler<TRequest, TResponse>` (keyed `SchedulingConstants.Handlers.Default`, with an
 unkeyed alias), hold the actual materialization logic described above.
 
-`StageJobExecutionResultRequest` is the fifth scheduling command. `JobExecutionDispatcher` sends it after an execution reaches its terminal state, carrying `State`, `RecentRunTime`, `RecentError`, and `NextRunTime`; `DefaultStageJobExecutionResultHandler` writes those fields under the process-wide `SchemataJobWriteGate` and materializes the next `Pending` execution with its timer for a recurring `Active` job. The job-row writers are `DefaultScheduleJobHandler`, `DefaultUnscheduleJobHandler`, and `DefaultStageJobExecutionResultHandler`, and all three persist under the same gate (`DefaultRescheduleJobHandler` delegates to the schedule handler), so schedule commands and execution finalization serialize on the job row, and a concurrency conflict propagates to the caller. `DefaultTriggerJobHandler` writes only the `SchemataJobExecution` row and does not take the gate.
+The scheduler's four request commands (`ScheduleJobRequest`, `UnscheduleJobRequest`,
+`TriggerJobRequest`, `RescheduleJobRequest`) cover materialization and schedule changes. Execution
+finalization has no command of its own: `JobExecutionDispatcher` hands the claimed lease and the
+terminal result to `IJobSettlement<TJob, TExecution>`, whose `JobSettlement` writes the execution
+row and the job row's `State`, `RecentRunTime`, `RecentError`, and `NextRunTime` in one unit of work
+(or a sequential schedule-then-execution fallback when the two repositories cannot share it). For a
+recurring `Active` job it also materializes the next `Pending` execution and re-arms its timer. The
+job-row writers are `DefaultScheduleJobHandler`, `DefaultUnscheduleJobHandler`, and
+`JobSettlement`; the first two persist under the process-wide `SchemataJobWriteGate`, and
+`JobSettlement` takes the same gate around its combined write (`DefaultRescheduleJobHandler`
+delegates to the schedule handler), so schedule commands and execution finalization serialize on
+the job row and a concurrency conflict propagates to the caller. `DefaultTriggerJobHandler` writes
+only the `SchemataJobExecution` row and does not take the gate.
 
-Registered `IRequestPipelineAdvisor<TRequest,TResponse>` wraps run for each scheduling command, whether it originates from `IScheduler` or a raw dispatcher call. The command closure selects the wrap registration and handler. See [Messaging](../messaging/overview.md) for dispatcher and ambient-context behavior.
+Registered `IRequestPipelineAdvisor<TRequest,TResponse>` wraps run for each scheduling command, whether it originates from `IScheduler` or a raw dispatcher call. The command closure selects the wrap registration and handler. See [Messaging](../messaging/overview.md) for dispatcher and advice-context behavior.
 
 ## Execution model
 
@@ -113,14 +137,27 @@ The `SchemataJobExecution` row is the single durable unit of work for cron, peri
 
 - The scheduler is a materializer and timer. `ScheduleAsync` and `TriggerAsync` persist a `Pending` execution row up front, carrying the occurrence's due time in `SchemataJobExecution.StartTime`. An in-memory timer signals the dispatcher when the row comes due; the scheduler does not run job bodies.
 - A future-dated occurrence is a `Pending` row whose `StartTime` is in the future. There is no separate `Scheduled` state. `TriggerAsync` with a future `JobContext.StartTime` returns an immediately addressable operation and arms a timer for the due time; the durable row is the restart backstop.
-- `JobExecutionDispatcher` drains rows where `State == Pending && StartTime <= now`, claims each with a `Pending -> Running` transition guarded by the concurrency token, runs the advisor -> observer -> body pipeline, records the terminal state, then dispatches `StageJobExecutionResultRequest`; its handler writes the job row's result fields and materializes the next `Pending` row for a recurring `Active` job. One dispatch pass opens one DI scope with `services.CreateScope()`; the claim, the advisors, the observers, the job body, the terminal write, and the fast-fail write all resolve from that provider, so they share one repository instance and one unit of work.
+- `JobExecutionDispatcher` claims due rows and expired scheduled leases through the store's
+  concurrency-token boundary. The shared execution lease starts after claim, covers setup and body,
+  and cancels work if renewal fails, is rejected, or cannot be confirmed before expiry. Pass reads,
+  restored execution scopes, and renewal writes use async scopes; heartbeat repositories are separate
+  from body repositories. Terminal CAS and requeue writes serialize with that claimant's renewal.
+  The settlement owner advances recurring jobs after settlement.
 
 Two background services run alongside the scheduler:
 
-- `SchedulingInitializer` starts the scheduler, fails orphaned `Running` rows, arms configured scheduled registrations, and reloads persisted `Active` jobs.
+- `SchedulingInitializer` starts the scheduler, fails expired inline ownership, arms configured jobs,
+  and reloads persisted `Active` schedules.
 - `JobExecutionDispatcher` runs as a hosted service draining due `Pending` rows.
 
 Missed-fire policy (`SchemataSchedulingOptions.MissedFirePolicy`) is applied before a recurring row is materialized: `Skip` advances past the missed window, `FireOnce` collapses it to a single overdue row, and `FireAll` keeps the oldest missed occurrence so the dispatcher's advance loop replays the rest. `FireAll`'s replay walk is bounded by `SchemataSchedulingOptions.MaxMissedWalk` (default 100,000).
+
+Schedule writers replace timers after commit; unschedule preserves terminal job outcomes. Explicit
+scheduling reactivates a named slot. Registry key/type conflicts throw while identical registrations
+remain idempotent. Implementation: `JobExecutionDispatcher.cs`, `JobExecutionLease.cs`,
+`Settlement/JobSettlement.cs`, `Handlers/DefaultScheduleJobHandler.cs`,
+`Handlers/DefaultUnscheduleJobHandler.cs`, and `Runtime/DefaultScheduledJobRegistry.cs` in
+`src/Schemata.Scheduling.Foundation/`.
 
 ## Resource bridge
 
@@ -144,12 +181,13 @@ The Resource `:purge` method dispatches `PurgeJob<TEntity>` through the schedule
 - Implement `IJobLifecycleObserver` (`TryAddEnumerable`) to observe or bridge lifecycle transitions. Observers are notification-only; gating belongs to `IJobExecutionAdvisor`.
 - Implement `IJobExecutionAdvisor` (`TryAddEnumerable`) to gate a fire before the job body runs.
 - Implement `IScheduler` to replace the in-memory scheduler with a distributed backend.
+- Implement `IJobExecutionStore` to replace the execution-store backend that carries lease, retry-ceiling, and crash-recovery semantics. The default `Schemata.Scheduling.Repository` provider is installed with `AddSchemataSchedulingRepositoryStore()`.
 - Add the Scheduling.Event feature with `UseScheduling().UseEvent()` to publish lifecycle events to the bus.
 
 ## Caveats
 
 - `DefaultScheduler` uses in-memory timers. If the host restarts between a job's `NextRunTime` and its fire, `SchemataSchedulingOptions.MissedFirePolicy` decides what happens. See [Triggers](triggers.md).
-- The scheduler and its observers require `IRepository<SchemataJob>` and `IRepository<SchemataJobExecution>` in the container — a missing registration throws. Configure a persistence provider (EF Core or LinqToDB) before activating scheduling.
+- The scheduler and its observers require `IRepository<SchemataJob>` and `IRepository<SchemataJobExecution>` in the container — a missing registration throws. Configure a persistence provider (EF Core or LinqToDB) before activating scheduling, and install an `IJobExecutionStore` backend (`AddSchemataSchedulingRepositoryStore()` or a custom implementation); startup fails without one.
 - `JobExecutionDispatcher` can run on multiple workers against the same store, but `DefaultScheduler` itself remains single-node timer ownership.
 
 ## See also

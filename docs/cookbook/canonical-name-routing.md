@@ -29,11 +29,12 @@ public class Book : ICanonicalName, IIdentifier, ITimestamp
 }
 ```
 
-`ResourceNameDescriptor` resolves placeholders by Pascalizing each name:
+`ResourceNameDescriptor` resolves placeholders by position:
 
-- A placeholder whose Pascalized form equals the entity's `Singular` (here `book` → `Book`) maps to `Name`.
-- A placeholder named `parent` maps to a `Parent` property.
-- Any other placeholder maps to a property with the same Pascalized name (`publisher` → `Publisher`).
+- The last placeholder binds to the entity's `Name` however it is spelled (`books/{book}` and
+  `books/{bookId}` both address the resource's own `Name`).
+- Every earlier placeholder binds to a property with the same Pascalized name
+  (`publisher` → `Publisher`).
 
 **Assertion:** `ResourceNameDescriptor.ForType<Book>().Pattern` is `"publishers/{publisher}/books/{book}"` and
 `CollectionPath` is `"publishers/{publisher}/books"`.
@@ -159,7 +160,9 @@ still filters to `acme`.
 - **Parent properties are cleared on the request, then re-bound from the route.** The HTTP controller calls
   `SetParentFromRouteValues` before mapping, so `publisher` comes from the URL, not the request body.
 - **A missing `[CanonicalName]` leaves the resource without a pattern.** `Pattern` is `null`,
-  `CollectionPath` is the lowercased plural type name, and `Resolve` throws `InvalidOperationException`.
+  `Collection` and `CollectionPath` are empty, and the CLR type name only feeds the singular and
+  plural labels; `Resolve` throws `InvalidOperationException`. The type carries no collection
+  addressability.
 
 ## See also
 

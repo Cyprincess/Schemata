@@ -7,7 +7,7 @@ Every scheduled unit is an `IScheduledJob`. The scheduler persists a `SchemataJo
 | Package                          | Key files                                                                                                                                                                                                                                                                                                             |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Schemata.Scheduling.Skeleton`   | `IScheduledJob.cs`, `JobContext.cs`, `JobRegistration.cs`, `IScheduledJobRegistry.cs`, `IScheduledJobKeyResolver.cs`, `Attributes/ScheduledJobAttribute.cs`, `IJobLifecycleObserver.cs`, `Advisors/IJobExecutionAdvisor.cs`, `Entities/SchemataJobExecution.cs`, `Entities/ExecutionState.cs` |
-| `Schemata.Scheduling.Foundation` | `JobExecutionDispatcher.cs`, `Internal/DefaultScheduler.Trigger.cs`, `Internal/DefaultScheduledJobRegistry.cs`, `Internal/SchemataJobWriteGate.cs`, `Handlers/DefaultStageJobExecutionResultHandler.cs`, `Commands/StageJobExecutionResultRequest.cs`, `RunJobHandler.cs`, `SchedulingResourceRegistration.cs` |
+| `Schemata.Scheduling.Foundation` | `JobExecutionDispatcher.cs`, `JobExecutionLease.cs`, `Settlement/JobSettlement.cs`, `Runtime/DefaultScheduler.Trigger.cs`, `Runtime/DefaultScheduledJobRegistry.cs`, `Runtime/SchemataJobWriteGate.cs`, `RunJobHandler.cs`, `SchedulingResourceRegistration.cs` |
 | `Schemata.Resource.Foundation`   | `PurgeJob.cs`, `PurgeJobKeyResolver.cs`, `PurgeHandler.cs`, `PurgeOperationArgs.cs`                                                                                                                                                                                                                                   |
 
 ## IScheduledJob
@@ -44,6 +44,8 @@ schema.UseScheduling()
       .WithJob<ReportJob>("0 8 * * *");  // daily at 08:00 UTC
 ```
 
+`UseScheduling()` activates the dispatcher, which runs executions through the `IJobExecutionStore` contract (lease, retry ceiling, crash recovery). Install the default repository-backed store with `builder.Services.AddSchemataSchedulingRepositoryStore()` from the `Schemata.Scheduling.Repository` package, or register a custom `IJobExecutionStore` to run against a different backend; startup fails when no store is registered.
+
 Register an on-demand job without a schedule through `WithJob<T>()`. That records the type in `SchemataSchedulingOptions.Jobs` so the registry can resolve executions after a restart without arming a timer at startup.
 
 ### Internal registration helper
@@ -56,9 +58,9 @@ Register an on-demand job without a schedule through `WithJob<T>()`. That record
 
 | Property         | Source and purpose                                                                                                                          |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Job`            | Canonical name of the job or one-shot operation being fired; `null` when the fire has no persistent scheduler entry.                        |
+| `Job`            | Caller-supplied or stored canonical job name; `null` for a one-shot fire with no associated job resource. |
 | `Variables`      | Free-form caller variables serialized through `SchemataJob.Variables`.                                                                      |
-| `ExecutionUid`   | UID reserved for the execution row; `TriggerAsync` accepts a caller-provided value so the caller can return the operation name immediately. |
+| `ExecutionUid`   | Optional caller-reserved execution UID. It is storage identity, not a prediction of the operation name. |
 | `StartTime`      | Scheduler-managed due time. Future values create future-dated `Pending` rows.                                                               |
 | `Method`         | Custom method verb that produced the long-running operation, for example `purge`; ordinary scheduled fires leave it `null`.                 |
 | `JobKey`         | Stable key used by `IScheduledJobRegistry` to resolve the job type.                                                                         |
@@ -67,11 +69,21 @@ Register an on-demand job without a schedule through `WithJob<T>()`. That record
 
 `ArgsJson` is for typed, restart-durable work. Resource purge stores the request filter, language, and force flag there, then `PurgeJob<TEntity>` deserializes the payload when the dispatcher runs the job. `Variables` remains the dictionary channel for caller-supplied values on ordinary job runs.
 
+Read operation identity from the execution returned by `TriggerAsync` after repository add advisors
+have run. `OperationMapper.FromExecution` copies its `Name` and `CanonicalName`; it never substitutes
+the UID. Applications supply names for `SchemataJob` and `SchemataJobExecution` through repository
+add advisors before canonical-name derivation. See [Persistence](persistence.md#resource-naming).
+
 ## Stable job keys
 
 A persisted execution stores `JobKey`, not an in-process delegate. The registry resolves that key to the concrete job type when `JobExecutionDispatcher` drains the row.
 
-`SchedulingInitializer` registers every discovered job type at startup, taking `[ScheduledJob("stable-key")]` when the type carries one and otherwise deriving a bounded key: the type's full name with the generic-arity suffix stripped and each generic argument appended as a dotted short name. That bound keeps a closed generic inside the length and character set a `jobs/{job}` segment and the persisted key column accept.
+`SchemataJob.Key` identifies one producer-owned schedule slot; `JobKey` identifies the executable
+job type. Resource `Name` is a third, consumer-owned identity. Multiple schedule slots can dispatch
+the same job type without sharing a resource name. The schedule handler matches a supplied `Key`
+first and preserves the existing row's name when updating that slot.
+
+`SchedulingInitializer` registers every discovered job type at startup, taking `[ScheduledJob("stable-key")]` when the type carries one and otherwise deriving a bounded key: the type's full name with the generic-arity suffix stripped and each generic argument appended as a dotted short name. That key identifies dispatch registration independently of the job's resource-name segment.
 
 `IScheduledJobRegistry.ResolveKey` handles a type that startup did not register, in order:
 
@@ -178,15 +190,27 @@ call ExecuteAsync(context, linkedToken)
   |-- host shutdown cancellation: leave the row Running for re-dispatch
 ```
 
-`JobExecutionDispatcher` owns the execution row from claim through terminal state. After the terminal write it computes a recurring job's next occurrence and dispatches `StageJobExecutionResultRequest` carrying the job identity, `State`, `RecentRunTime`, `RecentError`, and `NextRunTime`. `DefaultStageJobExecutionResultHandler` is the sole writer of the `RecentRunTime` and `RecentError` result fields: it fresh-reads the row under the process-wide `SchemataJobWriteGate`, writes the staged values, and for a recurring `Active` job materializes the next `Pending` execution and arms its timer. The other two staged fields are shared: the schedule handler also writes `State` and `NextRunTime`, and the unschedule handler writes `State` as `Paused`. All job-row writers run under the same gate, and a concurrency conflict on the job row propagates to the caller instead of being retried.
+`JobExecutionDispatcher` owns the execution row from claim through terminal state. It hands the
+claimed lease and the terminal result to `IJobSettlement<TJob, TExecution>`. `JobSettlement` writes
+the execution row and the job row's `State`, `RecentRunTime`, `RecentError`, and `NextRunTime` in
+one unit of work; when the two repositories cannot share that unit, it persists the schedule stage
+and the execution stage in sequence. For a recurring `Active` job the same settlement materializes
+the next `Pending` execution and arms its timer. The other job-row writers share two of those
+fields: the schedule handler also writes `State` and `NextRunTime`, and the unschedule handler
+writes `State` as `Paused`. Job-row writers run under the same `SchemataJobWriteGate`, and a
+concurrency conflict on the job row propagates to the caller instead of being retried.
 
 ## Cancelling a running execution
 
-The dispatcher tracks every in-flight body in a singleton
-`ConcurrentDictionary<string, CancellationTokenSource>` keyed by execution UID, linked to the fire's
-own token. `IOperationService.CancelAsync` on a `Running` execution first cancels that source — the
-job body observes `OperationCanceledException` on its linked token — then marks the row `Cancelled`.
-A body cancelled by host shutdown is left `Running` so a later pass reclaims and reruns it.
+The dispatcher and inline operations register every in-flight body with the singleton
+`IActiveExecutionRegistry` (`ActiveExecutionRegistry`), keyed by execution UID and holding the
+lease's linked source. `JobExecutionLease` registers on start, releases the registration when it
+disposes, and the registry disposes the source that the winning removal took ownership of.
+`IOperationService.CancelAsync` on a `Running` execution cancels that registered source without
+removing it — the job body observes `OperationCanceledException` on its linked token — then marks
+the row `Cancelled`. Cancellation runs the token's callbacks synchronously on the calling thread;
+`CancellationTokenSource` aggregates their failures into an `AggregateException` that surfaces at the
+caller. A body cancelled by host shutdown is left `Running` so a later pass reclaims and reruns it.
 
 ## Extension points
 

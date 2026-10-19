@@ -44,8 +44,6 @@ public interface ISimpleMapper
     TDestination? Map<TSource, TDestination>(TSource source);
     void Map<TSource, TDestination>(TSource source, TDestination destination);
     void Map<TSource, TDestination>(TSource source, TDestination destination, IEnumerable<string> fields);
-    object? Map(object source, Type sourceType, Type destinationType);
-    void Map(object source, object destination, Type sourceType, Type destinationType);
 }
 ```
 
@@ -82,26 +80,31 @@ relied upon for this guarantee.
 ## Field-mask semantics
 
 `MapWithMask` implements explicit AIP-161 field masks. The mask is a set of CLR property paths
-(dot paths traverse nested objects); listed fields are written authoritatively, and everything
-else is restored to its pre-map value.
+(dot paths traverse nested objects); listed fields are written authoritatively, and every other
+member keeps its current value.
 
 ```csharp
 public static void MapWithMask<TSource, TDestination>(
     TSource                       source,
     TDestination                  destination,
     IEnumerable<string>           mask,
-    Action<TSource, TDestination> mapAction)
+    Action<TSource, TDestination> mapAction,
+    Func<TSource, TDestination>   project)
 ```
 
 1. Parse the mask into a `MaskTree` rooted at `typeof(TDestination)` via `MaskTree.FromClr`.
-2. Snapshot the value of every writable destination property outside the mask, recursing into
-   masked interior objects through `MaskWalker.WalkUnmasked`.
-3. Run `mapAction(source, destination)` — the engine maps the whole object.
-4. Restore the snapshots, then copy the masked leaf values from source so a masked field can be
-   set to null.
+2. A null source or destination, an empty mask, or a mask naming every writable destination member
+   takes the `mapAction` path, where mapping the destination is safe.
+3. Otherwise `project(source)` builds one fresh staged instance under the current map
+   configuration; the real destination is never mapped, so unmasked mutable members cannot be
+   polluted by the engine's in-place writes. A null projection raises `InvalidOperationException`.
+4. `SimpleMapperHelper.ApplyMasked` is the single owner of the masked copy: it walks the staged
+   instance against the mask tree and writes selected members onto the destination.
 
-A masked leaf is authoritative: if the source value is null, the destination leaf is cleared. An
-unmasked field always retains its pre-map value, even one the engine would otherwise have written.
+A masked leaf replaces the member outright with the staged value, object references, collections,
+and record values included, so a null source value clears the destination leaf. A descendant
+selection recurses into the destination's own subtree and preserves every unmasked member; a null
+destination subtree receives a freshly created instance holding only the selected members.
 
 The mask uses CLR property names. The resource layer converts wire-format (`snake_case`) mask
 paths to CLR leaf paths with `MaskTree.FromWire` before calling this overload; see

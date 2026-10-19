@@ -39,7 +39,7 @@ Add more capabilities from the [Feature Domains](#feature-domains) below.
 ## Feature Domains
 
 - [Authorization](https://nuget.org/packages/Schemata.Authorization.Foundation) — OAuth 2.0 / OpenID Connect server
-- [Caching](https://nuget.org/packages/Schemata.Caching.Skeleton) — distributed cache abstraction; Redis and `IDistributedCache` adapters
+- [Caching](https://nuget.org/packages/Schemata.Caching.Skeleton) — scalar, atomic and collection cache operations through Memory or Redis providers
 - [DSL](https://nuget.org/packages/Schemata.Modeling.Generator) — `.skm` source generator
 - [Event](https://nuget.org/packages/Schemata.Event.Foundation) — in-process / RabbitMQ event bus
 - [Flow](https://nuget.org/packages/Schemata.Flow.Foundation) — BPMN process engine, HTTP/gRPC transports, event/scheduling bridges
@@ -78,9 +78,10 @@ A built-in feature can be activated by calling the `UseXXX` method on the `Schem
 | 170_000_000 | CookiePolicy           | ASP.NET Cookie Policy Middleware                                                     |
 | 180_000_000 | Routing                | ASP.NET Routing Middleware                                                           |
 | 185_000_000 | WellKnown              | `/.well-known/*` routes (+5M sub-feature of Routing)                                 |
-| 190_000_000 | Quota                  | ASP.NET Rate Limiter Middleware                                                      |
 | 200_000_000 | Cors                   | ASP.NET CORS Middleware                                                              |
-| 210_000_000 | Authentication         | ASP.NET Authentication & Authorization Middlewares                                   |
+| 210_000_000 | Authentication         | ASP.NET Authentication Middleware                                                    |
+| 212_000_000 | Authorization          | ASP.NET Authorization Middleware                                                     |
+| 215_000_000 | Quota                  | ASP.NET Rate Limiter Middleware (partitions after authentication)                    |
 | 220_000_000 | Session                | ASP.NET Session Middleware                                                           |
 | 230_000_000 | Controllers            | ASP.NET MVC Middlewares, without Views                                               |
 | 240_000_000 | JsonSerializer         | Configure System.Text.Json to use snake_case and handle JavaScript's 53-bit integers |

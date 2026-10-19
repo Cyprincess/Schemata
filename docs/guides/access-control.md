@@ -82,14 +82,18 @@ using static Schemata.Abstractions.SchemataConstants;
 
 public sealed class StudentAccessProvider : IAccessProvider<Student, StudentRequest>
 {
-    public Task<bool> HasAccessAsync(
+    public Task<AccessDecision> HasAccessAsync(
         Student?                      entity,
         AccessContext<StudentRequest> context,
         ClaimsPrincipal?              principal,
         CancellationToken             ct = default)
     {
-        // context.Operation is "List" / "Get" / "Create" / "Update" / "Delete"
-        return Task.FromResult(principal?.Identity?.IsAuthenticated == true);
+        // context.Operation is "List" / "Get" / "Create" / "Update" / "Delete";
+        // context.Stage is Target / Instance / Missing.
+        return Task.FromResult(
+            principal?.Identity?.IsAuthenticated == true
+                ? AccessDecision.Allowed
+                : AccessDecision.Denied);
     }
 }
 ```
@@ -158,7 +162,7 @@ The Identity bridge supplies `IdentityClaims.Subject` as the canonical user name
 filter compares `Owner` with the same canonical reference used by the ownership advisor.
 
 Populating `Owner` on create is your side of the contract — set it in an add advisor, or wire the
-`Schemata.Entity.Owner` package's `UseOwner()` which fills it through an `IOwnerResolver` (see the
+repository's `UseOwner()` which fills it through an `IOwnerResolver` (see the
 [ownership cookbook](../cookbook/ownership-and-row-acl.md)). Register the provider the same way as
 the access provider. Entitlement filtering applies to List, Get, Update, and Delete; Create has no
 entitlement step.

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Schemata is a modular .NET application framework for building extensible business applications with AIP-aligned resource primitives and documented compliance gaps. It ships as 77 `Schemata.*` NuGet packages built from `src/`, targeting `net8.0;net10.0` (source generators target `netstandard2.0`). Consumers bootstrap with `WebApplicationBuilder.UseSchemata(...)`; capabilities compose through a three-phase feature lifecycle. The public API is extension methods in the `Microsoft.AspNetCore.Builder` / `Microsoft.Extensions.DependencyInjection` namespaces; there is no `Program.cs` in this repo.
+Schemata is a modular .NET application framework for building extensible business applications with AIP-aligned resource primitives and documented compliance gaps. It ships as 90 `Schemata.*` NuGet packages built from `src/`, targeting `net8.0;net10.0` (source generators target `netstandard2.0`). Consumers bootstrap with `WebApplicationBuilder.UseSchemata(...)`; capabilities compose through a three-phase feature lifecycle. The public API is extension methods in the `Microsoft.AspNetCore.Builder` / `Microsoft.Extensions.DependencyInjection` namespaces; there is no `Program.cs` in this repo.
 
 ## Architecture & Data Flow
 
@@ -27,7 +27,7 @@ Schemata is a modular .NET application framework for building extensible busines
 
 | Path | Purpose |
 |---|---|
-| `src/` | 77 packages, `<Domain>.<Layer>` naming |
+| `src/` | 90 packages, `<Domain>.<Layer>` naming |
 | `src/Schemata.Core/` | Bootstrap, feature engine, `SchemataBuilder`, startup filter, built-in features, resource building kernel (`Building/`: `SchemataResourceBuilder`, `ResourceRegistry`, wiring) |
 | `src/Schemata.Abstractions/` | Contracts: `IAdvisor`, `AdviceContext`, `SchemataConstants`, exceptions, entity traits |
 | `src/Schemata.Advice/` | `Advisor.For`, `AdvicePipeline<T>`, `AdviceRunner` overloads |
@@ -37,7 +37,7 @@ Schemata is a modular .NET application framework for building extensible busines
 | `src/Schemata.Entity.Repository/` | Repository base + persistence advisors (soft-delete, canonical name, timestamps) |
 | `generators/` | `Schemata.Advice.Generator` (advisor `RunAsync` codegen), `Schemata.Modeling.Generator` (`.skm` DSL) |
 | `targets/` | MSBuild meta-packages (`Application`/`Business`/`Module` families) selecting features via `Use*` flags |
-| `tests/` | 52 xUnit projects (`*.Tests`, `*.Integration.Tests`, `*.Conformance.Tests`) |
+| `tests/` | 63 xUnit projects (`*.Tests`, `*.Integration.Tests`, `*.Conformance.Tests`) |
 | `docs/` | DocFX site: `guides/`, `cookbook/`, `documents/`, `modeling/` |
 | `eng/` | Arcade build scripts and signing assets (`eng/common/` is upstream-generated) |
 | `specs/` | Git submodules: `specs/cel`, `specs/bpmn` (required by tests) |

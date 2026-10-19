@@ -17,7 +17,7 @@ dotnet add package --prerelease Schemata.Identity.Foundation
 Add `UseIdentity()` inside the `UseSchemata` block in `Program.cs`:
 
 ```csharp
-schema.UseIdentity();
+schema.UseIdentity().UseRegistration().UseAccountConfirmation().UsePasswordReset();
 ```
 
 `UseIdentity()` registers ASP.NET Core Identity with bearer-token authentication using `SchemataUser` and `SchemataRole` as the default types. The authentication and HTTP transport features it depends on are pulled in automatically.
@@ -26,16 +26,17 @@ All four parameters are optional:
 
 ```csharp
 schema.UseIdentity(
-    identify:  opts => { opts.AllowRegistration = true; },
+    identify:  opts => { opts.LoginUri = "/login"; },
     configure: opts => { opts.Password.RequiredLength = 8; },
     build:     ib   => { /* IdentityBuilder customizations */ },
     bearer:    opts => { opts.BearerTokenExpiration = TimeSpan.FromHours(1); }
-);
+).UseRegistration().UseAccountConfirmation().UsePasswordReset()
+ .UsePasswordChange().UseEmailChange().UsePhoneNumberChange().UseTwoFactorAuthentication();
 ```
 
 | Parameter   | Type                              | Purpose                                                        |
 | ----------- | --------------------------------- | -------------------------------------------------------------- |
-| `identify`  | `Action<SchemataIdentityOptions>` | Enable/disable registration, account confirmation, password reset, password change, email change, phone-number change, 2FA; set `LoginUri` |
+| `identify` | `Action<SchemataIdentityOptions>` | Set the login redirect URI; operation installation uses the returned builder |
 | `configure` | `Action<IdentityOptions>`         | Password policy, lockout, sign-in requirements                 |
 | `build`     | `Action<IdentityBuilder>`         | Add token providers or custom stores                           |
 | `bearer`    | `Action<BearerTokenOptions>`      | Token expiration, refresh behavior                             |
@@ -44,11 +45,18 @@ To use custom user or role types, use the generic overloads:
 
 ```csharp
 schema.UseIdentity<CustomUser, SchemataRole>();
-// or
+// custom user, role, and the five auxiliary entity types, default stores
+schema.UseIdentity<CustomUser, CustomRole, CustomUserClaim, CustomRoleClaim,
+    CustomUserLogin, CustomUserToken, CustomUserRole>();
+// custom stores on the built-in auxiliary entities
 schema.UseIdentity<CustomUser, CustomRole, CustomUserStore, CustomRoleStore>();
 ```
 
-Type constraints: `TUser : SchemataUser, new()` and `TRole : SchemataRole`.
+Type constraints: `TUser : SchemataUser, new()`, `TRole : SchemataRole, new()`, each auxiliary type
+derives from its built-in `Schemata*` base with `new()`, and each store implements
+`IUserStore<TUser>`/`IRoleStore<TRole>`. A custom store that persists its own relation entities
+registers `IResourceMutation<TUser>` and `IResourceMutation<TRole>` explicitly; that registration
+owns the delete cascade.
 
 ## Browser sign-in redirects
 
@@ -66,23 +74,60 @@ local URL, and redirects back to where the user started.
 
 ## Update the DbContext
 
-Change `AppDbContext` to extend `IdentityDbContext`:
+Use a regular EF Core `DbContext` with the Schemata identity entity sets:
 
 ```csharp
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Schemata.Identity.Skeleton.Entities;
 
 public class AppDbContext(DbContextOptions<AppDbContext> options)
-    : IdentityDbContext<SchemataUser, SchemataRole, Guid,
-        SchemataUserClaim, SchemataUserRole, SchemataUserLogin,
-        SchemataRoleClaim, SchemataUserToken>(options)
+    : DbContext(options)
 {
     public DbSet<Student> Students => Set<Student>();
+    public DbSet<SchemataUser> Users => Set<SchemataUser>();
+    public DbSet<SchemataRole> Roles => Set<SchemataRole>();
+    public DbSet<SchemataUserClaim> UserClaims => Set<SchemataUserClaim>();
+    public DbSet<SchemataRoleClaim> RoleClaims => Set<SchemataRoleClaim>();
+    public DbSet<SchemataUserRole> UserRoles => Set<SchemataUserRole>();
+    public DbSet<SchemataUserLogin> UserLogins => Set<SchemataUserLogin>();
+    public DbSet<SchemataUserToken> UserTokens => Set<SchemataUserToken>();
 }
 ```
 
-The Identity entity set (`SchemataUser`, `SchemataRole`, the join tables) ships with class-level `[PrimaryKey(...)]` attributes already in place.
+The entities declare their primary keys. Users and roles keep `Guid Uid` system identities; relationship `UserId` and `RoleId` columns store canonical resource names. ASP.NET Core's generic `IdentityDbContext` requires one shared key type for principals and relationships and is not the model used by Schemata's repository stores.
+
+## Register the identity repositories
+
+`UseIdentity()` registers the user and role stores and their mutation owners, but it does not
+register the repositories they resolve. `SchemataUserStore` takes `IRepository<SchemataUserClaim>`,
+`IRepository<SchemataUserRole>`, `IRepository<SchemataUserLogin>`, and `IRepository<SchemataUserToken>`
+directly, the user mutation owner resolves `IRepository<SchemataUser>`, and the role store resolves
+`IRepository<SchemataRole>`, `IRepository<SchemataRoleClaim>`, and `IRepository<SchemataUserRole>`.
+Register one repository per entity set from [Getting Started](getting-started.md):
+
+```csharp
+using Schemata.Entity.EntityFrameworkCore;
+using Schemata.Identity.Skeleton.Entities;
+
+schema.ConfigureServices(services => {
+    services.AddRepository<SchemataUser,          EfCoreRepository<AppDbContext, SchemataUser>>();
+    services.AddRepository<SchemataRole,          EfCoreRepository<AppDbContext, SchemataRole>>();
+    services.AddRepository<SchemataUserClaim,     EfCoreRepository<AppDbContext, SchemataUserClaim>>();
+    services.AddRepository<SchemataRoleClaim,     EfCoreRepository<AppDbContext, SchemataRoleClaim>>();
+    services.AddRepository<SchemataUserRole,      EfCoreRepository<AppDbContext, SchemataUserRole>>();
+    services.AddRepository<SchemataUserLogin,     EfCoreRepository<AppDbContext, SchemataUserLogin>>();
+    services.AddRepository<SchemataUserToken,     EfCoreRepository<AppDbContext, SchemataUserToken>>();
+});
+```
+
+`SchemataUser` and `SchemataRole` are resources: their `Name` values come from a consumer-registered
+repository create advisor, as with any other resource.
+
+The database created by [Getting Started](getting-started.md) through `EnsureCreatedAsync()` holds
+only the `Student` set, and adding entity sets to `AppDbContext` does not change an existing
+database. Schemata ships no migration tool. For development, delete `app.db` and let
+`EnsureCreatedAsync()` recreate the full model, or adopt EF Core migrations for the whole model;
+in production the schema is yours to evolve.
 
 ## Verify
 

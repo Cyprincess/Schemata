@@ -130,7 +130,7 @@ the no-source `StartAsync` overload.
 public interface IProcessDefinitionService
 {
     [Operation]
-    ValueTask<ListResultBase<ProcessDefinitionInfo>> ListProcessDefinitionsAsync(
+    ValueTask<ListResultBase<ProcessDefinitionInfo, ProcessDefinitionInfo>> ListProcessDefinitionsAsync(
         ListRequest request, CallContext context = default);
 }
 ```
@@ -149,7 +149,7 @@ process declares.
 `ProcessDefinitionInfo`, `SchemataProcess`, `SchemataProcessToken`, and `SchemataProcessTransition`.
 Wire names follow `ResourceWireNameRules` (`Name` dropped, `CanonicalName` → `name`) and then
 `Humanizer.Underscore()` (snake_case). Custom-method request bodies ride the same wire shape as
-the HTTP JSON: `StartProcessInstanceRequest` (`DefinitionName` / `DisplayName` / `Description` /
+the HTTP JSON: `StartProcessInstanceRequest` (`DefinitionName` / `DefinitionVersion` / `DisplayName` / `Description` /
 `Source` plus `ICanonicalName` + `IRequestIdentification`), `CompleteActivityRequest` (`Token`
 plus `ICanonicalName`), `CorrelateMessageRequest` (`MessageName` / `Payload` / `Token` plus
 `ICanonicalName`), `ThrowSignalRequest` (`SignalName` / `Payload` / `Token` plus `ICanonicalName`

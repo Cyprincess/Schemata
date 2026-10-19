@@ -1,12 +1,13 @@
-# Repository Overview
+﻿# Repository Overview
 
 `IRepository<TEntity>` is the data-access abstraction in Schemata. It wraps a backing store (Entity
 Framework Core, LinqToDB, or a custom provider) behind a uniform API and routes every read and write
 through an advisor pipeline that handles timestamps, concurrency stamps, soft-delete, validation,
 uniqueness, and canonical-name generation. A non-generic `IRepository` carries the entity-agnostic
-surface — `AdviceContext`, `Begin`/`Join`/`CommitAsync`, and the `Suppress*` scopes — so coordination
+surface — `AdviceContext`, `Begin`/`Join`/`CommitAsync` — so coordination
 code that does not know `TEntity` depends on the non-generic interface; `IRepository<TEntity>`
-extends it with typed CRUD members.
+extends it with typed CRUD members and the per-operation `QueryOptions`/`MutationOptions`
+parameters.
 
 ## Where the code lives
 
@@ -38,7 +39,7 @@ ValueTask<int>      CountAsync<TResult>(
     Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate, CancellationToken ct = default);
 ValueTask<long>     LongCountAsync<TResult>(
     Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate, CancellationToken ct = default);
-ValueTask<long>     EstimateCountAsync<TResult>(
+ValueTask<long?>    EstimateCountAsync<TResult>(
     Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate, CancellationToken ct = default);
 
 // Key-based lookup
@@ -66,74 +67,74 @@ queryable. `GetAsync` reads the key properties off the supplied entity and deleg
 
 ### EstimateCountAsync
 
-`EstimateCountAsync` is a virtual passthrough: the base implementation delegates to `LongCountAsync`
-(exact), and `EfCoreRepository` does not override it. `LinqToDbRepository` overrides it per backend:
+`EstimateCountAsync` returns a nullable estimate of the scoped query's result count. The default
+interface and base implementations return `null`. Unsupported providers or query shapes also return
+`null`; callers that require exact totals must explicitly choose `CountAsync` or `LongCountAsync`.
+Estimation never falls back to either exact-count method. Cancellation, database failures, and invalid
+plan data propagate to the caller.
 
-- **PostgreSQL** — `EXPLAIN (FORMAT JSON)` of the query, reading `Plan Rows`.
-- **MySQL / MariaDB** — `EXPLAIN FORMAT=JSON`, reading `rows_examined_per_scan` /
-  `rows_produced_per_join`.
-- **SQL Server** — `sys.partitions` row sum, only when the predicate carries no `Where`.
-- **SQLite** — `sqlite_stat1` max stat, only when the predicate carries no `Where`.
+EF Core provides per-context opt-in through `WithCountEstimates<TContext>(QueryEstimateProvider)` or
+a custom `IEfCoreCountEstimator<TContext>`. The built-in estimator executes parameterized plan reads
+through EF reader interception and SHOWPLAN mode commands through nonquery interception. Policies
+receive the actual plan SQL and may reject it. LinqToDB selects estimation by its registered provider.
 
-An unrecognized backend or any failure during estimation falls back to the exact `LongCountAsync`
-passthrough, so an estimate never fails the request.
+The plan backends are PostgreSQL `EXPLAIN (FORMAT JSON)`, MySQL `EXPLAIN FORMAT=JSON`, and SQL Server
+`SHOWPLAN_XML`. These request optimizer plans without executing the SELECT for a count. LinqToDB also
+supports SQLite statistics for a restricted unfiltered table query and returns `null` for MariaDB or
+unrecognized provider names. See [Repository Providers](providers.md) for activation, query-shape limits,
+and connection requirements.
 
 ## Mutation API
 
 ```csharp
-Task AddAsync(TEntity entity, CancellationToken ct = default);
+Task<MutationResult> AddAsync(TEntity entity, CancellationToken ct = default);
 Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default);
-Task UpdateAsync(TEntity entity, CancellationToken ct = default);
-Task RemoveAsync(TEntity entity, CancellationToken ct = default);
+Task<MutationResult> UpdateAsync(TEntity entity, CancellationToken ct = default);
+Task<MutationResult> RemoveAsync(TEntity entity, CancellationToken ct = default);
 Task RemoveRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default);
 Task CommitAsync(CancellationToken ct = default);
 ```
 
-Each mutation runs its advisor pipeline before touching the backing store. When an advisor returns
-`Block` or `Handle`, the pipeline stops and the store operation is skipped. `AddRangeAsync` and
-`RemoveRangeAsync` fan out to per-entity calls so each entity gets a full pipeline pass — except
-LinqToDB's `AddRangeAsync`, which runs the add advisors per entity and then persists the survivors in a
-single bulk-copy round trip.
+Each single-entity mutation runs its advisor pipeline before touching the backing store and returns a
+`MutationResult`: `Applied` when this call staged or executed a write, `NoWrite` when an advisor
+blocked or handled it without staging one. `Block` or `Handle` stops the pipeline and skips the
+store operation. `AddRangeAsync` and `RemoveRangeAsync` fan out to per-entity calls so each entity
+gets a full pipeline pass — except LinqToDB's `AddRangeAsync`, which runs the add advisors per
+entity and then persists the survivors in a single bulk-copy round trip.
 
-`CommitAsync` persists pending changes and then dispatches `IRepositoryCommittedAdvisor<TEntity>` with
-a `CommitChanges<TEntity>` snapshot. See [unit-of-work.md](unit-of-work.md) for transaction and commit
-semantics.
+`CommitAsync` persists pending changes; the unit of work then runs two ordered segments — the
+repository type-level `IRepositoryCommittedAdvisor<TEntity>` notification (skippable when nothing
+staged) followed by the `IResourceMutationCommittedAdvisor<TEntity>` and domain sinks enlisted by
+resource mutations and application code. See [unit-of-work.md](unit-of-work.md) for transaction and
+commit semantics.
 
-## Suppression scopes
+## Per-operation options
 
-Repository `Suppress*()` methods store a marker class in `AdviceContext` and return an `IDisposable` that
-restores the prior state on dispose. The convention is a verb method (`SuppressSoftDelete()`) and a state-noun marker
-(`SoftDeleteSuppressed`). The advisor checks `ctx.Has<SoftDeleteSuppressed>()` at the top of `AdviseAsync`.
+Queries take `QueryOptions` and mutations take `MutationOptions` on the call that needs the
+override. Both apply to that one operation, so nested and parallel reads and writes never inherit
+them. `IgnoreCacheEviction` is the exception: it records a commit-scoped request for the
+repository's current unit of work instead of changing the operation itself, and both options
+records declare it.
 
-| Entry point                                     | Marker class                 | Advisors bypassed                               |
-| ----------------------------------------------- | ---------------------------- | ----------------------------------------------- |
-| `repository.SuppressAddValidation()`            | `AddValidationSuppressed`    | `AdviceAddValidation`                           |
-| `repository.SuppressUpdateValidation()`         | `UpdateValidationSuppressed` | `AdviceUpdateValidation`                        |
-| `repository.SuppressQuerySoftDelete()`          | `QuerySoftDeleteSuppressed`  | `AdviceBuildQuerySoftDelete`                    |
-| `repository.SuppressSoftDelete()`               | `SoftDeleteSuppressed`       | `AdviceAddSoftDelete`, `AdviceRemoveSoftDelete` |
-| `repository.SuppressTimestamp()`                | `TimestampSuppressed`        | `AdviceAddTimestamp`, `AdviceUpdateTimestamp`   |
-| `repository.SuppressQueryOwner()`               | `QueryOwnerSuppressed`       | `AdviceBuildQueryOwner`                         |
-
-Scope a suppression with `using`:
+| Option                | Type               | Advisors bypassed                                                 |
+| --------------------- | ------------------ | ----------------------------------------------------------------- |
+| `IgnoreValidation`    | `MutationOptions`  | `AdviceAddValidation`, `AdviceUpdateValidation`                   |
+| `IgnoreUniqueness`    | `MutationOptions`  | `AdviceAddUniqueness`                                             |
+| `IgnoreSoftDelete`    | both               | query: `AdviceBuildQuerySoftDelete`; mutation: `AdviceAddSoftDelete`, `AdviceRemoveSoftDelete` |
+| `IgnoreOwner`         | `QueryOptions`     | `AdviceBuildQueryOwner`                                           |
+| `IgnoreCache`         | `QueryOptions`     | `AdviceQueryCache`, `AdviceResultCache`                           |
+| `IgnoreCacheEviction` | both records       | `AdviceCommittedEvictCache` for the next commit                   |
 
 ```csharp
-using (repository.SuppressQuerySoftDelete())
-{
-    var tombstone = await repository.FirstOrDefaultAsync<Book>(q => q.Where(b => b.Uid == id), ct);
-}
+var tombstone = await repository.FirstOrDefaultAsync<Book>(
+    q => q.Where(b => b.Uid == id), ct, new QueryOptions(IgnoreSoftDelete: true));
 ```
-
-The `Schemata.Entity.Owner` and `Schemata.Entity.Cache` packages add further repository scopes as
-`IRepository<TEntity>` extension methods — `SuppressOwner()`, `SuppressQueryOwner()`,
-`SuppressQueryCache()`, `SuppressQueryCacheEviction()` — when `UseOwner()` or `UseQueryCache()` is
-called on the repository builder.
 
 ## AdviceContext
 
-Every repository instance holds an `AdviceContext`: a typed property bag keyed by runtime type. It
-flows through every advisor call. Advisors and application code share state via `Set<T>`, `TryGet<T>`,
-`Get<T>`, `Has<T>`, and `Use<T>` (the scoped variant the `Suppress*` methods build on). The context
-also carries the `IServiceProvider`, giving advisors access to any registered service.
+Every repository instance exposes an `AdviceContext` bound to the repository's `IServiceProvider` and
+passes it to every advisor call, giving advisors access to any registered service. The context holds
+no state; advisor payloads travel as explicit parameters.
 
 ## Registration
 

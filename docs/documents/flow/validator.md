@@ -28,6 +28,26 @@ public interface IFlowEngineValidator
 returns `FlowConstants.Engines.StateMachine` (the string `"statemachine"`), and its
 `Validate` delegates to the static `StateMachineValidator.Validate(definition)`.
 
+`BpmnValidator` and `StateMachineValidator` reject events carrying `LinkDefinition`,
+`MultipleDefinition`, or `ParallelDefinition` with `InvalidOperationException` at their
+existing unsupported-shape check. BPMN exclusive gateways are checked through `AllElements`
+and `AllFlows`, including gateways inside nested sub-processes: each requires an outgoing flow
+and permits at most one default flow (`src/Schemata.Flow.Bpmn/BpmnValidator.cs`).
+
+`ProcessRegistry.BuildSourceDescriptors` requires conditions sharing a binding name to use
+the same source CLR type; explicit declarations must agree with that type. At task execution,
+`FlowTaskContext.SourceAsync<TEntity>` checks the stored binding's source type before reading
+the requested repository (`src/Schemata.Flow.Foundation/ProcessRegistry.cs`,
+`src/Schemata.Flow.Skeleton/Runtime/FlowTaskContext.cs`).
+
+Activity enter/leave tasks and boundary catches use the attached activity's owning graph
+collections, selected by `ProcessDefinition.ScopeFor`. A nested leave chain's outgoing edges
+stay in that scope (`src/Schemata.Flow.Skeleton/Builders/ActivityBehavior.cs`,
+`src/Schemata.Flow.Skeleton/Builders/BoundaryCatch.cs`). Ambiguous process-level business-state
+projection emits a warning on each advisor invocation and leaves the source state unchanged;
+the advisor retains no per-process warning identities
+(`src/Schemata.Flow.Foundation/Advisors/AdviceSourceProjection.cs`).
+
 ## Validation rules
 
 `StateMachineValidator.Validate` runs these checks in order. Failed-precondition checks emit

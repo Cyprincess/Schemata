@@ -59,7 +59,7 @@ Without `[ConcurrencyCheck]`, the token is still minted but updates write uncond
 dotnet run
 ```
 
-Create a student and observe the non-null `entity_tag`:
+Create a student and observe the non-null `etag`:
 
 ```shell
 curl -X POST http://localhost:5000/v1/students \
@@ -72,7 +72,7 @@ curl -X POST http://localhost:5000/v1/students \
   "full_name": "Alice",
   "age": 20,
   "name": "students/a1b2c3d4e5f6a7b8",
-  "entity_tag": "W/\"dGVzdC10aW1lc3RhbXA\"",
+  "etag": "W/\"dGVzdC10aW1lc3RhbXA\"",
   "create_time": "2026-06-04T12:00:00Z",
   "update_time": "2026-06-04T12:00:00Z"
 }

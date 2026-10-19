@@ -40,6 +40,11 @@ The feature applies `Configure` to `JsonSerializerOptions` and
 `Microsoft.AspNetCore.Mvc.JsonOptions` when `SchemataControllersFeature` is registered. The user
 delegate runs after the defaults, so it can add converters or override any policy.
 
+Dictionary key conversion is a framework convention applied on serialization. Input dictionary
+keys retain their spelling. Applications should use stable snake_case keys: distinct input keys
+such as `FooBar` and `foo_bar` produce the same output member name. Human-readable labels belong
+in values or structured entries when their spelling must survive a round trip.
+
 ## JsonStringNumberConverter
 
 JavaScript's `Number` is an IEEE 754 double; its maximum safe integer is 2^53 − 1
@@ -50,9 +55,21 @@ number loses precision in a JavaScript client. `JsonStringNumberConverter` is a
 - **Writes** via `writer.WriteStringValue(value.ToString())`, so `1234567890123456789` becomes
   `"1234567890123456789"`.
 - **Reads** from both `JsonTokenType.Number` (via `reader.GetInt64()`) and `JsonTokenType.String`
-  (via `long.TryParse`), throwing `JsonException` when a string cannot be parsed.
+  (via `long.TryParse`), throwing `JsonException` for an unparseable string or any unsupported
+  token kind (`true`, objects, arrays, `null`) — the token kind is named in the error instead of
+  failing with a secondary `GetString` exception.
 
 It is a singleton, `JsonStringNumberConverter.Instance`.
+
+### Field-specific numeric overrides
+
+An owning protocol can opt specific `long` members out of the global string convention with a
+property-level converter — the attribute wins over the collection converter for that member
+while every other `long` keeps the string convention. The OAuth/OIDC protocol layer does this
+with `Schemata.Authorization.Skeleton.Json.ProtocolNumberConverter` on the introspection
+`exp`/`iat`/`nbf`/`auth_time` and registration `client_id_issued_at`/`client_secret_expires_at`
+members, so those fields serialize as JSON numbers through the shared ambient, MVC, and
+minimal-API configuration — no parallel options path, and no protocol DTO is known to Core.
 
 ## Polymorphic serialization
 
@@ -100,7 +117,7 @@ wire:
 | `ICanonicalName`         | `Name`          | Hidden — the short identifier is server-managed                                                                                              |
 | `ICanonicalName`         | `CanonicalName` | Renamed to `name` (AIP-122)                                                                                                                  |
 | `IFreshness`             | `EntityTag`     | Renamed to `etag` (AIP-154)                                                                                                                  |
-| `IEntitiesResult<TItem>` | `Entities`      | Renamed to the entity plural from `ResourceNameDescriptor.ForType(...).Plural`, then run through the active `PropertyNamingPolicy` (AIP-132) |
+| `IEntitiesResult<TEntity, TItem>` | `Entities`      | Renamed to the entity plural resolved from `TEntity` through `ResourceNameDescriptor.ForType(...).Plural`, then run through the active `PropertyNamingPolicy` (AIP-132) |
 
 The traits layer is HTTP-only. The gRPC transport (`Schemata.Transport.Grpc`) applies equivalent
 renames at the protobuf-net level via `SchemataProtoModelConfigurator`.

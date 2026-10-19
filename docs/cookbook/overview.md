@@ -33,7 +33,7 @@ Recipes are organized by domain. Pick the one that matches your scenario and fol
 
 | Recipe                                                      | What it covers                                                               |
 | ----------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| [Soft Delete and Recovery](soft-delete-and-recovery.md)     | ISoftDelete, SuppressQuerySoftDelete, restore endpoint                       |
+| [Soft Delete and Recovery](soft-delete-and-recovery.md)     | ISoftDelete, QueryOptions(IgnoreSoftDelete), restore endpoint               |
 | [Canonical Name Routing](canonical-name-routing.md)         | [CanonicalName] attribute, placeholder resolution                            |
 | [Adding a Resource](adding-a-resource.md)                   | [Resource] attribute, MapHttp, MapGrpc                                       |
 | [Distributed Cache](distributed-cache.md)                   | Adding Redis, eviction strategy trade-offs                                   |

@@ -104,6 +104,27 @@ The value families covered are:
 - `Timestamp` (`CelTimestamp`);
 - error (`CelError`).
 
+### Numeric comparisons and map keys
+
+Value-mode numeric equality and ordering in `CelValues.TryCompareNumbers` follow the CEL reference
+[comparison implementation](https://github.com/cel-expr/cel-go/blob/master/common/types/compare.go):
+integer pairs retain signed/unsigned precision; mixed integer/double operands compare in the double
+domain after range checks. Large integer values can therefore compare equal to a rounded double.
+
+Map lookup uses `CelValues.KeyComparer` and lossless numeric key matching, matching the reference
+[map accessor](https://github.com/cel-expr/cel-go/blob/master/common/types/map.go). Keys `1` and `1.0`
+identify the same entry, while `9007199254740993` and `9007199254740992.0` identify distinct entries.
+The key comparer and hash implementation apply this rule recursively to structural keys.
+Cross-representation key lookup also follows checked conversion bounds: integer `-9223372036854775808`
+and double `-9223372036854775808.0` retain separate map entries.
+
+Double-to-integer conversion follows the reference
+[checked conversion bounds](https://github.com/cel-expr/cel-go/blob/master/common/types/overflow.go):
+`int(double)` rejects both rounded Int64 endpoints, including `-9223372036854775808.0`;
+`uint(double)` accepts zero and rejects negatives and values at or above `18446744073709551616.0`.
+Interior values truncate toward zero. These CEL rules are owned by `CelValues` independently of
+AIP dynamic comparisons.
+
 `CelCompileVisitor` chooses value mode when the context type is `object`, `IReadOnlyDictionary<string, object?>`, `IDictionary<string, object?>`, or `IDictionary`. In value mode it emits calls to `CelValues.Identifier`, `Member`, `Has`, `And`, `Or`, arithmetic helpers, comparison helpers, `Contains`, `Index`, `List`, `Map`, macro helpers, conversion helpers, and `Call` for member functions. It still uses `DynamicValues.Member` for alias-keyed dictionary access under `CelValues.Member`.
 
 When compiling a value-mode CEL expression to `bool`, `CelCompiler` wraps the result with `CelValues.IsTrue`. Only the CEL value `true` passes as a predicate; errors and other values do not become true.

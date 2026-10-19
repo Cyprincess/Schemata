@@ -6,10 +6,10 @@ comes from advisors registered with the repository pipeline, each of which check
 an `is`-test or a constrained generic parameter and acts only when the entity matches.
 `AddRepository` wires every built-in trait advisor, so implementing a trait is the whole opt-in.
 
-Two opt-in packages extend the entity layer with the same advisor pattern: `Schemata.Entity.Owner`
-(`UseOwner()`) wires ownership traits and per-owner query filtering, and `Schemata.Entity.Cache`
-(`UseQueryCache()`) wires transparent query caching and committed eviction — see
-[query-cache.md](query-cache.md).
+Two opt-in extensions build on the same advisor pattern: ownership (`UseOwner()`, shipped in
+`Schemata.Entity.Repository`) wires ownership traits and per-owner query filtering, and query
+caching (`Schemata.Entity.Cache`'s `UseQueryCache()`) wires transparent query caching and committed
+eviction — see [query-cache.md](query-cache.md).
 
 ## Where the code lives
 
@@ -110,8 +110,8 @@ The pipeline runs each advisor in `Order` sequence. Advisors that do not apply t
   `TryAddEnumerable`. Pick an `Order` outside the built-in chain's `[100_000_000, 900_000_000]` window.
 - **Custom trait** — define a marker interface, write an advisor that checks `entity is IMyTrait`, and
   register it. The framework treats it like any built-in trait.
-- **Suppression** — call the matching `Suppress*()` scope on the repository before a mutation to skip a
-  specific advisor for the duration of the returned handle. See
+- **Per-operation options** — pass `QueryOptions` or `MutationOptions` with the call to skip a
+  specific advisor for that operation. See
   [repository/overview.md](../repository/overview.md) for the full table.
 
 ## Design rationale
@@ -129,6 +129,6 @@ which keeps it easy to test, serialize, and share across assembly boundaries.
 ## See also
 
 - [traits.md](traits.md) — full trait reference with advisor order numbers
-- [query-cache.md](query-cache.md) — `Schemata.Entity.Cache` advisors, reverse index, committed eviction
+- [query-cache.md](query-cache.md) — `Schemata.Entity.Cache` advisors, type generations, committed eviction
 - [repository/mutation-pipeline.md](../repository/mutation-pipeline.md) — add/update/remove advisor chains
 - [repository/query-pipeline.md](../repository/query-pipeline.md) — build-query/query/result advisor chains

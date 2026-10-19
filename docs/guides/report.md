@@ -28,9 +28,8 @@ Scheduling Foundation package.
 
 ## Step 2: Add Report storage
 
-Add the Report entity sets and mappings to `AppDbContext`. Keep the base class the earlier guides
-gave it — [Identity](identity.md) changes it to `IdentityDbContext<...>`, and this step only adds
-entity sets and an `OnModelCreating` override:
+Add the Report entity sets and mappings to the regular `AppDbContext` from the [Identity](identity.md)
+guide. This step adds entity sets and an `OnModelCreating` override:
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
@@ -85,10 +84,12 @@ Insight registration with this one, or add only the calls that are absent.
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Insight.Foundation;
+using Schemata.Insight.Foundation.Drivers;
 
 schema.UseInsight(insight => {
     insight.UseAip().UseCel().UseOrdering();
-    insight.AddRepositorySource("students", "students");
+    insight.AddRepositorySource<Student, StudentRow>("students",
+            s => new StudentRow { FullName = s.FullName, Age = s.Age });
     insight.AddSourceDriver<RepositoryDriver>(RepositoryDriver.DriverName);
 });
 
@@ -100,6 +101,12 @@ reports.Define("student-roster", definition => definition
     .Select("full_name")
     .Select("age"));
 reports.MapHttp().UseScheduling();
+
+public sealed class StudentRow
+{
+    public string? FullName { get; set; }
+    public int     Age      { get; set; }
+}
 ```
 
 `UseScheduling().MapHttp()` registers the scheduler and the HTTP operation polling route. The

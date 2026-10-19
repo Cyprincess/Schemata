@@ -207,6 +207,12 @@ the attribute declares.
 - **Decorating an entity does not register it.** `[Resource<...>]` supplies the type roles; the entity still has to
   reach `AddResource<T>()` or `Use<...>()`. An entity that never does has no endpoints, and `IResourceTypeResolver`
   cannot resolve it by name.
+- **Two resources cannot share a canonical pattern or leaf collection.** Registration rejects the second resource
+  because `IResourceTypeResolver` maps a name to one entity type. Pattern identity ignores literal case and
+  placeholder spelling, so `students/{student}` collides with `Students/{id}`; the leaf collection collides across
+  parents, so `students/{student}` collides with `schools/{school}/students/{student}`. To expose the second
+  resource under a different collection, declare that collection in a host-defined type's `[CanonicalName]` and
+  register the host type with `Use<TEntity, ...>()`.
 
 ## See also
 

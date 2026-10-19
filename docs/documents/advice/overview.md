@@ -1,17 +1,16 @@
-# Advice Overview
+﻿# Advice Overview
 
 `Schemata.Advice` is the runtime for the advisor pipeline: a zero-allocation dispatch token
 (`AdvicePipeline<TAdvisor>`), a static entry point (`Advisor.For<TAdvisor>()`), and a family of
 `AdviceRunner` static classes that resolve, sort, and execute advisors from DI.
 `Schemata.Advice.Generator` emits the `RunAsync` extension methods that bind the token to the
-correct runner at compile time.
+correct runner at compile time, and the `AdviceRunner` classes themselves.
 
 ## Where the code lives
 
 | Package                     | Key files                                                                       |
 | --------------------------- | ------------------------------------------------------------------------------- |
 | `Schemata.Advice`           | `AdvicePipeline.cs`, `Advisor.cs`                                               |
-| `Schemata.Advice`           | the `AdviceRunner` family (arities 1..16)                                       |
 | `Schemata.Advice.Generator` | `AdvicePipelineGenerator.cs`, `AdvisorInterfaceInfo.cs`                         |
 | `Schemata.Abstractions`     | `Advisors/IAdvisor.cs`, `Advisors/AdviceContext.cs`, `Advisors/AdviseResult.cs` |
 
@@ -45,21 +44,33 @@ invokes each in turn. The chain stops on the first non-`Continue` result:
 | ---------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `Continue` | Proceed to the next advisor; after the last, the operation runs normally.                                               |
 | `Block`    | Abort the operation; no further advisors run.                                                                           |
-| `Handle`   | The advisor handled the operation; no further advisors run, and the caller uses the state it placed in `AdviceContext`. |
+| `Handle`   | The advisor handled the operation; no further advisors run, and the caller reads the stage's typed result — `QueryContext<TEntity,TResult,T>.Result`, an authorization context's `Result`, or `HandledResponse<TResponse>` when the stage declares a handled-output carrier. |
 
-`AdviceCreateRequestIdempotency<TEntity, TRequest, TDetail>` is the canonical `Handle` case: on a
-cache hit with a matching payload hash it returns `Handle` after storing a `CreateResultBase<TDetail>`
-in the context, and the resource handler returns that cached result.
+A stage carries its short-circuit result on its own typed context. Repository query advisors write
+`QueryContext<TEntity,TResult,T>.Result`; authorization advisors write their authorization context's
+`Result`. Any stage that declares a handled-output carrier writes `HandledResponse<TResponse>` /
+`IHandledResponse<TResponse>`, and the owning handler reads it back through `HandledResponseRunner`
+(`Schemata.Abstractions/Advisors/HandledResponseRunner.cs`). Examples: the resource create, update,
+delete, and get request and handler advisors; custom-method stages carried by `ResourceMethodExecution`;
+and Identity operations carried by `IdentityOperationExecution` (`SchemataSignInManager` and
+`IdentityOperationHandler`). The resource create idempotency wrap is the exception: it returns the
+replayed `CreateResultBase<TDetail>` directly and never writes the carrier (see
+[Resource create pipeline](../resource/create-pipeline.md)).
+
+Event `Handle` is different: a publish advisor that returns `Handle` aborts the publish path — no
+lifecycle observers or audit row, no subscription matching or delivery — and may set
+`EventContext.Result`, which nothing reads back. Consume advisors run after handler dispatch, and the
+bus ignores their `AdviseResult`; see [Event dispatch pipeline](../event/dispatch-pipeline.md).
 
 ## AdviceContext
 
-`AdviceContext` is a typed property bag keyed by `RuntimeTypeHandle`, flowing through the pipeline
-with shared state and the service provider. See [Advice Pipeline](../core/advice-pipeline.md) for
-the full API.
+`AdviceContext` carries the `IServiceProvider` of the pipeline that constructed it and holds no
+state; advisor stages receive typed payloads as parameters. See
+[Advice Pipeline](../core/advice-pipeline.md) for the constructor contract.
 
-Two `AdviceContext` instances coexist per resource request: one in the resource operation handler,
-one in `IRepository<T>.AdviceContext`. They never share state — `repository.SuppressQuerySoftDelete()`
-sets a marker only on the repository's context.
+Two `AdviceContext` instances coexist per resource request: the handler's dispatch context and
+`IRepository<T>.AdviceContext`. Each is bound to its own provider, and an option passed to a
+repository call affects only that call's pipeline.
 
 ## Registering advisors
 
@@ -93,7 +104,7 @@ built-in steps or outside the reserved range.
 
 The zero-size struct token avoids heap allocation on every pipeline invocation. The generator
 removes the boilerplate `RunAsync` overloads — a new advisor interface needs only its declaration.
-The `AdviceContext` typed bag avoids parameter explosion as pipelines grow.
+Explicit typed payloads on each advisor stage avoid parameter explosion as pipelines grow.
 
 ## See also
 

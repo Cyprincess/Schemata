@@ -9,9 +9,11 @@ beyond `AdviceContext` and `CancellationToken`.
 
 | Package                 | Key files                                                                       |
 | ----------------------- | ------------------------------------------------------------------------------- |
-| `Schemata.Advice`       | the `AdviceRunner` family (arities 1..16)                                       |
 | `Schemata.Advice`       | `AdvicePipeline.cs`, `Advisor.cs`                                               |
 | `Schemata.Abstractions` | `Advisors/IAdvisor.cs`, `Advisors/AdviceContext.cs`, `Advisors/AdviseResult.cs` |
+
+The `AdviceRunner` classes have no source files; `Schemata.Advice.Generator` emits them into the
+`Schemata.Advice` compilation.
 
 ## AdviceRunner family
 
@@ -46,18 +48,18 @@ public static class AdviceRunner<TAdvisor, T1>
 
 Higher arities follow the same shape, adding `T2 a2`, `T3 a3`, up to `T16 a16`.
 
-### File naming
+### Emitted by the source generator
 
-The file names track the CLR generic arity (`TAdvisor` plus the argument type parameters). The
-nine-argument runner lives in the unsuffixed `AdviceRunner.cs`, so there is no `AdviceRunner\`10.cs`.
+`Schemata.Advice.Generator` emits one class per arity into the compilation that declares
+`AdvicePipeline<TAdvisor>`, which only `Schemata.Advice` does:
 
-| File                                         | Type parameters                            | Advisor interface                          | Argument arity |
-| -------------------------------------------- | ------------------------------------------ | ------------------------------------------ | -------------- |
-| `AdviceRunner\`2.cs`                         | `TAdvisor, T1`                             | `IAdvisor<T1>`                             | 1              |
-| `AdviceRunner\`3.cs`                         | `TAdvisor, T1, T2`                         | `IAdvisor<T1, T2>`                         | 2              |
-| `AdviceRunner\`4.cs`..`AdviceRunner\`9.cs`   | `TAdvisor, T1..T3` .. `TAdvisor, T1..T8`   | `IAdvisor<T1..T3>` .. `IAdvisor<T1..T8>`   | 3..8           |
-| `AdviceRunner.cs`                            | `TAdvisor, T1..T9`                         | `IAdvisor<T1..T9>`                         | 9              |
-| `AdviceRunner\`11.cs`..`AdviceRunner\`17.cs` | `TAdvisor, T1..T10` .. `TAdvisor, T1..T16` | `IAdvisor<T1..T10>` .. `IAdvisor<T1..T16>` | 10..16         |
+- class name `AdviceRunner<TAdvisor, T1, ..., TN>`, constrained to `IAdvisor<T1, ..., TN>`;
+- hint name `AdviceRunner.ArityN.g.cs`;
+- CLR metadata arity `N + 1` (`TAdvisor` plus the argument type parameters).
+
+The generator caps the family at the 16 `IAdvisor<T1, ..., TN>` overloads declared in
+`Schemata.Abstractions`. A compilation that only references `AdvicePipeline<TAdvisor>` receives
+the generated `RunAsync` extensions and no runner types; see `generator.md`.
 
 The minimum arity is 1; there is no zero-argument runner or `IAdvisor` zero-argument variant.
 
@@ -104,11 +106,18 @@ public readonly struct AdvicePipeline<TAdvisor>
 ## Extension points
 
 - A new advisor interface with an existing arity (e.g. `IMyAdvisor<T1, T2> : IAdvisor<T1, T2>`)
-  needs no runtime change; the generator emits its `RunAsync` and the matching runner already
-  exists.
+  needs no runtime change; the generator emits its `RunAsync` and the emitted runner family
+  already covers that arity.
 - A new advisor for an existing interface needs only an implementation plus a `TryAddEnumerable`
   registration.
 - Beyond 16 domain arguments, wrap them in a context object and use arity 1.
+
+## API reference coverage
+
+`docs/docfx.json` builds metadata with `SchemataSkipGenerators=true`, which removes the generator
+from the `src/` projects, so the DocFX API reference lists neither the generated `RunAsync`
+extensions nor the emitted `AdviceRunner` classes. Both appear in package IntelliSense and
+compile-time diagnostics.
 
 ## Design rationale
 

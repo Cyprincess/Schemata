@@ -38,6 +38,11 @@ Trait Entity {
 `public <CLRType> <PascalCaseName> { get; set; }` property. Base and `Use` names that resolve to
 known traits appear as base interfaces.
 
+Entities recursively implement local trait fields and inherited trait fields. Equivalent DSL
+type aliases share one property; incompatible declarations produce `SKM001`. Entity `Use` also
+supports external C# interface contracts; see [Entities](entities.md#composition).
+
+
 ```text
 Namespace My.Models
 

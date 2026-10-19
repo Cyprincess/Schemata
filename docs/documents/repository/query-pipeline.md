@@ -1,6 +1,7 @@
 # Query Pipeline
 
-Every query method on `IRepository<TEntity>` — `ListAsync`, `FirstOrDefaultAsync`, `SingleOrDefaultAsync`, `AnyAsync`, `CountAsync`, `LongCountAsync` — passes through a three-stage advisor pipeline before results are returned.
+Scalar terminal queries (`FirstOrDefaultAsync`, `SingleOrDefaultAsync`, `AnyAsync`, `CountAsync`, and
+`LongCountAsync`) pass through the three-stage advisor pipeline below.
 
 ## Where the code lives
 
@@ -72,6 +73,22 @@ IRepositoryResultAdvisor        post-process (cache store, etc.)
 
 For `ListAsync`, the build-query stage is identical, but the query and result advisor stages are not invoked — the composed queryable is streamed directly as an `IAsyncEnumerable`.
 
+## Original scalar queries
+
+`GetOriginalAsync(entity, projection, ct)` selects a direct mapped immutable scalar property by the
+entity's primary-key values and returns `OriginalResult<T>(Found, Value)`. `Found` remains true when
+the selected nullable scalar is null. Missing and filtered rows return `Found == false`.
+
+This method runs build-query advisors before selecting the scalar and directly executes the provider
+query; query/result cache advisors do not supply mutation evidence. EF Core uses its unit-of-work-owned
+admission snapshot for the same genuinely Added entity with an unchanged actual primary key, including
+queries from another transient repository joined to that unit of work. That private query object is
+created once on the first staged original lookup; selectors cannot return it or invoke methods on it. Persisted reads project
+the database scalar without materializing a tracked entity. LinqToDB follows this persisted path for
+transaction-local inserts too. Sources: `src/Schemata.Entity.Repository/RepositoryBase.cs`,
+`src/Schemata.Entity.EntityFrameworkCore/EfCoreRepository.cs`, and
+`src/Schemata.Entity.EntityFrameworkCore/EfCoreUnitOfWork.cs`.
+
 ## Built-in build-query advisors
 
 ### AdviceBuildQuerySoftDelete
@@ -81,7 +98,7 @@ For `ListAsync`, the build-query stage is identical, but the query and result ad
 | Interface     | `IRepositoryBuildQueryAdvisor<TEntity>`       |
 | Order         | 100,000,000 (`SchemataConstants.Orders.Base`) |
 | Trait         | `ISoftDelete`                                 |
-| Suppressed by | `QuerySoftDeleteSuppressed`                   |
+| Skipped by    | `QueryOptions.IgnoreSoftDelete`               |
 
 When the entity type implements `ISoftDelete`, appends a filter that excludes rows where `DeleteTime` is non-null:
 
@@ -92,18 +109,16 @@ container.ApplyModification(q =>
      .OfType<TEntity>());
 ```
 
-Entities with a non-null `DeleteTime` are invisible by default. To include them, scope the suppression:
+Entities with a non-null `DeleteTime` are invisible by default. To include them, pass
+`QueryOptions(IgnoreSoftDelete: true)` on the call:
 
 ```csharp
-using (repository.SuppressQuerySoftDelete())
-{
-    var all = await repository.ListAsync<Book>(null, ct).ToListAsync(ct);
-}
+var all = await repository.ListAsync<Book>(
+    null, ct, new QueryOptions(IgnoreSoftDelete: true)).ToListAsync(ct);
 ```
 
-Suppression lives on the repository only: `repository.SuppressQuerySoftDelete()` stores
-`QuerySoftDeleteSuppressed` in the repository's `AdviceContext` until the scope disposes. There is no
-container-level entry point; the resource handler applies the repository scope itself where documented.
+`IgnoreSoftDelete` travels with the call: the advisor checks `QueryContainer.Options`, and there is
+no repository-level switch. Callers pass the option themselves wherever tombstoned rows are needed.
 
 ### AdviceBuildQueryOwner
 
@@ -112,15 +127,14 @@ container-level entry point; the resource handler applies the repository scope i
 | Interface     | `IRepositoryBuildQueryAdvisor<TEntity>` |
 | Order         | 110,000,000                             |
 | Trait         | `IOwnable`                              |
-| Suppressed by | `QueryOwnerSuppressed`                  |
+| Skipped by    | `QueryOptions.IgnoreOwner`              |
 | Registered by | `UseOwner()`                            |
 
 Restricts results to entities owned by the current caller. Resolves the owner via `IOwnerResolver<TEntity>` and appends `.Where(e => e.Owner == owner)`. When the resolver returns `null`, behavior is governed by `SchemataOwnerOptions.OnNullOwner`. See [ownership.md](ownership.md).
 
-Repository callers can scope `repository.SuppressQueryOwner()` around a query. The resource
-handler queries through its own repository instance, so request advisors cannot reach that seam;
-they bridge through a scoped `IRepositoryBuildQueryAdvisor<TEntity>` that marks the query advice
-context with `QueryOwnerSuppressed` instead.
+A consumer that needs owner-free reads passes `QueryOptions(IgnoreOwner: true)` at its own call
+site against a repository it resolves itself. The resource pipeline keeps the owner filter on its
+reads; it passes `QueryOptions` only for soft-delete visibility.
 
 ## QueryContainer and QueryContext
 

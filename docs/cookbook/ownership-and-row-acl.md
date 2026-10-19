@@ -12,14 +12,10 @@ reads the authenticated user's subject claim.
 ## Prerequisites
 
 - Completed [Getting Started](../guides/getting-started.md) — the `Student`
-  entity and EF Core repository must already be wired up.
-- `Schemata.Entity.Owner` package added.
+  entity and EF Core repository must already be wired up. Ownership ships in
+  the repository package; no additional package is required.
 - An authentication scheme configured (e.g., via `UseIdentity` or bearer
   tokens) so `HttpContext.User` carries a `sub` claim.
-
-```shell
-dotnet add package --prerelease Schemata.Entity.Owner
-```
 
 ## Step 1 — Implement `IOwnable` on the entity
 
@@ -76,23 +72,21 @@ schema.ConfigureServices(services => {
 });
 ```
 
-`UseOwner()` registers three open-generic advisors as `Scoped`:
+`UseOwner()` registers two open-generic advisors as `Scoped`:
 
 | Advisor                                          | Pipeline     | What it does                                                                                  |
 | ------------------------------------------------ | ------------ | --------------------------------------------------------------------------------------------- |
 | `AdviceAddOwner<TEntity>`                        | Add          | Calls `IOwnerResolver<TEntity>.ResolveAsync`, sets `IOwnable.Owner`                           |
 | `AdviceBuildQueryOwner<TEntity>`                 | BuildQuery   | Appends `WHERE Owner = <resolved>` to every query                                             |
-| `AdviceValidateResourceReferenceExistence<TEntity>` | Add + Update | Resolves `[ResourceReference(ValidateExistence = true)]` targets and throws NotFound on a miss |
 
 Both owner advisors check `IOwnable` at runtime — entities that don't implement it
 are skipped. `AdviceAddOwner` runs right after `AdviceAddCanonicalName` (its
 `Order` is `AdviceAddCanonicalName.DefaultOrder + 1_000_000`).
 `AdviceBuildQueryOwner` runs after `AdviceBuildQuerySoftDelete` (its `Order`
 is `AdviceBuildQuerySoftDelete.DefaultOrder + 10_000_000`).
-`AdviceValidateResourceReferenceExistence` runs at
-`AdviceValidateResourceReferences.DefaultOrder + 10_000_000` on both the add and update
-pipelines; entities whose reference properties carry no `ValidateExistence = true` opt-in are
-skipped.
+Repository separately registers `AdviceValidateResourceReferenceExistence` on add/update.
+Properties opt in through `[ResourceReference(ValidateExistence = true)]`; this logical check
+does not install database foreign keys or prevent concurrent target deletion.
 
 **Verify:** Start the app. A `POST /v1/students` request without authentication
 throws `PermissionDeniedException` (the default `OnNullOwner` policy is
@@ -106,7 +100,7 @@ owner. Implement it to return the authenticated user's canonical name:
 ```csharp
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
-using Schemata.Entity.Owner;
+using Schemata.Entity.Repository;
 
 public sealed class HttpContextOwnerResolver<TEntity> : IOwnerResolver<TEntity>
 {
@@ -175,37 +169,34 @@ The three policies are:
 **Verify:** With `EmptyResult`, an unauthenticated `GET /v1/students` returns an
 empty list with HTTP 200 instead of 401.
 
-## Step 5 — Suppress ownership for admin queries
+## Step 5 — Bypass ownership for admin queries
 
 Some operations need to bypass the owner filter, for example an admin endpoint
-that lists all students. Use `SuppressQueryOwner()` on the repository:
+that lists all students. Pass `QueryOptions` on the call:
 
 ```csharp
 public class AdminStudentService(IRepository<Student> repository)
 {
     public async Task<List<Student>> ListAllAsync(CancellationToken ct)
     {
-        using (repository.SuppressQueryOwner())
-        {
-            return await repository.ListAsync<Student>(null, ct).ToListAsync(ct);
-        }
+        return await repository.ListAsync<Student>(
+            null, ct, new QueryOptions(IgnoreOwner: true)).ToListAsync(ct);
     }
 }
 ```
 
-`SuppressQueryOwner()` sets `QueryOwnerSuppressed` in the `AdviceContext` and
-returns an `IDisposable`. The `using` scope restores the prior state on exit.
-`AdviceBuildQueryOwner` checks `ctx.Has<QueryOwnerSuppressed>()` and skips the
-filter while the marker is present.
+`AdviceBuildQueryOwner` checks `container.Options.IgnoreOwner` and skips the
+filter for that call. The option is per-operation, so nested and parallel
+queries never inherit it. `IgnoreSoftDelete` and `IgnoreCache` override the
+other query behaviors the same way.
 
-To suppress owner stamping on insert (e.g., seeding data), scope
-`SuppressOwner()`:
+Insert stamping has no bypass. `AdviceAddOwner` assigns the owner only while
+`IOwnable.Owner` is unset, so seed a different owner by assigning it before
+`AddAsync`:
 
 ```csharp
-using (repository.SuppressOwner())
-{
-    await repository.AddAsync(entity, ct);
-}
+entity.Owner = "users/seed";
+await repository.AddAsync(entity, ct);
 ```
 
 **Verify:** `ListAllAsync` returns rows from all owners. A normal

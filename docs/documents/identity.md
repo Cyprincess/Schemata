@@ -11,7 +11,7 @@ depends on `SchemataAuthenticationFeature` and `SchemataTransportHttpFeature`.
 | Package                        | Key files                                                                                                                                                                                                                                       |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Schemata.Identity.Skeleton`   | `Entities/SchemataUser.cs`, `Entities/SchemataRole.cs`, the join entities, `Managers/SchemataUserManager.cs`, `Stores/`, `Advisors/`, `Json/ClaimStoreJsonConverter.cs`, `Services/IMailSender.cs`, `Services/IMessageSender.cs`                |
-| `Schemata.Identity.Foundation` | `Extensions/SchemataBuilderExtensions.cs` (three `UseIdentity` overloads), `Features/SchemataIdentityFeature.cs`, `Controllers/AuthenticateController*.cs`, `Commands/`, `Queries/`, `Handlers/IdentityHandler.cs`, `Handlers/IdentityOperationHandler*.cs`, `Advisors/Advice*.cs`, `SchemataIdentityOptions.cs` |
+| `Schemata.Identity.Foundation` | `Extensions/SchemataBuilderExtensions.cs` (four `UseIdentity` overloads), `Features/SchemataIdentityFeature.cs`, `Controllers/AuthenticateController*.cs`, `Commands/`, `Queries/`, `Handlers/IdentityHandler.cs`, `Handlers/IdentityOperationHandler*.cs`, `Advisors/Advice*.cs`, `SchemataIdentityOptions.cs` |
 
 ## Entity types
 
@@ -28,14 +28,34 @@ public override Guid Id { get => Uid; set => Uid = value; }
 The table is `SchemataUsers`, canonical-name pattern `users/{user}`. `SchemataRole` follows the
 same shape over `IdentityRole<Guid>`: table `SchemataRoles`, pattern `roles/{role}`.
 
-`SchemataUserStore<TUser>.CreateAsync` assigns `Identifiers.NewUid()` when `Uid` is empty and sets
-`Name` from `Uid.ToString()` before persisting the user. The canonical-name pattern therefore
-produces `users/{uid}`. `FindByIdAsync` accepts either the raw GUID or a canonical name such as
-`users/{uid}`; it parses the segment after the final `/` as the `Uid` used for lookup.
+Resource `Name` values are supplied by a consumer-registered repository create advisor. Database
+`Uid` and canonical `users/{name}` subjects are independent identities. `FindByIdAsync` accepts
+the database GUID; `GetUserAsync` resolves canonical subject claims through `FindByCanonicalNameAsync`,
+including resource names that happen to be GUID-shaped.
 
-The supporting join entities — `SchemataUserClaim`, `SchemataRoleClaim`, `SchemataUserRole`,
-`SchemataUserLogin`, `SchemataUserToken` — each carry their own `[Table]` and `[PrimaryKey]`
-attributes, so an `IdentityDbContext` over these types needs no extra Fluent configuration.
+These are three separate contracts with different uniqueness scopes. A canonical name is unique
+among currently active instances of its resource (AIP-122: one API, one name); a soft-deleted or
+permanently removed instance releases the name, and IDs of deleted resources are never reused
+(AIP-164). The database `Uid` is the strict internal identity and is never reassigned. OpenID
+Connect additionally requires the wire `sub` to be never reassigned within one issuer; Schemata
+currently emits the canonical name as `sub`, so a consumer who deletes and reconstructs a user
+under the same canonical name must treat the two instances as the same OIDC subject — or configure
+`subject_type = pairwise`, whose projected identifiers are derived from the (sector, subject,
+salt) tuple and persisted per application in `SchemataSubjectMappings`. Choosing a
+never-reassigned wire `sub` source remains a consumer decision under this policy; the framework
+does not tombstone or reserve names.
+
+Refresh admission rejects tickets with missing or expired `ExpiresUtc` before validating the
+security stamp or rebuilding the principal. Authentication-event claims retain the original
+sign-in time and methods. User and role stores translate optimistic-concurrency failures from
+both mutation and commit boundaries to Identity concurrency errors.
+
+The supporting entities `SchemataUserClaim`, `SchemataRoleClaim`, `SchemataUserRole`,
+`SchemataUserLogin` and `SchemataUserToken` store canonical `users/{name}` and `roles/{name}`
+references in their inherited string `UserId`/`RoleId` properties. User and role `Uid` values remain
+strict internal identities; claim rows retain their own `Uid` primary keys. Register these sets in
+a regular EF Core `DbContext` using the Schemata mapping conventions, rather than the platform
+`IdentityDbContext` whose shared key constraint cannot represent this split.
 
 ## Resource management surface
 
@@ -51,31 +71,46 @@ schema.UseIdentity()
 
 The shared Security extensions configure the management resource pipeline. `MapHttp()` and `MapGrpc()` are concrete Identity transport extensions that activate their domain features. The existing IdentityCore API endpoints remain separate from this resource surface.
 
+Management mutations resolve the mutation owners `IResourceMutation<TUser>` and
+`IResourceMutation<TRole>` after resource policy and mapping; the configured Identity stores
+delegate their writes to the same owners. Deletion therefore uses the same transactional dependent
+cleanup as direct store deletion. A replacement user or role may reuse a canonical name after
+deletion without inheriting retained relationships. Direct repository writes are low-level
+operations and bypass these owner lifecycle rules.
+
 ## Enabling the feature
 
-Three overloads chain into one another; each takes the same four optional delegates:
+Four overloads chain into one another; each takes the same four optional delegates:
 
 ```csharp
-schema.UseIdentity();                                          // SchemataUser, SchemataRole, default stores
-schema.UseIdentity<MyUser, MyRole>();                          // custom user/role, default stores
-schema.UseIdentity<MyUser, MyRole, MyUserStore, MyRoleStore>(); // fully custom
+schema.UseIdentity();                                  // SchemataUser, SchemataRole, default auxiliary entities and stores
+schema.UseIdentity<MyUser, MyRole>();                  // custom user/role, default auxiliary entities and stores
+schema.UseIdentity<MyUser, MyRole, MyUserClaim, MyRoleClaim,
+    MyUserLogin, MyUserToken, MyUserRole>();           // seven custom entity types, default stores
+schema.UseIdentity<MyUser, MyRole, MyUserStore, MyRoleStore>(); // fully custom stores on the built-in auxiliary entities
 ```
 
 | Parameter   | Type                               | Purpose                                                             |
 | ----------- | ---------------------------------- | ------------------------------------------------------------------- |
-| `identify`  | `Action<SchemataIdentityOptions>?` | Toggle which endpoint groups are enabled                            |
+| `identify` | `Action<SchemataIdentityOptions>?` | Configure the login redirect URI |
 | `configure` | `Action<IdentityOptions>?`         | Standard ASP.NET Core Identity options (password, lockout, sign-in) |
 | `build`     | `Action<IdentityBuilder>?`         | Add token providers, validators, custom stores                      |
 | `bearer`    | `Action<BearerTokenOptions>?`      | Bearer token lifetime and validation                                |
 
-Type constraints: `TUser : SchemataUser, new()`, `TRole : SchemataRole`,
-`TUserStore : class, IUserStore<TUser>`, `TRoleStore : class, IRoleStore<TRole>`. The default
-stores are `SchemataUserStore<TUser>` and `SchemataRoleStore<TRole>`.
+Type constraints: `TUser : SchemataUser, new()`, `TRole : SchemataRole, new()`, each auxiliary
+entity parameter constrained to its `SchemataUserClaim`/`SchemataRoleClaim`/`SchemataUserLogin`/
+`SchemataUserToken`/`SchemataUserRole` base with `new()`, `TUserStore : class, IUserStore<TUser>`,
+`TRoleStore : class, IRoleStore<TRole>`. The default stores close over every selected entity type:
+`SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, TUserToken, TRoleClaim>` and
+`SchemataRoleStore<TRole, TRoleClaim, TUserRole>`. A custom store that persists its own relation
+entities registers `IResourceMutation<TUser>` and `IResourceMutation<TRole>` explicitly; that
+registration owns the delete cascade.
 
 ## What the feature registers
 
-`SchemataIdentityFeature<TUser, TRole, TUserStore, TRoleStore>` (`Priority = Orders.Extension +
-30_000_000 = 430_000_000`) does the following in `ConfigureServices`:
+`SchemataIdentityFeature<TUser, TRole, TUserClaim, TRoleClaim, TUserLogin, TUserToken, TUserRole,
+TUserStore, TRoleStore>` (`Priority = Orders.Extension + 30_000_000 = 430_000_000`) does the
+following in `ConfigureServices`:
 
 - Adds `ClaimStoreJsonConverter` to all three JSON option surfaces: `JsonSerializerOptions`,
   `Microsoft.AspNetCore.Http.Json.JsonOptions`, and `Microsoft.AspNetCore.Mvc.JsonOptions`.
@@ -83,19 +118,22 @@ stores are `SchemataUserStore<TUser>` and `SchemataRoleStore<TRole>`.
   an `IdentityControllerFeatureProvider` so MVC discovers the controller without exposing the whole
   Schemata assembly as an `ApplicationPart`.
 - Supplies default dispatcher aliases when none is already registered, registers the scoped
-  `IdentityHandler<TUser>` facade, and explicitly closes 14 request handlers for `TUser`; the
-  operation handler owns the existing advisor and Identity-manager pipeline.
-- Registers `IMailSender<>` and `IMessageSender<>` with the `NoOpMailSender<>` /
-  `NoOpMessageSender<>` defaults.
+  `IdentityHandler<TUser>` facade, and closes login, refresh, and profile request handlers for
+  `TUser`. `SchemataSignInManager<TUser>` owns login verification and issuance; the operation
+  handler owns the remaining Identity operations. Email and SMS delivery are optional
+  capabilities: `IMailSender<TUser>` / `IMessageSender<TUser>` resolve only on the operation
+  path that needs the channel, so a host without a registered sender fails that operation at
+  its use instead of reporting a fabricated delivery.
 - Registers `IUserStore<TUser>` and `IRoleStore<TRole>` with the supplied store types.
 - Overrides `IdentityOptions.ClaimsIdentity` to OIDC-standard claim types: `UserIdClaimType =
 "sub"`, `UserNameClaimType = "preferred_username"`, `EmailClaimType = "email"`, `RoleClaimType =
 "role"`, `SecurityStampClaimType = "security_stamp"`.
 - Builds the Identity stack: `AddIdentityApiEndpoints<TUser>(configure).AddRoles<TRole>()
 .AddUserManager<SchemataUserManager<TUser>>()
+.AddSignInManager<SchemataSignInManager<TUser>>()
 .AddClaimsPrincipalFactory<SchemataUserClaimsPrincipalFactory<TUser, TRole>>()`, then applies the
   `build` delegate to the result. The factory issues `IdentityClaims.Subject` as the user's canonical name
-  (`users/{uid}`).
+  (`users/{name}`).
 
 ## AuthenticateController
 
@@ -123,22 +161,32 @@ account actions carry `[Authorize]`.
 | `PUT`   | `~/Account/Profile/Password`   | `Password`      | Change the password                   |
 
 The 14 account-operation actions dispatch their command or query directly; `SignOut` and `Continue`
-retain their HTTP-specific handling. `IdentityHandler<TUser>` exposes the same operations as a
-dispatcher-backed facade for non-HTTP callers. The internal operation handler requires the
-dispatcher-established `AdviceContext`, runs the request advisor pipeline, and then performs the
-operation. HTTP request bodies remain the `*Request` models in
+retain their HTTP-specific handling. `IdentityHandler<TUser>` exposes dispatcher-backed operations.
+Login consumes the current HTTP authentication context and returns `IdentityResult<Unit>` after
+writing credentials; its controller returns an empty result. Other operations retain their existing
+payloads. HTTP request bodies remain the `*Request` models in
 `Schemata.Identity.Skeleton.Models`; with snake_case serialization, `RegisterRequest` posts
 `username`, `email_address`, `phone_number`, `password`, and an optional `use_cookies`.
 
+Login uses ASP.NET Core's `PasswordSignInAsync` and, when required, its authenticator or recovery-code
+sign-in operation. The platform owns lockout, pending two-factor identity, remembered-device checks,
+and recovery-code consumption. Login advisors run after verification, then host observers run before
+final credentials are written. A failed advisor or observer prevents final sign-in; earlier platform
+effects, including recovery-code consumption, remain committed.
+
+`use_cookies` adds an application session cookie to the bearer response. It requests neither a
+persistent cookie nor a remembered-device grant. Authentication evidence reflects the factor actually
+verified, including password-only evidence when an existing remembered device bypasses a supplied code.
+
+
 ## Request advisors
 
-Every identity operation runs `IIdentityRequestAdvisor<T>`, whose `AdviseAsync` receives the
+Every identity operation runs `IIdentityRequestAdvisor<TRequest,TResponse>`, whose `AdviseAsync` receives the
 request `T`, the `IdentityOperation` enum value, and the caller's `ClaimsPrincipal`. The feature
 registers these built-ins:
 
 | Advisor                                  | Request                | Validates                                                                                    |
 | ---------------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------- |
-| `AdviceRequestFeature<T>`                | all                    | The matching `SchemataIdentityOptions` flag is enabled; throws `NotFoundException` otherwise |
 | `AdviceRequestConfirmValidation`         | `ConfirmRequest`       | A code plus at least one of email/phone is present                                           |
 | `AdviceRequestEmailValidation<TUser>`    | `ProfileRequest`       | New email differs from current (on `ChangeEmail`)                                            |
 | `AdviceRequestPhoneValidation<TUser>`    | `ProfileRequest`       | New phone differs from current                                                               |
@@ -146,8 +194,7 @@ registers these built-ins:
 | `AdviceRequestEnrollValidation<TUser>`   | `AuthenticatorRequest` | A valid 2FA code is supplied for enrollment                                                  |
 | `AdviceRequestDowngradeValidation`       | `AuthenticatorRequest` | A valid 2FA code is supplied for downgrade                                                   |
 
-`AdviceRequestFeature<T>` runs at `Orders.Base = 100,000,000`; the validation advisors at
-110,000,000. Operation-specific advisor interfaces — `IIdentityRegisterAdvisor<TUser>`,
+Validation advisors run at 110,000,000. Operation-specific advisor interfaces — `IIdentityRegisterAdvisor<TUser>`,
 `IIdentityLoginAdvisor`, `IIdentityRefreshAdvisor`, `IIdentityProfileChangeAdvisor`,
 `IIdentityTwoFactorAdvisor`, `IIdentityRecoveryAdvisor`, `IIdentityProfileResponseAdvisor<TUser>` — let
 you hook a single phase without filtering on the operation enum.
@@ -188,33 +235,27 @@ The redirect and its resume endpoint belong to Identity alone; they run with the
 package absent. The authorization server's consent/login page is a separate setting,
 `SchemataAuthorizationOptions.InteractionUri` — see [Authorization](authorization.md).
 
-## SchemataIdentityOptions
+## Identity capabilities
 
-Seven booleans, all defaulting to `true`, gate the endpoint groups:
+`UseIdentity()` installs login, refresh, profile, and the host Identity system. Optional operations
+are installed on its returned builder through `UseRegistration()`, `UseAccountConfirmation()`,
+`UsePasswordReset()`, `UsePasswordChange()`, `UseEmailChange()`, `UsePhoneNumberChange()`, and
+`UseTwoFactorAuthentication()`. Each registers its actual request handlers. MVC omits actions whose
+handlers are absent; a selected handler with broken dependencies fails at use.
 
-| Property                       | Gates                                  |
-| ------------------------------ | -------------------------------------- |
-| `AllowRegistration`            | `Register`                             |
-| `AllowAccountConfirmation`     | `Confirm`, `Code`                      |
-| `AllowPasswordReset`           | `Forgot`, `Reset`                      |
-| `AllowPasswordChange`          | `~/Account/Profile/Password`           |
-| `AllowEmailChange`             | `~/Account/Profile/Email`              |
-| `AllowPhoneNumberChange`       | `~/Account/Profile/Phone`              |
-| `AllowTwoFactorAuthentication` | `Authenticator`, `Enroll`, `Downgrade` |
-
-A disabled operation returns `NotFoundException` (HTTP 404) from `AdviceRequestFeature`.
-
-`LoginUri` is the eighth property and takes a URL rather than a flag; see
-[Sign-in redirect](#sign-in-redirect).
+`SchemataIdentityOptions.LoginUri` configures the [sign-in redirect](#sign-in-redirect).
 
 ## Extension points
 
 | Interface                    | Purpose                                                                |
 | ---------------------------- | ---------------------------------------------------------------------- |
-| `IIdentityRequestAdvisor<T>` | Gate or transform any request before the handler runs.                 |
-| `IMailSender<TUser>`         | Send confirmation and reset emails. Replace `NoOpMailSender<TUser>`.   |
-| `IMessageSender<TUser>`      | Send SMS confirmation/reset codes. Replace `NoOpMessageSender<TUser>`. |
+| `IIdentityRequestAdvisor<TRequest,TResponse>` | Gate or transform any request before the handler runs; a handled advisor writes `IdentityOperationExecution<TResponse>.Response`. |
+| `IMailSender<TUser>`         | Register an application implementation for confirmation and reset emails. |
+| `IMessageSender<TUser>`      | Register an application implementation for SMS confirmation/reset codes. |
 | `SchemataUserManager<TUser>` | Subclass for domain-specific user operations.                          |
+
+The selected send operation resolves its sender with `GetRequiredService`; a missing registration
+throws when that operation uses the channel.
 
 ## Design rationale
 

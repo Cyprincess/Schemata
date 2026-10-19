@@ -1,7 +1,7 @@
-# Advice Pipeline
+﻿# Advice Pipeline
 
 The advice pipeline injects cross-cutting logic at well-defined interception points. An advisor is
-a focused unit that runs in sequence; it inspects and mutates shared state, lets the operation
+a focused unit that runs in sequence; it reads and rewrites its typed payload, lets the operation
 continue, or short-circuits the chain. The pipeline backs repository mutations, resource
 operations, validation, and authorization.
 
@@ -10,8 +10,11 @@ operations, validation, and authorization.
 | Package                     | Key files                                                                                       |
 | --------------------------- | ----------------------------------------------------------------------------------------------- |
 | `Schemata.Abstractions`     | `Advisors/IAdvisor.cs` (arities 1..16), `Advisors/AdviceContext.cs`, `Advisors/AdviseResult.cs` |
-| `Schemata.Advice`           | `AdvicePipeline.cs`, `Advisor.cs`, the `AdviceRunner` family                                    |
-| `Schemata.Advice.Generator` | `AdvicePipelineGenerator.cs` — emits the `RunAsync` extension methods                           |
+| `Schemata.Advice`           | `AdvicePipeline.cs`, `Advisor.cs`                                                               |
+| `Schemata.Advice.Generator` | `AdvicePipelineGenerator.cs` — emits the `RunAsync` extension methods and the runner family     |
+
+The `AdviceRunner` family has no source files; the generator emits it into the `Schemata.Advice`
+compilation.
 
 ## IAdvisor
 
@@ -51,31 +54,24 @@ pipelines that pass a derived type.
 
 ## AdviceContext
 
-`AdviceContext` is a typed property bag flowing through the pipeline, giving advisors shared state
-and access to the service provider. Values key on `RuntimeTypeHandle`, so each type stores one
-value.
+`AdviceContext` carries the `IServiceProvider` of the pipeline that constructed it. It holds no
+per-request state: each advisor stage receives its payload as an explicit parameter. A stage that
+short-circuits writes its result to the stage's typed context: repository query advisors use
+`QueryContext<TEntity,TResult,T>.Result`, authorization advisors use their context's `Result`, and
+stages that declare a handled-output carrier use `HandledResponse<TResponse>` /
+`IHandledResponse<TResponse>`, read back by `HandledResponseRunner` from `Schemata.Abstractions/Advisors`.
+Resource request and handler advisors, `ResourceMethodExecution`, and `IdentityOperationExecution` are
+examples. Event publish `Handle` aborts the publish path and may set `EventContext.Result` that nothing
+reads back; consume advisors run after dispatch and the bus ignores their `AdviseResult` (see
+[Event dispatch pipeline](../event/dispatch-pipeline.md)).
 
 ```csharp
 public class AdviceContext
 {
     public AdviceContext(IServiceProvider sp);
     public IServiceProvider ServiceProvider { get; }
-
-    public void Set<T>(T? value);
-    public T?   Get<T>();
-    public bool TryGet<T>(out T? value);
-    public bool Has<T>();
-    public IDisposable Use<T>(T? value = default);
 }
 ```
-
-| Member                 | Behavior                                                                                                                              |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `Set<T>(value)`        | Stores `value` keyed by `typeof(T)`, overwriting any prior value of that type.                                                        |
-| `Get<T>()`             | Returns the stored value; throws `KeyNotFoundException` when absent.                                                                  |
-| `TryGet<T>(out value)` | Returns `true` and sets `value` only when a non-null entry exists.                                                                    |
-| `Has<T>()`             | Returns `true` when an entry for `typeof(T)` exists, even if the stored value is `null`.                                              |
-| `Use<T>(value)`        | Sets `value` and returns an `IDisposable` that restores the previous entry (or removes the key) on dispose, supporting nested scopes. |
 
 `ServiceProvider` lets advisors resolve services at execution time without constructor injection.
 
@@ -96,7 +92,7 @@ public enum AdviseResult
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Continue` | Proceed to the next advisor. After the last advisor, the operation runs normally.                                                                                                            |
 | `Block`    | Abort the operation; no further advisors run. The caller treats it as a silent refusal or default value.                                                                                     |
-| `Handle`   | The advisor has fully handled the operation (e.g. a cached result, or a delete converted to a soft-delete). No further advisors run; the caller uses what the advisor placed in the context. |
+| `Handle`   | The advisor has fully handled the operation (e.g. a cached result, or a delete converted to a soft-delete). No further advisors run; the caller reads the stage's typed result — `QueryContext<TEntity,TResult,T>.Result`, an authorization context's `Result`, or `HandledResponse<TResponse>` when the stage declares a handled-output carrier. |
 
 `Block` and `Handle` both short-circuit; the distinction lets the caller interpret the early exit.
 
@@ -160,8 +156,8 @@ switch (await Advisor.For<IRepositoryAddAdvisor<TEntity>>()
 // Normal operation proceeds here
 ```
 
-Query pipelines read `Handle` as "use the result already in the context" and `Block` as "return
-the default value."
+Query pipelines read `Handle` as "use `QueryContext<TEntity,TResult,T>.Result`" and `Block` as
+"return the default value."
 
 ## Registering advisors
 
@@ -178,24 +174,29 @@ services.TryAddEnumerable(
     ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(AdviceAddConcurrency<>)));
 ```
 
-## State markers
+## Per-operation options
 
-Advisors signal suppression through empty marker classes stored in `AdviceContext`. A fluent verb
-method (`SuppressSoftDelete()`) sets a state-noun marker (`SoftDeleteSuppressed`); the advisor
-checks `ctx.Has<SoftDeleteSuppressed>()` at the top of `AdviseAsync` and returns `Continue` when
-the marker is present.
+Advisors read per-call overrides from `QueryOptions` on a build-query container and from
+`MutationOptions` on a mutation. Both records travel with the call, so the choice applies to that
+operation alone and never reaches nested or parallel work.
 
 ```csharp
-public sealed class SoftDeleteSuppressed;
-
 public sealed class AdviceAddSoftDelete<TEntity> : IRepositoryAddAdvisor<TEntity>
 {
-    public Task<AdviseResult> AdviseAsync(AdviceContext ctx, ...) {
-        if (ctx.Has<SoftDeleteSuppressed>()) return Task.FromResult(AdviseResult.Continue);
+    public Task<AdviseResult> AdviseAsync(
+        AdviceContext ctx, IRepository<TEntity> repository, TEntity entity, MutationOptions options,
+        CancellationToken ct) {
+        if (options.IgnoreSoftDelete) return Task.FromResult(AdviseResult.Continue);
         // ...
     }
 }
 ```
+
+Framework-defined operational overrides belong in the option records; pipeline state travels in
+the typed stage payloads. `IgnoreCacheEviction` is the
+one commit-scoped option: it
+does not change the call, it suppresses eviction for the next commit of the repository's current
+unit of work, and both records declare it.
 
 ## Order constants
 
@@ -221,9 +222,9 @@ a single sequencing axis without explicit dependencies between advisors.
 
 - Advisors resolve from DI on every pipeline run. Scoped advisors get a fresh instance per request;
   avoid mutable state in singletons.
-- `AdviceContext` is not thread-safe; do not share one context across concurrent pipelines.
-- Two `AdviceContext` instances coexist per resource request — one in the handler, one in
-  `IRepository<T>.AdviceContext` — and never share state.
+- `AdviceContext` exposes only the pipeline's `IServiceProvider`; contexts are independent per pipeline.
+- Two `AdviceContext` instances coexist per resource request — the handler's dispatch context and
+  `IRepository<T>.AdviceContext` — each bound to its own provider.
 
 ## See also
 
