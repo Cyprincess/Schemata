@@ -1,9 +1,11 @@
-using Microsoft.AspNetCore.Hosting;
+﻿using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Actor.Foundation;
 using Schemata.Actor.Foundation.Features;
+using Schemata.Actor.Foundation.Handlers;
+using Schemata.Actor.Skeleton;
 using Schemata.Actor.Foundation.Runtime;
 using Schemata.Core;
 using Schemata.Core.Features;
@@ -49,26 +51,25 @@ public sealed class SchemataFlowActorFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        services.Replace(ServiceDescriptor.Transient<
-            IRequestHandler<CompleteActivityRequest, ProcessSnapshot>,
-            ActorSerializingHandler<CompleteActivityRequest, ProcessSnapshot>>());
-        services.Replace(ServiceDescriptor.Transient<
-            IRequestHandler<CorrelateMessageRequest, ProcessSnapshot>,
-            ActorSerializingHandler<CorrelateMessageRequest, ProcessSnapshot>>());
-        services.Replace(ServiceDescriptor.Transient<
-            IRequestHandler<RunEventRequest, ProcessSnapshot>,
-            ActorSerializingHandler<RunEventRequest, ProcessSnapshot>>());
-        services.Replace(ServiceDescriptor.Transient<
-            IRequestHandler<DeliverSignalRequest, SignalDeliveryResult>,
-            ActorSerializingHandler<DeliverSignalRequest, SignalDeliveryResult>>());
-        services.Replace(ServiceDescriptor.Transient<
-            IRequestHandler<TerminateProcessRequest, ProcessSnapshot>,
-            ActorSerializingHandler<TerminateProcessRequest, ProcessSnapshot>>());
-        services.Replace(ServiceDescriptor.Transient<
-            IRequestHandler<CancelTokenRequest, ProcessSnapshot>,
-            ActorSerializingHandler<CancelTokenRequest, ProcessSnapshot>>());
+        Register<CompleteActivityRequest, ProcessSnapshot>(services);
+        Register<CorrelateMessageRequest, ProcessSnapshot>(services);
+        Register<RunEventRequest, ProcessSnapshot>(services);
+        Register<DeliverSignalRequest, SignalDeliveryResult>(services);
+        Register<TerminateProcessRequest, ProcessSnapshot>(services);
+        Register<CancelTokenRequest, ProcessSnapshot>(services);
 
         new SchemataActorBuilder(schemata, services).Register<RequestDispatchingActor>(
             "flow", FlowConstants.Handlers.Default);
+    }
+
+    private static void Register<TRequest, TResult>(IServiceCollection services)
+        where TRequest : class, IRequest<TResult>, IProcessScoped {
+        services.TryAddScoped<IActorRouting<TRequest>, FlowActorRouting<TRequest>>();
+        services.Replace(ServiceDescriptor.Scoped<IRequestHandler<TRequest, TResult>>(provider =>
+            new ActorSerializingHandler<TRequest, TResult>(
+                provider.GetRequiredService<IActorSystem>(),
+                provider,
+                provider.GetRequiredService<IActorRouting<TRequest>>(),
+                FlowConstants.Handlers.Default)));
     }
 }

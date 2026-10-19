@@ -5,11 +5,14 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Actor.Foundation;
 using Schemata.Abstractions;
 using Schemata.Actor.Foundation.Features;
+using Schemata.Actor.Foundation.Handlers;
+using Schemata.Actor.Skeleton;
 using Schemata.Core;
 using Schemata.Push.Skeleton;
 using Schemata.Core.Features;
 using Schemata.Messaging.Skeleton;
 using Schemata.Push.Actor.Handlers;
+using Schemata.Push.Foundation;
 using Schemata.Push.Foundation.Commands;
 using Schemata.Push.Foundation.Features;
 using Schemata.Push.Skeleton.Entities;
@@ -44,14 +47,21 @@ public sealed class SchemataPushActorFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        services.Replace(ServiceDescriptor.Scoped<
-            IRequestHandler<AddPushSubscriptionRequest, SchemataPushSubscription>,
-            ActorSerializingHandler<AddPushSubscriptionRequest, SchemataPushSubscription>>());
-        services.Replace(ServiceDescriptor.Scoped<
-            IRequestHandler<RemovePushSubscriptionRequest, Unit>,
-            ActorSerializingHandler<RemovePushSubscriptionRequest, Unit>>());
+        Register<AddPushSubscriptionRequest, SchemataPushSubscription>(services);
+        Register<RemovePushSubscriptionRequest, Unit>(services);
 
         new SchemataActorBuilder(schemata, services).Register<Schemata.Actor.Foundation.Runtime.RequestDispatchingActor>(
             "push", PushConstants.Handlers.Default);
+    }
+
+    private static void Register<TRequest, TResult>(IServiceCollection services)
+        where TRequest : class, IRequest<TResult>, ISubscriptionScoped {
+        services.TryAddScoped<IActorRouting<TRequest>, PushActorRouting<TRequest>>();
+        services.Replace(ServiceDescriptor.Scoped<IRequestHandler<TRequest, TResult>>(provider =>
+            new ActorSerializingHandler<TRequest, TResult>(
+                provider.GetRequiredService<IActorSystem>(),
+                provider,
+                provider.GetRequiredService<IActorRouting<TRequest>>(),
+                PushConstants.Handlers.Default)));
     }
 }

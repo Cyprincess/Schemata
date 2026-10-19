@@ -5,6 +5,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions.Resource;
 using Schemata.Actor.Foundation;
 using Schemata.Actor.Foundation.Features;
+using Schemata.Actor.Foundation.Handlers;
+using Schemata.Actor.Skeleton;
 using Schemata.Actor.Foundation.Runtime;
 using Schemata.Core;
 using Schemata.Core.Features;
@@ -58,14 +60,21 @@ public sealed class SchemataReportActorFeature<TReport, TSnapshot, TChunk> : Fea
             return;
         }
 
-        services.Replace(ServiceDescriptor.Scoped<
-            IRequestHandler<RunReportRequest, ReportResult>,
-            ActorSerializingHandler<RunReportRequest, ReportResult>>());
-        services.Replace(ServiceDescriptor.Scoped<
-            IRequestHandler<GenerateReportRequest, Operation>,
-            ActorSerializingHandler<GenerateReportRequest, Operation>>());
+        Register<RunReportRequest, ReportResult>(services);
+        Register<GenerateReportRequest, Operation>(services);
 
         new SchemataActorBuilder(schemata, services).Register<RequestDispatchingActor>(
             "report", ReportConstants.Handlers.Default);
+    }
+
+    private static void Register<TRequest, TResult>(IServiceCollection services)
+        where TRequest : class, IRequest<TResult>, IReportScoped {
+        services.TryAddScoped<IActorRouting<TRequest>, ReportActorRouting<TRequest>>();
+        services.Replace(ServiceDescriptor.Scoped<IRequestHandler<TRequest, TResult>>(provider =>
+            new ActorSerializingHandler<TRequest, TResult>(
+                provider.GetRequiredService<IActorSystem>(),
+                provider,
+                provider.GetRequiredService<IActorRouting<TRequest>>(),
+                ReportConstants.Handlers.Default)));
     }
 }
