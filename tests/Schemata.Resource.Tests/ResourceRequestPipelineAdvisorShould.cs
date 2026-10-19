@@ -216,6 +216,7 @@ public class ResourceRequestPipelineAdvisorShould
 
     private static (Mock<IRepository<Entity>> Repository, Mock<ISimpleMapper> Mapper) CreateDoubles() {
         var repository = new Mock<IRepository<Entity>>();
+        repository.Setup(r => r.Begin()).Returns(() => Fixtures.UnitOfWorkMock.Create().Object);
         repository.Setup(r => r.SingleOrDefaultAsync(
                               It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
                               It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))

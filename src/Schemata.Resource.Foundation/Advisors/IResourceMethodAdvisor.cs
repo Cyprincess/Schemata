@@ -8,7 +8,7 @@ namespace Schemata.Resource.Foundation.Advisors;
 ///     have run, the instance entity has loaded, and before the registered
 ///     <see cref="Schemata.Messaging.Skeleton.IRequestHandler{TRequest,TResponse}" /> is invoked by
 ///     the dispatcher. Parallels <see cref="IResourceCreateAdvisor{TEntity, TRequest}" />: an advisor
-///     that writes its response to <see cref="ResourceMethodExecution{TEntity,TRequest,TResponse}.Response" />
+///     that writes its response to <see cref="IHandledResponse{TResponse}.Response" />
 ///     and returns <see cref="AdviseResult.Handle" /> short-circuits the handler invocation entirely.
 /// </summary>
 /// <typeparam name="TEntity">The entity type.</typeparam>

@@ -113,7 +113,7 @@ public class HandledResponseShould
         using var services = Services(mutation.Object, update: advisor.Object);
         var advice  = new AdviceContext(services);
         var handler = new ResourceOperationHandler<Student, Student, Student, Student>(
-            services, LoadedRepository().Object, Mock.Of<ISimpleMapper>());
+            services, LoadedRepository().Repository.Object, Mock.Of<ISimpleMapper>());
 
         var result = await handler.UpdateAsync("students/s1", new() { FullName = "Renamed" }, null, advice, CancellationToken.None);
 
@@ -140,13 +140,15 @@ public class HandledResponseShould
         mapper.Setup(value => value.Map<Student, Student>(Entity)).Returns(Entity);
         using var services = Services(mutation.Object, updateRequest: advisor.Object);
         var advice  = new AdviceContext(services);
+        var (repository, unit) = LoadedRepository();
         var handler = new ResourceOperationHandler<Student, Student, Student, Student>(
-            services, LoadedRepository().Object, mapper.Object);
+            services, repository.Object, mapper.Object);
 
         var result = await handler.UpdateAsync("students/s1", new() { FullName = "Renamed" }, null, advice, CancellationToken.None);
 
         Assert.Same(Entity, result.Detail);
-        mutation.Verify(value => value.UpdateAsync(Entity, null, Operations.Update, CancellationToken.None), Times.Once);
+        mutation.Verify(value => value.UpdateAsync(Entity, unit.Object, Operations.Update, CancellationToken.None), Times.Once);
+        unit.Verify(value => value.CommitAsync(CancellationToken.None), Times.Once);
     }
 
     [Fact]
@@ -164,7 +166,7 @@ public class HandledResponseShould
                          ResourceMethodExecution<MethodEntity, MethodRequest, MethodResponse> execution,
                          ResourceRequestContainer<MethodEntity> _,
                          CancellationToken _) => {
-                   execution.SetResponse(handled);
+                   ((IHandledResponse<MethodResponse>)execution).SetResponse(handled);
                    return Task.FromResult(AdviseResult.Handle);
                });
         using var services = MethodServices(handler, advisor.Object);
@@ -357,13 +359,14 @@ public class HandledResponseShould
         return repository.Object;
     }
 
-    private static Mock<IRepository<Student>> LoadedRepository() {
-        var repository = new Mock<IRepository<Student>>();
+    private static (Mock<IRepository<Student>> Repository, Mock<IUnitOfWork> Unit) LoadedRepository() {
+        var unit       = UnitOfWorkMock.Create();
+        var repository = UnitOfWorkMock.Repository<Student>(unit);
         repository.Setup(value => value.SingleOrDefaultAsync(
                               It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(),
                               It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
                   .Returns(new ValueTask<Student?>(Entity));
-        return repository;
+        return (repository, unit);
     }
 
     private static ServiceProvider MethodServices(

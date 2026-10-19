@@ -23,7 +23,8 @@ public class ResourceMutationNoWriteShould
         var request = new Student { Name = "s1", CanonicalName = "students/s1" };
         var entity  = new Student { Name = "s1", CanonicalName = "students/s1" };
 
-        var repository = new Mock<IRepository<Student>>();
+        var unit       = UnitOfWorkMock.Create();
+        var repository = UnitOfWorkMock.Repository<Student>(unit);
         var mapper = new Mock<ISimpleMapper>(MockBehavior.Strict);
         mapper.Setup(m => m.Map<Student, Student>(request)).Returns(entity);
 
@@ -38,7 +39,8 @@ public class ResourceMutationNoWriteShould
         var result = await handler.CreateAsync(request, null, advice, CancellationToken.None);
 
         Assert.Null(result.Detail);
-        owner.Verify(o => o.CreateAsync(entity, null, It.IsAny<CancellationToken>()), Times.Once);
+        owner.Verify(o => o.CreateAsync(entity, unit.Object, It.IsAny<CancellationToken>()), Times.Once);
+        unit.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Trait("Layer", "Unit")]
@@ -47,7 +49,7 @@ public class ResourceMutationNoWriteShould
         var entity  = new Student { Name = "s1", CanonicalName = "students/s1", FullName = "Original" };
         var request = new Student { Name = "s1", CanonicalName = "students/s1", FullName = "Renamed" };
 
-        var repository = LoadedRepository(entity);
+        var (repository, unit) = LoadedRepository(entity);
         var mapper = new Mock<ISimpleMapper>(MockBehavior.Strict);
         mapper.Setup(m => m.Map<Student, Student>(request, entity))
               .Callback((Student source, Student destination) => destination.FullName = source.FullName);
@@ -64,6 +66,8 @@ public class ResourceMutationNoWriteShould
 
         Assert.Null(result.Detail);
         Assert.Equal("Renamed", entity.FullName);
+        owner.Verify(o => o.UpdateAsync(entity, unit.Object, Operations.Update, It.IsAny<CancellationToken>()), Times.Once);
+        unit.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Trait("Layer", "Unit")]
@@ -71,7 +75,7 @@ public class ResourceMutationNoWriteShould
     public async Task Delete_NoWrite_ReturnsEmptyResult() {
         var entity = new Student { Name = "s1", CanonicalName = "students/s1" };
 
-        var repository = LoadedRepository(entity);
+        var (repository, _) = LoadedRepository(entity);
         var owner = new Mock<IResourceMutation<Student>>(MockBehavior.Strict);
         owner.Setup(o => o.DeleteAsync(entity, It.IsAny<IUnitOfWork?>(), Operations.Delete, It.IsAny<CancellationToken>()))
              .ReturnsAsync(MutationResult.NoWrite);
@@ -128,7 +132,7 @@ public class ResourceMutationNoWriteShould
         var entity = new TrashStudent { Name = "t1", CanonicalName = "trashStudents/t1" };
         var detail = new TrashStudent { Name = "t1", CanonicalName = "trashStudents/t1" };
 
-        var repository = LoadedRepository(entity);
+        var (repository, _) = LoadedRepository(entity);
         var mapper = new Mock<ISimpleMapper>(MockBehavior.Strict);
         mapper.Setup(m => m.Map<TrashStudent, TrashStudent>(entity)).Returns(detail);
 
@@ -156,7 +160,7 @@ public class ResourceMutationNoWriteShould
 
     private static (ResourceOperationHandler<TrashStudent, TrashStudent, TrashStudent, TrashStudent> Handler,
                     Mock<IResourceMutation<TrashStudent>> Owner, TrashStudent Entity, ServiceProvider Services) HandlerFor(TrashStudent entity) {
-        var repository = LoadedRepository(entity);
+        var (repository, _) = LoadedRepository(entity);
         var owner      = new Mock<IResourceMutation<TrashStudent>>(MockBehavior.Strict);
 
         var services = new ServiceCollection().AddSingleton(owner.Object).BuildServiceProvider();
@@ -166,13 +170,14 @@ public class ResourceMutationNoWriteShould
         return (handler, owner, entity, services);
     }
 
-    private static Mock<IRepository<TEntity>> LoadedRepository<TEntity>(TEntity entity)
+    private static (Mock<IRepository<TEntity>> Repository, Mock<IUnitOfWork> Unit) LoadedRepository<TEntity>(TEntity entity)
         where TEntity : class, ICanonicalName {
-        var repository = new Mock<IRepository<TEntity>>();
+        var unit       = UnitOfWorkMock.Create();
+        var repository = UnitOfWorkMock.Repository<TEntity>(unit);
         repository.Setup(r => r.SingleOrDefaultAsync(
                               It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
                               It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
                   .Returns(new ValueTask<TEntity?>(entity));
-        return repository;
+        return (repository, unit);
     }
 }

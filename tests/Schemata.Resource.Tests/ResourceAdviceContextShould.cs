@@ -78,6 +78,7 @@ public class ResourceAdviceContextShould
         var detail = new TestDetail { Name = "e1" };
 
         var repository = new Mock<IRepository<TestEntity>>();
+        repository.Setup(r => r.Begin()).Returns(() => UnitOfWorkMock.Create().Object);
         repository.Setup(r => r.SingleOrDefaultAsync(
                               It.IsAny<Func<IQueryable<TestEntity>, IQueryable<TestEntity>>>(),
                               It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))

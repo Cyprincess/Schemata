@@ -10,8 +10,8 @@ namespace Schemata.Resource.Foundation.Advisors;
 ///     <see cref="IResourceMethodRequestAdvisor{TEntity,TRequest,TResponse}" /> and
 ///     <see cref="IResourceMethodAdvisor{TEntity,TRequest,TResponse}" /> stages. Advisors read
 ///     the verb, target, request, loaded entity, and caller from this object, and an advisor
-///     that short-circuits writes its response to <see cref="Response" /> before returning
-///     <see cref="AdviseResult.Handle" />. The operation handler creates a fresh instance per
+///     that short-circuits writes its response to <see cref="IHandledResponse{TResponse}.Response" />
+///     before returning <see cref="AdviseResult.Handle" />. The operation handler creates a fresh instance per
 ///     dispatch, so nested or consecutive invocations never observe a prior request's state.
 /// </summary>
 /// <typeparam name="TEntity">The resource entity type.</typeparam>
@@ -52,11 +52,17 @@ public sealed class ResourceMethodExecution<TEntity, TRequest, TResponse> : IHan
     public ResourceDispatchExecution? Dispatch { get; set; }
 
     /// <summary>The response written by an advisor returning <see cref="AdviseResult.Handle" />.</summary>
-    public TResponse? Response { get; set; }
+    private readonly HandledResponse<TResponse> _output = new();
 
     /// <inheritdoc />
-    public bool Handled => Response is not null;
+    TResponse? IHandledResponse<TResponse>.Response => _output.Response;
 
     /// <inheritdoc />
-    public void SetResponse(TResponse response) { Response = response; }
+    bool IHandledResponse<TResponse>.Handled => _output.Handled;
+
+    /// <inheritdoc />
+    void IHandledResponse<TResponse>.SetResponse(TResponse response) => _output.SetResponse(response);
+
+    /// <summary>Clears a response written by a previous stage without sharing the carrier.</summary>
+    internal void ClearResponse() { _output.Response = null; }
 }

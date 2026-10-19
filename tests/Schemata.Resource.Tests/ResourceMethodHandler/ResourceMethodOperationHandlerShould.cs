@@ -48,8 +48,8 @@ public class ResourceMethodOperationHandlerShould
         Assert.Same(first, observed[0].Request);
         Assert.Same(second, observed[1].Request);
         Assert.Same(principal, observed[0].Principal);
-        Assert.Null(observed[0].Response);
-        Assert.Null(observed[1].Response);
+        Assert.Null(((IHandledResponse<MethodResponse>)observed[0]).Response);
+        Assert.Null(((IHandledResponse<MethodResponse>)observed[1]).Response);
     }
 
     private sealed class RecordingExecutionAdvisor(List<ResourceMethodExecution<MethodEntity, MethodRequest, MethodResponse>> observed)
@@ -96,7 +96,7 @@ public class ResourceMethodOperationHandlerShould
             ResourceRequestContainer<MethodEntity>                               container,
             CancellationToken                                                    ct = default
         ) {
-            execution.Response = response;
+            ((IHandledResponse<MethodResponse>)execution).SetResponse(response);
             return Task.FromResult(AdviseResult.Handle);
         }
     }

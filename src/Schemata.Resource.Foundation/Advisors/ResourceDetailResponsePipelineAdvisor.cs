@@ -38,7 +38,7 @@ public static class ResourceDetailResponsePipelineAdvisor
         }
 
         if (detail is IChild child) {
-            var parent = ChildParentHelper.DeriveParent(detail.CanonicalName);
+            var parent = ChildParentHelper.DeriveParent<TEntity>(detail.CanonicalName);
             if (!string.Equals(child.Parent, parent, StringComparison.Ordinal)) {
                 child.Parent = parent;
             }

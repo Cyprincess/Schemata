@@ -232,6 +232,7 @@ public class ResourceDetailResponsePipelineAdvisorShould
 
     private static Mock<IRepository<Entity>> CreateRepository() {
         var repository = new Mock<IRepository<Entity>>();
+        repository.Setup(r => r.Begin()).Returns(() => UnitOfWorkMock.Create().Object);
         repository.Setup(r => r.SingleOrDefaultAsync(
                           It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
                           It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))

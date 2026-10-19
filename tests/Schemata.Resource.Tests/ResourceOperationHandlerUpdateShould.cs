@@ -27,7 +27,7 @@ public class ResourceOperationHandlerUpdateShould
     public async Task AllowMissing_Creates_Through_Mutation_Owner_Without_Repository_Writes() {
         var request = new Student { Name = "missing", CanonicalName = "students/missing", AllowMissing = true };
         var prepared = new Student { Name = "missing", CanonicalName = "students/missing" };
-        var repository = MissingRepository<Student>();
+        var (repository, unit) = MissingRepository<Student>();
         var mapper = new Mock<ISimpleMapper>(MockBehavior.Strict);
         mapper.Setup(m => m.Map<Student, Student>(request)).Returns(prepared);
         mapper.Setup(m => m.Map<Student, Student>(prepared)).Returns(prepared);
@@ -42,8 +42,10 @@ public class ResourceOperationHandlerUpdateShould
         var result = await handler.UpdateAsync("students/missing", request, null, advice, CancellationToken.None);
 
         Assert.Equal("Domain result", result.Detail!.FullName);
+        owner.Verify(o => o.CreateAsync(prepared, unit.Object, It.IsAny<CancellationToken>()), Times.Once);
         repository.Verify(r => r.AddAsync(It.IsAny<Student>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()), Times.Never);
         repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+        unit.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -58,7 +60,7 @@ public class ResourceOperationHandlerUpdateShould
         var entity = new Student { Name = "missing", CanonicalName = "students/missing" };
         var detail = new Student { Name = "missing", CanonicalName = "students/missing" };
 
-        var repository = MissingRepository<Student>();
+        var (repository, unit) = MissingRepository<Student>();
         var owner = ResourceMutationMock.Create<Student>();
 
         var mapper = new Mock<ISimpleMapper>(MockBehavior.Strict);
@@ -86,7 +88,7 @@ public class ResourceOperationHandlerUpdateShould
 
         Assert.True(createCalled);
         Assert.Same(detail, result.Detail);
-        owner.Verify(o => o.CreateAsync(entity, null, CancellationToken.None), Times.Once);
+        owner.Verify(o => o.CreateAsync(entity, unit.Object, CancellationToken.None), Times.Once);
         repository.Verify(r => r.AddAsync(It.IsAny<Student>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()), Times.Never);
         repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
         mapper.Verify(m => m.Map<Student, Student>(request, It.IsAny<Student>(), It.IsAny<IEnumerable<string>>()), Times.Never);
@@ -98,7 +100,7 @@ public class ResourceOperationHandlerUpdateShould
         var entity  = new Widget { Name = "w1", Tenant = "acme" };
         var detail  = new Widget { Name = "w1", Tenant = "acme" };
 
-        var repository = MissingRepository<Widget>();
+        var (repository, unit) = MissingRepository<Widget>();
         var owner = ResourceMutationMock.Create<Widget>();
 
         var mapper = new Mock<ISimpleMapper>(MockBehavior.Strict);
@@ -139,7 +141,7 @@ public class ResourceOperationHandlerUpdateShould
         var match = Assert.Single(captured!.Query(sample));
         Assert.Equal("w1", match.Name);
         Assert.Equal("acme", match.Tenant);
-        owner.Verify(o => o.CreateAsync(entity, null, CancellationToken.None), Times.Once);
+        owner.Verify(o => o.CreateAsync(entity, unit.Object, CancellationToken.None), Times.Once);
     }
 
     [Fact]
@@ -148,7 +150,7 @@ public class ResourceOperationHandlerUpdateShould
         var entity  = new Student { Name = "missing" };
         var detail  = new Student { Name = "missing" };
 
-        var repository = MissingRepository<Student>();
+        var (repository, unit) = MissingRepository<Student>();
         var owner = ResourceMutationMock.Create<Student>();
 
         var sequence = new MockSequence();
@@ -206,12 +208,12 @@ public class ResourceOperationHandlerUpdateShould
                           It.IsAny<ClaimsPrincipal?>(),
                           It.IsAny<HandledResponse<CreateResultBase<Student>>>(),
                           It.IsAny<CancellationToken>()), Times.Once);
-        owner.Verify(o => o.CreateAsync(entity, null, CancellationToken.None), Times.Once);
+        owner.Verify(o => o.CreateAsync(entity, unit.Object, CancellationToken.None), Times.Once);
     }
 
     [Fact]
     public async Task MissingResource_WithoutAllowMissing_ThrowsNotFound() {
-        var repository = MissingRepository<Student>();
+        var (repository, _) = MissingRepository<Student>();
         var mapper = new Mock<ISimpleMapper>(MockBehavior.Strict);
         using var services = Services<Student, Student, Student>();
         var advice = new AdviceContext(services);
@@ -224,7 +226,7 @@ public class ResourceOperationHandlerUpdateShould
 
     [Fact]
     public async Task MissingResource_WithoutAllowMissingContract_ThrowsNotFound() {
-        var repository = MissingRepository<Student>();
+        var (repository, _) = MissingRepository<Student>();
         var mapper = new Mock<ISimpleMapper>(MockBehavior.Strict);
         using var services = Services<Student, RequestWithoutAllowMissing, Student>();
         var advice = new AdviceContext(services);
@@ -242,6 +244,8 @@ public class ResourceOperationHandlerUpdateShould
         var detail  = new Student { Name = "s1", CanonicalName = "students/s1" };
 
         var repository = new Mock<IRepository<Student>>();
+        var unit       = UnitOfWorkMock.Create();
+        repository.Setup(r => r.Begin()).Returns(unit.Object);
         var owner = ResourceMutationMock.Create<Student>();
 
         var mapper = new Mock<ISimpleMapper>();
@@ -255,9 +259,10 @@ public class ResourceOperationHandlerUpdateShould
         var result = await handler.CreateCoreAsync(advice, request, null, CancellationToken.None);
 
         Assert.Same(detail, result.Detail);
-        owner.Verify(o => o.CreateAsync(It.IsAny<Student>(), null, CancellationToken.None), Times.Once);
+        owner.Verify(o => o.CreateAsync(It.IsAny<Student>(), unit.Object, CancellationToken.None), Times.Once);
         repository.Verify(r => r.AddAsync(It.IsAny<Student>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()), Times.Never);
         repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+        unit.Verify(u => u.CommitAsync(CancellationToken.None), Times.Once);
     }
 
     [Fact]
@@ -265,11 +270,7 @@ public class ResourceOperationHandlerUpdateShould
         var request = new Student { Name = "s1" };
         var entity  = new Student { Name = "s1", CanonicalName = "students/s1" };
 
-        var repository = new Mock<IRepository<Student>>();
-        repository.Setup(r => r.SingleOrDefaultAsync(
-                       It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(),
-                       It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
-                  .Returns(new ValueTask<Student?>(entity));
+        var (repository, unit) = LoadedRepository(entity);
         var owner = ResourceMutationMock.Create<Student>();
 
         var mapper = new Mock<ISimpleMapper>(MockBehavior.Strict);
@@ -285,7 +286,39 @@ public class ResourceOperationHandlerUpdateShould
             () => handler.UpdateAsync("students/s1", request, null, advice, CancellationToken.None));
 
         Assert.Contains(typeof(Student).FullName!, ex.Message);
-        owner.Verify(o => o.UpdateAsync(entity, null, Operations.Update, CancellationToken.None), Times.Once);
+        owner.Verify(o => o.UpdateAsync(entity, unit.Object, Operations.Update, CancellationToken.None), Times.Once);
+        unit.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Update_WhenDetailMappingThrows_DoesNotCommit(bool identified) {
+        var entity  = new Student { Name = "s1", CanonicalName = "students/s1" };
+        var request = new Student { FullName = "Renamed" };
+
+        var (repository, unit) = LoadedRepository(entity);
+        var owner = ResourceMutationMock.Create<Student>();
+
+        var mapper = new Mock<ISimpleMapper>(MockBehavior.Strict);
+        mapper.Setup(m => m.Map<Student, Student>(request, entity));
+        mapper.Setup(m => m.Map<Student, Student>(entity)).Throws(new InvalidOperationException("detail mapping failed"));
+
+        using var services = Services<Student, Student, Student>(owner);
+        var advice  = new AdviceContext(services);
+        var handler = new ResourceOperationHandler<Student, Student, Student, Student>(
+            services, repository.Object, mapper.Object);
+        var execution = identified ? new ResourceDispatchExecution() : null;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => handler.UpdateAsync("students/s1", request, null, advice, CancellationToken.None, execution));
+
+        owner.Verify(o => o.UpdateAsync(entity, unit.Object, Operations.Update, CancellationToken.None), Times.Once);
+        unit.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+        if (execution is not null) {
+            Assert.Equal(ResourceDispatchOutcome.RolledBack, execution.Outcome);
+        }
     }
 
     [Theory]
@@ -299,7 +332,7 @@ public class ResourceOperationHandlerUpdateShould
         };
         var request = new Student { FullName = "Renamed", UpdateMask = mask };
 
-        var repository = LoadedRepository(entity);
+        var (repository, unit) = LoadedRepository(entity);
         var owner      = ResourceMutationMock.Create<Student>();
         var mapper     = MergingMapper();
 
@@ -315,7 +348,7 @@ public class ResourceOperationHandlerUpdateShould
         Assert.Equal("s1", entity.Name);
         Assert.Equal("Renamed", entity.FullName);
         Assert.Same(entity, result.Detail);
-        owner.Verify(o => o.UpdateAsync(entity, null, Operations.Update, CancellationToken.None), Times.Once);
+        owner.Verify(o => o.UpdateAsync(entity, unit.Object, Operations.Update, CancellationToken.None), Times.Once);
     }
 
     [Fact]
@@ -327,7 +360,7 @@ public class ResourceOperationHandlerUpdateShould
         };
         var request = new Student { FullName = "Renamed", UpdateMask = "uid,timestamp,full_name" };
 
-        var repository = LoadedRepository(entity);
+        var (repository, _) = LoadedRepository(entity);
         var owner      = ResourceMutationMock.Create<Student>();
         var mapper     = MergingMapper();
 
@@ -343,13 +376,14 @@ public class ResourceOperationHandlerUpdateShould
         Assert.Equal("Renamed", entity.FullName);
     }
 
-    private static Mock<IRepository<Student>> LoadedRepository(Student entity) {
-        var repository = new Mock<IRepository<Student>>();
+    private static (Mock<IRepository<Student>> Repository, Mock<IUnitOfWork> Unit) LoadedRepository(Student entity) {
+        var unit       = UnitOfWorkMock.Create();
+        var repository = UnitOfWorkMock.Repository<Student>(unit);
         repository.Setup(r => r.SingleOrDefaultAsync(
                               It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(),
                               It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
                   .Returns(new ValueTask<Student?>(entity));
-        return repository;
+        return (repository, unit);
     }
 
     // Mirrors the adapters' shared SimpleMapperHelper.MapMerging: a populated source member
@@ -381,13 +415,14 @@ public class ResourceOperationHandlerUpdateShould
         }
     }
 
-    private static Mock<IRepository<T>> MissingRepository<T>() where T : class {
-        var repository = new Mock<IRepository<T>>();
+    private static (Mock<IRepository<T>> Repository, Mock<IUnitOfWork> Unit) MissingRepository<T>() where T : class {
+        var unit       = UnitOfWorkMock.Create();
+        var repository = UnitOfWorkMock.Repository<T>(unit);
         repository.Setup(r => r.SingleOrDefaultAsync(
                               It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(),
                               It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
                   .Returns(new ValueTask<T?>((T?)null));
-        return repository;
+        return (repository, unit);
     }
 
     private static ServiceProvider Services<TEntity, TRequest, TDetail>(

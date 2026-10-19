@@ -159,7 +159,7 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
 
             // The method stage starts with no handled response: a request-stage write that
             // continued must not stand in for the method stage's result.
-            execution.Response = null;
+            execution.ClearResponse();
 
             var methodResult = await HandledResponseRunner.RunAsync(
                 execution,

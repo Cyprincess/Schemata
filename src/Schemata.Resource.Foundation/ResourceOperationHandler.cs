@@ -125,34 +125,36 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     }
 
     /// <summary>
-    ///     Runs one identified mutation as the commit owner: the verb handler begins the unit of
-    ///     work, the mutation joins and stages through it, fail-able response preparation runs inside
-    ///     <paramref name="mutate" /> before the provider commit, and the dispatch execution records
-    ///     the transaction outcome through the unit of work's commit and rollback sinks.
+    ///     Runs one mutation as the commit owner: this handler begins the unit of work through the
+    ///     injected repository, the mutation joins and stages through it, fail-able response
+    ///     preparation runs inside <paramref name="mutate" /> before the provider commit, and an
+    ///     identified dispatch records the transaction outcome through the unit of work's commit and
+    ///     rollback sinks.
     /// </summary>
     private async Task<TResponse> ExecuteOwnedAsync<TResponse>(
-        ResourceDispatchExecution          execution,
+        ResourceDispatchExecution?          execution,
         Func<IUnitOfWork, Task<TResponse>> mutate,
         CancellationToken                  ct
     ) {
-        await using var repository  = _sp.GetRequiredService<IRepository<TEntity>>();
-        await using var transaction = repository.Begin();
+        await using var transaction = _repository.Begin();
 
-        // The stamp sink registers ahead of the mutation's join and its repository notifications, so
-        // a throwing post-commit sink can never leave a persisted dispatch recorded as unwritten.
-        execution.MarkReached();
-        transaction.AddCommitSink(CommitOrders.Repository - 1, _ => {
-            execution.MarkCommitted();
-            return Task.CompletedTask;
-        });
-        transaction.AddRollbackSink(execution.MarkRolledBack);
+        if (execution is not null) {
+            // The stamp sink registers ahead of the mutation's join and its repository notifications,
+            // so a throwing post-commit sink can never leave a persisted dispatch recorded as unwritten.
+            execution.MarkReached();
+            transaction.AddCommitSink(CommitOrders.Repository - 1, _ => {
+                execution.MarkCommitted();
+                return Task.CompletedTask;
+            });
+            transaction.AddRollbackSink(execution.MarkRolledBack);
+        }
 
         var response = await mutate(transaction);
 
         // CommitAsync resolving normally is the owner's completion evidence: the provider
         // transaction ended committed before the sinks ran.
         await transaction.CommitAsync(ct);
-        execution.MarkCommitted();
+        execution?.MarkCommitted();
 
         return response;
     }

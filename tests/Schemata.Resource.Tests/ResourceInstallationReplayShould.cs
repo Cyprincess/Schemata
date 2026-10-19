@@ -49,7 +49,7 @@ public class ResourceInstallationReplayShould
         await dispatcher.SendAsync<DeleteResourceRequest<Widget, Widget>, DeleteResultBase<Widget>>(
             new(Name, StaleTag, null));
         var mutation = Mock.Get(scope.ServiceProvider.GetRequiredService<IResourceMutation<Widget>>());
-        mutation.Verify(m => m.UpdateAsync(It.IsAny<Widget>(), null, Operations.Update, It.IsAny<CancellationToken>()), Times.Once);
+        mutation.Verify(m => m.UpdateAsync(It.IsAny<Widget>(), It.Is<IUnitOfWork?>(unit => unit != null), Operations.Update, It.IsAny<CancellationToken>()), Times.Once);
         mutation.Verify(m => m.DeleteAsync(It.IsAny<Widget>(), null, Operations.Delete, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -144,7 +144,7 @@ public class ResourceInstallationReplayShould
         await Assert.ThrowsAsync<AbortedException>(() => dispatcher.SendAsync<DeleteResourceRequest<Widget, Widget>, DeleteResultBase<Widget>>(
             new(Name, StaleTag, null)));
         var mutation = Mock.Get(scope.ServiceProvider.GetRequiredService<IResourceMutation<Widget>>());
-        mutation.Verify(m => m.UpdateAsync(It.IsAny<Widget>(), null, Operations.Update, It.IsAny<CancellationToken>()), Times.Never);
+        mutation.Verify(m => m.UpdateAsync(It.IsAny<Widget>(), It.IsAny<IUnitOfWork?>(), Operations.Update, It.IsAny<CancellationToken>()), Times.Never);
         mutation.Verify(m => m.DeleteAsync(It.IsAny<Widget>(), null, Operations.Delete, It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -195,6 +195,7 @@ public class ResourceInstallationReplayShould
         SchemataBuilder? configured = null;
         var entity = new Widget { Name = "one", CanonicalName = Name, Timestamp = Guid.Parse("8f31e3b2-89a2-44c9-9227-0ee9c2cd024f") };
         var repository = new Mock<IRepository<Widget>>();
+        repository.Setup(r => r.Begin()).Returns(() => UnitOfWorkMock.Create().Object);
         repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<Widget>, IQueryable<Widget>>>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
             .Returns(new ValueTask<Widget?>(entity));
         var mapper = new Mock<ISimpleMapper>();

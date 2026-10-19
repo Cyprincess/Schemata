@@ -150,6 +150,7 @@ public sealed class ResourceEntryEquivalenceShould
         var detail = new Detail { Name = name, CanonicalName = $"entities/{name}" };
 
         var repository = new Mock<IRepository<Entity>>();
+        repository.Setup(r => r.Begin()).Returns(() => UnitOfWorkMock.Create().Object);
 
         var mapper = new Mock<ISimpleMapper>();
         mapper.Setup(m => m.Map<Request, Entity>(It.IsAny<Request>())).Returns(entity);

@@ -45,8 +45,8 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     /// <param name="ct">A cancellation token.</param>
     /// <param name="execution">
     ///     The identified dispatch execution carried from the idempotency wrap, or
-    ///     <see langword="null" /> when the dispatch runs unidentified. Non-null dispatches commit
-    ///     through this handler so the wrap receives transaction-completion evidence.
+    ///     <see langword="null" /> when the dispatch runs unidentified. This handler commits every
+    ///     dispatch; a non-null execution additionally receives the transaction-completion evidence.
     /// </param>
     /// <returns>An <see cref="UpdateResultBase{TDetail}" /> containing the updated detail DTO.</returns>
     public Task<UpdateResultBase<TDetail>> UpdateAsync(
@@ -134,21 +134,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             });
 
         var mutation = _sp.GetRequiredService<IResourceMutation<TEntity>>();
-        if (execution is null) {
-            var outcome = await mutation.UpdateAsync(entity, null, Operations.Update, ct);
 
-            // NoWrite means no change was staged: the mapped in-memory values were not persisted
-            // and must not be reported as the updated resource.
-            if (outcome == MutationResult.NoWrite) {
-                return new();
-            }
-
-            return new() { Detail = RequireDetail(_mapper.Map<TEntity, TDetail>(entity)) };
-        }
-
-        // Identified dispatch: this handler owns the commit so the wrap receives transaction
-        // completion through the execution payload, and the fail-able detail mapping runs before
-        // the provider commit.
         return await ExecuteOwnedAsync(
             execution,
             transaction => MutateUpdateAsync(mutation, entity, transaction, execution, ct),
@@ -156,16 +142,16 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     }
 
     private async Task<UpdateResultBase<TDetail>> MutateUpdateAsync(
-        IResourceMutation<TEntity> mutation,
-        TEntity                    entity,
-        IUnitOfWork                transaction,
-        ResourceDispatchExecution  execution,
-        CancellationToken          ct
+        IResourceMutation<TEntity>  mutation,
+        TEntity                     entity,
+        IUnitOfWork                 transaction,
+        ResourceDispatchExecution?  execution,
+        CancellationToken           ct
     ) {
         var outcome = await mutation.UpdateAsync(entity, transaction, Operations.Update, ct);
         if (outcome == MutationResult.NoWrite) {
-            // Nothing staged: the reservation releases and a retry re-runs deterministically.
-            execution.MarkNotWritten();
+            // Nothing staged: an identified reservation releases and a retry re-runs deterministically.
+            execution?.MarkNotWritten();
             return new();
         }
 
@@ -223,17 +209,6 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         }
 
         var mutation = _sp.GetRequiredService<IResourceMutation<TEntity>>();
-        if (execution is null) {
-            var outcome = await mutation.CreateAsync(entity, null, ct);
-
-            // NoWrite covers a repository advisor blocking the add and a consumer advisor handling
-            // the create as a no-op; either way no row exists, so the response carries no detail.
-            if (outcome == MutationResult.NoWrite) {
-                return new();
-            }
-
-            return new() { Detail = RequireDetail(_mapper.Map<TEntity, TDetail>(entity)) };
-        }
 
         return await ExecuteOwnedAsync(
             execution,
@@ -242,16 +217,16 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     }
 
     private async Task<UpdateResultBase<TDetail>> MutateMissingAsync(
-        IResourceMutation<TEntity> mutation,
-        TEntity                    entity,
-        IUnitOfWork                transaction,
-        ResourceDispatchExecution  execution,
-        CancellationToken          ct
+        IResourceMutation<TEntity>  mutation,
+        TEntity                     entity,
+        IUnitOfWork                 transaction,
+        ResourceDispatchExecution?  execution,
+        CancellationToken           ct
     ) {
         var outcome = await mutation.CreateAsync(entity, transaction, ct);
         if (outcome == MutationResult.NoWrite) {
-            // Nothing staged: the reservation releases and a retry re-runs deterministically.
-            execution.MarkNotWritten();
+            // Nothing staged: an identified reservation releases and a retry re-runs deterministically.
+            execution?.MarkNotWritten();
             return new();
         }
 
