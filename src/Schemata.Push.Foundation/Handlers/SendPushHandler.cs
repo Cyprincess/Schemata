@@ -4,10 +4,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Abstractions.Advisors;
 using Schemata.Messaging.Skeleton;
 using Schemata.Push.Foundation.Commands;
 using Schemata.Push.Skeleton;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Push.Foundation.Handlers;
 
@@ -17,9 +17,9 @@ public sealed class SendPushHandler(IServiceProvider services)
 {
     public async Task<ImmutableArray<TransportResult>> HandleAsync(
         SendPushRequest   request,
+        AdviceContext     context,
         CancellationToken ct = default
     ) {
-        _ = AdviceContext.Require();
         var pending = services.GetServices<IPushTransport>()
                               .Select(transport => InvokeAsync(transport, request.Context, ct))
                               .ToList();

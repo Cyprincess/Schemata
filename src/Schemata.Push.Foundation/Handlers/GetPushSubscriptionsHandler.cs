@@ -6,15 +6,19 @@ using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Push.Foundation.Commands;
 using Schemata.Push.Skeleton.Entities;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Push.Foundation.Handlers;
 
 /// <summary>Materializes an owner's push subscriptions for dispatcher delivery.</summary>
-public sealed class GetPushSubscriptionsHandler(IRepository<SchemataPushSubscription> subscriptions)
+/// <typeparam name="TPushSubscription">The persisted subscription entity type.</typeparam>
+public sealed class GetPushSubscriptionsHandler<TPushSubscription>(IRepository<TPushSubscription> subscriptions)
     : IRequestHandler<GetPushSubscriptionsQuery, IReadOnlyList<SchemataPushSubscription>>
+    where TPushSubscription : SchemataPushSubscription
 {
     public async Task<IReadOnlyList<SchemataPushSubscription>> HandleAsync(
         GetPushSubscriptionsQuery request,
+        AdviceContext             context,
         CancellationToken         ct = default
     ) {
         var results = new List<SchemataPushSubscription>();

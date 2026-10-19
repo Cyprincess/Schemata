@@ -33,9 +33,8 @@ public sealed class DefaultPushSubscriptionManager(IRequestDispatcher dispatcher
         Dictionary<string, string?>? metadata = null,
         CancellationToken            ct       = default
     ) {
-        var result = await dispatcher.SendAsync<AddPushSubscriptionRequest, PushSubscriptionResult>(
+        return await dispatcher.SendAsync<AddPushSubscriptionRequest, SchemataPushSubscription>(
             new(owner, provider, providerKey, metadata), ct);
-        return result.ToEntity();
     }
 
     public async ValueTask RemoveAsync(

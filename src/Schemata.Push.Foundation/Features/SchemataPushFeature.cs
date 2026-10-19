@@ -4,15 +4,15 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
+using Schemata.Push.Foundation.Builders;
 using Schemata.Push.Skeleton.Entities;
 
 namespace Schemata.Push.Foundation.Features;
 
 /// <summary>
-///     Registers the push service, subscription manager, and the
-///     <see cref="SchemataPushSubscription" /> resource. Transports are contributed separately
-///     through <c>UsePush(p =&gt; p.AddTransport&lt;T&gt;())</c>. Subscription endpoints are exposed
-///     by whatever resource transport (HTTP/gRPC) the host activates.
+///     Marks the Push subsystem as installed. The persisted subscription type is chosen by
+///     <see cref="SchemataPushFeature{TPushSubscription}" />; this marker only carries the feature
+///     ordering contract the bridge features depend on.
 /// </summary>
 public sealed class SchemataPushFeature : FeatureBase
 {
@@ -20,6 +20,20 @@ public sealed class SchemataPushFeature : FeatureBase
     public const int DefaultPriority = SchemataConstants.Orders.Extension + 120_000_000;
 
     public override int Priority => DefaultPriority;
+}
+
+/// <summary>
+///     Registers the push service, subscription manager, and the request handlers closed on the
+///     selected subscription entity. Transports are contributed through
+///     <see cref="SchemataPushBuilder.AddTransport{TTransport}" />. Subscription endpoints are
+///     exposed by whatever resource transport (HTTP/gRPC) the host activates.
+/// </summary>
+/// <typeparam name="TPushSubscription">The persisted subscription entity type.</typeparam>
+[DependsOn<SchemataPushFeature>]
+public sealed class SchemataPushFeature<TPushSubscription> : FeatureBase
+    where TPushSubscription : SchemataPushSubscription, new()
+{
+    public override int Priority => SchemataPushFeature.DefaultPriority;
 
     public override void ConfigureServices(
         IServiceCollection  services,
@@ -28,6 +42,6 @@ public sealed class SchemataPushFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        services.AddSchemataPush();
+        services.AddSchemataPush<TPushSubscription>();
     }
 }

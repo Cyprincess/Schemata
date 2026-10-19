@@ -23,6 +23,7 @@ internal sealed class PushSubscriptionNameAdvisor : IRepositoryAddAdvisor<Schema
         AdviceContext                     ctx,
         IRepository<SchemataPushSubscription> repository,
         SchemataPushSubscription          entity,
+        MutationOptions      options,
         CancellationToken                 ct
     ) {
         if (string.IsNullOrEmpty(entity.Name)) {

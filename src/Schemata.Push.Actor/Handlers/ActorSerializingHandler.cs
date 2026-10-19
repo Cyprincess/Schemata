@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Schemata.Actor.Skeleton;
 using Schemata.Messaging.Skeleton;
 using Schemata.Push.Foundation;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Push.Actor.Handlers;
 
@@ -26,9 +27,9 @@ internal sealed class ActorSerializingHandler<TRequest, TResult>(
     IActorSystem actors, IServiceProvider caller) : IRequestHandler<TRequest, TResult>
     where TRequest : IRequest<TResult>, ISubscriptionScoped
 {
-    public async Task<TResult> HandleAsync(TRequest request, CancellationToken ct = default) {
+    public async Task<TResult> HandleAsync(TRequest request, AdviceContext advice, CancellationToken ct = default) {
         var context = MessageContexts.Capture(caller);
-        var actor   = await actors.GetAsync(new ActorId("push", request.SubscriptionKey));
+        var actor   = await actors.GetAsync(new("push", request.SubscriptionKey));
         return await actor.AskAsync<TRequest, TResult>(request, context, ct: ct);
     }
 }
