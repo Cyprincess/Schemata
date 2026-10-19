@@ -36,25 +36,12 @@ public sealed class SimpleMapper : ISimpleMapper
     }
 
     public void Map<TSource, TDestination>(TSource source, TDestination destination, IEnumerable<string> fields) {
-        SimpleMapperHelper.MapWithMask(source, destination, fields, (s, d) => _mapper.Map(s, d));
-    }
-
-    public object? Map(object source, Type sourceType, Type destinationType) {
-        return _mapper.Map(source, sourceType, destinationType);
-    }
-
-    public void Map(
-        object source,
-        object destination,
-        Type   sourceType,
-        Type   destinationType
-    ) {
-        SimpleMapperHelper.MapMerging(
+        SimpleMapperHelper.MapWithMask(
             source,
             destination,
-            sourceType,
-            destinationType,
-            () => _mapper.Map(source, destination, sourceType, destinationType));
+            fields,
+            (s, d) => _mapper.Map(s, d),
+            s => _mapper.Map<TSource, TDestination>(s));
     }
 
     #endregion

@@ -1,9 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
@@ -21,7 +20,7 @@ public class RequestDispatcherShould
         var trail   = new List<string>();
         var advisor = new OrderedRenameAdvisor(0, "advisor", trail, callNext: true);
         var handler = new Mock<IRequestHandler<RenameWidget, string>>();
-        handler.Setup(h => h.HandleAsync(It.IsAny<RenameWidget>(), It.IsAny<CancellationToken>()))
+        handler.Setup(h => h.HandleAsync(It.IsAny<RenameWidget>(), It.IsAny<AdviceContext>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync("hub");
 
         using var scope = BuildScope(services => {
@@ -30,11 +29,11 @@ public class RequestDispatcherShould
         });
 
         var result = await scope.ServiceProvider.GetRequiredService<ICommandDispatcher>()
-                                 .SendAsync<RenameWidget, string>(new RenameWidget("hub"));
+                                 .SendAsync<RenameWidget, string>(new("hub"));
 
         Assert.Equal("hub", result);
         Assert.Equal(["advisor:before", "advisor:after"], trail);
-        handler.Verify(h => h.HandleAsync(It.IsAny<RenameWidget>(), It.IsAny<CancellationToken>()), Times.Once);
+        handler.Verify(h => h.HandleAsync(It.IsAny<RenameWidget>(), It.IsAny<AdviceContext>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -42,7 +41,7 @@ public class RequestDispatcherShould
         var trail   = new List<string>();
         var advisor = new QueryTracingPipelineAdvisor("query-advisor", trail);
         var handler = new Mock<IRequestHandler<CountWidgets, int>>();
-        handler.Setup(h => h.HandleAsync(It.IsAny<CountWidgets>(), It.IsAny<CancellationToken>()))
+        handler.Setup(h => h.HandleAsync(It.IsAny<CountWidgets>(), It.IsAny<AdviceContext>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(7);
 
         using var scope = BuildScope(services => {
@@ -51,18 +50,18 @@ public class RequestDispatcherShould
         });
 
         var result = await scope.ServiceProvider.GetRequiredService<IQueryDispatcher>()
-                                 .SendAsync<CountWidgets, int>(new CountWidgets());
+                                 .SendAsync<CountWidgets, int>(new());
 
         Assert.Equal(7, result);
         Assert.Equal(["query-advisor"], trail);
-        handler.Verify(h => h.HandleAsync(It.IsAny<CountWidgets>(), It.IsAny<CancellationToken>()), Times.Once);
+        handler.Verify(h => h.HandleAsync(It.IsAny<CountWidgets>(), It.IsAny<AdviceContext>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task Dispatch_ForAPlainRequest_RunsNoPipelineChain() {
         var advisor = new RecordingPlainPipelineAdvisor();
         var handler = new Mock<IRequestHandler<PlainRequest, string>>();
-        handler.Setup(h => h.HandleAsync(It.IsAny<PlainRequest>(), It.IsAny<CancellationToken>()))
+        handler.Setup(h => h.HandleAsync(It.IsAny<PlainRequest>(), It.IsAny<AdviceContext>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync("echo");
 
         using var scope = BuildScope(services => {
@@ -71,7 +70,7 @@ public class RequestDispatcherShould
         });
 
         var result = await scope.ServiceProvider.GetRequiredService<IRequestDispatcher>()
-                                 .SendAsync<PlainRequest, string>(new PlainRequest("echo"));
+                                 .SendAsync<PlainRequest, string>(new("echo"));
 
         Assert.Equal("echo", result);
         Assert.False(advisor.Ran);
@@ -89,10 +88,10 @@ public class RequestDispatcherShould
         });
 
         var result = await scope.ServiceProvider.GetRequiredService<ICommandDispatcher>()
-                                 .SendAsync<RenameWidget, string>(new RenameWidget("hub"));
+                                 .SendAsync<RenameWidget, string>(new("hub"));
 
         Assert.Equal("short:short", result);
-        handler.Verify(h => h.HandleAsync(It.IsAny<RenameWidget>(), It.IsAny<CancellationToken>()), Times.Never);
+        handler.Verify(h => h.HandleAsync(It.IsAny<RenameWidget>(), It.IsAny<AdviceContext>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -103,7 +102,7 @@ public class RequestDispatcherShould
             services.AddSingleton<IRequestPipelineAdvisor<RenameWidget, string>>(advisor));
 
         var result = await scope.ServiceProvider.GetRequiredService<ICommandDispatcher>()
-                                 .SendAsync<RenameWidget, string>(new RenameWidget("hub"));
+                                 .SendAsync<RenameWidget, string>(new("hub"));
 
         Assert.Equal("short:short", result);
     }
@@ -120,10 +119,10 @@ public class RequestDispatcherShould
 
         var error = await Assert.ThrowsAsync<NotSupportedException>(
             () => scope.ServiceProvider.GetRequiredService<ICommandDispatcher>()
-                       .SendAsync<RenameWidget, string>(new RenameWidget("hub")));
+                       .SendAsync<RenameWidget, string>(new("hub")));
 
         Assert.Equal("advisor-defined", error.Message);
-        handler.Verify(h => h.HandleAsync(It.IsAny<RenameWidget>(), It.IsAny<CancellationToken>()), Times.Never);
+        handler.Verify(h => h.HandleAsync(It.IsAny<RenameWidget>(), It.IsAny<AdviceContext>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -132,9 +131,9 @@ public class RequestDispatcherShould
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(
             () => scope.ServiceProvider.GetRequiredService<ICommandDispatcher>()
-                       .SendAsync<RenameWidget, string>(new RenameWidget("hub")));
+                       .SendAsync<RenameWidget, string>(new("hub")));
 
-        Assert.Contains(typeof(RenameWidget).FullName!, error.Message);
+        Assert.Equal($"No request handler registered for request type '{typeof(RenameWidget).FullName}'.", error.Message);
     }
 
     [Fact]
@@ -146,15 +145,17 @@ public class RequestDispatcherShould
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(
             () => scope.ServiceProvider.GetRequiredService<ICommandDispatcher>()
-                       .SendAsync<RenameWidget, string>(new RenameWidget("hub")));
+                       .SendAsync<RenameWidget, string>(new("hub")));
 
-        Assert.Contains(typeof(RenameWidget).FullName!, error.Message);
+        Assert.Equal(
+            $"Multiple request handlers registered for request type '{typeof(RenameWidget).FullName}'. Expected exactly one.",
+            error.Message);
     }
 
     [Fact]
     public async Task CommandDispatcher_SendAsync_ForAResultlessCommand_InvokesTheHandlerWithoutNamingUnit() {
         var handler = new Mock<IRequestHandler<RetireWidget, Unit>>();
-        handler.Setup(h => h.HandleAsync(It.IsAny<RetireWidget>(), It.IsAny<CancellationToken>()))
+        handler.Setup(h => h.HandleAsync(It.IsAny<RetireWidget>(), It.IsAny<AdviceContext>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(Unit.Value);
 
         using var scope = BuildScope(services =>
@@ -162,7 +163,7 @@ public class RequestDispatcherShould
 
         await scope.ServiceProvider.GetRequiredService<ICommandDispatcher>().SendAsync(new RetireWidget("hub"));
 
-        handler.Verify(h => h.HandleAsync(It.IsAny<RetireWidget>(), It.IsAny<CancellationToken>()), Times.Once);
+        handler.Verify(h => h.HandleAsync(It.IsAny<RetireWidget>(), It.IsAny<AdviceContext>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -180,13 +181,13 @@ public class RequestDispatcherShould
     }
 
     [Fact]
-    public async Task Dispatch_EstablishesTheAmbientAdviceContext_SharedWithAdvisorAndHandlerAndRestoredAfterward() {
+    public async Task Dispatch_PassesOneContext_SharedWithAdvisorAndHandler() {
         var advisor = new OrderedRenameAdvisor(0, "advisor", [], callNext: true);
         AdviceContext? seenInHandler = null;
         var handler = new Mock<IRequestHandler<RenameWidget, string>>();
-        handler.Setup(h => h.HandleAsync(It.IsAny<RenameWidget>(), It.IsAny<CancellationToken>()))
-               .Returns(() => {
-                    seenInHandler = AdviceContext.Current;
+        handler.Setup(h => h.HandleAsync(It.IsAny<RenameWidget>(), It.IsAny<AdviceContext>(), It.IsAny<CancellationToken>()))
+               .Returns((RenameWidget _, AdviceContext context, CancellationToken _) => {
+                    seenInHandler = context;
                     return Task.FromResult("hub");
                 });
 
@@ -195,14 +196,51 @@ public class RequestDispatcherShould
             services.AddSingleton<IRequestPipelineAdvisor<RenameWidget, string>>(advisor);
         });
 
-        Assert.Null(AdviceContext.Current);
-
         await scope.ServiceProvider.GetRequiredService<ICommandDispatcher>()
-                   .SendAsync<RenameWidget, string>(new RenameWidget("hub"));
+                   .SendAsync<RenameWidget, string>(new("hub"));
 
         Assert.NotNull(seenInHandler);
         Assert.Same(advisor.ObservedContext, seenInHandler);
-        Assert.Null(AdviceContext.Current);
+    }
+
+    [Fact]
+    public async Task NestedDispatch_RunsOnItsOwnContext_AndLeavesTheOuterContextUntouched() {
+        var outerSeen  = (AdviceContext?)null;
+        var innerSeen  = (AdviceContext?)null;
+        var innerHandler = new DelegatingHandler(context => innerSeen = context);
+        var outerHandler = new NestedDispatchHandler(context => outerSeen = context);
+
+        using var scope = BuildScope(services => {
+            services.AddSingleton<IRequestHandler<CountWidgets, int>>(innerHandler);
+            services.AddSingleton<IRequestHandler<RenameWidget, string>>(outerHandler);
+        });
+
+        var result = await scope.ServiceProvider.GetRequiredService<ICommandDispatcher>()
+                                .SendAsync<RenameWidget, string>(new("hub"));
+
+        Assert.Equal("renamed", result);
+        Assert.NotNull(outerSeen);
+        Assert.NotNull(innerSeen);
+        Assert.NotSame(outerSeen, innerSeen);
+    }
+
+    [Fact]
+    public async Task ParallelDispatches_RunOnDistinctContexts() {
+        var observed = new List<AdviceContext>();
+        var handler  = new DelegatingHandler(context => {
+            lock (observed) observed.Add(context);
+        });
+
+        using var scope = BuildScope(services =>
+            services.AddSingleton<IRequestHandler<CountWidgets, int>>(handler));
+
+        var dispatcher = scope.ServiceProvider.GetRequiredService<IQueryDispatcher>();
+        await Task.WhenAll(
+            dispatcher.SendAsync<CountWidgets, int>(new()),
+            dispatcher.SendAsync<CountWidgets, int>(new()));
+
+        Assert.Equal(2, observed.Count);
+        Assert.NotSame(observed[0], observed[1]);
     }
 
     [Fact]
@@ -222,19 +260,155 @@ public class RequestDispatcherShould
         });
 
         var result = await scope.ServiceProvider.GetRequiredService<ICommandDispatcher>()
-                                 .SendAsync<RenameWidget, string>(new RenameWidget("hub"));
+                                 .SendAsync<RenameWidget, string>(new("hub"));
 
         Assert.Equal("second:short", result);
         Assert.Equal(["first:before", "second:before", "first:after"], trail);
-        handler.Verify(h => h.HandleAsync(It.IsAny<RenameWidget>(), It.IsAny<CancellationToken>()), Times.Never);
+        handler.Verify(h => h.HandleAsync(It.IsAny<RenameWidget>(), It.IsAny<AdviceContext>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Trait("Layer", "Component")]
+    [Fact]
+    public async Task Dispatch_WithAHandlerKey_RunsOrderedWrapsAndValidationAroundTheInnerHandler() {
+        var trail = new List<string>();
+        var widgets = new Dictionary<string, int> { ["old"] = 42 };
+        var first = new OrderedRenameAdvisor(10, "first", trail, callNext: true);
+        var validation = new OrderedRenameAdvisor(20, "validation", trail, callNext: true);
+        var last = new OrderedRenameAdvisor(30, "last", trail, callNext: true);
+        var wrapper = new Mock<IRequestHandler<RenameWidget, string>>(MockBehavior.Strict);
+        wrapper.Setup(handler => handler.HandleAsync(It.IsAny<RenameWidget>(), It.IsAny<AdviceContext>(), It.IsAny<CancellationToken>()))
+               .Throws(new InvalidOperationException("actor self-ask"));
+
+        using var scope = BuildScope(services => {
+            services.AddSingleton<IRequestHandler<RenameWidget, string>>(wrapper.Object);
+            services.AddKeyedScoped<IRequestHandler<RenameWidget, string>>("inner",
+                (_, _) => new RenamingHandler(widgets, trail));
+            services.AddSingleton<IRequestPipelineAdvisor<RenameWidget, string>>(last);
+            services.AddSingleton<IRequestPipelineAdvisor<RenameWidget, string>>(first);
+            services.AddKeyedSingleton<IRequestPipelineAdvisor<RenameWidget, string>>(
+                RequestPipelineStages.Validation, validation);
+        });
+
+        var selfAsk = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            scope.ServiceProvider.GetRequiredService<InProcessRequestDispatcher>()
+                 .SendAsync<RenameWidget, string>(new("new"), ct: default));
+        Assert.Equal("actor self-ask", selfAsk.Message);
+        trail.Clear();
+
+        var result = await scope.ServiceProvider.GetRequiredService<InProcessRequestDispatcher>()
+                                .SendAsync<RenameWidget, string>(new("new"), serviceKey: "inner");
+
+        Assert.Equal("new", result);
+        Assert.False(widgets.ContainsKey("old"));
+        Assert.Equal(42, widgets["new"]);
+        Assert.Equal([
+            "first:before", "validation:before", "last:before", "handler",
+            "last:after", "validation:after", "first:after",
+        ], trail);
+        Assert.Same(first.ObservedContext, validation.ObservedContext);
+        Assert.Same(first.ObservedContext, last.ObservedContext);
+    }
+
+    [Trait("Layer", "Component")]
+    [Fact]
+    public async Task Dispatch_WithAHandlerKey_WhenShortCircuited_DoesNotConstructTheKeyedHandler() {
+        using var scope = BuildScope(services => {
+            services.AddKeyedScoped<IRequestHandler<RenameWidget, string>>("inner",
+                (_, _) => throw new InvalidOperationException("handler constructed"));
+            services.AddSingleton<IRequestPipelineAdvisor<RenameWidget, string>>(
+                new OrderedRenameAdvisor(0, "cached", [], callNext: false));
+        });
+
+        var result = await scope.ServiceProvider.GetRequiredService<InProcessRequestDispatcher>()
+                                .SendAsync<RenameWidget, string>(new("new"), "inner");
+
+        Assert.Equal("cached:short", result);
+    }
+
+    [Trait("Layer", "Component")]
+    [Fact]
+    public async Task Dispatch_WithAMissingHandlerKey_PropagatesTheRequiredKeyedServiceError() {
+        using var scope = BuildScope(services =>
+            services.AddSingleton<IRequestHandler<RenameWidget, string>>(
+                new Mock<IRequestHandler<RenameWidget, string>>(MockBehavior.Strict).Object));
+        var expected = Assert.Throws<InvalidOperationException>(() =>
+            scope.ServiceProvider.GetRequiredKeyedService<IRequestHandler<RenameWidget, string>>("missing"));
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            scope.ServiceProvider.GetRequiredService<InProcessRequestDispatcher>()
+                 .SendAsync<RenameWidget, string>(new("new"), "missing"));
+
+        Assert.Equal(expected.Message, error.Message);
+    }
+
+    [Trait("Layer", "Component")]
+    [Fact]
+    public async Task Dispatch_WithAPlainRequestAndHandlerKey_ValidatesBeforeHandlerResolution() {
+        using var scope = BuildScope(services => {
+            services.AddKeyedScoped<IRequestHandler<PlainRequest, string>>("inner",
+                (_, _) => throw new InvalidOperationException("handler constructed"));
+            services.AddScoped<IRequestPipelineAdvisor<PlainRequest, string>>(
+                _ => throw new InvalidOperationException("ordinary wrap constructed"));
+            services.AddKeyedSingleton<IRequestPipelineAdvisor<PlainRequest, string>>(
+                RequestPipelineStages.Validation, new PlainValueValidationAdvisor());
+        });
+
+        var error = await Assert.ThrowsAsync<ArgumentException>(() =>
+            scope.ServiceProvider.GetRequiredService<InProcessRequestDispatcher>()
+                 .SendAsync<PlainRequest, string>(new(" "), "inner"));
+
+        Assert.Equal("Value", error.ParamName);
+    }
+
+    private sealed class RenamingHandler(Dictionary<string, int> widgets, List<string> trail)
+        : IRequestHandler<RenameWidget, string>
+    {
+        public Task<string> HandleAsync(RenameWidget request, AdviceContext context, CancellationToken ct = default) {
+            widgets.Add(request.Name, widgets["old"]);
+            widgets.Remove("old");
+            trail.Add("handler");
+            return Task.FromResult(request.Name);
+        }
+    }
+
+    private sealed class DelegatingHandler(Action<AdviceContext> observe) : IRequestHandler<CountWidgets, int>
+    {
+        public Task<int> HandleAsync(CountWidgets request, AdviceContext context, CancellationToken ct = default) {
+            observe(context);
+            return Task.FromResult(7);
+        }
+    }
+
+    private sealed class NestedDispatchHandler(Action<AdviceContext> observe) : IRequestHandler<RenameWidget, string>
+    {
+        public async Task<string> HandleAsync(RenameWidget request, AdviceContext context, CancellationToken ct = default) {
+            observe(context);
+            await context.ServiceProvider.GetRequiredService<ICommandDispatcher>()
+                         .SendAsync<CountWidgets, int>(new(), ct);
+            return "renamed";
+        }
+    }
+
+    private sealed class PlainValueValidationAdvisor : IRequestPipelineAdvisor<PlainRequest, string>
+    {
+        public int Order => 0;
+
+        public Task<string> AdviseAsync(
+            AdviceContext ctx,
+            PlainRequest request,
+            RequestHandlerContinuation<string> next,
+            CancellationToken ct = default) {
+            if (string.IsNullOrWhiteSpace(request.Value)) {
+                throw new ArgumentException("A value is required.", nameof(request.Value));
+            }
+
+            return next(ct);
+        }
     }
 
     private static IServiceScope BuildScope(Action<IServiceCollection> configure) {
         var services = new ServiceCollection();
-        services.TryAddScoped<InProcessRequestDispatcher>();
-        services.TryAddScoped<ICommandDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<IQueryDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<IRequestDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+        services.AddInProcessRequestDispatcher();
         configure(services);
         return services.BuildServiceProvider().CreateScope();
     }

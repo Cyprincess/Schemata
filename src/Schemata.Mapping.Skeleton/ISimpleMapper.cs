@@ -57,27 +57,4 @@ public interface ISimpleMapper
     /// <param name="destination">The destination object to populate.</param>
     /// <param name="fields">The CLR field names or dot paths to map; all other fields retain their existing values.</param>
     void Map<TSource, TDestination>(TSource source, TDestination destination, IEnumerable<string> fields);
-
-    /// <summary>
-    ///     Maps the source object to a new instance of the destination type.
-    /// </summary>
-    /// <param name="source">The source object.</param>
-    /// <param name="sourceType">The runtime source type.</param>
-    /// <param name="destinationType">The runtime destination type.</param>
-    /// <returns>The mapped object, or <see langword="null" /> if mapping fails.</returns>
-    object? Map(object source, Type sourceType, Type destinationType);
-
-    /// <summary>
-    ///     Maps the source onto an existing destination using explicit runtime types.
-    /// </summary>
-    /// <param name="source">The source object.</param>
-    /// <param name="destination">The destination object to populate.</param>
-    /// <param name="sourceType">The runtime source type.</param>
-    /// <param name="destinationType">The runtime destination type.</param>
-    void Map(
-        object source,
-        object destination,
-        Type   sourceType,
-        Type   destinationType
-    );
 }

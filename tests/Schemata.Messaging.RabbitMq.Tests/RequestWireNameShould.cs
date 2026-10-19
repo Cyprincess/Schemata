@@ -21,7 +21,9 @@ public class RequestWireNameShould
     public void Resolve_AWireName_BackToItsBinding() {
         var options = new RabbitMqRequestOptions().Register<PriceQuery, decimal>("pricing.quote");
 
-        Assert.Equal(typeof(PriceQuery), options.Resolve("pricing.quote")!.Request);
+        var binding = options.Resolve("pricing.quote");
+        Assert.NotNull(binding);
+        Assert.Equal(typeof(PriceQuery), binding.Request);
     }
 
     [Fact]
