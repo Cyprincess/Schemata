@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Schemata.Abstractions.Resource;
 using System.Security.Claims;
@@ -8,12 +9,14 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Tests.Fixtures;
+using Schemata.Security.Foundation;
 using Schemata.Security.Skeleton;
 using Xunit;
 
@@ -29,7 +32,9 @@ public sealed class ResourceCreateAccessPipelineShould
     public async Task Create_AuthorizesFinalStructuralParent_BeforePersistence(string parent, bool allowed, bool upsert) {
         var request = new Child { Name = "c1", Parent = $"parents/{parent}", ParentId = "allowed" };
         var entity = new Child { Name = "c1", ParentId = "allowed" };
+        var unit       = UnitOfWorkMock.Create();
         var repository = new Mock<IRepository<Child>>(MockBehavior.Strict);
+        repository.Setup(r => r.Begin()).Returns(unit.Object);
         if (upsert) {
             repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<Child>, IQueryable<Child>>>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
                 .Returns(new ValueTask<Child?>((Child?)null));
@@ -47,6 +52,7 @@ public sealed class ResourceCreateAccessPipelineShould
             });
         using var services = new ServiceCollection().AddSingleton(access.Object)
             .AddSingleton(owner.Object)
+            .AddSingleton<IPermissionResolver, DefaultPermissionResolver>()
             .AddSingleton<IResourceCreateAdvisor<Child, Child, Child>, ResourceCreateAccessAdvisor<Child, Child, Child>>()
             .BuildServiceProvider();
         var advice = new AdviceContext(services);
@@ -57,7 +63,7 @@ public sealed class ResourceCreateAccessPipelineShould
                 ? (await handler.UpdateAsync($"parents/{parent}/children/c1", request, null, advice, CancellationToken.None)).Detail
                 : (await handler.CreateAsync(request, null, advice, CancellationToken.None)).Detail;
             Assert.Equal(parent, result!.ParentId);
-            owner.Verify(o => o.CreateAsync(It.Is<Child>(c => c.ParentId == parent), null, It.IsAny<CancellationToken>()), Times.Once);
+            owner.Verify(o => o.CreateAsync(It.Is<Child>(c => c.ParentId == parent), unit.Object, It.IsAny<CancellationToken>()), Times.Once);
         } else {
             await Assert.ThrowsAsync<PermissionDeniedException>(async () => {
                 if (upsert) await handler.UpdateAsync($"parents/{parent}/children/c1", request, null, advice, CancellationToken.None);
@@ -84,7 +90,9 @@ public sealed class ResourceCreateAccessPipelineShould
         var detail    = new Student { Name = entity.Name, CanonicalName = entity.CanonicalName, FullName = entity.FullName };
         var principal = new ClaimsPrincipal(new ClaimsIdentity("test"));
 
+        var unit       = UnitOfWorkMock.Create();
         var repository = new Mock<IRepository<Student>>(MockBehavior.Strict);
+        repository.Setup(r => r.Begin()).Returns(unit.Object);
         var owner = ResourceMutationMock.Create<Student>();
 
         var mapper = new Mock<ISimpleMapper>(MockBehavior.Strict);
@@ -99,7 +107,7 @@ public sealed class ResourceCreateAccessPipelineShould
         var result = await handler.CreateAsync(request, principal, advice, CancellationToken.None);
 
         Assert.Same(detail, result.Detail);
-        owner.Verify(o => o.CreateAsync(entity, null, CancellationToken.None), Times.Once);
+        owner.Verify(o => o.CreateAsync(entity, unit.Object, CancellationToken.None), Times.Once);
         access.Verify(provider => provider.HasAccessAsync(entity,
                           It.Is<AccessContext<Student>>(context => context.Operation == nameof(Operations.Create) && ReferenceEquals(context.Request, request) && context.Stage == AccessStage.Instance && context.Name == entity.CanonicalName),
                           principal, It.IsAny<CancellationToken>()), Times.Once);
@@ -134,6 +142,41 @@ public sealed class ResourceCreateAccessPipelineShould
         access.VerifyNoOtherCalls();
     }
 
+    [Fact]
+    public async Task Create_Denial_Uses_The_Registered_Default_Permission_Resolver() {
+        var request = new OrderItem { Name = "i1" };
+        var entity  = new OrderItem { Name = request.Name, CanonicalName = "order-items/i1" };
+
+        var repository = new Mock<IRepository<OrderItem>>(MockBehavior.Strict);
+        var mapper = new Mock<ISimpleMapper>(MockBehavior.Strict);
+        mapper.Setup(m => m.Map<OrderItem, OrderItem>(request)).Returns(entity);
+        var access = new Mock<IAccessProvider<OrderItem, OrderItem>>(MockBehavior.Strict);
+        access.Setup(p => p.HasAccessAsync(entity, It.IsAny<AccessContext<OrderItem>>(), null, It.IsAny<CancellationToken>()))
+              .ReturnsAsync(AccessDecision.Denied);
+        using var services = new ServiceCollection()
+            .AddSingleton<IPermissionResolver, DefaultPermissionResolver>()
+            .AddSingleton(access.Object)
+            .AddSingleton<IResourceCreateAdvisor<OrderItem, OrderItem, OrderItem>, ResourceCreateAccessAdvisor<OrderItem, OrderItem, OrderItem>>()
+            .BuildServiceProvider();
+        var advice  = new AdviceContext(services);
+        var handler = new ResourceOperationHandler<OrderItem, OrderItem, OrderItem, OrderItem>(
+            services, repository.Object, mapper.Object);
+
+        var denied = await Assert.ThrowsAsync<PermissionDeniedException>(
+            () => handler.CreateAsync(request, null, advice, CancellationToken.None));
+
+        var info = Assert.Single(Assert.IsType<List<IErrorDetail>>(denied.Details).OfType<ResourceInfoDetail>());
+        Assert.Contains("order-item.create", Assert.IsType<string>(info.Description), StringComparison.Ordinal);
+        access.VerifyAll();
+    }
+
+    [CanonicalName("order-items/{order_item}")]
+    public sealed class OrderItem : ICanonicalName
+    {
+        public string? Name          { get; set; }
+        public string? CanonicalName { get; set; }
+    }
+
     private static ServiceProvider Services(
         Student                                            request,
         ClaimsPrincipal                                    principal,
@@ -148,6 +191,7 @@ public sealed class ResourceCreateAccessPipelineShould
         var services = new ServiceCollection();
         services.AddSingleton(provider.Object);
         services.AddSingleton(owner.Object);
+        services.AddSingleton<IPermissionResolver, DefaultPermissionResolver>();
         services.AddSingleton<IResourceCreateAdvisor<Student, Student, Student>, ResourceCreateAccessAdvisor<Student, Student, Student>>();
 
         access = provider;

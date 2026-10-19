@@ -13,6 +13,7 @@ using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Tests.Fixtures;
 using Schemata.Abstractions.Resource;
+using Schemata.Security.Foundation;
 using Schemata.Security.Skeleton;
 using Schemata.Abstractions.Advisors;
 using Xunit;
@@ -65,6 +66,7 @@ public class ResourceMissingAccessShould
     )
         where TEntity : class {
         var services = new ServiceCollection();
+        services.AddSingleton<IPermissionResolver, DefaultPermissionResolver>();
         if (get is not null) {
             services.AddSingleton(get);
             services.AddKeyedScoped<ResourceAccessStage>(typeof(TEntity));

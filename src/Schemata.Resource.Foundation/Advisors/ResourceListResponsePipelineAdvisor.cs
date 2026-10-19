@@ -47,7 +47,7 @@ public sealed class ResourceListResponsePipelineAdvisor<TEntity, TSummary>
                 continue;
             }
 
-            var parent = ChildParentHelper.DeriveParent(summary.CanonicalName);
+            var parent = ChildParentHelper.DeriveParent<TEntity>(summary.CanonicalName);
             if (!string.Equals(child.Parent, parent, StringComparison.Ordinal)) {
                 child.Parent = parent;
             }

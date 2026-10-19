@@ -18,6 +18,7 @@ internal sealed class ResourceAccessStage(IServiceProvider services)
     internal Task FinalizeMissingAsync<TEntity, TRequest>(string operation, TRequest request, string? name,
         ClaimsPrincipal? principal, CancellationToken ct) where TEntity : class, ICanonicalName {
         var access = services.GetRequiredService<IAccessProvider<TEntity, TRequest>>();
-        return AuthorizeHelper.FinalizeMissingAsync<TEntity, TRequest>(access, operation, request, name, principal, ct);
+        var resolver = services.GetRequiredService<IPermissionResolver>();
+        return AuthorizeHelper.FinalizeMissingAsync<TEntity, TRequest>(access, resolver, operation, request, name, principal, ct);
     }
 }

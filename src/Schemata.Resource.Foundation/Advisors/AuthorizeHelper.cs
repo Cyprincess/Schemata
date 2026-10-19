@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using Humanizer;
 using Schemata.Abstractions.Entities;
 using Schemata.Common;
 using Schemata.Common.Errors;
@@ -35,12 +34,13 @@ internal static class AuthorizeHelper
     /// </summary>
     public static Task EnsureAsync<TEntity, TRequest>(
         IAccessProvider<TEntity, TRequest> access,
+        IPermissionResolver                resolver,
         AccessContext<TRequest>            context,
         string                             resource,
         ClaimsPrincipal?                   principal,
         CancellationToken                  ct
     ) {
-        return EnsureCoreAsync<TEntity, TRequest>(() => access.HasAccessAsync(default, context, principal, ct), context, resource);
+        return EnsureCoreAsync<TEntity, TRequest>(() => access.HasAccessAsync(default, context, principal, ct), context, resource, resolver);
     }
 
     /// <summary>
@@ -49,13 +49,14 @@ internal static class AuthorizeHelper
     /// </summary>
     public static Task EnsureAsync<TEntity, TRequest>(
         IAccessProvider<TEntity, TRequest> access,
+        IPermissionResolver                resolver,
         TEntity                            entity,
         AccessContext<TRequest>            context,
         string                             resource,
         ClaimsPrincipal?                   principal,
         CancellationToken                  ct
     ) {
-        return EnsureCoreAsync<TEntity, TRequest>(() => access.HasAccessAsync(entity, context, principal, ct), context, resource);
+        return EnsureCoreAsync<TEntity, TRequest>(() => access.HasAccessAsync(entity, context, principal, ct), context, resource, resolver);
     }
 
     /// <summary>
@@ -71,6 +72,7 @@ internal static class AuthorizeHelper
     /// </summary>
     public static async Task FinalizeMissingAsync<TEntity, TRequest>(
         IAccessProvider<TEntity, TRequest> access,
+        IPermissionResolver                resolver,
         string?                            operation,
         TRequest?                          request,
         string?                            name,
@@ -106,7 +108,7 @@ internal static class AuthorizeHelper
         }
 
         var resource = !string.IsNullOrWhiteSpace(name) ? name : typeof(TEntity).Name;
-        var permission = $"{ResourceNameDescriptor.ForType<TEntity>().Singular.Camelize()}.{operation}";
+        var permission = resolver.Resolve(operation ?? string.Empty, typeof(TEntity));
         throw SchemataResourceErrors.PermissionDenied<TEntity>(
             resource,
             description: string.Format(PermissionDeniedTemplate, permission, resource));
@@ -119,31 +121,20 @@ internal static class AuthorizeHelper
     /// </summary>
     internal static string? ResolveParent<TEntity>(string? name)
         where TEntity : class, ICanonicalName {
-        if (string.IsNullOrWhiteSpace(name)) {
-            return null;
-        }
-
-        var descriptor = ResourceNameDescriptor.ForType<TEntity>();
-        if (!descriptor.HasParent || descriptor.ParseCanonicalName(name) is not { } parsed) {
-            return null;
-        }
-
-        // A canonical name is [parent-literals/]collection/leaf: the parent path is every
-        // segment before the final collection literal and leaf.
-        var segments = name.Split('/');
-        return segments.Length > 2 ? string.Join('/', segments[..^2]) : null;
+        return ResourceNameDescriptor.ForType<TEntity>().ParentOf(name);
     }
 
     private static async Task EnsureCoreAsync<TEntity, TRequest>(
         Func<Task<AccessDecision>>        hasAccess,
         AccessContext<TRequest>           context,
-        string                            resource
+        string                            resource,
+        IPermissionResolver               resolver
     ) {
         if (await hasAccess() == AccessDecision.Allowed) {
             return;
         }
 
-        var permission = $"{ResourceNameDescriptor.ForType<TEntity>().Singular.Camelize()}.{context.Operation}";
+        var permission = resolver.Resolve(context.Operation ?? string.Empty, typeof(TEntity));
         throw SchemataResourceErrors.PermissionDenied<TEntity>(
             resource,
             description: string.Format(PermissionDeniedTemplate, permission, resource));

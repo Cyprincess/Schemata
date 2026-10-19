@@ -138,6 +138,7 @@ builder.UseSchemata(schema => {
         resource.MapGrpc().Use<ParentedRecord, ParentedRecordRequest, ParentedRecord, ParentedRecord>();
     }
     schema.Services.AddSingleton<Schemata.Security.Skeleton.IAccessProvider<ParentedRecord, ParentedRecordRequest>, ParentedRecordAccess>();
+    schema.Services.AddSingleton<Schemata.Security.Skeleton.IPermissionResolver, Schemata.Security.Foundation.DefaultPermissionResolver>();
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<Schemata.Resource.Foundation.Advisors.IResourceCreateAdvisor<ParentedRecord, ParentedRecordRequest, ParentedRecord>, Schemata.Resource.Foundation.Advisors.ResourceCreateAccessAdvisor<ParentedRecord, ParentedRecordRequest, ParentedRecord>>());
     if (builder.Configuration["ResourceExclusionsFirst"] != "true") {
         resource.WithoutCreateValidation().WithoutUpdateValidation().WithoutFreshness();

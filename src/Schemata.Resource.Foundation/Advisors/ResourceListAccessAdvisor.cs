@@ -9,7 +9,7 @@ using Schemata.Security.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
-public sealed class ResourceListAccessAdvisor<TEntity, TSummary>(IAccessProvider<TEntity, ListRequest> access)
+public sealed class ResourceListAccessAdvisor<TEntity, TSummary>(IAccessProvider<TEntity, ListRequest> access, IPermissionResolver permissions)
     : IResourceListRequestAdvisor<TEntity, TSummary>
     where TEntity : class, ICanonicalName
     where TSummary : class, ICanonicalName
@@ -25,7 +25,7 @@ public sealed class ResourceListAccessAdvisor<TEntity, TSummary>(IAccessProvider
         CancellationToken                                  ct = default
     ) {
         if (!AnonymousAccess.IsAnonymous<TEntity>(nameof(Operations.List))) {
-            await AuthorizeHelper.EnsureAsync(access,
+            await AuthorizeHelper.EnsureAsync(access, permissions,
                                               new() { Operation = nameof(Operations.List), Request = request, Stage = AccessStage.Target, Parent = request.Parent },
                                               request.Parent ?? string.Empty, principal, ct);
         }

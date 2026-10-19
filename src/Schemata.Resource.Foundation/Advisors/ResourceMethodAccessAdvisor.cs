@@ -6,7 +6,7 @@ using Schemata.Security.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
-public sealed class ResourceMethodAccessAdvisor<TEntity, TRequest, TResponse>(IAccessProvider<TEntity, TRequest> access)
+public sealed class ResourceMethodAccessAdvisor<TEntity, TRequest, TResponse>(IAccessProvider<TEntity, TRequest> access, IPermissionResolver permissions)
     : IResourceMethodAdvisor<TEntity, TRequest, TResponse>
     where TEntity : class, ICanonicalName
     where TRequest : class
@@ -24,7 +24,7 @@ public sealed class ResourceMethodAccessAdvisor<TEntity, TRequest, TResponse>(IA
         }
 
         var entity = execution.Entity!;
-        await AuthorizeHelper.EnsureAsync(access, entity,
+        await AuthorizeHelper.EnsureAsync(access, permissions, entity,
                                           new() { Operation = execution.Verb, Request = execution.Request, Stage = AccessStage.Instance, Name = entity.CanonicalName }, entity.CanonicalName ?? string.Empty, execution.Principal, ct);
         return AdviseResult.Continue;
     }

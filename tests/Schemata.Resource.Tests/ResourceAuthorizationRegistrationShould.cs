@@ -186,6 +186,12 @@ public sealed class ResourceAuthorizationRegistrationShould
         Assert.Equal(typeof(AnonymousEntity), actual.Entity);
     }
 
+    private static IPermissionResolver PermissionResolver() {
+        var resolver = new Mock<IPermissionResolver>(MockBehavior.Strict);
+        resolver.Setup(value => value.Resolve(It.IsAny<string>(), It.IsAny<Type>())).Returns("permission");
+        return resolver.Object;
+    }
+
     private static void VerifyAuthorization<TRequest, TResponse>(ServiceCollection services, TRequest request, string operation)
         where TRequest : class, IRequest<TResponse>, IRequestPrincipal
         where TResponse : class {
@@ -216,8 +222,8 @@ public sealed class ResourceAuthorizationRegistrationShould
                          It.Is<AccessContext<Request>>(context => context.Operation == nameof(Operations.Update) && ReferenceEquals(context.Request, request)),
                          principal, It.IsAny<CancellationToken>()))
               .ReturnsAsync(AccessDecision.Allowed);
-        var create = new ResourceCreateAccessAdvisor<Entity, Request, Detail>(access.Object);
-        var update = new ResourceUpdateAccessAdvisor<Entity, Request, Detail>(access.Object);
+        var create = new ResourceCreateAccessAdvisor<Entity, Request, Detail>(access.Object, PermissionResolver());
+        var update = new ResourceUpdateAccessAdvisor<Entity, Request, Detail>(access.Object, PermissionResolver());
 
         var createResult = await create.AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, entity, principal, new());
         var updateResult = await update.AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, entity, principal, new());
@@ -244,8 +250,8 @@ public sealed class ResourceAuthorizationRegistrationShould
                                principal, It.IsAny<CancellationToken>()))
                     .ReturnsAsync(AccessDecision.Allowed);
 
-        var getResult = await new ResourceGetAccessAdvisor<Entity, Detail>(getAccess.Object).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), get, entity, principal, new());
-        var deleteResult = await new ResourceDeleteAccessAdvisor<Entity, Detail>(deleteAccess.Object).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), delete, entity, principal, new());
+        var getResult = await new ResourceGetAccessAdvisor<Entity, Detail>(getAccess.Object, PermissionResolver()).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), get, entity, principal, new());
+        var deleteResult = await new ResourceDeleteAccessAdvisor<Entity, Detail>(deleteAccess.Object, PermissionResolver()).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), delete, entity, principal, new());
 
         Assert.Equal(AdviseResult.Continue, getResult);
         Assert.Equal(AdviseResult.Continue, deleteResult);
@@ -269,7 +275,7 @@ public sealed class ResourceAuthorizationRegistrationShould
                    .ReturnsAsync(entity => entity.Name == "allowed");
         var container = new ResourceRequestContainer<Entity>();
 
-        var accessResult = await new ResourceListAccessAdvisor<Entity, Summary>(access.Object).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, container, principal, new());
+        var accessResult = await new ResourceListAccessAdvisor<Entity, Summary>(access.Object, PermissionResolver()).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, container, principal, new());
         var entitlementResult = await new ResourceEntitlementListAdvisor<Entity, Summary>(entitlement.Object).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, container, principal, new());
         var names = container.Query(new[] { new Entity { Name = "allowed" }, new Entity { Name = "denied" } }.AsQueryable()).Select(entity => entity.Name).ToArray();
 
@@ -298,7 +304,7 @@ public sealed class ResourceAuthorizationRegistrationShould
             Entity    = entity,
         };
 
-        var result = await new ResourceMethodAccessAdvisor<Entity, MethodRequest, MethodResponse>(access.Object).AdviseAsync(context, execution);
+        var result = await new ResourceMethodAccessAdvisor<Entity, MethodRequest, MethodResponse>(access.Object, PermissionResolver()).AdviseAsync(context, execution);
 
         Assert.Equal(AdviseResult.Continue, result);
         access.VerifyAll();
@@ -312,7 +318,7 @@ public sealed class ResourceAuthorizationRegistrationShould
         access.Setup(provider => provider.HasAccessAsync(entity, It.IsAny<AccessContext<Request>>(), principal, It.IsAny<CancellationToken>()))
               .ReturnsAsync(AccessDecision.Denied);
 
-        var exception = await Assert.ThrowsAsync<PermissionDeniedException>(() => new ResourceCreateAccessAdvisor<Entity, Request, Detail>(access.Object).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, entity, principal, new()));
+        var exception = await Assert.ThrowsAsync<PermissionDeniedException>(() => new ResourceCreateAccessAdvisor<Entity, Request, Detail>(access.Object, PermissionResolver()).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, entity, principal, new()));
 
         Assert.Equal(403, exception.Code);
         Assert.Equal("PERMISSION_DENIED", exception.Status);
@@ -332,7 +338,7 @@ public sealed class ResourceAuthorizationRegistrationShould
         access.Setup(provider => provider.HasAccessAsync(entity, It.IsAny<AccessContext<Request>>(), principal, It.IsAny<CancellationToken>()))
               .ReturnsAsync(AccessDecision.Denied);
 
-        var exception = await Assert.ThrowsAsync<PermissionDeniedException>(() => new ResourceUpdateAccessAdvisor<Entity, Request, Detail>(access.Object).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, entity, principal, new()));
+        var exception = await Assert.ThrowsAsync<PermissionDeniedException>(() => new ResourceUpdateAccessAdvisor<Entity, Request, Detail>(access.Object, PermissionResolver()).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, entity, principal, new()));
 
         Assert.Equal(403, exception.Code);
         Assert.Equal("PERMISSION_DENIED", exception.Status);

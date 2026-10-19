@@ -8,7 +8,7 @@ using Schemata.Security.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
-public sealed class ResourceCreateAccessAdvisor<TEntity, TRequest, TDetail>(IAccessProvider<TEntity, TRequest> access)
+public sealed class ResourceCreateAccessAdvisor<TEntity, TRequest, TDetail>(IAccessProvider<TEntity, TRequest> access, IPermissionResolver permissions)
     : IResourceCreateAdvisor<TEntity, TRequest, TDetail>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
@@ -26,6 +26,7 @@ public sealed class ResourceCreateAccessAdvisor<TEntity, TRequest, TDetail>(IAcc
     ) {
         if (!AnonymousAccess.IsAnonymous<TEntity>(nameof(Operations.Create))) {
             await AuthorizeHelper.EnsureAsync(access,
+                permissions,
                 entity,
                 new() { Operation = nameof(Operations.Create), Request = request, Stage = AccessStage.Instance, Name = entity.CanonicalName },
                 entity.CanonicalName ?? string.Empty, principal, ct);

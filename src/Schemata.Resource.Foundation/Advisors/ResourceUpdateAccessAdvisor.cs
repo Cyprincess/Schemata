@@ -8,7 +8,7 @@ using Schemata.Security.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
-public sealed class ResourceUpdateAccessAdvisor<TEntity, TRequest, TDetail>(IAccessProvider<TEntity, TRequest> access)
+public sealed class ResourceUpdateAccessAdvisor<TEntity, TRequest, TDetail>(IAccessProvider<TEntity, TRequest> access, IPermissionResolver permissions)
     : IResourceUpdateAdvisor<TEntity, TRequest, TDetail>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
@@ -25,7 +25,7 @@ public sealed class ResourceUpdateAccessAdvisor<TEntity, TRequest, TDetail>(IAcc
         CancellationToken                          ct = default
     ) {
         if (!AnonymousAccess.IsAnonymous<TEntity>(nameof(Operations.Update))) {
-            await AuthorizeHelper.EnsureAsync(access, entity,
+            await AuthorizeHelper.EnsureAsync(access, permissions, entity,
                                               new() { Operation = nameof(Operations.Update), Request = request, Stage = AccessStage.Instance, Name = entity.CanonicalName },
                                               entity.CanonicalName ?? string.Empty, principal, ct);
         }

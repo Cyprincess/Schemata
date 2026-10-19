@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 ﻿using System;
 using System.Linq;
 using System.Security.Claims;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Entity.Repository;
@@ -43,6 +45,9 @@ public class ResourceMissingStageSeparationShould
                       It.IsAny<CancellationToken>()))
               .ReturnsAsync(AccessDecision.Denied);
         services.AddSingleton(access.Object);
+        var resolver = new Mock<IPermissionResolver>(MockBehavior.Strict);
+        resolver.Setup(r => r.Resolve(It.IsAny<string>(), It.IsAny<Type>())).Returns("custom.permission");
+        services.AddSingleton(resolver.Object);
 
         using var provider = services.BuildServiceProvider();
         var advice = new AdviceContext(provider);
@@ -60,8 +65,11 @@ public class ResourceMissingStageSeparationShould
         var authorizedRepository = AbsentLoad<Authorized>();
         var authorized = new ResourceOperationHandler<Authorized, Request, Detail, Summary>(
             provider, authorizedRepository.Object, new Mock<ISimpleMapper>(MockBehavior.Loose).Object);
-        await Assert.ThrowsAsync<PermissionDeniedException>(
+        var denied = await Assert.ThrowsAsync<PermissionDeniedException>(
             () => authorized.GetAsync(new GetRequest { Name = "authorizeds/a1" }, null, advice, CancellationToken.None));
+        var info = Assert.Single(Assert.IsType<List<IErrorDetail>>(denied.Details).OfType<ResourceInfoDetail>());
+        Assert.Contains("custom.permission", Assert.IsType<string>(info.Description), StringComparison.Ordinal);
+        resolver.Verify(r => r.Resolve(nameof(Operations.Get), typeof(Authorized)), Times.Once);
         access.Verify(a => a.HasAccessAsync(
                           null,
                           It.Is<AccessContext<GetRequest>>(c => c.Stage == AccessStage.Target

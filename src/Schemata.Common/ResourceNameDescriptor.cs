@@ -308,6 +308,25 @@ public sealed class ResourceNameDescriptor
     }
 
     /// <summary>
+    ///     Returns the parent canonical name of a child resource, or <see langword="null" /> for a
+    ///     root resource or a malformed value.
+    /// </summary>
+    /// <param name="canonicalName">The full canonical resource name.</param>
+    /// <returns>The parent path without the collection and leaf segments.</returns>
+    public string? ParentOf(string? canonicalName) {
+        if (string.IsNullOrWhiteSpace(canonicalName)) {
+            return null;
+        }
+
+        var segments = canonicalName.Split('/');
+        if (segments.Length < 4 || segments.Length % 2 != 0) {
+            return null;
+        }
+
+        return string.Join('/', segments[..^2]);
+    }
+
+    /// <summary>
     ///     Builds a parent path string from ASP.NET route values.
     ///     e.g., routeValues <c>{ publisher: "acme" }</c> => <c>"publishers/acme"</c>.
     ///     Every parent placeholder must be present, so the result always addresses one parent.
