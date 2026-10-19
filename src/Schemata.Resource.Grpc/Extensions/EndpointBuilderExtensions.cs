@@ -54,6 +54,8 @@ public static class EndpointBuilderExtensions
                     + "the resource's endpoints would be silently dropped.");
             }
 
+            builder.WithMetadata(resource);
+
             var quota = resource.Entity.GetCustomAttribute<RateLimitPolicyAttribute>();
             if (quota is not null) {
                 builder.RequireRateLimiting(quota.PolicyName);

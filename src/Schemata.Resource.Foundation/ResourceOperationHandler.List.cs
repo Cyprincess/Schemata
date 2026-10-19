@@ -156,15 +156,23 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
 
         Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>>? order = null;
         if (!string.IsNullOrWhiteSpace(request.OrderBy)) {
+            ValidationException InvalidOrderBy() {
+                return new([new() {
+                    Field       = nameof(request.OrderBy).Underscore(),
+                    Description = string.Format(SchemataResources.GetResourceString(SchemataResources.INVALID_EXPRESSION), "order_by"),
+                    Reason      = SchemataResources.INVALID_ORDER_BY,
+                }]);
+            }
+
+            var compiler = _sp.GetService<IOrderCompiler>();
+            if (compiler is null) {
+                throw InvalidOrderBy();
+            }
+
             try {
-                var compiler = _sp.GetRequiredService<IOrderCompiler>();
                 order = compiler.CompileOrder<TEntity>(request.OrderBy);
             } catch (ArgumentException) {
-                throw new ValidationException([new() {
-                    Field = nameof(request.OrderBy).Underscore(),
-                    Description = string.Format(SchemataResources.GetResourceString(SchemataResources.INVALID_EXPRESSION), "order_by"),
-                    Reason = SchemataResources.INVALID_ORDER_BY,
-                }]);
+                throw InvalidOrderBy();
             }
         }
 

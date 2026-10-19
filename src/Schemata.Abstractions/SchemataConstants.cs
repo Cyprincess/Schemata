@@ -191,6 +191,22 @@ public static class SchemataConstants
 
     #endregion
 
+    #region Nested type: Pagination
+
+    /// <summary>
+    ///     Wire fields carrying AIP-158 pagination state.
+    /// </summary>
+    public static class Pagination
+    {
+        /// <summary>The opaque continuation token request field and link target attribute.</summary>
+        public const string PageToken = "page_token";
+
+        /// <summary>The offset request field of the offset-based pagination form.</summary>
+        public const string Skip = "skip";
+    }
+
+    #endregion
+
     #region Nested type: Keys
 
     /// <summary>

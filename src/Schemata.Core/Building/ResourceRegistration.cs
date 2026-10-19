@@ -57,6 +57,13 @@ public sealed class ResourceRegistration
     public IReadOnlyList<ResourceMethodRegistration> Methods { get; }
     internal TotalSizeMode? ConfiguredTotalSize { get; }
 
+    /// <summary>Whether the resource exposes the named endpoint; no declaration means all endpoints are enabled.</summary>
+    public bool IsEndpointEnabled(string name) {
+        return Endpoints is null
+            || Endpoints.Count == 0
+            || Endpoints.Contains(name, StringComparer.Ordinal);
+    }
+
     internal ResourceRegistration WithMethods(IReadOnlyList<ResourceMethodRegistration> methods) => new(this,
         AuthenticationScheme, DefaultPageSize, MaxPageSize, ConfiguredTotalSize, Endpoints, Operations,
         Array.AsReadOnly(methods.ToArray()));
