@@ -1,4 +1,4 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
@@ -14,7 +14,11 @@ namespace Schemata.Scheduling.Foundation;
 ///     <c>SchemataResourceBuilder.Use&lt;...&gt;</c>, keeping this package free of
 ///     any cross-component resource dependency.
 /// </summary>
-internal static class SchedulingResourceRegistration
+/// <typeparam name="TJob">The persisted job entity type registered by the host.</typeparam>
+/// <typeparam name="TExecution">The persisted execution entity type registered by the host.</typeparam>
+internal static class SchedulingResourceRegistration<TJob, TExecution>
+    where TJob : SchemataJob, new()
+    where TExecution : SchemataJobExecution, new()
 {
     /// <summary>
     ///     Options-bag key carrying the authentication scheme set through
@@ -23,13 +27,13 @@ internal static class SchedulingResourceRegistration
     /// </summary>
     internal const string AuthenticationSchemeKey = "Scheduling:AuthenticationScheme";
 
-    /// <summary>The AIP-136 <c>:run</c> custom method on <see cref="SchemataJob" />.</summary>
+    /// <summary>The AIP-136 <c>:run</c> custom method on <typeparamref name="TJob" />.</summary>
     internal static readonly ResourceMethodAttribute[] JobMethods = [
-        new(Verbs.Run, typeof(RunJobHandler)),
+        new(Verbs.Run, typeof(RunJobHandler<TJob>)),
     ];
 
     /// <summary>
-    ///     The <c>:cancel</c> and <c>:wait</c> custom methods on <see cref="SchemataJobExecution" />,
+    ///     The <c>:cancel</c> and <c>:wait</c> custom methods on <typeparamref name="TExecution" />,
     ///     following the AIP-136 colon convention and mirroring <c>CancelOperation</c> and
     ///     <c>WaitOperation</c> on the <c>google.longrunning.Operations</c> service.
     /// </summary>
@@ -38,13 +42,13 @@ internal static class SchedulingResourceRegistration
         new(Verbs.Wait,   typeof(WaitOperationHandler)),
     ];
 
-    /// <summary>The standard CRUD verbs exposed for <see cref="SchemataJobExecution" />.</summary>
+    /// <summary>The standard CRUD verbs exposed for <typeparamref name="TExecution" />.</summary>
     internal static readonly Operations[] ExecutionOperations = [Operations.Get, Operations.List, Operations.Delete];
 
     internal static void RegisterHandlers(IServiceCollection services) {
-        services.TryAddScoped<RunJobHandler>();
+        services.TryAddScoped<RunJobHandler<TJob>>();
         services.TryAddScoped<CancelOperationHandler>();
         services.TryAddScoped<WaitOperationHandler>();
-        services.Map<SchemataJobExecution, Operation>(map => map.With(e => OperationMapper.FromExecution(e)));
+        services.Map<TExecution, Operation>(map => map.With(e => OperationMapper.FromExecution(e)));
     }
 }

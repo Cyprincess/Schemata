@@ -14,9 +14,8 @@ namespace Schemata.Scheduling.Skeleton;
 public sealed class RunJobRequest : ICanonicalName, ICommand<Operation>, IRequestPrincipal
 {
     /// <summary>
-    ///     Variables copied to <see cref="JobContext.Variables" /> for this trigger.
-    ///     When omitted, the execution receives an empty dictionary; the handler does not merge
-    ///     values from the persisted job row.
+    ///     Variables copied to <see cref="JobContext.Variables" /> for this trigger, overriding
+    ///     colliding keys of the persisted job row's stored variables.
     /// </summary>
     public Dictionary<string, string?>? Variables { get; set; }
 

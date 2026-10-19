@@ -6,6 +6,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
@@ -16,12 +17,12 @@ using Xunit;
 
 namespace Schemata.Scheduling.Integration.Tests.Fixtures;
 
-public sealed class SchedulingFixture : IAsyncLifetime
+public sealed class SchedulingFixture(bool supplyNames = true) : IAsyncLifetime
 {
     private SqliteConnection? _connection;
     private ServiceProvider?   _root;
 
-    public MutableClock Clock { get; } = new(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+    public MutableClock Clock { get; } = new(new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
 
     public BlockingJob BlockingJob { get; } = new();
 
@@ -43,6 +44,10 @@ public sealed class SchedulingFixture : IAsyncLifetime
 
         services.AddRepository<SchemataJob, EfCoreRepository<SchedulingDbContext, SchemataJob>>();
         services.AddRepository<SchemataJobExecution, EfCoreRepository<SchedulingDbContext, SchemataJobExecution>>();
+        if (supplyNames) {
+            services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJob>, AdviceAddResourceName<SchemataJob>>());
+            services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJobExecution>, AdviceAddResourceName<SchemataJobExecution>>());
+        }
 
         services.AddScoped<IUnitOfWork<SchedulingDbContext>, EfCoreUnitOfWork<SchedulingDbContext>>();
 
@@ -51,6 +56,7 @@ public sealed class SchedulingFixture : IAsyncLifetime
         services.AddSingleton(BlockingJob);
         services.AddSingleton<IRepositoryUpdateAdvisor<SchemataJob>>(BlockingJobUpdateAdvisor);
         services.AddSchemataScheduling();
+        services.AddSchemataSchedulingRepositoryStore();
 
         _root = services.BuildServiceProvider();
 
@@ -59,12 +65,12 @@ public sealed class SchedulingFixture : IAsyncLifetime
             await db.Database.EnsureCreatedAsync();
         }
 
-        await _root.GetRequiredService<IScheduler>().StartAsync(CancellationToken.None);
+        await _root.GetRequiredService<IScheduler<SchemataJob, SchemataJobExecution>>().StartAsync(CancellationToken.None);
     }
 
     public async Task DisposeAsync() {
         if (_root is not null) {
-            await _root.GetRequiredService<IScheduler>().StopAsync(CancellationToken.None);
+            await _root.GetRequiredService<IScheduler<SchemataJob, SchemataJobExecution>>().StopAsync(CancellationToken.None);
             await _root.DisposeAsync();
         }
 

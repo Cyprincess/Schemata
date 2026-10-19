@@ -1,9 +1,10 @@
-using System;
+﻿using System;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Core;
 using Schemata.Scheduling.Event;
 using Schemata.Scheduling.Event.Features;
 using Schemata.Scheduling.Foundation.Builders;
+using Schemata.Scheduling.Skeleton.Entities;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.AspNetCore.Builder;
@@ -12,10 +13,12 @@ namespace Microsoft.AspNetCore.Builder;
 public static class SchedulingEventBuilderExtensions
 {
     /// <summary>Adds <c>SchemataSchedulingEventFeature</c> and applies the optional options delegate.</summary>
-    public static SchedulingBuilder UseEvent(
-        this SchedulingBuilder                  builder,
-        Action<SchemataSchedulingEventOptions>? configure = null
-    ) {
+    public static SchedulingBuilder<TJob, TExecution> UseEvent<TJob, TExecution>(
+        this SchedulingBuilder<TJob, TExecution> builder,
+        Action<SchemataSchedulingEventOptions>?  configure = null
+    )
+        where TJob : SchemataJob, new()
+        where TExecution : SchemataJobExecution, new() {
         builder.AddFeature<SchemataSchedulingEventFeature>();
         if (configure != null) {
             builder.Services.Configure(configure);

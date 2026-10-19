@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
+using ProtoBuf;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Scheduling.Skeleton.Entities;
@@ -11,8 +13,17 @@ namespace Schemata.Scheduling.Skeleton.Entities;
 [CanonicalName("jobs/{job}")]
 [PrimaryKey(nameof(Uid))]
 [Index(nameof(Name), IsUnique = true)]
+[Index(nameof(Key), IsUnique = true)]
 public class SchemataJob : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
+    [JsonIgnore, ProtoIgnore]
+    public virtual Dictionary<string, string?>? MessageContext { get; set; }
+
+    /// <summary>Producer-owned schedule slot used to recover an existing job across registrations.</summary>
+    public virtual string? Key { get; set; }
+
+    public virtual Guid ScheduleVersion { get; set; }
+
     /// <summary>Stable job identifier resolved through <see cref="IScheduledJobRegistry" />.</summary>
     public virtual string? JobKey { get; set; }
 

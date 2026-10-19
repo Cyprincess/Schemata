@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -20,22 +20,26 @@ namespace Schemata.Scheduling.Foundation;
 ///     population runs in <see cref="StartAsync" /> so it completes before the dispatcher's first
 ///     pass, which resolves job keys for any persisted due rows.
 /// </summary>
-public sealed class SchedulingInitializer : BackgroundService
+/// <typeparam name="TJob">The persisted job entity type registered by the host.</typeparam>
+/// <typeparam name="TExecution">The persisted execution entity type registered by the host.</typeparam>
+public sealed class SchedulingInitializer<TJob, TExecution> : BackgroundService
+    where TJob : SchemataJob, new()
+    where TExecution : SchemataJobExecution, new()
 {
-    private readonly ILogger<SchedulingInitializer>?     _logger;
+    private readonly ILogger<SchedulingInitializer<TJob, TExecution>>? _logger;
     private readonly IOptions<SchemataSchedulingOptions> _options;
     private readonly IScheduledJobRegistry               _registry;
-    private readonly IScheduler                          _scheduler;
+    private readonly IScheduler<TJob, TExecution>        _scheduler;
     private readonly IServiceProvider                    _services;
     private readonly TimeProvider                        _time;
 
     public SchedulingInitializer(
-        IScheduler                          scheduler,
-        IOptions<SchemataSchedulingOptions> options,
-        IServiceProvider                    services,
-        IScheduledJobRegistry               registry,
-        ILogger<SchedulingInitializer>?     logger       = null,
-        TimeProvider?                       time = null
+        IScheduler<TJob, TExecution>                        scheduler,
+        IOptions<SchemataSchedulingOptions>                 options,
+        IServiceProvider                                    services,
+        IScheduledJobRegistry                               registry,
+        ILogger<SchedulingInitializer<TJob, TExecution>>?   logger       = null,
+        TimeProvider?                                       time = null
     ) {
         _scheduler = scheduler;
         _options   = options;
@@ -45,14 +49,19 @@ public sealed class SchedulingInitializer : BackgroundService
         _time      = time ?? TimeProvider.System;
     }
 
-    public override Task StartAsync(CancellationToken ct) {
+    public override async Task StartAsync(CancellationToken ct) {
+        // The dispatcher cannot claim a single row without an execution store, so a missing
+        // backend is a startup error, not a dispatch-time surprise.
+        await using (var scope = _services.CreateAsyncScope()) {
+            scope.ServiceProvider.GetRequiredService<IJobExecutionStore<TJob, TExecution>>();
+        }
+
         _registry.RegisterAll(_options.Value.Jobs.Select(j => j.JobType));
-        return base.StartAsync(ct);
+        await _scheduler.StartAsync(ct);
+        await base.StartAsync(ct);
     }
 
     protected override async Task ExecuteAsync(CancellationToken st) {
-        await _scheduler.StartAsync(st);
-
         await FailOrphanedRunningAsync(st);
 
         foreach (var registration in _options.Value.Jobs) {
@@ -66,12 +75,12 @@ public sealed class SchedulingInitializer : BackgroundService
                 continue;
             }
 
-            var job = new SchemataJob {
-                Name   = jobKey,
+            var job = new TJob {
+                Key    = $"registration:{jobKey}",
                 JobKey = jobKey,
                 State  = JobState.Active,
             };
-            ScheduleDefinitionMapper.ApplyToJob(registration.Schedule, job);
+            ScheduleDefinitionMapper.ApplyToJob(registration.Schedule, job, _time);
 
             await _scheduler.ScheduleAsync(job, st);
         }
@@ -80,31 +89,14 @@ public sealed class SchedulingInitializer : BackgroundService
     }
 
     /// <summary>
-    ///     Fails executions left <see cref="ExecutionState.Running" /> by a crash. The scheduler is
-    ///     single-node, so any Running row at startup is orphaned by an interrupted process. Each
-    ///     becomes <see cref="ExecutionState.Failed" /> so its operation reaches a terminal state and
-    ///     the caller can re-issue; the interrupted occurrence is not rerun automatically.
+    ///     Fails inline operations with expired ownership. Live leases remain owned, and rows
+    ///     without ownership evidence are left unchanged. Scheduled executions recover when
+    ///     dispatchers reclaim their expired leases.
     /// </summary>
     private async Task FailOrphanedRunningAsync(CancellationToken ct) {
-        using var scope      = _services.CreateScope();
-        var       executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
-
-        var orphaned = new List<SchemataJobExecution>();
-        await foreach (var row in executions.ListAsync(q => q.Where(e => e.State == ExecutionState.Running), ct)) {
-            orphaned.Add(row);
-        }
-
-        var now = _time.GetUtcNow().UtcDateTime;
-        foreach (var row in orphaned) {
-            row.State       = ExecutionState.Failed;
-            row.EndTime     = now;
-            row.RecentError = "Execution was interrupted by a host restart.";
-            await executions.UpdateAsync(row, ct);
-        }
-
-        if (orphaned.Count > 0) {
-            await executions.CommitAsync(ct);
-        }
+        await using var scope = _services.CreateAsyncScope();
+        var       store = scope.ServiceProvider.GetRequiredService<IJobExecutionStore<TJob, TExecution>>();
+        await store.FailOrphanedRunningAsync(_time.GetUtcNow().UtcDateTime, ct);
     }
 
     public override async Task StopAsync(CancellationToken ct) {
@@ -113,12 +105,12 @@ public sealed class SchedulingInitializer : BackgroundService
     }
 
     internal async Task ReloadPersistedJobsAsync(CancellationToken ct) {
-        using var scope = _services.CreateScope();
+        await using var scope = _services.CreateAsyncScope();
 
-        var jobs = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJob>>();
+        var store = scope.ServiceProvider.GetRequiredService<IJobExecutionStore<TJob, TExecution>>();
 
-        var active = new List<SchemataJob>();
-        await foreach (var job in jobs.ListAsync(q => q.Where(j => j.State == JobState.Active), ct)) {
+        var active = new List<TJob>();
+        await foreach (var job in store.ListActiveJobsAsync(ct)) {
             active.Add(job);
         }
 

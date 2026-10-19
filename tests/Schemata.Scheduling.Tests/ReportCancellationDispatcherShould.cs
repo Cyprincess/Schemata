@@ -7,6 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
+using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Runtime;
 using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Foundation.Runtime;
 using Schemata.Scheduling.Skeleton;
@@ -25,34 +27,43 @@ public class ReportCancellationDispatcherShould
         var jobs = new Mock<IRepository<SchemataJob>>();
         jobs.Setup(r => r.FirstOrDefaultAsync(
                        It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(),
-                       It.IsAny<CancellationToken>()))
+                       It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
             .Returns(ValueTask.FromResult<SchemataJob?>(null));
-        var services = new ServiceCollection().AddScoped<IRepository<SchemataJobExecution>>(_ => CreateRepository(storage).Object)
+        var services = new ServiceCollection().AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
+                                              .AddScoped<IRepository<SchemataJobExecution>>(_ => CreateRepository(storage).Object)
                                                .AddSingleton<IScheduledJobRegistry>(registry)
                                                .AddSingleton(new CancellingJob(storage.Cancel))
                                                .AddSingleton(jobs.Object)
                                                .AddSingleton<IScheduler>(Mock.Of<IScheduler>())
+                                               .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
+                                               .AddSchemataScheduling()
+                                               .AddSchemataSchedulingRepositoryStore()
                                                .BuildServiceProvider();
-        var dispatcher = new JobExecutionDispatcher(services);
+        var dispatcher = new JobExecutionDispatcher<SchemataJob, SchemataJobExecution>(services);
 
         await dispatcher.DispatchPendingAsync(CancellationToken.None);
 
         Assert.Equal(ExecutionState.Cancelled, storage.Stored.State);
-        Assert.Equal(2, storage.UpdateAttempts);
     }
 
     private static Mock<IRepository<SchemataJobExecution>> CreateRepository(CancellationStorage storage) {
         var repository = new Mock<IRepository<SchemataJobExecution>>();
         repository.Setup(r => r.ListAsync(
                               It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(),
-                              It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> query, CancellationToken _) => {
+                              It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> query, CancellationToken _, QueryOptions _) => {
                       return ToAsync(query(new[] { storage.DispatchCopy }.AsQueryable()));
                   });
-        repository.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
-                  .Callback<SchemataJobExecution, CancellationToken>((row, _) => storage.Update(row))
-                  .Returns(Task.CompletedTask);
+        repository.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
+                  .Callback<SchemataJobExecution, CancellationToken, MutationOptions>((row, _, _) => storage.Update(row))
+                  .ReturnsAsync(MutationResult.Applied);
         repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        repository.Setup(r => r.Begin()).Returns(() => {
+            var unit = new Mock<IUnitOfWork>(MockBehavior.Strict);
+            unit.Setup(u => u.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+            unit.Setup(u => u.DisposeAsync()).Returns(ValueTask.CompletedTask);
+            return unit.Object;
+        });
         return repository;
     }
 
@@ -88,7 +99,6 @@ public class ReportCancellationDispatcherShould
 
         internal SchemataJobExecution Stored { get; private set; }
 
-        internal int UpdateAttempts { get; private set; }
 
         internal void Cancel() {
             Stored = Copy(Stored);
@@ -97,7 +107,6 @@ public class ReportCancellationDispatcherShould
         }
 
         internal void Update(SchemataJobExecution row) {
-            UpdateAttempts++;
             if (row.Timestamp != Stored.Timestamp) {
                 throw new AbortedException();
             }

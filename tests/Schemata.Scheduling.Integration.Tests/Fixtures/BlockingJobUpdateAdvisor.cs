@@ -33,6 +33,7 @@ public sealed class BlockingJobUpdateAdvisor : IRepositoryUpdateAdvisor<Schemata
         AdviceContext            ctx,
         IRepository<SchemataJob> repository,
         SchemataJob              entity,
+        MutationOptions      options,
         CancellationToken        ct
     ) {
         if (!_armed) {

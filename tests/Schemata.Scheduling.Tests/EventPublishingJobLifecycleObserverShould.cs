@@ -2,7 +2,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
-using Schemata.Core;
 using Schemata.Event.Skeleton;
 using Schemata.Scheduling.Foundation.Runtime;
 using Schemata.Scheduling.Event.Events;
@@ -23,7 +22,7 @@ public class EventPublishingJobLifecycleObserverShould
         events.Setup(bus => bus.PublishAsync(It.IsAny<JobBlocked>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         events.Setup(bus => bus.PublishAsync(It.IsAny<JobSkipped>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var services = new ServiceCollection().AddSingleton(events.Object).AddSingleton<IScheduledJobRegistry>(new DefaultScheduledJobRegistry());
-        new SchemataSchedulingEventFeature().ConfigureServices(services, new SchemataOptions(), new Configurators(), null!, null!);
+        new SchemataSchedulingEventFeature().ConfigureServices(services, new(), new(), null!, null!);
         await using var provider = services.BuildServiceProvider();
         var observer = Assert.Single(provider.GetServices<IJobLifecycleObserver>());
         var job = new SchemataJob { CanonicalName = "jobs/a" };

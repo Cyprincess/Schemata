@@ -1,47 +1,61 @@
-using System;
-using System.Collections.Concurrent;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Entity.Repository;
-using Schemata.Messaging.Skeleton;
-using Schemata.Scheduling.Foundation.Commands;
+using Schemata.Scheduling.Foundation.Settlement;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Advisors;
 using Schemata.Scheduling.Skeleton.Entities;
+using Schemata.Scheduling.Skeleton.Services;
 
 namespace Schemata.Scheduling.Foundation;
 
 /// <summary>
-///     The single executor for every <see cref="SchemataJobExecution" /> occurrence. The scheduler
+///     The single executor for every <typeparamref name="TExecution" /> occurrence. The scheduler
 ///     materializes a <see cref="ExecutionState.Pending" /> row up front (immediate or future-dated)
 ///     and arms a timer that signals this dispatcher at the row's due time; the dispatcher drains
-///     rows whose <see cref="SchemataJobExecution.StartTime" /> has arrived, claims each with a
-///     <see cref="ExecutionState.Pending" /> → <see cref="ExecutionState.Running" /> transition
-///     guarded by the concurrency token, runs the advisor / observer / job-body pipeline, records
-///     the terminal state, and dispatches <see cref="Commands.StageJobExecutionResultRequest" /> so
-///     the scheduling writer stages the job row and re-arms recurring schedules. Multiple
-///     dispatchers can scale execution horizontally; only the row claim serializes them.
+///     the pending set through <see cref="IJobExecutionStore{TJob,TExecution}" />, claims each row
+///     with a <see cref="ExecutionState.Pending" /> → <see cref="ExecutionState.Running" />
+///     transition guarded by the concurrency token, runs the advisor / observer / job-body pipeline
+///     under a renewed lease, and records the terminal state so the scheduling writer stages the
+///     job row and re-arms recurring schedules. Multiple dispatchers can scale execution
+///     horizontally; only the row claim serializes them.
 /// </summary>
-public sealed class JobExecutionDispatcher(
-    IServiceProvider                 services,
-    ILogger<JobExecutionDispatcher>? logger       = null,
-    TimeProvider?                    time = null
+/// <remarks>
+///     Lease, retry-ceiling, and crash-recovery semantics are owned here and carried by the
+///     <see cref="IJobExecutionStore{TJob,TExecution}" /> contract: a claim holds a lease
+///     (<see cref="JobRegistration.Lease" /> falling back to
+///     <see cref="SchemataSchedulingOptions.ExecutionLease" />) renewed from claim through
+///     setup and termination; when the lease lapses without renewal (host shutdown or crash), the row
+///     returns to the pending set and any live dispatcher reclaims it. A job body that fails with
+///     attempts remaining is requeued with linear backoff; the attempt that reaches
+///     <see cref="JobRegistration.MaxAttempts" /> is settled <see cref="ExecutionState.Failed" />.
+/// </remarks>
+public sealed class JobExecutionDispatcher<TJob, TExecution>(
+    IServiceProvider                                    services,
+    ILogger<JobExecutionDispatcher<TJob, TExecution>>?  logger       = null,
+    TimeProvider?                                       time = null
 ) : BackgroundService
+    where TJob : SchemataJob, new()
+    where TExecution : SchemataJobExecution, new()
 {
     private const           int           BatchSize = 100;
     private static readonly TimeSpan      Interval  = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan      DefaultLease   = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan      DefaultBackoff = TimeSpan.FromSeconds(30);
     private readonly        SemaphoreSlim _pending  = new(0, int.MaxValue);
-    private readonly        ConcurrentDictionary<string, CancellationTokenSource> _running =
-        services.GetService<ConcurrentDictionary<string, CancellationTokenSource>>() ?? new();
+    private readonly        IActiveExecutionRegistry _executions = services.GetRequiredService<IActiveExecutionRegistry>();
     private readonly        TimeProvider  _time     = time ?? TimeProvider.System;
 
 
@@ -54,198 +68,242 @@ public sealed class JobExecutionDispatcher(
         while (!st.IsCancellationRequested) {
             try {
                 await DispatchPendingAsync(st);
-                await _pending.WaitAsync(Interval, st);
             } catch (OperationCanceledException) when (st.IsCancellationRequested) {
                 return;
             } catch (Exception ex) {
                 logger?.LogError(ex, "Job execution dispatch pass failed; retrying next interval.");
             }
+            using var interval = new CancellationTokenSource(Interval, _time);
+            using var wait = CancellationTokenSource.CreateLinkedTokenSource(st, interval.Token);
+            try {
+                await _pending.WaitAsync(wait.Token);
+            } catch (OperationCanceledException) when (interval.IsCancellationRequested && !st.IsCancellationRequested) {
+                continue;
+            } catch (OperationCanceledException) when (st.IsCancellationRequested) {
+                return;
+            }
         }
     }
 
-    /// <summary>Claims and runs every due pending execution row in a scoped dispatch pass.</summary>
+    /// <summary>Claims and runs every row in the pending set in a scoped dispatch pass.</summary>
     public async Task DispatchPendingAsync(CancellationToken ct) {
-        using var scope      = services.CreateScope();
-        var       executions = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
-        var       now        = _time.GetUtcNow().UtcDateTime;
-        var       due        = new List<SchemataJobExecution>();
+        await using var scope = services.CreateAsyncScope();
+        var       store = scope.ServiceProvider.GetRequiredService<IJobExecutionStore<TJob, TExecution>>();
+        var       now   = _time.GetUtcNow().UtcDateTime;
+        var       due   = new List<TExecution>();
+        await store.FailOrphanedRunningAsync(now, ct);
 
-        // A Pending row whose StartTime is still in the future is a scheduled occurrence; only rows
-        // that have come due are the dispatcher's concern. The worker or LRO client owns a Running row.
-        await foreach (var row in executions.ListAsync(
-                           q => q.Where(e => e.State == ExecutionState.Pending && e.StartTime <= now)
-                                 .Take(BatchSize),
-                           ct)) {
+        // A Pending row whose StartTime is still in the future is a scheduled occurrence or a
+        // backed-off retry; only rows that have come due are the dispatcher's concern. A Running
+        // row with a live lease is owned by its claimant; a Running row whose lease lapsed
+        // returns to the pending set for crash recovery. Inline operations have no JobKey;
+        // their expired ownership is settled by the store sweep.
+        await foreach (var row in store.ListDueAsync(now, BatchSize, ct)) {
             due.Add(row);
         }
 
         foreach (var row in due) {
-            await DispatchAsync(scope.ServiceProvider, executions, row, ct);
+            await using var rowScope = services.CreateAsyncScope();
+            var scoped = rowScope.ServiceProvider.GetRequiredService<IJobExecutionStore<TJob, TExecution>>();
+            await DispatchAsync(rowScope.ServiceProvider, scoped, row, ct);
         }
     }
 
     private async Task DispatchAsync(
-        IServiceProvider                  serviceProvider,
-        IRepository<SchemataJobExecution> executions,
-        SchemataJobExecution              execution,
-        CancellationToken                 ct
+        IServiceProvider                     serviceProvider,
+        IJobExecutionStore<TJob, TExecution> store,
+        TExecution                           execution,
+        CancellationToken                    ct
     ) {
         if (string.IsNullOrWhiteSpace(execution.JobKey)) {
-            await MarkFailedAsync(serviceProvider, execution, "Job execution is missing its JobKey.", ct);
+            await MarkFailedAsync(store, execution, "Job execution is missing its JobKey.", ct);
             return;
         }
 
-        // Claim the row before execution to serialize competing dispatchers.
-        execution.State = ExecutionState.Running;
+        var registry = serviceProvider.GetService<IScheduledJobRegistry>();
+        var jobType  = registry?.Resolve(execution.JobKey);
+
+        // A misconfigured policy condemns only this execution; the pass continues for other rows.
+        ExecutionPolicy policy;
         try {
-            await executions.UpdateAsync(execution, ct);
-            await executions.CommitAsync(ct);
-        } catch (AbortedException) {
+            policy = ResolvePolicy(jobType);
+        } catch (Exception error) {
+            await MarkFailedAsync(store, execution, error.Message, ct);
             return;
         }
 
-        await RunPipelineAsync(serviceProvider, execution, ct);
+        // Claim the row before execution to serialize competing dispatchers; the lease bounds how
+        // long a crashed claimant can hold the row. A lost race means another dispatcher won.
+        var leaseExpire = _time.GetUtcNow().UtcDateTime.Add(policy.Lease);
+        if (!await store.TryClaimAsync(execution, leaseExpire, ct)) {
+            return;
+        }
+
+        await using var lease = new JobExecutionLease<TJob, TExecution>(JobExecutionScopes.Plain(services.GetRequiredService<IServiceScopeFactory>()), execution,
+            policy.Lease, _time, _executions, ct);
+        try {
+            lease.ThrowIfOwnershipLost();
+            await lease.ConfirmAsync(lease.Token);
+            lease.ThrowIfOwnershipLost();
+            await RunPipelineAsync(serviceProvider, execution, policy, lease);
+        } catch (OperationCanceledException) when (lease.Token.IsCancellationRequested) {
+            return;
+        } catch (Exception error) {
+            await lease.TransitionAsync(current => MarkFailedAsync(current, execution, error.Message, lease.Token), lease.Token);
+            throw;
+        }
     }
 
     /// <summary>
     ///     Runs the advisor → observer → job-body pipeline for a claimed execution row, records the
     ///     terminal state, and stages the job-row result. Pipeline context and scheduling state
-    ///     are sourced from the durable row.
+    ///     are sourced from the durable row. A failure before the job body (job resolution,
+    ///     advisors, lifecycle publication) settles the claimed row as
+    ///     <see cref="ExecutionState.Failed" /> through the same finalize owner. A job-body
+    ///     failure with attempts remaining is requeued with backoff and no observer fires until
+    ///     the attempt that exhausts <see cref="ExecutionPolicy.MaxAttempts" />, which settles
+    ///     <see cref="ExecutionState.Failed" /> and notifies
+    ///     <see cref="IJobLifecycleObserver.OnFailedAsync" />.
     /// </summary>
     private async Task RunPipelineAsync(
-        IServiceProvider     serviceProvider,
-        SchemataJobExecution execution,
-        CancellationToken    ct
+        IServiceProvider                     serviceProvider,
+        TExecution                           execution,
+        ExecutionPolicy                      policy,
+        JobExecutionLease<TJob, TExecution>  lease
     ) {
+        var ct = lease.Token;
         var registry = serviceProvider.GetRequiredService<IScheduledJobRegistry>();
         var jobType  = registry.Resolve(execution.JobKey!);
         if (jobType is null) {
-            await MarkFailedAsync(serviceProvider, execution, $"Job key '{execution.JobKey}' is not registered.", ct);
+            await lease.TransitionAsync(current => MarkFailedAsync(current, execution, $"Job key '{execution.JobKey}' is not registered.", ct), ct);
             return;
         }
 
         var observers = serviceProvider.GetServices<IJobLifecycleObserver>().ToList();
-        var job       = await LoadOrSynthesizeJobAsync(serviceProvider, execution, ct);
-        var context   = BuildContext(execution);
 
+        TJob?       job     = null;
+        JobContext? context = null;
+        AdviseResult advise;
         var adviceCtx = new AdviceContext(serviceProvider);
-        using var adviceScope = AdviceContext.Establish(adviceCtx);
-        adviceCtx.Set(job);
+        try {
+            job     = await LoadOrSynthesizeJobAsync(serviceProvider, execution, ct);
+            context = BuildContext(execution);
 
-        switch (await Advisor.For<IJobExecutionAdvisor>().RunAsync(adviceCtx, context, ct)) {
+            advise = await Advisor.For<IJobExecutionAdvisor>().RunAsync(adviceCtx, context, ct);
+            if (advise == AdviseResult.Continue) {
+                foreach (var observer in observers) {
+                    await observer.OnTriggeredAsync(job, context, ct);
+                }
+            }
+        } catch (OperationCanceledException) when (ct.IsCancellationRequested) {
+            // Host shutdown mid-setup leaves the claimed row Running for a later pass to reclaim.
+            throw;
+        } catch (Exception ex) {
+            // Job resolution, advisor, or publication failed after the claim and the body never
+            // ran, so no job-outcome observer fires; settle the row Failed and let the staging
+            // writer advance a recurring schedule.
+            job     ??= SynthesizeJob(execution);
+            context ??= BuildContext(execution);
+            await FinalizeAsync(serviceProvider, job, execution, ExecutionState.Failed, ex, observers, context, lease, ct);
+            return;
+        }
+
+        switch (advise) {
             case AdviseResult.Continue:
                 break;
             case AdviseResult.Handle:
             default:
                 // An advisor handled or blocked the fire before it ran; leave no terminal row churn
                 // beyond the claim and advance the schedule so the next occurrence is materialized.
-                await FinalizeAsync(serviceProvider, job, execution, ExecutionState.Skipped, null, observers,
-                                    context, ct, notifySkipped: true);
+                await FinalizeAsync(serviceProvider, job!, execution, ExecutionState.Skipped, null, observers,
+                    context!, lease, ct, notifySkipped: true);
                 return;
             case AdviseResult.Block:
-                await FinalizeAsync(serviceProvider, job, execution, ExecutionState.Blocked, null, observers,
-                                    context, ct, notifyBlocked: true);
+                await FinalizeAsync(serviceProvider, job!, execution, ExecutionState.Blocked, null, observers,
+                    context!, lease, ct, notifyBlocked: true);
                 return;
         }
 
-        foreach (var observer in observers) {
-            await observer.OnTriggeredAsync(job, context, ct);
-        }
 
         try {
             var scheduledJob = (IScheduledJob)serviceProvider.GetRequiredService(jobType);
-            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            var key = execution.Uid.ToString("n");
-            if (!_running.TryAdd(key, linked)) {
+            lease.ThrowIfOwnershipLost();
+            await scheduledJob.ExecuteAsync(context!, ct);
+            lease.ThrowIfOwnershipLost();
+            execution.Output = context!.Execution?.Output;
+        } catch (OperationCanceledException) when (ct.IsCancellationRequested) {
+            return;
+        } catch (Exception ex) {
+            if (execution.Attempt < policy.MaxAttempts) {
+                var next = _time.GetUtcNow().UtcDateTime.Add(policy.Backoff * execution.Attempt);
+                if (await lease.TransitionAsync(current => {
+                    execution.RecentError = ex.Message;
+                    return current.TryRequeueAsync(execution, next, ct);
+                }, ct)) {
+                    logger?.LogInformation("Execution '{ExecutionUid}' failed attempt {Attempt}; requeued for {NextStartUtc}.",
+                                           execution.Uid, execution.Attempt, next);
+                }
+
                 return;
             }
 
-            try {
-                await scheduledJob.ExecuteAsync(context, linked.Token);
-            } finally {
-                _running.TryRemove(key, out _);
-            }
-
-            execution.Output = context.Execution?.Output;
-            await FinalizeAsync(serviceProvider, job, execution, ExecutionState.Succeeded, null, observers,
-                                context, ct, true);
-        } catch (OperationCanceledException) {
-            // Host shutdown mid-run: leave the row Running so a later pass reclaims and reruns it.
-            logger?.LogInformation("Execution '{ExecutionUid}' cancelled mid-run; leaving it for re-dispatch.",
-                                   execution.Uid);
-        } catch (Exception ex) {
-            await FinalizeAsync(serviceProvider, job, execution, ExecutionState.Failed, ex, observers,
-                                context, ct, notifyFailed: true);
+            await FinalizeAsync(serviceProvider, job!, execution, ExecutionState.Failed, ex, observers,
+                context!, lease, ct, notifyFailed: true);
+            return;
         }
+        await FinalizeAsync(serviceProvider, job!, execution, ExecutionState.Succeeded, null, observers,
+            context!, lease, ct, true);
     }
 
+
     /// <summary>
-    ///     Writes the terminal execution row, stages the job-row result through the scheduling
-    ///     writer, then runs the matching lifecycle observers against the post-write job fields.
-    ///     The claimed <paramref name="execution" /> instance carries its expected concurrency
-    ///     token, so a concurrent cancellation aborts finalization instead of overwriting it.
+    ///     Hands the claimed execution and its terminal result to the settlement owner, then runs
+    ///     the matching lifecycle observers against the post-write job fields. The claimed
+    ///     <paramref name="execution" /> instance carries its expected concurrency token, so a
+    ///     concurrent cancellation aborts finalization instead of overwriting it.
     /// </summary>
     private async Task FinalizeAsync(
-        IServiceProvider                  serviceProvider,
-        SchemataJob                       job,
-        SchemataJobExecution              execution,
-        ExecutionState                    state,
-        Exception?                        exception,
-        List<IJobLifecycleObserver>       observers,
-        JobContext                        context,
-        CancellationToken                 ct,
-        bool                              notifySucceeded = false,
-        bool                              notifyFailed    = false,
-        bool                              notifyBlocked   = false,
-        bool                              notifySkipped   = false
+        IServiceProvider                     serviceProvider,
+        TJob                                 job,
+        TExecution                           execution,
+        ExecutionState                       state,
+        Exception?                           exception,
+        List<IJobLifecycleObserver>          observers,
+        JobContext                           context,
+        JobExecutionLease<TJob, TExecution>  lease,
+        CancellationToken                    ct,
+        bool                                 notifySucceeded = false,
+        bool                                 notifyFailed    = false,
+        bool                                 notifyBlocked   = false,
+        bool                                 notifySkipped   = false
     ) {
-        execution.State       = state;
-        execution.EndTime     = _time.GetUtcNow().UtcDateTime;
-        execution.RecentError = exception?.Message;
+        var settlement = serviceProvider.GetRequiredService<IJobSettlement<TJob, TExecution>>();
+        var outcome = await settlement.SettleAsync(
+            lease, new(job, state, _time.GetUtcNow().UtcDateTime, exception?.Message), ct);
 
-        var executions = serviceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
-        try {
-            await executions.UpdateAsync(execution, ct);
-            await executions.CommitAsync(ct);
-        } catch (AbortedException) {
-            // Row moved on under another worker (e.g. :cancel) after we claimed it; honour that.
+        if (!outcome.ExecutionSettled) {
+            // A concurrency conflict means another worker transitioned the claimed row first;
+            // that transition owns the terminal state and this finalization stops without
+            // overwriting it. Any other failure kept the row unpersisted and surfaces here.
+            if (outcome.Failure is not null and not AbortedException) {
+                ExceptionDispatchInfo.Capture(outcome.Failure).Throw();
+            }
+
             return;
         }
 
-        // Advance the in-memory job row so observers always see the post-fire view; the staging handler
-        // persists these fields only when the persisted job row exists.
-        job.RecentRunTime = execution.EndTime;
-        job.RecentError   = state == ExecutionState.Failed ? exception?.Message : null;
-
-        var recurring = job.ScheduleType is ScheduleType.Cron or ScheduleType.Periodic;
-
-        if (state == ExecutionState.Failed) {
-            job.State = recurring ? JobState.Active : JobState.Failed;
-        } else if (!recurring) {
-            job.State       = JobState.Completed;
-            job.NextRunTime = null;
-        }
-
-        // Recurring active jobs carry their next occurrence in the staged payload; the staging
-        // handler recomputes from the freshly loaded persisted schedule only when the FireAll
-        // missed-fire walk exhausts its cap.
-        if (recurring && job is { State: JobState.Active }) {
-            job.NextRunTime = ComputeNextRunTime(job);
-        }
-
-        var identity = job.CanonicalName ?? job.Name ?? execution.Job;
-        if (!string.IsNullOrWhiteSpace(identity)) {
-            var dispatcher = serviceProvider.GetRequiredService<IRequestDispatcher>();
-            await dispatcher.SendAsync<StageJobExecutionResultRequest, Unit>(
-                new(identity, job.State, job.RecentRunTime, job.RecentError, job.NextRunTime), ct);
+        if (outcome.Failure is not null) {
+            logger?.LogWarning(outcome.Failure,
+                "Job settlement recorded execution '{ExecutionUid}' without a fully persisted schedule.",
+                execution.Uid);
         }
 
         foreach (var observer in observers) {
             try {
                 if (notifySucceeded) {
                     await observer.OnSucceededAsync(job, context, ct);
-                } else if (notifyFailed) {
-                    await observer.OnFailedAsync(job, context, exception!, ct);
+                } else if (notifyFailed && exception is { } failure) {
+                    await observer.OnFailedAsync(job, context, failure, ct);
                 } else if (notifyBlocked) {
                     await observer.OnBlockedAsync(job, context, ct);
                 } else if (notifySkipped) {
@@ -257,12 +315,12 @@ public sealed class JobExecutionDispatcher(
         }
     }
 
-    private async Task<SchemataJob> LoadOrSynthesizeJobAsync(
-        IServiceProvider     serviceProvider,
-        SchemataJobExecution execution,
-        CancellationToken    ct
+    private async Task<TJob> LoadOrSynthesizeJobAsync(
+        IServiceProvider serviceProvider,
+        TExecution       execution,
+        CancellationToken ct
     ) {
-        var jobs      = serviceProvider.GetRequiredService<IRepository<SchemataJob>>();
+        var jobs      = serviceProvider.GetRequiredService<IRepository<TJob>>();
         var canonical = execution.Job;
         if (!string.IsNullOrWhiteSpace(canonical)) {
             var existing = await jobs.FirstOrDefaultAsync(
@@ -272,11 +330,16 @@ public sealed class JobExecutionDispatcher(
             }
         }
 
-        // One-shot triggers and durable operations carry no persisted SchemataJob row; synthesize a
-        // transient shell so the advisor / observer pipeline has a job to reason about. CanonicalName
-        // mirrors execution.Job so downstream lookups stay consistent.
+        return SynthesizeJob(execution);
+    }
+
+    // One-shot triggers and durable operations carry no persisted job row; the transient
+    // shell gives the advisor / observer pipeline a job to reason about. CanonicalName mirrors
+    // execution.Job so downstream lookups stay consistent.
+    private static TJob SynthesizeJob(TExecution execution) {
         return new() {
-            CanonicalName = canonical,
+            MessageContext = execution.MessageContext is null ? null : new(execution.MessageContext),
+            CanonicalName = execution.Job,
             JobKey        = execution.JobKey,
             ArgsJson      = execution.ArgsJson,
             ScheduleType  = ScheduleType.OneTime,
@@ -285,7 +348,7 @@ public sealed class JobExecutionDispatcher(
         };
     }
 
-    private static JobContext BuildContext(SchemataJobExecution execution) {
+    private static JobContext BuildContext(TExecution execution) {
         return new() {
             Job          = execution.Job,
             ExecutionUid = execution.Uid,
@@ -299,43 +362,42 @@ public sealed class JobExecutionDispatcher(
     }
 
     internal bool TryCancel(Guid executionUid) {
-        if (!_running.TryGetValue(executionUid.ToString("n"), out var source)) {
-            return false;
-        }
-
-        try {
-            source.Cancel();
-            return true;
-        } catch (ObjectDisposedException) {
-            return false;
-        }
+        return _executions.Cancel(executionUid.ToString("n"));
     }
 
-    private DateTime? ComputeNextRunTime(SchemataJob job) {
-        if (job.ScheduleType == ScheduleType.Periodic && job is { NextRunTime: not null, IntervalTicks: not null }) {
-            return job.NextRunTime.Value.AddTicks(job.IntervalTicks.Value);
-        }
-
-        var schedule = ScheduleDefinitionMapper.ToDefinition(job);
-        return schedule.GetNextRunTime(job.NextRunTime ?? _time.GetUtcNow().UtcDateTime);
-    }
-
-    private async Task MarkFailedAsync(
-        IServiceProvider     serviceProvider,
-        SchemataJobExecution execution,
-        string               error,
-        CancellationToken    ct
+    private async Task<bool> MarkFailedAsync(
+        IJobExecutionStore<TJob, TExecution> store,
+        TExecution                           execution,
+        string                               error,
+        CancellationToken                    ct
     ) {
         execution.State       = ExecutionState.Failed;
         execution.EndTime     = _time.GetUtcNow().UtcDateTime;
         execution.RecentError = error;
 
-        var executions = serviceProvider.GetRequiredService<IRepository<SchemataJobExecution>>();
-        try {
-            await executions.UpdateAsync(execution, ct);
-            await executions.CommitAsync(ct);
-        } catch (AbortedException) {
-            // Another dispatcher already transitioned the row; nothing to do.
-        }
+        // Another dispatcher transitioning the row first is honoured by the settle.
+        return await store.TrySettleAsync(execution, ct);
     }
+
+    /// <summary>
+    ///     Resolves the lease, retry ceiling, and backoff for <paramref name="jobType" /> from its
+    ///     <see cref="JobRegistration" /> on <see cref="SchemataSchedulingOptions.Jobs" />, falling
+    ///     back to one attempt and the option defaults when the job has no registration.
+    /// </summary>
+    private ExecutionPolicy ResolvePolicy(Type? jobType) {
+        var options      = services.GetService<IOptions<SchemataSchedulingOptions>>()?.Value;
+        var registration = jobType is null ? null : options?.Jobs.FirstOrDefault(j => j.JobType == jobType);
+
+        var lease = registration?.Lease ?? options?.ExecutionLease ?? DefaultLease;
+        if (lease <= TimeSpan.Zero) {
+            throw new InvalidOperationException("Execution lease must be greater than zero.");
+        }
+
+        var maxAttempts = registration?.MaxAttempts ?? 1;
+        var backoff     = registration?.RetryBackoff ?? DefaultBackoff;
+        return new(maxAttempts < 1 ? 1 : maxAttempts, backoff, lease);
+    }
+
+    /// <summary>Lease and retry settings resolved for one job type at dispatch time.</summary>
+    internal readonly record struct ExecutionPolicy(int MaxAttempts, TimeSpan Backoff, TimeSpan Lease);
 }
