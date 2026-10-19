@@ -20,12 +20,21 @@ public class QueryContext<TEntity, TResult, T>
     ///     Initializes a context for executing the given queryable.
     /// </summary>
     /// <param name="repository">The repository that initiated this query.</param>
+    /// <param name="operation">The terminal operation the repository will apply to the query.</param>
     /// <param name="query">
     ///     The queryable after all build-query advisors and the user predicate have been applied.
     /// </param>
-    public QueryContext(IRepository<TEntity> repository, IQueryable<TResult> query) {
+    /// <param name="options">Per-call query behavior overrides.</param>
+    public QueryContext(
+        IRepository<TEntity> repository,
+        QueryOperation       operation,
+        IQueryable<TResult>  query,
+        QueryOptions         options = default
+    ) {
         Repository = repository;
+        Operation  = operation;
         Query      = query;
+        Options    = options;
     }
 
     /// <summary>
@@ -34,7 +43,17 @@ public class QueryContext<TEntity, TResult, T>
     public IRepository<TEntity> Repository { get; private set; }
 
     /// <summary>
-    ///     Indicates whether the repository has pending mutations or an open implicit write unit of work.
+    ///     The terminal operation the repository will apply to <see cref="Query" />.
+    /// </summary>
+    public QueryOperation Operation { get; }
+
+    /// <summary>
+    ///     The per-call query behavior overrides.
+    /// </summary>
+    public QueryOptions Options { get; }
+
+    /// <summary>
+    ///     Indicates an active implicit or explicitly joined unit of work, including enlistments with no local writes.
     /// </summary>
     public bool HasOpenWriteUnitOfWork => Repository is RepositoryBase<TEntity> repository && repository.HasOpenWriteUnitOfWork;
 

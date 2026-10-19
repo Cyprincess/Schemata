@@ -18,7 +18,7 @@ public class AdviceAddConcurrencyShould
         var repository = new Mock<IRepository<PlainEntity>>().Object;
         var entity     = new PlainEntity();
 
-        var result = await advisor.AdviseAsync(ctx, repository, entity, CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, repository, entity, default, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
     }

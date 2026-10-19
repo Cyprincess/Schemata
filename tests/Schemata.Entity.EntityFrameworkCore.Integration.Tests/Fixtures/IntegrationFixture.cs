@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,10 +13,15 @@ namespace Schemata.Entity.EntityFrameworkCore.Integration.Tests.Fixtures;
 public class IntegrationFixture : IAsyncLifetime
 {
     private readonly string _dbPath = $"{Guid.NewGuid():n}.db";
+    private readonly bool _useQueryCache;
 
     private ServiceProvider? _root;
 
     public IServiceProvider ServiceProvider => _root!;
+
+    public IntegrationFixture(bool useQueryCache = false) {
+        _useQueryCache = useQueryCache;
+    }
 
     #region IAsyncLifetime Members
 
@@ -25,8 +31,14 @@ public class IntegrationFixture : IAsyncLifetime
         services.AddDbContextFactory<TestDbContext>(opts => opts.UseSqlite($"Data Source={_dbPath}")
                                                          .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
 
-        services.AddRepository<Student, EfCoreRepository<TestDbContext, Student>>();
+        var students = services.AddRepository<Student, EfCoreRepository<TestDbContext, Student>>();
+        if (_useQueryCache) {
+            services.AddMemoryCacheProvider();
+            students.UseQueryCache();
+        }
         services.AddRepository<Course, EfCoreRepository<TestDbContext, Course>>();
+        services.AddRepository<NestedThing, EfCoreRepository<TestDbContext, NestedThing>>();
+        services.AddRepository<StampedNestedThing, EfCoreRepository<TestDbContext, StampedNestedThing>>();
 
         services.AddScoped<IUnitOfWork<TestDbContext>, EfCoreUnitOfWork<TestDbContext>>();
 

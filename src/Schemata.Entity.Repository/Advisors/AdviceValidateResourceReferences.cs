@@ -32,8 +32,9 @@ public static class AdviceValidateResourceReferences
 ///     <list type="bullet">
 ///         <item>
 ///             Typed references (<see cref="ResourceReferenceAttribute.Target" /> non-<see langword="null" />)
-///             require <see cref="IResourceTypeResolver.Resolve(string)" /> to return the exact
-///             target type. A mismatch throws
+///             require <see cref="IResourceTypeResolver.Resolve(string)" /> to return a type
+///             assignable to the declared target, so a host-defined subtype satisfies a reference
+///             declared against its built-in base. An unrelated or unresolvable type throws
 ///             <see cref="SchemataResourceErrors.NotFound(System.Type, string?, string?, string)" /> for
 ///             the target type so callers see <c>NOT_FOUND</c> with a populated
 ///             <see cref="Schemata.Abstractions.Errors.ResourceInfoDetail" />.
@@ -64,6 +65,7 @@ public sealed class AdviceValidateResourceReferences<TEntity> :
         AdviceContext        ctx,
         IRepository<TEntity> repository,
         TEntity              entity,
+        MutationOptions      options,
         CancellationToken    ct = default) {
         return Task.FromResult(Validate(ctx, entity));
     }
@@ -86,10 +88,17 @@ public sealed class AdviceValidateResourceReferences<TEntity> :
                 continue;
             }
 
+            // Canonical references are {collection}/{id}-shaped and never carry a scheme;
+            // an absolute URI is an identity (e.g. an issuer), not a resource reference.
+            // Untyped references only: typed references keep resolving and validating.
+            if (reference.Target is null && Uri.TryCreate(value, UriKind.Absolute, out _)) {
+                continue;
+            }
+
             var resolved = resolver.Resolve(value);
 
             if (reference.Target is not null) {
-                if (resolved == reference.Target) {
+                if (resolved is not null && reference.Target.IsAssignableFrom(resolved)) {
                     continue;
                 }
 

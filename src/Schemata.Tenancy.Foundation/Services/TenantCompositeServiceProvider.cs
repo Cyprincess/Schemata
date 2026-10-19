@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Schemata.Tenancy.Skeleton;
 
 namespace Schemata.Tenancy.Foundation.Services;
 
@@ -27,6 +29,15 @@ internal sealed class TenantCompositeServiceProvider :
     private readonly ServiceProvider  _overrides;
     private readonly IServiceProvider _root;
     private          int              _disposed;
+
+    /// <summary>
+    ///     Attached by the provider cache once the entry owning this provider is committed.
+    ///     Invoking it leases that exact entry again, so every nested scope pins the provider
+    ///     independently and parent disposal cannot revoke child usability; a retired entry is
+    ///     never rebuilt under the same key. Null when the provider was composed without a
+    ///     provider cache — host-only composition needs no tenancy services.
+    /// </summary>
+    internal Func<ITenantProviderLease?>? LeaseSource { get; set; }
 
     /// <summary>Initializes a provider that resolves tenant overrides before host services.</summary>
     public TenantCompositeServiceProvider(ServiceProvider overrides, IServiceProvider root) {
@@ -77,7 +88,12 @@ internal sealed class TenantCompositeServiceProvider :
 
     public IServiceScope CreateScope() {
         var hostFactory = _root.GetRequiredService<IServiceScopeFactory>();
-        return new CompositeScope(this, hostFactory.CreateScope());
+        var host = hostFactory.CreateScope();
+        try {
+            var lease = LeaseSource?.Invoke();
+            try { return new CompositeScope(this, host, lease); }
+            catch { lease?.Dispose(); throw; }
+        } catch { host.Dispose(); throw; }
     }
 
     #endregion
@@ -132,23 +148,40 @@ internal sealed class TenantCompositeServiceProvider :
     ///     Concatenates an <see cref="IEnumerable{T}" /> resolved from <paramref name="root" /> with
     ///     the same set from <paramref name="overrides" />, preserving registration order (host
     ///     registrations first, tenant additions after) so a tenant override that adds to a
-    ///     collection is visible alongside the host's services.
+    ///     collection is visible alongside the host's services. A concrete implementation type
+    ///     resolved from both providers is one logical service whose tenant registration owns the
+    ///     execution boundary, so host items of that type are replaced by the tenant instance —
+    ///     the same override-wins rule that governs single-slot resolution; host-internal
+    ///     duplicates of a type absent tenant-side keep plain concatenation. Options families
+    ///     (<see cref="IConfigureOptions{TOptions}" />, <see cref="IPostConfigureOptions{TOptions}" />,
+    ///     <see cref="IValidateOptions{TOptions}" />) are exempt: every registration composes,
+    ///     host setups and validators before tenant appliers.
     /// </summary>
     internal static object ComposeEnumerable(Type enumerableType, IServiceProvider root, IServiceProvider overrides) {
         var elementType = enumerableType.GetGenericArguments()[0];
-        var items       = new List<object?>();
-
-        if (root.GetService(enumerableType) is IEnumerable fromRoot) {
-            foreach (var item in fromRoot) {
-                items.Add(item);
-            }
-        }
+        var composes    = ComposesPerInstance(elementType);
+        var tenantTypes = new HashSet<Type>();
+        var tenantItems = new List<object?>();
 
         if (overrides.GetService(enumerableType) is IEnumerable fromOverrides) {
             foreach (var item in fromOverrides) {
-                items.Add(item);
+                tenantItems.Add(item);
+                if (item is not null) {
+                    tenantTypes.Add(item.GetType());
+                }
             }
         }
+
+        var items = new List<object?>();
+        if (root.GetService(enumerableType) is IEnumerable fromRoot) {
+            foreach (var item in fromRoot) {
+                if (composes || item is null || !tenantTypes.Contains(item.GetType())) {
+                    items.Add(item);
+                }
+            }
+        }
+
+        items.AddRange(tenantItems);
 
         var array = Array.CreateInstance(elementType, items.Count);
         for (var i = 0; i < items.Count; i++) {
@@ -156,6 +189,17 @@ internal sealed class TenantCompositeServiceProvider :
         }
 
         return array;
+    }
+
+    private static bool ComposesPerInstance(Type elementType) {
+        if (!elementType.IsGenericType) {
+            return false;
+        }
+
+        var definition = elementType.GetGenericTypeDefinition();
+        return definition == typeof(IConfigureOptions<>)
+            || definition == typeof(IPostConfigureOptions<>)
+            || definition == typeof(IValidateOptions<>);
     }
 
     internal static bool IsEnumerableService(Type serviceType, out Type elementType) {

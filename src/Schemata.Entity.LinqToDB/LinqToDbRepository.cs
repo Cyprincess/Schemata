@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -12,12 +13,14 @@ using LinqToDB.Async;
 using LinqToDB.Concurrency;
 using LinqToDB.Data;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
+using Schemata.Common.Errors;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
+using Schemata.Entity.Repository.Estimation;
 
 namespace Schemata.Entity.LinqToDB;
 
@@ -33,13 +36,13 @@ namespace Schemata.Entity.LinqToDB;
 /// </remarks>
 /// <typeparam name="TContext">The <see cref="DataConnection" /> type.</typeparam>
 /// <typeparam name="TEntity">The entity type managed by this repository.</typeparam>
-public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
+public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQueryCacheKeyProvider, IRepositorySource
     where TContext : DataConnection
     where TEntity : class
 {
-    private readonly Func<TContext>   _factory;
-    private readonly ILogger?         _logger;
-    private          TContext         _context;
+    private readonly Func<TContext>      _factory;
+    private readonly RepositoryBinding   _binding;
+    private          TContext            _context;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="LinqToDbRepository{TContext,TEntity}" /> class.
@@ -48,7 +51,7 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
     /// <param name="factory">A factory that creates a new <typeparamref name="TContext" /> instance.</param>
     public LinqToDbRepository(IServiceProvider sp, Func<TContext> factory) : base(sp) {
         _factory = factory;
-        _logger  = sp.GetService<ILogger<LinqToDbRepository<TContext, TEntity>>>();
+        _binding = sp.GetService<RepositoryBinding>() ?? RepositoryBinding.Default;
         _context = factory();
 
         var entity = typeof(TEntity);
@@ -68,27 +71,40 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
 
     protected override IQueryable<TEntity> AsQueryable() { return Context.GetTable<TEntity>().TableName(TableName).AsQueryable(); }
 
-    public override async Task AddAsync(TEntity entity, CancellationToken ct = default) {
+    public override async Task<MutationResult> AddAsync(TEntity entity, CancellationToken ct = default, MutationOptions options = default) {
         ct.ThrowIfCancellationRequested();
 
-        if (!await RunAddAdvisorsAsync(entity, ct)) {
-            return;
+        var mark   = WriteSequence;
+        var advise = await RunAddAdvisorsAsync(entity, options, ct);
+        if (advise != AdviseResult.Continue) {
+            return ResolveWriteResult(mark, advise);
         }
 
         EnsureWriteUnitOfWork();
 
-        await Context.InsertAsync(entity, TableName, token: ct);
+        try {
+            await Context.InsertAsync(entity, TableName, token: ct);
+        } catch (Exception ex) when (DatabaseErrorClassifier.IsUniqueConstraintViolation(ex)) {
+            // The SQL executes here, before any unit-of-work commit, so the provider's unique
+            // violation must be classified at this actual execution boundary.
+            throw CreateAlreadyExists(ex, entity);
+        }
+
+        StageWrite();
+
+        return MutationResult.Applied;
     }
 
     /// <summary>
     ///     Runs the add-advisor chain per entity, then persists the survivors with a single
     ///     bulk-copy round trip instead of one insert per entity.
     /// </summary>
-    public override async Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default) {
+    public override async Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default, MutationOptions options = default) {
+        TrackEvictionSuppression(options.IgnoreCacheEviction);
         var staged = new List<TEntity>();
         foreach (var entity in entities) {
             ct.ThrowIfCancellationRequested();
-            if (await RunAddAdvisorsAsync(entity, ct)) {
+            if (await RunAddAdvisorsAsync(entity, options, ct) == AdviseResult.Continue) {
                 staged.Add(entity);
             }
         }
@@ -99,52 +115,98 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
 
         EnsureWriteUnitOfWork();
 
-        await Context.GetTable<TEntity>().TableName(TableName).BulkCopyAsync(new BulkCopyOptions { BulkCopyType = BulkCopyType.ProviderSpecific }, staged, ct);
+        try {
+            await Context.GetTable<TEntity>().TableName(TableName).BulkCopyAsync(new BulkCopyOptions { BulkCopyType = BulkCopyType.ProviderSpecific }, staged, ct);
+        } catch (Exception ex) when (DatabaseErrorClassifier.IsUniqueConstraintViolation(ex)) {
+            // A batch cannot identify which row collided, so the error names the resource type
+            // without guessing a conflicting resource name.
+            throw CreateAlreadyExists(ex, entity: null);
+        }
+
+        // One type-level write fact per successful bulk copy; no entity journal is kept.
+        StageWrite();
     }
 
-    public override async Task UpdateAsync(TEntity entity, CancellationToken ct = default) {
+    public override async Task<MutationResult> UpdateAsync(TEntity entity, CancellationToken ct = default, MutationOptions options = default) {
         ct.ThrowIfCancellationRequested();
+        TrackEvictionSuppression(options.IgnoreCacheEviction);
 
-        switch (await Advisor.For<IRepositoryUpdateAdvisor<TEntity>>()
-                             .RunAsync(AdviceContext, this, entity, ct)) {
-            case AdviseResult.Block:
-            case AdviseResult.Handle:
-                return;
-            case AdviseResult.Continue:
-            default:
-                break;
+        var mark = WriteSequence;
+
+        var advise = await Advisor.For<IRepositoryUpdateAdvisor<TEntity>>()
+                                  .RunAsync(AdviceContext, this, entity, options, ct);
+        if (advise != AdviseResult.Continue) {
+            return ResolveWriteResult(mark, advise);
         }
 
         EnsureWriteUnitOfWork();
 
         if (IsConcurrencyControlled) {
-            var rows = await Context.GetTable<TEntity>().TableName(TableName).UpdateOptimisticAsync(entity, ct);
+            int rows;
+            try {
+                rows = await Context.GetTable<TEntity>().TableName(TableName).UpdateOptimisticWithRefreshAsync(entity, ct);
+            } catch (Exception ex) when (DatabaseErrorClassifier.IsUniqueConstraintViolation(ex)) {
+                // The optimistic UPDATE executes here, before any unit-of-work commit: a
+                // matching version that moves a column onto an existing unique value fails at
+                // this boundary and becomes ALREADY_EXISTS, while a stale version still fails
+                // the zero-row check below as ABORTED.
+                throw CreateAlreadyExists(ex, entity);
+            }
+
             if (rows == 0) {
-                throw new AbortedException();
+                throw SchemataResourceErrors.Aborted<TEntity>((entity as ICanonicalName)?.CanonicalName);
             }
         } else {
-            await Context.UpdateAsync(entity, TableName, token: ct);
+            try {
+                await Context.UpdateAsync(entity, TableName, token: ct);
+            } catch (Exception ex) when (DatabaseErrorClassifier.IsUniqueConstraintViolation(ex)) {
+                // An update that moves a column onto an existing unique value fails at execution
+                // time, before the unit-of-work commit classifier could see it.
+                throw CreateAlreadyExists(ex, entity);
+            }
         }
 
-        TrackUpdate(entity);
+        StageWrite();
+
+        return MutationResult.Applied;
     }
 
-    public override async Task RemoveAsync(TEntity entity, CancellationToken ct = default) {
-        switch (await Advisor.For<IRepositoryRemoveAdvisor<TEntity>>()
-                             .RunAsync(AdviceContext, this, entity, ct)) {
-            case AdviseResult.Block:
-            case AdviseResult.Handle:
-                return;
-            case AdviseResult.Continue:
-            default:
-                break;
+    public override async Task<MutationResult> RemoveAsync(TEntity entity, CancellationToken ct = default, MutationOptions options = default) {
+        ct.ThrowIfCancellationRequested();
+        TrackEvictionSuppression(options.IgnoreCacheEviction);
+
+        var mark = WriteSequence;
+
+        var advise = await Advisor.For<IRepositoryRemoveAdvisor<TEntity>>()
+                                  .RunAsync(AdviceContext, this, entity, options, ct);
+        if (advise != AdviseResult.Continue) {
+            return ResolveWriteResult(mark, advise);
         }
 
         EnsureWriteUnitOfWork();
 
-        TrackRemove(entity);
+        if (IsConcurrencyControlled) {
+            var rows = await Context.GetTable<TEntity>().TableName(TableName).DeleteOptimisticAsync(entity, ct);
+            if (rows == 0) {
+                throw SchemataResourceErrors.Aborted<TEntity>((entity as ICanonicalName)?.CanonicalName);
+            }
+        } else {
+            await Context.DeleteAsync(entity, TableName, token: ct);
+        }
 
-        await Context.DeleteAsync(entity, TableName, token: ct);
+        StageWrite();
+
+        return MutationResult.Applied;
+    }
+
+    /// <summary>
+    ///     Builds the consumer-facing ALREADY_EXISTS error for a unique-constraint violation raised
+    ///     at the actual SQL execution boundary. The provider exception never crosses the wire; the
+    ///     error carries the entity type and, when the colliding row is identifiable, its canonical
+    ///     resource name.
+    /// </summary>
+    private static AlreadyExistsException CreateAlreadyExists(Exception exception, TEntity? entity) {
+        return SchemataResourceErrors.AlreadyExists(typeof(TEntity), (entity as ICanonicalName)?.CanonicalName, innerException: exception);
     }
 
     protected override ConfiguredCancelableAsyncEnumerable<TResult> AsAsyncEnumerable<TResult>(
@@ -176,56 +238,91 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
         return query.LongCountAsync(ct);
     }
 
-    public override async ValueTask<long> EstimateCountAsync<TResult>(
+    public override async ValueTask<long?> EstimateCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
+        CancellationToken                               ct      = default,
+        QueryOptions                                    options = default
     ) {
-        try {
-            var query    = await BuildQueryAsync(predicate, ct);
-            var provider = EstimateQueries.GetProvider(Context.DataProvider.Name);
-            if (provider is EstimateProvider.None) {
-                return await base.EstimateCountAsync(predicate, ct);
-            }
+        ct.ThrowIfCancellationRequested();
+        TrackEvictionSuppression(options.IgnoreCacheEviction);
+        var provider = EstimateQueries.GetProvider(Context.DataProvider.Name);
+        if (provider is EstimateProvider.None) return null;
+        var query = await BuildQueryAsync(predicate, ct, options);
 
-            if ((provider is EstimateProvider.SqlServer or EstimateProvider.Sqlite) && EstimateQueries.HasWhere(query.Expression)) {
-                return await base.EstimateCountAsync(predicate, ct);
+        if (provider is EstimateProvider.Sqlite) {
+            if (!EstimateQueries.IsTableRoot<TEntity>(query.Expression, TableName)) return null;
+            var mapping = Context.MappingSchema.GetEntityDescriptor(typeof(TEntity), Context.Options.ConnectionOptions.OnEntityDescriptorCreated);
+            if (mapping.QueryFilterLambda is not null || mapping.QueryFilterFunc is not null
+             || mapping.InheritanceMapping.Count != 0 || mapping.InheritanceRoot is not null
+             || mapping.HasCalculatedMembers || mapping.SchemaName is not null || mapping.DatabaseName is not null) return null;
+            var exists = await Context.ExecuteAsync<long>(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sqlite_stat1')", ct);
+            if (exists == 0) return null;
+            var stat = await Context.ExecuteAsync<string?>(
+                "SELECT stat FROM sqlite_stat1 WHERE tbl = @t AND (idx IS NULL OR idx IN "
+                + "(SELECT name FROM pragma_index_list(@t) WHERE partial = 0)) ORDER BY idx LIMIT 1", ct, new DataParameter("@t", TableName));
+            if (stat is null) return null;
+            var end = stat.IndexOf(' ');
+            var cardinality = end < 0 ? stat.AsSpan() : stat.AsSpan(0, end);
+            if (!long.TryParse(cardinality, NumberStyles.None, CultureInfo.InvariantCulture, out var rows)) {
+                throw new FormatException("Invalid SQLite table cardinality statistic.");
             }
-
-            var table = Context.GetTable<TEntity>();
-            switch (provider) {
-                case EstimateProvider.PostgreSql: {
-                    var sql = query.ToSqlQuery(new() { InlineParameters = false });
-                    var json = Context.Execute<string>("EXPLAIN (FORMAT JSON) " + sql.Sql, sql.Parameters.ToArray());
-                    if (EstimateQueries.TryParsePostgreSql(json, out var rows)) return rows;
-                    break;
-                }
-                case EstimateProvider.MySql: {
-                    var sql = query.ToSqlQuery(new() { InlineParameters = false });
-                    var json = Context.Execute<string>("EXPLAIN FORMAT=JSON " + sql.Sql, sql.Parameters.ToArray());
-                    if (EstimateQueries.TryParseMySql(json, out var rows)) return rows;
-                    break;
-                }
-                case EstimateProvider.SqlServer: {
-                    var full = $"{table.SchemaName ?? "dbo"}.{table.TableName}";
-                    var rows = Context.Execute<long>(
-                        "SELECT COALESCE(SUM(p.[rows]), 0) FROM sys.partitions p WHERE p.object_id = OBJECT_ID(@full) AND p.index_id IN (0,1)",
-                        new DataParameter("@full", full));
-                    return rows;
-                }
-                case EstimateProvider.Sqlite: {
-                    var rows = Context.Execute<long?>(
-                        "SELECT MAX(stat) FROM sqlite_stat1 WHERE tbl = @t",
-                        new DataParameter("@t", table.TableName));
-                    if (rows is not null) return rows.Value;
-                    break;
-                }
-            }
-        } catch (Exception ex) {
-            _logger?.LogWarning(ex, "Count estimate failed; falling back to an exact count.");
+            return rows;
         }
 
-        return await base.EstimateCountAsync(predicate, ct);
+        if (provider is EstimateProvider.MySql && EstimateQueries.HasMySqlUnsupportedShape(query.Expression)) return null;
+        var sql = query.ToSqlQuery(new() { InlineParameters = false });
+        var parameters = sql.Parameters.ToArray();
+        switch (provider) {
+            case EstimateProvider.PostgreSql:
+                return QueryPlanEstimate.Parse(await Context.ExecuteAsync<string>("EXPLAIN (FORMAT JSON) " + sql.Sql, ct, parameters),
+                    QueryEstimateProvider.PostgreSql);
+            case EstimateProvider.MySql:
+                return QueryPlanEstimate.Parse(await Context.ExecuteAsync<string>("EXPLAIN FORMAT=JSON " + sql.Sql, ct, parameters),
+                    QueryEstimateProvider.MySql);
+            case EstimateProvider.SqlServer:
+                if (((IDataContext)Context).CloseAfterUse) return null;
+                var connection = await Context.OpenDbConnectionAsync(ct);
+                return await QueryPlanEstimate.EstimateSqlServerAsync(connection, Context.CommandTimeout,
+                    token => Context.ExecuteAsync<string>(sql.Sql, token, parameters),
+                    async (text, timeout, token) => {
+                        await using var mode = connection.CreateCommand();
+                        mode.Transaction = Context.Transaction;
+                        if (timeout >= 0) mode.CommandTimeout = timeout;
+                        mode.CommandText = text;
+                        await mode.ExecuteNonQueryAsync(token);
+                    }, ct);
+            default:
+                throw new ArgumentOutOfRangeException(nameof(provider), provider, null);
+        }
     }
+
+    /// <summary>
+    ///     Builds a stable cache key for the query's translated SQL. Returns
+    ///     <see langword="null" /> for SQLite in-memory connections, whose connection string
+    ///     cannot identify a specific database across scopes.
+    /// </summary>
+    /// <param name="query">The translated query.</param>
+    /// <typeparam name="TResult">The query result element type.</typeparam>
+    /// <returns>The hashed cache key, or <see langword="null" /> when caching must be disabled.</returns>
+    public string? GetQueryCacheKey<TResult>(IQueryable<TResult> query) {
+        var source = Context.ConnectionString;
+        if (string.IsNullOrEmpty(source)
+         || (Context.DataProvider.Name.StartsWith("SQLite", StringComparison.OrdinalIgnoreCase) && LinqToDbSourceKeys.IsEphemeralDataSource(source))) {
+            return null;
+        }
+
+        var sql = query.ToSqlQuery(new() { InlineParameters = false });
+
+        return QueryCacheKey.Create(
+            Context.DataProvider.Name,
+            source,
+            sql.Sql,
+            sql.Parameters.Select(p => (p.Name ?? string.Empty, $"{p.DataType}:{p.DbType}", (object?)p.Value)));
+    }
+
+    /// <inheritdoc />
+    public string SourceKey { get { return LinqToDbSourceKeys.CreateKey(_context, _factory, _binding); } }
 
     protected override IUnitOfWork CreateUnitOfWork() {
         return new LinqToDbUnitOfWork<TContext>(_factory, ServiceProvider);
@@ -238,6 +335,14 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>
             } is not compatible with {
                 typeof(TContext)
             }.");
+        }
+
+        // Source resolution may open the unit of work's connection and begin its transaction; a
+        // failure propagates from its own compensation path and leaves the owned context usable.
+        // The owned context is released only after type, source, and binding all match.
+        if (db.SourceKey != SourceKey) {
+            throw new InvalidOperationException(
+                $"Cannot join a unit of work bound to a different source or tenant binding; repository context type {typeof(TContext)}.");
         }
 
         _context.Dispose();

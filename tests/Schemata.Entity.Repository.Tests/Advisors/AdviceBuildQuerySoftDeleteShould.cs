@@ -48,16 +48,15 @@ public class AdviceBuildQuerySoftDeleteShould
     }
 
     [Fact]
-    public async Task Advise_Suppressed_DoesNotFilter() {
-        var advisor = new AdviceBuildQuerySoftDelete<Student>();
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        ctx.Set(new QuerySoftDeleteSuppressed());
+    public async Task Advise_IgnoreSoftDelete_DoesNotFilter() {
+        var advisor    = new AdviceBuildQuerySoftDelete<Student>();
+        var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<Student>>().Object;
         var data = new List<Student> {
             new() { Uid = Guid.NewGuid(), DeleteTime = null },
             new() { Uid = Guid.NewGuid(), DeleteTime = DateTime.UtcNow },
         }.AsQueryable();
-        var container = new QueryContainer<Student>(repository, data);
+        var container = new QueryContainer<Student>(repository, data, new QueryOptions(IgnoreSoftDelete: true));
 
         var result = await advisor.AdviseAsync(ctx, container, CancellationToken.None);
 

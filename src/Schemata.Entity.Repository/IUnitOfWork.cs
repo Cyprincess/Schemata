@@ -20,10 +20,13 @@ namespace Schemata.Entity.Repository;
 public interface IUnitOfWork : IAsyncDisposable, IDisposable
 {
     /// <summary>
-    ///     Registers a callback that runs after the unit of work commits its transaction.
+    ///     Registers a callback that runs after the unit of work commits its transaction. Sinks run
+    ///     in ascending <paramref name="order" />; equal orders keep registration sequence. Use the
+    ///     <see cref="CommitOrders" /> segments unless the sink has its own lifecycle position.
     /// </summary>
+    /// <param name="order">The ordering segment of the sink.</param>
     /// <param name="sink">The post-commit callback.</param>
-    void AddCommitSink(Func<CancellationToken, Task> sink);
+    void AddCommitSink(int order, Func<CancellationToken, Task> sink);
 
     /// <summary>
     ///     Registers a callback that runs when the unit of work rolls back or is disposed before completion.
@@ -32,16 +35,34 @@ public interface IUnitOfWork : IAsyncDisposable, IDisposable
     void AddRollbackSink(Action reset);
 
     /// <summary>
-    ///     Commits all pending changes and the database transaction, then notifies
-    ///     enlisted repositories to dispatch their
-    ///     <see cref="IRepositoryCommittedAdvisor{TEntity}" /> pipelines.
+    ///     Registers a value-projection callback that synchronizes scalar derived values on entities
+    ///     already enlisted in this unit of work, at the point where provider-generated write values
+    ///     (such as rotated concurrency stamps) are final. A preparation MUST NOT stage or execute
+    ///     writes, resolve services, register further callbacks, or produce external effects.
+    /// </summary>
+    /// <remarks>
+    ///     Provider timing follows the execution model: a buffered provider (EF Core) queues the
+    ///     preparation and runs it after its commit-time value generation and before the save; an
+    ///     immediate-execution provider (LinqToDB) has already executed the staged write, so the
+    ///     preparation runs synchronously at registration, before the caller stages any dependent
+    ///     write that persists the projected value. A throwing preparation fails the commit on a
+    ///     buffered provider (stamps restore and the transaction rolls back) and surfaces at
+    ///     registration on an immediate-execution provider (the caller disposes the unit of work to
+    ///     roll back).
+    /// </remarks>
+    /// <param name="preparation">The projection callback.</param>
+    void AddSavePreparation(Action preparation);
+
+    /// <summary>
+    ///     Commits all pending changes and the database transaction, then runs the enlisted commit
+    ///     sinks in ascending order — repository type-level notifications first, then resource and
+    ///     domain callbacks. A commit with no writes runs no repository notification.
     /// </summary>
     /// <param name="ct">A cancellation token.</param>
     Task CommitAsync(CancellationToken ct = default);
 
     /// <summary>
-    ///     Rolls back the database transaction and resets the tracking lists on every
-    ///     enlisted repository.
+    ///     Rolls back the database transaction and runs the enlisted rollback sinks.
     /// </summary>
     /// <param name="ct">A cancellation token.</param>
     Task RollbackAsync(CancellationToken ct = default);

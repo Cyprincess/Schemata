@@ -1,10 +1,12 @@
 using System;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Entity.EntityFrameworkCore.Integration.Tests.Fixtures;
 
 [PrimaryKey(nameof(Uid))]
+[Index(nameof(Title), IsUnique = true)]
 public class Course : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
     public string? Title   { get; set; }

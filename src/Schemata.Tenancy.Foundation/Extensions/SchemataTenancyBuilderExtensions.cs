@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Tenancy.Foundation;
 using Schemata.Tenancy.Foundation.Resolvers;
@@ -17,7 +18,7 @@ public static class SchemataTenancyBuilderExtensions
         this SchemataTenancyBuilder<TTenant> builder
     )
         where TTenant : SchemataTenant {
-        builder.Services.TryAddScoped<ITenantResolver, RequestHeaderResolver>();
+        builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped<ITenantResolver, RequestHeaderResolver>());
 
         return builder;
     }
@@ -25,7 +26,7 @@ public static class SchemataTenancyBuilderExtensions
     /// <summary>Registers the request <c>Host</c> header resolver, matching against tenant host names.</summary>
     public static SchemataTenancyBuilder<TTenant> UseHostResolver<TTenant>(this SchemataTenancyBuilder<TTenant> builder)
         where TTenant : SchemataTenant {
-        builder.Services.TryAddScoped<ITenantResolver, RequestHostResolver<TTenant>>();
+        builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped<ITenantResolver, RequestHostResolver<TTenant>>());
 
         return builder;
     }
@@ -33,7 +34,7 @@ public static class SchemataTenancyBuilderExtensions
     /// <summary>Registers the <c>{Tenant}</c> route parameter resolver.</summary>
     public static SchemataTenancyBuilder<TTenant> UsePathResolver<TTenant>(this SchemataTenancyBuilder<TTenant> builder)
         where TTenant : SchemataTenant {
-        builder.Services.TryAddScoped<ITenantResolver, RequestPathResolver>();
+        builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped<ITenantResolver, RequestPathResolver>());
 
         return builder;
     }
@@ -43,7 +44,7 @@ public static class SchemataTenancyBuilderExtensions
         this SchemataTenancyBuilder<TTenant> builder
     )
         where TTenant : SchemataTenant {
-        builder.Services.TryAddScoped<ITenantResolver, RequestPrincipalResolver>();
+        builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped<ITenantResolver, RequestPrincipalResolver>());
 
         return builder;
     }
@@ -53,7 +54,7 @@ public static class SchemataTenancyBuilderExtensions
         this SchemataTenancyBuilder<TTenant> builder
     )
         where TTenant : SchemataTenant {
-        builder.Services.TryAddScoped<ITenantResolver, RequestQueryResolver>();
+        builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped<ITenantResolver, RequestQueryResolver>());
 
         return builder;
     }

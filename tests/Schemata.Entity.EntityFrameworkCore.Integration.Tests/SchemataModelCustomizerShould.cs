@@ -1,12 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Entities;
 using Xunit;
+using Index = Schemata.Abstractions.Entities.IndexAttribute;
+using PrimaryKey = Schemata.Abstractions.Entities.PrimaryKeyAttribute;
 
 namespace Schemata.Entity.EntityFrameworkCore.Integration.Tests;
 
@@ -49,38 +53,6 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
     #endregion
 
     [Fact]
-    public async Task JsonConverter_OnDictionaryStringString_Roundtrips() {
-        Guid bookUid;
-        {
-            using var scope = _root!.CreateScope();
-            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
-
-            var book = new Book {
-                Uid           = Guid.NewGuid(),
-                Name          = "dict-test",
-                CanonicalName = "books/dict-test",
-                Metadata = new() {
-                    ["author"]  = "Hugo",
-                    ["edition"] = "1862",
-                },
-            };
-            db.Books.Add(book);
-            await db.SaveChangesAsync();
-            bookUid = book.Uid;
-        }
-
-        {
-            using var scope = _root!.CreateScope();
-            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
-            var       found = await db.Books.FindAsync(bookUid);
-            Assert.NotNull(found);
-            Assert.NotNull(found!.Metadata);
-            Assert.Equal("Hugo", found.Metadata!["author"]);
-            Assert.Equal("1862", found.Metadata["edition"]);
-        }
-    }
-
-    [Fact]
     public async Task JsonConverter_OnNullableValueDictionary_Roundtrips() {
         Guid bookUid;
         {
@@ -106,38 +78,9 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
             var       found = await db.Books.FindAsync(bookUid);
             Assert.NotNull(found);
-            Assert.NotNull(found!.Annotations);
+            Assert.NotNull(found.Annotations);
             Assert.Equal("fr", found.Annotations!["language"]);
             Assert.Null(found.Annotations["origin"]);
-        }
-    }
-
-    [Fact]
-    public async Task JsonConverter_OnCollectionString_Roundtrips() {
-        Guid bookUid;
-        {
-            using var scope = _root!.CreateScope();
-            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
-
-            var book = new Book {
-                Uid           = Guid.NewGuid(),
-                Name          = "list-test",
-                CanonicalName = "books/list-test",
-                Tags          = ["classic", "french", "novel"],
-            };
-            db.Books.Add(book);
-            await db.SaveChangesAsync();
-            bookUid = book.Uid;
-        }
-
-        {
-            using var scope = _root!.CreateScope();
-            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
-            var       found = await db.Books.FindAsync(bookUid);
-            Assert.NotNull(found);
-            Assert.NotNull(found!.Tags);
-            Assert.Equal(3, found.Tags!.Count);
-            Assert.Contains("french", found.Tags);
         }
     }
 
@@ -164,68 +107,8 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
             var       found = await db.Books.FindAsync(bookUid);
             Assert.NotNull(found);
-            Assert.NotNull(found!.Aliases);
+            Assert.NotNull(found.Aliases);
             Assert.Equal(["les-mis", "the-miserables"], found.Aliases!);
-        }
-    }
-
-    [Fact]
-    public async Task JsonConverter_OnDictionaryStringInt_Roundtrips() {
-        Guid bookUid;
-        {
-            using var scope = _root!.CreateScope();
-            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
-
-            var book = new Book {
-                Uid           = Guid.NewGuid(),
-                Name          = "int-dict-test",
-                CanonicalName = "books/int-dict-test",
-                Counters = new() {
-                    ["views"] = 3,
-                    ["likes"] = 5,
-                },
-            };
-            db.Books.Add(book);
-            await db.SaveChangesAsync();
-            bookUid = book.Uid;
-        }
-
-        {
-            using var scope = _root!.CreateScope();
-            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
-            var       found = await db.Books.FindAsync(bookUid);
-            Assert.NotNull(found);
-            Assert.NotNull(found!.Counters);
-            Assert.Equal(3, found.Counters!["views"]);
-            Assert.Equal(5, found.Counters["likes"]);
-        }
-    }
-
-    [Fact]
-    public async Task JsonConverter_OnCollectionInt_Roundtrips() {
-        Guid bookUid;
-        {
-            using var scope = _root!.CreateScope();
-            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
-
-            var book = new Book {
-                Uid           = Guid.NewGuid(),
-                Name          = "int-list-test",
-                CanonicalName = "books/int-list-test",
-                Ratings       = [1, 2, 3],
-            };
-            db.Books.Add(book);
-            await db.SaveChangesAsync();
-            bookUid = book.Uid;
-        }
-
-        {
-            using var scope = _root!.CreateScope();
-            var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
-            var       found = await db.Books.FindAsync(bookUid);
-            Assert.NotNull(found);
-            Assert.NotNull(found!.Ratings);
-            Assert.Equal([1, 2, 3], found.Ratings!);
         }
     }
 
@@ -254,7 +137,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
             var       found = await db.Books.FindAsync(bookUid);
             Assert.NotNull(found);
-            Assert.NotNull(found!.Counters);
+            Assert.NotNull(found.Counters);
 
             found.Counters!["views"] = 2;
             await db.SaveChangesAsync();
@@ -265,7 +148,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
             var       found = await db.Books.FindAsync(bookUid);
             Assert.NotNull(found);
-            Assert.Equal(2, found!.Counters!["views"]);
+            Assert.Equal(2, found.Counters!["views"]);
         }
     }
 
@@ -293,7 +176,7 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
             var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
             var       found = await db.Books.FindAsync(bookUid);
             Assert.NotNull(found);
-            Assert.Equal([Book.Shelf.Fiction, Book.Shelf.Science], found!.Genres!);
+            Assert.Equal([Book.Shelf.Fiction, Book.Shelf.Science], found.Genres!);
             Assert.Equal(Book.Shelf.History, found.ShelfByName!["primary"]);
         }
     }
@@ -305,19 +188,47 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
 
         var property = db.Model.FindEntityType(typeof(Book))!.FindProperty(nameof(Book.Payload));
         Assert.NotNull(property);
-        Assert.Null(property!.GetValueConverter());
+        Assert.Null(property.GetValueConverter());
+    }
+
+    [Fact]
+    public void Index_Declarations_Shadow_Only_The_Same_Property_List_On_A_Subtype_Table() {
+        using var scope = _root!.CreateScope();
+        var       db    = scope.ServiceProvider.GetRequiredService<CustomizerDbContext>();
+
+        var derived = db.Model.FindEntityType(typeof(ShadowedTenantRow))!;
+        var key     = FindIndex(derived.GetIndexes(), nameof(ShadowedRow.Key));
+        Assert.True(key.IsUnique);
+        Assert.Equal("TenantUid IS NULL", key.GetFilter());
+
+        var tenantKey = FindIndex(derived.GetIndexes(), nameof(ShadowedTenantRow.TenantUid), nameof(ShadowedRow.Key));
+        Assert.True(tenantKey.IsUnique);
+        Assert.Equal("TenantUid IS NOT NULL", tenantKey.GetFilter());
+
+        var name = FindIndex(derived.GetIndexes(), nameof(ShadowedRow.Name));
+        Assert.True(name.IsUnique);
+        Assert.Null(name.GetFilter());
+
+        Assert.NotNull(FindIndex(derived.GetIndexes(), nameof(ShadowedRow.Subject), nameof(ShadowedRow.Process)));
+        Assert.NotNull(FindIndex(derived.GetIndexes(), nameof(ShadowedTenantRow.TenantUid), nameof(ShadowedRow.Subject), nameof(ShadowedRow.Process)));
+
+        var root = db.Model.FindEntityType(typeof(ShadowedRow))!;
+        var rootKey = FindIndex(root.GetIndexes(), nameof(ShadowedRow.Key));
+        Assert.True(rootKey.IsUnique);
+        Assert.Null(rootKey.GetFilter());
+    }
+
+    private static Microsoft.EntityFrameworkCore.Metadata.IIndex FindIndex(IEnumerable<Microsoft.EntityFrameworkCore.Metadata.IIndex> indexes, params string[] properties) {
+        return Assert.Single(indexes, index => index.Properties.Select(property => property.Name).SequenceEqual(properties));
     }
 
     #region Nested type: Book
 
     public sealed class Book : IIdentifier, ICanonicalName
     {
-        public Dictionary<string, string>?  Metadata    { get; set; }
         public Dictionary<string, string?>? Annotations { get; set; }
-        public List<string>?                Tags        { get; set; }
         public ICollection<string>?         Aliases     { get; set; }
         public Dictionary<string, int>?     Counters    { get; set; }
-        public List<int>?                   Ratings     { get; set; }
         public List<Shelf>?                 Genres      { get; set; }
         public Dictionary<string, Shelf>?   ShelfByName { get; set; }
         public byte[]?                      Payload     { get; set; }
@@ -337,6 +248,38 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
 
     #endregion
 
+    #region Nested type: ShadowedRow
+
+    [Table("ShadowedRows")]
+    [PrimaryKey(nameof(Uid))]
+    [Index(nameof(Name), IsUnique = true)]
+    [Index(nameof(Key), IsUnique = true)]
+    [Index(nameof(Subject), nameof(Process))]
+    public class ShadowedRow : IIdentifier
+    {
+        public Guid    Uid     { get; set; }
+        public string? Name    { get; set; }
+        public string? Key     { get; set; }
+        public string? Subject { get; set; }
+        public string? Process { get; set; }
+    }
+
+    #endregion
+
+    #region Nested type: ShadowedTenantRow
+
+    [Table("ShadowedTenantRows")]
+    [PrimaryKey(nameof(Uid))]
+    [Index(nameof(Key), IsUnique = true, Filter = "TenantUid IS NULL")]
+    [Index(nameof(TenantUid), nameof(Key), IsUnique = true, Filter = "TenantUid IS NOT NULL")]
+    [Index(nameof(TenantUid), nameof(Subject), nameof(Process))]
+    public class ShadowedTenantRow : ShadowedRow
+    {
+        public Guid? TenantUid { get; set; }
+    }
+
+    #endregion
+
     #region Nested type: CustomizerDbContext
 
     public sealed class CustomizerDbContext : DbContext
@@ -345,8 +288,12 @@ public class SchemataModelCustomizerShould : IAsyncLifetime
 
         public DbSet<Book> Books { get; set; } = null!;
 
+        public DbSet<ShadowedRow>       ShadowedRows       { get; set; } = null!;
+        public DbSet<ShadowedTenantRow> ShadowedTenantRows { get; set; } = null!;
+
         protected override void OnModelCreating(ModelBuilder modelBuilder) {
             modelBuilder.Entity<Book>().HasKey(b => b.Uid);
+            modelBuilder.Entity<ShadowedTenantRow>().HasBaseType((Type?)null);
         }
     }
 

@@ -36,7 +36,7 @@ public class AddRangeShould : IAsyncLifetime
                 foreach (var student in batch) {
                     var found = await verifier.FirstOrDefaultAsync<Student>(q => q.Where(s => s.Uid == student.Uid));
                     Assert.NotNull(found);
-                    Assert.Equal(student.Name, found!.Name);
+                    Assert.Equal(student.Name, found.Name);
                 }
             }
         }
@@ -58,7 +58,8 @@ public class AddRangeShould : IAsyncLifetime
                 foreach (var student in batch) {
                     var found = await verifier.FirstOrDefaultAsync<Student>(q => q.Where(s => s.Uid == student.Uid));
                     // The add-concurrency advisor stamps a token per entity before persistence.
-                    Assert.NotEqual(Guid.Empty, found!.Timestamp);
+                    Assert.NotNull(found);
+                    Assert.NotEqual(Guid.Empty, found.Timestamp);
                 }
             }
         }

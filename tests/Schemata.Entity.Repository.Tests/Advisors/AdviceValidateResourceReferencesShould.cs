@@ -24,7 +24,7 @@ public class AdviceValidateResourceReferencesShould
         var (advisor, ctx, repo) = Build(resolver.Object);
         var entity = new ReferencingEntity { BookCanonicalName = "books/x" };
 
-        var result = await advisor.AdviseAsync(ctx, repo, entity, CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, repo, entity, default, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
     }
@@ -38,7 +38,7 @@ public class AdviceValidateResourceReferencesShould
         var entity = new ReferencingEntity { BookCanonicalName = "books/x" };
 
         var exception = await Assert.ThrowsAsync<NotFoundException>(
-            () => advisor.AdviseAsync(ctx, repo, entity, CancellationToken.None));
+            () => advisor.AdviseAsync(ctx, repo, entity, default, CancellationToken.None));
 
         Assert.NotNull(exception.Details);
         var resource = Assert.Single(exception.Details!.OfType<ResourceInfoDetail>());
@@ -55,7 +55,7 @@ public class AdviceValidateResourceReferencesShould
         var entity = new ReferencingEntity { BookCanonicalName = "books/missing" };
 
         await Assert.ThrowsAsync<NotFoundException>(
-            () => advisor.AdviseAsync(ctx, repo, entity, CancellationToken.None));
+            () => advisor.AdviseAsync(ctx, repo, entity, default, CancellationToken.None));
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public class AdviceValidateResourceReferencesShould
         var (advisor, ctx, repo) = Build(resolver.Object);
         var entity = new ReferencingEntity { Subject = "users/alice" };
 
-        var result = await advisor.AdviseAsync(ctx, repo, entity, CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, repo, entity, default, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
     }
@@ -80,7 +80,7 @@ public class AdviceValidateResourceReferencesShould
         var entity = new ReferencingEntity { Subject = "unknown/x" };
 
         var exception = await Assert.ThrowsAsync<ValidationException>(
-            () => advisor.AdviseAsync(ctx, repo, entity, CancellationToken.None));
+            () => advisor.AdviseAsync(ctx, repo, entity, default, CancellationToken.None));
 
         Assert.NotNull(exception.Details);
         var badRequest = Assert.Single(exception.Details!.OfType<BadRequestDetail>());
@@ -90,13 +90,38 @@ public class AdviceValidateResourceReferencesShould
     }
 
     [Fact]
+    public async Task PolymorphicReference_SkipsValidation_For_Absolute_Uri_Identity() {
+        var resolver = new Mock<IResourceTypeResolver>(MockBehavior.Strict);
+
+        var (advisor, ctx, repo) = Build(resolver.Object);
+        var entity = new ReferencingEntity { Subject = "https://as.example" };
+
+        var result = await advisor.AdviseAsync(ctx, repo, entity, default, CancellationToken.None);
+
+        Assert.Equal(AdviseResult.Continue, result);
+        resolver.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task TypedReference_Still_Validates_Absolute_Uri_Values() {
+        var resolver = new Mock<IResourceTypeResolver>();
+        resolver.Setup(r => r.Resolve("https://as.example")).Returns((Type?)null);
+
+        var (advisor, ctx, repo) = Build(resolver.Object);
+        var entity = new ReferencingEntity { BookCanonicalName = "https://as.example" };
+
+        await Assert.ThrowsAsync<NotFoundException>(
+            () => advisor.AdviseAsync(ctx, repo, entity, default, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task NullValue_SkipsValidation() {
         var resolver = new Mock<IResourceTypeResolver>(MockBehavior.Strict);
 
         var (advisor, ctx, repo) = Build(resolver.Object);
         var entity = new ReferencingEntity { BookCanonicalName = null, Subject = null };
 
-        var result = await advisor.AdviseAsync(ctx, repo, entity, CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, repo, entity, default, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
         resolver.VerifyNoOtherCalls();
@@ -109,7 +134,7 @@ public class AdviceValidateResourceReferencesShould
         var repository = new Mock<IRepository<ReferencingEntity>>().Object;
         var entity     = new ReferencingEntity { BookCanonicalName = "books/x" };
 
-        var result = await advisor.AdviseAsync(ctx, repository, entity, CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, repository, entity, default, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
     }
@@ -120,7 +145,7 @@ public class AdviceValidateResourceReferencesShould
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<PlainEntity>>().Object;
 
-        var result = await advisor.AdviseAsync(ctx, repository, new(), CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, repository, new(), default, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
     }

@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Schemata.Caching.Distributed\Schemata.Caching.Distributed.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Caching.Memory\Schemata.Caching.Memory.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Caching.Skeleton\Schemata.Caching.Skeleton.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Entity.Cache\Schemata.Entity.Cache.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Entity.LinqToDB\Schemata.Entity.LinqToDB.csproj" />

@@ -1,29 +1,28 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Schemata.Abstractions.Exceptions;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
+using Schemata.Tenancy.Skeleton.Tenancy;
 
 namespace Schemata.Tenancy.Foundation.Services;
 
 /// <summary>
-///     Per-tenant <see cref="IServiceProvider" /> factory that caches one provider per tenant
-///     holding tenant-specific singletons (tenant entity, accessor, registered overrides).
-///     Host services resolve through <see cref="TenantCompositeServiceProvider" />.
+///     Acquires version-keyed tenant providers after an authoritative lookup in a fresh host scope.
 /// </summary>
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
 /// <remarks>
 ///     <para>
-///         Tenant overrides must be Singleton; Scoped/Transient and open-generic descriptors are
-///         rejected while building the tenant container. Tenant singleton constructors may safely
-///         capture host singletons. A host Scoped or Transient service resolved through fallback is
-///         retained by the tenant singleton for the tenant provider's lifetime.
+///         Closed tenant registrations retain Singleton, Scoped or Transient lifetime.
+///         Tenant singleton dependencies resolve through the root composite; scoped and transient
+///         dependencies resolve through their paired tenant/host scope.
 ///     </para>
 ///     <para>
 ///         Overrides win for tenant-side top-level resolution. Host service constructors resolve
-///         from the host container, so their dependencies are not tenant-overridable. Tenant-aware
-///         host services should consult <see cref="ITenantContextAccessor{TTenant}" /> at call time.
+///         from the host container, so their dependencies are not tenant-overridable.
+///         Host singletons can read immutable TenantContext.Current at call time.
 ///         <see cref="ITenantContextAccessor{TTenant}.GetBaseServiceProviderAsync" /> returns the
 ///         host root provider.
 ///     </para>
@@ -32,7 +31,17 @@ namespace Schemata.Tenancy.Foundation.Services;
 ///         <see cref="System.Collections.Generic.IEnumerable{T}" /> resolves the tenant collection
 ///         when it contains a matching key and otherwise resolves the host collection. Non-keyed
 ///         <see cref="System.Collections.Generic.IEnumerable{T}" /> resolution keeps host-first
-///         concatenation with tenant additions after it.
+///         concatenation with tenant additions after it, except that a concrete implementation
+///         type resolved from both providers keeps only the tenant instance (the same
+///         override-wins rule as single-slot resolution) and the options families
+///         <c>IConfigureOptions&lt;&gt;</c> / <c>IPostConfigureOptions&lt;&gt;</c> /
+///         <c>IValidateOptions&lt;&gt;</c> always compose.
+///     </para>
+///     <para>
+///         The collection holds only finite, explicitly declared tenant dependencies. Each
+///         module owns its dependency closure — state capabilities register their closed native
+///         options services through <see cref="State.ClosedOptions.Register{TOptions}" /> — and
+///         the factory never clones host registrations nor reopens the closed-type boundary.
 ///     </para>
 /// </remarks>
 public class SchemataTenantServiceProviderFactory<TTenant> : ITenantServiceProviderFactory<TTenant>
@@ -55,14 +64,15 @@ public class SchemataTenantServiceProviderFactory<TTenant> : ITenantServiceProvi
 
     #region ITenantServiceProviderFactory<TTenant> Members
 
-    public ITenantProviderLease CreateServiceProvider(ITenantContextAccessor<TTenant> accessor) {
-        if (accessor.Tenant is not { } tenant) {
-            throw new TenantResolveException();
+    public async ValueTask<ITenantProviderLease> CreateServiceProviderAsync(Guid identifier, CancellationToken ct = default) {
+        TTenant? tenant;
+        await using (var bootstrap = _root.CreateAsyncScope()) {
+            var manager = bootstrap.ServiceProvider.GetRequiredService<ITenantManager<TTenant>>();
+            tenant = await manager.FindByTenantId(identifier, ct);
         }
-
+        if (tenant is null) throw new TenantResolveException();
         var id = tenant.Uid.ToString();
-
-        return _cache.Lease(id, () => Build(id, tenant));
+        return await _cache.LeaseVersionAsync(id, tenant.Timestamp, () => Build(id, tenant), ct);
     }
 
     #endregion
@@ -85,6 +95,7 @@ public class SchemataTenantServiceProviderFactory<TTenant> : ITenantServiceProvi
 
         TenantCompositeServiceProvider composite = null!;
         ValidateAndWrapOverrides(id, overrides, () => composite);
+        overrides.AddScoped(_ => new TenantResolutionContext { Services = composite });
 
         var container = overrides.BuildServiceProvider();
         composite = new(container, _root);
@@ -104,12 +115,6 @@ public class SchemataTenantServiceProviderFactory<TTenant> : ITenantServiceProvi
     }
 
     private static void ValidateDescriptor(string id, ServiceDescriptor descriptor) {
-        if (descriptor.Lifetime != ServiceLifetime.Singleton) {
-            throw new InvalidOperationException(
-                $"Tenant override for '{id}' registered '{descriptor.ServiceType}' as {descriptor.Lifetime}; "
-              + "tenant-specific registrations must be Singleton. Resolve Scoped/Transient services "
-              + "from the host scope instead.");
-        }
 
         var implementationType = descriptor.IsKeyedService
             ? descriptor.KeyedImplementationType
@@ -127,33 +132,35 @@ public class SchemataTenantServiceProviderFactory<TTenant> : ITenantServiceProvi
     ) {
         if (descriptor.IsKeyedService) {
             if (descriptor.KeyedImplementationType is { } implementationType) {
-                return ServiceDescriptor.KeyedSingleton(
-                    descriptor.ServiceType,
-                    descriptor.ServiceKey,
-                    (_, _) => ActivatorUtilities.CreateInstance(composite(), implementationType)
-                );
+                return new ServiceDescriptor(
+                    descriptor.ServiceType, descriptor.ServiceKey,
+                    (provider, _) => ActivatorUtilities.CreateInstance(
+                        descriptor.Lifetime == ServiceLifetime.Singleton ? composite() : provider.GetRequiredService<TenantResolutionContext>().Services,
+                        implementationType), descriptor.Lifetime);
             }
 
             if (descriptor.KeyedImplementationFactory is { } factory) {
-                return ServiceDescriptor.KeyedSingleton(
-                    descriptor.ServiceType,
-                    descriptor.ServiceKey,
-                    (_, key) => factory(composite(), key)
-                );
+                return new ServiceDescriptor(
+                    descriptor.ServiceType, descriptor.ServiceKey,
+                    (provider, key) => factory(
+                        descriptor.Lifetime == ServiceLifetime.Singleton ? composite() : provider.GetRequiredService<TenantResolutionContext>().Services,
+                        key), descriptor.Lifetime);
             }
 
             return descriptor;
         }
 
         if (descriptor.ImplementationType is { } type) {
-            return ServiceDescriptor.Singleton(
-                descriptor.ServiceType,
-                _ => ActivatorUtilities.CreateInstance(composite(), type)
-            );
+            return new ServiceDescriptor(descriptor.ServiceType,
+                provider => ActivatorUtilities.CreateInstance(
+                    descriptor.Lifetime == ServiceLifetime.Singleton ? composite() : provider.GetRequiredService<TenantResolutionContext>().Services,
+                    type), descriptor.Lifetime);
         }
 
         if (descriptor.ImplementationFactory is { } implementationFactory) {
-            return ServiceDescriptor.Singleton(descriptor.ServiceType, _ => implementationFactory(composite()));
+            return new ServiceDescriptor(descriptor.ServiceType,
+                provider => implementationFactory(descriptor.Lifetime == ServiceLifetime.Singleton
+                    ? composite() : provider.GetRequiredService<TenantResolutionContext>().Services), descriptor.Lifetime);
         }
 
         return descriptor;

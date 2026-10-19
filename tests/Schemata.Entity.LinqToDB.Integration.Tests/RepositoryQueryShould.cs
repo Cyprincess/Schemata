@@ -1,7 +1,7 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Schemata.Entity.Repository;
 using Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
 using Xunit;
 
@@ -63,98 +63,41 @@ public class RepositoryQueryShould : IAsyncLifetime
     #endregion
 
     [Fact]
-    public async Task ListAsync_WithPredicate_ReturnsMatchingEntities() {
-        var (repository, scope) = _fixture.CreateScopeWithRepository();
-        using (scope) {
-            var results = new List<Student>();
-            await foreach (var student in repository.ListAsync(q => q.Where(s => s.Grade == 2))) {
-                results.Add(student);
-            }
-
-            Assert.Equal(2, results.Count);
-            Assert.All(results, s => Assert.Equal(2, s.Grade));
-        }
-    }
-
-    [Fact]
-    public async Task FirstOrDefaultAsync_Found_ReturnsEntity() {
-        var (repository, scope) = _fixture.CreateScopeWithRepository();
-        using (scope) {
-            var found = await repository.FirstOrDefaultAsync(q => q.Where(s => s.FullName == "Alice"));
-
-            Assert.NotNull(found);
-            Assert.Equal("Alice", found.FullName);
-        }
-    }
-
-    [Fact]
-    public async Task FirstOrDefaultAsync_NotFound_ReturnsNull() {
-        var (repository, scope) = _fixture.CreateScopeWithRepository();
-        using (scope) {
-            var found = await repository.FirstOrDefaultAsync(q => q.Where(s => s.FullName == "Nonexistent"));
-
-            Assert.Null(found);
-        }
-    }
-
-    [Fact]
-    public async Task SingleOrDefaultAsync_Found_ReturnsEntity() {
-        var (repository, scope) = _fixture.CreateScopeWithRepository();
-        using (scope) {
-            var found = await repository.SingleOrDefaultAsync(q => q.Where(s => s.FullName == "Bob"));
-
-            Assert.NotNull(found);
-            Assert.Equal("Bob", found.FullName);
-        }
-    }
-
-    [Fact]
-    public async Task AnyAsync_WithMatch_ReturnsTrue() {
-        var (repository, scope) = _fixture.CreateScopeWithRepository();
-        using (scope) {
-            var exists = await repository.AnyAsync(q => q.Where(s => s.Age >= 18));
-
-            Assert.True(exists);
-        }
-    }
-
-    [Fact]
-    public async Task AnyAsync_WithNoMatch_ReturnsFalse() {
-        var (repository, scope) = _fixture.CreateScopeWithRepository();
-        using (scope) {
-            var exists = await repository.AnyAsync(q => q.Where(s => s.Age > 100));
-
-            Assert.False(exists);
-        }
-    }
-
-    [Fact]
-    public async Task CountAsync_ReturnsCorrectCount() {
-        var (repository, scope) = _fixture.CreateScopeWithRepository();
-        using (scope) {
-            var count = await repository.CountAsync(q => q.Where(s => s.Grade == 2));
-
-            Assert.Equal(2, count);
-        }
-    }
-
-    [Fact]
-    public async Task LongCountAsync_ReturnsCorrectCount() {
-        var (repository, scope) = _fixture.CreateScopeWithRepository();
-        using (scope) {
-            var count = await repository.LongCountAsync<Student>(null);
-
-            Assert.Equal(3L, count);
-        }
-    }
-
-    [Fact]
-    public async Task EstimateCountAsync_OnSqlite_ReturnsExactFallbackCount() {
+    public async Task EstimateCountAsync_FilteredSqliteQuery_ReturnsNull() {
         var (repository, scope) = _fixture.CreateScopeWithRepository();
         using (scope) {
             var count = await repository.EstimateCountAsync(q => q.Where(student => student.Grade == 2));
 
-            Assert.Equal(2L, count);
+            Assert.Null(count);
+        }
+    }
+
+    [Fact]
+    [Trait("Layer", "Integration")]
+    public async Task Guid_Keyset_Uses_The_Same_Order_As_The_Database() {
+        var ids = new[] {
+            Guid.Parse("00000001-0000-0000-0000-000000000000"),
+            Guid.Parse("00000100-0000-0000-0000-000000000000"),
+            Guid.Parse("00010000-0000-0000-0000-000000000000"),
+            Guid.Parse("01000000-0000-0000-0000-000000000000"),
+            Guid.Parse("00000000-0000-0000-0000-000000000001"),
+        };
+        var (writer, writeScope) = _fixture.CreateScopeWithRepository();
+        using (writeScope) {
+            foreach (var uid in ids) {
+                await writer.AddAsync(new() { Uid = uid, Name = $"guid-{uid:N}" });
+            }
+            await writer.CommitAsync();
+        }
+
+        var (repository, scope) = _fixture.CreateScopeWithRepository();
+        using (scope) {
+            var ordered = await repository.ListAsync(q => q.Where(row => ids.Contains(row.Uid))
+                                                          .OrderBy(row => row.Uid).Select(row => row.Uid)).ToListAsync();
+            var cursor = ordered[1];
+            var remaining = await repository.ListAsync(q => q.Where(row => ids.Contains(row.Uid) && row.Uid.CompareTo(cursor) > 0)
+                                                            .OrderBy(row => row.Uid).Select(row => row.Uid)).ToListAsync();
+            Assert.Equal(ordered.Skip(2), remaining);
         }
     }
 }

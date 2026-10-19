@@ -3,10 +3,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
-using Schemata.Abstractions.Exceptions;
 using Schemata.Tenancy.Foundation.Services;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
+using Schemata.Tenancy.Skeleton.Tenancy;
 using Xunit;
 
 namespace Schemata.Tenancy.Tests;
@@ -24,7 +24,7 @@ public class SchemataTenantContextAccessorShould
         manager.Setup(m => m.FindByTenantId(id, It.IsAny<CancellationToken>())).ReturnsAsync((SchemataTenant?)null);
 
         var accessor = new SchemataTenantContextAccessor<SchemataTenant>(
-            new ServiceCollection().BuildServiceProvider(), resolver.Object, manager.Object);
+            new ServiceCollection().BuildServiceProvider(), [resolver.Object], manager.Object);
 
         await Assert.ThrowsAsync<TenantResolveException>(() => accessor.InitializeAsync(CancellationToken.None));
     }
@@ -37,7 +37,7 @@ public class SchemataTenantContextAccessorShould
         var manager = new Mock<ITenantManager<SchemataTenant>>(MockBehavior.Strict);
 
         var accessor = new SchemataTenantContextAccessor<SchemataTenant>(
-            new ServiceCollection().BuildServiceProvider(), resolver.Object, manager.Object);
+            new ServiceCollection().BuildServiceProvider(), [resolver.Object], manager.Object);
 
         await accessor.InitializeAsync(CancellationToken.None);
 

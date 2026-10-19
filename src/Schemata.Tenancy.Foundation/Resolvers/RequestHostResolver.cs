@@ -14,7 +14,7 @@ namespace Schemata.Tenancy.Foundation.Resolvers;
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
 /// <remarks>
 ///     Looks up the tenant via <see cref="ITenantManager{TTenant}.FindByHost" />.
-///     Throws <see cref="TenantResolveException" /> when host lookup misses.
+///     An unmatched host leaves tenant selection to other configured sources.
 /// </remarks>
 public class RequestHostResolver<TTenant> : ITenantResolver
     where TTenant : SchemataTenant
@@ -33,15 +33,11 @@ public class RequestHostResolver<TTenant> : ITenantResolver
     public async Task<Guid?> ResolveAsync(CancellationToken ct = default) {
         var hostname = _accessor.HttpContext?.Request.Host.Host;
         if (string.IsNullOrWhiteSpace(hostname)) {
-            throw new TenantResolveException();
+            return null;
         }
 
         var tenant = await _manager.FindByHost(hostname, ct);
-        if (tenant is null) {
-            throw new TenantResolveException();
-        }
-
-        return tenant.Uid;
+        return tenant?.Uid;
     }
 
     #endregion

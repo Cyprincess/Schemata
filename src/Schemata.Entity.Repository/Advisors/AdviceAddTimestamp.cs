@@ -22,7 +22,7 @@ public static class AdviceAddTimestamp
 /// <typeparam name="TEntity">The entity type being added.</typeparam>
 /// <remarks>
 ///     Runs first in the add pipeline. Only activates for entities implementing
-///     <see cref="ITimestamp" />. Suppressed by <see cref="TimestampSuppressed" />.
+///     <see cref="ITimestamp" />.
 /// </remarks>
 public sealed class AdviceAddTimestamp<TEntity>(TimeProvider? time = null) : IRepositoryAddAdvisor<TEntity>
     where TEntity : class
@@ -37,12 +37,9 @@ public sealed class AdviceAddTimestamp<TEntity>(TimeProvider? time = null) : IRe
         AdviceContext        ctx,
         IRepository<TEntity> repository,
         TEntity              entity,
+        MutationOptions      options,
         CancellationToken    ct
     ) {
-        if (ctx.Has<TimestampSuppressed>()) {
-            return Task.FromResult(AdviseResult.Continue);
-        }
-
         if (entity is not ITimestamp timestamp) {
             return Task.FromResult(AdviseResult.Continue);
         }

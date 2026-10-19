@@ -37,6 +37,7 @@ public sealed class AdviceAddCanonicalName<TEntity> : IRepositoryAddAdvisor<TEnt
         AdviceContext        ctx,
         IRepository<TEntity> repository,
         TEntity              entity,
+        MutationOptions      options,
         CancellationToken    ct
     ) {
         if (entity is not ICanonicalName named) {

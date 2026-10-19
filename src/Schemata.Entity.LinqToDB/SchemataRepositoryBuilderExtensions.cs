@@ -57,6 +57,11 @@ public static class SchemataRepositoryBuilderExtensions
     /// <typeparam name="TContextImplementation">The implementation type for the data connection.</typeparam>
     /// <param name="builder">The repository builder.</param>
     /// <param name="configure">A function to configure <see cref="DataOptions" />.</param>
+    /// <param name="lifetime">
+    ///     The lifetime of the native connection factory delegate; the default keeps the
+    ///     per-scope global semantics.
+    /// </param>
+    /// <param name="optionsLifetime">The lifetime of the composed <see cref="DataOptions" />.</param>
     /// <returns>The same builder for chaining.</returns>
     /// <exception cref="ArgumentException">
     ///     Thrown when <typeparamref name="TContextImplementation" /> lacks a constructor
@@ -64,35 +69,99 @@ public static class SchemataRepositoryBuilderExtensions
     /// </exception>
     public static SchemataRepositoryBuilder UseLinqToDb<TContext, TContextImplementation>(
         this SchemataRepositoryBuilder                   builder,
-        Func<IServiceProvider, DataOptions, DataOptions> configure
+        Func<IServiceProvider, DataOptions, DataOptions> configure,
+        ServiceLifetime                                  lifetime        = ServiceLifetime.Scoped,
+        ServiceLifetime                                  optionsLifetime = ServiceLifetime.Singleton
     )
         where TContextImplementation : TContext
         where TContext : DataConnection {
-        // Register the metadata reader that maps System.ComponentModel.DataAnnotations.Schema attributes
-        // to LINQ to DB mapping attributes so [Table], [Column], etc. are recognized. This mutates the
-        // process-wide MappingSchema.Default, making the reader affect
-        // every DataConnection in the process, and repeated UseLinqToDb calls append additional reader
-        // instances. LINQ to DB resolves attributes through any registered reader, so the duplication is
-        // harmless, but the global reach is intentional and shared.
-        MappingSchema.Default.AddMetadataReader(new SystemComponentModelDataAnnotationsSchemaAttributeReader());
+        AddConnectionServices<TContext, TContextImplementation>(builder.Services, configure, lifetime, optionsLifetime);
 
+        return builder;
+    }
+
+    /// <summary>
+    ///     Standard source registration entry for a repository-side native connection factory:
+    ///     registers the scoped connection delegate, the <see cref="DataOptions" /> in the same
+    ///     scope (host options are never cached), and the matching unit of work in the target
+    ///     collection, and records a local <see cref="RepositorySourceRegistration" /> so callers
+    ///     can prove the source was configured here instead of inherited from the host container.
+    /// </summary>
+    /// <typeparam name="TContext">The <see cref="DataConnection" /> type.</typeparam>
+    /// <param name="services">The target service collection.</param>
+    /// <param name="configure">A function to configure <see cref="DataOptions" />.</param>
+    /// <param name="lifetime">
+    ///     The lifetime of the factory delegate and options; Scoped binds both to the composing
+    ///     tenant or partition scope so its configuration is authoritative there.
+    /// </param>
+    /// <returns>The same collection for chaining.</returns>
+    public static IServiceCollection AddRepositorySource<TContext>(
+        this IServiceCollection                          services,
+        Func<IServiceProvider, DataOptions, DataOptions> configure,
+        ServiceLifetime                                  lifetime = ServiceLifetime.Scoped
+    )
+        where TContext : DataConnection {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        AddConnectionServices<TContext, TContext>(services, configure, lifetime, lifetime);
+
+        services.AddSingleton(new RepositorySourceRegistration(typeof(TContext)));
+
+        services.TryAddScoped<IUnitOfWork<TContext>, LinqToDbUnitOfWork<TContext>>();
+
+        return services;
+    }
+
+    private static void AddConnectionServices<TContext, TContextImplementation>(
+        IServiceCollection                               services,
+        Func<IServiceProvider, DataOptions, DataOptions> configure,
+        ServiceLifetime                                  lifetime,
+        ServiceLifetime                                  optionsLifetime
+    )
+        where TContextImplementation : TContext
+        where TContext : DataConnection {
         var constructor = HasTypedContextConstructor<TContextImplementation, TContext>();
 
-        builder.Services.TryAddSingleton(typeof(Func<TContext>), sp => (Func<TContext>)(() => ActivatorUtilities.CreateInstance<TContextImplementation>(sp)));
+        // A singleton delegate captures the root provider, so scoped constructor
+        // dependencies of TContextImplementation would resolve from the root container.
+        // Scoped registration binds the delegate to the calling scope; every invocation
+        // still creates a fresh connection.
+        services.TryAdd(new ServiceDescriptor(
+            typeof(Func<TContext>),
+            sp => (Func<TContext>)(() => ActivatorUtilities.CreateInstance<TContextImplementation>(sp)),
+            lifetime));
 
         switch (constructor) {
             case OptionsParameterType.DataOptionsTImpl:
-                builder.Services.TryAddSingleton(typeof(DataOptions<TContextImplementation>), sp => new DataOptions<TContextImplementation>(configure(sp, new())));
+                services.TryAdd(new ServiceDescriptor(
+                    typeof(DataOptions<TContextImplementation>),
+                    sp => new DataOptions<TContextImplementation>(ComposeOptions(configure, sp)),
+                    optionsLifetime));
                 break;
             case OptionsParameterType.DataOptionsTContext:
-                builder.Services.TryAddSingleton(typeof(DataOptions<TContext>), sp => new DataOptions<TContext>(configure(sp, new())));
+                services.TryAdd(new ServiceDescriptor(
+                    typeof(DataOptions<TContext>),
+                    sp => new DataOptions<TContext>(ComposeOptions(configure, sp)),
+                    optionsLifetime));
                 break;
             case OptionsParameterType.DataOptions:
-                builder.Services.TryAddSingleton(typeof(DataOptions), sp => configure(sp, new()));
+                services.TryAdd(new ServiceDescriptor(
+                    typeof(DataOptions),
+                    sp => ComposeOptions(configure, sp),
+                    optionsLifetime));
                 break;
         }
+    }
 
-        return builder;
+    private static DataOptions ComposeOptions(Func<IServiceProvider, DataOptions, DataOptions> configure, IServiceProvider services) {
+        var options = configure(services, new());
+        var metadata = new MappingSchema();
+        metadata.AddMetadataReader(new SystemComponentModelDataAnnotationsSchemaAttributeReader());
+        var mapping = options.ConnectionOptions.MappingSchema is { } application
+            ? new MappingSchema(application, metadata)
+            : metadata;
+        return options.UseMappingSchema(mapping);
     }
 
     /// <summary>

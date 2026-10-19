@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
@@ -8,13 +11,14 @@ using Schemata.Tenancy.Skeleton;
 namespace Schemata.Tenancy.Foundation.Services;
 
 /// <summary>
-///     LRU <see cref="ITenantProviderCache" /> with capacity-bound synchronous eviction
-///     and sliding expiration. Disposal of retired providers is deferred until every
-///     outstanding lease has been released so active tenant scopes keep their provider.
+///     LRU <see cref="ITenantProviderCache" /> with capacity-bound eviction and sliding expiration.
+///     Disposal of retired providers is deferred until every outstanding lease has been released so
+///     active tenant scopes keep their provider.
 /// </summary>
 public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisposable, IAsyncDisposable
 {
     private readonly int                                       _capacity;
+    private readonly AsyncLocal<ImmutableStack<Pending>?>      _constructing = new();
     private readonly object                                    _gate = new();
     private readonly Dictionary<string, LinkedListNode<Entry>> _index;
     private readonly LinkedList<Entry>                         _order = [];
@@ -22,9 +26,6 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
     private readonly TimeProvider                              _time;
     private readonly TimeSpan                                  _ttl;
     private          bool                                      _disposed;
-
-    [ThreadStatic]
-    private static HashSet<Pending>? _constructing;
 
     /// <summary>
     ///     Initializes a new instance with capacity and sliding expiration sourced from <see cref="SchemataTenancyOptions" />.
@@ -47,21 +48,67 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
 
     public async ValueTask DisposeAsync() {
         var orphaned = RetireAll();
+        List<Exception>? failures = null;
         foreach (var entry in orphaned) {
-            await DisposeProviderAsync(entry.Provider);
+            try { await DisposeEntryAsync(entry); }
+            catch (Exception error) { (failures ??= []).Add(error); }
         }
+        ThrowFailures(failures);
     }
 
     #endregion
 
     #region ITenantProviderCache Members
 
-    public ITenantProviderLease Lease(string id, Func<IServiceProvider> factory) {
+    public ValueTask<ITenantProviderLease> LeaseVersionAsync(
+        string                 id,
+        Guid                   version,
+        Func<IServiceProvider> create,
+        CancellationToken      ct = default
+    ) {
+        return LeaseKeyAsync($"{id.Length}:{id}:{version:N}", create, ct);
+    }
+
+    public async ValueTask RemoveAsync(string id) {
+        var          prefix  = $"{id.Length}:{id}:";
+        List<Entry>? retired = null;
+        lock (_gate) {
+            if (_disposed) return;
+            foreach (var pair in _pending) {
+                if (pair.Key.StartsWith(prefix, StringComparison.Ordinal)) pair.Value.Cancelled = true;
+            }
+            var node = _order.First;
+            while (node is not null) {
+                var next = node.Next;
+                if (node.Value.Id.StartsWith(prefix, StringComparison.Ordinal)) {
+                    _index.Remove(node.Value.Id);
+                    _order.Remove(node);
+                    node.Value.Retired = true;
+                    (retired ??= []).Add(node.Value);
+                }
+                node = next;
+            }
+        }
+
+        await DisposeRetiredAsync(retired);
+    }
+
+    #endregion
+
+    private async ValueTask<ITenantProviderLease> LeaseKeyAsync(
+        string                 id,
+        Func<IServiceProvider> create,
+        CancellationToken      ct
+    ) {
         while (true) {
-            Entry?       entry   = null;
-            Pending?     pending = null;
-            List<Entry>? retired = null;
-            var          build   = false;
+            ct.ThrowIfCancellationRequested();
+
+            Entry?                entry   = null;
+            Pending?              pending = null;
+            List<Entry>?          retired = null;
+            var                   build   = false;
+            ITenantProviderLease? lease   = null;
+            Exception?            failure = null;
 
             try {
                 lock (_gate) {
@@ -75,8 +122,12 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
                         hit.Value.ActiveLeases++;
                         entry = hit.Value;
                     } else if (_pending.TryGetValue(id, out pending)) {
-                        if (IsConstructing(pending)) {
-                            throw new InvalidOperationException($"Tenant provider construction for '{id}' cannot reenter the same key.");
+                        // Construction ownership lives on the per-key Pending. The flow-local
+                        // chain holds every build this call stack started, so re-entering any
+                        // ancestor key is rejected instead of waiting on itself.
+                        if (_constructing.Value?.Contains(pending) == true) {
+                            throw new InvalidOperationException(
+                                $"Tenant provider construction for '{id}' cannot reenter the same key.");
                         }
                     } else {
                         pending = new();
@@ -86,60 +137,54 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
                 }
 
                 if (entry is not null) {
-                    return new LeaseHandle(this, entry);
+                    lease = new LeaseHandle(this, entry);
+                } else if (build) {
+                    lease = await BuildLeaseAsync(id, create, pending!);
                 }
+            } catch (Exception error) { failure = error; }
 
-                if (pending is null) {
-                    continue;
-                }
-
-                if (build) {
-                    return BuildLease(id, factory, pending);
-                }
-            } finally {
-                DisposeRetired(retired);
+            try { await DisposeRetiredAsync(retired); }
+            catch (Exception error) {
+                failure = failure is null ? error : new AggregateException(failure, error);
             }
 
-            pending.Wait();
+            if (failure is not null) {
+                if (lease is not null) {
+                    try { await lease.DisposeAsync(); }
+                    catch (Exception error) { throw new AggregateException(failure, error); }
+                }
+
+                ExceptionDispatchInfo.Capture(failure).Throw();
+            }
+
+            if (lease is not null) {
+                if (!ct.IsCancellationRequested) return lease;
+                await lease.DisposeAsync();
+                throw new OperationCanceledException(ct);
+            }
+
+            if (pending is null || pending.Completion.Task.IsCompleted) continue;
+
+            await pending.Completion.Task.WaitAsync(ct);
         }
     }
 
-    public void Remove(string id) {
-        Entry? entry = null;
-        lock (_gate) {
-            if (_disposed) {
-                return;
-            }
-
-            if (_pending.TryGetValue(id, out var pending)) {
-                pending.Cancelled = true;
-            }
-
-            if (_index.TryGetValue(id, out var node)) {
-                _index.Remove(id);
-                _order.Remove(node);
-                node.Value.Retired = true;
-                entry              = node.Value;
-            }
-        }
-
-        if (entry is not null) {
-            DisposeIfZero(entry);
-        }
-    }
-
-    #endregion
-
-    private ITenantProviderLease BuildLease(string id, Func<IServiceProvider> factory, Pending pending) {
+    private async ValueTask<ITenantProviderLease?> BuildLeaseAsync(
+        string                 id,
+        Func<IServiceProvider> create,
+        Pending                pending
+    ) {
         IServiceProvider provider;
-        EnterConstruction(pending);
+        var              chain    = _constructing.Value ?? ImmutableStack<Pending>.Empty;
+        var              previous = _constructing.Value;
+        _constructing.Value = chain.Push(pending);
         try {
-            provider = factory();
+            provider = create();
         } catch {
             CompletePending(id, pending);
             throw;
         } finally {
-            ExitConstruction(pending);
+            _constructing.Value = previous;
         }
 
         Entry?       entry   = null;
@@ -163,6 +208,26 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
                 _order.AddFirst(node);
                 _index.Add(id, node);
                 _pending.Remove(id);
+
+                // A new committed version retires the superseded providers of the same tenant;
+                // outstanding leases on them keep their captured provider until release.
+                var tenantPrefix = id[..(id.LastIndexOf(':') + 1)];
+                var cursor       = _order.First;
+                while (cursor is not null) {
+                    var next = cursor.Next;
+                    if (cursor.Value.Id != id && cursor.Value.Id.StartsWith(tenantPrefix, StringComparison.Ordinal)) {
+                        _index.Remove(cursor.Value.Id);
+                        _order.Remove(cursor);
+                        cursor.Value.Retired = true;
+                        (evicted ??= []).Add(cursor.Value);
+                    }
+
+                    cursor = next;
+                }
+
+                if (provider is TenantCompositeServiceProvider composite) {
+                    composite.LeaseSource = () => LeaseEntry(entry);
+                }
             } else {
                 retry = !_disposed;
                 if (_pending.TryGetValue(id, out var remaining) && ReferenceEquals(remaining, pending)) {
@@ -173,18 +238,26 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
             pending.Complete();
         }
 
-        DisposeRetired(evicted);
+        try { await DisposeRetiredAsync(evicted); }
+        catch (Exception error) {
+            if (entry is not null) {
+                try { await ReleaseAsync(entry); }
+                catch (Exception cleanup) { throw new AggregateException(error, cleanup); }
+            }
+
+            throw;
+        }
 
         if (entry is not null) {
             return new LeaseHandle(this, entry);
         }
 
-        DisposeProvider(provider);
+        await DisposeProviderAsync(provider);
         if (!retry) {
             throw new ObjectDisposedException(nameof(MemoryCacheTenantProviderCache));
         }
 
-        return Lease(id, factory);
+        return null;
     }
 
     private void CompletePending(string id, Pending pending) {
@@ -261,7 +334,22 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
         }
 
         if (dispose) {
-            DisposeProvider(entry.Provider);
+            DisposeEntry(entry);
+        }
+    }
+
+    /// <summary>
+    ///     Leases an already-committed entry for a nested scope. The lease is bound to the exact
+    ///     entry that owns the caller's provider — it is never rebuilt under the same key — so a
+    ///     retired entry cannot be rebound as a new version. Returns null once the entry is
+    ///     disposing, or retired with no active lease: nothing pins the provider anymore and the
+    ///     caller fails naturally against the disposed provider.
+    /// </summary>
+    private ITenantProviderLease? LeaseEntry(Entry entry) {
+        lock (_gate) {
+            if (entry.Disposing || (entry.Retired && entry.ActiveLeases == 0)) return null;
+            entry.ActiveLeases++;
+            return new LeaseHandle(this, entry);
         }
     }
 
@@ -273,42 +361,77 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
         }
 
         if (dispose) {
-            await DisposeProviderAsync(entry.Provider);
+            await DisposeEntryAsync(entry);
         }
     }
 
-    private void DisposeIfZero(Entry entry) {
+    private async ValueTask DisposeIfZeroAsync(Entry entry) {
         bool dispose;
         lock (_gate) {
             dispose = TryBeginDisposalLocked(entry);
         }
 
         if (dispose) {
-            DisposeProvider(entry.Provider);
+            await DisposeEntryAsync(entry);
         }
     }
 
-    private void DisposeRetired(List<Entry>? entries) {
+    private async ValueTask DisposeRetiredAsync(List<Entry>? entries) {
         if (entries is null) {
             return;
         }
 
+        List<Exception>? failures = null;
         foreach (var entry in entries) {
-            DisposeIfZero(entry);
+            try { await DisposeIfZeroAsync(entry); }
+            catch (Exception error) { (failures ??= []).Add(error); }
         }
+
+        ThrowFailures(failures);
     }
 
-    private static void DisposeProviders(List<Entry>? entries) {
+    private void DisposeProviders(List<Entry>? entries) {
         if (entries is null) {
             return;
         }
 
+        List<Exception>? failures = null;
         foreach (var entry in entries) {
-            DisposeProvider(entry.Provider);
+            try { DisposeEntry(entry); }
+            catch (Exception error) { (failures ??= []).Add(error); }
+        }
+
+        ThrowFailures(failures);
+    }
+
+    private void DisposeEntry(Entry entry) {
+        try { DisposeProviderSynchronously(entry.Provider); }
+        catch {
+            ReleaseDisposalClaim(entry);
+            throw;
         }
     }
 
-    private static void DisposeProvider(IServiceProvider provider) {
+    private async ValueTask DisposeEntryAsync(Entry entry) {
+        try { await DisposeProviderAsync(entry.Provider); }
+        catch {
+            ReleaseDisposalClaim(entry);
+            throw;
+        }
+    }
+
+    private void ReleaseDisposalClaim(Entry entry) {
+        lock (_gate) { entry.Disposing = false; }
+    }
+
+    /// <summary>
+    ///     Synchronous disposal backs <see cref="IDisposable.Dispose" /> on the cache and its leases,
+    ///     which run on scope teardown and host shutdown rather than on the acquisition path.
+    ///     Dual-interface providers go through <see cref="IAsyncDisposable" /> because their
+    ///     synchronous <see cref="IDisposable.Dispose" /> fails for async-only services; the caller
+    ///     blocks until that completes.
+    /// </summary>
+    private static void DisposeProviderSynchronously(IServiceProvider provider) {
         if (provider is IAsyncDisposable asynchronous) {
             asynchronous.DisposeAsync().AsTask().GetAwaiter().GetResult();
         } else if (provider is IDisposable disposable) {
@@ -324,13 +447,10 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
         }
     }
 
-    private static void EnterConstruction(Pending pending) {
-        (_constructing ??= []).Add(pending);
+    private static void ThrowFailures(List<Exception>? failures) {
+        if (failures is { Count: 1 }) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures is { Count: > 1 }) throw new AggregateException(failures);
     }
-
-    private static void ExitConstruction(Pending pending) { _constructing?.Remove(pending); }
-
-    private static bool IsConstructing(Pending pending) { return _constructing?.Contains(pending) == true; }
 
     private void ThrowIfDisposed() {
         if (_disposed) {
@@ -371,20 +491,18 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
 
     private sealed class Pending
     {
-        private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public bool Cancelled { get; set; }
 
-        public void Complete() { _completion.TrySetResult(); }
-
-        public void Wait() { _completion.Task.GetAwaiter().GetResult(); }
+        public void Complete() { Completion.TrySetResult(); }
     }
 
     #endregion
 
     #region Nested type: LeaseHandle
 
-    private sealed class LeaseHandle : ITenantProviderLease, IAsyncDisposable
+    private sealed class LeaseHandle : ITenantProviderLease
     {
         private readonly MemoryCacheTenantProviderCache _cache;
         private readonly Entry                          _entry;

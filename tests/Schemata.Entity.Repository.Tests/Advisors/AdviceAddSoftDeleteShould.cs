@@ -19,7 +19,7 @@ public class AdviceAddSoftDeleteShould
         var repository = new Mock<IRepository<Student>>().Object;
         var entity     = new Student { DeleteTime = DateTime.UtcNow };
 
-        var result = await advisor.AdviseAsync(ctx, repository, entity, CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, repository, entity, default, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
         Assert.Null(entity.DeleteTime);
@@ -32,21 +32,24 @@ public class AdviceAddSoftDeleteShould
         var repository = new Mock<IRepository<PlainEntity>>().Object;
         var entity     = new PlainEntity();
 
-        var result = await advisor.AdviseAsync(ctx, repository, entity, CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, repository, entity, default, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
     }
 
     [Fact]
-    public async Task Advise_Suppressed_DoesNotClearDeleteTime() {
-        var advisor = new AdviceAddSoftDelete<Student>();
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        ctx.Set(new SoftDeleteSuppressed());
+    public async Task Advise_IgnoreSoftDelete_DoesNotClearDeleteTime() {
+        var advisor    = new AdviceAddSoftDelete<Student>();
+        var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<Student>>().Object;
         var existing   = DateTime.UtcNow;
         var entity     = new Student { DeleteTime = existing };
 
-        var result = await advisor.AdviseAsync(ctx, repository, entity, CancellationToken.None);
+        var result = await advisor.AdviseAsync(
+            ctx,
+            repository,
+            entity,
+            new MutationOptions(IgnoreSoftDelete: true), CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
         Assert.Equal(existing, entity.DeleteTime);

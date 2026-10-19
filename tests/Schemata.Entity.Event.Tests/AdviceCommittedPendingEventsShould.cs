@@ -3,10 +3,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Moq;
 using Schemata.Abstractions;
-using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Entities;
 using Schemata.Entity.Event.Advisors;
 using Schemata.Entity.Event.Tests.Fixtures;
-using Schemata.Entity.Repository;
 using Schemata.Event.Skeleton;
 using Xunit;
 
@@ -20,24 +19,11 @@ public class AdviceCommittedPendingEventsShould
         var entity = new Widget();
         entity.Rename("hub");
 
-        await Advise(bus, added: [entity]);
+        var callback = Prepare(bus, entity);
+        Assert.NotNull(callback);
+        await callback(CancellationToken.None);
 
         bus.Verify(b => b.PublishAsync(It.IsAny<IEvent>(), It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task Publish_ForUpdatedAndRemovedEntitiesToo() {
-        var bus     = new Mock<IEventBus>();
-        var updated = new Widget();
-        var removed = new Widget();
-        updated.Rename("a");
-        removed.Rename("b");
-
-        // A removed aggregate can have raised events before it was deleted; dropping those would
-        // lose exactly the facts a consumer needs most.
-        await Advise(bus, updated: [updated], removed: [removed]);
-
-        bus.Verify(b => b.PublishAsync(It.IsAny<IEvent>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 
     [Fact]
@@ -48,72 +34,83 @@ public class AdviceCommittedPendingEventsShould
         entity.Rename("second");
         entity.Rename("third");
 
-        await Advise(bus, added: [entity]);
+        var callback = Prepare(bus, entity);
+        Assert.NotNull(callback);
+        await callback(CancellationToken.None);
 
         bus.Verify(b => b.PublishAsync(It.IsAny<IEvent>(), It.IsAny<CancellationToken>()), Times.Exactly(3));
     }
 
+    [Trait("Layer", "Unit")]
     [Fact]
-    public async Task Publish_Nothing_WhenTheEntityBufferedNoEvents() {
-        var bus = new Mock<IEventBus>();
-
-        await Advise(bus, added: [new Widget()]);
-
-        bus.Verify(b => b.PublishAsync(It.IsAny<IEvent>(), It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task Publish_Nothing_ForAnEntityThatDoesNotBufferEvents() {
-        var bus     = new Mock<IEventBus>();
-        var advisor = new AdviceCommittedPendingEvents<Plain>(bus.Object);
-        var changes = new CommitChanges<Plain> { Added = [new Plain()], Updated = [], Removed = [] };
-
-        await advisor.AdviseAsync(new(Mock.Of<IServiceProvider>()), Mock.Of<IRepository<Plain>>(), changes);
-
-        bus.Verify(b => b.PublishAsync(It.IsAny<IEvent>(), It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task Drain_TheEntity_SoASecondCommitRepublishesNothing() {
+    public void Publish_Nothing_AtPrepareTime() {
+        // Prepare is side-effect free: events leave the entity only when the post-commit
+        // callback runs, so a rolled-back transaction never publishes.
         var bus    = new Mock<IEventBus>();
         var entity = new Widget();
         entity.Rename("hub");
 
-        await Advise(bus, added: [entity]);
-        await Advise(bus, added: [entity]);
+        var callback = Prepare(bus, entity);
+
+        Assert.NotNull(callback);
+        bus.Verify(b => b.PublishAsync(It.IsAny<IEvent>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public void Prepare_Nothing_ForAnEntityThatDoesNotBufferEvents() {
+        var bus     = new Mock<IEventBus>();
+        var advisor = new AdviceCommittedPendingEvents<Plain>(bus.Object);
+
+        var callback = advisor.Prepare(new(), Operations.Create);
+
+        Assert.Null(callback);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task Publish_Nothing_WhenTheEntityBufferedNoEvents() {
+        var bus    = new Mock<IEventBus>();
+        var entity = new Widget();
+
+        var callback = Prepare(bus, entity);
+        Assert.NotNull(callback);
+        await callback(CancellationToken.None);
+
+        bus.Verify(b => b.PublishAsync(It.IsAny<IEvent>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task Drain_TheEntity_SoASecondCallbackRepublishesNothing() {
+        // Two mutations capturing the same entity: only the first callback to run observes the
+        // buffered events, because draining dequeues them.
+        var bus    = new Mock<IEventBus>();
+        var entity = new Widget();
+        entity.Rename("hub");
+
+        var first = Prepare(bus, entity);
+        var second = Prepare(bus, entity);
+        Assert.NotNull(first);
+        Assert.NotNull(second);
+        await first(CancellationToken.None);
+        await second(CancellationToken.None);
 
         bus.Verify(b => b.PublishAsync(It.IsAny<IEvent>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task Continue_TheAdvisorChain() {
-        var bus = new Mock<IEventBus>();
-
-        var result = await Advise(bus, added: [new Widget()]);
-
-        Assert.Equal(AdviseResult.Continue, result);
-    }
-
-    [Fact]
     public void Order_SitsBeforeCacheEviction() {
-        // Eviction runs at Orders.Max; publishing must happen while the committed state is still
-        // the freshest thing any consumer could read back.
+        // Cache eviction is structural (repository segment runs before the resource segment);
+        // within the resource segment this advisor keeps its relative order.
         var advisor = new AdviceCommittedPendingEvents<Widget>(Mock.Of<IEventBus>());
 
         Assert.Equal(SchemataConstants.Orders.Max - 1_000, advisor.Order);
     }
 
-    private static Task<AdviseResult> Advise(
-        Mock<IEventBus> bus,
-        Widget[]?       added   = null,
-        Widget[]?       updated = null,
-        Widget[]?       removed = null
-    ) {
+    private static Func<CancellationToken, Task>? Prepare(Mock<IEventBus> bus, Widget entity) {
         var advisor = new AdviceCommittedPendingEvents<Widget>(bus.Object);
-        var changes = new CommitChanges<Widget> {
-            Added = added ?? [], Updated = updated ?? [], Removed = removed ?? [],
-        };
 
-        return advisor.AdviseAsync(new(Mock.Of<IServiceProvider>()), Mock.Of<IRepository<Widget>>(), changes);
+        return advisor.Prepare(entity, Operations.Create);
     }
 }

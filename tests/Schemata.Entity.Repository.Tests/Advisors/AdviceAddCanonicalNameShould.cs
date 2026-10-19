@@ -19,7 +19,7 @@ public class AdviceAddCanonicalNameShould
         var repository = new Mock<IRepository<Student>>().Object;
         var entity     = new Student { Uid = Guid.NewGuid(), Name = "alice" };
 
-        var result = await advisor.AdviseAsync(ctx, repository, entity, CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, repository, entity, default, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
         Assert.Equal("students/alice", entity.CanonicalName);
@@ -32,7 +32,7 @@ public class AdviceAddCanonicalNameShould
         var repository = new Mock<IRepository<PlainEntity>>().Object;
         var entity     = new PlainEntity();
 
-        var result = await advisor.AdviseAsync(ctx, repository, entity, CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, repository, entity, default, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
     }
@@ -44,7 +44,7 @@ public class AdviceAddCanonicalNameShould
         var repository = new Mock<IRepository<NoPatternEntity>>().Object;
         var entity     = new NoPatternEntity { Name = "test", CanonicalName = null };
 
-        var result = await advisor.AdviseAsync(ctx, repository, entity, CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, repository, entity, default, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
         Assert.Null(entity.CanonicalName);

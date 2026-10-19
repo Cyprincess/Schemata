@@ -23,7 +23,7 @@ public static class AdviceBuildQuerySoftDelete
 /// <typeparam name="TEntity">The entity type being queried.</typeparam>
 /// <remarks>
 ///     Only activates when <typeparamref name="TEntity" /> implements <see cref="ISoftDelete" />.
-///     Suppressed by <see cref="QuerySoftDeleteSuppressed" />.
+///     Skipped when the query passes <see cref="QueryOptions.IgnoreSoftDelete" />.
 /// </remarks>
 public sealed class AdviceBuildQuerySoftDelete<TEntity> : IRepositoryBuildQueryAdvisor<TEntity>
     where TEntity : class
@@ -37,7 +37,7 @@ public sealed class AdviceBuildQuerySoftDelete<TEntity> : IRepositoryBuildQueryA
         QueryContainer<TEntity> container,
         CancellationToken       ct = default
     ) {
-        if (ctx.Has<QuerySoftDeleteSuppressed>()) {
+        if (container.Options.IgnoreSoftDelete) {
             return Task.FromResult(AdviseResult.Continue);
         }
 

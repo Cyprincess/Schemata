@@ -34,7 +34,7 @@ public static class AdviceQueryCache
 ///         not auto-registered.
 ///     </para>
 ///     <para>Returns <see cref="AdviseResult.Handle" /> on cache hit, which prevents database execution.</para>
-///     <para>Suppressed when <see cref="QueryCacheSuppressed" /> is present in the advice context.</para>
+///     <para>Skipped when the query passes <see cref="QueryOptions.IgnoreCache" />.</para>
 /// </remarks>
 public sealed class AdviceQueryCache<TEntity, TResult, T> : IRepositoryQueryAdvisor<TEntity, TResult, T>
     where TEntity : class
@@ -44,7 +44,7 @@ public sealed class AdviceQueryCache<TEntity, TResult, T> : IRepositoryQueryAdvi
     /// <summary>
     ///     Initializes a new instance of the <see cref="AdviceQueryCache{TEntity, TResult, T}" /> class.
     /// </summary>
-    /// <param name="cache">The distributed cache instance.</param>
+    /// <param name="cache">The cache provider holding query results and generation metadata.</param>
     public AdviceQueryCache(ICacheProvider cache) { _cache = cache; }
 
     #region IRepositoryQueryAdvisor<TEntity,TResult,T> Members
@@ -56,16 +56,22 @@ public sealed class AdviceQueryCache<TEntity, TResult, T> : IRepositoryQueryAdvi
         QueryContext<TEntity, TResult, T> context,
         CancellationToken                 ct = default
     ) {
-        if (ctx.Has<QueryCacheSuppressed>() || context.HasOpenWriteUnitOfWork) {
+        if (context.Options.IgnoreCache || context.HasOpenWriteUnitOfWork) {
             return AdviseResult.Continue;
         }
 
-        var key = context.ToCacheKey();
+        var queryKey = context.ToCacheKey();
+        if (string.IsNullOrWhiteSpace(queryKey)) {
+            return AdviseResult.Continue;
+        }
+
+        var sourceKey = context.Repository is IRepositorySource source ? source.SourceKey : null;
+        var key = await CacheGeneration<TEntity>.CaptureAsync(_cache, context, queryKey, sourceKey, ct);
         if (string.IsNullOrWhiteSpace(key)) {
             return AdviseResult.Continue;
         }
 
-        var bytes = await _cache.GetAsync(key!, ct);
+        var bytes = await _cache.GetAsync(key, ct);
         if (bytes is null) {
             return AdviseResult.Continue;
         }
