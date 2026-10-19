@@ -17,7 +17,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoBuf.Grpc.Client;
 using ProtoBuf.Grpc.Configuration;
+using Schemata.Abstractions.Resource;
+using Schemata.Core.Building;
 using Schemata.Entity.EntityFrameworkCore;
+using Schemata.Resource.Foundation;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Push.Grpc.Integration.Tests.Fixtures;
 using Schemata.Push.Skeleton;
@@ -55,6 +58,11 @@ public sealed class PushListeningShould
         });
         builder.Services.AddDbContextFactory<PushGrpcDbContext>(options => options.UseSqlite(connectionString).ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
         builder.Services.AddRepository<SchemataPushSubscription, EfCoreRepository<PushGrpcDbContext, SchemataPushSubscription>>();
+        var resourceRegistry = new ResourceRegistry();
+        resourceRegistry.Add(new(typeof(SchemataPushSubscription)), []);
+        resourceRegistry.Add(new(typeof(TestSubject)), []);
+        builder.Services.TryAddSingleton(resourceRegistry);
+        builder.Services.TryAddSingleton<IResourceTypeResolver, DefaultResourceTypeResolver>();
         if (transportFirst) builder.Services.AddSchemataPushHttp();
         if (schemata) {
             builder.UseSchemata(schema => {

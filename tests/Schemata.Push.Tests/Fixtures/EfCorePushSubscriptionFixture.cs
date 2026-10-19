@@ -8,12 +8,15 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions.Resource;
+using Schemata.Core.Building;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Push.Foundation.Commands;
 using Schemata.Push.Foundation.Handlers;
 using Schemata.Push.Skeleton.Entities;
+using Schemata.Resource.Foundation;
 
 using Schemata.Abstractions.Advisors;
 namespace Schemata.Push.Tests.Fixtures;
@@ -37,6 +40,7 @@ public sealed class EfCorePushSubscriptionFixture(bool nameAdvisor = true) : IPu
         services.AddRepository<SchemataPushSubscription, EfCoreRepository<PushDbContext, SchemataPushSubscription>>();
         services.AddScoped<IUnitOfWork<PushDbContext>, EfCoreUnitOfWork<PushDbContext>>();
         services.AddSingleton(TimeProvider.System);
+        PushTestResources.AddResourceTypeResolver(services, typeof(SchemataPushSubscription));
 
         if (nameAdvisor) {
             services.TryAddEnumerable(ServiceDescriptor.Singleton<IRepositoryAddAdvisor<SchemataPushSubscription>>(

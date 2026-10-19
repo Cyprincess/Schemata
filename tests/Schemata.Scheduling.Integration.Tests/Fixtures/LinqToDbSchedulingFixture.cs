@@ -46,6 +46,7 @@ public sealed class LinqToDbSchedulingFixture(Action<SchemataSchedulingOptions>?
 
         services.AddRepository<SchemataJob, LinqToDbRepository<SchedulingDataConnection, SchemataJob>>();
         services.AddRepository<SchemataJobExecution, LinqToDbRepository<SchedulingDataConnection, SchemataJobExecution>>();
+        SchedulingTestResources.AddResourceTypeResolver(services, typeof(SchemataJob), typeof(SchemataJobExecution));
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJob>, AdviceAddResourceName<SchemataJob>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJobExecution>, AdviceAddResourceName<SchemataJobExecution>>());
         services.AddScoped<IUnitOfWork<SchedulingDataConnection>, LinqToDbUnitOfWork<SchedulingDataConnection>>();

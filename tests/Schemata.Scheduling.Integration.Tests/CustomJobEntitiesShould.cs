@@ -75,7 +75,7 @@ public class CustomJobEntitiesShould
                 Assert.Equal(ExecutionState.Succeeded, execution!.State);
             }
 
-            var triggered = await scheduler.TriggerAsync<CustomProbeJob>(new() { Job = "custom-trigger" }, CancellationToken.None);
+            var triggered = await scheduler.TriggerAsync<CustomProbeJob>(new() { Job = "jobs/custom-trigger" }, CancellationToken.None);
             Assert.IsType<MyExecution>(triggered);
             Assert.Equal(ExecutionState.Pending, triggered.State);
 
@@ -153,6 +153,7 @@ public class CustomJobEntitiesShould
         services.TryAddSingleton<Func<SchedulingDataConnection>>(_ => () => new(options));
         services.AddRepository<MyJob, LinqToDbRepository<SchedulingDataConnection, MyJob>>();
         services.AddRepository<MyExecution, LinqToDbRepository<SchedulingDataConnection, MyExecution>>();
+        SchedulingTestResources.AddResourceTypeResolver(services, typeof(MyJob), typeof(MyExecution));
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<MyJob>, AdviceAddResourceName<MyJob>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<MyExecution>, AdviceAddResourceName<MyExecution>>());
         services.AddScoped<IUnitOfWork<SchedulingDataConnection>, LinqToDbUnitOfWork<SchedulingDataConnection>>();
@@ -189,7 +190,7 @@ public class CustomJobEntitiesShould
 
             Assert.Single(probe.Runs);
 
-            var triggered = await scheduler.TriggerAsync<CustomProbeJob>(new() { Job = "custom-linq-trigger" }, CancellationToken.None);
+            var triggered = await scheduler.TriggerAsync<CustomProbeJob>(new() { Job = "jobs/custom-linq-trigger" }, CancellationToken.None);
             Assert.IsType<MyExecution>(triggered);
             await dispatcher.DispatchPendingAsync(CancellationToken.None);
             Assert.Equal(2, probe.Runs.Count);
@@ -228,6 +229,7 @@ public class CustomJobEntitiesShould
                      .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
         services.AddRepository<MyJob, EfCoreRepository<CustomSchedulingDbContext, MyJob>>();
         services.AddRepository<MyExecution, EfCoreRepository<CustomSchedulingDbContext, MyExecution>>();
+        SchedulingTestResources.AddResourceTypeResolver(services, typeof(MyJob), typeof(MyExecution));
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<MyJob>, AdviceAddResourceName<MyJob>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<MyExecution>, AdviceAddResourceName<MyExecution>>());
         services.AddScoped<IUnitOfWork<CustomSchedulingDbContext>, EfCoreUnitOfWork<CustomSchedulingDbContext>>();

@@ -55,6 +55,7 @@ internal sealed class ReportActorIdentityFixture(IHost host, string path) : IAsy
         services.AddRepository<SchemataReportSnapshotChunk, EfCoreRepository<ReportActorIdentityDbContext, SchemataReportSnapshotChunk>>();
         services.AddRepository<SchemataJob, EfCoreRepository<ReportActorIdentityDbContext, SchemataJob>>();
         services.AddRepository<SchemataJobExecution, EfCoreRepository<ReportActorIdentityDbContext, SchemataJobExecution>>();
+        ReportTestResources.AddResourceTypeResolver(services, typeof(SchemataJob), typeof(SchemataJobExecution));
         services.AddScoped<IUnitOfWork<ReportActorIdentityDbContext>, EfCoreUnitOfWork<ReportActorIdentityDbContext>>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataReportSnapshot>, AdviceAddResourceName<SchemataReportSnapshot>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataReportSnapshotChunk>, AdviceAddResourceName<SchemataReportSnapshotChunk>>());

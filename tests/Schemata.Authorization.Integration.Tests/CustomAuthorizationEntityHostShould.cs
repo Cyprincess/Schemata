@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Authorization.Foundation.Mutations;
+using Schemata.Authorization.Integration.Tests.Fixtures;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Entity.EntityFrameworkCore;
@@ -201,6 +202,9 @@ public class CustomAuthorizationEntityHostShould
                 Register<SchemataSubjectMapping>(schema.Services, linq);
                 Register<SchemataToken>(schema.Services, linq);
                 Register<SchemataSecurity>(schema.Services, linq);
+                TestResourceTypeResolver.AddResourceTypeResolver(schema.Services,
+                    typeof(TestSubject), typeof(Application), typeof(Grant), typeof(Scope),
+                    typeof(SubjectMapping), typeof(SchemataToken), typeof(SchemataSecurity));
                 schema.Services.TryAddEnumerable(
                     ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SubjectMapping>, NameSubjectMapping>());
 

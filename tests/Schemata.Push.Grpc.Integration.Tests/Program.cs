@@ -5,9 +5,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions.Resource;
+using Schemata.Core.Building;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
 using Schemata.Push.Grpc.Integration.Tests.Fixtures;
+using Schemata.Resource.Foundation;
 using Schemata.Push.Skeleton;
 using Schemata.Push.Skeleton.Entities;
 
@@ -28,6 +31,11 @@ builder.Services.AddAuthorization(options => {
 builder.Services.AddDbContextFactory<PushGrpcDbContext>(options => options.UseSqlite(connectionString)
     .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
 builder.Services.AddRepository<SchemataPushSubscription, EfCoreRepository<PushGrpcDbContext, SchemataPushSubscription>>();
+var resourceRegistry = new ResourceRegistry();
+resourceRegistry.Add(new(typeof(SchemataPushSubscription)), []);
+resourceRegistry.Add(new(typeof(TestSubject)), []);
+builder.Services.TryAddSingleton(resourceRegistry);
+builder.Services.TryAddSingleton<IResourceTypeResolver, DefaultResourceTypeResolver>();
 
 builder.Services.AddSchemataPush();
 builder.Services.AddSchemataPushGrpc();

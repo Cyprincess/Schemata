@@ -44,6 +44,7 @@ public sealed class SchedulingFixture(bool supplyNames = true) : IAsyncLifetime
 
         services.AddRepository<SchemataJob, EfCoreRepository<SchedulingDbContext, SchemataJob>>();
         services.AddRepository<SchemataJobExecution, EfCoreRepository<SchedulingDbContext, SchemataJobExecution>>();
+        SchedulingTestResources.AddResourceTypeResolver(services, typeof(SchemataJob), typeof(SchemataJobExecution));
         if (supplyNames) {
             services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJob>, AdviceAddResourceName<SchemataJob>>());
             services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJobExecution>, AdviceAddResourceName<SchemataJobExecution>>());

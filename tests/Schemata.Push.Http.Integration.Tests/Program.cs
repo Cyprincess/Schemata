@@ -11,6 +11,9 @@ using Schemata.Push.Foundation;
 using Schemata.Push.Http;
 using Schemata.Push.Skeleton;
 using Schemata.Push.Skeleton.Entities;
+using Schemata.Abstractions.Resource;
+using Schemata.Core.Building;
+using Schemata.Resource.Foundation;
 
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = $"Data Source=push-http-{Guid.NewGuid():n};Mode=Memory;Cache=Shared";
@@ -34,6 +37,11 @@ builder.UseSchemata(schema => {
     schema.UsePush().MapHttp().MapHttp();
 });
 builder.Services.AddSchemataPushHttp();
+var resourceRegistry = new ResourceRegistry();
+resourceRegistry.Add(new(typeof(SchemataPushSubscription)), []);
+resourceRegistry.Add(new(typeof(TestSubject)), []);
+builder.Services.TryAddSingleton(resourceRegistry);
+builder.Services.TryAddSingleton<IResourceTypeResolver, DefaultResourceTypeResolver>();
 builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped<Schemata.Entity.Repository.Advisors.IRepositoryAddAdvisor<SchemataPushSubscription>, AdviceAddSubscriptionName>());
 builder.Services.AddSingleton<IPushTransport>(new RecordingTransport("ok"));
 builder.Services.AddSingleton<IPushTransport>(new RecordingTransport("later"));

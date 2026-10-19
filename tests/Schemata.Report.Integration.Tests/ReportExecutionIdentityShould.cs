@@ -108,6 +108,7 @@ public class ReportExecutionIdentityShould
         services.AddRepository<SchemataReportSnapshot, EfCoreRepository<TestDbContext, SchemataReportSnapshot>>();
         services.AddRepository<SchemataReportSnapshotChunk, EfCoreRepository<TestDbContext, SchemataReportSnapshotChunk>>();
         services.AddRepository<SchemataJobExecution, EfCoreRepository<TestDbContext, SchemataJobExecution>>();
+        Fixtures.ReportTestResources.AddResourceTypeResolver(services, typeof(SchemataJob), typeof(SchemataJobExecution));
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataReportSnapshot>, AdviceAddResourceName<SchemataReportSnapshot>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataReportSnapshotChunk>, AdviceAddResourceName<SchemataReportSnapshotChunk>>());
         services.AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>();

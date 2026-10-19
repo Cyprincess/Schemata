@@ -22,6 +22,12 @@ public static class AdviceValidateResourceReferences
     ///     mismatch surfaces as <c>NOT_FOUND</c> rather than a duplicate lookup.
     /// </summary>
     public const int DefaultOrder = AdviceAddValidation.DefaultOrder + 10_000_000;
+
+    internal static IResourceTypeResolver RequireResolver(AdviceContext ctx, Type entity, string? detail = null) {
+        return ctx.ServiceProvider.GetService<IResourceTypeResolver>()
+            ?? throw new InvalidOperationException(
+                $"{entity.Name}{detail} requires {nameof(IResourceTypeResolver)} for {nameof(ResourceReferenceAttribute)}.");
+    }
 }
 
 /// <summary>
@@ -76,10 +82,7 @@ public sealed class AdviceValidateResourceReferences<TEntity> :
             return AdviseResult.Continue;
         }
 
-        var resolver = ctx.ServiceProvider.GetService<IResourceTypeResolver>();
-        if (resolver is null) {
-            return AdviseResult.Continue;
-        }
+        var resolver = AdviceValidateResourceReferences.RequireResolver(ctx, typeof(TEntity));
 
         List<ErrorFieldViolation>? violations = null;
 

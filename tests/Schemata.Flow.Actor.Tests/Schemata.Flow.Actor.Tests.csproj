@@ -24,6 +24,7 @@
     <ProjectReference Include="..\..\src\Schemata.Flow.Skeleton\Schemata.Flow.Skeleton.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Flow.StateMachine\Schemata.Flow.StateMachine.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Messaging.Skeleton\Schemata.Messaging.Skeleton.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
   </ItemGroup>
 
 </Project>

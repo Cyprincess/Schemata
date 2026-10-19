@@ -13,6 +13,7 @@ using Schemata.Abstractions.Entities;
 using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Managers;
 using Schemata.Authorization.Foundation.Mutations;
+using Schemata.Authorization.Integration.Tests.Fixtures;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.LinqToDB;
@@ -296,6 +297,9 @@ public class ApplicationCascadeShould
             Register<SchemataToken>(services, linq);
             Register<SchemataSecurity>(services, linq);
             Register<SchemataSubjectMapping>(services, linq);
+            TestResourceTypeResolver.AddResourceTypeResolver(services,
+                typeof(TestSubject), typeof(Application), typeof(Grant), typeof(SchemataToken),
+                typeof(SchemataSecurity), typeof(SchemataSubjectMapping));
             // Mirror the production closed-owner registration; the open-generic default has no cascade.
             services.TryAddScoped<IResourceMutation<Application>, ApplicationResourceMutation<Application, Grant, SchemataSubjectMapping, SchemataSecurity, SchemataToken>>();
             services.TryAddScoped<IResourceMutation<SchemataApplication>, ApplicationResourceMutation<SchemataApplication, Grant, SchemataSubjectMapping, SchemataSecurity, SchemataToken>>();

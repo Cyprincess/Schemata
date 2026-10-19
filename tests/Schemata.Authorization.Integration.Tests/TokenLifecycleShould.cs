@@ -420,6 +420,9 @@ public class TokenLifecycleShould
             Register<SchemataScope>(services, linq);
             Register<SchemataApplication>(services, linq);
             Register<SchemataAuthorization>(services, linq);
+            TestResourceTypeResolver.AddResourceTypeResolver(services,
+                typeof(TestSubject), typeof(SchemataApplication), typeof(SchemataAuthorization),
+                typeof(SchemataScope), typeof(SchemataToken), typeof(SchemataSecurity));
             services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(ResourceNameAdvisor<>)));
             services.AddSingleton(TimeProvider.System);
             services.AddScoped<RepositoryTokenStore<SchemataToken>>();

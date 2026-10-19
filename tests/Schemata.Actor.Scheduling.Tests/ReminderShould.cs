@@ -16,9 +16,12 @@ using Schemata.Actor.Scheduling.Features;
 using Schemata.Actor.Scheduling.Runtime;
 using Schemata.Actor.Scheduling.Tests.Fixtures;
 using Schemata.Actor.Skeleton;
+using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Core.Building;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository.Advisors;
+using Schemata.Resource.Foundation;
 using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -197,6 +200,11 @@ public sealed class ReminderShould
                      .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
         services.AddRepository<SchemataJob, EfCoreRepository<TestDbContext, SchemataJob>>();
         services.AddRepository<SchemataJobExecution, EfCoreRepository<TestDbContext, SchemataJobExecution>>();
+        var registry = new ResourceRegistry();
+        registry.Add(new(typeof(SchemataJob)), []);
+        registry.Add(new(typeof(SchemataJobExecution)), []);
+        services.TryAddSingleton(registry);
+        services.TryAddSingleton<IResourceTypeResolver, DefaultResourceTypeResolver>();
         if (nameAdvisors) {
             services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJob>, SchedulingNameAdvisor<SchemataJob>>());
             services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJobExecution>, SchedulingNameAdvisor<SchemataJobExecution>>());

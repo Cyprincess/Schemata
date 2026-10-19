@@ -17,6 +17,7 @@ using Schemata.Security.Foundation.Features;
 using Schemata.Security.Foundation.Stores;
 using Schemata.Security.Skeleton.Entities;
 using Schemata.Security.Skeleton.Services;
+using Schemata.Security.Tests.Fixtures;
 using Xunit;
 using static Schemata.Security.Skeleton.SecurityConstants;
 
@@ -158,6 +159,7 @@ public class CustomTokenEntityShould
             }
 
             services.AddSingleton(TimeProvider.System);
+            SecurityTestResources.AddResourceTypeResolver(services);
             var builder = new SchemataBuilder(new ConfigurationBuilder().Build(), null!);
             builder.UseSecurity<MySecurity, MyToken>();
             new SchemataSecurityFeature<MySecurity, MyToken>()

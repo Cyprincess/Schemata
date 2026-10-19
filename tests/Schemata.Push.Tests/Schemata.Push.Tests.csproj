@@ -20,6 +20,7 @@
     <ProjectReference Include="..\..\src\Schemata.Entity.LinqToDB\Schemata.Entity.LinqToDB.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Push.Foundation\Schemata.Push.Foundation.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Push.Scheduling\Schemata.Push.Scheduling.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
   </ItemGroup>
 
 </Project>

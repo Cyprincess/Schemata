@@ -128,15 +128,17 @@ public class AdviceValidateResourceReferencesShould
     }
 
     [Fact]
-    public async Task ReferencedEntity_MissingResolver_Continues() {
+    public async Task ReferencedEntity_MissingResolver_ThrowsInvalidOperation() {
         var advisor    = new AdviceValidateResourceReferences<ReferencingEntity>();
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<ReferencingEntity>>().Object;
         var entity     = new ReferencingEntity { BookCanonicalName = "books/x" };
 
-        var result = await advisor.AdviseAsync(ctx, repository, entity, default, CancellationToken.None);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => advisor.AdviseAsync(ctx, repository, entity, default, CancellationToken.None));
 
-        Assert.Equal(AdviseResult.Continue, result);
+        Assert.Contains(nameof(ReferencingEntity), exception.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IResourceTypeResolver), exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

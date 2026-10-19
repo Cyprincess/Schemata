@@ -29,6 +29,7 @@ using Schemata.Push.Foundation.Features;
 using Schemata.Push.Foundation.Handlers;
 using Schemata.Push.Skeleton;
 using Schemata.Push.Skeleton.Entities;
+using Schemata.Push.Tests.Fixtures;
 using Xunit;
 using IndexAttribute = Schemata.Abstractions.Entities.IndexAttribute;
 using TableAttribute = System.ComponentModel.DataAnnotations.Schema.TableAttribute;
@@ -183,6 +184,7 @@ public sealed class CustomPushSubscriptionShould
             var services = new ServiceCollection();
             services.AddLogging();
             services.AddSingleton(TimeProvider.System);
+            PushTestResources.AddResourceTypeResolver(services, typeof(CustomPushSubscription));
             services.AddSingleton<IRepositoryAddAdvisor<CustomPushSubscription>>(
                 new CustomNameAdvisor(new NameSequence().Next));
 

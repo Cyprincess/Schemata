@@ -22,6 +22,7 @@ using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Security.Foundation.Stores;
 using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Tests.Fixtures;
 using Xunit;
 using static Schemata.Security.Skeleton.SecurityConstants;
 
@@ -54,6 +55,7 @@ public class RepositoryTokenStoreIntegrationShould : IAsyncLifetime
         services.TryAddScoped(_ => new TokenConnection(options));
         services.TryAddSingleton<Func<TokenConnection>>(_ => () => new(options));
         services.AddRepository<SchemataToken, LinqToDbRepository<TokenConnection, SchemataToken>>();
+        SecurityTestResources.AddResourceTypeResolver(services);
         // Production resolves the store through DI, so abort classification opens a fresh scope
         // instead of reusing a repository whose unit of work was just disposed.
         services.TryAddSingleton(TimeProvider.System);
@@ -88,10 +90,10 @@ public class RepositoryTokenStoreIntegrationShould : IAsyncLifetime
             var (repository, scope) = CreateScope();
             using (scope) {
                 await SeedAsync(repository,
-                                new() { Name = "target-1", Authorization = "auth-1", Status = Statuses.Valid },
-                                new() { Name = "target-2", Authorization = "auth-1", Status = Statuses.Redeemed },
-                                new() { Name = "already",  Authorization = "auth-1", Status = Statuses.Revoked },
-                                new() { Name = "away",     Authorization = "auth-2", Status = Statuses.Valid });
+                                new() { Name = "target-1", Authorization = "authorizations/auth-1", Status = Statuses.Valid },
+                                new() { Name = "target-2", Authorization = "authorizations/auth-1", Status = Statuses.Redeemed },
+                                new() { Name = "already",  Authorization = "authorizations/auth-1", Status = Statuses.Revoked },
+                                new() { Name = "away",     Authorization = "authorizations/auth-2", Status = Statuses.Valid });
             }
         }
 
@@ -100,7 +102,7 @@ public class RepositoryTokenStoreIntegrationShould : IAsyncLifetime
             var (repository, scope) = CreateScope();
             using (scope) {
                 count = await new RepositoryTokenStore<SchemataToken>(scope.ServiceProvider, TimeProvider.System)
-                    .RevokeByAuthorizationAsync("auth-1");
+                    .RevokeByAuthorizationAsync("authorizations/auth-1");
             }
         }
 
@@ -453,6 +455,7 @@ public class RepositoryTokenStoreIntegrationShould : IAsyncLifetime
             services.TryAddSingleton<Func<TokenConnection>>(_ => () => new(_options!));
             services.TryAddSingleton(_ => (Func<Task>)WinnerRotates);
             services.AddRepository<SchemataToken, RaceAfterReadRepository>();
+            SecurityTestResources.AddResourceTypeResolver(services);
             services.TryAddSingleton(TimeProvider.System);
             services.TryAddScoped<RepositoryTokenStore<SchemataToken>>();
             await using var provider = services.BuildServiceProvider();
@@ -890,6 +893,7 @@ public class RepositoryTokenStoreIntegrationShould : IAsyncLifetime
                     .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
                 services.AddRepository<SchemataToken, EfCoreRepository<VetoContext, SchemataToken>>();
             }
+            SecurityTestResources.AddResourceTypeResolver(services);
             services.AddSingleton(TimeProvider.System);
             services.AddScoped<RepositoryTokenStore<SchemataToken>>();
             configure(services);

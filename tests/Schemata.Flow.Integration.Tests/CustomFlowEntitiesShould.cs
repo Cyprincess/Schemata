@@ -47,6 +47,8 @@ public sealed class CustomFlowEntitiesShould
             FlowFixtureServices.AddTenantFlowRepositories(services, dbPath);
         }
 
+        FlowFixtureServices.AddResourceTypeResolver(services, typeof(TenantProcess), typeof(TenantProcessToken),
+            typeof(TenantProcessTransition), typeof(TenantProcessSource));
         Schemata.Flow.Tests.FlowTestCreation.Register(services);
         services.AddLogging();
 

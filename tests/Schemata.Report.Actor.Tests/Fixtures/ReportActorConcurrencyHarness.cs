@@ -9,6 +9,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Core;
+using Schemata.Core.Building;
+using Schemata.Abstractions.Resource;
+using Schemata.Resource.Foundation;
 using Schemata.Actor.Skeleton;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Runtime;
@@ -58,6 +61,15 @@ public sealed class ReportActorConcurrencyHarness : IAsyncDisposable
         services.AddRepository<SchemataReportSnapshot, EfCoreRepository<TestDbContext, SchemataReportSnapshot>>();
         services.AddRepository<SchemataReportSnapshotChunk, EfCoreRepository<TestDbContext, SchemataReportSnapshotChunk>>();
         services.AddScoped<IUnitOfWork<TestDbContext>, EfCoreUnitOfWork<TestDbContext>>();
+        var registry = new ResourceRegistry();
+        foreach (var type in new[] {
+                     typeof(SchemataReport), typeof(SchemataReportSnapshot), typeof(SchemataReportSnapshotChunk),
+                 }) {
+            registry.Add(new(type), []);
+        }
+
+        services.TryAddSingleton(registry);
+        services.TryAddSingleton<IResourceTypeResolver, DefaultResourceTypeResolver>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataReport>, AdviceAddReportName>());
     services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataReportSnapshot>, AdviceAddResourceName<SchemataReportSnapshot>>());
     services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataReportSnapshotChunk>, AdviceAddResourceName<SchemataReportSnapshotChunk>>());

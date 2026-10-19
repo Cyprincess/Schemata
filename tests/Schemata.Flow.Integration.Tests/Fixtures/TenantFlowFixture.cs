@@ -88,6 +88,8 @@ public sealed class TenantFlowFixture(bool linq) : IAsyncLifetime, IFlowIntegrat
             TenantProcessCompensation, TenantProcessParticipant, TenantProcessSource, TenantFlowEffectIntent>(services);
         services.AddSingleton<IOptions<SchemataFlowOptions>>(Options.Create(new SchemataFlowOptions()));
         ConfigureServices?.Invoke(services);
+        FlowFixtureServices.AddResourceTypeResolver(services, typeof(TenantProcess), typeof(TenantProcessToken),
+            typeof(Order), typeof(TestUser));
 
         _root = services.BuildServiceProvider();
         (_cache, _scopes) = FlowFixtureServices.CreateTenantScopes(_root);

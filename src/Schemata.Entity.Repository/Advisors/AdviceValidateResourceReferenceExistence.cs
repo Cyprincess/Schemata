@@ -79,12 +79,10 @@ public sealed class AdviceValidateResourceReferenceExistence<TEntity> :
             return AdviseResult.Continue;
         }
 
-        var resolver = ctx.ServiceProvider.GetService<IResourceTypeResolver>();
-        if (resolver is null) {
-            var reference = references[0];
-            throw new InvalidOperationException(
-                $"{typeof(TEntity).Name}.{reference.Property.Name} requires {nameof(IResourceTypeResolver)} for {nameof(ResourceReferenceAttribute.ValidateExistence)}.");
-        }
+        var resolver = AdviceValidateResourceReferences.RequireResolver(
+            ctx,
+            typeof(TEntity),
+            $".{references[0].Property.Name} ({nameof(ResourceReferenceAttribute.ValidateExistence)})");
 
         foreach (var reference in references) {
             if (reference.Property.GetValue(entity) is not string value || string.IsNullOrWhiteSpace(value)) {

@@ -57,6 +57,7 @@ internal sealed class ReportScheduleLifecycleHost(WebApplication app, string pat
             reports.UseScheduling();
             schema.UseReport<ScheduleReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>().UseScheduling();
         });
+        ReportTestResources.AddResourceTypeResolver(builder.Services, typeof(SchemataJob), typeof(SchemataJobExecution));
         configure?.Invoke(builder.Services);
         var app = builder.Build();
         var host = new ReportScheduleLifecycleHost(app, path);

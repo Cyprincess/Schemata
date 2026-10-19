@@ -34,6 +34,7 @@ public class ScheduleVetoShould
         services.AddDbContextFactory<SchedulingDbContext>(options => options.UseSqlite(connection).ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
         services.AddRepository<SchemataJob, EfCoreRepository<SchedulingDbContext, SchemataJob>>();
         services.AddRepository<SchemataJobExecution, EfCoreRepository<SchedulingDbContext, SchemataJobExecution>>();
+        SchedulingTestResources.AddResourceTypeResolver(services, typeof(SchemataJob), typeof(SchemataJobExecution));
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJob>, AdviceAddResourceName<SchemataJob>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJobExecution>, AdviceAddResourceName<SchemataJobExecution>>());
         services.AddSingleton<IRepositoryAddAdvisor<SchemataJobExecution>>(veto);
@@ -78,6 +79,7 @@ public class ScheduleVetoShould
         var services = new ServiceCollection();
         services.AddDbContextFactory<SchedulingDbContext>(options => options.UseSqlite(connection).ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
         services.AddRepository<SchemataJobExecution, EfCoreRepository<SchedulingDbContext, SchemataJobExecution>>();
+        SchedulingTestResources.AddResourceTypeResolver(services, typeof(SchemataJob), typeof(SchemataJobExecution));
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJobExecution>, AdviceAddResourceName<SchemataJobExecution>>());
         services.AddSingleton<IRepositoryUpdateAdvisor<SchemataJobExecution>>(new TerminalVeto());
         services.AddSchemataScheduling();
@@ -101,6 +103,7 @@ public class ScheduleVetoShould
         var services = new ServiceCollection();
         services.AddDbContextFactory<SchedulingDbContext>(options => options.UseSqlite(connection).ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
         services.AddRepository<SchemataJobExecution, EfCoreRepository<SchedulingDbContext, SchemataJobExecution>>();
+        SchedulingTestResources.AddResourceTypeResolver(services, typeof(SchemataJob), typeof(SchemataJobExecution));
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJobExecution>, AdviceAddResourceName<SchemataJobExecution>>());
         services.AddSingleton<IRepositoryCommittedAdvisor<SchemataJobExecution>>(gate);
         services.AddSchemataScheduling();
@@ -142,6 +145,7 @@ public class ScheduleVetoShould
         services.AddDbContextFactory<SchedulingDbContext>(options => options.UseSqlite(connection).ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
         services.AddRepository<SchemataJob, EfCoreRepository<SchedulingDbContext, SchemataJob>>();
         services.AddRepository<SchemataJobExecution, EfCoreRepository<SchedulingDbContext, SchemataJobExecution>>();
+        SchedulingTestResources.AddResourceTypeResolver(services, typeof(SchemataJob), typeof(SchemataJobExecution));
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJob>, AdviceAddResourceName<SchemataJob>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJobExecution>, AdviceAddResourceName<SchemataJobExecution>>());
         services.AddSingleton<IRepositoryUpdateAdvisor<SchemataJob>>(new SettlementVeto());
@@ -207,6 +211,7 @@ public class ScheduleVetoShould
         services.AddDbContextFactory<SchedulingDbContext>(options => options.UseSqlite(connection).ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
         services.AddRepository<SchemataJob, EfCoreRepository<SchedulingDbContext, SchemataJob>>();
         services.AddRepository<SchemataJobExecution, EfCoreRepository<SchedulingDbContext, SchemataJobExecution>>();
+        SchedulingTestResources.AddResourceTypeResolver(services, typeof(SchemataJob), typeof(SchemataJobExecution));
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJob>, AdviceAddResourceName<SchemataJob>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJobExecution>, AdviceAddResourceName<SchemataJobExecution>>());
         services.AddSingleton<IRepositoryCommittedAdvisor<SchemataJobExecution>>(new ThrowAfterSuccess());

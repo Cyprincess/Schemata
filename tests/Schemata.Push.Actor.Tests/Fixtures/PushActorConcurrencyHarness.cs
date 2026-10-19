@@ -10,6 +10,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Actor.Foundation.Features;
 using Schemata.Actor.Skeleton;
+using Schemata.Abstractions.Resource;
+using Schemata.Core.Building;
+using Schemata.Resource.Foundation;
 using Schemata.Actor.Skeleton.Entities;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
@@ -39,6 +42,11 @@ public sealed class PushActorConcurrencyHarness : IAsyncDisposable
                      .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
         services.AddRepository<SchemataPushSubscription, EfCoreRepository<TestDbContext, SchemataPushSubscription>>();
         services.AddScoped<IUnitOfWork<TestDbContext>, EfCoreUnitOfWork<TestDbContext>>();
+        var registry = new ResourceRegistry();
+        registry.Add(new(typeof(SchemataPushSubscription)), []);
+        registry.Add(new(typeof(TestOwner)), []);
+        services.TryAddSingleton(registry);
+        services.TryAddSingleton<IResourceTypeResolver, DefaultResourceTypeResolver>();
         services.TryAddEnumerable(
             ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataPushSubscription>, PushSubscriptionNameAdvisor>());
         if (addAdvisor is not null) {

@@ -11,12 +11,15 @@ using LinqToDB.Mapping;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions.Resource;
+using Schemata.Core.Building;
 using Schemata.Entity.LinqToDB;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Push.Foundation.Commands;
 using Schemata.Push.Foundation.Handlers;
 using Schemata.Push.Skeleton.Entities;
+using Schemata.Resource.Foundation;
 using IndexAttribute = Schemata.Abstractions.Entities.IndexAttribute;
 using TableAttribute = System.ComponentModel.DataAnnotations.Schema.TableAttribute;
 
@@ -45,6 +48,7 @@ public sealed class LinqToDbPushSubscriptionFixture(bool nameAdvisor = true) : I
         services.AddRepository<SchemataPushSubscription, LinqToDbRepository<PushDataConnection, SchemataPushSubscription>>();
         services.AddScoped<IUnitOfWork<PushDataConnection>, LinqToDbUnitOfWork<PushDataConnection>>();
         services.AddSingleton(TimeProvider.System);
+        PushTestResources.AddResourceTypeResolver(services, typeof(SchemataPushSubscription));
 
         if (nameAdvisor) {
             services.TryAddEnumerable(ServiceDescriptor.Singleton<IRepositoryAddAdvisor<SchemataPushSubscription>>(
