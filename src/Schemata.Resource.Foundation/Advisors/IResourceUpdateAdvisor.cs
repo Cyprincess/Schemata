@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Resource;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Resource.Foundation.Advisors;
@@ -12,6 +13,8 @@ namespace Schemata.Resource.Foundation.Advisors;
 /// </summary>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>
-public interface IResourceUpdateAdvisor<TEntity, TRequest> : IAdvisor<TRequest, TEntity, ClaimsPrincipal?>
+public interface IResourceUpdateAdvisor<TEntity, TRequest, TDetail>
+    : IAdvisor<TRequest, TEntity, ClaimsPrincipal?, HandledResponse<UpdateResultBase<TDetail>>>
     where TEntity : class, ICanonicalName
-    where TRequest : class, ICanonicalName;
+    where TRequest : class, ICanonicalName
+    where TDetail : class, ICanonicalName;

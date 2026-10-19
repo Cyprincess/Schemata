@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Resource;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Common.Errors;
 using static Schemata.Abstractions.SchemataConstants;
@@ -32,11 +33,12 @@ public static class AdviceUpdateSoftDeleted
 /// </summary>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>
-public sealed class AdviceUpdateSoftDeleted<TEntity, TRequest> : IResourceUpdateAdvisor<TEntity, TRequest>
+public sealed class AdviceUpdateSoftDeleted<TEntity, TRequest, TDetail> : IResourceUpdateAdvisor<TEntity, TRequest, TDetail>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
+    where TDetail : class, ICanonicalName
 {
-    #region IResourceUpdateAdvisor<TEntity,TRequest> Members
+    #region IResourceUpdateAdvisor<TEntity,TRequest,TDetail> Members
 
     public int Order => AdviceUpdateSoftDeleted.DefaultOrder;
 
@@ -45,6 +47,7 @@ public sealed class AdviceUpdateSoftDeleted<TEntity, TRequest> : IResourceUpdate
         TRequest          request,
         TEntity           entity,
         ClaimsPrincipal?  principal,
+        HandledResponse<UpdateResultBase<TDetail>> handled,
         CancellationToken ct = default
     ) {
         if (entity is ISoftDelete { DeleteTime: not null }) {

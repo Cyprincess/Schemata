@@ -4,6 +4,7 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Messaging.Skeleton;
 using Schemata.Resource.Foundation.Commands;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Resource.Foundation.Handlers;
 
@@ -17,8 +18,9 @@ internal sealed class DefaultDeleteResourceHandler<TEntity, TRequest, TDetail, T
 {
     public Task<DeleteResultBase<TDetail>> HandleAsync(
         DeleteResourceRequest<TEntity, TDetail> request,
-        CancellationToken              ct = default
+        AdviceContext                           context,
+        CancellationToken                       ct = default
     ) {
-        return operation.DeleteAsync(request.Name, request.Etag, request.Principal, ct, request.AllowMissing);
+        return operation.DeleteAsync(request.Name, request.Etag, request.Principal, context, ct, request.AllowMissing);
     }
 }

@@ -1,11 +1,9 @@
-using Schemata.Core.Building;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
@@ -96,30 +94,6 @@ public class ResourceRequestPipelineAdvisorShould
     }
 
     [Fact]
-    public async Task Create_SuppressedValidation_SkipsValidator() {
-        var request = new Request { DisplayName = "" };
-
-        var (repository, mapper) = CreateDoubles();
-        var validator = new RejectingValidationAdvisor();
-        using var services = BuildServices(
-            repository.Object,
-            mapper.Object,
-            services => {
-                services.AddSingleton<IRequestPipelineAdvisor<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>>(
-                    new ResourceCreateValidationPipelineAdvisor<Entity, Request, Detail>());
-                services.AddSingleton<IValidationAdvisor<Request>>(validator);
-            },
-            new SchemataResourceOptions { SuppressCreateValidation = true });
-        var dispatcher = new InProcessRequestDispatcher(services);
-
-        var result = await dispatcher.SendAsync<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>(
-            new(request, null), CancellationToken.None);
-
-        Assert.Same(MappedDetail, result.Detail);
-        Assert.False(validator.Invoked);
-    }
-
-    [Fact]
     public async Task Update_Sanitize_ClearsSystemFields_AndStripsMask_BeforeHandlerMaps() {
         var request = new Request {
             DisplayName = "keep-me",
@@ -181,31 +155,7 @@ public class ResourceRequestPipelineAdvisorShould
         Assert.Null(validator.SeenCreateTime);
     }
 
-    [Fact]
-    public async Task Update_SuppressedValidation_SkipsValidator() {
-        var request = new Request { DisplayName = "" };
-
-        var (repository, mapper) = CreateDoubles();
-        var validator = new RejectingValidationAdvisor();
-        using var services = BuildServices(
-            repository.Object,
-            mapper.Object,
-            services => {
-                services.AddSingleton<IRequestPipelineAdvisor<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>>(
-                    new ResourceUpdateValidationPipelineAdvisor<Entity, Request, Detail>());
-                services.AddSingleton<IValidationAdvisor<Request>>(validator);
-            },
-            new SchemataResourceOptions { SuppressUpdateValidation = true });
-        var dispatcher = new InProcessRequestDispatcher(services);
-
-        var result = await dispatcher.SendAsync<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>(
-            new("entities/e1", request, null), CancellationToken.None);
-
-        Assert.Same(MappedDetail, result.Detail);
-        Assert.False(validator.Invoked);
-    }
-
-
+    [Trait("Layer", "Component")]
     [Fact]
     public async Task Update_Authorization_Sees_Client_System_Fields_Before_Sanitize_And_Handler_Sees_Scrubbed_Payload() {
         var request = new Request {
@@ -225,14 +175,15 @@ public class ResourceRequestPipelineAdvisorShould
         permissionResolver.Setup(value => value.Resolve(nameof(Operations.Update), typeof(Entity))).Returns("entities.update");
         var permissionMatcher = new Mock<IPermissionMatcher>();
         permissionMatcher.Setup(value => value.IsMatch(It.IsAny<System.Security.Claims.ClaimsPrincipal>(), "entities.update")).Returns(true);
+        using var policyServices = new ServiceCollection().BuildServiceProvider();
         var authorization = new AuthorizationPipelineAdvisor<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>(
             envelope => {
                 authorized = envelope.Request;
                 authorizedName = envelope.Request.Name;
                 authorizedCreateTime = envelope.Request.CreateTime;
                 authorizedUpdateMask = envelope.Request.UpdateMask;
-                return (nameof(Operations.Update), typeof(Entity));
-            }, permissionResolver.Object, permissionMatcher.Object);
+                return ResourceTarget.Instance(nameof(Operations.Update), typeof(Entity), envelope.Name);
+            }, permissionResolver.Object, permissionMatcher.Object, policyServices);
         using var services = BuildServices(repository.Object, mapper.Object, service => {
             service.AddSingleton<IRequestPipelineAdvisor<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>>(authorization);
             service.AddSingleton<IRequestPipelineAdvisor<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>>(
@@ -265,13 +216,9 @@ public class ResourceRequestPipelineAdvisorShould
 
     private static (Mock<IRepository<Entity>> Repository, Mock<ISimpleMapper> Mapper) CreateDoubles() {
         var repository = new Mock<IRepository<Entity>>();
-        repository.Setup(r => r.AddAsync(MappedEntity, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        repository.Setup(r => r.UpdateAsync(MappedEntity, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Mock.Of<IDisposable>());
         repository.Setup(r => r.SingleOrDefaultAsync(
                               It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
-                              It.IsAny<CancellationToken>()))
+                              It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
                   .Returns(new ValueTask<Entity?>(MappedEntity));
 
         var mapper = new Mock<ISimpleMapper>();
@@ -284,12 +231,12 @@ public class ResourceRequestPipelineAdvisorShould
     private static ServiceProvider BuildServices(
         IRepository<Entity>       repository,
         ISimpleMapper             mapper,
-        Action<ServiceCollection> configureAdvisors,
-        SchemataResourceOptions?  options = null
+        Action<ServiceCollection> configureAdvisors
     ) {
         var services = new ServiceCollection();
         services.AddSingleton(repository);
         services.AddSingleton(mapper);
+        services.AddSingleton(Fixtures.ResourceMutationMock.Create<Entity>().Object);
         services.AddSingleton<ResourceOperationHandler<Entity, Request, Detail, Summary>>();
         services.AddSingleton<
             IRequestHandler<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>,
@@ -298,9 +245,6 @@ public class ResourceRequestPipelineAdvisorShould
             IRequestHandler<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>,
             DefaultUpdateResourceHandler<Entity, Request, Detail, Summary>>();
         configureAdvisors(services);
-        if (options is not null) {
-            services.AddSingleton<IOptions<SchemataResourceOptions>>(Options.Create(options));
-        }
 
         return services.BuildServiceProvider();
     }
@@ -321,7 +265,7 @@ public class ResourceRequestPipelineAdvisorShould
         ) {
             Invoked        = true;
             SeenCreateTime = request.CreateTime;
-            errors.Add(new ErrorFieldViolation {
+            errors.Add(new() {
                 Field       = nameof(Request.DisplayName),
                 Description = "Display name is required.",
             });

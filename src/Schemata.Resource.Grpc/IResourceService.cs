@@ -27,9 +27,9 @@ public interface IResourceService<TEntity, TRequest, TDetail, TSummary>
     /// </summary>
     /// <param name="request">The <see cref="ListRequest" /> with filter, page size, and page token.</param>
     /// <param name="context">The <see cref="CallContext" /> carrying gRPC metadata.</param>
-    /// <returns>A <see cref="ListResultBase{TSummary}" /> with the matching resource summaries.</returns>
+    /// <returns>A <see cref="ListResultBase{TEntity,TSummary}" /> with the matching resource summaries.</returns>
     [Operation]
-    ValueTask<ListResultBase<TSummary>> ListAsync(ListRequest request, CallContext context = default);
+    ValueTask<ListResultBase<TEntity, TSummary>> ListAsync(ListRequest request, CallContext context = default);
 
     /// <summary>
     ///     Gets a single resource by canonical name
@@ -47,9 +47,10 @@ public interface IResourceService<TEntity, TRequest, TDetail, TSummary>
     /// </summary>
     /// <param name="request">The creation request DTO.</param>
     /// <param name="context">The <see cref="CallContext" /> carrying gRPC metadata.</param>
-    /// <returns>The created resource detail DTO.</returns>
+    /// <returns>The created resource detail DTO, or <see langword="null" /> when the create was
+    ///     handled without a write. The unary adapter creates a default detail through the protobuf model.</returns>
     [Operation]
-    ValueTask<TDetail> CreateAsync(TRequest request, CallContext context = default);
+    ValueTask<TDetail?> CreateAsync(TRequest request, CallContext context = default);
 
     /// <summary>
     ///     Updates an existing resource by canonical name
@@ -57,9 +58,10 @@ public interface IResourceService<TEntity, TRequest, TDetail, TSummary>
     /// </summary>
     /// <param name="request">The update request DTO.</param>
     /// <param name="context">The <see cref="CallContext" /> carrying gRPC metadata.</param>
-    /// <returns>The updated resource detail DTO.</returns>
+    /// <returns>The updated resource detail DTO, or <see langword="null" /> when the update was
+    ///     handled without a write. The unary adapter creates a default detail through the protobuf model.</returns>
     [Operation]
-    ValueTask<TDetail> UpdateAsync(TRequest request, CallContext context = default);
+    ValueTask<TDetail?> UpdateAsync(TRequest request, CallContext context = default);
 
     /// <summary>
     ///     Deletes a resource by canonical name
@@ -72,7 +74,9 @@ public interface IResourceService<TEntity, TRequest, TDetail, TSummary>
     ///     The <see cref="DeleteRequest" /> containing the canonical name and ETag for concurrency.
     /// </param>
     /// <param name="context">The <see cref="CallContext" /> carrying gRPC metadata.</param>
-    /// <returns>The soft-deleted resource detail, or <see langword="null" /> for a hard delete.</returns>
+    /// <returns>The soft-deleted resource detail, or <see langword="null" /> when no detail is produced.
+    ///     The unary adapter creates a default detail for soft-delete responses and uses
+    ///     <c>google.protobuf.Empty</c> for hard-delete responses.</returns>
     [Operation]
     ValueTask<TDetail?> DeleteAsync(DeleteRequest request, CallContext context = default);
 }

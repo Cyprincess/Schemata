@@ -4,6 +4,7 @@ using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Messaging.Skeleton;
 using Schemata.Resource.Foundation.Commands;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Resource.Foundation.Handlers;
 
@@ -17,8 +18,9 @@ internal sealed class DefaultGetResourceHandler<TEntity, TRequest, TDetail, TSum
 {
     public Task<GetResultBase<TDetail>> HandleAsync(
         GetResourceQueryRequest<TEntity, TDetail> request,
-        CancellationToken                ct = default
+        AdviceContext                             context,
+        CancellationToken                         ct = default
     ) {
-        return operation.GetAsync(request.Request, request.Principal, ct);
+        return operation.GetAsync(request.Request, request.Principal, context, ct);
     }
 }

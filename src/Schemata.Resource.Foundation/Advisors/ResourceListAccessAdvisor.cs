@@ -9,22 +9,24 @@ using Schemata.Security.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
-public sealed class ResourceListAccessAdvisor<TEntity>(IAccessProvider<TEntity, ListRequest> access)
-    : IResourceListRequestAdvisor<TEntity>
+public sealed class ResourceListAccessAdvisor<TEntity, TSummary>(IAccessProvider<TEntity, ListRequest> access)
+    : IResourceListRequestAdvisor<TEntity, TSummary>
     where TEntity : class, ICanonicalName
+    where TSummary : class, ICanonicalName
 {
     public int Order => ResourceSecurityAdvisorOrders.Access;
 
     public async Task<AdviseResult> AdviseAsync(
-        AdviceContext                     ctx,
-        ListRequest                       request,
-        ResourceRequestContainer<TEntity> container,
-        ClaimsPrincipal?                  principal,
-        CancellationToken                 ct = default
+        AdviceContext                                      ctx,
+        ListRequest                                        request,
+        ResourceRequestContainer<TEntity>                  container,
+        ClaimsPrincipal?                                   principal,
+        HandledResponse<ListResultBase<TEntity, TSummary>> handled,
+        CancellationToken                                  ct = default
     ) {
         if (!AnonymousAccess.IsAnonymous<TEntity>(nameof(Operations.List))) {
             await AuthorizeHelper.EnsureAsync(access,
-                                              new() { Operation = nameof(Operations.List), Request = request },
+                                              new() { Operation = nameof(Operations.List), Request = request, Stage = AccessStage.Target, Parent = request.Parent },
                                               request.Parent ?? string.Empty, principal, ct);
         }
 

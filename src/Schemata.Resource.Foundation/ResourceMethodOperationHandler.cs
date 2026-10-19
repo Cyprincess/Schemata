@@ -1,18 +1,23 @@
 using System;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Advice;
 using Schemata.Common;
 using Schemata.Common.Errors;
+using Schemata.Core.Building;
 using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Commands;
 using Schemata.Resource.Foundation.Advisors;
-using Schemata.Resource.Foundation.Runtime;
+using Schemata.Security.Skeleton;
+using static Schemata.Security.Skeleton.AnonymousAccess;
 
 namespace Schemata.Resource.Foundation;
 
@@ -49,10 +54,8 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
     ///     <see cref="Schemata.Abstractions.Resource.ResourceMethodAttribute" />.
     /// </param>
     /// <param name="name">
-    ///     The canonical name of the target resource for
-    ///     <see cref="ResourceMethodScope.Instance" />-scoped methods, or
-    ///     <see langword="null" /> for
-    ///     <see cref="ResourceMethodScope.Collection" />-scoped methods.
+    ///     The canonical name of the target resource. Used only when the registered method is
+    ///     <see cref="ResourceMethodScope.Instance" />-scoped; a collection-scoped method ignores it.
     /// </param>
     /// <param name="request">The incoming request payload.</param>
     /// <param name="principal">
@@ -84,11 +87,12 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
     ///     <see cref="Schemata.Abstractions.Resource.ResourceMethodAttribute" />.
     /// </param>
     /// <param name="name">
-    ///     The canonical name of the target resource for instance-scoped methods, or
-    ///     <see langword="null" /> for collection-scoped methods.
+    ///     The canonical name of the target resource. Used only when the registered method is
+    ///     <see cref="ResourceMethodScope.Instance" />-scoped; a collection-scoped method ignores it.
     /// </param>
     /// <param name="request">The incoming request payload.</param>
     /// <param name="principal">The authenticated caller, or <see langword="null" /> for anonymous calls.</param>
+    /// <param name="ctx">The advisor context shared with the caller.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The method's response.</returns>
     internal async Task<TResponse> InvokeCoreAsync(
@@ -96,13 +100,16 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
         string?           name,
         TRequest          request,
         ClaimsPrincipal?  principal,
+        AdviceContext     ctx,
         CancellationToken ct
     ) {
-        var ctx = ResourceAdviceContext.Create(_sp);
-        ctx.Set(new ResourceMethodVerb(verb));
+        var scope = ResolveScope(verb);
 
         var container = new ResourceRequestContainer<TEntity>();
-        if (name is not null) {
+        var instance  = scope == ResourceMethodScope.Instance;
+        if (instance) {
+            // An instance-scoped method requires its target; ResourceIdentifiers.Apply rejects a
+            // missing or malformed name before any business handler can run.
             ResourceIdentifiers.Apply(container, name);
 
             // The URI target identifies the resource for AIP-155 idempotency; carry it on the request
@@ -112,36 +119,77 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
             }
         }
 
-        var requestResult = await ResourcePipelineRunner<string>.RunAsync<TResponse>(
-            ctx,
-            () => Advisor.For<IResourceMethodRequestAdvisor<TEntity, TRequest>>()
-                         .RunAsync(ctx, request, container, principal, ct), () => Blocked(name));
+        var execution = new ResourceMethodExecution<TEntity, TRequest, TResponse> {
+            Verb      = verb,
+            Target    = instance ? name : null,
+            Request   = request,
+            Principal = principal,
+        };
+
+        // The idempotency wrap attaches its dispatch execution to the inner request DTO. Method
+        // stages and the business handler report their transaction completion through it; a
+        // dispatch whose owner never reports settles conservatively.
+        execution.Dispatch = (request as IResourceDispatchCarrier)?.Dispatch;
+
+        var requestResult = await HandledResponseRunner.RunAsync(
+            execution,
+            () => Advisor.For<IResourceMethodRequestAdvisor<TEntity, TRequest, TResponse>>()
+                         .RunAsync(ctx, execution, container, ct),
+            () => Blocked(name));
         if (requestResult is not null) {
             return requestResult;
         }
 
-        TEntity? entity = null;
-        if (name is not null) {
-            using (_repository.SuppressQuerySoftDelete()) {
-                entity = await _repository.SingleOrDefaultAsync(q => container.Query(q), ct);
-            }
+        if (instance) {
+            var entity = await _repository.SingleOrDefaultAsync(
+                q => container.Query(q), ct, new QueryOptions(IgnoreSoftDelete: true));
 
             if (entity is null) {
+                // Entitlement-filtered null and physical absence are indistinguishable; authorize
+                // the missing outcome before a NOT_FOUND, same matrix as the standard handlers.
+                if (!IsAnonymous<TEntity>(verb)
+                 && _sp.GetKeyedService<ResourceAccessStage>(typeof(TEntity)) is { } access) {
+                    await access.FinalizeMissingAsync<TEntity, TRequest>(verb, request, name, principal, ct);
+                }
+
                 throw ResourceNotFound(name);
             }
 
+            execution.Entity = entity;
 
-            var methodResult = await ResourcePipelineRunner<string>.RunAsync<TResponse>(
-                ctx,
+            // The method stage starts with no handled response: a request-stage write that
+            // continued must not stand in for the method stage's result.
+            execution.Response = null;
+
+            var methodResult = await HandledResponseRunner.RunAsync(
+                execution,
                 () => Advisor.For<IResourceMethodAdvisor<TEntity, TRequest, TResponse>>()
-                             .RunAsync(ctx, request, entity, principal, ct), () => Blocked(name));
+                             .RunAsync(ctx, execution, ct),
+                () => Blocked(name));
             if (methodResult is not null) {
                 return methodResult;
             }
         }
 
+        // The business dispatch is running: without an explicit completion report the outcome
+        // stays Reached, which the idempotency wrap treats as unknown and keeps pending.
+        execution.Dispatch?.MarkReached();
+
         request.Principal = principal;
         return await _dispatcher.SendAsync<TRequest, TResponse>(request, ct);
+    }
+
+    private ResourceMethodScope ResolveScope(string verb) {
+        var method = _sp.GetService<ResourceRegistry>()
+                       ?.GetMethods(typeof(TEntity))
+                        .FirstOrDefault(candidate => candidate.Verb == verb);
+        if (method is null) {
+            throw new InvalidOperationException(
+                $"Custom method '{verb}' is not registered for resource '{typeof(TEntity).FullName}'; "
+                + "register it on the resource before dispatch.");
+        }
+
+        return method.Scope;
     }
 
     private static NotFoundException Blocked(string? name) {

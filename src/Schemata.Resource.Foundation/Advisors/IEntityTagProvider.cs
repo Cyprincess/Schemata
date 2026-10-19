@@ -1,4 +1,4 @@
-using Schemata.Abstractions.Advisors;
+﻿using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 
 namespace Schemata.Resource.Foundation.Advisors;
@@ -13,7 +13,7 @@ public interface IEntityTagProvider
     /// <typeparam name="TEntity">The entity type behind the response.</typeparam>
     /// <typeparam name="TDetail">The detail DTO type carrying the response.</typeparam>
     /// <param name="detail">The mapped detail, or <see langword="null" /> when the response carries none.</param>
-    /// <param name="ctx">The ambient advisor context for the dispatch.</param>
+    /// <param name="ctx">The dispatch's advisor context.</param>
     /// <returns>The weak ETag to set on the detail, or <see langword="null" /> when the resource has no freshness tag.</returns>
     string? GetEntityTag<TEntity, TDetail>(TDetail? detail, AdviceContext ctx)
         where TEntity : class, ICanonicalName

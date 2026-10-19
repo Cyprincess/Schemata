@@ -14,7 +14,7 @@ namespace Schemata.Resource.Foundation.Advisors;
 /// </summary>
 /// <typeparam name="TEntity">The entity type being read.</typeparam>
 /// <typeparam name="TDetail">The resource detail response type.</typeparam>
-public sealed class ResourceGetResponsePipelineAdvisor<TEntity, TDetail>(IEntityTagProvider entityTags)
+public sealed class ResourceGetResponsePipelineAdvisor<TEntity, TDetail>
     : IRequestPipelineAdvisor<GetResourceQueryRequest<TEntity, TDetail>, GetResultBase<TDetail>>
     where TEntity : class, ICanonicalName
     where TDetail : class, ICanonicalName
@@ -30,7 +30,7 @@ public sealed class ResourceGetResponsePipelineAdvisor<TEntity, TDetail>(IEntity
         CancellationToken                                  ct
     ) {
         var response = await next(ct);
-        ResourceDetailResponsePipelineAdvisor.Shape<TEntity, TDetail>(entityTags, ctx, response.Detail);
+        ResourceDetailResponsePipelineAdvisor.Shape<TEntity, TDetail>(ctx, response.Detail);
         return response;
     }
 

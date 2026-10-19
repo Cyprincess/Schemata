@@ -8,22 +8,24 @@ using Schemata.Security.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
-public sealed class ResourceDeleteAccessAdvisor<TEntity>(IAccessProvider<TEntity, DeleteRequest> access)
-    : IResourceDeleteAdvisor<TEntity>
+public sealed class ResourceDeleteAccessAdvisor<TEntity, TDetail>(IAccessProvider<TEntity, DeleteRequest> access)
+    : IResourceDeleteAdvisor<TEntity, TDetail>
     where TEntity : class, ICanonicalName
+    where TDetail : class, ICanonicalName
 {
     public int Order => ResourceSecurityAdvisorOrders.Access;
 
     public async Task<AdviseResult> AdviseAsync(
-        AdviceContext     ctx,
-        DeleteRequest     request,
-        TEntity           entity,
-        ClaimsPrincipal?  principal,
-        CancellationToken ct = default
+        AdviceContext                              ctx,
+        DeleteRequest                              request,
+        TEntity                                    entity,
+        ClaimsPrincipal?                           principal,
+        HandledResponse<DeleteResultBase<TDetail>> handled,
+        CancellationToken                          ct = default
     ) {
         if (!AnonymousAccess.IsAnonymous<TEntity>(nameof(Operations.Delete))) {
             await AuthorizeHelper.EnsureAsync(access, entity,
-                                              new() { Operation = nameof(Operations.Delete), Request = request },
+                                              new() { Operation = nameof(Operations.Delete), Request = request, Stage = AccessStage.Instance, Name = entity.CanonicalName },
                                               entity.CanonicalName ?? string.Empty, principal, ct);
         }
 

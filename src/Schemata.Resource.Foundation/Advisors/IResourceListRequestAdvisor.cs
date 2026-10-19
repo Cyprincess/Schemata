@@ -12,5 +12,7 @@ namespace Schemata.Resource.Foundation.Advisors;
 ///     authorize the caller and can shape the query.
 /// </summary>
 /// <typeparam name="TEntity">The entity type.</typeparam>
-public interface IResourceListRequestAdvisor<TEntity> : IAdvisor<ListRequest, ResourceRequestContainer<TEntity>, ClaimsPrincipal?>
-    where TEntity : class, ICanonicalName;
+public interface IResourceListRequestAdvisor<TEntity, TSummary>
+    : IAdvisor<ListRequest, ResourceRequestContainer<TEntity>, ClaimsPrincipal?, HandledResponse<ListResultBase<TEntity, TSummary>>>
+    where TEntity : class, ICanonicalName
+    where TSummary : class, ICanonicalName;

@@ -8,6 +8,7 @@ using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
 using Schemata.Messaging.Skeleton;
 using Schemata.Resource.Foundation.Commands;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Resource.Foundation;
 
@@ -18,32 +19,34 @@ namespace Schemata.Resource.Foundation;
 /// <typeparam name="TDetail">The resource detail response type.</typeparam>
 /// <seealso href="https://google.aip.dev/164">AIP-164: Soft delete</seealso>
 public sealed class UndeleteHandler<TEntity, TDetail>
-    : IRequestHandler<UndeleteResourceRequest<TEntity, TDetail>, TDetail>
+    : IRequestHandler<UndeleteResourceRequest<TEntity, TDetail>, TDetail?>
     where TEntity : class, ICanonicalName, ISoftDelete
     where TDetail : class, ICanonicalName
 {
-    private readonly ISimpleMapper        _mapper;
-    private readonly IRepository<TEntity> _repository;
+    private readonly ISimpleMapper             _mapper;
+    private readonly IResourceMutation<TEntity> _mutation;
+    private readonly IRepository<TEntity>      _repository;
 
     /// <summary>
     ///     Initializes the built-in undelete handler.
     /// </summary>
     /// <param name="repository">The repository for the target resource.</param>
+    /// <param name="mutation">The resource mutation owner persisting the restore.</param>
     /// <param name="mapper">The mapper that creates the detail response.</param>
-    public UndeleteHandler(IRepository<TEntity> repository, ISimpleMapper mapper) {
+    public UndeleteHandler(IRepository<TEntity> repository, IResourceMutation<TEntity> mutation, ISimpleMapper mapper) {
         _repository = repository;
+        _mutation   = mutation;
         _mapper     = mapper;
     }
 
-    public async Task<TDetail> HandleAsync(
+    public async Task<TDetail?> HandleAsync(
         UndeleteResourceRequest<TEntity, TDetail> request,
+        AdviceContext                             context,
         CancellationToken                         ct = default
     ) {
-        TEntity? entity;
-        using (_repository.SuppressQuerySoftDelete()) {
-            entity = await _repository.SingleOrDefaultAsync(
-                q => q.Where(e => e.CanonicalName == request.CanonicalName), ct);
-        }
+        var entity = await _repository.SingleOrDefaultAsync(
+            q => q.Where(e => e.CanonicalName == request.CanonicalName), ct,
+            new QueryOptions(IgnoreSoftDelete: true));
 
         if (entity is null) {
             throw SchemataResourceErrors.NotFound<TEntity>(request.CanonicalName);
@@ -58,8 +61,13 @@ public sealed class UndeleteHandler<TEntity, TDetail>
         entity.DeleteTime = null;
         entity.PurgeTime  = null;
 
-        await _repository.UpdateAsync(entity, ct);
-        await _repository.CommitAsync(ct);
+        var outcome = await _mutation.UpdateAsync(entity, null, Operations.Undelete, ct);
+
+        // An advisor handled the restore without staging: no restored detail exists to report,
+        // and the transport renders the absent detail as no content.
+        if (outcome == MutationResult.NoWrite) {
+            return null;
+        }
 
         var map = _mapper.Map<TEntity, TDetail>(entity);
         if (map is null) {

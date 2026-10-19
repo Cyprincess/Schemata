@@ -48,7 +48,12 @@ public static class ServicesExtensions
     public static IServiceCollection AddSchemataGrpcTransport(this IServiceCollection services) {
         services.AddHttpContextAccessor();
 
-        services.AddCodeFirstGrpc(options => { options.Interceptors.Add<ExceptionMappingInterceptor>(); });
+        services.AddCodeFirstGrpc(null);
+        services.PostConfigure<GrpcServiceOptions>(options => {
+            if (!options.Interceptors.Any(interceptor => interceptor.Type == typeof(ExceptionMappingInterceptor))) {
+                options.Interceptors.Add<ExceptionMappingInterceptor>();
+            }
+        });
 
         services.TryAddSingleton<ExceptionMappingInterceptor>();
 
@@ -59,10 +64,10 @@ public static class ServicesExtensions
     }
 
     private static ProtoServiceDescriptor[] MergeDescriptors(IServiceProvider sp) {
+        var epd = sp.GetRequiredService<EndpointDataSource>();
+        var protoFirst = ResolveProtoFirstDescriptors(epd).ToArray();
         var contributed = sp.GetServices<IGrpcServiceDescriptorContributor>()
                             .SelectMany(c => c.GetServiceDescriptors(sp));
-        var epd        = sp.GetRequiredService<EndpointDataSource>();
-        var protoFirst = ResolveProtoFirstDescriptors(epd);
         return contributed.Concat(protoFirst).ToArray();
     }
 

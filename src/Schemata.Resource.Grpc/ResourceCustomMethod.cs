@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Grpc.AspNetCore.Server.Model;
 using Grpc.Core;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Entities;
 using Schemata.Common;
@@ -9,6 +10,7 @@ using Schemata.Core.Building;
 using Schemata.Resource.Foundation;
 using Schemata.Messaging.Skeleton;
 using Schemata.Resource.Grpc.Runtime;
+using Schemata.Security.Skeleton;
 using Schemata.Transport.Grpc;
 
 namespace Schemata.Resource.Grpc;
@@ -86,8 +88,13 @@ internal static class ResourceCustomMethod
             rpcName,
             GrpcMarshallers.Create<TRequest>(config.Model),
             GrpcMarshallers.Create<TResponse>(config.Model));
+        config.Record(rpc);
 
-        context.AddUnaryMethod(rpc, [], (_, request, callContext) => InvokeAsync<TEntity, TRequest, TResponse>(request, callContext, verb));
+        // [Anonymous] operations keep their exemption at the transport boundary; the
+        // service-level scheme policy short-circuits for endpoints carrying IAllowAnonymous.
+        object[] metadata = AnonymousAccess.IsAnonymous(typeof(TEntity), verb) ? [new AllowAnonymousAttribute()] : [];
+
+        context.AddUnaryMethod(rpc, metadata, (_, request, callContext) => InvokeAsync<TEntity, TRequest, TResponse>(request, callContext, verb));
     }
 
     private static async Task<TResponse> InvokeAsync<TEntity, TRequest, TResponse>(

@@ -22,18 +22,18 @@ namespace Schemata.Resource.Foundation.Advisors;
 /// <typeparam name="TEntity">The entity type being listed.</typeparam>
 /// <typeparam name="TSummary">The summary DTO type.</typeparam>
 public sealed class ResourceListResponsePipelineAdvisor<TEntity, TSummary>
-    : IRequestPipelineAdvisor<ListResourceQueryRequest<TEntity, TSummary>, ListResultBase<TSummary>>
+    : IRequestPipelineAdvisor<ListResourceQueryRequest<TEntity, TSummary>, ListResultBase<TEntity, TSummary>>
     where TEntity : class, ICanonicalName
     where TSummary : class, ICanonicalName
 {
-    #region IRequestPipelineAdvisor<ListResourceQueryRequest<TEntity,TSummary>,ListResultBase<TSummary>> Members
+    #region IRequestPipelineAdvisor<ListResourceQueryRequest<TEntity,TSummary>,ListResultBase<TEntity,TSummary>> Members
 
     public int Order => SecurityOrders.ResponseFamily;
 
-    public async Task<ListResultBase<TSummary>> AdviseAsync(
+    public async Task<ListResultBase<TEntity, TSummary>> AdviseAsync(
         AdviceContext                                        ctx,
         ListResourceQueryRequest<TEntity, TSummary>          request,
-        RequestHandlerContinuation<ListResultBase<TSummary>> next,
+        RequestHandlerContinuation<ListResultBase<TEntity, TSummary>> next,
         CancellationToken                                    ct
     ) {
         var response = await next(ct);

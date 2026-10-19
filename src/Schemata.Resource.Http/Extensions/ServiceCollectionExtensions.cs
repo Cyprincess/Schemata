@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Options;
 using Schemata.Core.Building;
 using Schemata.Resource.Http;
+using Schemata.Resource.Http.Linking;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -30,6 +31,7 @@ public static class ServiceCollectionExtensions
                 .Configure<ResourceRegistry, IOptions<SchemataResourceOptions>>((mvc, registry, opts) => {
                      mvc.Conventions.Add(new ResourceControllerConvention(registry, opts.Value.AuthenticationScheme));
                      mvc.Conventions.Add(new ResourceMethodControllerConvention(registry, opts.Value.AuthenticationScheme));
+                     mvc.ModelMetadataDetailsProviders.Add(new ListRequestBindingMetadataProvider());
                  });
 
         services.AddMvcCore()
@@ -37,6 +39,8 @@ public static class ServiceCollectionExtensions
                      manager.FeatureProviders.Add(provider);
                      manager.FeatureProviders.Add(method);
                  });
+
+        services.AddSchemataLinkContributor<ResourceLinkContributor>();
 
         return services;
     }

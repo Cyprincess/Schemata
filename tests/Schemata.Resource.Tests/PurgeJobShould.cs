@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -11,11 +11,12 @@ using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Resource.Foundation;
-using Schemata.Resource.Foundation.Commands;
+using Schemata.Resource.Tests.Fixtures;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 using Xunit;
 
+using Schemata.Abstractions.Advisors;
 namespace Schemata.Resource.Tests;
 
 public class PurgeJobShould
@@ -39,21 +40,20 @@ public class PurgeJobShould
         using var services = new ServiceCollection()
                             .AddSingleton(scheduler.Object)
                             .BuildServiceProvider();
+        var advice  = new AdviceContext(services);
         var handler = new PurgeHandler<ParentTrashStudent>(services);
 
         var operation = await handler.HandleAsync(
-            new PurgeResourceRequest<ParentTrashStudent> {
-                Filter   = "*",
-                Language = "aip",
-                Parent   = "schools/one",
-                Force    = false,
-            },
+            new() {
+                Filter = "*", Language = "aip", Parent = "schools/one", Force = false,
+            }, advice,
             CancellationToken.None);
 
         Assert.NotNull(staged);
         Assert.Equal("purge", staged.Method);
         Assert.NotEqual(Guid.Empty, staged.ExecutionUid);
-        var args = JsonSerializer.Deserialize<PurgeOperationArgs>(staged.ArgsJson!, SchemataJson.Default);
+        Assert.NotNull(staged.ArgsJson);
+        var args = JsonSerializer.Deserialize<PurgeOperationArgs>(staged.ArgsJson, SchemataJson.Default);
         Assert.NotNull(args);
         Assert.Equal("*", args.Filter);
         Assert.Equal("aip", args.Language);
@@ -70,78 +70,43 @@ public class PurgeJobShould
             Entity("two", "b"),
         };
         var repository = new Mock<IRepository<ParentTrashStudent>>();
-        repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Mock.Of<IDisposable>());
         repository.Setup(r => r.LongCountAsync(
                               It.IsAny<Func<IQueryable<ParentTrashStudent>, IQueryable<ParentTrashStudent>>>(),
-                              It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<ParentTrashStudent>, IQueryable<ParentTrashStudent>> query, CancellationToken _) =>
-                      new ValueTask<long>(query(rows.AsQueryable()).LongCount()));
+                              It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<ParentTrashStudent>, IQueryable<ParentTrashStudent>> query, CancellationToken _, QueryOptions _) =>
+                      new(query(rows.AsQueryable()).LongCount()));
         repository.Setup(r => r.ListAsync(
                               It.IsAny<Func<IQueryable<ParentTrashStudent>, IQueryable<ParentTrashStudent>>>(),
-                              It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<ParentTrashStudent>, IQueryable<ParentTrashStudent>> query, CancellationToken _) =>
+                              It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<ParentTrashStudent>, IQueryable<ParentTrashStudent>> query, CancellationToken _, QueryOptions _) =>
                       ToAsyncEnumerable(query(rows.AsQueryable())));
+        var owner = ResourceMutationMock.Create<ParentTrashStudent>();
 
         using var services = new ServiceCollection()
                             .AddSingleton(repository.Object)
                             .BuildServiceProvider();
-        var job = new PurgeJob<ParentTrashStudent>(repository.Object, services);
+        var job = new PurgeJob<ParentTrashStudent>(repository.Object, owner.Object, services);
         var execution = new SchemataJobExecution();
 
-        await job.ExecuteAsync(new JobContext {
+        await job.ExecuteAsync(new() {
             ArgsJson = "{\"filter\":\"*\",\"parent\":\"schools/one\",\"force\":false}",
             Execution = execution,
         }, CancellationToken.None);
 
-        var result = JsonSerializer.Deserialize<PurgeResponse>(execution.Output!, SchemataJson.Default);
+        Assert.NotNull(execution.Output);
+        var result = JsonSerializer.Deserialize<PurgeResponse>(execution.Output, SchemataJson.Default);
         Assert.NotNull(result);
         Assert.Equal(1, result.PurgeCount);
         Assert.Equal(["schools/one/students/a"], result.PurgeSample);
-        repository.Verify(r => r.RemoveAsync(It.IsAny<ParentTrashStudent>(), It.IsAny<CancellationToken>()), Times.Never);
+        owner.Verify(o => o.DeleteAsync(
+                         It.IsAny<ParentTrashStudent>(),
+                         It.IsAny<IUnitOfWork?>(),
+                         It.IsAny<Operations>(),
+                         It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(r => r.RemoveAsync(It.IsAny<ParentTrashStudent>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()), Times.Never);
         repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    [Fact]
-    public async Task Force_WithParent_RemovesMatchingChildren_And_CommitsOnce() {
-        var matching = Entity("one", "a");
-        var other    = Entity("two", "b");
-        var rows     = new[] { matching, other };
-        var repository = new Mock<IRepository<ParentTrashStudent>>();
-        repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Mock.Of<IDisposable>());
-        repository.Setup(r => r.SuppressSoftDelete()).Returns(Mock.Of<IDisposable>());
-        repository.Setup(r => r.LongCountAsync(
-                              It.IsAny<Func<IQueryable<ParentTrashStudent>, IQueryable<ParentTrashStudent>>>(),
-                              It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<ParentTrashStudent>, IQueryable<ParentTrashStudent>> query, CancellationToken _) =>
-                      new ValueTask<long>(query(rows.AsQueryable()).LongCount()));
-        repository.Setup(r => r.ListAsync(
-                              It.IsAny<Func<IQueryable<ParentTrashStudent>, IQueryable<ParentTrashStudent>>>(),
-                              It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<ParentTrashStudent>, IQueryable<ParentTrashStudent>> query, CancellationToken _) =>
-                      ToAsyncEnumerable(query(rows.AsQueryable())));
-        repository.Setup(r => r.RemoveAsync(It.IsAny<ParentTrashStudent>(), It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
-        repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-
-        using var services = new ServiceCollection()
-                            .AddSingleton(repository.Object)
-                            .BuildServiceProvider();
-        var job       = new PurgeJob<ParentTrashStudent>(repository.Object, services);
-        var execution = new SchemataJobExecution();
-
-        await job.ExecuteAsync(new JobContext {
-            ArgsJson  = "{\"filter\":\"*\",\"parent\":\"schools/one\",\"force\":true}",
-            Execution = execution,
-        }, CancellationToken.None);
-
-        var result = JsonSerializer.Deserialize<PurgeResponse>(execution.Output!, SchemataJson.Default);
-        Assert.NotNull(result);
-        Assert.Equal(1, result.PurgeCount);
-        Assert.Empty(result.PurgeSample);
-        repository.Verify(r => r.RemoveAsync(matching, It.IsAny<CancellationToken>()), Times.Once);
-        repository.Verify(r => r.RemoveAsync(other, It.IsAny<CancellationToken>()), Times.Never);
-        repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
-    }
 
     private static ParentTrashStudent Entity(string school, string name) {
         return new() {

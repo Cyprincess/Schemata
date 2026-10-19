@@ -1,8 +1,5 @@
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Schemata.Core.Building;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
@@ -16,10 +13,8 @@ namespace Schemata.Resource.Foundation.Advisors;
 ///     Validates update requests
 ///     per <seealso href="https://google.aip.dev/134">AIP-134: Standard methods: Update</seealso> on the wrap pipeline
 ///     by delegating to all registered <c>IValidationAdvisor&lt;TRequest&gt;</c> implementations.
-///     When the request has <c>ValidateOnly = true</c>, throws
-///     <c>NoContentException</c> after validation to signal a dry-run.
-///     Suppressed when <see cref="UpdateRequestValidationSuppressed" /> is present on the ambient
-///     context or <see cref="SchemataResourceOptions.SuppressUpdateValidation" /> is set.
+///     Installed per resource unless the host excludes the stage with
+///     <c>SchemataResourceBuilder.WithoutUpdateValidation()</c>.
 /// </summary>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>
@@ -40,10 +35,7 @@ public sealed class ResourceUpdateValidationPipelineAdvisor<TEntity, TRequest, T
         RequestHandlerContinuation<UpdateResultBase<TDetail>> next,
         CancellationToken                                     ct
     ) {
-        var suppressed = ctx.Has<UpdateRequestValidationSuppressed>()
-                      || ctx.ServiceProvider.GetService<IOptions<SchemataResourceOptions>>()?.Value.SuppressUpdateValidation == true;
-
-        await ValidationHelper.ValidateAsync(ctx, request.Request, Operations.Update, suppressed, ct);
+        await ValidationHelper.ValidateAsync(ctx, request.Request, Operations.Update, ct);
 
         return await next(ct);
     }

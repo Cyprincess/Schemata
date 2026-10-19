@@ -1,12 +1,15 @@
 using System;
+using System.Buffers;
 using System.Reflection;
 using Grpc.AspNetCore.Server.Model;
 using Grpc.Core;
+using Microsoft.AspNetCore.Authorization;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Core.Building;
 using Schemata.Resource.Grpc.Runtime;
+using Schemata.Security.Skeleton;
 using Schemata.Transport.Grpc;
 using Empty = Google.Protobuf.WellKnownTypes.Empty;
 
@@ -75,15 +78,9 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
 
         var allowed = registry.GetResource(typeof(TEntity))?.Operations;
 
-        bool IsAllowed(Operations verb) {
-            return allowed is null || Array.IndexOf(allowed, verb) >= 0;
-        }
-
-        var metadata = Array.Empty<object>();
-
         if (IsAllowed(Operations.List)) {
             context.AddUnaryMethod(
-                new Method<ListRequest, ListResultBase<TSummary>>(MethodType.Unary, service, GrpcResourceNaming.MethodName(descriptor, Operations.List), GrpcMarshallers.Create<ListRequest>(model), GrpcMarshallers.Create<ListResultBase<TSummary>>(model)), metadata,
+                config.Record(new Method<ListRequest, ListResultBase<TEntity, TSummary>>(MethodType.Unary, service, GrpcResourceNaming.MethodName(descriptor, Operations.List), GrpcMarshallers.Create<ListRequest>(model), GrpcMarshallers.Create<ListResultBase<TEntity, TSummary>>(model))), Metadata(nameof(Operations.List)),
                 async (svc, req, ctx) => {
                     var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
                     return await rs.ListAsync(req, new(svc, ctx));
@@ -92,28 +89,30 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
 
         if (IsAllowed(Operations.Get)) {
             context.AddUnaryMethod(
-                new Method<GetRequest, TDetail>(MethodType.Unary, service, GrpcResourceNaming.MethodName(descriptor, Operations.Get), GrpcMarshallers.Create<GetRequest>(model), GrpcMarshallers.Create<TDetail>(model)),
-                metadata, async (svc, req, ctx) => {
+                config.Record(new Method<GetRequest, TDetail>(MethodType.Unary, service, GrpcResourceNaming.MethodName(descriptor, Operations.Get), GrpcMarshallers.Create<GetRequest>(model), GrpcMarshallers.Create<TDetail>(model))),
+                Metadata(nameof(Operations.Get)), async (svc, req, ctx) => {
                     var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
                     return await rs.GetAsync(req, new(svc, ctx));
                 });
         }
 
+        // ASP.NET Core gRPC rejects null unary responses before marshalling. Deserialize
+        // an empty payload through the configured model when the mutation has no detail.
         if (IsAllowed(Operations.Create)) {
             context.AddUnaryMethod(
-                new Method<TRequest, TDetail>(MethodType.Unary, service, GrpcResourceNaming.MethodName(descriptor, Operations.Create), GrpcMarshallers.Create<TRequest>(model), GrpcMarshallers.Create<TDetail>(model)),
-                metadata, async (svc, req, ctx) => {
+                config.Record(new Method<TRequest, TDetail>(MethodType.Unary, service, GrpcResourceNaming.MethodName(descriptor, Operations.Create), GrpcMarshallers.Create<TRequest>(model), GrpcMarshallers.Create<TDetail>(model))),
+                Metadata(nameof(Operations.Create)), async (svc, req, ctx) => {
                     var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
-                    return await rs.CreateAsync(req, new(svc, ctx));
+                    return await rs.CreateAsync(req, new(svc, ctx)) ?? model.Deserialize<TDetail>(ReadOnlySequence<byte>.Empty);
                 });
         }
 
         if (IsAllowed(Operations.Update)) {
             context.AddUnaryMethod(
-                new Method<TRequest, TDetail>(MethodType.Unary, service, GrpcResourceNaming.MethodName(descriptor, Operations.Update), GrpcMarshallers.Create<TRequest>(model), GrpcMarshallers.Create<TDetail>(model)),
-                metadata, async (svc, req, ctx) => {
+                config.Record(new Method<TRequest, TDetail>(MethodType.Unary, service, GrpcResourceNaming.MethodName(descriptor, Operations.Update), GrpcMarshallers.Create<TRequest>(model), GrpcMarshallers.Create<TDetail>(model))),
+                Metadata(nameof(Operations.Update)), async (svc, req, ctx) => {
                     var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
-                    return await rs.UpdateAsync(req, new(svc, ctx));
+                    return await rs.UpdateAsync(req, new(svc, ctx)) ?? model.Deserialize<TDetail>(ReadOnlySequence<byte>.Empty);
                 });
         }
 
@@ -122,20 +121,36 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
             // hard-deletable resources respond with Empty per AIP-135.
             if (typeof(ISoftDelete).IsAssignableFrom(typeof(TEntity))) {
                 context.AddUnaryMethod(
-                    new Method<DeleteRequest, TDetail>(MethodType.Unary, service, GrpcResourceNaming.MethodName(descriptor, Operations.Delete), GrpcMarshallers.Create<DeleteRequest>(model), GrpcMarshallers.Create<TDetail>(model)), metadata,
+                    config.Record(new Method<DeleteRequest, TDetail>(MethodType.Unary, service, GrpcResourceNaming.MethodName(descriptor, Operations.Delete), GrpcMarshallers.Create<DeleteRequest>(model), GrpcMarshallers.Create<TDetail>(model))), Metadata(nameof(Operations.Delete)),
                     async (svc, req, ctx) => {
                         var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
-                        return (await rs.DeleteAsync(req, new(svc, ctx)))!;
+                        return await rs.DeleteAsync(req, new(svc, ctx)) ?? model.Deserialize<TDetail>(ReadOnlySequence<byte>.Empty);
                     });
             } else {
                 context.AddUnaryMethod(
-                    new Method<DeleteRequest, Empty>(MethodType.Unary, service, GrpcResourceNaming.MethodName(descriptor, Operations.Delete), GrpcMarshallers.Create<DeleteRequest>(model), EmptyMarshaller), metadata,
+                    config.Record(new Method<DeleteRequest, Empty>(MethodType.Unary, service, GrpcResourceNaming.MethodName(descriptor, Operations.Delete), GrpcMarshallers.Create<DeleteRequest>(model), EmptyMarshaller)), Metadata(nameof(Operations.Delete)),
                     async (svc, req, ctx) => {
                         var rs = (IResourceService<TEntity, TRequest, TDetail, TSummary>)svc;
                         await rs.DeleteAsync(req, new(svc, ctx));
                         return new();
                     });
             }
+        }
+
+        return;
+
+        object[] Metadata(string operation) {
+            // [Anonymous] operations keep their exemption at the transport boundary; the
+            // service-level scheme policy short-circuits for endpoints carrying IAllowAnonymous.
+            return AnonymousAccess.IsAnonymous(typeof(TEntity), operation) ? [new AllowAnonymousAttribute()] : [];
+        }
+
+        bool IsAllowed(Operations verb) {
+            if (allowed is null) return true;
+            for (var i = 0; i < allowed.Count; i++) {
+                if (allowed[i] == verb) return true;
+            }
+            return false;
         }
     }
 }

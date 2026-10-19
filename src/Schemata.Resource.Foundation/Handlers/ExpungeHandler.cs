@@ -8,6 +8,7 @@ using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Resource.Foundation.Commands;
 using static Schemata.Abstractions.SchemataConstants;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Resource.Foundation.Handlers;
 
@@ -19,23 +20,27 @@ namespace Schemata.Resource.Foundation.Handlers;
 public sealed class ExpungeHandler<TEntity> : IRequestHandler<ExpungeResourceRequest<TEntity>, EmptyResourceResponse>
     where TEntity : class, ICanonicalName, ISoftDelete
 {
-    private readonly IRepository<TEntity> _repository;
+    private readonly IResourceMutation<TEntity> _mutation;
+    private readonly IRepository<TEntity>      _repository;
 
     /// <summary>
     ///     Initializes the built-in expunge handler.
     /// </summary>
     /// <param name="repository">The repository for the target resource.</param>
-    public ExpungeHandler(IRepository<TEntity> repository) { _repository = repository; }
+    /// <param name="mutation">The resource mutation owner persisting the physical removal.</param>
+    public ExpungeHandler(IRepository<TEntity> repository, IResourceMutation<TEntity> mutation) {
+        _repository = repository;
+        _mutation   = mutation;
+    }
 
     public async Task<EmptyResourceResponse> HandleAsync(
         ExpungeResourceRequest<TEntity> request,
+        AdviceContext                   context,
         CancellationToken               ct = default
     ) {
-        TEntity? entity;
-        using (_repository.SuppressQuerySoftDelete()) {
-            entity = await _repository.SingleOrDefaultAsync(
-                q => q.Where(e => e.CanonicalName == request.CanonicalName), ct);
-        }
+        var entity = await _repository.SingleOrDefaultAsync(
+            q => q.Where(e => e.CanonicalName == request.CanonicalName), ct,
+            new QueryOptions(IgnoreSoftDelete: true));
 
         if (entity is null) {
             throw SchemataResourceErrors.NotFound<TEntity>(request.CanonicalName);
@@ -48,11 +53,8 @@ public sealed class ExpungeHandler<TEntity> : IRequestHandler<ExpungeResourceReq
                 "Resource is not deleted.");
         }
 
-        using (_repository.SuppressSoftDelete()) {
-            await _repository.RemoveAsync(entity, ct);
-        }
-
-        await _repository.CommitAsync(ct);
+        // The expunge intent passes IgnoreSoftDelete to the repository the mutation stages through.
+        await _mutation.DeleteAsync(entity, null, Operations.Expunge, ct);
 
         return new();
     }

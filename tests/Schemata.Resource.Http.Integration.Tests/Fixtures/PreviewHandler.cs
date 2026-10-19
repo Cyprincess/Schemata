@@ -5,6 +5,7 @@ using Schemata.Common.Errors;
 using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 
+using Schemata.Abstractions.Advisors;
 namespace Schemata.Resource.Http.Integration.Tests.Fixtures;
 
 public sealed class PreviewHandler(IRepository<Student> repository)
@@ -12,6 +13,7 @@ public sealed class PreviewHandler(IRepository<Student> repository)
 {
     public async Task<Student> HandleAsync(
         PreviewResourceRequest request,
+AdviceContext context,
         CancellationToken      ct = default
     ) {
         var entity = await repository.SingleOrDefaultAsync(

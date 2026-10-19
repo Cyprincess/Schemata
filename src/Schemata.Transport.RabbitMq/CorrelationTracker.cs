@@ -19,12 +19,14 @@ public sealed class CorrelationTracker : IDisposable
     #region IDisposable Members
 
     public void Dispose() {
+        // Only the path that wins the dictionary removal releases a pending entry's CTS; a racing
+        // timeout continuation finds the entry gone and never touches the transferred resources.
         foreach (var kvp in _pending) {
-            kvp.Value.Source.TrySetCanceled();
-            kvp.Value.Timeout.Dispose();
+            if (!_pending.TryRemove(kvp.Key, out var pending)) continue;
+            pending.Timeout.Cancel();
+            pending.Timeout.Dispose();
+            pending.Source.TrySetCanceled();
         }
-
-        _pending.Clear();
     }
 
     #endregion
@@ -40,17 +42,17 @@ public sealed class CorrelationTracker : IDisposable
         _pending[correlationId] = new(wrapper, cts);
 
         _ = Task.Delay(timeout, _timeProvider, cts.Token).ContinueWith(task => {
-            // Replies and disposal cancel the delay before it elapses; an elapsed timeout fails
-            // the request if it wins the race to remove the entry.
+            // A canceled delay means a reply, an abandon, or disposal removed the entry first and
+            // owns the CTS; the losing side of the race never touches the transferred resources.
             if (task.IsCanceled) {
                 return;
             }
 
-            if (_pending.TryRemove(correlationId, out _)) {
-                wrapper.TrySetException(new TimeoutException("Request timed out waiting for response."));
+            // The timeout releases the entry only together with the dictionary removal it wins.
+            if (_pending.TryRemove(correlationId, out var pending)) {
+                pending.Source.TrySetException(new TimeoutException("Request timed out waiting for response."));
+                pending.Timeout.Dispose();
             }
-
-            cts.Dispose();
         }, TaskScheduler.Default);
 
         _ = wrapper.Task.ContinueWith(t => {
@@ -97,6 +99,34 @@ public sealed class CorrelationTracker : IDisposable
         pending.Timeout.Cancel();
         pending.Timeout.Dispose();
         pending.Source.TrySetResult(result);
+
+        return true;
+    }
+
+    /// <summary>Fails the tracked request for <paramref name="correlationId" /> with a remote error.</summary>
+    public bool Fail(string correlationId, Exception exception) {
+        if (!_pending.TryRemove(correlationId, out var pending)) {
+            return false;
+        }
+
+        // Release the pending timeout's delay timer.
+        pending.Timeout.Cancel();
+        pending.Timeout.Dispose();
+        pending.Source.TrySetException(exception);
+
+        return true;
+    }
+
+    /// <summary>Cancels and removes a pending request that the caller abandoned.</summary>
+    public bool Abandon(string correlationId) {
+        if (!_pending.TryRemove(correlationId, out var pending)) {
+            return false;
+        }
+
+        // Release the pending timeout's delay timer.
+        pending.Timeout.Cancel();
+        pending.Timeout.Dispose();
+        pending.Source.TrySetCanceled();
 
         return true;
     }

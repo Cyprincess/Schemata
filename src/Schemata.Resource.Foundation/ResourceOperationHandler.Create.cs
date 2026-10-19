@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
@@ -8,6 +9,7 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Advice;
 using Schemata.Common;
+using Schemata.Entity.Repository;
 using Schemata.Resource.Foundation.Advisors;
 
 namespace Schemata.Resource.Foundation;
@@ -25,16 +27,23 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     /// </summary>
     /// <param name="request">The creation request DTO.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
+    /// <param name="ctx">The advisor context shared with the caller.</param>
     /// <param name="ct">A cancellation token.</param>
+    /// <param name="execution">
+    ///     The identified dispatch execution carried from the idempotency wrap, or
+    ///     <see langword="null" /> when the dispatch runs unidentified. Non-null dispatches commit
+    ///     through this handler so the wrap receives transaction-completion evidence.
+    /// </param>
     /// <returns>A <see cref="CreateResultBase{TDetail}" /> containing the new resource's detail DTO.</returns>
     public Task<CreateResultBase<TDetail>> CreateAsync(
-        TRequest           request,
-        ClaimsPrincipal?   principal,
-        CancellationToken? ct
+        TRequest                     request,
+        ClaimsPrincipal?             principal,
+        AdviceContext                ctx,
+        CancellationToken?           ct,
+        ResourceDispatchExecution?   execution = null
     ) {
         ct ??= CancellationToken.None;
-        var ctx = CreateAdviceContext();
-        return CreateCoreAsync(ctx, request, principal, ct.Value, true);
+        return CreateCoreAsync(ctx, request, principal, ct.Value, execution);
     }
 
     /// <summary>
@@ -44,21 +53,22 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     /// <param name="request">The creation request DTO.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
     /// <param name="ct">A cancellation token.</param>
-    /// <param name="finalize">Whether to commit the repository and run response advisors.</param>
+    /// <param name="execution">The identified dispatch execution, or <see langword="null" />.</param>
     /// <returns>A <see cref="CreateResultBase{TDetail}" /> containing the resource detail DTO.</returns>
     internal async Task<CreateResultBase<TDetail>> CreateCoreAsync(
-        AdviceContext     ctx,
-        TRequest          request,
-        ClaimsPrincipal?  principal,
-        CancellationToken ct,
-        bool              finalize
+        AdviceContext                 ctx,
+        TRequest                      request,
+        ClaimsPrincipal?              principal,
+        CancellationToken             ct,
+        ResourceDispatchExecution?    execution = null
     ) {
         var container = new ResourceRequestContainer<TEntity>();
 
-        var requestResult = await RunPipelineAsync<CreateResultBase<TDetail>>(
-            ctx,
-            () => Advisor.For<IResourceCreateRequestAdvisor<TEntity, TRequest>>()
-                         .RunAsync(ctx, request, container, principal, ct), CollectionNotFound);
+        var requestOutput = new HandledResponse<CreateResultBase<TDetail>>();
+        var requestResult = await HandledResponseRunner.RunAsync(
+            requestOutput,
+            () => Advisor.For<IResourceCreateRequestAdvisor<TEntity, TRequest, TDetail>>()
+                         .RunAsync(ctx, request, container, principal, requestOutput, ct), CollectionNotFound);
         if (requestResult is not null) {
             return requestResult;
         }
@@ -71,24 +81,55 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
                 Reason      = SchemataResources.INVALID_PAYLOAD,
             }]);
         }
+        AdviceApplyChildParent<TEntity, TRequest, TDetail>.Apply(request, entity);
 
-        var entityResult = await RunPipelineAsync<CreateResultBase<TDetail>>(
-            ctx,
-            () => Advisor.For<IResourceCreateAdvisor<TEntity, TRequest>>()
-                         .RunAsync(ctx, request, entity, principal, ct), CollectionNotFound);
+        var entityOutput = new HandledResponse<CreateResultBase<TDetail>>();
+        var entityResult = await HandledResponseRunner.RunAsync(
+            entityOutput,
+            () => Advisor.For<IResourceCreateAdvisor<TEntity, TRequest, TDetail>>()
+                         .RunAsync(ctx, request, entity, principal, entityOutput, ct), CollectionNotFound);
         if (entityResult is not null) {
             return entityResult;
         }
 
-        await _repository.AddAsync(entity, ct);
-        await _repository.CommitAsync(ct);
+        var mutation = _sp.GetRequiredService<IResourceMutation<TEntity>>();
+        if (execution is null) {
+            var outcome = await mutation.CreateAsync(entity, null, ct);
 
-        if (!finalize) {
-            var staged = _mapper.Map<TEntity, TDetail>(entity);
-            return new() { Detail = staged };
+            // NoWrite covers a repository advisor blocking the add and a consumer advisor handling
+            // the create as a no-op; either way no row exists, so the response carries no detail.
+            if (outcome == MutationResult.NoWrite) {
+                return new();
+            }
+
+            return new() { Detail = RequireDetail(_mapper.Map<TEntity, TDetail>(entity)) };
         }
 
-        var detail = _mapper.Map<TEntity, TDetail>(entity);
+        // Identified dispatch: this handler owns the commit so the wrap receives transaction
+        // completion through the execution payload, and the fail-able detail mapping runs before
+        // the provider commit.
+        return await ExecuteOwnedAsync(
+            execution,
+            transaction => MutateCreateAsync(mutation, entity, transaction, execution, ct),
+            ct);
+    }
+
+    private async Task<CreateResultBase<TDetail>> MutateCreateAsync(
+        IResourceMutation<TEntity> mutation,
+        TEntity                    entity,
+        IUnitOfWork                transaction,
+        ResourceDispatchExecution  execution,
+        CancellationToken          ct
+    ) {
+        var outcome = await mutation.CreateAsync(entity, transaction, ct);
+        if (outcome == MutationResult.NoWrite) {
+            // Nothing staged: the reservation releases and a retry re-runs deterministically.
+            execution.MarkNotWritten();
+            return new();
+        }
+
+        var detail = RequireDetail(_mapper.Map<TEntity, TDetail>(entity));
+        SyncStamp(entity, detail, transaction);
 
         return new() { Detail = detail };
     }

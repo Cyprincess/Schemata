@@ -51,6 +51,14 @@ public class CustomMethodGrpcShould : IClassFixture<WebAppFactory>
     }
 
     [Fact]
+    public async Task Announce_Without_Name_Returns_InvalidArgument_Before_Handler() {
+        var error = await Assert.ThrowsAsync<RpcException>(() =>
+            Call<LockedStudent, LockedAnnounceRequest, LockedStudent>("announce", new()));
+
+        Assert.Equal(StatusCode.InvalidArgument, error.StatusCode);
+    }
+
+    [Fact]
     public async Task CancelOperation_And_WaitOperation_Return_Expected_Envelopes() {
         var pending = Execution(ExecutionState.Pending, DateTime.UtcNow.AddHours(1));
         var done    = Execution(ExecutionState.Succeeded, DateTime.UtcNow.AddHours(-1));
@@ -64,7 +72,8 @@ public class CustomMethodGrpcShould : IClassFixture<WebAppFactory>
             "wait", new() { CanonicalName = done.CanonicalName, Timeout = TimeSpan.FromMilliseconds(50) });
 
         Assert.True(cancelled.Done);
-        Assert.Equal(1, cancelled.Error!.Code);
+        Assert.NotNull(cancelled.Error);
+        Assert.Equal(1, cancelled.Error.Code);
         Assert.True(waited.Done);
     }
 
@@ -121,7 +130,8 @@ public class CustomMethodGrpcShould : IClassFixture<WebAppFactory>
         var execution = await executions.FirstOrDefaultAsync(query => query.Where(row => row.Method == "purge"));
         Assert.NotNull(execution);
         Assert.Equal(execution.CanonicalName, operation.Name ?? operation.CanonicalName);
-        var args = System.Text.Json.JsonSerializer.Deserialize<PurgeOperationArgs>(execution.ArgsJson!, SchemataJson.Default);
+        Assert.NotNull(execution.ArgsJson);
+        var args = System.Text.Json.JsonSerializer.Deserialize<PurgeOperationArgs>(execution.ArgsJson, SchemataJson.Default);
         Assert.NotNull(args);
         Assert.False(args.Force);
     }

@@ -10,12 +10,14 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Core.Building;
 using Schemata.Abstractions;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Advice;
 using Schemata.Common;
 using Schemata.Expressions.Skeleton;
+using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Foundation.Models;
@@ -35,28 +37,31 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     /// </summary>
     /// <param name="request">The list request with filter, order, paging, and parent parameters.</param>
     /// <param name="principal">The optional <see cref="ClaimsPrincipal" />.</param>
+    /// <param name="ctx">The advisor context shared with the caller.</param>
     /// <param name="ct">A cancellation token.</param>
-    /// <returns>A <see cref="ListResultBase{TSummary}" /> with summaries and an optional next page token.</returns>
-    public async Task<ListResultBase<TSummary>> ListAsync(
+    /// <returns>A <see cref="ListResultBase{TEntity,TSummary}" /> with summaries and an optional next page token.</returns>
+    public async Task<ListResultBase<TEntity, TSummary>> ListAsync(
         ListRequest        request,
         ClaimsPrincipal?   principal,
+        AdviceContext      ctx,
         CancellationToken? ct
     ) {
         ct ??= CancellationToken.None;
 
-        var ctx = CreateAdviceContext();
-
         var container = new ResourceRequestContainer<TEntity>();
 
-        var requestResult = await RunPipelineAsync<ListResultBase<TSummary>>(
-            ctx,
-            () => Advisor.For<IResourceListRequestAdvisor<TEntity>>()
-                         .RunAsync(ctx, request, container, principal, ct.Value), CollectionNotFound);
+        var requestOutput = new HandledResponse<ListResultBase<TEntity, TSummary>>();
+        var requestResult = await HandledResponseRunner.RunAsync(
+            requestOutput,
+            () => Advisor.For<IResourceListRequestAdvisor<TEntity, TSummary>>()
+                         .RunAsync(ctx, request, container, principal, requestOutput, ct.Value), CollectionNotFound);
         if (requestResult is not null) {
             return requestResult;
         }
 
         ResourceIdentifiers.ApplyParent(container, request.Parent);
+
+        var caller = ProtectedContinuationCaller.Bind(principal);
 
         var token = await PageToken.FromStringAsync(request.PageToken, Protector)
                  ?? new PageToken {
@@ -65,8 +70,10 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
                         Language    = request.Language,
                         OrderBy     = request.OrderBy,
                         ShowDeleted = request.ShowDeleted,
+                        Caller      = caller,
                     };
-        if (token.Parent != request.Parent
+        if (token.Caller != caller
+         || token.Parent != request.Parent
          || token.Filter != request.Filter
          || token.Language != request.Language
          || token.OrderBy != request.OrderBy
@@ -77,6 +84,8 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
                 Reason      = SchemataResources.INVALID_PAGE_TOKEN,
             }]);
         }
+
+        var (defaultPageSize, maxPageSize) = ResolvePagingPolicy();
 
         if (request.PageSize is < 0) {
             throw new ValidationException([new() {
@@ -90,14 +99,26 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             token.PageSize = request.PageSize.Value;
         }
 
-        token.PageSize = token.PageSize switch {
-            <= 0  => 25,
-            > 100 => 100,
-            var _ => token.PageSize,
-        };
+        // A continuation that omits page_size keeps the token's effective size, still subject
+        // to the current maximum; an explicit zero adopts the effective default. The skip
+        // offset is unaffected, so a shrunk continuation page resumes exactly where the
+        // previous page ended.
+        if (token.PageSize <= 0) {
+            token.PageSize = defaultPageSize;
+        } else if (token.PageSize > maxPageSize) {
+            token.PageSize = maxPageSize;
+        }
 
         if (request.Skip.HasValue) {
-            token.Skip += request.Skip.Value;
+            try {
+                token.Skip = checked(token.Skip + request.Skip.Value);
+            } catch (OverflowException) {
+                throw new ValidationException([new() {
+                    Field       = nameof(request.PageToken).Underscore(),
+                    Description = SchemataResources.GetResourceString(SchemataResources.INVALID_PAGE_TOKEN),
+                    Reason      = SchemataResources.INVALID_PAGE_TOKEN,
+                }]);
+            }
         }
 
         if (token.Skip < 0) {
@@ -149,7 +170,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
 
         container.ApplyOrdering(KeyOrdering<TEntity>.Compose(order));
 
-        using var suppression = request.ShowDeleted is true ? _repository.SuppressQuerySoftDelete() : null;
+        var options = new QueryOptions(IgnoreSoftDelete: request.ShowDeleted is true);
 
         List<TSummary> summaries;
         bool           hasMore;
@@ -158,9 +179,12 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         if (residual is null) {
             totalSize = ResolveTotalSizeMode() switch {
                 TotalSizeMode.None => null,
-                TotalSizeMode.Estimated => (int)Math.Min(
-                    await _repository.EstimateCountAsync(q => container.Query(q), ct.Value), int.MaxValue),
-                var _ => await _repository.CountAsync(q => container.Query(q), ct.Value),
+                TotalSizeMode.Estimated => await _repository.EstimateCountAsync(q => container.Query(q), ct.Value, options) switch {
+                    null => null,
+                    < 0 => throw new InvalidOperationException("A count estimate cannot be negative."),
+                    var estimate => (int)Math.Min(estimate.Value, int.MaxValue),
+                },
+                var _ => await _repository.CountAsync(q => container.Query(q), ct.Value, options),
             };
 
             // The extra look-ahead row detects a following page; AIP-158 forbids a
@@ -168,7 +192,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             // relied on once total_size becomes optional.
             container.ApplyPaginating(token, 1);
 
-            var entities = _repository.ListAsync(q => container.Query(q), ct.Value);
+            var entities = _repository.ListAsync(q => container.Query(q), ct.Value, options);
             summaries = await _mapper.EachAsync<TEntity, TSummary>(entities, ct.Value).ToListAsync(ct.Value);
 
             hasMore = summaries.Count > token.PageSize;
@@ -180,17 +204,12 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
 
             // The residual runs locally over the pushed superset, so paging and an exact total are
             // computed after the residual rather than in the backend query.
-            var superset = _repository.ListAsync(q => container.Query(q), ct.Value);
+            var superset = _repository.ListAsync(q => container.Query(q), ct.Value, options);
             var scan = await ResidualPage.ScanAsync(
                 superset, residual, token.Skip, token.PageSize, resolved!.MaxResidualScanRows,
                 mode is TotalSizeMode.Exact, ct.Value);
 
-            totalSize = mode switch {
-                TotalSizeMode.None => null,
-                TotalSizeMode.Estimated => (int)Math.Min(
-                    await _repository.EstimateCountAsync(q => container.Query(q), ct.Value), int.MaxValue),
-                var _ => scan.Total,
-            };
+            totalSize = scan.Total;
 
             summaries = new(scan.Page.Count);
             foreach (var entity in scan.Page) {
@@ -203,9 +222,20 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             hasMore = scan.HasMore;
         }
 
-        token.Skip += token.PageSize;
+        string? nextPageToken = null;
+        if (hasMore) {
+            try {
+                token.Skip = checked(token.Skip + token.PageSize);
+            } catch (OverflowException) {
+                throw new ValidationException([new() {
+                    Field       = nameof(request.PageToken).Underscore(),
+                    Description = SchemataResources.GetResourceString(SchemataResources.INVALID_PAGE_TOKEN),
+                    Reason      = SchemataResources.INVALID_PAGE_TOKEN,
+                }]);
+            }
 
-        string? nextPageToken = hasMore ? await token.ToStringAsync(Protector) : null;
+            nextPageToken = await token.ToStringAsync(Protector);
+        }
 
         return new() {
             TotalSize = totalSize, Entities = summaries.ToImmutableArray(), NextPageToken = nextPageToken,

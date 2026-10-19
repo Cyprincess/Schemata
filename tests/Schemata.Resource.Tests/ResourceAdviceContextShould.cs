@@ -1,10 +1,10 @@
-using Schemata.Core.Building;
-using System;
+﻿using System;
+using System.Collections.Concurrent;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
@@ -19,198 +19,158 @@ using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Foundation.Commands;
 using Schemata.Resource.Foundation.Handlers;
+using Schemata.Resource.Foundation.Models;
+using Schemata.Resource.Tests.Fixtures;
 using Xunit;
+using TestEntity = Schemata.Resource.Tests.ResourceRequestPipelineAdvisorShould.Entity;
+using TestRequest = Schemata.Resource.Tests.ResourceRequestPipelineAdvisorShould.Request;
+using TestDetail = Schemata.Resource.Tests.ResourceRequestPipelineAdvisorShould.Detail;
+using TestSummary = Schemata.Resource.Tests.ResourceRequestPipelineAdvisorShould.Summary;
 
 namespace Schemata.Resource.Tests;
 
+/// <summary>
+///     One dispatch constructs one <see cref="AdviceContext" /> and hands that same instance to the
+///     request pipeline advisor, the handler, and the resource advisor stages.
+/// </summary>
 public class ResourceAdviceContextShould
 {
     [Fact]
-    public void Throw_When_No_Ambient_Context() {
-        var services = new ServiceCollection().BuildServiceProvider();
+    public async Task Dispatch_PassesOneContext_ToThePipelineAdvisor_TheHandler_AndResourceAdvisors() {
+        var pipeline  = new CapturingPipelineAdvisor();
+        var resource  = new CapturingResourceAdvisor();
+        using var services = BuildServices(pipeline, resource);
+        var handler = (ContextCapturingHandler)services.GetRequiredService<
+            IRequestHandler<CreateResourceRequest<TestEntity, TestRequest, TestDetail>, CreateResultBase<TestDetail>>>();
+        var dispatcher = new InProcessRequestDispatcher(services);
 
-        var ex = Assert.Throws<InvalidOperationException>(() => ResourceAdviceContext.Create(services));
+        await dispatcher.SendAsync<CreateResourceRequest<TestEntity, TestRequest, TestDetail>, CreateResultBase<TestDetail>>(
+            new(new() { DisplayName = "created" }, null), CancellationToken.None);
 
-        Assert.Contains("dispatcher", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(pipeline.Context);
+        Assert.Same(pipeline.Context, handler.Context);
+        Assert.Same(handler.Context, resource.Context);
     }
 
     [Fact]
-    public async Task Expose_Dispatcher_Items_To_Resource_Advisors() {
-        // Facade entry: some other pipeline root already established the ambient context and a
-        // command advisor stashed the marker before the resource handler ran.
-        var (facadeRepository, facadeMapper) = CreatePipelineDoubles();
-        var facadeSpy = new SpyCreateRequestAdvisor();
-        using var facadeServices = BuildFacadeServices(facadeSpy, facadeRepository.Object, facadeMapper.Object);
-        var facadeHandler = new ResourceOperationHandler<Entity, Request, Detail, Summary>(
-            facadeServices, facadeRepository.Object, facadeMapper.Object);
+    public async Task ParallelDispatches_RunOnDistinctContexts() {
+        var pipeline = new ConcurrentCapturingPipelineAdvisor();
 
-        using (AdviceContext.Establish(new AdviceContext(facadeServices))) {
-            AdviceContext.Current!.Set(new TestMarker());
-            await facadeHandler.CreateAsync(new Request(), null, CancellationToken.None);
-        }
+        using var services = BuildServices(pipeline, new CapturingResourceAdvisor());
+        var dispatcher = new InProcessRequestDispatcher(services);
 
-        Assert.True(facadeSpy.SawMarker);
+        await Task.WhenAll(
+            dispatcher.SendAsync<CreateResourceRequest<TestEntity, TestRequest, TestDetail>, CreateResultBase<TestDetail>>(
+                new(new() { DisplayName = "first" }, null), CancellationToken.None),
+            dispatcher.SendAsync<CreateResourceRequest<TestEntity, TestRequest, TestDetail>, CreateResultBase<TestDetail>>(
+                new(new() { DisplayName = "second" }, null), CancellationToken.None));
 
-        // Dispatcher entry: the IRequestPipelineAdvisor<CreateResourceRequest<...>, CreateResultBase<Detail>> chain
-        // stashes the marker during dispatch; the resource pipeline continues that same ambient context.
-        var (dispatcherRepository, dispatcherMapper) = CreatePipelineDoubles();
-        var dispatcherSpy = new SpyCreateRequestAdvisor();
-        using var dispatcherServices = BuildDispatcherServices(
-            dispatcherSpy, dispatcherRepository.Object, dispatcherMapper.Object);
-        var dispatcher = new InProcessRequestDispatcher(dispatcherServices);
-
-        await dispatcher.SendAsync<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>(
-            new(new Request(), null), CancellationToken.None);
-
-        Assert.True(dispatcherSpy.SawMarker);
+        var contexts = pipeline.Contexts.ToArray();
+        Assert.Equal(2, contexts.Length);
+        Assert.NotSame(contexts[0], contexts[1]);
     }
 
-    [Fact]
-    public async Task Seed_Options_Suppression_Into_Ambient() {
-        var options = new SchemataResourceOptions { SuppressFreshness = true };
+    private static ServiceProvider BuildServices(
+        IRequestPipelineAdvisor<CreateResourceRequest<TestEntity, TestRequest, TestDetail>, CreateResultBase<TestDetail>> pipeline,
+        IResourceCreateRequestAdvisor<TestEntity, TestRequest, TestDetail>       resource
+    ) {
+        var entity = new TestEntity { Name = "e1" };
+        var detail = new TestDetail { Name = "e1" };
 
-        // Facade entry.
-        var (facadeRepository, facadeMapper) = CreatePipelineDoubles();
-        var facadeSpy = new SpyCreateRequestAdvisor();
-        using var facadeServices = BuildFacadeServices(
-            facadeSpy, facadeRepository.Object, facadeMapper.Object, options);
-        var facadeHandler = new ResourceOperationHandler<Entity, Request, Detail, Summary>(
-            facadeServices, facadeRepository.Object, facadeMapper.Object);
-
-        using (AdviceContext.Establish(new AdviceContext(facadeServices))) {
-            await facadeHandler.CreateAsync(new Request(), null, CancellationToken.None);
-        }
-
-        Assert.True(facadeSpy.SawSuppression);
-
-        // Dispatcher entry.
-        var (dispatcherRepository, dispatcherMapper) = CreatePipelineDoubles();
-        var dispatcherSpy = new SpyCreateRequestAdvisor();
-        using var dispatcherServices = BuildDispatcherServices(
-            dispatcherSpy, dispatcherRepository.Object, dispatcherMapper.Object, options);
-        var dispatcher = new InProcessRequestDispatcher(dispatcherServices);
-
-        await dispatcher.SendAsync<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>(
-            new(new Request(), null), CancellationToken.None);
-
-        Assert.True(dispatcherSpy.SawSuppression);
-    }
-
-    private static (Mock<IRepository<Entity>> Repository, Mock<ISimpleMapper> Mapper) CreatePipelineDoubles() {
-        var entity = new Entity { Name = "e1" };
-        var detail = new Detail { Name = "e1" };
-
-        var repository = new Mock<IRepository<Entity>>();
-        repository.Setup(r => r.AddAsync(It.IsAny<Entity>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var repository = new Mock<IRepository<TestEntity>>();
+        repository.Setup(r => r.SingleOrDefaultAsync(
+                              It.IsAny<Func<IQueryable<TestEntity>, IQueryable<TestEntity>>>(),
+                              It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns(new ValueTask<TestEntity?>(entity));
 
         var mapper = new Mock<ISimpleMapper>();
-        mapper.Setup(m => m.Map<Request, Entity>(It.IsAny<Request>())).Returns(entity);
-        mapper.Setup(m => m.Map<Entity, Detail>(It.IsAny<Entity>())).Returns(detail);
+        mapper.Setup(m => m.Map<TestRequest, TestEntity>(It.IsAny<TestRequest>())).Returns(entity);
+        mapper.Setup(m => m.Map<TestEntity, TestDetail>(It.IsAny<TestEntity>())).Returns(detail);
 
-        return (repository, mapper);
-    }
-
-    private static ServiceProvider BuildFacadeServices(
-        IResourceCreateRequestAdvisor<Entity, Request> spy,
-        IRepository<Entity>                            repository,
-        ISimpleMapper                                  mapper,
-        SchemataResourceOptions?                       options = null
-    ) {
         var services = new ServiceCollection();
-        services.AddSingleton(spy);
-        services.AddSingleton(repository);
-        services.AddSingleton(mapper);
-        if (options is not null) {
-            services.AddSingleton<IOptions<SchemataResourceOptions>>(Options.Create(options));
-        }
+        services.AddSingleton(repository.Object);
+        services.AddSingleton(mapper.Object);
+        services.AddSingleton(ResourceMutationMock.Create<TestEntity>().Object);
+        services.AddSingleton<ResourceOperationHandler<TestEntity, TestRequest, TestDetail, TestSummary>>();
+        services.AddSingleton<IResourceCreateRequestAdvisor<TestEntity, TestRequest, TestDetail>>(resource);
+        services.AddSingleton(pipeline);
+        services.AddSingleton<IRequestHandler<CreateResourceRequest<TestEntity, TestRequest, TestDetail>, CreateResultBase<TestDetail>>>(
+            provider => new ContextCapturingHandler(
+                new DefaultCreateResourceHandler<TestEntity, TestRequest, TestDetail, TestSummary>(
+                    provider.GetRequiredService<ResourceOperationHandler<TestEntity, TestRequest, TestDetail, TestSummary>>())));
 
         return services.BuildServiceProvider();
     }
 
-    private static ServiceProvider BuildDispatcherServices(
-        IResourceCreateRequestAdvisor<Entity, Request> spy,
-        IRepository<Entity>                            repository,
-        ISimpleMapper                                  mapper,
-        SchemataResourceOptions?                       options = null
-    ) {
-        var services = new ServiceCollection();
-        services.AddSingleton(spy);
-        services.AddSingleton(repository);
-        services.AddSingleton(mapper);
-        services.AddSingleton<ResourceOperationHandler<Entity, Request, Detail, Summary>>();
-        services.AddSingleton<
-            IRequestHandler<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>,
-            DefaultCreateResourceHandler<Entity, Request, Detail, Summary>>();
-        services.AddSingleton<
-            IRequestPipelineAdvisor<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>, SetMarkerCommandAdvisor>();
-        if (options is not null) {
-            services.AddSingleton<IOptions<SchemataResourceOptions>>(Options.Create(options));
-        }
-
-        return services.BuildServiceProvider();
-    }
-
-    private sealed record TestMarker;
-
-    /// <summary>Dispatcher-level command advisor that stashes <see cref="TestMarker" /> on the ambient context.</summary>
-    private sealed class SetMarkerCommandAdvisor : IRequestPipelineAdvisor<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>
+    private sealed class ContextCapturingHandler(IRequestHandler<CreateResourceRequest<TestEntity, TestRequest, TestDetail>, CreateResultBase<TestDetail>> inner)
+        : IRequestHandler<CreateResourceRequest<TestEntity, TestRequest, TestDetail>, CreateResultBase<TestDetail>>
     {
+        public AdviceContext? Context { get; private set; }
+
+        public Task<CreateResultBase<TestDetail>> HandleAsync(
+            CreateResourceRequest<TestEntity, TestRequest, TestDetail> request,
+            AdviceContext                                              context,
+            CancellationToken                                          ct = default
+        ) {
+            Context = context;
+
+            return inner.HandleAsync(request, context, ct);
+        }
+    }
+
+    private sealed class CapturingPipelineAdvisor : IRequestPipelineAdvisor<CreateResourceRequest<TestEntity, TestRequest, TestDetail>, CreateResultBase<TestDetail>>
+    {
+        public AdviceContext? Context { get; private set; }
+
         public int Order => 0;
 
-        public Task<CreateResultBase<Detail>> AdviseAsync(
+        public Task<CreateResultBase<TestDetail>> AdviseAsync(
             AdviceContext                                        ctx,
-            CreateResourceRequest<Entity, Request, Detail>       a1,
-            RequestHandlerContinuation<CreateResultBase<Detail>> next,
+            CreateResourceRequest<TestEntity, TestRequest, TestDetail>       request,
+            RequestHandlerContinuation<CreateResultBase<TestDetail>> next,
             CancellationToken                                    ct = default
         ) {
-            ctx.Set(new TestMarker());
+            Context = ctx;
+
             return next(ct);
         }
     }
 
-    /// <summary>Resource-pipeline observer recording what it sees on the ambient context it was handed.</summary>
-    private sealed class SpyCreateRequestAdvisor : IResourceCreateRequestAdvisor<Entity, Request>
+    private sealed class ConcurrentCapturingPipelineAdvisor : IRequestPipelineAdvisor<CreateResourceRequest<TestEntity, TestRequest, TestDetail>, CreateResultBase<TestDetail>>
     {
-        public int  Order          => 0;
-        public bool SawMarker      { get; private set; }
-        public bool SawSuppression { get; private set; }
+        public ConcurrentBag<AdviceContext> Contexts { get; } = [];
 
-        public Task<AdviseResult> AdviseAsync(
-            AdviceContext                    ctx,
-            Request                          a1,
-            ResourceRequestContainer<Entity> a2,
-            ClaimsPrincipal?                 a3,
-            CancellationToken                ct = default
+        public int Order => 0;
+
+        public Task<CreateResultBase<TestDetail>> AdviseAsync(
+            AdviceContext                                        ctx,
+            CreateResourceRequest<TestEntity, TestRequest, TestDetail>       request,
+            RequestHandlerContinuation<CreateResultBase<TestDetail>> next,
+            CancellationToken                                    ct = default
         ) {
-            SawMarker      = ctx.TryGet<TestMarker>(out _);
-            SawSuppression = ctx.Has<FreshnessSuppressed>();
-            return Task.FromResult(AdviseResult.Continue);
+            Contexts.Add(ctx);
+
+            return next(ct);
         }
     }
 
-    [CanonicalName("entities/{entity}")]
-    public sealed class Entity : ICanonicalName
+    private sealed class CapturingResourceAdvisor : IResourceCreateRequestAdvisor<TestEntity, TestRequest, TestDetail>
     {
-        public string? Name          { get; set; }
-        public string? CanonicalName { get; set; }
-    }
+        public AdviceContext? Context { get; private set; }
 
-    public sealed class Request : ICanonicalName
-    {
-        public string? Name          { get; set; }
-        public string? CanonicalName { get; set; }
-    }
+        public int Order => 0;
 
-    public sealed class Detail : ICanonicalName
-    {
-        public string? Name          { get; set; }
-        public string? CanonicalName { get; set; }
-    }
+        public Task<AdviseResult> AdviseAsync(
+            AdviceContext                             ctx,
+            TestRequest                                   request,
+            ResourceRequestContainer<TestEntity>          container,
+            ClaimsPrincipal?                          principal,
+            HandledResponse<CreateResultBase<TestDetail>> output,
+            CancellationToken                         ct = default
+        ) {
+            Context = ctx;
 
-    public sealed class Summary : ICanonicalName
-    {
-        public string? Name          { get; set; }
-        public string? CanonicalName { get; set; }
+            return Task.FromResult(AdviseResult.Continue);
+        }
     }
 }

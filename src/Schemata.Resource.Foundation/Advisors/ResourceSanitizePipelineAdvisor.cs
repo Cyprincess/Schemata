@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
@@ -72,6 +73,39 @@ public static class ResourceSanitizePipelineAdvisor
                 ? Activator.CreateInstance(property.PropertyType)
                 : null;
             property.SetValue(request, @default);
+        }
+    }
+
+    /// <summary>
+    ///     Retains the loaded <paramref name="target" /> values of every listed system field across
+    ///     <paramref name="map" />. A scrubbed update request carries value-type defaults
+    ///     (<see cref="Guid.Empty" /> uid/timestamps) that merge mapping treats as populated, so the
+    ///     update mapping boundary restores the loaded identity and concurrency values afterward.
+    /// </summary>
+    /// <typeparam name="TTarget">The entity type being updated.</typeparam>
+    /// <param name="target">The loaded entity the update maps onto.</param>
+    /// <param name="fields">The system fields to retain.</param>
+    /// <param name="map">The mapping action to run.</param>
+    public static void RetainSystemFields<TTarget>(TTarget target, IEnumerable<string> fields, Action map) where TTarget : class {
+        var properties = AppDomainTypeCache.GetProperties(typeof(TTarget));
+
+        List<(PropertyInfo Property, object? Value)>? saved = null;
+        foreach (var field in fields) {
+            if (!properties.TryGetValue(field, out var property) || !property.CanRead || !property.CanWrite) {
+                continue;
+            }
+
+            (saved ??= []).Add((property, property.GetValue(target)));
+        }
+
+        map();
+
+        if (saved is null) {
+            return;
+        }
+
+        foreach (var (property, value) in saved) {
+            property.SetValue(target, value);
         }
     }
 }

@@ -20,7 +20,7 @@ internal static class ChildParentHelper
             return null;
         }
 
-        var segments = canonical!.Split('/');
+        var segments = canonical.Split('/');
         if (segments.Length < 4 || segments.Length % 2 != 0) {
             return null;
         }

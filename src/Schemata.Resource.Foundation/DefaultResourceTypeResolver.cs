@@ -85,7 +85,7 @@ public sealed class DefaultResourceTypeResolver : IResourceTypeResolver
             var entity     = resource.Entity;
             var collection = ResourceNameDescriptor.ForType(entity).Collection;
             if (!string.IsNullOrEmpty(collection)) {
-                index.TryAdd(collection, entity);
+                Claim(index, collection, entity);
             }
         }
 
@@ -102,18 +102,18 @@ public sealed class DefaultResourceTypeResolver : IResourceTypeResolver
                 continue;
             }
 
-            var segments = pattern!.Split(Separator);
+            var segments = pattern.Split(Separator);
             // Only patterns whose leaf is a placeholder participate, matching
             // ResourceNameDescriptor.ParseCanonicalName's contract: a bare collection name
             // is served by ResolveCollection rather than full-pattern matching.
             var leaf = segments[^1];
-            if (!IsPlaceholder(leaf)) {
+            if (!ResourceNameDescriptor.IsPlaceholder(leaf)) {
                 continue;
             }
 
             var node = root;
             foreach (var part in segments) {
-                if (IsPlaceholder(part)) {
+                if (ResourceNameDescriptor.IsPlaceholder(part)) {
                     node.Placeholder ??= new();
                     node             =   node.Placeholder;
                 } else {
@@ -127,16 +127,23 @@ public sealed class DefaultResourceTypeResolver : IResourceTypeResolver
                 }
             }
 
-            // First registration wins on terminal conflicts.
-            node.Entity ??= entity;
+            if (node.Entity is not null) {
+                throw Ambiguous(pattern, node.Entity, entity);
+            }
+            node.Entity = entity;
         }
 
         return root;
     }
 
-    private static bool IsPlaceholder(string segment) {
-        return segment.Length > 2 && segment[0] == '{' && segment[^1] == '}';
+    private static void Claim(Dictionary<string, Type> index, string name, Type entity) {
+        if (!index.TryAdd(name, entity)) {
+            throw Ambiguous(name, index[name], entity);
+        }
     }
+
+    private static InvalidOperationException Ambiguous(string name, Type registered, Type incoming) =>
+        new($"Canonical name '{name}' is registered by both '{registered.FullName}' and '{incoming.FullName}'.");
 
     #region Nested type: TrieNode
 

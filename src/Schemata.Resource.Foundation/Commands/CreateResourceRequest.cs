@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Messaging.Skeleton;
+using Schemata.Resource.Foundation.Advisors;
 
 namespace Schemata.Resource.Foundation.Commands;
 
@@ -13,11 +14,15 @@ namespace Schemata.Resource.Foundation.Commands;
 /// <typeparam name="TRequest">The resource request DTO type.</typeparam>
 /// <typeparam name="TDetail">The resource detail response type.</typeparam>
 public sealed record CreateResourceRequest<TEntity, TRequest, TDetail>(TRequest Request, ClaimsPrincipal? Principal)
-    : ICommand<CreateResultBase<TDetail>>, IRequestPrincipal
+    : ICommand<CreateResultBase<TDetail>>, IRequestPrincipal, IResourceDispatchCarrier
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
     where TDetail : class, ICanonicalName
 {
     [JsonIgnore]
     public ClaimsPrincipal? Principal { get; set; } = Principal;
+
+    /// <summary>The identified dispatch execution attached by the idempotency wrap.</summary>
+    [JsonIgnore]
+    public ResourceDispatchExecution? Dispatch { get; set; }
 }

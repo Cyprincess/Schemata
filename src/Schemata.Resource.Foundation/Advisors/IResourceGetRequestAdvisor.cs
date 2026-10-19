@@ -13,5 +13,7 @@ namespace Schemata.Resource.Foundation.Advisors;
 ///     <see cref="ResourceRequestContainer{TEntity}" />.
 /// </summary>
 /// <typeparam name="TEntity">The entity type.</typeparam>
-public interface IResourceGetRequestAdvisor<TEntity> : IAdvisor<GetRequest, ResourceRequestContainer<TEntity>, ClaimsPrincipal?>
-    where TEntity : class, ICanonicalName;
+public interface IResourceGetRequestAdvisor<TEntity, TDetail>
+    : IAdvisor<GetRequest, ResourceRequestContainer<TEntity>, ClaimsPrincipal?, HandledResponse<GetResultBase<TDetail>>>
+    where TEntity : class, ICanonicalName
+    where TDetail : class, ICanonicalName;

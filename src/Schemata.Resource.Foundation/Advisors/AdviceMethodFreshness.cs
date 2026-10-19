@@ -1,10 +1,10 @@
-using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
+using Schemata.Common.Errors;
 using Schemata.Security.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
@@ -26,9 +26,6 @@ public static class AdviceMethodFreshness
 ///         strong-format or malformed tags — raises <see cref="AbortedException" /> (AIP-154:
 ///         a provided mismatching etag MUST abort). Only an absent or whitespace tag opts out.
 ///     </para>
-///     <para>
-///         Suppressed when <see cref="FreshnessSuppressed" /> is present.
-///     </para>
 /// </remarks>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>
@@ -43,24 +40,23 @@ public sealed class AdviceMethodFreshness<TEntity, TRequest, TResponse> : IResou
     public int Order => AdviceMethodFreshness.DefaultOrder;
 
     public Task<AdviseResult> AdviseAsync(
-        AdviceContext     ctx,
-        TRequest          request,
-        TEntity           entity,
-        ClaimsPrincipal?  principal,
-        CancellationToken ct = default
+        AdviceContext                                         ctx,
+        ResourceMethodExecution<TEntity, TRequest, TResponse> execution,
+        CancellationToken                                     ct = default
     ) {
-        if (!FreshnessHelper.TryGetEntityTag(ctx, entity, out var expected)) {
+        var entity = execution.Entity!;
+        if (!FreshnessHelper.TryGetEntityTag(entity, out var expected)) {
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        var tag = request is IFreshness freshness ? freshness.EntityTag : null;
+        var tag = execution.Request is IFreshness freshness ? freshness.EntityTag : null;
 
         if (string.IsNullOrWhiteSpace(tag)) {
             return Task.FromResult(AdviseResult.Continue);
         }
 
         if (tag != expected) {
-            throw new AbortedException();
+            throw SchemataResourceErrors.Aborted<TEntity>(entity.CanonicalName);
         }
 
         return Task.FromResult(AdviseResult.Continue);

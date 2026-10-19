@@ -1,3 +1,4 @@
+using System;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
@@ -10,49 +11,43 @@ namespace Schemata.Resource.Tests.Grpc;
 public class GrpcResourceNamingShould
 {
     [Theory]
+    [InlineData(typeof(PackagedStudent), "school.v1.StudentService")]
+    [InlineData(typeof(Student), "Schemata.Resource.Tests.Fixtures.StudentService")]
+    public void ServiceFullName_UsesResourcePackage_OrNamespaceFallback(Type entityType, string expected) {
+        Assert.Equal(expected, GrpcResourceNaming.ServiceFullName(entityType));
+    }
+
+    [Theory]
+    [InlineData(typeof(Student), "ListStudents")]
+    [InlineData(typeof(TrashStudent), "ListTrashStudents")]
+    public void MethodName_List_UsesPluralResourceName(Type entityType, string expected) {
+        var descriptor = ResourceNameDescriptor.ForType(entityType);
+
+        Assert.Equal(expected, GrpcResourceNaming.MethodName(descriptor, Operations.List));
+    }
+
+    [Theory]
+    [InlineData(Operations.Get, "GetStudent")]
+    [InlineData(Operations.Create, "CreateStudent")]
+    [InlineData(Operations.Update, "UpdateStudent")]
+    [InlineData(Operations.Delete, "DeleteStudent")]
+    public void MethodName_StandardUnary_UsesSingularResourceName(Operations operation, string expected) {
+        var descriptor = ResourceNameDescriptor.ForType<PackagedStudent>();
+
+        Assert.Equal(expected, GrpcResourceNaming.MethodName(descriptor, operation));
+    }
+
+    [Theory]
     [InlineData("run", "RunStudent")]
     [InlineData("archive", "ArchiveStudent")]
     [InlineData("batchCreate", "BatchCreateStudent")]
     [InlineData("x", "XStudent")]
     [InlineData("", "Student")]
-    public void Concat_PascalCasedVerbWithSingular(string verb, string expected) {
+    [InlineData("preview", "PreviewStudent")]
+    public void CustomMethodName_PascalCasesVerb_WithSingularResourceName(string verb, string expected) {
         var descriptor = ResourceNameDescriptor.ForType(typeof(Student));
 
         Assert.Equal(expected, GrpcResourceNaming.CustomMethodName(descriptor, verb));
-    }
-
-    [Fact]
-    public void ServiceFullName_UsesResourcePackageWhenPresent() {
-        var name = GrpcResourceNaming.ServiceFullName(typeof(PackagedStudent));
-
-        Assert.Equal("school.v1.StudentService", name);
-    }
-
-    [Fact]
-    public void MethodName_List_UsesPluralResourceName() {
-        var descriptor = ResourceNameDescriptor.ForType<PackagedStudent>();
-
-        var name = GrpcResourceNaming.MethodName(descriptor, Operations.List);
-
-        Assert.Equal("ListStudents", name);
-    }
-
-    [Fact]
-    public void MethodName_StandardUnary_UsesSingularResourceName() {
-        var descriptor = ResourceNameDescriptor.ForType<PackagedStudent>();
-
-        var name = GrpcResourceNaming.MethodName(descriptor, Operations.Delete);
-
-        Assert.Equal("DeleteStudent", name);
-    }
-
-    [Fact]
-    public void CustomMethodName_UsesVerbAndSingularResourceName() {
-        var descriptor = ResourceNameDescriptor.ForType<PackagedStudent>();
-
-        var name = GrpcResourceNaming.CustomMethodName(descriptor, "preview");
-
-        Assert.Equal("PreviewStudent", name);
     }
 
     #region Nested type: PackagedStudent

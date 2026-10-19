@@ -72,6 +72,11 @@ public class ResourceMethodController<TEntity, TRequest, TResponse> : Controller
         var fullName = string.IsNullOrEmpty(name) ? null : BuildFullName(name);
 
         var response = await Operation.InvokeAsync(verb, fullName, request, HttpContext.User, ct);
+        if (response is null) {
+            // The handler reported no written resource; an absent response carries that
+            // disposition instead of an empty body.
+            return NoContent();
+        }
 
         return new JsonResult(response, JsonOptions);
     }

@@ -76,7 +76,7 @@ public sealed class ResourceAuthorizationRegistrationShould
         VerifyAuthorization<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>(services, new(new(), null), nameof(Operations.Create));
         VerifyAuthorization<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>(services, new("entities/e1", new(), null), nameof(Operations.Update));
         VerifyAuthorization<GetResourceQueryRequest<Entity, Detail>, GetResultBase<Detail>>(services, new(new(), null), nameof(Operations.Get));
-        VerifyAuthorization<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Summary>>(services, new(new(), null), nameof(Operations.List));
+        VerifyAuthorization<ListResourceQueryRequest<Entity, Summary>, ListResultBase<Entity, Summary>>(services, new(new(), null), nameof(Operations.List));
         VerifyAuthorization<DeleteResourceRequest<Entity, Detail>, DeleteResultBase<Detail>>(services, new("entities/e1", null, null), nameof(Operations.Delete));
         VerifyAuthorization<ResourceMethodRequest<Entity, MethodRequest, MethodResponse>, MethodResponse>(services, new("archive", "entities/e1", new(), null), "archive");
     }
@@ -111,11 +111,11 @@ public sealed class ResourceAuthorizationRegistrationShould
 
         Assert.Single(descriptors, descriptor => descriptor.ImplementationType == typeof(AuthenticationPipelineAdvisor<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>));
         Assert.Single(descriptors, descriptor => descriptor.ImplementationType == typeof(AuthorizationPipelineAdvisor<CreateResourceRequest<Entity, Request, Detail>, CreateResultBase<Detail>>));
-        var resolverType = typeof(Func<CreateResourceRequest<Entity, Request, Detail>, (string Operation, Type? Entity)>);
+        var resolverType = typeof(Func<CreateResourceRequest<Entity, Request, Detail>, ResourceTarget>);
         Assert.Equal(1, services.Count(descriptor => descriptor.ServiceType == resolverType));
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
-        var resolve = scope.ServiceProvider.GetRequiredService<Func<CreateResourceRequest<Entity, Request, Detail>, (string Operation, Type? Entity)>>();
+        var resolve = scope.ServiceProvider.GetRequiredService<Func<CreateResourceRequest<Entity, Request, Detail>, ResourceTarget>>();
         var actual = resolve(new(new(), null));
         Assert.Equal(nameof(Operations.Create), actual.Operation);
         Assert.Equal(typeof(Entity), actual.Entity);
@@ -130,19 +130,40 @@ public sealed class ResourceAuthorizationRegistrationShould
         builder.Use<Entity, Request, Detail, Summary>(null, resource => resource.Methods = [new("archive", typeof(MethodHandler))]);
         var envelope = typeof(ResourceMethodRequest<Entity, MethodRequest, MethodResponse>);
         var service = typeof(IRequestPipelineAdvisor<,>).MakeGenericType(envelope, typeof(MethodResponse));
-        var resolverType = typeof(Func<ResourceMethodRequest<Entity, MethodRequest, MethodResponse>, (string Operation, Type? Entity)>);
+        var resolverType = typeof(Func<ResourceMethodRequest<Entity, MethodRequest, MethodResponse>, ResourceTarget>);
 
         Assert.Single(services, descriptor => descriptor.ServiceType == service
                                            && descriptor.ImplementationType == typeof(AuthorizationPipelineAdvisor<ResourceMethodRequest<Entity, MethodRequest, MethodResponse>, MethodResponse>));
         Assert.Equal(1, services.Count(descriptor => descriptor.ServiceType == resolverType));
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
-        var resolve = scope.ServiceProvider.GetRequiredService<Func<ResourceMethodRequest<Entity, MethodRequest, MethodResponse>, (string Operation, Type? Entity)>>();
+        var resolve = scope.ServiceProvider.GetRequiredService<Func<ResourceMethodRequest<Entity, MethodRequest, MethodResponse>, ResourceTarget>>();
 
         var actual = resolve(new("archive", "entities/e1", new() { Principal = new(new ClaimsIdentity("test")) }, new(new ClaimsIdentity("test"))));
 
         Assert.Equal("archive", actual.Operation);
         Assert.Equal(typeof(Entity), actual.Entity);
+    }
+
+    [Fact]
+    public void Get_Resolver_Carries_The_Canonical_Name_The_Transport_Projects() {
+        var services = new ServiceCollection();
+        var options = new SchemataOptions();
+        services.AddSchemataResources(options);
+        var builder = new SchemataResourceBuilder(options, services);
+        builder.WithAuthorization();
+        builder.Use<Entity, Request, Detail, Summary>();
+        using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var resolve = scope.ServiceProvider.GetRequiredService<Func<GetResourceQueryRequest<Entity, Detail>, ResourceTarget>>();
+
+        // HTTP/gRPC project the path into GetRequest.CanonicalName only; the handler resolves
+        // CanonicalName ?? Name — the typed target must preserve the same fact.
+        var projected = resolve(new(new() { CanonicalName = "entities/e1" }, null));
+        Assert.Equal("entities/e1", projected.Name);
+
+        var named = resolve(new(new() { Name = "entities/e2" }, null));
+        Assert.Equal("entities/e2", named.Name);
     }
 
 
@@ -151,13 +172,13 @@ public sealed class ResourceAuthorizationRegistrationShould
         var services = new ServiceCollection();
         var options = new SchemataOptions();
         services.AddSchemataResources(options);
-        services.AddScoped<Func<CreateResourceRequest<Entity, Request, Detail>, (string Operation, Type? Entity)>>(_ => _ => ("first", typeof(AnonymousEntity)));
+        services.AddScoped<Func<CreateResourceRequest<Entity, Request, Detail>, ResourceTarget>>(_ => _ => new() { Operation = "first", Entity = typeof(AnonymousEntity) });
         var builder = new SchemataResourceBuilder(options, services);
         builder.WithAuthorization();
         builder.Use<Entity, Request, Detail, Summary>();
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
-        var resolve = scope.ServiceProvider.GetRequiredService<Func<CreateResourceRequest<Entity, Request, Detail>, (string Operation, Type? Entity)>>();
+        var resolve = scope.ServiceProvider.GetRequiredService<Func<CreateResourceRequest<Entity, Request, Detail>, ResourceTarget>>();
 
         var actual = resolve(new(new(), null));
 
@@ -173,7 +194,7 @@ public sealed class ResourceAuthorizationRegistrationShould
         Assert.Equal(ServiceLifetime.Scoped, descriptor.Lifetime);
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
-        var resolve = scope.ServiceProvider.GetRequiredService<Func<TRequest, (string Operation, Type? Entity)>>();
+        var resolve = scope.ServiceProvider.GetRequiredService<Func<TRequest, ResourceTarget>>();
 
         var actual = resolve(request);
 
@@ -187,19 +208,19 @@ public sealed class ResourceAuthorizationRegistrationShould
         var request   = new Request { Name = "request" };
         var principal = new ClaimsPrincipal(new ClaimsIdentity("test"));
         var access    = new Mock<IAccessProvider<Entity, Request>>(MockBehavior.Strict);
-        access.Setup(provider => provider.HasAccessAsync(null,
-                         It.Is<AccessContext<Request>>(context => context.Operation == nameof(Operations.Create) && ReferenceEquals(context.Request, request)),
+        access.Setup(provider => provider.HasAccessAsync(entity,
+                         It.Is<AccessContext<Request>>(context => context.Operation == nameof(Operations.Create) && ReferenceEquals(context.Request, request) && context.Stage == AccessStage.Instance && context.Name == entity.CanonicalName),
                          principal, It.IsAny<CancellationToken>()))
-              .ReturnsAsync(true);
+              .ReturnsAsync(AccessDecision.Allowed);
         access.Setup(provider => provider.HasAccessAsync(entity,
                          It.Is<AccessContext<Request>>(context => context.Operation == nameof(Operations.Update) && ReferenceEquals(context.Request, request)),
                          principal, It.IsAny<CancellationToken>()))
-              .ReturnsAsync(true);
-        var create = new ResourceCreateAccessAdvisor<Entity, Request>(access.Object);
-        var update = new ResourceUpdateAccessAdvisor<Entity, Request>(access.Object);
+              .ReturnsAsync(AccessDecision.Allowed);
+        var create = new ResourceCreateAccessAdvisor<Entity, Request, Detail>(access.Object);
+        var update = new ResourceUpdateAccessAdvisor<Entity, Request, Detail>(access.Object);
 
-        var createResult = await create.AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, entity, principal);
-        var updateResult = await update.AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, entity, principal);
+        var createResult = await create.AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, entity, principal, new());
+        var updateResult = await update.AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, entity, principal, new());
 
         Assert.Equal(AdviseResult.Continue, createResult);
         Assert.Equal(AdviseResult.Continue, updateResult);
@@ -217,14 +238,14 @@ public sealed class ResourceAuthorizationRegistrationShould
         getAccess.Setup(provider => provider.HasAccessAsync(entity,
                             It.Is<AccessContext<GetRequest>>(context => context.Operation == nameof(Operations.Get) && ReferenceEquals(context.Request, get)),
                             principal, It.IsAny<CancellationToken>()))
-                 .ReturnsAsync(true);
+                 .ReturnsAsync(AccessDecision.Allowed);
         deleteAccess.Setup(provider => provider.HasAccessAsync(entity,
                                It.Is<AccessContext<DeleteRequest>>(context => context.Operation == nameof(Operations.Delete) && ReferenceEquals(context.Request, delete)),
                                principal, It.IsAny<CancellationToken>()))
-                    .ReturnsAsync(true);
+                    .ReturnsAsync(AccessDecision.Allowed);
 
-        var getResult = await new ResourceGetAccessAdvisor<Entity>(getAccess.Object).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), get, entity, principal);
-        var deleteResult = await new ResourceDeleteAccessAdvisor<Entity>(deleteAccess.Object).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), delete, entity, principal);
+        var getResult = await new ResourceGetAccessAdvisor<Entity, Detail>(getAccess.Object).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), get, entity, principal, new());
+        var deleteResult = await new ResourceDeleteAccessAdvisor<Entity, Detail>(deleteAccess.Object).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), delete, entity, principal, new());
 
         Assert.Equal(AdviseResult.Continue, getResult);
         Assert.Equal(AdviseResult.Continue, deleteResult);
@@ -241,15 +262,15 @@ public sealed class ResourceAuthorizationRegistrationShould
         access.Setup(provider => provider.HasAccessAsync(null,
                          It.Is<AccessContext<ListRequest>>(context => context.Operation == nameof(Operations.List) && ReferenceEquals(context.Request, request)),
                          principal, It.IsAny<CancellationToken>()))
-              .ReturnsAsync(true);
+              .ReturnsAsync(AccessDecision.Allowed);
         entitlement.Setup(provider => provider.GenerateEntitlementExpressionAsync(
                                It.Is<AccessContext<ListRequest>>(context => context.Operation == nameof(Operations.List) && ReferenceEquals(context.Request, request)),
                                principal, It.IsAny<CancellationToken>()))
                    .ReturnsAsync(entity => entity.Name == "allowed");
         var container = new ResourceRequestContainer<Entity>();
 
-        var accessResult = await new ResourceListAccessAdvisor<Entity>(access.Object).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, container, principal);
-        var entitlementResult = await new ResourceEntitlementListAdvisor<Entity>(entitlement.Object).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, container, principal);
+        var accessResult = await new ResourceListAccessAdvisor<Entity, Summary>(access.Object).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, container, principal, new());
+        var entitlementResult = await new ResourceEntitlementListAdvisor<Entity, Summary>(entitlement.Object).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, container, principal, new());
         var names = container.Query(new[] { new Entity { Name = "allowed" }, new Entity { Name = "denied" } }.AsQueryable()).Select(entity => entity.Name).ToArray();
 
         Assert.Equal(AdviseResult.Continue, accessResult);
@@ -268,50 +289,56 @@ public sealed class ResourceAuthorizationRegistrationShould
         access.Setup(provider => provider.HasAccessAsync(entity,
                          It.Is<AccessContext<MethodRequest>>(context => context.Operation == "archive" && ReferenceEquals(context.Request, request)),
                          principal, It.IsAny<CancellationToken>()))
-              .ReturnsAsync(true);
+              .ReturnsAsync(AccessDecision.Allowed);
         var context = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        context.Set(new ResourceMethodVerb("archive"));
+        var execution = new ResourceMethodExecution<Entity, MethodRequest, MethodResponse> {
+            Verb      = "archive",
+            Request   = request,
+            Principal = principal,
+            Entity    = entity,
+        };
 
-        var result = await new ResourceMethodAccessAdvisor<Entity, MethodRequest, MethodResponse>(access.Object).AdviseAsync(context, request, entity, principal);
+        var result = await new ResourceMethodAccessAdvisor<Entity, MethodRequest, MethodResponse>(access.Object).AdviseAsync(context, execution);
 
         Assert.Equal(AdviseResult.Continue, result);
         access.VerifyAll();
     }
     [Fact]
-    public async Task Create_Access_Denial_Uses_Null_Entity_And_Reports_Parent_Visible_Permission_Denial() {
+    public async Task Create_Access_Denial_Uses_The_Mapped_Entity_And_Reports_Permission_Denied_Without_A_Get_Probe() {
+        var entity = new Entity { Name = "created", CanonicalName = "entities/created" };
         var request = new Request { Name = "created" };
         var principal = new ClaimsPrincipal(new ClaimsIdentity("test"));
         var access = new Mock<IAccessProvider<Entity, Request>>(MockBehavior.Strict);
-        access.SetupSequence(provider => provider.HasAccessAsync(null, It.IsAny<AccessContext<Request>>(), principal, It.IsAny<CancellationToken>()))
-              .ReturnsAsync(false)
-              .ReturnsAsync(true);
+        access.Setup(provider => provider.HasAccessAsync(entity, It.IsAny<AccessContext<Request>>(), principal, It.IsAny<CancellationToken>()))
+              .ReturnsAsync(AccessDecision.Denied);
 
-        var exception = await Assert.ThrowsAsync<PermissionDeniedException>(() => new ResourceCreateAccessAdvisor<Entity, Request>(access.Object).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, new(), principal));
+        var exception = await Assert.ThrowsAsync<PermissionDeniedException>(() => new ResourceCreateAccessAdvisor<Entity, Request, Detail>(access.Object).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, entity, principal, new()));
 
         Assert.Equal(403, exception.Code);
         Assert.Equal("PERMISSION_DENIED", exception.Status);
         Assert.Equal(ErrorReasons.InsufficientPermission, Assert.Single(exception.Details!.OfType<ErrorInfoDetail>()).Reason);
-        access.Verify(provider => provider.HasAccessAsync(null, It.Is<AccessContext<Request>>(context => context.Operation == nameof(Operations.Create) && ReferenceEquals(context.Request, request)), principal, It.IsAny<CancellationToken>()), Times.Once);
-        access.Verify(provider => provider.HasAccessAsync(null, It.Is<AccessContext<Request>>(context => context.Operation == nameof(Operations.Get) && ReferenceEquals(context.Request, request)), principal, It.IsAny<CancellationToken>()), Times.Once);
+        // AIP-211: the denial is reported as PERMISSION_DENIED with the resource details; a
+        // same-entity Get probe is not a parent-resource check and never runs.
+        access.Verify(provider => provider.HasAccessAsync(entity, It.Is<AccessContext<Request>>(context => context.Operation == nameof(Operations.Create) && ReferenceEquals(context.Request, request) && context.Stage == AccessStage.Instance && context.Name == entity.CanonicalName), principal, It.IsAny<CancellationToken>()), Times.Once);
+        access.VerifyNoOtherCalls();
     }
 
     [Fact]
-    public async Task Update_Access_Denial_Hides_Loaded_Entity_When_Parent_Read_Fails() {
+    public async Task Update_Access_Denial_Reports_Permission_Denied_Even_When_A_Read_Would_Also_Fail() {
         var entity = new Entity { Name = "e1", CanonicalName = "entities/e1" };
         var request = new Request { Name = "e1" };
         var principal = new ClaimsPrincipal(new ClaimsIdentity("test"));
         var access = new Mock<IAccessProvider<Entity, Request>>(MockBehavior.Strict);
-        access.SetupSequence(provider => provider.HasAccessAsync(entity, It.IsAny<AccessContext<Request>>(), principal, It.IsAny<CancellationToken>()))
-              .ReturnsAsync(false)
-              .ReturnsAsync(false);
+        access.Setup(provider => provider.HasAccessAsync(entity, It.IsAny<AccessContext<Request>>(), principal, It.IsAny<CancellationToken>()))
+              .ReturnsAsync(AccessDecision.Denied);
 
-        var exception = await Assert.ThrowsAsync<NotFoundException>(() => new ResourceUpdateAccessAdvisor<Entity, Request>(access.Object).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, entity, principal));
+        var exception = await Assert.ThrowsAsync<PermissionDeniedException>(() => new ResourceUpdateAccessAdvisor<Entity, Request, Detail>(access.Object).AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request, entity, principal, new()));
 
-        Assert.Equal(404, exception.Code);
-        Assert.Equal("NOT_FOUND", exception.Status);
-        Assert.Equal(ErrorReasons.ResourceNotFound, Assert.Single(exception.Details!.OfType<ErrorInfoDetail>()).Reason);
+        Assert.Equal(403, exception.Code);
+        Assert.Equal("PERMISSION_DENIED", exception.Status);
+        Assert.Equal(ErrorReasons.InsufficientPermission, Assert.Single(exception.Details!.OfType<ErrorInfoDetail>()).Reason);
         access.Verify(provider => provider.HasAccessAsync(entity, It.Is<AccessContext<Request>>(context => context.Operation == nameof(Operations.Update) && ReferenceEquals(context.Request, request)), principal, It.IsAny<CancellationToken>()), Times.Once);
-        access.Verify(provider => provider.HasAccessAsync(entity, It.Is<AccessContext<Request>>(context => context.Operation == nameof(Operations.Get) && ReferenceEquals(context.Request, request)), principal, It.IsAny<CancellationToken>()), Times.Once);
+        access.VerifyNoOtherCalls();
     }
 
 
@@ -340,10 +367,10 @@ public sealed class ResourceAuthorizationRegistrationShould
         using var scope = provider.CreateScope();
         var envelope = new ListResourceQueryRequest<AnonymousEntity, Summary>(request, null);
         var context = new AdviceContext(scope.ServiceProvider);
-        var advisors = scope.ServiceProvider.GetServices<IRequestPipelineAdvisor<ListResourceQueryRequest<AnonymousEntity, Summary>, ListResultBase<Summary>>>().ToArray();
-        var authentication = Assert.Single(advisors.OfType<AuthenticationPipelineAdvisor<ListResourceQueryRequest<AnonymousEntity, Summary>, ListResultBase<Summary>>>());
-        var authorization = Assert.Single(advisors.OfType<AuthorizationPipelineAdvisor<ListResourceQueryRequest<AnonymousEntity, Summary>, ListResultBase<Summary>>>());
-        var listAdvisors = scope.ServiceProvider.GetServices<IResourceListRequestAdvisor<AnonymousEntity>>().OrderBy(advisor => advisor.Order).ToArray();
+        var advisors = scope.ServiceProvider.GetServices<IRequestPipelineAdvisor<ListResourceQueryRequest<AnonymousEntity, Summary>, ListResultBase<AnonymousEntity, Summary>>>().ToArray();
+        var authentication = Assert.Single(advisors.OfType<AuthenticationPipelineAdvisor<ListResourceQueryRequest<AnonymousEntity, Summary>, ListResultBase<AnonymousEntity, Summary>>>());
+        var authorization = Assert.Single(advisors.OfType<AuthorizationPipelineAdvisor<ListResourceQueryRequest<AnonymousEntity, Summary>, ListResultBase<AnonymousEntity, Summary>>>());
+        var listAdvisors = scope.ServiceProvider.GetServices<IResourceListRequestAdvisor<AnonymousEntity, Summary>>().OrderBy(advisor => advisor.Order).ToArray();
         var container = new ResourceRequestContainer<AnonymousEntity>();
         var calls = 0;
 
@@ -351,11 +378,11 @@ public sealed class ResourceAuthorizationRegistrationShould
             ct => authorization.AdviseAsync(context, envelope, async token => {
                 calls++;
                 foreach (var advisor in listAdvisors) {
-                    var advice = await advisor.AdviseAsync(context, request, container, null, token);
+                    var advice = await advisor.AdviseAsync(context, request, container, null, new(), token);
                     Assert.Equal(AdviseResult.Continue, advice);
                 }
 
-                return new ListResultBase<Summary>();
+                return new();
             }, ct), CancellationToken.None);
         var names = container.Query(new[] { new AnonymousEntity { Name = "allowed" }, new AnonymousEntity { Name = "denied" } }.AsQueryable()).Select(entity => entity.Name).ToArray();
 
@@ -405,7 +432,7 @@ public sealed class ResourceAuthorizationRegistrationShould
 
     public sealed class MethodHandler : IRequestHandler<MethodRequest, MethodResponse>
     {
-        public Task<MethodResponse> HandleAsync(MethodRequest request, CancellationToken ct = default) {
+        public Task<MethodResponse> HandleAsync(MethodRequest request, AdviceContext context, CancellationToken ct = default) {
             return Task.FromResult(new MethodResponse());
         }
     }

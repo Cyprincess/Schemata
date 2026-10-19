@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+using Grpc.Core;
+using Schemata.Transport.Grpc.Proto;
 using ProtoBuf.Grpc.Configuration;
 using ProtoBuf.Meta;
 
@@ -27,4 +30,11 @@ internal sealed class ResourceBinderConfiguration
     ///     Gets the protobuf-net gRPC binder configuration.
     /// </summary>
     public BinderConfiguration Binder { get; }
+
+    public List<GrpcMethodSchema> Methods { get; } = [];
+
+    public Method<TRequest, TResponse> Record<TRequest, TResponse>(Method<TRequest, TResponse> method) {
+        Methods.Add(GrpcMethodSchema.From(method));
+        return method;
+    }
 }

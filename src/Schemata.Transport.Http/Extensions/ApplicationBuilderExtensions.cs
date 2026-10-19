@@ -1,12 +1,17 @@
+using System;
+using System.Globalization;
+using System.Linq;
+using Schemata.Abstractions.Errors;
 using System.Net.Mime;
 using System.Text.Json;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Primitives;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Abstractions.Globalization;
+using Schemata.Transport.Http.Middleware;
 using static Schemata.Abstractions.SchemataConstants;
 
 // ReSharper disable once CheckNamespace
@@ -17,6 +22,16 @@ namespace Microsoft.AspNetCore.Builder;
 /// </summary>
 public static class ApplicationBuilderExtensions
 {
+    /// <summary>
+    ///     Installs <see cref="RequestCultureMiddleware" /> which flows the
+    ///     <c>Accept-Language</c> preference into the request culture.
+    /// </summary>
+    /// <param name="app">The application builder.</param>
+    /// <returns>The application builder for chaining.</returns>
+    public static IApplicationBuilder UseSchemataRequestCulture(this IApplicationBuilder app) {
+        return app.UseMiddleware<RequestCultureMiddleware>();
+    }
+
     /// <summary>
     ///     Installs the AIP-193 exception handler, mapping <see cref="SchemataException" /> subtypes
     ///     into structured error responses and every other exception into a generic 500.
@@ -35,13 +50,16 @@ public static class ApplicationBuilderExtensions
                 }
 
                 if (feature.Error is not SchemataException ex) {
-                    ex = new(500, ErrorCodes.Internal, SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY));
+                    ex = new(500, ErrorCodes.Internal, SchemataResources.GetResourceString(SchemataResources.INTERNAL));
                 }
 
                 context.Response.StatusCode  = ex.Code;
                 context.Response.ContentType = MediaTypeNames.Application.Json;
+                if (ex.Details?.OfType<RetryInfoDetail>().FirstOrDefault()?.RetryDelay is { } retry) {
+                    context.Response.Headers.RetryAfter = Math.Max(0, Math.Ceiling(retry.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
+                }
 
-                var locale   = ParseAcceptLanguage(context.Request.Headers.AcceptLanguage);
+                var locale   = AcceptLanguageParser.Parse(context.Request.Headers.AcceptLanguage)?.Name;
                 var response = ex.CreateErrorResponse(context.TraceIdentifier, locale: locale);
                 if (response is null) {
                     return;
@@ -52,36 +70,5 @@ public static class ApplicationBuilderExtensions
         });
 
         return app;
-    }
-
-    /// <summary>
-    ///     Extracts the highest-quality language tag from an
-    ///     <c>Accept-Language</c> header (e.g. <c>"zh-CN,en-US;q=0.9"</c> -> <c>"zh-CN"</c>).
-    ///     Returns <see langword="null" /> when the header is empty so the central
-    ///     <c>EnsureLocalizedMessage</c> helper skips localization.
-    /// </summary>
-    private static string? ParseAcceptLanguage(StringValues header) {
-        foreach (var value in header) {
-            if (string.IsNullOrWhiteSpace(value)) {
-                continue;
-            }
-
-            foreach (var segment in value.Split(',')) {
-                var trimmed = segment.Trim();
-                if (trimmed.Length == 0) {
-                    continue;
-                }
-
-                var semicolon = trimmed.IndexOf(';');
-                var tag       = semicolon < 0 ? trimmed : trimmed[..semicolon].Trim();
-                if (tag.Length == 0 || tag == "*") {
-                    continue;
-                }
-
-                return tag;
-            }
-        }
-
-        return null;
     }
 }

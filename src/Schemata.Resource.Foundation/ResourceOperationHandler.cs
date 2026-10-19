@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,7 +13,7 @@ using Schemata.Common;
 using Schemata.Common.Errors;
 using Schemata.Entity.Repository;
 using Schemata.Mapping.Skeleton;
-using Schemata.Resource.Foundation.Runtime;
+using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Foundation.Models;
 
 namespace Schemata.Resource.Foundation;
@@ -73,6 +74,16 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         return ResourceNotFound(ResourceNameDescriptor.ForType<TEntity>().Collection);
     }
 
+    private TDetail RequireDetail(TDetail? detail) {
+        if (detail is null) {
+            throw new InvalidOperationException(
+                $"Could not map '{typeof(TEntity).FullName}' to '{typeof(TDetail).FullName}'."
+            );
+        }
+
+        return detail;
+    }
+
     private TotalSizeMode ResolveTotalSizeMode() {
         var options = _sp.GetService<IOptions<SchemataResourceOptions>>()?.Value;
         if (options is null) {
@@ -87,15 +98,76 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         return options.TotalSize is TotalSizeMode.Default ? TotalSizeMode.Exact : options.TotalSize;
     }
 
-    private AdviceContext CreateAdviceContext() { return ResourceAdviceContext.Create(_sp); }
+    private (int DefaultPageSize, int MaxPageSize) ResolvePagingPolicy() {
+        var options  = _sp.GetService<IOptions<SchemataResourceOptions>>()?.Value;
+        var pageSize = options?.DefaultPageSize ?? 25;
+        var maxSize  = options?.MaxPageSize ?? 100;
 
-    private static Task<TResult?> RunPipelineAsync<TResult>(
-        AdviceContext            ctx,
-        Func<Task<AdviseResult>> advise,
-        Func<Exception>          blocked,
-        Func<TResult>?           handled = null
-    )
-        where TResult : class {
-        return ResourcePipelineRunner<Operations>.RunAsync(ctx, advise, blocked, handled);
+        var resource = _sp.GetService<ResourceRegistry>()?.GetResource(typeof(TEntity));
+        if (resource is not null) {
+            if (resource.DefaultPageSize != 0) {
+                pageSize = resource.DefaultPageSize;
+            }
+
+            if (resource.MaxPageSize != 0) {
+                maxSize = resource.MaxPageSize;
+            }
+        }
+
+        if (pageSize <= 0 || maxSize <= 0 || pageSize > maxSize || maxSize >= int.MaxValue) {
+            throw new InvalidOperationException(
+                $"The List paging policy for '{typeof(TEntity).FullName}' is invalid: default {pageSize}, "
+              + $"maximum {maxSize}. Require 0 < default <= maximum, and a maximum below int.MaxValue so the look-ahead row cannot overflow."
+            );
+        }
+
+        return (pageSize, maxSize);
+    }
+
+    /// <summary>
+    ///     Runs one identified mutation as the commit owner: the verb handler begins the unit of
+    ///     work, the mutation joins and stages through it, fail-able response preparation runs inside
+    ///     <paramref name="mutate" /> before the provider commit, and the dispatch execution records
+    ///     the transaction outcome through the unit of work's commit and rollback sinks.
+    /// </summary>
+    private async Task<TResponse> ExecuteOwnedAsync<TResponse>(
+        ResourceDispatchExecution          execution,
+        Func<IUnitOfWork, Task<TResponse>> mutate,
+        CancellationToken                  ct
+    ) {
+        await using var repository  = _sp.GetRequiredService<IRepository<TEntity>>();
+        await using var transaction = repository.Begin();
+
+        // The stamp sink registers ahead of the mutation's join and its repository notifications, so
+        // a throwing post-commit sink can never leave a persisted dispatch recorded as unwritten.
+        execution.MarkReached();
+        transaction.AddCommitSink(CommitOrders.Repository - 1, _ => {
+            execution.MarkCommitted();
+            return Task.CompletedTask;
+        });
+        transaction.AddRollbackSink(execution.MarkRolledBack);
+
+        var response = await mutate(transaction);
+
+        // CommitAsync resolving normally is the owner's completion evidence: the provider
+        // transaction ended committed before the sinks ran.
+        await transaction.CommitAsync(ct);
+        execution.MarkCommitted();
+
+        return response;
+    }
+
+    /// <summary>
+    ///     Copies the final concurrency stamp from the staged entity onto the response detail once
+    ///     provider-generated write values are final: immediately on immediate-execution providers,
+    ///     after stamp rotation on buffered ones. Keeps the pre-commit mapped detail's ETag equal to
+    ///     the persisted row's stamp.
+    /// </summary>
+    private static void SyncStamp(TEntity entity, TDetail detail, IUnitOfWork transaction) {
+        transaction.AddSavePreparation(() => {
+            if (entity is IConcurrency source && detail is IConcurrency stamped) {
+                stamped.Timestamp = source.Timestamp;
+            }
+        });
     }
 }

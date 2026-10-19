@@ -22,6 +22,7 @@ using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Foundation.Commands;
 using Schemata.Resource.Foundation.Handlers;
+using Schemata.Resource.Tests.Fixtures;
 using Schemata.Security.Skeleton;
 using Xunit;
 
@@ -52,7 +53,7 @@ public class ResourceMethodEnvelopeShould
         var principal  = new ClaimsPrincipal(new ClaimsIdentity());
         using var services = BuildServices(handler: handler);
 
-        var response = await DispatchAsync(services, "archive", null, request, principal);
+        var response = await DispatchAsync(services, "batchArchive", null, request, principal);
 
         Assert.Same(handler.Response, response);
         Assert.Equal(1, handler.Invocations);
@@ -68,7 +69,7 @@ public class ResourceMethodEnvelopeShould
             services.AddSingleton<IRequestPipelineAdvisor<ResourceMethodRequest<MethodEntity, MethodRequest, MethodResponse>, MethodResponse>>(wrap);
         });
 
-        await DispatchAsync(services, "archive", "entities/e1", new MethodRequest { CanonicalName = "entities/payload" }, null);
+        await DispatchAsync(services, "archive", "entities/e1", new() { CanonicalName = "entities/payload" }, null);
 
         var observed = Assert.Single(wrap.Observed);
         Assert.Equal("archive", observed.Verb);
@@ -83,16 +84,15 @@ public class ResourceMethodEnvelopeShould
         var handler = new MethodHandler();
         var entityAdvisor = new RecordingMethodEntityAdvisor();
         var repository = new Mock<IRepository<MethodEntity>>();
-        repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Mock.Of<IDisposable>());
         repository.Setup(r => r.SingleOrDefaultAsync(
                        It.IsAny<Func<IQueryable<MethodEntity>, IQueryable<MethodEntity>>>(),
-                       It.IsAny<CancellationToken>()))
+                       It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
                   .Returns(new ValueTask<MethodEntity?>(entity));
         using var services = BuildServices(repository: repository.Object, handler: handler, configure: services => {
             services.AddSingleton<IResourceMethodAdvisor<MethodEntity, MethodRequest, MethodResponse>>(entityAdvisor);
         });
 
-        var response = await DispatchAsync(services, "archive", "entities/e1", new MethodRequest(), null);
+        var response = await DispatchAsync(services, "archive", "entities/e1", new(), null);
 
         Assert.Same(handler.Response, response);
         Assert.Same(entity, entityAdvisor.Entity);
@@ -102,7 +102,7 @@ public class ResourceMethodEnvelopeShould
     [Fact]
     public async Task Method_Response_Wrap_Derives_Parent_And_Sets_Weak_ETag() {
         var handler = new MethodHandler {
-            Response = new MethodResponse { CanonicalName = "tenants/t1/hosts/h1", Timestamp = Timestamp },
+            Response = new() { CanonicalName = "tenants/t1/hosts/h1", Timestamp = Timestamp },
         };
         using var services = BuildServices(handler: handler, configure: services => {
             services.AddSingleton<IEntityTagProvider, DefaultEntityTagProvider>();
@@ -111,7 +111,7 @@ public class ResourceMethodEnvelopeShould
                 ResourceMethodResponsePipelineAdvisor<MethodEntity, MethodRequest, MethodResponse>>();
         });
 
-        var response = await DispatchAsync(services, "archive", null, new MethodRequest(), null);
+        var response = await DispatchAsync(services, "batchArchive", null, new(), null);
 
         Assert.Equal("tenants/t1", response.Parent);
         Assert.Equal(WeakTag(Timestamp), response.EntityTag);
@@ -145,7 +145,7 @@ public class ResourceMethodEnvelopeShould
     public async Task Method_Idempotency_Reserves_With_Verb_And_Target_Then_Commits_The_Produced_Response() {
         var request = new MethodRequest { RequestId = "req-1" };
         var handler = new MethodHandler {
-            Response = new MethodResponse { CanonicalName = "tenants/t1/hosts/h1", Timestamp = Timestamp },
+            Response = new() { CanonicalName = "tenants/t1/hosts/h1", Timestamp = Timestamp },
         };
         var store    = new Dictionary<string, byte[]>();
         var reserved = new List<byte[]>();
@@ -177,22 +177,76 @@ public class ResourceMethodEnvelopeShould
     }
 
     [Fact]
+    public async Task Method_Idempotency_WithAnUnreportedSuccess_KeepsTheReservationPending() {
+        var request = new MethodRequest { RequestId = "req-1" };
+        var handler = new SilentMethodHandler();
+        var store    = new Dictionary<string, byte[]>();
+        var reserved = new List<byte[]>();
+        var replaced = new List<byte[]>();
+        var cache    = StatefulCache(store, reserved, replaced);
+        using var services = BuildServices(repository: LoadedRepository().Object, handler: handler, configure: services => {
+            services.AddSingleton(cache.Object);
+            services.AddSingleton<
+                IRequestPipelineAdvisor<ResourceMethodRequest<MethodEntity, MethodRequest, MethodResponse>, MethodResponse>,
+                ResourceMethodIdempotencyPipelineAdvisor<MethodEntity, MethodRequest, MethodResponse>>();
+        });
+
+        var response = await DispatchAsync(services, "archive", "entities/e1", request, null);
+
+        // The handler returned without reporting completion: the wrap cannot certify the result,
+        // so the reservation stays pending and is neither finalized nor removed.
+        Assert.Same(handler.Response, response);
+        var pending = Assert.Single(reserved);
+        Assert.Equal("PENDING", JsonDocument.Parse(pending).RootElement.GetProperty("Kind").GetString());
+        Assert.Empty(replaced);
+        cache.Verify(c => c.TryRemoveAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Method_Idempotency_WithAnUnreportedFailure_KeepsTheReservationPending() {
+        var request = new MethodRequest { RequestId = "req-1" };
+        var store    = new Dictionary<string, byte[]>();
+        var reserved = new List<byte[]>();
+        var replaced = new List<byte[]>();
+        var cache    = StatefulCache(store, reserved, replaced);
+        using var services = BuildServices(repository: LoadedRepository().Object, handler: new FailingMethodHandler(), configure: services => {
+            services.AddSingleton(cache.Object);
+            services.AddSingleton<
+                IRequestPipelineAdvisor<ResourceMethodRequest<MethodEntity, MethodRequest, MethodResponse>, MethodResponse>,
+                ResourceMethodIdempotencyPipelineAdvisor<MethodEntity, MethodRequest, MethodResponse>>();
+        });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => DispatchAsync(services, "archive", "entities/e1", request, null));
+
+        // The failure carries no completion evidence: the reservation stays pending so a retry
+        // inside the retention window cannot repeat the dispatch.
+        var pending = Assert.Single(reserved);
+        Assert.Equal("PENDING", JsonDocument.Parse(pending).RootElement.GetProperty("Kind").GetString());
+        Assert.Empty(replaced);
+        cache.Verify(c => c.TryRemoveAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Delete_Dispatch_Derives_Parent_And_Sets_Weak_ETag() {
         var detail = new SoftDetail { CanonicalName = "tenants/t1/hosts/h1", Timestamp = Timestamp };
         var repository = new Mock<IRepository<SoftEntity>>();
-        repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Mock.Of<IDisposable>());
         repository.Setup(r => r.SingleOrDefaultAsync(
                        It.IsAny<Func<IQueryable<SoftEntity>, IQueryable<SoftEntity>>>(),
-                       It.IsAny<CancellationToken>()))
+                       It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
                   .Returns(new ValueTask<SoftEntity?>(new SoftEntity { Name = "e1", CanonicalName = "entities/e1" }));
-        repository.Setup(r => r.RemoveAsync(It.IsAny<SoftEntity>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var mapper = new Mock<Mapping.Skeleton.ISimpleMapper>();
         mapper.Setup(m => m.Map<SoftEntity, SoftDetail>(It.IsAny<SoftEntity>())).Returns(detail);
         var services = new ServiceCollection();
         services.AddSingleton(repository.Object);
         services.AddSingleton(mapper.Object);
-        services.AddSingleton<IResourceDeleteAdvisor<SoftEntity>>(new SoftDeleteStampingAdvisor());
+        var mutation = ResourceMutationMock.Create<SoftEntity>();
+        mutation.Setup(m => m.DeleteAsync(
+                    It.IsAny<SoftEntity>(), It.IsAny<IUnitOfWork?>(), Operations.Delete, It.IsAny<CancellationToken>()))
+                .Callback((SoftEntity entity, IUnitOfWork? unit, Operations operation, CancellationToken ct) =>
+                    entity.DeleteTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc))
+                .ReturnsAsync(MutationResult.Applied);
+        services.AddSingleton(mutation.Object);
         services.AddSingleton<ResourceOperationHandler<SoftEntity, SoftRequest, SoftDetail, SoftSummary>>();
         services.AddSingleton<
             IRequestHandler<DeleteResourceRequest<SoftEntity, SoftDetail>, DeleteResultBase<SoftDetail>>,
@@ -207,7 +261,8 @@ public class ResourceMethodEnvelopeShould
             <DeleteResourceRequest<SoftEntity, SoftDetail>, DeleteResultBase<SoftDetail>>(
                 new("entities/e1", null, null), CancellationToken.None);
 
-        Assert.Equal("tenants/t1", result.Detail!.Parent);
+        Assert.NotNull(result.Detail);
+        Assert.Equal("tenants/t1", result.Detail.Parent);
         Assert.Equal(WeakTag(Timestamp), result.Detail.EntityTag);
     }
 
@@ -241,9 +296,9 @@ public class ResourceMethodEnvelopeShould
     [Fact]
     public void Method_Wraps_Order_The_Shaping_Above_The_Idempotency_Commit() {
         Assert.Equal(SecurityOrders.Idempotency,
-            new ResourceMethodIdempotencyPipelineAdvisor<MethodEntity, MethodRequest, MethodResponse>(Mock.Of<ICacheProvider>()).Order);
+            new ResourceMethodIdempotencyPipelineAdvisor<MethodEntity, MethodRequest, MethodResponse>().Order);
         Assert.Equal(ResourceDetailResponsePipelineAdvisor.DefaultOrder,
-            new ResourceMethodResponsePipelineAdvisor<MethodEntity, MethodRequest, MethodResponse>(Mock.Of<IEntityTagProvider>()).Order);
+            new ResourceMethodResponsePipelineAdvisor<MethodEntity, MethodRequest, MethodResponse>().Order);
         Assert.True(ResourceDetailResponsePipelineAdvisor.DefaultOrder > SecurityOrders.Idempotency);
     }
 
@@ -260,13 +315,14 @@ public class ResourceMethodEnvelopeShould
     }
 
     private static ServiceProvider BuildServices(
-        IRepository<MethodEntity>?     repository = null,
-        MethodHandler?                 handler    = null,
-        Action<ServiceCollection>?     configure  = null
+        IRepository<MethodEntity>?                   repository = null,
+        IRequestHandler<MethodRequest, MethodResponse>? handler   = null,
+        Action<ServiceCollection>?                   configure  = null
     ) {
         var services = new ServiceCollection();
         services.AddSingleton(repository ?? Mock.Of<IRepository<MethodEntity>>());
         services.AddSingleton<IRequestHandler<MethodRequest, MethodResponse>>(handler ?? new MethodHandler());
+        services.AddSingleton(Registry());
         services.AddSingleton(sp => new ResourceMethodOperationHandler<MethodEntity, MethodRequest, MethodResponse>(
             sp.GetRequiredService<IRepository<MethodEntity>>(), sp, new InProcessRequestDispatcher(sp)));
         services.AddSingleton<
@@ -277,12 +333,20 @@ public class ResourceMethodEnvelopeShould
         return services.BuildServiceProvider();
     }
 
+    private static ResourceRegistry Registry() {
+        var registry = new ResourceRegistry();
+        registry.Add(new ResourceAttribute(typeof(MethodEntity)), [
+            new ResourceMethodAttribute("archive", typeof(MethodHandler)),
+            new ResourceMethodAttribute("batchArchive", typeof(MethodHandler), ResourceMethodScope.Collection),
+        ]);
+        return registry;
+    }
+
     private static Mock<IRepository<MethodEntity>> LoadedRepository() {
         var repository = new Mock<IRepository<MethodEntity>>();
-        repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Mock.Of<IDisposable>());
         repository.Setup(r => r.SingleOrDefaultAsync(
                        It.IsAny<Func<IQueryable<MethodEntity>, IQueryable<MethodEntity>>>(),
-                       It.IsAny<CancellationToken>()))
+                       It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
                   .Returns(new ValueTask<MethodEntity?>(new MethodEntity { Name = "e1", CanonicalName = "entities/e1" }));
         return repository;
     }
@@ -344,29 +408,11 @@ public class ResourceMethodEnvelopeShould
         public int Order => 0;
 
         public Task<AdviseResult> AdviseAsync(
-            AdviceContext     ctx,
-            MethodRequest     request,
-            MethodEntity      entity,
-            ClaimsPrincipal?  principal,
-            CancellationToken ct = default
+            AdviceContext                                     ctx,
+            ResourceMethodExecution<MethodEntity, MethodRequest, MethodResponse> execution,
+            CancellationToken                                 ct = default
         ) {
-            Entity = entity;
-            return Task.FromResult(AdviseResult.Continue);
-        }
-    }
-
-    private sealed class SoftDeleteStampingAdvisor : IResourceDeleteAdvisor<SoftEntity>
-    {
-        public int Order => 0;
-
-        public Task<AdviseResult> AdviseAsync(
-            AdviceContext     ctx,
-            DeleteRequest     request,
-            SoftEntity        entity,
-            ClaimsPrincipal?  principal,
-            CancellationToken ct = default
-        ) {
-            entity.DeleteTime = DateTime.UtcNow;
+            Entity = execution.Entity;
             return Task.FromResult(AdviseResult.Continue);
         }
     }
@@ -378,12 +424,14 @@ public class ResourceMethodEnvelopeShould
         public string? CanonicalName { get; set; }
     }
 
-    public sealed class MethodRequest : ICanonicalName, ICommand<MethodResponse>, IRequestPrincipal, IRequestIdentification
+    public sealed class MethodRequest : ICanonicalName, ICommand<MethodResponse>, IRequestPrincipal, IRequestIdentification, IResourceDispatchCarrier
     {
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
         public string? RequestId     { get; set; }
         public ClaimsPrincipal? Principal { get; set; }
+
+        public ResourceDispatchExecution? Dispatch { get; set; }
     }
 
     public sealed class MethodResponse : ICanonicalName, IChild, IFreshness, IConcurrency
@@ -403,10 +451,31 @@ public class ResourceMethodEnvelopeShould
 
         public MethodResponse Response { get; set; } = new() { CanonicalName = "entities/handled" };
 
-        public Task<MethodResponse> HandleAsync(MethodRequest request, CancellationToken ct = default) {
+        public Task<MethodResponse> HandleAsync(MethodRequest request, AdviceContext context, CancellationToken ct = default) {
             Invocations++;
             Request = request;
+            // Stand-in for a business method completing its transaction: the completion report on
+            // the dispatch execution is the wrap's only accepted commit evidence.
+            request.Dispatch?.MarkCommitted();
             return Task.FromResult(Response);
+        }
+    }
+
+    /// <summary>A business method that finishes without reporting its transaction completion.</summary>
+    public sealed class SilentMethodHandler : IRequestHandler<MethodRequest, MethodResponse>
+    {
+        public MethodResponse Response { get; } = new() { CanonicalName = "entities/silent" };
+
+        public Task<MethodResponse> HandleAsync(MethodRequest request, AdviceContext context, CancellationToken ct = default) {
+            return Task.FromResult(Response);
+        }
+    }
+
+    /// <summary>A business method that fails without reporting its transaction completion.</summary>
+    public sealed class FailingMethodHandler : IRequestHandler<MethodRequest, MethodResponse>
+    {
+        public Task<MethodResponse> HandleAsync(MethodRequest request, AdviceContext context, CancellationToken ct = default) {
+            throw new InvalidOperationException("business dispatch failed without reporting");
         }
     }
 
