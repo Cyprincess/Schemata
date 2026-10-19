@@ -69,7 +69,12 @@ internal sealed class CelCompileVisitor
                 return Expression.Constant(type, typeof(object));
             }
 
-            return Expression.Call(ValueMethod(nameof(CelValues.Identifier), 2), ToObject(Parameter), Expression.Constant(node.Name));
+            if (IsContextAlias(node.Name)) {
+                return Parameter;
+            }
+
+            return Expression.Call(ValueMethod(nameof(CelValues.Identifier), 2), ToObject(Parameter),
+                                   Expression.Constant(node.Name));
         }
 
         foreach (var scope in _scopes) {
@@ -78,7 +83,7 @@ internal sealed class CelCompileVisitor
             }
         }
 
-        if (string.Equals(node.Name, Parameter.Name, StringComparison.Ordinal)) {
+        if (string.Equals(node.Name, Parameter.Name, StringComparison.Ordinal) || IsContextAlias(node.Name)) {
             return Parameter;
         }
 
@@ -133,9 +138,26 @@ internal sealed class CelCompileVisitor
         var left  = Visit(node.Left);
         var right = Visit(node.Right);
 
+        // Binary numeric promotion picks the common non-narrowing representation before either
+        // operand converts, so operand order cannot decide whether a wider value narrows
+        // (int + long -> long, int + uint -> long, uint + ulong -> ulong, float -> double).
+        if (TryNumericPromotion(left.Type, right.Type, out var commonType)) {
+            left  = ConvertIfNeeded(left, commonType);
+            right = ConvertIfNeeded(right, commonType);
+        }
+
+        if (IsNullConstant(left) || IsNullConstant(right)) {
+            var comparison = TryBuildNullComparison(node.Operator, left, right);
+            if (comparison is not null) {
+                return comparison;
+            }
+        }
+
         return node.Operator switch {
             "&&"  => Expression.AndAlso(ToBoolean(left), ToBoolean(right)),
             "||"  => Expression.OrElse(ToBoolean(left), ToBoolean(right)),
+            "+" when left.Type == typeof(string) && right.Type == typeof(string) => Expression.Call(
+                typeof(string).GetMethod(nameof(string.Concat), [typeof(string), typeof(string)])!, left, right),
             "+"   => Expression.Add(left, ConvertIfNeeded(right, left.Type)),
             "-"   => Expression.Subtract(left, ConvertIfNeeded(right, left.Type)),
             "*"   => Expression.Multiply(left, ConvertIfNeeded(right, left.Type)),
@@ -165,6 +187,10 @@ internal sealed class CelCompileVisitor
             if (node.Args.Count == 1 && IsConversion(node.Name)) {
                 return Expression.Call(ValueMethod(nameof(CelValues.Convert), 2), Expression.Constant(node.Name),
                                        ToObject(Visit(node.Args[0])));
+            }
+
+            if (_options?.Functions.TryGetValue(node.Name, out var valueFunction) is true) {
+                return valueFunction.Build(node.Args.Select(Visit).ToArray());
             }
 
             return Expression.Call(ValueMethod(nameof(CelValues.UnknownFunction), 1), Expression.Constant(node.Name));
@@ -291,11 +317,8 @@ internal sealed class CelCompileVisitor
             return CallString(source, nameof(string.Contains), value);
         }
 
-        if (TryGetDictionaryKeyType(source.Type, out var keyType)) {
-            var containsKey = source.Type.GetMethod("ContainsKey", [keyType]);
-            if (containsKey is not null) {
-                return Expression.Call(source, containsKey, ConvertIfNeeded(value, keyType));
-            }
+        if (TryGetDictionaryContainsKey(source.Type, out var containsKey, out var keyType)) {
+            return Expression.Call(source, containsKey, ConvertIfNeeded(value, keyType));
         }
 
         var elementType = GetElementType(source.Type);
@@ -415,6 +438,63 @@ internal sealed class CelCompileVisitor
         return typeof(object);
     }
 
+    private static bool TryNumericPromotion(Type left, Type right, out Type common) {
+        var leftValue  = Nullable.GetUnderlyingType(left) ?? left;
+        var rightValue = Nullable.GetUnderlyingType(right) ?? right;
+        if (!IsNumeric(leftValue) || !IsNumeric(rightValue)) {
+            common = null!;
+            return false;
+        }
+
+        var promoted = BinaryNumericType(leftValue, rightValue)
+            ?? throw new ParseException($"No common numeric type for '{left}' and '{right}'.", default);
+
+        common = left != leftValue || right != rightValue
+            ? typeof(Nullable<>).MakeGenericType(promoted)
+            : promoted;
+        return true;
+    }
+
+    private static bool IsNumeric(Type type) {
+        return type == typeof(sbyte) || type == typeof(byte)
+            || type == typeof(short) || type == typeof(ushort)
+            || type == typeof(int) || type == typeof(uint)
+            || type == typeof(long) || type == typeof(ulong)
+            || type == typeof(float) || type == typeof(double);
+    }
+
+    // C# binary numeric promotion over CEL's numeric representations: floating operands widen to
+    // double, otherwise the predefined operator sets decide (uint with a signed 32-bit or smaller
+    // operand widens to long; ulong pairs only with unsigned operands; signed long has no common
+    // representation with ulong).
+    private static Type? BinaryNumericType(Type left, Type right) {
+        if (left == typeof(double) || left == typeof(float) || right == typeof(double) || right == typeof(float)) {
+            return typeof(double);
+        }
+
+        if (left == typeof(ulong) || right == typeof(ulong)) {
+            return IsSigned(left) || IsSigned(right) ? null : typeof(ulong);
+        }
+
+        if (left == typeof(long) || right == typeof(long)) {
+            return typeof(long);
+        }
+
+        if (left == typeof(uint) || right == typeof(uint)) {
+            return IsSigned(left) || IsSigned(right) ? typeof(long) : typeof(uint);
+        }
+
+        return typeof(int);
+    }
+
+    private static bool IsSigned(Type type) {
+        return type == typeof(sbyte) || type == typeof(short) || type == typeof(int) || type == typeof(long);
+    }
+
+    private bool IsContextAlias(string name) {
+        return _options?.ContextAlias is { } alias && string.Equals(name, alias, StringComparison.Ordinal);
+    }
+
     private static bool TryAccess(Expression source, string name, out Expression expression) {
         var member = source.Type.GetMember(name.Pascalize(), BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
         if (member is PropertyInfo property) {
@@ -457,6 +537,7 @@ internal sealed class CelCompileVisitor
             }
 
             if (!string.Equals(identifier.Name, Parameter.Name, StringComparison.Ordinal)
+             && !IsContextAlias(identifier.Name)
              && !TryAccess(Parameter, identifier.Name, out _)) {
                 throw new ParseException($"Undeclared identifier '{identifier.Name}' in has() macro.", default);
             }
@@ -475,6 +556,30 @@ internal sealed class CelCompileVisitor
 
     private static Expression ConvertIfNeeded(Expression expression, Type type) {
         return expression.Type == type ? expression : Expression.Convert(expression, type);
+    }
+
+    private static bool IsNullConstant(Expression expression) {
+        return expression is ConstantExpression { Value: null };
+    }
+
+    // Heterogeneous equality decides null comparisons by type agreement and never unwraps the
+    // null constant; ordering has no null binding at all.
+    private static Expression? TryBuildNullComparison(string op, Expression left, Expression right) {
+        switch (op) {
+            case "==" or "!=":
+                var other = IsNullConstant(left) ? right : left;
+                if (other.Type.IsValueType && Nullable.GetUnderlyingType(other.Type) is null) {
+                    // A non-nullable value operand has a different type than null, so the
+                    // comparison is decided statically.
+                    return Expression.Constant(op == "!=");
+                }
+
+                return null;
+            case "<" or "<=" or ">" or ">=":
+                throw new ParseException($"Operator '{op}' has no binding for null.", default);
+            default:
+                return null;
+        }
     }
 
     private static Expression ToBoolean(Expression expression) {
@@ -523,6 +628,14 @@ internal sealed class CelCompileVisitor
             return Expression.Constant(type, typeof(object));
         }
 
+        if (member.Target is CelIdentifier identifier && !_scopes.Any(scope => scope.ContainsKey(identifier.Name))) {
+            if (IsContextAlias(identifier.Name)) {
+                return ValueMember(Parameter, member.Member);
+            }
+
+            return Expression.Call(ValueMethod(nameof(CelValues.QualifiedMember), 3), ToObject(Parameter),
+                Expression.Constant(identifier.Name), Expression.Constant(member.Member));
+        }
         return ValueMember(Visit(member.Target), member.Member);
     }
 
@@ -619,6 +732,22 @@ internal sealed class CelCompileVisitor
             throw new ParseException($"CEL macro '{name}' requires iteration variables and expression.", default);
         }
 
+        // Macros dispatch by name and arity before shape matching: a three-argument map is a
+        // filtered map even when its predicate is a bare identifier, which shape-matching would
+        // misread as a two-variable macro signature.
+        if (name == "map" && args.Count == 3) {
+            var filterParameter = Expression.Parameter(typeof(object), first.Name);
+            _scopes.Push(new() { [first.Name] = filterParameter });
+            try {
+                var predicate = Expression.Lambda<Func<object?, object?>>(ToObject(Visit(args[1])), filterParameter);
+                var transform = Expression.Lambda<Func<object?, object?>>(ToObject(Visit(args[2])), filterParameter);
+                return Expression.Call(ValueMethod(nameof(CelValues.MapMacro), 3), ToObject(source), predicate,
+                                       transform);
+            } finally {
+                _scopes.Pop();
+            }
+        }
+
         if (args is [_, CelIdentifier second, _, ..]) {
             return BuildValueMacro2(name, source, first.Name, second.Name, args.Skip(2).ToArray());
         }
@@ -626,12 +755,6 @@ internal sealed class CelCompileVisitor
         var parameter = Expression.Parameter(typeof(object), first.Name);
         _scopes.Push(new() { [first.Name] = parameter });
         try {
-            if (name == "map" && args.Count == 3) {
-                var predicate = Expression.Lambda<Func<object?, object?>>(ToObject(Visit(args[1])), parameter);
-                var transform = Expression.Lambda<Func<object?, object?>>(ToObject(Visit(args[2])), parameter);
-                return Expression.Call(ValueMethod(nameof(CelValues.MapMacro), 3), ToObject(source), predicate, transform);
-            }
-
             if (args.Count != 2) {
                 throw new ParseException($"CEL macro '{name}' has an unsupported argument shape.", default);
             }

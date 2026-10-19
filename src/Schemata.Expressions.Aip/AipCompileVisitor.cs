@@ -111,8 +111,6 @@ internal sealed class AipCompileVisitor
                 }
 
                 result = ToBoolean(left);
-            } else if (node.Comparator is Equal && TryGetQuotedLiteral(node.Arg, out var literal)) {
-                result = Expression.Equal(left, ConvertIfNeeded(Expression.Constant(literal, typeof(string)), left.Type));
             } else {
                 var right = Visit(node.Arg);
                 result = BuildBinary(node.Comparator, left, right);
@@ -128,16 +126,6 @@ internal sealed class AipCompileVisitor
 
         _guard = outerGuard;
         return result;
-    }
-
-    private static bool TryGetQuotedLiteral(IArg arg, out string literal) {
-        if (arg is Member { Value: Text { IsQuoted: true } text, Fields.Count: 0 }) {
-            literal = text.Value;
-            return true;
-        }
-
-        literal = string.Empty;
-        return false;
     }
 
     /// <summary>
@@ -199,7 +187,7 @@ internal sealed class AipCompileVisitor
 
     private Expression VisitValue(IValue node, bool preferMember) {
         return node switch {
-            Text text when preferMember && TryResolveIdentifier(text.Value, out var access) => access,
+            Text { IsQuoted: false } text when preferMember && TryResolveIdentifier(text.Value, out var access) => access,
             Text text => Expression.Constant(text.Value),
             Integer integer => Expression.Constant(integer.Value),
             Number number => Expression.Constant(number.Value),
@@ -210,7 +198,8 @@ internal sealed class AipCompileVisitor
     }
 
     private bool TryResolveIdentifier(string name, out Expression expression) {
-        if (string.Equals(name, Parameter.Name, StringComparison.Ordinal)) {
+        if (string.Equals(name, Parameter.Name, StringComparison.Ordinal)
+         || _options?.ContextAlias is { } alias && string.Equals(name, alias, StringComparison.Ordinal)) {
             expression = Parameter;
             return true;
         }
@@ -234,11 +223,11 @@ internal sealed class AipCompileVisitor
                 throw new ParseException("Expected collection index.", field.Position);
             }
 
-            var elementType = source.Type.GetElementType()
-                           ?? source.Type.GenericTypeArguments.FirstOrDefault() ?? typeof(object);
+            var elementType = GetElementType(source.Type);
             var method = typeof(Enumerable).GetMethods(BindingFlags.Static | BindingFlags.Public)
                                            .Single(m => m.Name == nameof(Enumerable.ElementAt)
-                                                     && m.GetParameters().Length == 2)
+                                                     && m.GetParameters().Length == 2
+                                                     && m.GetParameters()[1].ParameterType == typeof(int))
                                            .MakeGenericMethod(elementType);
             return GuardAccess(source, Expression.Call(method, source, Expression.Constant(index)));
         }
@@ -267,8 +256,7 @@ internal sealed class AipCompileVisitor
             return false;
         }
 
-        var elementType = source.Type.GetElementType()
-                       ?? source.Type.GenericTypeArguments.FirstOrDefault() ?? typeof(object);
+        var elementType = GetElementType(source.Type);
         var item = Expression.Parameter(elementType, "item");
 
         // Isolate inner-lambda guards: GuardAccess accumulations on `item` reference a
@@ -327,7 +315,11 @@ internal sealed class AipCompileVisitor
             return BuildEqual(left, right);
         }
 
-        return Expression.MakeBinary(op.Type!.Value, left, ConvertIfNeeded(right, left.Type));
+        if (op.Type is not { } type) {
+            throw new ParseException("Unsupported AIP comparator.", op.Position);
+        }
+
+        return Expression.MakeBinary(type, left, ConvertIfNeeded(right, left.Type));
     }
 
     private static Expression BuildEqual(Expression left, Expression right) {
@@ -351,9 +343,9 @@ internal sealed class AipCompileVisitor
         var literalExpr = Expression.Constant(literal, typeof(string));
 
         return (leading, trailing) switch {
-            (false, true) => Expression.Call(left, nameof(string.StartsWith), null, literalExpr),
-            (true, false) => Expression.Call(left, nameof(string.EndsWith), null, literalExpr),
-            (true, true)  => Expression.Call(left, nameof(string.Contains), null, literalExpr),
+            (false, true) => NonNullAnd(left, Expression.Call(left, nameof(string.StartsWith), null, literalExpr)),
+            (true, false) => NonNullAnd(left, Expression.Call(left, nameof(string.EndsWith), null, literalExpr)),
+            (true, true)  => NonNullAnd(left, Expression.Call(left, nameof(string.Contains), null, literalExpr)),
             // Unsupported pattern shape (e.g. "A*B"): fall back to literal equality after stripping
             // wildcards, producing a stable comparison result.
             var _ => Expression.Equal(left, literalExpr),
@@ -412,20 +404,47 @@ internal sealed class AipCompileVisitor
         }
 
         if (left.Type != typeof(string) && typeof(IEnumerable).IsAssignableFrom(left.Type)) {
-            var elementType = left.Type.GetElementType()
-                           ?? left.Type.GenericTypeArguments.FirstOrDefault() ?? typeof(object);
+            var elementType = GetElementType(left.Type);
             var method = typeof(Enumerable).GetMethods(BindingFlags.Static | BindingFlags.Public)
                                            .Single(m => m.Name == nameof(Enumerable.Contains)
                                                      && m.GetParameters().Length == 2)
                                            .MakeGenericMethod(elementType);
-            return Expression.Call(method, left, ConvertIfNeeded(right, elementType));
+            return NonNullAnd(left, Expression.Call(method, left, ConvertIfNeeded(right, elementType)));
         }
 
         if (left.Type == typeof(string)) {
-            return Expression.Call(left, nameof(string.Contains), null, ConvertIfNeeded(right, typeof(string)));
+            return NonNullAnd(left, Expression.Call(left, nameof(string.Contains), null, ConvertIfNeeded(right, typeof(string))));
         }
 
         return Expression.Equal(left, ConvertIfNeeded(right, left.Type));
+    }
+
+    // AIP-160 skip-as-nonmatch: a wildcard, substring, or membership test against a null operand
+    // matches nothing instead of dereferencing it.
+    private static Expression NonNullAnd(Expression operand, Expression match) {
+        return Expression.AndAlso(
+            Expression.NotEqual(operand, Expression.Constant(null, operand.Type)),
+            match);
+    }
+
+    // Resolves the element type from the IEnumerable<T> contract itself, including inherited
+    // implementations: a non-generic subclass of List<int> carries no generic argument of its own.
+    private static Type GetElementType(Type type) {
+        if (type.IsArray) {
+            return type.GetElementType()!;
+        }
+
+        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IEnumerable<>)) {
+            return type.GetGenericArguments()[0];
+        }
+
+        foreach (var contract in type.GetInterfaces()) {
+            if (contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IEnumerable<>)) {
+                return contract.GetGenericArguments()[0];
+            }
+        }
+
+        return typeof(object);
     }
 
     private static Expression ConvertIfNeeded(Expression expression, Type type) {
@@ -493,8 +512,7 @@ internal sealed class AipCompileVisitor
     // AIP-160 presence on a repeated field is satisfied only when it holds at least one element,
     // not merely when the collection reference is non-null.
     private static Expression CollectionPresence(Expression collection) {
-        var elementType = collection.Type.GetElementType()
-                       ?? collection.Type.GenericTypeArguments.FirstOrDefault() ?? typeof(object);
+        var elementType = GetElementType(collection.Type);
         var any = typeof(Enumerable).GetMethods(BindingFlags.Static | BindingFlags.Public)
                                     .Single(m => m.Name == nameof(Enumerable.Any) && m.GetParameters().Length == 1)
                                     .MakeGenericMethod(elementType);
@@ -516,7 +534,11 @@ internal sealed class AipCompileVisitor
 
     private Expression VisitDynamic(Member node) {
         if (node.Fields.Count == 0) {
-            return DynamicConstant(node.Value);
+            if (node.Value is not Text { IsQuoted: false } field) {
+                return DynamicConstant(node.Value);
+            }
+
+            return MemberAccess(Parameter, field.Value);
         }
 
         if (node.Value is not Text head) {

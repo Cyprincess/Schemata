@@ -30,8 +30,8 @@ public class Filter : LogicalBase, IArg, ISimple, IExpressionTree
     public List<Sequence> Sequences { get; } = [];
 
     /// <summary>
-    ///     The original filter source this tree was parsed from. Used as a lossless compile-cache key
-    ///     instead of <see cref="ToString" />, whose display form does not round-trip quoting/escaping.
+    ///     The original filter source this tree was parsed from. Compiler caching keys on the
+    ///     tree's structural fingerprint instead, since this annotation is mutable.
     /// </summary>
     public string Source { get; set; } = string.Empty;
 

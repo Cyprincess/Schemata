@@ -50,16 +50,16 @@ public static class CelParser
         var hexUint = Parsers.Terms.Text("0x", true)
                              .SkipAnd(hexDigits)
                              .And(Parsers.Terms.Text("u", true))
-                             .Then<CelNode>(n => new CelConstant(ParseUIntHex(n.Item1.Span.ToString())));
+                             .Then<CelNode>((ctx, n) => new CelConstant(ParseUIntHex(ctx, n.Item1.Span.ToString())));
         var decimalUint = digits.And(Parsers.Terms.Text("u", true))
-                                .Then<CelNode>(n => new CelConstant(
-                                                   ulong.Parse(n.Item1.Span.ToString(), CultureInfo.InvariantCulture)));
+                                .Then<CelNode>((ctx, n) => new CelConstant(
+                                                   ParseUInt(ctx, n.Item1.Span.ToString())));
         var negativeHexInt = Parsers.Terms.Text("-0x", true)
                                     .SkipAnd(hexDigits)
-                                    .Then<CelNode>((_, n) => new CelConstant(-ParseIntHex(n.Span.ToString())));
+                                    .Then<CelNode>((ctx, n) => new CelConstant(ParseIntHex(ctx, n.Span.ToString(), true)));
         var hexInt = Parsers.Terms.Text("0x", true)
                             .SkipAnd(hexDigits)
-                            .Then<CelNode>((_, n) => new CelConstant(ParseIntHex(n.Span.ToString())));
+                            .Then<CelNode>((ctx, n) => new CelConstant(ParseIntHex(ctx, n.Span.ToString())));
         var decimalWithDot
             = Parsers.Capture(
                 sign.And(digits).And(Parsers.Terms.Char('.')).And(digits).And(Parsers.ZeroOrOne(exponent)));
@@ -83,7 +83,7 @@ public static class CelParser
                                                  doubleTripleQuote);
         var tripleQuotedLiteral = singleTripleQuoted.Or(doubleTripleQuoted);
 
-        var normalString = quotedLiteral.Then<CelNode>((_, s) => new CelConstant(DecodeString(s)));
+        var normalString = quotedLiteral.Then<CelNode>((ctx, s) => new CelConstant(DecodeString(ctx, s)));
         var rawString = Parsers.Terms.Text("r", true)
                                .SkipAnd(quotedLiteral)
                                .Then<CelNode>((_, s) => new CelConstant(s));
@@ -92,7 +92,7 @@ public static class CelParser
                                      .Then<CelNode>((_, s) => new CelConstant(s.Span.ToString()));
         var bytesString = Parsers.Terms.Text("b", true)
                                  .SkipAnd(quotedLiteral)
-                                 .Then<CelNode>((_, s) => new CelConstant(DecodeBytes(s)));
+                                 .Then<CelNode>((ctx, s) => new CelConstant(DecodeBytes(ctx, s)));
         var text = rawTripleString.Or(rawString).Or(bytesString).Or(normalString);
 
         var has = WithWordBoundary(Parsers.Terms.Text("has"))
@@ -218,12 +218,40 @@ public static class CelParser
         return c is >= '0' and <= '9' || c is >= 'a' and <= 'f' || c is >= 'A' and <= 'F';
     }
 
-    private static long ParseIntHex(string source) {
-        return long.Parse(source, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+    // Literal decoding owns malformed-literal failures: conversion failures the grammar cannot
+    // reject structurally (overflow, truncated or non-hex escape digits) surface as ParseException
+    // at the literal's position, keeping CelCompiler's invalid-expression contract intact.
+    private static T DecodeLiteral<T>(ParseContext context, Func<T> conversion, string literal) {
+        try {
+            return conversion();
+        } catch (Exception e) when (e is OverflowException or FormatException or ArgumentOutOfRangeException) {
+            throw new ParseException($"Invalid {literal} literal.", context.Scanner.Cursor.Position);
+        }
     }
 
-    private static ulong ParseUIntHex(string source) {
-        return ulong.Parse(source, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+    private static long ParseIntHex(ParseContext context, string source, bool negative = false) {
+        return DecodeLiteral(context, () => {
+            var magnitude = ulong.Parse(source, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+            if (negative && magnitude == (ulong)long.MaxValue + 1) {
+                return long.MinValue;
+            }
+
+            var value = checked((long)magnitude);
+            return negative ? -value : value;
+        }, "hex integer");
+    }
+
+    private static ulong ParseUIntHex(ParseContext context, string source) {
+        return DecodeLiteral(context, () => ulong.Parse(source, NumberStyles.HexNumber, CultureInfo.InvariantCulture),
+                             "hex integer");
+    }
+
+    private static ulong ParseUInt(ParseContext context, string source) {
+        return DecodeLiteral(context, () => ulong.Parse(source, CultureInfo.InvariantCulture), "integer");
+    }
+
+    private static string DecodeString(ParseContext context, string source) {
+        return DecodeLiteral(context, () => DecodeString(source), "string");
     }
 
     private static string DecodeString(string source) {
@@ -289,13 +317,34 @@ public static class CelParser
         return builder.ToString();
     }
 
+    private static byte[] DecodeBytes(ParseContext context, string source) {
+        return DecodeLiteral(context, () => DecodeBytes(source), "bytes");
+    }
+
     private static byte[] DecodeBytes(string source) {
         var bytes = new List<byte>(source.Length);
-        for (var i = 0; i < source.Length; i++) {
-            var c = source[i];
-            if (c != '\\' || i + 1 >= source.Length) {
-                bytes.AddRange(Encoding.UTF8.GetBytes([c]));
+
+        void AddUtf8(ReadOnlySpan<char> text) {
+            var length = Encoding.UTF8.GetMaxByteCount(text.Length);
+            Span<byte> encoded = length <= 256 ? stackalloc byte[length] : new byte[length];
+            var count = Encoding.UTF8.GetBytes(text, encoded);
+            foreach (var b in encoded[..count]) {
+                bytes.Add(b);
+            }
+        }
+
+        // Unescaped runs are encoded as whole UTF-8 scalars so supplementary characters (surrogate
+        // pairs) yield their multi-byte sequence instead of one replacement per UTF-16 unit.
+        var start = 0;
+        var i     = 0;
+        while (i < source.Length) {
+            if (source[i] != '\\' || i + 1 >= source.Length) {
+                i++;
                 continue;
+            }
+
+            if (i > start) {
+                AddUtf8(source.AsSpan(start, i - start));
             }
 
             var escaped = source[++i];
@@ -342,6 +391,12 @@ public static class CelParser
 
                     break;
             }
+
+            start = i + 1;
+        }
+
+        if (start < source.Length) {
+            AddUtf8(source.AsSpan(start));
         }
 
         return [.. bytes];

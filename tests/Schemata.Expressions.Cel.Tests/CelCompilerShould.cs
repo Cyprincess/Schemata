@@ -194,9 +194,7 @@ public class CelCompilerShould
 
     [Fact]
     public void Compile_CustomFunction_BindsAtCompileTime() {
-        var options = new ExpressionCompileOptions();
-        options.Functions["startsWith"]
-            = new(args => Expression.Call(args[0], nameof(string.StartsWith), null, args[1]));
+        var options = new ExpressionCompileOptions { Functions = { ["startsWith"] = new(args => Expression.Call(args[0], nameof(string.StartsWith), null, args[1])) } };
 
         var tree       = _compiler.Parse("startsWith(full_name, 'Al')");
         var expression = _compiler.Compile<Student, bool>(tree, options);
@@ -208,10 +206,8 @@ public class CelCompilerShould
 
     [Fact]
     public void Compile_CustomFunctionCacheKey_UsesFunctionIdentity() {
-        var first = new ExpressionCompileOptions();
-        first.Functions["classify"] = new(args => Expression.Call(args[0], nameof(string.StartsWith), null, args[1]));
-        var second = new ExpressionCompileOptions();
-        second.Functions["classify"] = new(args => Expression.Call(args[0], nameof(string.EndsWith), null, args[1]));
+        var first  = new ExpressionCompileOptions { Functions = { ["classify"] = new(args => Expression.Call(args[0], nameof(string.StartsWith), null, args[1])) } };
+        var second = new ExpressionCompileOptions { Functions = { ["classify"] = new(args => Expression.Call(args[0], nameof(string.EndsWith), null, args[1])) } };
 
         var tree       = _compiler.Parse("classify(full_name, 'ice')");
         var startsWith = _compiler.Compile<Student, bool>(tree, first).Compile();
@@ -220,6 +216,24 @@ public class CelCompilerShould
         Assert.False(startsWith(new() { FullName = "Alice" }));
         Assert.True(endsWith(new() { FullName    = "Alice" }));
     }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void Compile_Source_Bound_Scalar_Result_Uses_Input_And_Options_Snapshot() {
+        var options = new ExpressionCompileOptions();
+        options.Functions["twice"] = new(args => Expression.Multiply(args[0], Expression.Constant(2L)));
+        var published = options.Snapshot();
+        options.Functions["twice"] = new(args => Expression.Multiply(args[0], Expression.Constant(3L)));
+        var tree = _compiler.Parse("twice(score)");
+        var original = _compiler.Compile<Student, long>(tree, published).Compile();
+        var changed = _compiler.Compile<Student, long>(tree, options).Compile();
+
+        Assert.Equal(42L, original(new() { Score = 21L }));
+        Assert.Equal(14L, original(new() { Score = 7L }));
+        Assert.Equal(63L, changed(new() { Score = 21L }));
+    }
+
 
     #region Nested type: Student
 
@@ -230,6 +244,8 @@ public class CelCompilerShould
         public bool Ready { get; set; }
 
         public bool Verified { get; set; }
+        public long Score { get; set; }
+
 
         public long[] Scores { get; set; } = [];
 

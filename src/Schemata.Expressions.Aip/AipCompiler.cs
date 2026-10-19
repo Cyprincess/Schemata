@@ -44,8 +44,8 @@ public sealed class AipCompiler : IExpressionCompiler
             throw new ArgumentException("Tree must be an AIP filter.", nameof(tree));
         }
 
-        var key = ExpressionCacheKey.Create(Language, filter.Source, typeof(TContext), typeof(TResult), AipBuiltInFunctions.Fingerprint(options));
         try {
+            var key = ExpressionCacheKey.Create(Language, AipTreeFingerprint.Compute(filter), typeof(TContext), typeof(TResult), AipBuiltInFunctions.Fingerprint(options));
             return ExpressionCache.GetOrAddExpression(key, () => {
                 var visitor = new AipCompileVisitor(typeof(TContext), options);
                 var body    = visitor.Visit(filter);

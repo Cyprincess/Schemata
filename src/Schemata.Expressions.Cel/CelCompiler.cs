@@ -44,9 +44,9 @@ public sealed class CelCompiler : IExpressionCompiler
             throw new ArgumentException("Tree must be a CEL node.", nameof(tree));
         }
 
-        var key = ExpressionCacheKey.Create(Language, node.Source, typeof(TContext), typeof(TResult), Fingerprint(options));
         try {
-            return ExpressionCache.GetOrAddExpression(key, () => {
+            var fingerprint = CelTreeFingerprint.Compute(node, out var cacheable);
+            Expression<Func<TContext, TResult>> CompileTree() {
                 var visitor = new CelCompileVisitor(typeof(TContext), options);
                 var body    = visitor.Visit(node);
                 if (visitor.ValueMode && typeof(TResult) == typeof(bool)) {
@@ -56,7 +56,14 @@ public sealed class CelCompiler : IExpressionCompiler
                 }
 
                 return Expression.Lambda<Func<TContext, TResult>>(body, visitor.Parameter);
-            });
+            }
+
+            if (!cacheable) {
+                return CompileTree();
+            }
+
+            var key = ExpressionCacheKey.Create(Language, fingerprint, typeof(TContext), typeof(TResult), Fingerprint(options));
+            return ExpressionCache.GetOrAddExpression(key, CompileTree);
         } catch (ParseException ex) {
             throw new ExpressionException(ex.Message, ex);
         }
@@ -65,6 +72,6 @@ public sealed class CelCompiler : IExpressionCompiler
     #endregion
 
     private static string Fingerprint(ExpressionCompileOptions? options) {
-        return ExpressionCompileOptions.Fingerprint(options);
+        return ExpressionCompileOptions.Fingerprint(options, "qualified-members-v2");
     }
 }

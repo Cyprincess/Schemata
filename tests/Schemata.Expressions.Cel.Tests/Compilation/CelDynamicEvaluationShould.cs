@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using Xunit;
 
 namespace Schemata.Expressions.Cel.Tests.Compilation;
@@ -47,6 +48,29 @@ public class CelDynamicEvaluationShould
         var compute = _compiler.Compile<IReadOnlyDictionary<string, object?>, object>(tree).Compile();
 
         Assert.Equal(new CelError("no matching overload"), compute(Combined(("c", "discount", 0.2), ("o", "amount", 100))));
+    }
+
+    [Trait("Layer", "Unit")]
+    [Theory]
+    [Trait("Category", "Integration")]
+    [InlineData(false, "missing", "undeclared reference to 'missing' (in container '')")]
+    [InlineData(true, "missing", "undeclared reference to 'missing' (in container '')")]
+    [InlineData(false, "numerator / denominator", "divide by zero")]
+    [InlineData(true, "numerator / denominator", "divide by zero")]
+    public void Return_Standalone_Error_Values_With_Message_Equality_And_Json(bool objectContext, string source, string message) {
+        var tree = _compiler.Parse(source);
+        IReadOnlyDictionary<string, object?> input = new Dictionary<string, object?> { ["numerator"] = 42L, ["denominator"] = 0L };
+        var result = objectContext
+            ? _compiler.Compile<object, object>(tree).Compile()(input)
+            : _compiler.Compile<IReadOnlyDictionary<string, object?>, object>(tree).Compile()(input);
+
+        var error = Assert.IsType<CelError>(result);
+        Assert.Equal(new CelError(message), error);
+        var json = JsonSerializer.Serialize(error);
+        using var document = JsonDocument.Parse(json);
+        Assert.Equal("Message", Assert.Single(document.RootElement.EnumerateObject()).Name);
+        Assert.Equal(message, document.RootElement.GetProperty("Message").GetString());
+        Assert.Equal(error, JsonSerializer.Deserialize<CelError>(json));
     }
 
     [Fact]

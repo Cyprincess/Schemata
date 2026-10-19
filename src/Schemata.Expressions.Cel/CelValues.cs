@@ -25,6 +25,8 @@ public static class CelValues
                 return mutable.TryGetValue(name, out var entry) ? Normalize(entry) : DynamicValues.Missing;
             case IDictionary untyped:
                 return untyped.Contains(name) ? Normalize(untyped[name]) : DynamicValues.Missing;
+            case IReadOnlyDictionary<object, object?> objectKeyed:
+                return objectKeyed.TryGetValue(name, out var found) ? Normalize(found) : DynamicValues.Missing;
             case CelTimestamp timestamp:
                 return TimestampMember(timestamp, name, null);
             case CelDuration duration:
@@ -32,6 +34,12 @@ public static class CelValues
             default:
                 return DynamicValues.Missing;
         }
+    }
+
+    public static object? QualifiedMember(object? container, string qualifier, string member) {
+        if (container is IQualifiedExpressionContext context
+            && context.TryGetQualifiedMember(qualifier, member, out var value)) return Normalize(value);
+        return Member(Identifier(container, qualifier), member);
     }
 
     public static object? Identifier(object? container, string name) {
@@ -131,7 +139,7 @@ public static class CelValues
                 (double l, double r) => l + r,
                 (CelTimestamp l, CelDuration r) => AddDuration(l, r),
                 (CelDuration l, CelTimestamp r) => AddDuration(r, l),
-                (CelDuration l, CelDuration r) => DurationFromNanos(checked(ToNanos(l) + ToNanos(r))),
+                (CelDuration l, CelDuration r) => AddDurations(l, r),
                 (string l, string r) => l + r,
                 (byte[] l, byte[] r) => l.Concat(r).ToArray(),
                 (IReadOnlyList<object?> l, IReadOnlyList<object?> r) => l.Concat(r).ToList(),
@@ -152,9 +160,9 @@ public static class CelValues
                 (long l, long r)                 => checked(l - r),
                 (ulong l, ulong r)               => checked(l - r),
                 (double l, double r)             => l - r,
-                (CelTimestamp l, CelTimestamp r) => DurationFromNanos(checked(ToNanos(l) - ToNanos(r))),
+                (CelTimestamp l, CelTimestamp r) => SubtractTimestamps(l, r),
                 (CelTimestamp l, CelDuration r)  => AddDuration(l, new(-r.Seconds, -r.Nanos)),
-                (CelDuration l, CelDuration r)   => DurationFromNanos(checked(ToNanos(l) - ToNanos(r))),
+                (CelDuration l, CelDuration r)   => SubtractDurations(l, r),
                 _                                => Error("no matching overload"),
             };
         } catch (OverflowException) {
@@ -262,7 +270,11 @@ public static class CelValues
         }
 
         if (source is IReadOnlyDictionary<object, object?> map) {
-            return map.ContainsKey(value!);
+            if (value is null) {
+                return Error("no such key");
+            }
+
+            return map.ContainsKey(value);
         }
 
         return Error("no matching overload");
@@ -291,7 +303,11 @@ public static class CelValues
         }
 
         if (source is IReadOnlyDictionary<object, object?> map) {
-            return map.TryGetValue(index!, out var value) ? value : Error("no such key");
+            if (index is null) {
+                return Error("no such key");
+            }
+
+            return map.TryGetValue(index, out var value) ? value : Error("no such key");
         }
 
         return Error("no matching overload");
@@ -308,7 +324,12 @@ public static class CelValues
                 return error;
             }
 
-            map[entries[i]!] = entries[i + 1];
+            var key = entries[i];
+            if (key is null) {
+                return Error("invalid_argument");
+            }
+
+            map[key] = entries[i + 1];
         }
 
         return map;
@@ -428,16 +449,16 @@ public static class CelValues
             uint u => (ulong)u,
             ushort u => (ulong)u,
             float f => (double)f,
-            IDictionary<string, object?> map => map.ToDictionary(pair => pair.Key, pair => Normalize(pair.Value), KeyComparer),
-            IReadOnlyDictionary<string, object?> map => map.ToDictionary(pair => pair.Key, pair => Normalize(pair.Value), KeyComparer),
+            IDictionary<string, object?> map => map.ToDictionary(pair => (object)pair.Key, pair => Normalize(pair.Value), KeyComparer),
+            IReadOnlyDictionary<string, object?> map => map.ToDictionary(pair => (object)pair.Key, pair => Normalize(pair.Value), KeyComparer),
             IEnumerable<object?> list when value is not string and not byte[] => list.Select(Normalize).ToList(),
             var other => other,
         };
     }
 
     public static object? Exists(object? source, Func<object?, object?> predicate) {
-        if (source is CelError) {
-            return source;
+        if (MacroSourceError(source) is { } sourceError) {
+            return sourceError;
         }
 
         var error = (CelError?)null;
@@ -447,8 +468,9 @@ public static class CelValues
                 return true;
             }
 
-            if (result is CelError e && error is null) {
-                error = e;
+            var failure = result as CelError ?? InvalidPredicate(result);
+            if (failure is not null && error is null) {
+                error = failure;
             }
         }
 
@@ -456,8 +478,8 @@ public static class CelValues
     }
 
     public static object? All(object? source, Func<object?, object?> predicate) {
-        if (source is CelError) {
-            return source;
+        if (MacroSourceError(source) is { } sourceError) {
+            return sourceError;
         }
 
         var error = (CelError?)null;
@@ -467,8 +489,9 @@ public static class CelValues
                 return false;
             }
 
-            if (result is CelError e && error is null) {
-                error = e;
+            var failure = result as CelError ?? InvalidPredicate(result);
+            if (failure is not null && error is null) {
+                error = failure;
             }
         }
 
@@ -476,8 +499,8 @@ public static class CelValues
     }
 
     public static object? ExistsOne(object? source, Func<object?, object?> predicate) {
-        if (source is CelError) {
-            return source;
+        if (MacroSourceError(source) is { } sourceError) {
+            return sourceError;
         }
 
         var count = 0;
@@ -485,6 +508,10 @@ public static class CelValues
             var result = predicate(item);
             if (result is CelError) {
                 return result;
+            }
+
+            if (result is not (true or false)) {
+                return Error("no matching overload");
             }
 
             if (result is true) {
@@ -496,8 +523,8 @@ public static class CelValues
     }
 
     public static object? Filter(object? source, Func<object?, object?> predicate) {
-        if (source is CelError) {
-            return source;
+        if (MacroSourceError(source) is { } sourceError) {
+            return sourceError;
         }
 
         var result = new List<object?>();
@@ -505,6 +532,10 @@ public static class CelValues
             var include = predicate(item);
             if (include is CelError) {
                 return include;
+            }
+
+            if (include is not (true or false)) {
+                return Error("no matching overload");
             }
 
             if (include is true) {
@@ -516,8 +547,8 @@ public static class CelValues
     }
 
     public static object? MapMacro(object? source, Func<object?, object?> transform) {
-        if (source is CelError) {
-            return source;
+        if (MacroSourceError(source) is { } sourceError) {
+            return sourceError;
         }
 
         var result = new List<object?>();
@@ -534,8 +565,8 @@ public static class CelValues
     }
 
     public static object? MapMacro(object? source, Func<object?, object?> predicate, Func<object?, object?> transform) {
-        if (source is CelError) {
-            return source;
+        if (MacroSourceError(source) is { } sourceError) {
+            return sourceError;
         }
 
         var result = new List<object?>();
@@ -543,6 +574,10 @@ public static class CelValues
             var include = predicate(item);
             if (include is CelError) {
                 return include;
+            }
+
+            if (include is not (true or false)) {
+                return Error("no matching overload");
             }
 
             if (include is not true) {
@@ -569,8 +604,8 @@ public static class CelValues
     }
 
     public static object? ExistsOne2(object? source, Func<object?, object?, object?> predicate) {
-        if (source is CelError) {
-            return source;
+        if (MacroSourceError(source) is { } sourceError) {
+            return sourceError;
         }
 
         var count = 0;
@@ -578,6 +613,10 @@ public static class CelValues
             var result = predicate(key, value);
             if (result is CelError) {
                 return result;
+            }
+
+            if (result is not (true or false)) {
+                return Error("no matching overload");
             }
 
             if (result is true) {
@@ -589,8 +628,8 @@ public static class CelValues
     }
 
     public static object? TransformList2(object? source, Func<object?, object?, object?> transform) {
-        if (source is CelError) {
-            return source;
+        if (MacroSourceError(source) is { } sourceError) {
+            return sourceError;
         }
 
         var result = new List<object?>();
@@ -607,8 +646,8 @@ public static class CelValues
     }
 
     public static object? TransformList2(object? source, Func<object?, object?, object?> predicate, Func<object?, object?, object?> transform) {
-        if (source is CelError) {
-            return source;
+        if (MacroSourceError(source) is { } sourceError) {
+            return sourceError;
         }
 
         var result = new List<object?>();
@@ -616,6 +655,10 @@ public static class CelValues
             var include = predicate(key, item);
             if (include is CelError) {
                 return include;
+            }
+
+            if (include is not (true or false)) {
+                return Error("no matching overload");
             }
 
             if (include is not true) {
@@ -634,33 +677,45 @@ public static class CelValues
     }
 
     public static object? TransformMap2(object? source, Func<object?, object?, object?> transform) {
-        if (source is CelError) {
-            return source;
+        if (MacroSourceError(source) is { } sourceError) {
+            return sourceError;
         }
 
         var result = new Dictionary<object, object?>(KeyComparer);
         foreach (var (key, value) in Iterate2(source)) {
+            if (key is null) {
+                return Error("invalid_argument");
+            }
+
             var transformed = transform(key, value);
             if (transformed is CelError) {
                 return transformed;
             }
 
-            result[key!] = transformed;
+            result[key] = transformed;
         }
 
         return result;
     }
 
     public static object? TransformMap2(object? source, Func<object?, object?, object?> predicate, Func<object?, object?, object?> transform) {
-        if (source is CelError) {
-            return source;
+        if (MacroSourceError(source) is { } sourceError) {
+            return sourceError;
         }
 
         var result = new Dictionary<object, object?>(KeyComparer);
         foreach (var (key, value) in Iterate2(source)) {
+            if (key is null) {
+                return Error("invalid_argument");
+            }
+
             var include = predicate(key, value);
             if (include is CelError) {
                 return include;
+            }
+
+            if (include is not (true or false)) {
+                return Error("no matching overload");
             }
 
             if (include is not true) {
@@ -672,15 +727,15 @@ public static class CelValues
                 return transformed;
             }
 
-            result[key!] = transformed;
+            result[key] = transformed;
         }
 
         return result;
     }
 
     private static object? Scan2(object? source, Func<object?, object?, object?> predicate, string mode) {
-        if (source is CelError) {
-            return source;
+        if (MacroSourceError(source) is { } sourceError) {
+            return sourceError;
         }
 
         var error = (CelError?)null;
@@ -694,14 +749,27 @@ public static class CelValues
                 return false;
             }
 
-            if (result is CelError e && error is null) {
-                error = e;
+            var failure = result as CelError ?? InvalidPredicate(result);
+            if (failure is not null && error is null) {
+                error = failure;
             }
         }
 
         return mode == "exists"
             ? error is null ? false : error
             : error is null ? true : error;
+    }
+
+    private static CelError? MacroSourceError(object? source) {
+        return source switch {
+            CelError error => error,
+            IReadOnlyDictionary<object, object?> or IReadOnlyList<object?> or (IEnumerable and not string) => null,
+            var _ => Error("no matching overload"),
+        };
+    }
+
+    private static CelError? InvalidPredicate(object? result) {
+        return result is true or false or CelError ? null : Error("no matching overload");
     }
 
     private static object? CompareResult(object? left, object? right, Func<int, bool> op) {
@@ -722,13 +790,13 @@ public static class CelValues
             (string l, string r) => string.CompareOrdinal(l, r),
             (byte[] l, byte[] r) => CompareBytes(l, r),
             (bool l, bool r) => l.CompareTo(r),
-            (CelTimestamp l, CelTimestamp r) => ToNanos(l).CompareTo(ToNanos(r)),
-            (CelDuration l, CelDuration r) => ToNanos(l).CompareTo(ToNanos(r)),
+            (CelTimestamp l, CelTimestamp r) => CompareComponents(l.Seconds, l.Nanos, r.Seconds, r.Nanos),
+            (CelDuration l, CelDuration r) => CompareComponents(l.Seconds, l.Nanos, r.Seconds, r.Nanos),
             _ => null,
         };
     }
 
-    private static bool EqualValue(object? left, object? right) {
+    private static bool EqualValue(object? left, object? right, bool mapKey = false) {
         if (ReferenceEquals(left, right)) {
             return true;
         }
@@ -738,13 +806,11 @@ public static class CelValues
         }
 
         if (IsNumber(left) && IsNumber(right)) {
-            if (left is double || right is double) {
-                var lv = ToDoubleNumber(left);
-                var rv = ToDoubleNumber(right);
-                return !double.IsNaN(lv) && !double.IsNaN(rv) && lv == rv;
+            if (IsNaN(left) || IsNaN(right)) {
+                return false;
             }
 
-            if (TryCompareNumbers(left, right, out var numeric)) {
+            if (TryCompareNumbers(left, right, out var numeric, mapKey)) {
                 return numeric == 0;
             }
         }
@@ -754,27 +820,35 @@ public static class CelValues
         }
 
         if (left is IReadOnlyList<object?> ll && right is IReadOnlyList<object?> rl) {
-            return ll.Count == rl.Count && ll.Zip(rl).All(pair => EqualValue(pair.First, pair.Second));
+            return ll.Count == rl.Count && ll.Zip(rl).All(pair => EqualValue(pair.First, pair.Second, mapKey));
         }
 
         if (left is IReadOnlyDictionary<object, object?> lm && right is IReadOnlyDictionary<object, object?> rm) {
             return lm.Count == rm.Count
-                && lm.All(kv => rm.TryGetValue(kv.Key, out var value) && EqualValue(kv.Value, value));
+                && lm.All(kv => rm.TryGetValue(kv.Key, out var value) && EqualValue(kv.Value, value, mapKey));
         }
 
         return left.GetType() == right.GetType() && left.Equals(right);
     }
 
-    private static bool TryCompareNumbers(object? left, object? right, out int comparison) {
+    private static bool TryCompareNumbers(object? left, object? right, out int comparison, bool mapKey = false) {
         comparison = 0;
         if (!IsNumber(left) || !IsNumber(right)) {
             return false;
         }
 
-        if (left is double ld || right is double) {
-            var l = ToDoubleNumber(left);
-            var r = ToDoubleNumber(right);
-            comparison = l.CompareTo(r);
+        if (left is double ld && right is double rd) {
+            comparison = ld.CompareTo(rd);
+            return true;
+        }
+
+        if (left is double leftDouble) {
+            comparison = -CompareIntegerWithDouble(right!, leftDouble, mapKey);
+            return true;
+        }
+
+        if (right is double rightDouble) {
+            comparison = CompareIntegerWithDouble(left!, rightDouble, mapKey);
             return true;
         }
 
@@ -794,6 +868,59 @@ public static class CelValues
             _ => 0,
         };
         return true;
+    }
+
+    private static int CompareIntegerWithDouble(object integer, double d, bool mapKey) {
+        if (double.IsNaN(d) || double.IsPositiveInfinity(d)) {
+            return -1;
+        }
+
+        if (double.IsNegativeInfinity(d)) {
+            return 1;
+        }
+
+        // CEL compares mixed scalar numbers in the double domain; map lookup requires
+        // lossless key conversion, as in cel-go's compare.go and map.go.
+        if (!mapKey) {
+            return integer switch {
+                long l => d < (double)long.MinValue ? 1 : d > (double)long.MaxValue ? -1 : ((double)l).CompareTo(d),
+                ulong u => d < 0 ? 1 : d > (double)ulong.MaxValue ? -1 : ((double)u).CompareTo(d),
+                _ => 0,
+            };
+        }
+
+        // A non-integral double is strictly below 2^53 in magnitude, so its floor orders it
+        // exactly against any integer; an equal floor leaves the fraction to decide.
+        if (d % 1 != 0) {
+            var floor = (long)Math.Floor(d);
+            if (integer is long l) {
+                var c = l.CompareTo(floor);
+                return c == 0 ? -1 : c;
+            }
+
+            if (floor < 0) {
+                return 1;
+            }
+
+            var uc = ((ulong)integer).CompareTo((ulong)floor);
+            return uc == 0 ? -1 : uc;
+        }
+
+        // Map-key conversion uses the same open Int64 endpoints as checked int(double).
+        if (d > -9223372036854775808.0 && d < 9223372036854775808.0) {
+            var li = (long)d;
+            return integer switch {
+                long l  => l.CompareTo(li),
+                ulong u => li < 0 ? 1 : u.CompareTo((ulong)li),
+                _       => 0,
+            };
+        }
+
+        if (d >= 0) {
+            return integer is ulong u && d < 18446744073709551616.0 ? u.CompareTo((ulong)d) : -1;
+        }
+
+        return 1;
     }
 
     private static object? TypeOf(object? value) {
@@ -904,7 +1031,7 @@ public static class CelValues
         }
 
         if (value is long seconds) {
-            return new CelTimestamp(seconds, 0);
+            return seconds is < -62_135_596_800L or > 253_402_300_799L ? Error("range") : new CelTimestamp(seconds, 0);
         }
 
         if (value is not string text) {
@@ -944,16 +1071,20 @@ public static class CelValues
         }
 
         var local = ToLocalTime(timestamp, zone);
+        if (local is not DateTimeOffset time) {
+            return local;
+        }
+
         return name switch {
-            "getFullYear" => (long)local.Year,
-            "getMonth" => (long)(local.Month - 1),
-            "getDate" => (long)local.Day,
-            "getDayOfMonth" => (long)(local.Day - 1),
-            "getDayOfWeek" => (long)local.DayOfWeek,
-            "getDayOfYear" => (long)(local.DayOfYear - 1),
-            "getHours" => (long)local.Hour,
-            "getMinutes" => (long)local.Minute,
-            "getSeconds" => (long)local.Second,
+            "getFullYear" => (long)time.Year,
+            "getMonth" => (long)(time.Month - 1),
+            "getDate" => (long)time.Day,
+            "getDayOfMonth" => (long)(time.Day - 1),
+            "getDayOfWeek" => (long)time.DayOfWeek,
+            "getDayOfYear" => (long)(time.DayOfYear - 1),
+            "getHours" => (long)time.Hour,
+            "getMinutes" => (long)time.Minute,
+            "getSeconds" => (long)time.Second,
             "getMilliseconds" => (long)(timestamp.Nanos / 1_000_000),
             _ => Error("no matching overload"),
         };
@@ -969,8 +1100,14 @@ public static class CelValues
         };
     }
 
-    private static DateTimeOffset ToLocalTime(CelTimestamp timestamp, string? zone) {
-        var dto = DateTimeOffset.FromUnixTimeSeconds(timestamp.Seconds).AddTicks(timestamp.Nanos / 100);
+    private static object? ToLocalTime(CelTimestamp timestamp, string? zone) {
+        DateTimeOffset dto;
+        try {
+            dto = DateTimeOffset.FromUnixTimeSeconds(timestamp.Seconds).AddTicks(timestamp.Nanos / 100);
+        } catch (ArgumentOutOfRangeException) {
+            return Error("range");
+        }
+
         if (string.IsNullOrEmpty(zone) || zone is "UTC" or "Z") {
             return dto.ToUniversalTime();
         }
@@ -980,15 +1117,22 @@ public static class CelValues
                 offset = -offset;
             }
 
+            // DateTimeOffset.ToOffset only accepts whole-minute offsets; reject finer offsets
+            // here so callers observe the evaluator's error value, not an escaping exception.
+            if (offset.Ticks % TimeSpan.TicksPerMinute != 0
+             || offset < TimeSpan.FromHours(-14) || offset > TimeSpan.FromHours(14)) {
+                return Error("invalid time zone");
+            }
+
             return dto.ToOffset(offset);
         }
 
         try {
             return TimeZoneInfo.ConvertTime(dto, TimeZoneInfo.FindSystemTimeZoneById(zone));
         } catch (TimeZoneNotFoundException) {
-            return dto.ToUniversalTime();
+            return Error("unknown time zone");
         } catch (InvalidTimeZoneException) {
-            return dto.ToUniversalTime();
+            return Error("unknown time zone");
         }
     }
 
@@ -1050,14 +1194,7 @@ public static class CelValues
 
     private static bool IsNumber(object? value) { return value is long or ulong or double; }
 
-    private static double ToDoubleNumber(object? value) {
-        return value switch {
-            long i => i,
-            ulong u => u,
-            double d => d,
-            _ => 0,
-        };
-    }
+    private static bool IsNaN(object? value) { return value is double d && double.IsNaN(d); }
 
     private static int CompareBytes(byte[] left, byte[] right) {
         for (var i = 0; i < Math.Min(left.Length, right.Length); i++) {
@@ -1085,20 +1222,58 @@ public static class CelValues
         }
     }
 
-    private static long ToNanos(CelTimestamp timestamp) {
-        return checked(timestamp.Seconds * 1_000_000_000L + timestamp.Nanos);
+    private static int CompareComponents(long leftSeconds, int leftNanos, long rightSeconds, int rightNanos) {
+        var (ls, ln) = NormalizeComponents(leftSeconds, leftNanos);
+        var (rs, rn) = NormalizeComponents(rightSeconds, rightNanos);
+        var comparison = ls.CompareTo(rs);
+        return comparison != 0 ? comparison : ln.CompareTo(rn);
     }
 
-    private static long ToNanos(CelDuration duration) {
-        return checked(duration.Seconds * 1_000_000_000L + duration.Nanos);
+    private static object? AddDurations(CelDuration left, CelDuration right) {
+        try {
+            return DurationFromComponents(checked(left.Seconds + right.Seconds), (long)left.Nanos + right.Nanos);
+        } catch (OverflowException) {
+            return Error("overflow");
+        }
     }
 
-    private static CelDuration DurationFromNanos(long nanos) {
-        return new(nanos / 1_000_000_000L, (int)(nanos % 1_000_000_000L));
+    private static object? SubtractDurations(CelDuration left, CelDuration right) {
+        try {
+            return DurationFromComponents(checked(left.Seconds - right.Seconds), (long)left.Nanos - right.Nanos);
+        } catch (OverflowException) {
+            return Error("overflow");
+        }
     }
 
-    private static CelTimestamp TimestampFromNanos(long nanos) {
-        return new(nanos / 1_000_000_000L, (int)(nanos % 1_000_000_000L));
+    private static object? SubtractTimestamps(CelTimestamp left, CelTimestamp right) {
+        try {
+            var (seconds, nanos) = NormalizeComponents(checked(left.Seconds - right.Seconds), (long)left.Nanos - right.Nanos);
+            // Timestamp differences must remain representable as signed 64-bit nanoseconds.
+            _ = checked(seconds * 1_000_000_000L + nanos);
+            return new CelDuration(seconds, nanos);
+        } catch (OverflowException) {
+            return Error("range");
+        }
+    }
+
+    private static object? DurationFromComponents(long seconds, long nanos) {
+        var (total, rest) = NormalizeComponents(seconds, nanos);
+        return total is < -315_576_000_000L or > 315_576_000_000L ? Error("range") : new CelDuration(total, rest);
+    }
+
+    // Canonical components keep |nanos| below one second with nanos sharing the sign of seconds.
+    private static (long Seconds, int Nanos) NormalizeComponents(long seconds, long nanos) {
+        var rest = nanos % 1_000_000_000L;
+        var total = checked(seconds + (nanos - rest) / 1_000_000_000L);
+        if (rest > 0 && total < 0) {
+            total = checked(total + 1);
+            rest -= 1_000_000_000L;
+        } else if (rest < 0 && total > 0) {
+            total = checked(total - 1);
+            rest += 1_000_000_000L;
+        }
+
+        return (total, (int)rest);
     }
 
     private static object? AddDuration(CelTimestamp timestamp, CelDuration duration) {
@@ -1132,8 +1307,14 @@ public static class CelValues
         return int.Parse(fraction, CultureInfo.InvariantCulture);
     }
 
-    private static string FormatTimestamp(CelTimestamp timestamp) {
-        var dto = DateTimeOffset.FromUnixTimeSeconds(timestamp.Seconds).ToUniversalTime();
+    private static object? FormatTimestamp(CelTimestamp timestamp) {
+        DateTimeOffset dto;
+        try {
+            dto = DateTimeOffset.FromUnixTimeSeconds(timestamp.Seconds).ToUniversalTime();
+        } catch (ArgumentOutOfRangeException) {
+            return Error("range");
+        }
+
         return timestamp.Nanos == 0
             ? dto.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture)
             : dto.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture)
@@ -1141,8 +1322,12 @@ public static class CelValues
     }
 
     private static string FormatDuration(CelDuration duration) {
-        var nanos = duration.Nanos == 0 ? string.Empty : "." + duration.Nanos.ToString("D9", CultureInfo.InvariantCulture).TrimEnd('0');
-        return duration.Seconds.ToString(CultureInfo.InvariantCulture) + nanos + "s";
+        var (seconds, nanos) = NormalizeComponents(duration.Seconds, duration.Nanos);
+        var sign = seconds < 0 || nanos < 0 ? "-" : string.Empty;
+        var fraction = nanos == 0
+            ? string.Empty
+            : "." + Math.Abs(nanos).ToString("D9", CultureInfo.InvariantCulture).TrimEnd('0');
+        return sign + Math.Abs(seconds).ToString(CultureInfo.InvariantCulture) + fraction + "s";
     }
 
     private static object? ParseDuration(string text) {
@@ -1151,57 +1336,84 @@ public static class CelValues
             return Error("invalid duration");
         }
 
-        decimal total = 0;
-        if (match.Groups["h"].Success) {
-            total += decimal.Parse(match.Groups["h"].Value, CultureInfo.InvariantCulture) * 3600;
-        }
+        try {
+            decimal total = 0;
+            if (match.Groups["h"].Success) {
+                total += decimal.Parse(match.Groups["h"].Value, CultureInfo.InvariantCulture) * 3600;
+            }
 
-        if (match.Groups["m"].Success) {
-            total += decimal.Parse(match.Groups["m"].Value, CultureInfo.InvariantCulture) * 60;
-        }
+            if (match.Groups["m"].Success) {
+                total += decimal.Parse(match.Groups["m"].Value, CultureInfo.InvariantCulture) * 60;
+            }
 
-        if (match.Groups["s"].Success) {
-            total += decimal.Parse(match.Groups["s"].Value, CultureInfo.InvariantCulture);
-        }
+            if (match.Groups["s"].Success) {
+                total += decimal.Parse(match.Groups["s"].Value, CultureInfo.InvariantCulture);
+            }
 
-        if (match.Groups["ms"].Success) {
-            total += decimal.Parse(match.Groups["ms"].Value, CultureInfo.InvariantCulture) / 1_000;
-        }
+            if (match.Groups["ms"].Success) {
+                total += decimal.Parse(match.Groups["ms"].Value, CultureInfo.InvariantCulture) / 1_000;
+            }
 
-        if (match.Groups["us"].Success) {
-            total += decimal.Parse(match.Groups["us"].Value, CultureInfo.InvariantCulture) / 1_000_000;
-        }
+            if (match.Groups["us"].Success) {
+                total += decimal.Parse(match.Groups["us"].Value, CultureInfo.InvariantCulture) / 1_000_000;
+            }
 
-        if (match.Groups["ns"].Success) {
-            total += decimal.Parse(match.Groups["ns"].Value, CultureInfo.InvariantCulture) / 1_000_000_000;
-        }
+            if (match.Groups["ns"].Success) {
+                total += decimal.Parse(match.Groups["ns"].Value, CultureInfo.InvariantCulture) / 1_000_000_000;
+            }
 
-        if (match.Groups["sign"].Success) {
-            total = -total;
-        }
+            if (match.Groups["sign"].Success) {
+                total = -total;
+            }
 
-        var seconds = decimal.Truncate(total);
-        var nanos = (int)((total - seconds) * 1_000_000_000m);
-        if (seconds is < -315_576_000_000m or > 315_576_000_000m) {
+            var seconds = decimal.Truncate(total);
+            var nanos = (int)((total - seconds) * 1_000_000_000m);
+            if (seconds is < -315_576_000_000m or > 315_576_000_000m) {
+                return Error("range");
+            }
+
+            return new CelDuration((long)seconds, nanos);
+        } catch (FormatException) {
+            return Error("invalid duration");
+        } catch (OverflowException) {
             return Error("range");
         }
+    }
 
-        return new CelDuration((long)seconds, nanos);
+    // Losslessly equal numeric map keys share a hash; structural keys follow the same rule.
+    private static int HashValue(object? value) {
+        return value switch {
+            null => 0,
+            byte[] bytes => bytes.Aggregate(17, (hash, b) => hash * 31 + b),
+            double d => HashDouble(d),
+            long i => i.GetHashCode(),
+            ulong u => u <= long.MaxValue ? ((long)u).GetHashCode() : u.GetHashCode(),
+            IReadOnlyList<object?> list => list.Aggregate(17, (hash, item) => hash * 31 + HashValue(item)),
+            IReadOnlyDictionary<object, object?> map => map.Aggregate(17, (hash, pair) => hash ^ HashValue(pair.Key) * 397 ^ HashValue(pair.Value)),
+            var other => other.GetHashCode(),
+        };
+    }
+
+    private static int HashDouble(double d) {
+        if (d % 1 != 0) {
+            return d.GetHashCode();
+        }
+
+        if (d >= -9223372036854775808.0 && d < 9223372036854775808.0) {
+            return ((long)d).GetHashCode();
+        }
+
+        if (d >= 0 && d < 18446744073709551616.0) {
+            return ((ulong)d).GetHashCode();
+        }
+
+        return d.GetHashCode();
     }
 
     private sealed class CelKeyComparer : IEqualityComparer<object>
     {
-        public new bool Equals(object? x, object? y) { return EqualValue(x, y); }
+        public new bool Equals(object? x, object? y) { return EqualValue(x, y, true); }
 
-        public int GetHashCode(object obj) {
-            return obj switch {
-                byte[] bytes => bytes.Aggregate(17, (hash, b) => hash * 31 + b),
-                long i => i.GetHashCode(),
-                ulong u when u <= long.MaxValue => ((long)u).GetHashCode(),
-                ulong u => u.GetHashCode(),
-                double d => d.GetHashCode(),
-                _ => obj.GetHashCode(),
-            };
-        }
+        public int GetHashCode(object obj) { return HashValue(obj); }
     }
 }

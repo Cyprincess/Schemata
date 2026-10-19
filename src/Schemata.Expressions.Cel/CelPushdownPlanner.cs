@@ -63,9 +63,9 @@ public sealed class CelPushdownPlanner : IExpressionPushdownPlanner
     }
 
     // Rebuilds a sub-filter from a subset of the original conjuncts. The suffix keeps the pushed and
-    // residual parts on distinct compile-cache keys (the cache is keyed by CelNode.Source). A single
-    // conjunct is wrapped in `&& true` so the rebuilt root is a fresh node whose Source can be set
-    // without mutating the shared parsed tree.
+    // residual Source annotations distinct; compile-cache identity is the structural fingerprint. A
+    // single conjunct is wrapped in `&& true` so the rebuilt root is a fresh node whose Source can
+    // be set without mutating the shared parsed tree.
     private static CelNode Rebuild(CelNode original, List<CelNode> conjuncts, string suffix) {
         var node = conjuncts.Count == 1
             ? new CelBinary("&&", conjuncts[0], new CelConstant(true))
