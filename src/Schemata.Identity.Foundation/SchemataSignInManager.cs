@@ -103,7 +103,7 @@ public class SchemataSignInManager<TUser>(
 
         // The login stage starts with no handled response: a request-stage write that continued
         // must not stand in for this stage's result.
-        execution.Response = null;
+        execution.ClearResponse();
 
         var handled = await HandledResponseRunner.RunAsync(
             execution,

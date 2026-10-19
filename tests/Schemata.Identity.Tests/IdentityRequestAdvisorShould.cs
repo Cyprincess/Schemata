@@ -89,7 +89,7 @@ public class IdentityRequestAdvisorShould
                          IdentityOperationExecution<IdentityResult<TResponse>> execution,
                          CancellationToken            _) => {
                    observed = execution.Operation;
-                   execution.Response = expected;
+                   ((IHandledResponse<IdentityResult<TResponse>>)execution).SetResponse(expected);
                    return Task.FromResult(AdviseResult.Handle);
                });
         using var host = new IdentityHandlerTestHost(services => services.AddSingleton(advisor.Object));

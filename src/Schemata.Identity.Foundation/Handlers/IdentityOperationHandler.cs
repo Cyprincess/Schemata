@@ -56,7 +56,7 @@ internal sealed partial class IdentityOperationHandler<TUser>
         var handled = await HandledResponseRunner.RunAsync(
             execution, advise, static () => new PermissionDeniedException());
         if (handled is null) {
-            execution.Response = null;
+            execution.ClearResponse();
         }
 
         return handled;

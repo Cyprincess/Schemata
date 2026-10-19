@@ -6,8 +6,9 @@ namespace Schemata.Identity.Skeleton;
 /// <summary>
 ///     Explicit execution payload for one identity operation dispatch, carried through every
 ///     advisor stage of that operation. Advisors read the operation and caller from this object,
-///     and an advisor that short-circuits writes its result to <see cref="Response" /> before
-///     returning <see cref="AdviseResult.Handle" />. The handler creates a fresh instance per
+///     and an advisor that short-circuits writes its result to
+///     <see cref="IHandledResponse{TResponse}.Response" /> before returning
+///     <see cref="AdviseResult.Handle" />. The handler creates a fresh instance per
 ///     dispatch, so consecutive operations never observe a prior result.
 /// </summary>
 /// <typeparam name="TResponse">The operation's result payload type.</typeparam>
@@ -20,11 +21,17 @@ public sealed class IdentityOperationExecution<TResponse> : IHandledResponse<TRe
     public required ClaimsPrincipal Principal { get; init; }
 
     /// <summary>The result written by an advisor returning <see cref="AdviseResult.Handle" />.</summary>
-    public TResponse? Response { get; set; }
+    private readonly HandledResponse<TResponse> _output = new();
 
     /// <inheritdoc />
-    public bool Handled => Response is not null;
+    TResponse? IHandledResponse<TResponse>.Response => _output.Response;
 
     /// <inheritdoc />
-    public void SetResponse(TResponse response) { Response = response; }
+    bool IHandledResponse<TResponse>.Handled => _output.Handled;
+
+    /// <inheritdoc />
+    void IHandledResponse<TResponse>.SetResponse(TResponse response) => _output.SetResponse(response);
+
+    /// <summary>Clears a result written by a previous stage without sharing the carrier.</summary>
+    public void ClearResponse() { _output.Response = null; }
 }

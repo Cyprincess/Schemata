@@ -222,7 +222,7 @@ public class IdentityOperationHandlerShould
                          IdentityOperationExecution<IdentityResult<Unit>> payload,
                          CancellationToken _) => {
                    execution = payload;
-                   payload.SetResponse(stray);
+                   ((IHandledResponse<IdentityResult<Unit>>)payload).SetResponse(stray);
                    return Task.FromResult(AdviseResult.Continue);
                });
         var change = new Mock<IIdentityProfileChangeAdvisor>();
@@ -248,7 +248,7 @@ public class IdentityOperationHandlerShould
         }, Principal));
 
         Assert.NotNull(execution);
-        Assert.Null(execution.Response);
+        Assert.Null(((IHandledResponse<IdentityResult<Unit>>)execution).Response);
     }
 
     private static Mock<IIdentityRequestAdvisor<TRequest, IdentityResult<TResponse>>> RequestAdvisor<TRequest, TResponse>(

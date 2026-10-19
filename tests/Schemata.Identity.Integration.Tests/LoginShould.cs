@@ -268,10 +268,11 @@ public class LoginShould
             LoginRequest request,
             IdentityOperationExecution<Schemata.Identity.Skeleton.IdentityResult<ClaimsPrincipal>> execution,
             CancellationToken ct = default) {
-            execution.Response = success
-                ? Schemata.Identity.Skeleton.IdentityResult<ClaimsPrincipal>.Success(
-                    new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "users/external")], "external")))
-                : Schemata.Identity.Skeleton.IdentityResult<ClaimsPrincipal>.Challenge();
+            ((IHandledResponse<Schemata.Identity.Skeleton.IdentityResult<ClaimsPrincipal>>)execution).SetResponse(
+                success
+                    ? Schemata.Identity.Skeleton.IdentityResult<ClaimsPrincipal>.Success(
+                        new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "users/external")], "external")))
+                    : Schemata.Identity.Skeleton.IdentityResult<ClaimsPrincipal>.Challenge());
             return Task.FromResult(AdviseResult.Handle);
         }
     }
