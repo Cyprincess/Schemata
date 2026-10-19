@@ -1,14 +1,13 @@
 using System.Collections.Generic;
-using Schemata.Modular;
+using Schemata.Core;
 using static Schemata.Abstractions.SchemataConstants;
 
-// ReSharper disable once CheckNamespace
-namespace Schemata.Core;
+namespace Schemata.Modular;
 
 /// <summary>
 ///     Extension methods for storing and retrieving module descriptors in <see cref="SchemataOptions" />.
 /// </summary>
-public static class SchemataOptionsExtensions
+public static class ModularOptionsExtensions
 {
     /// <summary>
     ///     Gets the list of discovered module descriptors.
