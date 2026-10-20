@@ -3,12 +3,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
-using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Core.Building;
 using Schemata.Entity.Repository;
-using Schemata.Entity.Repository.Advisors;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Tests.Fixtures;
@@ -95,35 +93,6 @@ public class ResourceRegistryConflictShould
         Assert.Single(registry.Resources);
     }
 
-    [Fact]
-    public async Task Typed_Reference_Resolves_To_The_Unique_Target() {
-        var registry = Registry(typeof(Book), typeof(Student));
-        var resolver = new DefaultResourceTypeResolver(registry);
-        var (advisor, context, repository, provider) = ReferenceHost(resolver);
-        using var _ = provider;
-        var entity = new ReferencingEntity { Book = "publishers/acme/books/les-miserables" };
-
-        var result = await advisor.AdviseAsync(context, repository, entity, default, CancellationToken.None);
-
-        Assert.Equal(AdviseResult.Continue, result);
-        Assert.Same(typeof(Book), resolver.Resolve(entity.Book));
-    }
-
-    [Fact]
-    public async Task Polymorphic_Reference_Resolves_To_The_Unique_Target() {
-        var registry = Registry(typeof(Book), typeof(Student));
-        var resolver = new DefaultResourceTypeResolver(registry);
-        var (advisor, context, repository, provider) = ReferenceHost(resolver);
-        using var _ = provider;
-        var entity = new ReferencingEntity { Subject = "publishers/acme/books/les-miserables" };
-
-        var result = await advisor.AdviseAsync(context, repository, entity, default, CancellationToken.None);
-
-        Assert.Equal(AdviseResult.Continue, result);
-        Assert.Same(typeof(Book), resolver.Resolve(entity.Subject));
-        Assert.Same(typeof(Student), resolver.Resolve("students/alice"));
-    }
-
     private static ResourceRegistry Registry(params Type[] entities) {
         var registry = new ResourceRegistry();
         foreach (var entity in entities) {
@@ -131,14 +100,6 @@ public class ResourceRegistryConflictShould
         }
 
         return registry;
-    }
-
-    private static (AdviceValidateResourceReferences<ReferencingEntity> Advisor, AdviceContext Context,
-        IRepository<ReferencingEntity> Repository, ServiceProvider Provider) ReferenceHost(IResourceTypeResolver resolver) {
-        var services = new ServiceCollection();
-        services.AddSingleton(resolver);
-        var provider = services.BuildServiceProvider();
-        return (new(), new AdviceContext(provider), new Mock<IRepository<ReferencingEntity>>().Object, provider);
     }
 
     [CanonicalName("students/{student}")]
@@ -173,12 +134,5 @@ public class ResourceRegistryConflictShould
         public string? Name   { get; set; }
     }
 
-    public sealed class ReferencingEntity
-    {
-        [ResourceReference(typeof(Book))]
-        public string? Book { get; set; }
 
-        [ResourceReference]
-        public string? Subject { get; set; }
-    }
 }

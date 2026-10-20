@@ -77,8 +77,6 @@ Built-in add advisors, in execution order:
 | 120,000,000 | `AdviceAddCanonicalName<TEntity>`                   | `ICanonicalName` | Resolves the `[CanonicalName]` pattern and writes `CanonicalName`. No suppress flag.                                                                                        |
 | 121,000,000 | `AdviceAddOwner<TEntity>`                           | `IOwnable`       | Calls `IOwnerResolver<TEntity>.ResolveAsync` and sets `Owner`. Registered by `UseOwner()`. Skipped when the entity already carries a non-empty `Owner`.                                                 |
 | 130,000,000 | `AdviceAddValidation<TEntity>`                      | (any)            | Runs `IValidationAdvisor<TEntity>` for `Operations.Create`. Throws `ValidationException` when an advisor blocks. Skipped by `MutationOptions.IgnoreValidation`.                   |
-| 140,000,000 | `AdviceValidateResourceReferences<TEntity>`         | (any)            | Validates every `[ResourceReference]` value. A typed reference is checked against the declared target: with `IResourceTypeResolver` the resolved type must be assignable, without one the value must match the target's `[CanonicalName]` pattern; a mismatch throws `NotFoundException`. A polymorphic reference resolves through `IResourceTypeResolver` (a missing resolver is a configuration `InvalidOperationException`) and an unresolvable value raises `ValidationException` (`INVALID_REFERENCE`). |
-| 150,000,000 | `AdviceValidateResourceReferenceExistence<TEntity>` | (any) | Verifies opted-in reference targets. Registered by `AddRepository` for add/update; missing targets produce `NotFoundException`. A typed reference queries the declared target repository directly; only polymorphic references need `IResourceTypeResolver`, and a missing registration produces `InvalidOperationException`. |
 | 160,000,000 | `AdviceAddUniqueness<TEntity>`                      | (any)            | Looks up the entity by key (with the query soft-delete filter suppressed); throws `AlreadyExistsException` when a row already exists. Skipped by `MutationOptions.IgnoreUniqueness`. |
 | 900,000,000 | `AdviceAddSoftDelete<TEntity>`                      | `ISoftDelete`    | Clears `DeleteTime` to `null`. Skipped by `MutationOptions.IgnoreSoftDelete`.                                                                                                        |
 
@@ -89,9 +87,10 @@ An add advisor that blocks or handles the call without staging yields `MutationR
 row exists, and the resource create handler answers with an empty result instead of a created
 detail.
 
-`AdviceAddOwner` activates through `UseOwner()`. Logical existence validation activates per
-property through `ValidateExistence`, independently of ownership. These pre-write checks do not
-provide database-level referential integrity or prevent a concurrent target deletion.
+`AdviceAddOwner` activates through `UseOwner()`. `[ResourceReference]` is declarative metadata:
+the repository pipeline performs no write-time reference validation and provides no database-level
+referential integrity; applications enforce their own reference rules in business logic or a
+repository advisor.
 
 ### Consumer-owned resource names
 
@@ -179,8 +178,6 @@ The execution paths are
 | ----------- | --------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 100,000,000 | `AdviceUpdateTimestamp<TEntity>`                    | `ITimestamp` | Sets `UpdateTime` to the current UTC time. Runs on every update for `ITimestamp`.                                                                              |
 | 110,000,000 | `AdviceUpdateValidation<TEntity>`                   | (any)        | Runs `IValidationAdvisor<TEntity>` for `Operations.Update`. Throws `ValidationException` when an advisor blocks. Skipped by `MutationOptions.IgnoreValidation`. |
-| 140,000,000 | `AdviceValidateResourceReferences<TEntity>`         | (any)        | Validates every `[ResourceReference]` value as on add: typed references against the declared target (resolver assignability, or the target pattern when the resolver is absent), polymorphic references through `IResourceTypeResolver`. |
-| 150,000,000 | `AdviceValidateResourceReferenceExistence<TEntity>` | (any) | Verifies opted-in logical references, as on add; registered by `AddRepository`. |
 
 There is no update-side concurrency advisor. Optimistic concurrency on update is enforced by the
 database when the concrete entity annotates `IConcurrency.Timestamp` with `[ConcurrencyCheck]`.

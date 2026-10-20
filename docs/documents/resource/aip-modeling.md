@@ -40,7 +40,7 @@ The resource runtime maps `TRequest` to `TEntity`, then maps entities to `TDetai
 
 `ICanonicalName.Name` is Schemata's internal leaf identifier. It is suppressed on both wires. `ICanonicalName.CanonicalName` carries the collection-relative canonical resource name and is emitted as `name`. `IIdentifier.Uid` is the [AIP-148](https://google.aip.dev/148) `uid` field: `AdviceAddIdentifier` assigns it when an entity is added, request sanitizers clear it on writes, and both transports serialize it as the string field `uid` when an output DTO exposes it. `Identifiers.NewUid` returns UUID v4, meeting the AIP's UUID4 value requirement; the `UUID4` field-format annotation the AIP also requires is absent from both transports.
 
-A child resource has one path-derived parent channel. `ResourceNameDescriptor` derives parent values from an HTTP route and `AdviceApplyChildParent` parses a DTO `IChild.Parent` into the entity's structural parent properties. Update clears all parent properties before the advisor path so a body cannot move an existing resource. Cross-resource values use `string` properties with `[ResourceReference]`; `AddRepository` registers type-resolvability and opted-in `ValidateExistence` validation independently of ownership. See [Resource Naming](resource-naming.md) and [Entity Traits](../entity/traits.md).
+A child resource has one path-derived parent channel. `ResourceNameDescriptor` derives parent values from an HTTP route and `AdviceApplyChildParent` parses a DTO `IChild.Parent` into the entity's structural parent properties. Update clears all parent properties before the advisor path so a body cannot move an existing resource. Cross-resource values use `string` properties with the declarative `[ResourceReference]` marker. The framework performs no write-time type or existence validation and creates no foreign keys; applications enforce reference rules themselves. See [Resource Naming](resource-naming.md) and [Entity Traits](../entity/traits.md).
 
 ### Transport transformations
 
@@ -92,7 +92,7 @@ The matrix gives the narrow, evidenced status for the AIP requirement summarized
 1. Choose a single canonical parent before declaring the resource pattern. Put each alternate association in a named string reference or a repeated collection of canonical names.
 2. Keep parent-child paths and reference graphs acyclic. Register an addressable pattern and use the same canonical string form in every reference.
 3. Put a parent only in a DTO channel that the resource pipeline owns. The URI supplies Create parent values, and Update must retain its URI parent rather than a body-provided value.
-4. Enable `ResourceReferenceAttribute.ValidateExistence` only when the application registers its corresponding validator and resolver. Existence validation does not replace authorization.
+4. `[ResourceReference]` marks the association only. The application owns any type or existence check (business logic or its own repository advisor); such a check does not replace authorization.
 
 ### Fields and values
 

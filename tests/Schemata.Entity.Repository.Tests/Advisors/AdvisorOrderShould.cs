@@ -26,8 +26,6 @@ public class AdvisorOrderShould
                 120_000_000,
                 121_000_000,
                 130_000_000,
-                140_000_000,
-                150_000_000,
                 160_000_000,
                 900_000_000,
             ],
@@ -38,8 +36,6 @@ public class AdvisorOrderShould
                 AdviceAddCanonicalName.DefaultOrder,
                 AdviceAddOwner.DefaultOrder,
                 AdviceAddValidation.DefaultOrder,
-                AdviceValidateResourceReferences.DefaultOrder,
-                AdviceValidateResourceReferenceExistence.DefaultOrder,
                 AdviceAddUniqueness.DefaultOrder,
                 AdviceAddSoftDelete.DefaultOrder,
             ]);
@@ -63,8 +59,6 @@ public class AdvisorOrderShould
             advisor => Assert.IsType<AdviceAddCanonicalName<AdvisorEntity>>(advisor),
             advisor => Assert.IsType<AdviceAddOwner<AdvisorEntity>>(advisor),
             advisor => Assert.IsType<AdviceAddValidation<AdvisorEntity>>(advisor),
-            advisor => Assert.IsType<AdviceValidateResourceReferences<AdvisorEntity>>(advisor),
-            advisor => Assert.IsType<AdviceValidateResourceReferenceExistence<AdvisorEntity>>(advisor),
             advisor => Assert.IsType<AdviceAddUniqueness<AdvisorEntity>>(advisor),
             advisor => Assert.IsType<AdviceAddSoftDelete<AdvisorEntity>>(advisor));
 

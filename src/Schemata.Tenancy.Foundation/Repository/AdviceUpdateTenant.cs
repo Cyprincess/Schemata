@@ -11,7 +11,9 @@ namespace Schemata.Tenancy.Foundation.Repository;
 public sealed class AdviceUpdateTenant<TEntity> : IRepositoryUpdateAdvisor<TEntity>
     where TEntity : class
 {
-    public int Order => AdviceValidateResourceReferenceExistence.DefaultOrder + 1_000_000;
+    // Runs after the generic update validation stage and before any uniqueness stage; the tenant
+    // binding is verified once the entity itself has been validated.
+    public int Order => AdviceUpdateValidation.DefaultOrder + 10_000_000;
 
     public async Task<AdviseResult> AdviseAsync(
         AdviceContext ctx,

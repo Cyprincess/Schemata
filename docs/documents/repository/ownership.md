@@ -12,7 +12,6 @@ Ownership is opt-in. Call `UseOwner()` on the repository builder to enable the a
 | `SchemataOwnerOptions`                            | `src/Schemata.Entity.Repository/SchemataOwnerOptions.cs`                                   |
 | `AdviceAddOwner<TEntity>`                         | `src/Schemata.Entity.Repository/Advisors/AdviceAddOwner.cs`                                |
 | `AdviceBuildQueryOwner<TEntity>`                  | `src/Schemata.Entity.Repository/Advisors/AdviceBuildQueryOwner.cs`                         |
-| `AdviceValidateResourceReferenceExistence<TEntity>` | `src/Schemata.Entity.Repository/Advisors/AdviceValidateResourceReferenceExistence.cs`    |
 | `UseOwner` extension                              | `src/Schemata.Entity.Repository/Extensions/SchemataRepositoryBuilderOwnerExtensions.cs`    |
 
 ## IOwnerResolver
@@ -57,30 +56,6 @@ public interface IOwnerResolver<TEntity>
 3. Calls `IOwnerResolver<TEntity>.ResolveAsync`. If non-empty, appends `.OfType<IOwnable>().Where(e => e.Owner == owner).OfType<TEntity>()`.
 4. When the resolver returns `null`, applies `SchemataOwnerOptions.OnNullOwner` (same policy as `AdviceAddOwner`).
 
-### AdviceValidateResourceReferenceExistence
-
-`AdviceValidateResourceReferenceExistence<TEntity>` belongs to Repository and is registered by
-`AddRepository` for add/update operations. Each property opts in with `ValidateExistence = true`.
-Its target query passes `QueryOptions(IgnoreOwner: true)`; ownership installation is independent.
-The validation creates no database foreign keys or cascades and
-cannot prevent a target from being deleted after the check.
-
-**Order:** `AdviceValidateResourceReferences.DefaultOrder + 10_000_000` = 150,000,000, on both the add
-and update pipelines. Type resolvability is established before any existence query executes.
-
-**Behavior:**
-
-1. Collects the entity's string properties carrying `[ResourceReference(ValidateExistence = true)]`. An
-   entity with none is skipped in constant time.
-2. Resolves the target type: the attribute's `Target` when set, otherwise
-   `IResourceTypeResolver.Resolve(value)` for polymorphic references. Targets that do not implement
-   `ICanonicalName` are skipped. A typed reference queries the declared target's repository without
-   requiring `IResourceTypeResolver`; an unregistered resolver encountered by a polymorphic reference
-   throws `InvalidOperationException` as a configuration error.
-3. Queries the target's `IRepository<TTarget>` for any row with the matching `CanonicalName`, with
-   `QueryOptions(IgnoreOwner: true)` so cross-owner references resolve.
-4. A missing row throws `NotFoundException` (`SchemataResourceErrors.NotFound(target, value)`).
-
 ## Registration
 
 ```csharp
@@ -88,7 +63,7 @@ services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
         .UseOwner();
 ```
 
-`UseOwner()` registers `SchemataOwnerOptions`, `AdviceBuildQueryOwner<>` and `AdviceAddOwner<>`. Registrations use `TryAddEnumerable`; logical reference existence validation is registered independently by Repository.
+`UseOwner()` registers `SchemataOwnerOptions`, `AdviceBuildQueryOwner<>` and `AdviceAddOwner<>`. Registrations use `TryAddEnumerable`. Reference validation is application-owned: `[ResourceReference]` is declarative metadata and the framework performs no write-time type or existence checks.
 
 You must also register a concrete `IOwnerResolver<TEntity>`. A typical implementation reads the current principal from `IHttpContextAccessor`:
 

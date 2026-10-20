@@ -84,9 +84,9 @@ are skipped. `AdviceAddOwner` runs right after `AdviceAddCanonicalName` (its
 `Order` is `AdviceAddCanonicalName.DefaultOrder + 1_000_000`).
 `AdviceBuildQueryOwner` runs after `AdviceBuildQuerySoftDelete` (its `Order`
 is `AdviceBuildQuerySoftDelete.DefaultOrder + 10_000_000`).
-Repository separately registers `AdviceValidateResourceReferenceExistence` on add/update.
-Properties opt in through `[ResourceReference(ValidateExistence = true)]`; this logical check
-does not install database foreign keys or prevent concurrent target deletion.
+`[ResourceReference]` only declares a canonical-name association; the framework performs no
+write-time reference validation and installs no database foreign keys. Applications that need
+type or existence checks implement them in business logic or their own repository advisor.
 
 **Verify:** Start the app. A `POST /v1/students` request without authentication
 throws `PermissionDeniedException` (the default `OnNullOwner` policy is

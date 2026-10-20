@@ -194,8 +194,8 @@ advisors ship in `Schemata.Entity.Repository` and are all registered by `UseOwne
 | `AdviceAddOwner<TEntity>`                             | Add          | 121,000,000 | Calls `IOwnerResolver<TEntity>.ResolveAsync` and assigns `Owner` when it is unset.                              |
 | `AdviceBuildQueryOwner<TEntity>`                      | BuildQuery   | 110,000,000 | Appends `.Where(e => e.Owner == owner)` to every query.                                                         |
 
-Repository independently registers `AdviceValidateResourceReferenceExistence` for properties
-opting in with `[ResourceReference(ValidateExistence = true)]`. It is not an ownership capability.
+`[ResourceReference]` is declarative metadata for cross-resource canonical-name associations;
+the framework performs no write-time reference validation. It is not an ownership capability.
 
 `AdviceAddOwner` and `AdviceBuildQueryOwner` consult `SchemataOwnerOptions.OnNullOwner` when the
 resolver returns `null`: `Reject` (default) throws `PermissionDeniedException`, `EmptyResult` blocks,

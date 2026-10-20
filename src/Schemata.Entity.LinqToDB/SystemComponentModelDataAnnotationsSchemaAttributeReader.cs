@@ -156,8 +156,9 @@ public sealed class SystemComponentModelDataAnnotationsSchemaAttributeReader : I
 
         // [ResourceReference] is intentionally not projected to a LinqToDB AssociationAttribute:
         // AssociationAttribute targets navigation properties (declared type == the related entity),
-        // not the canonical-name scalar foreign key. Referential integrity is enforced at write time
-        // by AdviceValidateResourceReferences in the repository pipeline.
+        // not the canonical-name scalar foreign key. The marker is declarative metadata; the
+        // framework performs no write-time reference validation, so applications enforce their own
+        // referential rules in business logic or a repository advisor.
 
         if (TryGetMemberType(member) is { } memberType) {
             // An application-declared member-level converter is the explicit conversion contract
