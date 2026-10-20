@@ -74,8 +74,9 @@ and update pipelines. Type resolvability is established before any existence que
    entity with none is skipped in constant time.
 2. Resolves the target type: the attribute's `Target` when set, otherwise
    `IResourceTypeResolver.Resolve(value)` for polymorphic references. Targets that do not implement
-   `ICanonicalName` are skipped; an unregistered `IResourceTypeResolver` throws
-   `InvalidOperationException`.
+   `ICanonicalName` are skipped. A typed reference queries the declared target's repository without
+   requiring `IResourceTypeResolver`; an unregistered resolver encountered by a polymorphic reference
+   throws `InvalidOperationException` as a configuration error.
 3. Queries the target's `IRepository<TTarget>` for any row with the matching `CanonicalName`, with
    `QueryOptions(IgnoreOwner: true)` so cross-owner references resolve.
 4. A missing row throws `NotFoundException` (`SchemataResourceErrors.NotFound(target, value)`).

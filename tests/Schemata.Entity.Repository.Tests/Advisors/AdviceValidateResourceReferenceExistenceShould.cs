@@ -137,18 +137,35 @@ public class AdviceValidateResourceReferenceExistenceShould
     }
 
     [Fact]
-    public async Task NoResolverRegistered_ThrowsInvalidOperationNamingEntityPropertyAndService() {
+    public async Task PolymorphicReference_NoResolverRegistered_ThrowsInvalidOperationNamingEntityPropertyAndService() {
         var advisor    = new AdviceValidateResourceReferenceExistence<ReferencingEntity>();
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<ReferencingEntity>>().Object;
-        var entity     = new ReferencingEntity { BookCanonicalName = "books/x" };
+        var entity     = new ReferencingEntity { Subject = "users/alice" };
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => advisor.AdviseAsync(ctx, repository, entity, default, CancellationToken.None));
 
         Assert.Contains(nameof(ReferencingEntity), exception.Message, StringComparison.Ordinal);
-        Assert.Contains(nameof(ReferencingEntity.BookCanonicalName), exception.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(ReferencingEntity.Subject), exception.Message, StringComparison.Ordinal);
         Assert.Contains(nameof(IResourceTypeResolver), exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TypedReference_WithoutResolver_QueriesDeclaredTargetRepository() {
+        var ctx            = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var bookRepository = QueryableRepository([new Book { CanonicalName = "books/x" }], ctx);
+        var services       = new ServiceCollection();
+        services.AddSingleton(bookRepository.Object);
+
+        var advisor    = new AdviceValidateResourceReferenceExistence<ReferencingEntity>();
+        var adviceCtx  = new AdviceContext(services.BuildServiceProvider());
+        var repository = new Mock<IRepository<ReferencingEntity>>().Object;
+        var entity     = new ReferencingEntity { BookCanonicalName = "books/x" };
+
+        var result = await advisor.AdviseAsync(adviceCtx, repository, entity, default, CancellationToken.None);
+
+        Assert.Equal(AdviseResult.Continue, result);
     }
 
     [Fact]

@@ -128,17 +128,41 @@ public class AdviceValidateResourceReferencesShould
     }
 
     [Fact]
-    public async Task ReferencedEntity_MissingResolver_ThrowsInvalidOperation() {
+    public async Task PolymorphicReference_MissingResolver_ThrowsInvalidOperation() {
         var advisor    = new AdviceValidateResourceReferences<ReferencingEntity>();
         var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
         var repository = new Mock<IRepository<ReferencingEntity>>().Object;
-        var entity     = new ReferencingEntity { BookCanonicalName = "books/x" };
+        var entity     = new ReferencingEntity { Subject = "users/alice" };
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => advisor.AdviseAsync(ctx, repository, entity, default, CancellationToken.None));
 
         Assert.Contains(nameof(ReferencingEntity), exception.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(ReferencingEntity.Subject), exception.Message, StringComparison.Ordinal);
         Assert.Contains(nameof(IResourceTypeResolver), exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TypedReference_ValidatesDeclaredTargetPattern_WithoutResolver() {
+        var advisor    = new AdviceValidateResourceReferences<ReferencingEntity>();
+        var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var repository = new Mock<IRepository<ReferencingEntity>>().Object;
+        var entity     = new ReferencingEntity { BookCanonicalName = "books/x" };
+
+        var result = await advisor.AdviseAsync(ctx, repository, entity, default, CancellationToken.None);
+
+        Assert.Equal(AdviseResult.Continue, result);
+    }
+
+    [Fact]
+    public async Task TypedReference_ThrowsNotFound_WhenPatternIsNotTheDeclaredTarget_WithoutResolver() {
+        var advisor    = new AdviceValidateResourceReferences<ReferencingEntity>();
+        var ctx        = new AdviceContext(new ServiceCollection().BuildServiceProvider());
+        var repository = new Mock<IRepository<ReferencingEntity>>().Object;
+        var entity     = new ReferencingEntity { BookCanonicalName = "users/x" };
+
+        await Assert.ThrowsAsync<NotFoundException>(
+            () => advisor.AdviseAsync(ctx, repository, entity, default, CancellationToken.None));
     }
 
     [Fact]
@@ -164,6 +188,7 @@ public class AdviceValidateResourceReferencesShould
 
     #region Nested type: Book
 
+    [CanonicalName("books/{book}")]
     public sealed class Book : ICanonicalName
     {
         public string? Name          { get; set; }

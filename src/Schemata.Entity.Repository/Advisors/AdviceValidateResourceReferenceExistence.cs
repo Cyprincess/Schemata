@@ -41,6 +41,12 @@ public static class AdviceValidateResourceReferenceExistence
 ///         for the target type, matching the shape produced by typed-reference type mismatches.
 ///     </para>
 ///     <para>
+///         Typed references query the declared target's repository directly and therefore do not
+///         require an <see cref="IResourceTypeResolver" />; polymorphic references resolve the
+///         target through it and fail with a configuration <see cref="InvalidOperationException" />
+///         when it is absent.
+///     </para>
+///     <para>
 ///         Polymorphic references resolving to a type that does not implement
 ///         <see cref="ICanonicalName" /> cannot be queried by canonical name and are skipped.
 ///         Typed references declaring <see cref="ResourceReferenceAttribute.ValidateExistence" />
@@ -79,17 +85,22 @@ public sealed class AdviceValidateResourceReferenceExistence<TEntity> :
             return AdviseResult.Continue;
         }
 
-        var resolver = AdviceValidateResourceReferences.RequireResolver(
-            ctx,
-            typeof(TEntity),
-            $".{references[0].Property.Name} ({nameof(ResourceReferenceAttribute.ValidateExistence)})");
+        IResourceTypeResolver? resolver = null;
 
         foreach (var reference in references) {
             if (reference.Property.GetValue(entity) is not string value || string.IsNullOrWhiteSpace(value)) {
                 continue;
             }
 
-            var target = reference.Target ?? resolver.Resolve(value);
+            var target = reference.Target;
+            if (target is null) {
+                resolver ??= AdviceValidateResourceReferences.RequireResolver(
+                    ctx,
+                    typeof(TEntity),
+                    $".{reference.Property.Name} ({nameof(ResourceReferenceAttribute.ValidateExistence)})");
+                target = resolver.Resolve(value);
+            }
+
             if (target is null || !typeof(ICanonicalName).IsAssignableFrom(target)) {
                 continue;
             }

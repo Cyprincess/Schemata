@@ -7,8 +7,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Errors;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
+using Schemata.Common;
 using Schemata.Common.Errors;
 
 namespace Schemata.Entity.Repository.Advisors;
@@ -28,6 +30,20 @@ public static class AdviceValidateResourceReferences
             ?? throw new InvalidOperationException(
                 $"{entity.Name}{detail} requires {nameof(IResourceTypeResolver)} for {nameof(ResourceReferenceAttribute)}.");
     }
+
+    /// <summary>
+    ///     Validates a typed reference without a resolver: the value must match the declared
+    ///     target's own <see cref="CanonicalNameAttribute" /> pattern. Host-defined subtypes that
+    ///     keep the built-in pattern satisfy the reference; a subtype with a different pattern
+    ///     needs a resolver to be recognized as assignable.
+    /// </summary>
+    internal static bool MatchesDeclaredTarget(Type target, string value) {
+        if (!typeof(ICanonicalName).IsAssignableFrom(target)) {
+            return false;
+        }
+
+        return ResourceNameDescriptor.ForType(target).ParseCanonicalName(value) is not null;
+    }
 }
 
 /// <summary>
@@ -38,19 +54,23 @@ public static class AdviceValidateResourceReferences
 ///     <list type="bullet">
 ///         <item>
 ///             Typed references (<see cref="ResourceReferenceAttribute.Target" /> non-<see langword="null" />)
-///             require <see cref="IResourceTypeResolver.Resolve(string)" /> to return a type
-///             assignable to the declared target, so a host-defined subtype satisfies a reference
-///             declared against its built-in base. An unrelated or unresolvable type throws
+///             are validated against the declared target: when an <see cref="IResourceTypeResolver" />
+///             is registered the resolved type must be assignable to the target, so a host-defined
+///             subtype satisfies a reference declared against its built-in base; without a resolver
+///             the value must match the target's own <see cref="CanonicalNameAttribute" /> pattern,
+///             so repository-only hosts still validate the framework's typed references. An invalid
+///             value throws
 ///             <see cref="SchemataResourceErrors.NotFound(System.Type, string?, string?, string)" /> for
 ///             the target type so callers see <c>NOT_FOUND</c> with a populated
 ///             <see cref="Schemata.Abstractions.Errors.ResourceInfoDetail" />.
 ///         </item>
 ///         <item>
 ///             Polymorphic references (<see cref="ResourceReferenceAttribute.Target" /> <see langword="null" />)
-///             only require the resolver to return any non-<see langword="null" /> type;
-///             unresolvable values are collected into a
+///             require an <see cref="IResourceTypeResolver" />: absolute URI identities pass
+///             through, an unresolvable value is collected into a
 ///             <see cref="ValidationException" /> with
-///             <see cref="ErrorFieldViolation.Reason" /> <c>INVALID_REFERENCE</c>.
+///             <see cref="ErrorFieldViolation.Reason" /> <c>INVALID_REFERENCE</c>, and a missing
+///             resolver throws a configuration <see cref="InvalidOperationException" />.
 ///         </item>
 ///     </list>
 ///     Null or empty values pass through; nullability of the reference field is governed
@@ -82,7 +102,7 @@ public sealed class AdviceValidateResourceReferences<TEntity> :
             return AdviseResult.Continue;
         }
 
-        var resolver = AdviceValidateResourceReferences.RequireResolver(ctx, typeof(TEntity));
+        var resolver = ctx.ServiceProvider.GetService<IResourceTypeResolver>();
 
         List<ErrorFieldViolation>? violations = null;
 
@@ -91,24 +111,24 @@ public sealed class AdviceValidateResourceReferences<TEntity> :
                 continue;
             }
 
-            // Canonical references are {collection}/{id}-shaped and never carry a scheme;
-            // an absolute URI is an identity (e.g. an issuer), not a resource reference.
-            // Untyped references only: typed references keep resolving and validating.
-            if (reference.Target is null && Uri.TryCreate(value, UriKind.Absolute, out _)) {
-                continue;
-            }
-
-            var resolved = resolver.Resolve(value);
-
             if (reference.Target is not null) {
-                if (resolved is not null && reference.Target.IsAssignableFrom(resolved)) {
+                if (IsTypedReferenceValid(reference.Target, value, resolver)) {
                     continue;
                 }
 
                 throw SchemataResourceErrors.NotFound(reference.Target, value);
             }
 
-            if (resolved is not null) {
+            // Canonical references are {collection}/{id}-shaped and never carry a scheme;
+            // an absolute URI is an identity (e.g. an issuer), not a resource reference.
+            // Untyped references only: typed references keep resolving and validating.
+            if (Uri.TryCreate(value, UriKind.Absolute, out _)) {
+                continue;
+            }
+
+            resolver ??= AdviceValidateResourceReferences.RequireResolver(ctx, typeof(TEntity), $".{reference.Property.Name}");
+
+            if (resolver.Resolve(value) is not null) {
                 continue;
             }
 
@@ -127,6 +147,15 @@ public sealed class AdviceValidateResourceReferences<TEntity> :
         }
 
         return AdviseResult.Continue;
+    }
+
+    private static bool IsTypedReferenceValid(Type target, string value, IResourceTypeResolver? resolver) {
+        if (resolver is null) {
+            return AdviceValidateResourceReferences.MatchesDeclaredTarget(target, value);
+        }
+
+        var resolved = resolver.Resolve(value);
+        return resolved is not null && target.IsAssignableFrom(resolved);
     }
 
     private static IReadOnlyList<Reference> BuildReferences() {

@@ -5,9 +5,13 @@ namespace Schemata.Abstractions.Resource;
 
 /// <summary>
 ///     Marks a property carrying a full canonical resource reference. Repository advisors
-///     validate type resolvability through <see cref="IResourceTypeResolver" /> and optionally
-///     validate target existence. Database foreign keys, unique indexes and cascades remain
-///     application mapping responsibilities.
+///     validate the referenced resource type and optionally validate target existence.
+///     Typed references validate against the declared target type: without an
+///     <see cref="IResourceTypeResolver" /> the value must match the target's own
+///     <see cref="CanonicalNameAttribute" /> pattern; with a resolver the resolved type
+///     must be assignable to the target. Polymorphic references resolve the target type from the
+///     canonical name and therefore require a resolver. Database foreign keys, unique indexes and
+///     cascades remain application mapping responsibilities.
 /// </summary>
 /// <remarks>
 ///     This is distinct from identity-composing parents (mode A), which the framework
@@ -21,17 +25,22 @@ public sealed class ResourceReferenceAttribute : Attribute
     /// <summary>
     ///     Initializes a polymorphic reference. The field accepts canonical names of any
     ///     registered resource; the ORM bridge emits no foreign-key configuration, and
-    ///     write-time validation only requires <see cref="IResourceTypeResolver.Resolve(string)" />
-    ///     to return a non-<see langword="null" /> type.
+    ///     write-time validation requires <see cref="IResourceTypeResolver.Resolve(string)" />
+    ///     to return a non-<see langword="null" /> type. A repository-only host that persists
+    ///     polymorphic references must register an <see cref="IResourceTypeResolver" />; a missing
+    ///     registration is a configuration error, not a silent skip.
     /// </summary>
     public ResourceReferenceAttribute() {
         Target = null;
     }
 
     /// <summary>
-    ///     Initializes a typed logical reference. Write-time validation requires the resolved
-    ///     resource type to be assignable to <paramref name="target" />, so a host-defined subtype
-    ///     satisfies a reference declared against its built-in base; an unrelated type fails.
+    ///     Initializes a typed logical reference. Write-time validation requires the referenced
+    ///     resource to be <paramref name="target" /> or a type assignable to it: with an
+    ///     <see cref="IResourceTypeResolver" /> the canonical name must resolve to such a type, so a
+    ///     host-defined subtype satisfies a reference declared against its built-in base; without a
+    ///     resolver the canonical name must match <paramref name="target" />'s own
+    ///     <see cref="CanonicalNameAttribute" /> pattern. An unrelated type fails.
     /// </summary>
     /// <param name="target">The referenced entity type.</param>
     public ResourceReferenceAttribute(Type target) {
@@ -47,8 +56,10 @@ public sealed class ResourceReferenceAttribute : Attribute
     ///     When <see langword="true" />, write-time validation also verifies the referenced
     ///     row exists, in addition to type resolvability. The existence query runs against
     ///     the target repository by <see cref="ICanonicalName.CanonicalName" /> with
-    ///     <c>QueryOptions.IgnoreOwner</c>, so cross-owner references resolve. A missing row
-    ///     surfaces as <c>NOT_FOUND</c> for the target type.
+    ///     <c>QueryOptions.IgnoreOwner</c>, so cross-owner references resolve. A typed reference
+    ///     queries the declared target's repository directly; a polymorphic reference needs an
+    ///     <see cref="IResourceTypeResolver" /> to select that repository. A missing row surfaces as
+    ///     <c>NOT_FOUND</c> for the target type.
     /// </summary>
     /// <remarks>
     ///     Repository mutation advisors perform existence validation independently of ownership
