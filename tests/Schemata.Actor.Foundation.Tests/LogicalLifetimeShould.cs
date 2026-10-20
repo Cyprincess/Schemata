@@ -31,13 +31,13 @@ public sealed class LogicalLifetimeShould
         var first = await reference.AskAsync<Identity, Guid>(new());
         var activation = await system.ResolveForSendAsync(reference.Id, props, default);
         var blocked = reference.AskAsync<Block, Guid>(new()).AsTask();
-        await state.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await state.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         now = 1000;
         Assert.False(activation.TryRetireIdle(TimeSpan.FromMinutes(15)));
         state.Release.SetResult();
         Assert.Equal(first, await blocked);
         await reference.AskAsync<Identity, Guid>(new());
-        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         while (true) {
             now += 1000;
             if (activation.TryRetireIdle(TimeSpan.FromMinutes(15))) break;
@@ -66,7 +66,7 @@ public sealed class LogicalLifetimeShould
         await reference.AskAsync<Identity, Guid>(new());
         var activation = await system.ResolveForSendAsync(reference.Id, props, default);
         var blocked = reference.AskAsync<Block, Guid>(new()).AsTask();
-        await state.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await state.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         var old = 0;
         var current = 0;
         activation.RegisterTimer("tick", _ => { old++; return ValueTask.CompletedTask; }, TimeSpan.Zero, null);

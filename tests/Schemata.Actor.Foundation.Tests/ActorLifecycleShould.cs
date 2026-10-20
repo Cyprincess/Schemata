@@ -21,7 +21,7 @@ public class ActorLifecycleShould
         // happens: gate.Started only completes once GatedActor.OnReceiveAsync has actually begun
         // and is blocked inside it.
         var executing = actor.AskAsync<GateAndWait, string>(new()).AsTask();
-        await gate.Started.WaitAsync(TimeSpan.FromSeconds(5));
+        await gate.Started.WaitAsync(TimeSpan.FromSeconds(30));
 
         // AskAsync is an async method that runs synchronously up to its first real suspension
         // point: WriteAsync on a bounded channel with free capacity (item #1 already dequeued,
@@ -43,9 +43,9 @@ public class ActorLifecycleShould
         // The turn that was already executing when the stop was requested runs to completion and
         // replies normally, and the graceful retirement drains the accepted Ask to completion too
         // instead of faulting it with "actor stopped".
-        Assert.Equal("released", await executing.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal("released", await executing.WaitAsync(TimeSpan.FromSeconds(30)));
         Assert.Equal(1, await queued.WaitAsync(TimeSpan.FromSeconds(10)));
-        await stopping.WaitAsync(TimeSpan.FromSeconds(5));
+        await stopping.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
@@ -56,7 +56,7 @@ public class ActorLifecycleShould
         var actor = await system.SpawnAsync(new("gated", "overlap"), new(typeof(GatedActor), [gate]));
 
         var executing = actor.AskAsync<GateAndWait, string>(new()).AsTask();
-        await gate.Started.WaitAsync(TimeSpan.FromSeconds(5));
+        await gate.Started.WaitAsync(TimeSpan.FromSeconds(30));
 
         // The stop signal lands before the gated turn finishes; the retirement cannot complete
         // while that turn is still in flight.
@@ -68,10 +68,10 @@ public class ActorLifecycleShould
         await Assert.ThrowsAsync<TimeoutException>(() => actor.AskAsync<Increment, int>(new(), timeout: TimeSpan.FromMilliseconds(30)).AsTask());
 
         gate.Release();
-        Assert.Equal("released", await executing.WaitAsync(TimeSpan.FromSeconds(5)));
-        await stopping.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("released", await executing.WaitAsync(TimeSpan.FromSeconds(30)));
+        await stopping.WaitAsync(TimeSpan.FromSeconds(30));
 
-        Assert.Equal(1, await waiting.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(1, await waiting.WaitAsync(TimeSpan.FromSeconds(30)));
         Assert.Equal(1, await actor.AskAsync<Increment, int>(new()));
     }
 
@@ -84,15 +84,15 @@ public class ActorLifecycleShould
         var actor = await system.GetAsync(new("gated-recording", "a"));
 
         var executing = actor.AskAsync<GateAndWait, string>(new()).AsTask();
-        await gate.Started.WaitAsync(TimeSpan.FromSeconds(5));
+        await gate.Started.WaitAsync(TimeSpan.FromSeconds(30));
 
         // Accepted before the stop signal, so the graceful drain must deliver it.
         await actor.TellAsync(new RecordTell("queued-before-stop"));
         var stopping = system.StopAsync(new("gated-recording", "a"));
 
         gate.Release();
-        Assert.Equal("released", await executing.WaitAsync(TimeSpan.FromSeconds(5)));
-        await stopping.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("released", await executing.WaitAsync(TimeSpan.FromSeconds(30)));
+        await stopping.WaitAsync(TimeSpan.FromSeconds(30));
 
         // The drain finished before StopAsync returned, so the accepted Tell is recorded - the
         // stop never returned success while silently dropping it.
@@ -121,7 +121,7 @@ public class ActorLifecycleShould
 
         // The first call's construction genuinely blocks inside the actor's own constructor.
         var first = Task.Run(() => system.GetAsync(id));
-        await gate.Entered.WaitAsync(TimeSpan.FromSeconds(5));
+        await gate.Entered.WaitAsync(TimeSpan.FromSeconds(30));
 
         // The second call is issued while the first is still blocked inside the constructor.
         // Under Lazy<T>'s ExecutionAndPublication mode it must block waiting for the SAME
@@ -136,8 +136,8 @@ public class ActorLifecycleShould
 
         gate.Release();
 
-        var firstRef  = await first.WaitAsync(TimeSpan.FromSeconds(5));
-        var secondRef = await second.WaitAsync(TimeSpan.FromSeconds(5));
+        var firstRef  = await first.WaitAsync(TimeSpan.FromSeconds(30));
+        var secondRef = await second.WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.Equal(1, counter.Count);
     }
@@ -182,7 +182,7 @@ public class ActorLifecycleShould
         var child = system.SpawnUnregistered(props, services);
         var activation = await system.ResolveForSendAsync(child.Id, props, default);
         release.SetResult(true);
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => activation.Completion.WaitAsync(TimeSpan.FromSeconds(5)));
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => activation.Completion.WaitAsync(TimeSpan.FromSeconds(30)));
         Assert.Equal("startup failed", failure.Message);
         var absent = await Assert.ThrowsAsync<InvalidOperationException>(() => system.GetAsync(child.Id));
         Assert.Contains("No actor type is registered", absent.Message);

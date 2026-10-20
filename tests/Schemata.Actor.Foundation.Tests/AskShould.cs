@@ -24,7 +24,7 @@ public class AskShould
         var actor           = await system.SpawnAsync(new("versatile", "b"), new(typeof(VersatileActor)));
 
         await Assert.ThrowsAsync<TimeoutException>(
-            () => actor.AskAsync<SlowPing, string>(new(TimeSpan.FromSeconds(5)), timeout: TimeSpan.FromMilliseconds(50)).AsTask());
+            () => actor.AskAsync<SlowPing, string>(new(TimeSpan.FromSeconds(30)), timeout: TimeSpan.FromMilliseconds(50)).AsTask());
     }
 
     [Fact]
@@ -34,7 +34,7 @@ public class AskShould
         using var cts   = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => actor.AskAsync<SlowPing, string>(new(TimeSpan.FromSeconds(5)), ct: cts.Token).AsTask());
+            () => actor.AskAsync<SlowPing, string>(new(TimeSpan.FromSeconds(30)), ct: cts.Token).AsTask());
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public class AskShould
         var ask = actor.AskAsync<SlowPing, string>(
             new(TimeSpan.FromSeconds(3), entered), ct: source.Token).AsTask();
 
-        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         source.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ask);
 

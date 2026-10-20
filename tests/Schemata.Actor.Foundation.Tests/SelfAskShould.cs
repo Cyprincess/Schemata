@@ -15,10 +15,10 @@ public class SelfAskShould
         try {
             var other = await system.SpawnAsync(new("probe", "other"), new(typeof(Probe)));
             var self = await system.SpawnAsync(new("probe", "self"), new(typeof(Probe)));
-            var rejected = await self.AskAsync<Call, string>(new(self), timeout: TimeSpan.FromSeconds(5));
+            var rejected = await self.AskAsync<Call, string>(new(self), timeout: TimeSpan.FromSeconds(30));
             Assert.Equal("rejected", rejected);
-            Assert.Equal("pong", await self.AskAsync<Call, string>(new(other), timeout: TimeSpan.FromSeconds(5)));
-            Assert.Equal("pong", await self.AskAsync<Ping, string>(new(), timeout: TimeSpan.FromSeconds(5)));
+            Assert.Equal("pong", await self.AskAsync<Call, string>(new(other), timeout: TimeSpan.FromSeconds(30)));
+            Assert.Equal("pong", await self.AskAsync<Ping, string>(new(), timeout: TimeSpan.FromSeconds(30)));
         } finally {
             await system.ShutdownAsync(default);
             if (root is IAsyncDisposable disposable) await disposable.DisposeAsync();

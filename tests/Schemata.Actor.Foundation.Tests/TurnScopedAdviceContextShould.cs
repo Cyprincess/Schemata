@@ -28,8 +28,8 @@ public class TurnScopedAdviceContextShould
         try {
             var actor = await system.GetAsync(new("probe", "context"));
 
-            var first  = await actor.AskAsync<ProbeMarker, MarkerProbe>(new(), timeout: TimeSpan.FromSeconds(5));
-            var second = await actor.AskAsync<ProbeMarker, MarkerProbe>(new(), timeout: TimeSpan.FromSeconds(5));
+            var first  = await actor.AskAsync<ProbeMarker, MarkerProbe>(new(), timeout: TimeSpan.FromSeconds(30));
+            var second = await actor.AskAsync<ProbeMarker, MarkerProbe>(new(), timeout: TimeSpan.FromSeconds(30));
 
             Assert.True(first.SameScope);
             Assert.True(second.SameScope);

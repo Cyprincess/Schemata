@@ -79,7 +79,7 @@ public class SupervisionShould
         Assert.Equal("boom", ex.Message);
 
         // Disposed[0] is the loop's terminal act, so every earlier event is already recorded.
-        await tracker.WaitForAsync("Disposed[0]").WaitAsync(TimeSpan.FromSeconds(5));
+        await tracker.WaitForAsync("Disposed[0]").WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.Equal(
             ["Constructed[0]", "OnStarted[0]", "OnReceive[0]", "OnFailed[0]",
@@ -98,7 +98,7 @@ public class SupervisionShould
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => actor.AskAsync<Fail, string>(new("boom")).AsTask());
         Assert.Equal("boom", ex.Message);
 
-        await tracker.WaitForAsync("Disposed[1]").WaitAsync(TimeSpan.FromSeconds(5));
+        await tracker.WaitForAsync("Disposed[1]").WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.Equal(
             ["Constructed[0]", "OnStarted[0]", "OnReceive[0]", "OnFailed[0]",

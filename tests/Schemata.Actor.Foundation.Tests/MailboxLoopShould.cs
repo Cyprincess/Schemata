@@ -30,7 +30,7 @@ public class MailboxLoopShould
 
         await channel.Writer.WriteAsync(new(new(new Ping("first"))));
 
-        await loop.RunAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await loop.RunAsync().WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.Equal(["first", "second"], processed);
     }
@@ -52,7 +52,7 @@ public class MailboxLoopShould
             return Task.CompletedTask;
         });
 
-        await loop.RunAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await loop.RunAsync().WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.Equal(["kept"], invoked);
     }

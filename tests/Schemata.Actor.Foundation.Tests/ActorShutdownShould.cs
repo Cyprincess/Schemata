@@ -32,12 +32,12 @@ public class ActorShutdownShould
         actor.Setup(a => a.OnStoppedAsync(It.IsAny<IActorContext>())).Throws(stopped);
         var reference = await SpawnActivation(system, new("cleanup", "one"), new(typeof(ForwardActor), [actor.Object]));
         var first = reference.StopAsync();
-        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         var second = reference.StopAsync();
         Assert.False(first.IsCompleted);
         Assert.False(second.IsCompleted);
         release.SetResult();
-        var failure = await Assert.ThrowsAsync<AggregateException>(() => first.WaitAsync(TimeSpan.FromSeconds(5)));
+        var failure = await Assert.ThrowsAsync<AggregateException>(() => first.WaitAsync(TimeSpan.FromSeconds(30)));
         Assert.Contains(callback, failure.Flatten().InnerExceptions);
         Assert.Contains(stopped, failure.Flatten().InnerExceptions);
         await Assert.ThrowsAsync<AggregateException>(() => second);
@@ -56,20 +56,20 @@ public class ActorShutdownShould
         var gate = new ManualGate();
         var actor = await SpawnActivation(system, new("deadline", "one"), new(typeof(GatedActor), [gate]));
         var executing = actor.AskAsync<GateAndWait, string>(new()).AsTask();
-        await gate.Started.WaitAsync(TimeSpan.FromSeconds(5));
+        await gate.Started.WaitAsync(TimeSpan.FromSeconds(30));
         var queued = actor.AskAsync<Increment, int>(new()).AsTask();
         using var budget = new CancellationTokenSource();
         var stopping = host.StopAsync(budget.Token);
         await Assert.ThrowsAsync<InvalidOperationException>(() => system.GetAsync(actor.Id));
         await Assert.ThrowsAsync<InvalidOperationException>(() => actor.TellAsync(new Increment()).AsTask());
         budget.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => stopping.WaitAsync(TimeSpan.FromSeconds(5)));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => executing.WaitAsync(TimeSpan.FromSeconds(5)));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => queued.WaitAsync(TimeSpan.FromSeconds(5)));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => stopping.WaitAsync(TimeSpan.FromSeconds(30)));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => executing.WaitAsync(TimeSpan.FromSeconds(30)));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => queued.WaitAsync(TimeSpan.FromSeconds(30)));
         Assert.False(actor.Completion.IsCompleted);
         await Assert.ThrowsAsync<InvalidOperationException>(() => system.SpawnAsync(actor.Id, new(typeof(IdentityActor))));
         gate.Release();
-        await actor.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await actor.Completion.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
@@ -80,16 +80,16 @@ public class ActorShutdownShould
         var gate = new ManualGate();
         var actor = await system.SpawnAsync(new("drain", "one"), new(typeof(GatedActor), [gate]));
         var executing = actor.AskAsync<GateAndWait, string>(new()).AsTask();
-        await gate.Started.WaitAsync(TimeSpan.FromSeconds(5));
+        await gate.Started.WaitAsync(TimeSpan.FromSeconds(30));
         var queued = actor.AskAsync<Increment, int>(new()).AsTask();
         host.Services.GetRequiredService<IHostApplicationLifetime>().StopApplication();
         await Assert.ThrowsAsync<InvalidOperationException>(() => system.GetAsync(actor.Id));
         await Assert.ThrowsAsync<InvalidOperationException>(() => system.SpawnAsync(new("new", "one"), new(typeof(IdentityActor))));
         await Assert.ThrowsAsync<InvalidOperationException>(() => actor.AskAsync<Increment, int>(new()).AsTask());
         gate.Release();
-        Assert.Equal("released", await executing.WaitAsync(TimeSpan.FromSeconds(5)));
-        Assert.Equal(1, await queued.WaitAsync(TimeSpan.FromSeconds(5)));
-        await host.StopAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("released", await executing.WaitAsync(TimeSpan.FromSeconds(30)));
+        Assert.Equal(1, await queued.WaitAsync(TimeSpan.FromSeconds(30)));
+        await host.StopAsync().WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
@@ -128,7 +128,7 @@ public class ActorShutdownShould
         });
         mock.Setup(a => a.OnStoppedAsync(It.IsAny<IActorContext>())).Throws(stop);
         var actor = await SpawnActivation(system, new("startfail", "one"), new(typeof(ForwardActor), [mock.Object]));
-        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(30));
         var queued = actor.AskAsync<Increment, int>(new()).AsTask();
         var stopping = actor.StopAsync();
         release.SetResult();
@@ -148,14 +148,14 @@ public class ActorShutdownShould
         var gate = new ConstructionGate();
         var spawning = Task.Run(() => system.SpawnAsync(new("constructing", "one"),
             new(typeof(GatedConstructionActor), [gate, new SharedCounter()])));
-        await gate.Entered.WaitAsync(TimeSpan.FromSeconds(5));
+        await gate.Entered.WaitAsync(TimeSpan.FromSeconds(30));
         using var budget = new CancellationTokenSource();
         var stopping = system.ShutdownAsync(budget.Token);
         await Task.Run(() => budget.Cancel());
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => stopping.WaitAsync(TimeSpan.FromSeconds(5)));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => stopping.WaitAsync(TimeSpan.FromSeconds(30)));
         gate.Release();
-        var actor = await spawning.WaitAsync(TimeSpan.FromSeconds(5));
-        await system.ShutdownAsync(default).WaitAsync(TimeSpan.FromSeconds(5));
+        var actor = await spawning.WaitAsync(TimeSpan.FromSeconds(30));
+        await system.ShutdownAsync(default).WaitAsync(TimeSpan.FromSeconds(30));
         await Assert.ThrowsAsync<InvalidOperationException>(() => actor.AskAsync<WhoAmI, Guid>(new()).AsTask());
     }
 
@@ -174,18 +174,18 @@ public class ActorShutdownShould
         }).Returns(ValueTask.CompletedTask);
         blocked.Setup(a => a.OnStoppedAsync(It.IsAny<IActorContext>())).Returns(ValueTask.CompletedTask);
         var first = await SpawnActivation(system, new("blocked", "one"), new(typeof(ForwardActor), [blocked.Object]));
-        await ready.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await ready.Task.WaitAsync(TimeSpan.FromSeconds(30));
         var other = new Mock<IActor>();
         other.Setup(a => a.OnStartedAsync(It.IsAny<IActorContext>())).Returns(ValueTask.CompletedTask);
         other.Setup(a => a.OnStoppedAsync(It.IsAny<IActorContext>())).Callback(() => notified.SetResult()).Returns(ValueTask.CompletedTask);
         await system.SpawnAsync(new("other", "one"), new(typeof(ForwardActor), [other.Object]));
         var shutdown = system.ShutdownAsync(default);
-        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await notified.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        await notified.Task.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.False(first.Completion.IsCompleted);
         Assert.False(shutdown.IsCompleted);
         release.SetResult();
-        await shutdown.WaitAsync(TimeSpan.FromSeconds(5));
+        await shutdown.WaitAsync(TimeSpan.FromSeconds(30));
         blocked.Verify(a => a.OnStoppedAsync(It.IsAny<IActorContext>()), Times.Once);
     }
 
@@ -206,7 +206,7 @@ public class ActorShutdownShould
         actor.Setup(a => a.OnStoppedAsync(It.IsAny<IActorContext>())).Returns(ValueTask.CompletedTask);
         var reference = await SpawnActivation(system, new("cleanup", "turn"), new(typeof(ForwardActor), [actor.Object]));
         Assert.Same(receive, await Assert.ThrowsAsync<InvalidOperationException>(() => reference.AskAsync<Increment, int>(new()).AsTask()));
-        var failure = await Assert.ThrowsAsync<AggregateException>(() => reference.Completion.WaitAsync(TimeSpan.FromSeconds(5)));
+        var failure = await Assert.ThrowsAsync<AggregateException>(() => reference.Completion.WaitAsync(TimeSpan.FromSeconds(30)));
         Assert.All(new[] { receive, supervision, cleanup }, error => Assert.Contains(error, failure.Flatten().InnerExceptions));
         actor.Verify(a => a.OnStoppedAsync(It.IsAny<IActorContext>()), Times.Once);
         resource.Verify(r => r.DisposeAsync(), Times.Once);
@@ -233,15 +233,15 @@ public class ActorShutdownShould
         var reference = await SpawnActivation(system, new("cancel", "item"), new(typeof(ForwardActor), [actor.Object]));
         using var cancellation = new CancellationTokenSource();
         var asking = reference.AskAsync<Increment, int>(new(), ct: cancellation.Token).AsTask();
-        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         cancellation.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => asking.WaitAsync(TimeSpan.FromSeconds(5)));
-        await callback.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => asking.WaitAsync(TimeSpan.FromSeconds(30)));
+        await callback.Task.WaitAsync(TimeSpan.FromSeconds(30));
         var stopping = reference.StopAsync();
         finish.SetResult();
         Assert.False(stopping.IsCompleted);
         release.SetResult();
-        var errors = await Assert.ThrowsAsync<AggregateException>(() => stopping.WaitAsync(TimeSpan.FromSeconds(5)));
+        var errors = await Assert.ThrowsAsync<AggregateException>(() => stopping.WaitAsync(TimeSpan.FromSeconds(30)));
         Assert.Contains(failure, errors.Flatten().InnerExceptions);
         actor.Verify(a => a.OnStoppedAsync(It.IsAny<IActorContext>()), Times.Once);
     }

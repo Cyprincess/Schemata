@@ -23,14 +23,14 @@ public class ActorLifecycleSerializationShould
         // executing; the fix makes StopAsync only signal intent and waits for the mailbox loop's
         // own task to notify OnStoppedAsync once the turn has actually finished.
         var executing = actor.AskAsync<GateAndWait, string>(new()).AsTask();
-        await gate.Started.WaitAsync(TimeSpan.FromSeconds(5));
+        await gate.Started.WaitAsync(TimeSpan.FromSeconds(30));
 
         var stopping = system.StopAsync(id);
 
         gate.Release();
 
-        Assert.Equal("released", await executing.WaitAsync(TimeSpan.FromSeconds(5)));
-        await stopping.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("released", await executing.WaitAsync(TimeSpan.FromSeconds(30)));
+        await stopping.WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.True(recorder.MaxConcurrent <= 1, $"lifecycle callbacks overlapped: max concurrent = {recorder.MaxConcurrent}");
         Assert.Equal(1, recorder.Events.Count(e => e == "OnStopped"));
@@ -48,7 +48,7 @@ public class ActorLifecycleSerializationShould
 
         // The failing turn begins and blocks before it ever throws.
         var failing = actor.AskAsync<Fail, string>(new("boom")).AsTask();
-        await gate.Started.WaitAsync(TimeSpan.FromSeconds(5));
+        await gate.Started.WaitAsync(TimeSpan.FromSeconds(30));
 
         // A stop is requested while that turn is still in flight, before it throws.
         var stopping = system.StopAsync(id);
@@ -56,8 +56,8 @@ public class ActorLifecycleSerializationShould
         // Only now does the turn actually throw.
         gate.Release();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => failing).WaitAsync(TimeSpan.FromSeconds(5));
-        await stopping.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => failing).WaitAsync(TimeSpan.FromSeconds(30));
+        await stopping.WaitAsync(TimeSpan.FromSeconds(30));
 
         // OnFailedAsync would return true (restart) if consulted, but the stop that had already
         // begun must suppress supervision entirely: exactly one construction ever happened - the

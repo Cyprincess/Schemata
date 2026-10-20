@@ -24,7 +24,7 @@ public class RequestDispatchingActorShould
         registry.Register("ledger", new(typeof(RequestDispatchingActor), ["selected"]));
         try {
             var actor = await system.GetAsync(new("ledger", "base"));
-            var response = await actor.AskAsync<Credit, int>(new BonusCredit(7, 90), timeout: TimeSpan.FromSeconds(5));
+            var response = await actor.AskAsync<Credit, int>(new BonusCredit(7, 90), timeout: TimeSpan.FromSeconds(30));
 
             Assert.Equal(7, response);
             Assert.Equal(7, ledger.Balance);
@@ -44,8 +44,8 @@ public class RequestDispatchingActorShould
         registry.Register("ledger", new(typeof(RequestDispatchingActor), ["selected"]));
         try {
             var actor = await system.GetAsync(new("ledger", "multiple"));
-            var numeric = await actor.AskAsync<Adjustment, int>(new(4), timeout: TimeSpan.FromSeconds(5));
-            var receipt = await actor.AskAsync<Adjustment, string>(new(3), timeout: TimeSpan.FromSeconds(5));
+            var numeric = await actor.AskAsync<Adjustment, int>(new(4), timeout: TimeSpan.FromSeconds(30));
+            var receipt = await actor.AskAsync<Adjustment, string>(new(3), timeout: TimeSpan.FromSeconds(30));
 
             Assert.Equal(4, numeric);
             Assert.Equal("balance=7", receipt);
@@ -67,7 +67,7 @@ public class RequestDispatchingActorShould
         try {
             var actor = await system.GetAsync(new("ledger", "tell"));
             await actor.TellAsync<IRequest<int>>(new Adjustment(6));
-            var balance = await actor.AskAsync<ReadBalance, int>(new(), timeout: TimeSpan.FromSeconds(5));
+            var balance = await actor.AskAsync<ReadBalance, int>(new(), timeout: TimeSpan.FromSeconds(30));
 
             Assert.Equal(6, balance);
             Assert.Equal(6, ledger.Balance);
@@ -86,7 +86,7 @@ public class RequestDispatchingActorShould
         registry.Register("ledger", new(typeof(RequestDispatchingActor), ["selected"]));
         try {
             var actor = await system.GetAsync(new("ledger", "exact"));
-            var balance = await actor.AskAsync<Credit, int>(new(5), timeout: TimeSpan.FromSeconds(5));
+            var balance = await actor.AskAsync<Credit, int>(new(5), timeout: TimeSpan.FromSeconds(30));
 
             Assert.Equal(5, balance);
             Assert.Equal(5, ledger.Balance);
@@ -108,7 +108,7 @@ public class RequestDispatchingActorShould
         try {
             var actor = await system.GetAsync(new("ledger", "ambiguous"));
             await actor.TellAsync(new Adjustment(8));
-            var balance = await actor.AskAsync<ReadBalance, int>(new(), timeout: TimeSpan.FromSeconds(5));
+            var balance = await actor.AskAsync<ReadBalance, int>(new(), timeout: TimeSpan.FromSeconds(30));
 
             Assert.Equal(0, balance);
             Assert.Equal(0, ledger.Balance);

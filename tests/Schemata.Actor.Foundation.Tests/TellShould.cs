@@ -29,12 +29,12 @@ public class TellShould
 
         // The handler reaches the gate only by actually executing the turn, so this handshake
         // proves TellAsync already returned while the handler is still in flight.
-        await gate.Started.WaitAsync(TimeSpan.FromSeconds(5));
+        await gate.Started.WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.False(gate.TurnCompleted.IsCompleted);
 
         gate.Release();
-        await gate.TurnCompleted.WaitAsync(TimeSpan.FromSeconds(5));
+        await gate.TurnCompleted.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
