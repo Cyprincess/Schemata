@@ -39,6 +39,7 @@ internal static class FlowFixtureServices
         foreach (var resourceType in resourceTypes) {
             registry.Add(new(resourceType), []);
         }
+
         services.TryAddSingleton<ResourceRegistry>(registry);
         services.TryAddSingleton<IResourceTypeResolver, DefaultResourceTypeResolver>();
     }

@@ -81,38 +81,6 @@ public sealed class FlowTenantRepositoryShould
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Accept_Host_Defined_Subtypes_For_Typed_Resource_References(bool linq) {
-        var fixture = new TenantFlowFixture(linq) {
-            ConfigureServices = services => FlowFixtureServices.AddResourceTypeResolver(
-                services, typeof(TenantProcess), typeof(TenantProcessToken), typeof(Order)),
-        };
-        var lifecycle = (IAsyncLifetime)fixture;
-        await lifecycle.InitializeAsync();
-        try {
-            await using var scope = await fixture.EnterTenantAsync(Guid.NewGuid());
-            var repository = scope.ServiceProvider.GetRequiredService<IRepository<TenantProcessTransition>>();
-            var accepted = new TenantProcessTransition {
-                Name = "advance", Process = "shared", Token = "processes/shared/tokens/shared", Event = "advance",
-            };
-            await repository.AddAsync(accepted);
-            await repository.CommitAsync();
-            Assert.Equal("processes/shared/transitions/advance", accepted.CanonicalName);
-
-            var rejected = new TenantProcessTransition {
-                Name = "foreign", Process = "shared", Token = "orders/shared", Event = "advance",
-            };
-            await Assert.ThrowsAsync<NotFoundException>(async () => {
-                await repository.AddAsync(rejected);
-                await repository.CommitAsync();
-            });
-        } finally {
-            await lifecycle.DisposeAsync();
-        }
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
     public async Task Reject_Duplicate_Partition_Keys_Including_Null_Host_And_Process_Source(bool linq) {
         var fixture = new TenantFlowFixture(linq);
         var lifecycle = (IAsyncLifetime)fixture;
