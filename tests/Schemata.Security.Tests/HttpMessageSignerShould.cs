@@ -345,8 +345,10 @@ public class HttpMessageSignerShould
 
     [Fact]
     public void Support_Only_The_Named_Curve_For_The_Ecdsa_Algorithms() {
-        using var secp256k1 = ECDsa.Create(ECCurve.CreateFromFriendlyName("secP256K1"));
-        var mismatched      = new SecurityKeyMaterial.EcKey(secp256k1);
+        // P-521 is a named platform curve that RFC 9421 registers no algorithm for. secp256k1
+        // cannot be used here: Apple's crypto backend rejects it, so the test would fail on macOS.
+        using var unsupported = ECDsa.Create(ECCurve.NamedCurves.nistP521);
+        var mismatched        = new SecurityKeyMaterial.EcKey(unsupported);
 
         Assert.False(new EcdsaP256SignatureAlgorithm().Supports(mismatched));
         Assert.Throws<InvalidArgumentException>(() => HttpSignatureAlgorithms.Resolve(null, mismatched));
