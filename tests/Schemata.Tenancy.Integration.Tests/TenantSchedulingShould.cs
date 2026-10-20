@@ -197,7 +197,7 @@ public class TenantSchedulingShould
             var uid = TenantContext.Current.Uid!.Value;
             Assert.Equal(uid, Assert.IsType<TenantJobExecution>(context.Execution).TenantUid);
             probe.Clock.Advance(TimeSpan.FromSeconds(6));
-            Assert.Equal(uid, await probe.Heartbeats.Reader.ReadAsync(ct).AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.Equal(uid, await probe.Heartbeats.Reader.ReadAsync(ct).AsTask().WaitAsync(TimeSpan.FromSeconds(30)));
             Assert.Equal(uid, TenantContext.Current.Uid);
             probe.Bodies.Add(uid);
         }

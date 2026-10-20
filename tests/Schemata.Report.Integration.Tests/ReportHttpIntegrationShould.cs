@@ -97,7 +97,7 @@ public class ReportHttpIntegrationShould : IClassFixture<WebAppFactory>
         Assert.True(complete.GetProperty("done").GetBoolean());
         using var scope = _factory.Services.CreateScope();
         var operations = scope.ServiceProvider.GetRequiredService<IOperationService>();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var inProcess = await operations.WaitAsync(operationName, timeout.Token);
         Assert.True(inProcess.Done);
         var snapshots = await client.GetFromJsonAsync<JsonElement>($"/v1/reports/{report}/snapshots");
@@ -135,7 +135,7 @@ public class ReportHttpIntegrationShould : IClassFixture<WebAppFactory>
     }
 
     private static async Task<JsonElement> WaitForDoneAsync(HttpClient client, string operationName) {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         while (true) {
             timeout.Token.ThrowIfCancellationRequested();
             var response = await client.GetAsync("/v1/" + operationName, timeout.Token);

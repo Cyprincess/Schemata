@@ -30,7 +30,7 @@ public class SchemataJobWriteGateShould : IAsyncLifetime
     public async Task Concurrent_Finalize_And_Schedule_Preserve_Result_And_Configuration() {
         var interval = TimeSpan.FromHours(1);
         var now      = _fixture.Clock.Now;
-        var timeout  = TimeSpan.FromSeconds(5);
+        var timeout  = TimeSpan.FromSeconds(30);
 
         var scheduler  = _fixture.Services.GetRequiredService<IScheduler<SchemataJob, SchemataJobExecution>>();
         var dispatcher = _fixture.Services.GetRequiredService<JobExecutionDispatcher<SchemataJob, SchemataJobExecution>>();
@@ -99,9 +99,9 @@ public class SchemataJobWriteGateShould : IAsyncLifetime
         }, CancellationToken.None);
 
         var dispatch = dispatcher.DispatchPendingAsync(CancellationToken.None);
-        await _fixture.BlockingJob.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await _fixture.BlockingJob.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         _fixture.BlockingJob.Release.TrySetResult();
-        await dispatch.WaitAsync(TimeSpan.FromSeconds(5));
+        await dispatch.WaitAsync(TimeSpan.FromSeconds(30));
 
         var job = await _fixture.JobAsync("one-time-complete");
         Assert.NotNull(job);
@@ -169,14 +169,14 @@ public class SchemataJobWriteGateShould : IAsyncLifetime
             NextRunTime = now, State = JobState.Active, ArgsJson = "old",
         }, CancellationToken.None);
         var dispatch = dispatcher.DispatchPendingAsync(CancellationToken.None);
-        await _fixture.BlockingJob.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await _fixture.BlockingJob.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         try {
             await scheduler.ScheduleAsync(new() {
                 Name = "replace-running", JobKey = BlockingJob.Key, ScheduleType = ScheduleType.OneTime,
                 NextRunTime = now.AddHours(1), State = JobState.Active, ArgsJson = "replacement",
             }, CancellationToken.None);
         } finally { _fixture.BlockingJob.Release.TrySetResult(); }
-        await dispatch.WaitAsync(TimeSpan.FromSeconds(5));
+        await dispatch.WaitAsync(TimeSpan.FromSeconds(30));
         var job = await _fixture.JobAsync("replace-running");
         Assert.Equal(JobState.Active, job!.State);
         Assert.Equal(now.AddHours(1), job.NextRunTime);

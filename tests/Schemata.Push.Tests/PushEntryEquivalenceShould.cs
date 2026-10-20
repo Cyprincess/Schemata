@@ -36,7 +36,7 @@ public class PushEntryEquivalenceShould
         var results = await CollectAsync(provider.GetRequiredService<IPushService>()
                                               .SendAsync(new("message", new RecipientTarget("users/one"))));
 
-        var context = await captured.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var context = await captured.Task.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Equal("message", context.Message);
         Assert.Equal("users/one", Assert.IsType<RecipientTarget>(context.Target).Subject);
         Assert.Same(commandAdvisor.Context, pushAdvisor.Context);

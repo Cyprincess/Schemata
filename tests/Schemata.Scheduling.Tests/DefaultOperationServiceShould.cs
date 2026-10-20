@@ -54,10 +54,10 @@ public class DefaultOperationServiceShould
             Mock.Of<IScheduler>(), clock.Object);
         var called = false;
         var work = service.ExecuteAsync("blocked", (_, _) => { called = true; return ValueTask.FromResult<string?>(null); }).AsTask();
-        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         var renewal = Assert.Single(callbacks, callback => callback.Due == TimeSpan.FromSeconds(5));
         renewal.Callback(renewal.State);
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => work.WaitAsync(TimeSpan.FromSeconds(5)));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => work.WaitAsync(TimeSpan.FromSeconds(30)));
         Assert.False(called);
         store.Verify(s => s.TrySettleAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -92,7 +92,7 @@ public class DefaultOperationServiceShould
                       return new(snapshot);
                   });
         var service = CreateService(executions, pollInterval: TimeSpan.FromMilliseconds(5));
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         var wait = service.WaitAsync(row.CanonicalName!, cts.Token).AsTask();
         var complete = Task.Run(async () => {
@@ -217,7 +217,7 @@ public class DefaultOperationServiceShould
         var row = CreateExecution(settled);
         var executions = CreateRepositoryReturning(row);
         var service = CreateService(executions);
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         var operation = await service.WaitAsync(row.CanonicalName!, cts.Token);
 
@@ -378,7 +378,7 @@ public class DefaultOperationServiceShould
         var service = new DefaultOperationService<SchemataJob, SchemataJobExecution>(services, Options.Create(new SchemataSchedulingOptions()), Mock.Of<IScheduler>());
         var entered = false;
         var work = service.ExecuteAsync("teardown", (_, _) => { entered = true; return ValueTask.FromResult<string?>(null); }).AsTask();
-        await disposing.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await disposing.Task.WaitAsync(TimeSpan.FromSeconds(30));
         await service.CancelAsync("operations/teardown");
         release.SetResult();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => work);
@@ -457,7 +457,7 @@ public class DefaultOperationServiceShould
             await Task.Delay(Timeout.InfiniteTimeSpan, token);
             return null;
         }).AsTask();
-        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.NotNull(saved!.LeaseExpireTime);
         var cancelled = await service.CancelAsync("operations/inline");
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => work);

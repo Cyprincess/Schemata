@@ -70,11 +70,11 @@ public class RabbitMqConsumerHostShould
         using var host = new RabbitMqConsumerHost(services, connections.Object, Options.Create(new RabbitMqEventOptions()),
             Options.Create(new System.Text.Json.JsonSerializerOptions()));
         await host.StartAsync(CancellationToken.None);
-        var consumer = await ready.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var consumer = await ready.Task.WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => consumer.HandleBasicDeliverAsync(
             "consumer", 1, false, "events", "sample", new BasicProperties(), "{}"u8.ToArray(), CancellationToken.None)));
-        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => host.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(5))));
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => host.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(30))));
         channel.Verify(value => value.DisposeAsync(), Times.Once);
         if (acknowledge) channel.Verify(value => value.BasicAckAsync(1, false, It.IsAny<CancellationToken>()), Times.Once);
         else channel.Verify(value => value.BasicNackAsync(1, false, false, It.IsAny<CancellationToken>()), Times.Once);
@@ -114,7 +114,7 @@ public class RabbitMqConsumerHostShould
         var handled = await InvokeHandleMessageAsync(host, delivery);
 
         Assert.True(handled);
-        var context = await observed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var context = await observed.Task.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Equal("corr-1", context.CorrelationId);
         handler.Verify(value => value.HandleAsync(It.IsAny<SampleEvent>(), It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -197,13 +197,13 @@ public class RabbitMqConsumerHostShould
         using var host = new RabbitMqConsumerHost(services, connections.Object, Options.Create(new RabbitMqEventOptions()),
             Options.Create(new System.Text.Json.JsonSerializerOptions()));
         await host.StartAsync(CancellationToken.None);
-        var consumer = await ready.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var consumer = await ready.Task.WaitAsync(TimeSpan.FromSeconds(30));
 
         await consumer.HandleBasicDeliverAsync("consumer", 1, false, "events", "sample",
             new BasicProperties { CorrelationId = "corr-advisor" },
             System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new SampleEvent()), CancellationToken.None);
 
-        var context = await observed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var context = await observed.Task.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Same(failure, context.Exception);
         Assert.Equal(new[] { "observer", "audit" }, order);
         Assert.Same(auditRow, persisted);

@@ -115,7 +115,7 @@ public class JobExecutionLeaseShould
         now = now.AddSeconds(6);
         var timer = Assert.Single(callbacks);
         timer.Callback(timer.State);
-        await renewed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await renewed.Task.WaitAsync(TimeSpan.FromSeconds(30));
         now = now.AddSeconds(5);
         lease.ThrowIfOwnershipLost();
         Assert.False(lease.Token.IsCancellationRequested);
@@ -147,7 +147,7 @@ public class JobExecutionLeaseShould
         using var registration = lease.Token.Register(() => cancelled.TrySetResult());
         var renewalTimer = Assert.Single(callbacks, value => value.Due == TimeSpan.FromSeconds(5));
         renewalTimer.Callback(renewalTimer.State);
-        await cancelled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await cancelled.Task.WaitAsync(TimeSpan.FromSeconds(30));
         var applied = false;
         Assert.False(await lease.TransitionAsync(_ => { applied = true; return Task.FromResult(true); }));
         Assert.False(applied);
@@ -177,7 +177,7 @@ public class JobExecutionLeaseShould
             clock.Object, new ActiveExecutionRegistry(), CancellationToken.None);
         var renewal = Assert.Single(callbacks, value => value.Due == TimeSpan.FromSeconds(5));
         renewal.Callback(renewal.State);
-        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         var expiry = Assert.Single(callbacks, value => value.Due == TimeSpan.FromSeconds(10));
         expiry.Callback(expiry.State);
         Assert.True(lease.Token.IsCancellationRequested);

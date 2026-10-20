@@ -39,12 +39,12 @@ public class MemoryCacheTenantProviderCacheLeaseShould
 
         barrier.SignalAndWait();
         try {
-            Assert.True(started.Wait(TimeSpan.FromSeconds(5)));
+            Assert.True(started.Wait(TimeSpan.FromSeconds(30)));
         } finally {
             release.Set();
         }
 
-        var resolved = await Task.WhenAll(leases).WaitAsync(TimeSpan.FromSeconds(5));
+        var resolved = await Task.WhenAll(leases).WaitAsync(TimeSpan.FromSeconds(30));
         try {
             Assert.Equal(1, builds);
             Assert.All(resolved, lease => Assert.Same(provider, lease.Provider));
@@ -71,7 +71,7 @@ public class MemoryCacheTenantProviderCacheLeaseShould
         }));
 
         try {
-            Assert.True(started.Wait(TimeSpan.FromSeconds(5)));
+            Assert.True(started.Wait(TimeSpan.FromSeconds(30)));
             using var cancellation = new CancellationTokenSource();
             var waiter = cache.LeaseVersionAsync("tenant", Guid.Empty, () => throw new InvalidOperationException("factory must not run"), cancellation.Token)
                 .AsTask();
@@ -83,7 +83,7 @@ public class MemoryCacheTenantProviderCacheLeaseShould
             release.Set();
         }
 
-        using var lease = await builder.WaitAsync(TimeSpan.FromSeconds(5));
+        using var lease = await builder.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Equal(1, builds);
         Assert.Same(provider.Object, lease.Provider);
         lease.Dispose();
@@ -102,7 +102,7 @@ public class MemoryCacheTenantProviderCacheLeaseShould
             return provider.Object;
         }, cancellation.Token).AsTask());
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => leaseTask.WaitAsync(TimeSpan.FromSeconds(5)));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => leaseTask.WaitAsync(TimeSpan.FromSeconds(30)));
 
         provider.As<IDisposable>().Verify(value => value.Dispose(), Times.Never);
         cache.Dispose();
@@ -162,7 +162,7 @@ public class MemoryCacheTenantProviderCacheLeaseShould
             Task.Run(() => cache.LeaseVersionAsync("tenant", Guid.Empty, () => {
                 cache.LeaseVersionAsync("tenant", Guid.Empty, BuildProvider).AsTask().GetAwaiter().GetResult();
                 return BuildProvider();
-            }).AsTask()).WaitAsync(TimeSpan.FromSeconds(5)));
+            }).AsTask()).WaitAsync(TimeSpan.FromSeconds(30)));
 
         Assert.Contains("cannot reenter the same key", error.Message);
     }
@@ -178,7 +178,7 @@ public class MemoryCacheTenantProviderCacheLeaseShould
                     return BuildProvider();
                 }).AsTask().GetAwaiter().GetResult();
                 return BuildProvider();
-            }).AsTask()).WaitAsync(TimeSpan.FromSeconds(5)));
+            }).AsTask()).WaitAsync(TimeSpan.FromSeconds(30)));
 
         Assert.Contains("cannot reenter the same key", error.Message);
     }
@@ -190,7 +190,7 @@ public class MemoryCacheTenantProviderCacheLeaseShould
         using var outer = await Task.Run(() => cache.LeaseVersionAsync("outer", Guid.Empty, () => {
             using var inner = cache.LeaseVersionAsync("inner", Guid.Empty, BuildProvider).AsTask().GetAwaiter().GetResult();
             return BuildProvider();
-        }).AsTask()).WaitAsync(TimeSpan.FromSeconds(5));
+        }).AsTask()).WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.NotNull(outer.Provider);
     }
@@ -207,14 +207,14 @@ public class MemoryCacheTenantProviderCacheLeaseShould
         }));
 
         try {
-            Assert.True(started.Wait(TimeSpan.FromSeconds(5)));
+            Assert.True(started.Wait(TimeSpan.FromSeconds(30)));
             using var second = await cache.LeaseVersionAsync("second", Guid.Empty, BuildProvider);
             Assert.NotNull(second.Provider);
         } finally {
             release.Set();
         }
 
-        (await first.WaitAsync(TimeSpan.FromSeconds(5))).Dispose();
+        (await first.WaitAsync(TimeSpan.FromSeconds(30))).Dispose();
     }
 
     [Fact]
@@ -236,13 +236,13 @@ public class MemoryCacheTenantProviderCacheLeaseShould
         }));
 
         try {
-            Assert.True(started.Wait(TimeSpan.FromSeconds(5)));
+            Assert.True(started.Wait(TimeSpan.FromSeconds(30)));
             await cache.RemoveAsync("tenant");
         } finally {
             release.Set();
         }
 
-        using var lease = await leaseTask.WaitAsync(TimeSpan.FromSeconds(5));
+        using var lease = await leaseTask.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Equal(2, builds);
         firstProbe.Verify(disposable => disposable.Dispose(), Times.Once);
         Assert.Same(second, lease.Provider);

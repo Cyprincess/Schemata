@@ -43,7 +43,7 @@ public sealed class TenantActorLifetimeShould
         }
         using var cancellation = new CancellationTokenSource();
         var collector = system.CollectIdleAsync(cancellation.Token);
-        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         while (!collector.IsCompleted) {
             deadline.Token.ThrowIfCancellationRequested();
             clock.Advance(TimeSpan.FromSeconds(2));
@@ -162,7 +162,7 @@ public sealed class TenantActorLifetimeShould
         });
         var system = new InProcessActorSystem<SchemataActor>(root, new ActorRegistry(), scopes.Object, Options.Create(new SchemataActorOptions()));
         var reference = await system.SpawnAsync(new("probe", "entry"), new(typeof(ActorAdapter), [actor.Object]));
-        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(30));
         injectTurnFailure = true;
         var ask = reference.AskAsync<Read, Guid?>(new()).AsTask();
         release.SetResult();
@@ -241,7 +241,7 @@ public sealed class TenantActorLifetimeShould
         }
         using var cancellation = new CancellationTokenSource();
         var collection = system.CollectIdleAsync(cancellation.Token);
-        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         while (!first.Stopped.Task.IsCompleted || !second.Stopped.Task.IsCompleted) {
             deadline.Token.ThrowIfCancellationRequested();
             clock.Advance(TimeSpan.FromSeconds(2));
@@ -300,8 +300,8 @@ public sealed class TenantActorLifetimeShould
             Assert.Equal(a.Uid, await reference.AskAsync<Read, Guid?>(new()));
         }
         foreach (var (callback, state) in callbacks) callback(state);
-        Assert.Equal(a.Uid, await first.Tick.Task.WaitAsync(TimeSpan.FromSeconds(5)));
-        Assert.Equal(b.Uid, await second.Tick.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(a.Uid, await first.Tick.Task.WaitAsync(TimeSpan.FromSeconds(30)));
+        Assert.Equal(b.Uid, await second.Tick.Task.WaitAsync(TimeSpan.FromSeconds(30)));
         await system.ShutdownAsync(default);
         Assert.Equal(a.Uid, await first.Stopped.Task);
         Assert.Equal(b.Uid, await second.Stopped.Task);

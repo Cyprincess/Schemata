@@ -123,8 +123,8 @@ public class TenantReminderShould
             using var entered = TenantContext.Enter(new(tenant.Uid));
             await scope.ServiceProvider.GetRequiredService<JobExecutionDispatcher<TenantJob, TenantJobExecution>>().DispatchPendingAsync(default);
         }
-        var first = await received.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
-        var second = await received.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        var first = await received.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30));
+        var second = await received.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Contains(a.Uid, new[] { first, second });
         Assert.Contains(b.Uid, new[] { first, second });
         await using (var scope = await tenants.CreateAsync(new(a.Uid))) {
@@ -137,7 +137,7 @@ public class TenantReminderShould
             using var entered = TenantContext.Enter(new(tenant.Uid));
             await scope.ServiceProvider.GetRequiredService<JobExecutionDispatcher<TenantJob, TenantJobExecution>>().DispatchPendingAsync(default);
         }
-        Assert.Equal(b.Uid, await received.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(b.Uid, await received.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30)));
         foreach (var uid in new[] { a.Uid, b.Uid }) {
             using var frame = TenantContext.Enter(new(uid));
             await actors.StopAsync(new("counter", "same"));

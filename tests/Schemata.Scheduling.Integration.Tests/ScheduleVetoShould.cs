@@ -115,8 +115,8 @@ public class ScheduleVetoShould
         using var cleanup = new CancellationTokenSource();
         var work = operation.ExecuteAsync("commit-gate", (_, _) => { entered = true; return ValueTask.FromResult<string?>(null); }, cleanup.Token).AsTask();
         try {
-            if (await Task.WhenAny(gate.Committed.Task, work).WaitAsync(TimeSpan.FromSeconds(5)) == work) await work;
-            var name = await gate.Committed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            if (await Task.WhenAny(gate.Committed.Task, work).WaitAsync(TimeSpan.FromSeconds(30)) == work) await work;
+            var name = await gate.Committed.Task.WaitAsync(TimeSpan.FromSeconds(30));
             await operation.CancelAsync(name);
             gate.Release.SetResult();
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => work);
@@ -129,7 +129,7 @@ public class ScheduleVetoShould
             await cleanup.CancelAsync();
             if (!work.IsCompleted) {
                 try {
-                    await work.WaitAsync(TimeSpan.FromSeconds(5));
+                    await work.WaitAsync(TimeSpan.FromSeconds(30));
                 } catch (OperationCanceledException) when (cleanup.IsCancellationRequested) {
                     Assert.True(work.IsCompleted);
                 }

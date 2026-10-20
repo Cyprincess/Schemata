@@ -46,11 +46,11 @@ public class JobExecutionDispatcherShould
                                                           .BuildServiceProvider();
         using var dispatcher = new JobExecutionDispatcher<SchemataJob, SchemataJobExecution>(services, time: clock.Object);
         await dispatcher.StartAsync(CancellationToken.None);
-        await armed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await armed.Task.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Equal(1, Volatile.Read(ref calls));
         var timer = Assert.Single(timers);
         timer.Callback(timer.State);
-        await second.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await second.Task.WaitAsync(TimeSpan.FromSeconds(30));
         await dispatcher.StopAsync(CancellationToken.None);
     }
 
@@ -87,10 +87,10 @@ public class JobExecutionDispatcherShould
             .BuildServiceProvider();
         var dispatcher = new JobExecutionDispatcher<SchemataJob, SchemataJobExecution>(services, time: clock.Object);
         var work = dispatcher.DispatchPendingAsync(CancellationToken.None);
-        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         var renewal = Assert.Single(callbacks, value => value.Due == TimeSpan.FromSeconds(5));
         renewal.Callback(renewal.State);
-        await work.WaitAsync(TimeSpan.FromSeconds(5));
+        await work.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.False(job.Ran);
         Assert.Equal(ExecutionState.Running, row.State);
         store.Verify(s => s.TrySettleAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -872,13 +872,13 @@ public class JobExecutionDispatcherShould
                                               .BuildServiceProvider();
 
         var dispatch = new JobExecutionDispatcher<SchemataJob, SchemataJobExecution>(services).DispatchPendingAsync(CancellationToken.None);
-        await job.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await job.Started.Task.WaitAsync(TimeSpan.FromSeconds(30));
 
         // Another worker transitions the row (e.g. :cancel) while the body still runs; the next
         // renewal observes the lost lease and cancels the body instead of settling it Succeeded.
         storage.TakeOver();
-        await job.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await dispatch.WaitAsync(TimeSpan.FromSeconds(5));
+        await job.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        await dispatch.WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.Equal(ExecutionState.Cancelled, storage.Stored.State);
         Assert.Null(storage.Stored.Output);

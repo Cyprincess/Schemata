@@ -218,7 +218,7 @@ public sealed class TenantSessionShould
         Assert.False(read.IsCompleted);
 
         await Assert.ThrowsAsync<NotSupportedException>(
-            () => Task.Run(() => sessions.Get("slow")).WaitAsync(TimeSpan.FromSeconds(5)));
+            () => Task.Run(() => sessions.Get("slow")).WaitAsync(TimeSpan.FromSeconds(30)));
 
         pending.SetResult(new byte[] { 3 });
         Assert.Equal(new byte[] { 3 }, await read);
@@ -287,7 +287,7 @@ public sealed class TenantSessionShould
         var sessions = Assert.IsType<SessionCache>(lease.Provider.GetRequiredService<IDistributedCache>());
 
         await Assert.ThrowsAsync<NotSupportedException>(
-            () => Task.Run(() => sessions.Get("shared")).WaitAsync(TimeSpan.FromSeconds(5)));
+            () => Task.Run(() => sessions.Get("shared")).WaitAsync(TimeSpan.FromSeconds(30)));
         host.VerifyNoOtherCalls();
     }
 

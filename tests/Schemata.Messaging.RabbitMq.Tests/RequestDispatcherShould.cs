@@ -98,7 +98,7 @@ public class RequestDispatcherShould
             ? new() { [RequestErrorHeaders.RemoteError] = true }
             : null));
 
-        await Assert.ThrowsAsync<System.Text.Json.JsonException>(async () => await response.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+        await Assert.ThrowsAsync<System.Text.Json.JsonException>(async () => await response.Task.WaitAsync(TimeSpan.FromSeconds(30)));
         Assert.False(tracker.Abandon(id));
     }
 

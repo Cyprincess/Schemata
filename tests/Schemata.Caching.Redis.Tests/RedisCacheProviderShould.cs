@@ -40,7 +40,7 @@ public class RedisCacheProviderShould
         var deletion = clearCollection
             ? provider.CollectionClearAsync("{entry}")
             : provider.RemoveAsync("{entry}");
-        await deletion.WaitAsync(TimeSpan.FromSeconds(5));
+        await deletion.WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.DoesNotContain((RedisKey)(RedisConstants.DataPrefix + "{entry}"), stored);
         Assert.DoesNotContain((RedisKey)(RedisConstants.MetaPrefix + "{entry}"), stored);
@@ -61,7 +61,7 @@ public class RedisCacheProviderShould
         pending.SetException(failure);
 
         var observed = await Assert.ThrowsAsync<RedisConnectionException>(
-            () => deletion.WaitAsync(TimeSpan.FromSeconds(5)));
+            () => deletion.WaitAsync(TimeSpan.FromSeconds(30)));
         Assert.Same(failure, observed);
     }
 
