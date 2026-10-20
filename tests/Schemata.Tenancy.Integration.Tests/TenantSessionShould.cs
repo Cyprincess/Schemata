@@ -61,15 +61,15 @@ public sealed class TenantSessionShould
         using var client  = CreateClient(handler);
 
         var establishedA = await SetSessionAsync(client, "A", "alice");
-        Assert.Single(establishedA.Where(value => value.StartsWith(CookieA, StringComparison.Ordinal)));
-        Assert.Empty(establishedA.Where(value => value.StartsWith(CookieName, StringComparison.Ordinal)));
+        Assert.Single(establishedA, value => value.StartsWith(CookieA, StringComparison.Ordinal));
+        Assert.DoesNotContain(establishedA, value => value.StartsWith(CookieName, StringComparison.Ordinal));
 
         var establishedGlobal = await SetSessionAsync(client, "global", "carol");
-        Assert.Single(establishedGlobal.Where(value => value.StartsWith(CookieName, StringComparison.Ordinal)));
-        Assert.Empty(establishedGlobal.Where(value => value.StartsWith(CookieA, StringComparison.Ordinal)));
+        Assert.Single(establishedGlobal, value => value.StartsWith(CookieName, StringComparison.Ordinal));
+        Assert.DoesNotContain(establishedGlobal, value => value.StartsWith(CookieA, StringComparison.Ordinal));
 
         var establishedB = await SetSessionAsync(client, "B", "bob");
-        Assert.Single(establishedB.Where(value => value.StartsWith(CookieB, StringComparison.Ordinal)));
+        Assert.Single(establishedB, value => value.StartsWith(CookieB, StringComparison.Ordinal));
 
         var sessionId = await SessionIdAsync(client, "A");
         Assert.Equal("alice", await ReadSessionAsync(client, "A"));

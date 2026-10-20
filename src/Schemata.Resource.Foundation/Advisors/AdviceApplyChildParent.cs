@@ -13,7 +13,7 @@ using Schemata.Common;
 namespace Schemata.Resource.Foundation.Advisors;
 
 /// <summary>
-///     Default order constants for <see cref="AdviceApplyChildParent{TEntity, TRequest}" />.
+///     Default order constants for <see cref="AdviceApplyChildParent{TEntity,TRequest,TDetail}" />.
 /// </summary>
 public static class AdviceApplyChildParent
 {
@@ -48,6 +48,7 @@ public static class AdviceApplyChildParent
 /// </remarks>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type; reverse-parsing fires only when it implements <see cref="IChild" />.</typeparam>
+/// <typeparam name="TDetail">The detail DTO type.</typeparam>
 public sealed class AdviceApplyChildParent<TEntity, TRequest, TDetail> :
     IResourceUpdateAdvisor<TEntity, TRequest, TDetail>
     where TEntity : class, ICanonicalName

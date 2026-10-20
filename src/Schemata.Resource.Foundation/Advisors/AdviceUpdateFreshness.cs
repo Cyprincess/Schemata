@@ -10,7 +10,7 @@ using Schemata.Common.Errors;
 namespace Schemata.Resource.Foundation.Advisors;
 
 /// <summary>
-///     Default order constants for <see cref="AdviceUpdateFreshness{TEntity,TRequest}" />.
+///     Default order constants for <see cref="AdviceUpdateFreshness{TEntity,TRequest,TDetail}" />.
 /// </summary>
 public static class AdviceUpdateFreshness
 {
@@ -36,6 +36,7 @@ public static class AdviceUpdateFreshness
 /// </remarks>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>
+/// <typeparam name="TDetail">The detail DTO type.</typeparam>
 public sealed class AdviceUpdateFreshness<TEntity, TRequest, TDetail> : IResourceUpdateAdvisor<TEntity, TRequest, TDetail>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName

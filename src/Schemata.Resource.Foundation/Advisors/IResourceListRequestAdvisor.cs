@@ -12,6 +12,7 @@ namespace Schemata.Resource.Foundation.Advisors;
 ///     authorize the caller and can shape the query.
 /// </summary>
 /// <typeparam name="TEntity">The entity type.</typeparam>
+/// <typeparam name="TSummary">The summary DTO type.</typeparam>
 public interface IResourceListRequestAdvisor<TEntity, TSummary>
     : IAdvisor<ListRequest, ResourceRequestContainer<TEntity>, ClaimsPrincipal?, HandledResponse<ListResultBase<TEntity, TSummary>>>
     where TEntity : class, ICanonicalName

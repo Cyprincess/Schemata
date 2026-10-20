@@ -32,8 +32,8 @@ public class ResourceGrpcIdempotencyShould
         var first  = await client.CreateAsync(new() { Note = note, RequestId = requestId });
         var second = await client.CreateAsync(new() { Note = note, RequestId = requestId });
 
-        Assert.Equal(first.CanonicalName, second.CanonicalName);
-        Assert.Equal(first.Uid, second.Uid);
+        Assert.Equal(first!.CanonicalName, second!.CanonicalName);
+        Assert.Equal(first!.Uid, second!.Uid);
 
         var listed = await client.ListAsync(new() { Filter = $"note=\"{note}\"" });
         Assert.Single(listed.Entities!);
@@ -50,7 +50,7 @@ public class ResourceGrpcIdempotencyShould
         var responses = await Task.WhenAll(Enumerable.Range(0, 4)
                                                      .Select(_ => client.CreateAsync(new() { Note = note, RequestId = requestId }).AsTask()));
 
-        Assert.Single(responses.Select(r => r.CanonicalName).Distinct());
+        Assert.Single(responses.Select(r => r!.CanonicalName).Distinct());
 
         var listed = await client.ListAsync(new() { Filter = $"note=\"{note}\"" });
         Assert.Single(listed.Entities!);
@@ -64,7 +64,7 @@ public class ResourceGrpcIdempotencyShould
         var requestId = Guid.NewGuid().ToString();
 
         var created = await client.CreateAsync(new() { Note = $"first-{requestId}", RequestId = requestId });
-        Assert.NotNull(created.CanonicalName);
+        Assert.NotNull(created!.CanonicalName);
 
         var error = await Assert.ThrowsAsync<RpcException>(() =>
             client.CreateAsync(new() { Note = $"changed-{requestId}", RequestId = requestId }).AsTask());
@@ -92,7 +92,7 @@ public class ResourceGrpcIdempotencyShould
         await Task.Delay(TimeSpan.FromSeconds(1.2));
 
         var replay = await client.CreateAsync(new() { Note = note, RequestId = requestId });
-        Assert.NotEqual(first.CanonicalName, replay.CanonicalName);
+        Assert.NotEqual(first!.CanonicalName, replay!.CanonicalName);
 
         var listed = await client.ListAsync(new() { Filter = $"note=\"{note}\"" });
         Assert.Equal(2, listed.Entities!.Count);

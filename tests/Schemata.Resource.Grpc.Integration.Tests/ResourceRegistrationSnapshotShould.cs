@@ -38,7 +38,7 @@ public class ResourceRegistrationSnapshotShould
         http.DefaultRequestHeaders.Add("X-Test-Auth", "valid");
         http.DefaultRequestHeaders.Add("X-Test-Scheme", "SnapshotScheme");
         var created = new List<Student>();
-        for (var i = 0; i < 5; i++) created.Add(await client.CreateAsync(new() { FullName = $"Snapshot{i}" }));
+        for (var i = 0; i < 5; i++) created.Add((await client.CreateAsync(new() { FullName = $"Snapshot{i}" }))!);
 
         var input = factory.Services.GetRequiredService<ResourceAttribute>();
         input.Endpoints!.Clear();

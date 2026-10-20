@@ -50,11 +50,11 @@ public sealed class TenantAntiforgeryShould
         var (tokenB, cookiesB)           = await EstablishAsync(client, "B");
         var (tokenGlobal, cookiesGlobal) = await EstablishAsync(client, "global");
 
-        Assert.Single(cookiesA.Where(value => value.StartsWith(".a" + AntiforgeryOptions.DefaultCookiePrefix, StringComparison.Ordinal)));
-        Assert.Empty(cookiesA.Where(value => value.StartsWith(AntiforgeryOptions.DefaultCookiePrefix, StringComparison.Ordinal)));
-        Assert.Single(cookiesB.Where(value => value.StartsWith(".b" + AntiforgeryOptions.DefaultCookiePrefix, StringComparison.Ordinal)));
-        Assert.Single(cookiesGlobal.Where(value => value.StartsWith(AntiforgeryOptions.DefaultCookiePrefix, StringComparison.Ordinal)));
-        Assert.Empty(cookiesGlobal.Where(value => value.StartsWith(".a" + AntiforgeryOptions.DefaultCookiePrefix, StringComparison.Ordinal)));
+        Assert.Single(cookiesA, value => value.StartsWith(".a" + AntiforgeryOptions.DefaultCookiePrefix, StringComparison.Ordinal));
+        Assert.DoesNotContain(cookiesA, value => value.StartsWith(AntiforgeryOptions.DefaultCookiePrefix, StringComparison.Ordinal));
+        Assert.Single(cookiesB, value => value.StartsWith(".b" + AntiforgeryOptions.DefaultCookiePrefix, StringComparison.Ordinal));
+        Assert.Single(cookiesGlobal, value => value.StartsWith(AntiforgeryOptions.DefaultCookiePrefix, StringComparison.Ordinal));
+        Assert.DoesNotContain(cookiesGlobal, value => value.StartsWith(".a" + AntiforgeryOptions.DefaultCookiePrefix, StringComparison.Ordinal));
 
         Assert.Equal(HttpStatusCode.OK, await SubmitAsync(client, "A", "metadata", tokenA));
         Assert.Equal(HttpStatusCode.OK, await SubmitAsync(client, "A", "direct", tokenA));

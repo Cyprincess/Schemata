@@ -414,7 +414,7 @@ public class SchemataResourceFeatureRegisterMethodShould
         Assert.Contains(typeof(ResourceMethodRequest<SoftEntity, ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>).FullName!, expunge.Message, StringComparison.Ordinal);
         var purge = await Assert.ThrowsAsync<InvalidOperationException>(() => dispatcher.SendAsync<PurgeResourceRequest<SoftEntity>, Operation>(new()));
         Assert.Contains(typeof(PurgeResourceRequest<SoftEntity>).FullName!, purge.Message, StringComparison.Ordinal);
-        var undelete = await Assert.ThrowsAsync<InvalidOperationException>(() => dispatcher.SendAsync<UndeleteResourceRequest<SoftEntity, SoftEntity>, SoftEntity>(new()));
+        var undelete = await Assert.ThrowsAsync<InvalidOperationException>(() => dispatcher.SendAsync<UndeleteResourceRequest<SoftEntity, SoftEntity>, SoftEntity?>(new()));
         Assert.Contains(typeof(UndeleteResourceRequest<SoftEntity, SoftEntity>).FullName!, undelete.Message, StringComparison.Ordinal);
         Assert.Empty(provider.GetServices<IRequestPipelineAdvisor<ResourceMethodRequest<SoftEntity, ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>, EmptyResourceResponse>>());
         Assert.Empty(provider.GetServices<IResourceMethodAdvisor<SoftEntity, ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>>());

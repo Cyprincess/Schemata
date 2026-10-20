@@ -10,7 +10,7 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class SchemataFlowRepositoryServiceCollectionExtensions
 {
     /// <summary>
-    ///     Installs <see cref="RepositoryFlowEffectRecorder" /> for the default
+    ///     Installs <see cref="RepositoryFlowEffectRecorder{SchemataFlowEffectIntent}" /> for the default
     ///     <see cref="SchemataFlowEffectIntent" /> entity.
     /// </summary>
     /// <param name="services">The service collection.</param>
@@ -20,7 +20,7 @@ public static class SchemataFlowRepositoryServiceCollectionExtensions
     }
 
     /// <summary>
-    ///     Installs <see cref="RepositoryFlowEffectRecorder" /> as the <see cref="IFlowEffectRecorder" />
+    ///     Installs <see cref="RepositoryFlowEffectRecorder{TEffectIntent}" /> as the <see cref="IFlowEffectRecorder" />
     ///     the flow engines record external-effect intents and completions through, over the
     ///     host-selected <typeparamref name="TEffectIntent" /> row. The recorder rides on the
     ///     application's <c>IRepository&lt;TEffectIntent&gt;</c> registration, so the persistence engine

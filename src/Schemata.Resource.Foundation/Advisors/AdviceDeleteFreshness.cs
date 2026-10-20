@@ -11,7 +11,7 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Resource.Foundation.Advisors;
 
 /// <summary>
-///     Default order constants for <see cref="AdviceDeleteFreshness{TEntity}" />.
+///     Default order constants for <see cref="AdviceDeleteFreshness{TEntity,TDetail}" />.
 /// </summary>
 public static class AdviceDeleteFreshness
 {
@@ -35,6 +35,7 @@ public static class AdviceDeleteFreshness
 ///     </para>
 /// </remarks>
 /// <typeparam name="TEntity">The entity type.</typeparam>
+/// <typeparam name="TDetail">The detail DTO type.</typeparam>
 public sealed class AdviceDeleteFreshness<TEntity, TDetail> : IResourceDeleteAdvisor<TEntity, TDetail>
     where TEntity : class, ICanonicalName
     where TDetail : class, ICanonicalName

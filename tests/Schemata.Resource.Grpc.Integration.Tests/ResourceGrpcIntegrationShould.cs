@@ -31,7 +31,7 @@ public class ResourceGrpcIntegrationShould
 
         Assert.NotNull(result);
         Assert.NotNull(result.Entities);
-        var listed = Assert.Single(result.Entities, s => s.CanonicalName == created.CanonicalName);
+        var listed = Assert.Single(result.Entities, s => s.CanonicalName == created!.CanonicalName);
         Assert.Equal("GrpcListStudent", listed.FullName);
         Assert.NotNull(result.TotalSize);
         Assert.True(result.TotalSize >= result.Entities.Count);
@@ -57,7 +57,7 @@ public class ResourceGrpcIntegrationShould
         var first = await client.ListAsync(new() { Filter = filter, PageSize = 1 });
         Assert.Equal(mode == TotalSizeMode.Exact ? 2 : (int?)null, first.TotalSize);
         var firstRow = Assert.Single(first.Entities!);
-        Assert.Contains(firstRow.CanonicalName, new[] { one.CanonicalName, two.CanonicalName });
+        Assert.Contains(firstRow.CanonicalName, new[] { one!.CanonicalName, two!.CanonicalName });
         Assert.False(string.IsNullOrEmpty(first.NextPageToken));
 
         var second = await client.ListAsync(new() {

@@ -73,10 +73,10 @@ public class ResourceEndpointDeclarationShould : IClassFixture<WebAppFactory>
             ClientFactory.Create(factory.Services.GetRequiredService<BinderConfiguration>()));
 
         var created = await client.CreateAsync(new() { Label = "gRPC declaration" });
-        Assert.StartsWith("grpcNotes/consumer-", created.CanonicalName);
-        var fetched = await client.GetAsync(new() { CanonicalName = created.CanonicalName });
-        Assert.Equal(created.CanonicalName, fetched.CanonicalName);
-        Assert.Equal("gRPC declaration", fetched.Label);
+        Assert.StartsWith("grpcNotes/consumer-", created!.CanonicalName);
+        var fetched = await client.GetAsync(new() { CanonicalName = created!.CanonicalName });
+        Assert.Equal(created!.CanonicalName, fetched!.CanonicalName);
+        Assert.Equal("gRPC declaration", fetched!.Label);
         using var list = await http.GetAsync("/v1/grpcNotes");
         Assert.Equal(HttpStatusCode.NotFound, list.StatusCode);
         using var get = await http.GetAsync($"/v1/{created.CanonicalName}");

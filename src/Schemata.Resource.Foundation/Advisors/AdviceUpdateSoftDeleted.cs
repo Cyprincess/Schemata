@@ -11,14 +11,14 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Resource.Foundation.Advisors;
 
 /// <summary>
-///     Default order constants for <see cref="AdviceUpdateSoftDeleted{TEntity, TRequest}" />.
+///     Default order constants for <see cref="AdviceUpdateSoftDeleted{TEntity,TRequest,TDetail}" />.
 /// </summary>
 public static class AdviceUpdateSoftDeleted
 {
     /// <summary>
     ///     Default order: chained after <see cref="AdviceApplyChildParent" /> so the
     ///     mode A parent field is in place before the soft-delete guard inspects the
-    ///     entity, and before <see cref="AdviceUpdateFreshness{TEntity, TRequest}" /> runs
+    ///     entity, and before <see cref="AdviceUpdateFreshness{TEntity,TRequest,TDetail}" /> runs
     ///     the concurrency comparison.
     /// </summary>
     public const int DefaultOrder = AdviceApplyChildParent.DefaultOrder + 10_000_000;
@@ -33,6 +33,7 @@ public static class AdviceUpdateSoftDeleted
 /// </summary>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>
+/// <typeparam name="TDetail">The detail DTO type.</typeparam>
 public sealed class AdviceUpdateSoftDeleted<TEntity, TRequest, TDetail> : IResourceUpdateAdvisor<TEntity, TRequest, TDetail>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName

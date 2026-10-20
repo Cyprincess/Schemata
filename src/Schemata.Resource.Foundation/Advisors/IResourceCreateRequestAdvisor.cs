@@ -14,6 +14,7 @@ namespace Schemata.Resource.Foundation.Advisors;
 /// </summary>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>
+/// <typeparam name="TDetail">The detail DTO type.</typeparam>
 public interface IResourceCreateRequestAdvisor<TEntity, TRequest, TDetail>
     : IAdvisor<TRequest, ResourceRequestContainer<TEntity>, ClaimsPrincipal?, HandledResponse<CreateResultBase<TDetail>>>
     where TEntity : class, ICanonicalName

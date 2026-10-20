@@ -41,7 +41,7 @@ public class FinalParentShould
             var denied = await Assert.ThrowsAsync<RpcException>(async () => await client.CreateAsync(new() { Parent = "parents/denied" }));
             Assert.Equal(StatusCode.PermissionDenied, denied.StatusCode);
             var allowed = await client.CreateAsync(new() { Parent = "parents/allowed" });
-            Assert.Equal("allowed", allowed.ParentId);
+            Assert.Equal("allowed", allowed!.ParentId);
         } else {
             using var scope = host.Services.CreateScope();
             var dispatcher = scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
