@@ -10,13 +10,13 @@ namespace Schemata.Core.Features;
 /// <summary>
 ///     Enables antiforgery token validation. Registers the native antiforgery
 ///     services and wires the antiforgery state branch after authentication,
-///     authorization, and tenant execution.
+///     authorization.
 /// </summary>
 public sealed class SchemataAntiforgeryFeature : FeatureBase
 {
     /// <summary>
     ///     Default middleware priority for antiforgery, after authentication,
-    ///     authorization, and tenant execution.
+    ///     authorization.
     /// </summary>
     public const int DefaultPriority = SchemataAuthorizationFeature.DefaultPriority + 2_000_000;
 

@@ -11,7 +11,7 @@ namespace Schemata.Core.Features;
 
 /// <summary>
 ///     Configures authentication and authorization services and inserts authentication
-///     before final tenant binding and authorization. Consumes deferred configurators for
+///     before authorization and downstream resolution. Consumes deferred configurators for
 ///     <see cref="AuthenticationOptions" />,
 ///     <see cref="AuthenticationBuilder" />, and
 ///     <see cref="AuthorizationOptions" />. Core registers the native ASP.NET Core

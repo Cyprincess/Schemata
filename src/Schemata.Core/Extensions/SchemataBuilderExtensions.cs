@@ -400,7 +400,7 @@ public static class SchemataBuilderExtensions
 
     /// <summary>
     ///     Enables <c>Antiforgery</c>, which validates antiforgery tokens after
-    ///     authentication, authorization, and tenant execution.
+    ///     authentication and authorization.
     ///     See <see cref="SchemataAntiforgeryFeature" /> for details.
     /// </summary>
     /// <param name="builder">The <see cref="SchemataBuilder" />.</param>
