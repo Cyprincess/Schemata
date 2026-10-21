@@ -37,6 +37,11 @@ public sealed class TenantMessageExecutionScopeFactory<TTenant>(IServiceScopeFac
             }
             ExceptionDispatchInfo.Capture(failure).Throw();
         }
-        return new(final!.Value, () => TenantContext.Enter(identity));
+
+        if (final is not { } scope) {
+            throw new InvalidOperationException("The tenant message execution scope was not created.");
+        }
+
+        return new(scope, () => TenantContext.Enter(identity));
     }
 }

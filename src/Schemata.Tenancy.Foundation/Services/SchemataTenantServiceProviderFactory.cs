@@ -93,9 +93,15 @@ public class SchemataTenantServiceProviderFactory<TTenant> : ITenantServiceProvi
             apply(id, overrides, _root);
         }
 
-        TenantCompositeServiceProvider composite = null!;
-        ValidateAndWrapOverrides(id, overrides, () => composite);
-        overrides.AddScoped(_ => new TenantResolutionContext { Services = composite });
+        TenantCompositeServiceProvider? composite = null;
+
+        IServiceProvider Composite() {
+            return composite
+                ?? throw new InvalidOperationException($"Tenant '{id}' resolved its overrides before the tenant provider was built.");
+        }
+
+        ValidateAndWrapOverrides(id, overrides, Composite);
+        overrides.AddScoped(_ => new TenantResolutionContext { Services = Composite() });
 
         var container = overrides.BuildServiceProvider();
         composite = new(container, _root);

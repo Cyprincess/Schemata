@@ -36,9 +36,12 @@ internal sealed class ResourceServiceMethodProvider<TService> : IServiceMethodPr
         }
 
         var args   = t.GetGenericArguments();
-        var method = typeof(ResourceServiceMethodProvider<TService>).GetMethod(nameof(RegisterAll), BindingFlags.Static | BindingFlags.NonPublic)!.MakeGenericMethod(args[0], args[1], args[2], args[3]);
+        var method = typeof(ResourceServiceMethodProvider<TService>)
+                    .GetMethod(nameof(RegisterAll), BindingFlags.Static | BindingFlags.NonPublic)
+                 ?? throw new InvalidOperationException($"The resource service registration method '{nameof(RegisterAll)}' was not found.");
+        var closed = method.MakeGenericMethod(args[0], args[1], args[2], args[3]);
 
-        Registrar = (Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, ResourceRegistry>)Delegate.CreateDelegate(typeof(Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, ResourceRegistry>), method);
+        Registrar = (Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, ResourceRegistry>)Delegate.CreateDelegate(typeof(Action<ServiceMethodProviderContext<TService>, ResourceBinderConfiguration, ResourceRegistry>), closed);
     }
 
     /// <summary>

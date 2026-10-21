@@ -231,7 +231,7 @@ public static class ServiceCollectionExtensions
             if (string.IsNullOrWhiteSpace(subject)) subject = $"client:{context.Connection.RemoteIpAddress}";
             var error = new QuotaExceededException([new() { Subject = subject }]);
             if (rejected.Lease.TryGetMetadata(MetadataName.RetryAfter, out var delay)) {
-                error.Details!.Add(new RetryInfoDetail { RetryDelay = delay });
+                (error.Details ??= []).Add(new RetryInfoDetail { RetryDelay = delay });
             }
             return error;
         }

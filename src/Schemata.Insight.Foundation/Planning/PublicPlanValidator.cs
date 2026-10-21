@@ -65,10 +65,19 @@ internal sealed class PublicPlanValidator(IServiceProvider services)
                 var result = new Dictionary<string, Value>(StringComparer.Ordinal);
                 foreach (var item in selection.Items) {
                     if (item.Kind == SelectionKind.Expression) {
-                        result[item.Alias] = Analyze(item.Expression!, input);
+                        if (item.Expression is not { } expression) {
+                            throw Invalid(item.Alias);
+                        }
+
+                        result[item.Alias] = Analyze(expression, input);
                         continue;
                     }
-                    var value = Resolve(input, new(item.FieldPath!.Split('.')));
+
+                    if (item.FieldPath is not { } fieldPath) {
+                        throw Invalid(item.Alias);
+                    }
+
+                    var value = Resolve(input, new(fieldPath.Split('.')));
                     result[item.Alias] = value;
                     if (item.Nested is null) continue;
                     var environment = new Dictionary<string, Value>(input, StringComparer.Ordinal) {

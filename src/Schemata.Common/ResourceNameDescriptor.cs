@@ -25,7 +25,7 @@ public sealed class ResourceNameDescriptor
     private readonly Segment?  _leafSegment;
     private readonly Segment[] _parentSegments;
     private readonly Segment[] _segments;
-    private readonly Type      _type = null!;
+    private readonly Type      _type;
     private readonly string?   _plural;
     private readonly string?   _singular;
 
@@ -234,15 +234,19 @@ public sealed class ResourceNameDescriptor
                 continue;
             }
 
-            if (!properties.TryGetValue(seg.Property!, out var property)) {
-                throw new MissingFieldException(type.Name, seg.Property!);
+            if (seg.Property is not { } propertyName) {
+                throw new MissingFieldException(type.Name, seg.Raw);
+            }
+
+            if (!properties.TryGetValue(propertyName, out var property)) {
+                throw new MissingFieldException(type.Name, propertyName);
             }
 
             var value = property.GetValue(entity)?.ToString();
             if (string.IsNullOrWhiteSpace(value)) {
                 throw new ValidationException([new() {
-                    Field       = seg.Property!.Underscore(),
-                    Description = string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), seg.Property!.Humanize(LetterCasing.Title)),
+                    Field       = propertyName.Underscore(),
+                    Description = string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), propertyName.Humanize(LetterCasing.Title)),
                     Reason      = SchemataResources.NOT_EMPTY,
                 }]);
             }

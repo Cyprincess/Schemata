@@ -154,7 +154,7 @@ public static class InsightValueModel
             FieldType.Timestamp => value.GetDateTime(),
             FieldType.DateTimeOffset => value.GetDateTimeOffset(),
             FieldType.Duration => TimeSpan.ParseExact(value.GetString()!, "c", CultureInfo.InvariantCulture),
-            FieldType.Char => value.GetString()![0],
+            FieldType.Char => value.GetString()?[0],
             FieldType.String or FieldType.Enum => value.GetString(),
             _ => value.ValueKind switch {
                 JsonValueKind.String => value.GetString(),

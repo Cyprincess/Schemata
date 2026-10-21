@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using Schemata.Actor.Skeleton;
 
 namespace Schemata.Actor.Foundation.Runtime;
@@ -18,13 +19,13 @@ public sealed class ActorRegistry : IActorRegistry
         _recipes[actorType] = props;
     }
 
-    public bool TryResolve(string actorType, out Props props) {
+    public bool TryResolve(string actorType, [NotNullWhen(true)] out Props? props) {
         if (_recipes.TryGetValue(actorType, out var found)) {
             props = found;
             return true;
         }
 
-        props = null!;
+        props = null;
         return false;
     }
 

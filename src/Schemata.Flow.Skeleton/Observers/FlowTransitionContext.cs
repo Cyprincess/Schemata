@@ -18,7 +18,7 @@ public class FlowTransitionContext
     ///     Engine-produced view of the transition outcome, carrying the new token set and transition rows.
     ///     The mutated process row lives at <c>Snapshot.Process</c>.
     /// </summary>
-    public ProcessSnapshot Snapshot { get; set; } = null!;
+    public required ProcessSnapshot Snapshot { get; set; }
 
     /// <summary>
     ///     The specific token this transition advances. Required for both engines: the state-machine

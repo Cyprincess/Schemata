@@ -13,13 +13,13 @@ namespace Schemata.Flow.Skeleton.Runtime;
 public sealed class FlowConditionContext
 {
     /// <summary>The process definition that contains the flow being traversed.</summary>
-    public ProcessDefinition Definition { get; set; } = null!;
+    public required ProcessDefinition Definition { get; set; }
 
     /// <summary>
     ///     The token being evaluated. The state-machine engine sets this to the unique token; the
     ///     BPMN engine sets it to the specific token whose outgoing flow is under evaluation.
     /// </summary>
-    public TokenSnapshot Token { get; set; } = null!;
+    public required TokenSnapshot Token { get; set; }
 
     /// <summary>The persisted process instance being evaluated.</summary>
     public SchemataProcess? Process { get; set; }
@@ -37,7 +37,7 @@ public sealed class FlowConditionContext
     public Dictionary<string, int> Bookkeeping { get; set; } = [];
 
     /// <summary>The element name currently being evaluated for outgoing transitions.</summary>
-    public string CurrentState { get; set; } = null!;
+    public required string CurrentState { get; set; }
 
     /// <summary>Builds a task context for source-aware condition expressions.</summary>
     public FlowTaskContext CreateTaskContext() {

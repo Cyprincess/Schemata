@@ -209,12 +209,15 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             }
         } else {
             var mode = ResolveTotalSizeMode();
+            if (resolved is not { } language) {
+                throw new InvalidOperationException("A residual page requires a resolved expression language.");
+            }
 
             // The residual runs locally over the pushed superset, so paging and an exact total are
             // computed after the residual rather than in the backend query.
             var superset = _repository.ListAsync(q => container.Query(q), ct.Value, options);
             var scan = await ResidualPage.ScanAsync(
-                superset, residual, token.Skip, token.PageSize, resolved!.MaxResidualScanRows,
+                superset, residual, token.Skip, token.PageSize, language.MaxResidualScanRows,
                 mode is TotalSizeMode.Exact, ct.Value);
 
             totalSize = scan.Total;

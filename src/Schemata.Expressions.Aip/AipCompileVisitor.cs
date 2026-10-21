@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
@@ -186,8 +187,11 @@ internal sealed class AipCompileVisitor
     }
 
     private Expression VisitValue(IValue node, bool preferMember) {
+        if (node is Text { IsQuoted: false } identifier && preferMember && ResolveIdentifier(identifier.Value) is { } access) {
+            return access;
+        }
+
         return node switch {
-            Text { IsQuoted: false } text when preferMember && TryResolveIdentifier(text.Value, out var access) => access,
             Text text => Expression.Constant(text.Value),
             Integer integer => Expression.Constant(integer.Value),
             Number number => Expression.Constant(number.Value),
@@ -197,14 +201,13 @@ internal sealed class AipCompileVisitor
         };
     }
 
-    private bool TryResolveIdentifier(string name, out Expression expression) {
+    private Expression? ResolveIdentifier(string name) {
         if (string.Equals(name, Parameter.Name, StringComparison.Ordinal)
          || _options?.ContextAlias is { } alias && string.Equals(name, alias, StringComparison.Ordinal)) {
-            expression = Parameter;
-            return true;
+            return Parameter;
         }
 
-        return TryAccess(Parameter, name, out expression);
+        return Common.MemberAccess.Resolve(Parameter, name);
     }
 
     private Expression Access(Expression source, IField field) {
@@ -239,20 +242,24 @@ internal sealed class AipCompileVisitor
         throw new ParseException($"Unknown field '{key}'.", field.Position);
     }
 
-    private static bool TryAccess(Expression source, string name, out Expression expression) {
-        var access = Common.MemberAccess.Resolve(source, name);
-        expression = access!;
-        return access is not null;
+    private static bool TryAccess(Expression source, string name, [NotNullWhen(true)] out Expression? expression) {
+        expression = Common.MemberAccess.Resolve(source, name);
+        return expression is not null;
     }
 
-    private bool TryBuildRepeatedHas(IComparableArg comparable, IArg arg, out Expression expression) {
-        expression = null!;
+    private bool TryBuildRepeatedHas(
+        IComparableArg                     comparable,
+        IArg                               arg,
+        [NotNullWhen(true)] out Expression? expression
+    ) {
         if (comparable is not Member { Fields.Count: > 0 } member || member.Fields[0] is not Text) {
+            expression = null;
             return false;
         }
 
         var source = VisitValue(member.Value, true);
         if (source.Type == typeof(string) || !typeof(IEnumerable).IsAssignableFrom(source.Type)) {
+            expression = null;
             return false;
         }
 

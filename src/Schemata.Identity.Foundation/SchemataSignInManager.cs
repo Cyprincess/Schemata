@@ -137,7 +137,7 @@ public class SchemataSignInManager<TUser>(
         foreach (var observer in observers) {
             await observer.OnSigningInAsync(principal, _incoming!, _cancellation);
         }
-        if (_request!.UseCookies == true) {
+        if (_request is { UseCookies: true }) {
             await Context.SignInAsync(Schemes(Context).ApplicationScheme, principal, properties);
         }
         Context.User = principal;

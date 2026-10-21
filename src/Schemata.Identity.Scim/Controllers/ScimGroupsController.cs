@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
@@ -34,7 +35,7 @@ public sealed class ScimGroupsController(
     public async Task<IActionResult> Create([FromBody] JsonElement body, CancellationToken ct) {
         try {
             var group    = WithLocation(await groups.CreateAsync(ScimGroupRequest.Parse(body), ct));
-            var location = group.Meta!.Location!;
+            var location = Location("Groups", group.Id);
             var result   = ScimResults.Json(group);
             result.StatusCode                    = StatusCodes.Status201Created;
             Response.Headers.Location            = location;
@@ -123,12 +124,16 @@ public sealed class ScimGroupsController(
     }
 
     private ScimGroupResource WithLocation(ScimGroupResource group) {
+        if (group.Meta is not { } meta) {
+            throw new InvalidOperationException("A SCIM group requires service provider metadata.");
+        }
+
         var members = group.Members.Select(member => member with { Ref = Location("Users", member.Value) })
                           .ToList();
 
         return group with {
             Members = members,
-            Meta    = group.Meta! with { Location = Location("Groups", group.Id) },
+            Meta    = meta with { Location = Location("Groups", group.Id) },
         };
     }
 

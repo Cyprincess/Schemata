@@ -69,9 +69,9 @@ public sealed class InProcessActorSystem<TActor> : IActorSystem, IActorSystemLif
     public async Task<IActorRef> GetAsync(ActorId id) {
         ThrowIfStopping();
         var context = await CaptureAsync();
-        Props props;
+        Props? props;
         if (_instances.TryGetValue(id, out var existing)) props = Resolve(id, existing).Props;
-        else if (!_registry.TryResolve(id.Type, out props!)) {
+        else if (!_registry.TryResolve(id.Type, out props)) {
             throw new InvalidOperationException($"No actor type is registered for '{id.Type}'.");
         }
         GetOrCreate(id, props, context);

@@ -68,7 +68,11 @@ public class EfCoreRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQue
         var entry = await Context.AddAsync(entity, ct);
 
         StageWrite();
-        _unitOfWork!.Admit(entry);
+        if (_unitOfWork is not { } unitOfWork) {
+            throw new InvalidOperationException("The EF Core repository has no attached unit of work after EnsureWriteUnitOfWork.");
+        }
+
+        unitOfWork.Admit(entry);
 
         return MutationResult.Applied;
     }

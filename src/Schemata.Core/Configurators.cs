@@ -25,15 +25,15 @@ public sealed class Configurators
     public void Set<T>(Action<T> action) {
         var key = typeof(T);
 
-        if (!TryGet<T>(out var configure)) {
-            _configurators[key] = action;
+        if (_configurators.TryGetValue(key, out var existing) && existing is Action<T> configure) {
+            _configurators[key] = (T options) => {
+                configure.Invoke(options);
+                action(options);
+            };
             return;
         }
 
-        _configurators[key] = (T options) => {
-            configure!.Invoke(options);
-            action(options);
-        };
+        _configurators[key] = action;
     }
 
     /// <summary>
@@ -45,15 +45,15 @@ public sealed class Configurators
     public void Set<T1, T2>(Action<T1, T2> action) {
         var key = typeof((T1, T2));
 
-        if (!TryGet<T1, T2>(out var configure)) {
-            _configurators[key] = action;
+        if (_configurators.TryGetValue(key, out var existing) && existing is Action<T1, T2> configure) {
+            _configurators[key] = (T1 a1, T2 a2) => {
+                configure.Invoke(a1, a2);
+                action(a1, a2);
+            };
             return;
         }
 
-        _configurators[key] = (T1 a1, T2 a2) => {
-            configure!.Invoke(a1, a2);
-            action(a1, a2);
-        };
+        _configurators[key] = action;
     }
 
     /// <summary>

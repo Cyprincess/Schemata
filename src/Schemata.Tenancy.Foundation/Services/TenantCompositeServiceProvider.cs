@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -202,13 +203,13 @@ internal sealed class TenantCompositeServiceProvider :
             || definition == typeof(IValidateOptions<>);
     }
 
-    internal static bool IsEnumerableService(Type serviceType, out Type elementType) {
+    internal static bool IsEnumerableService(Type serviceType, [NotNullWhen(true)] out Type? elementType) {
         if (serviceType.IsGenericType && serviceType.GetGenericTypeDefinition() == typeof(IEnumerable<>)) {
             elementType = serviceType.GetGenericArguments()[0];
             return true;
         }
 
-        elementType = null!;
+        elementType = null;
         return false;
     }
 

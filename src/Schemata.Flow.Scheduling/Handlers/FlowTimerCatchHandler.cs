@@ -116,7 +116,12 @@ public sealed class FlowTimerCatchHandler<TJob, TExecution> : IFlowCatchHandler
     #endregion
 
     private static string JobName(SchemataProcess process, string elementName, string tokenCanonical) {
-        var processLeaf = process.CanonicalName![(process.CanonicalName!.LastIndexOf('/') + 1)..];
+        if (process.CanonicalName is not { } canonicalName) {
+            throw new InvalidOperationException(
+                $"A timer catch cannot be scheduled for process '{process.Name}' because it has no canonical name.");
+        }
+
+        var processLeaf = canonicalName[(canonicalName.LastIndexOf('/') + 1)..];
         var token       = tokenCanonical[(tokenCanonical.LastIndexOf('/') + 1)..];
         return $"flow-{processLeaf}-{elementName}-{token}";
     }

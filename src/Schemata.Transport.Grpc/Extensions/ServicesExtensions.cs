@@ -82,8 +82,8 @@ public static class ServicesExtensions
     private static IEnumerable<ProtoServiceDescriptor> ResolveProtoFirstDescriptors(EndpointDataSource epd) {
         return epd.Endpoints
                   .Select(e => e.Metadata.GetMetadata<GrpcMethodMetadata>())
-                  .Where(m => m is not null)
-                  .Select(m => m!.ServiceType)
+                  .OfType<GrpcMethodMetadata>()
+                  .Select(m => m.ServiceType)
                   .Distinct()
                   .Select(GetServiceDescriptor)
                   .Where(d => d is not null)

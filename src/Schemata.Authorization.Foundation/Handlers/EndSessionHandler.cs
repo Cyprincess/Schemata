@@ -77,21 +77,23 @@ public sealed class EndSessionHandler<TApp, TSecurity, TToken>(
                 throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.INVALID_REQUEST);
             }
             application = await ResolveClientAsync(request, strict: true, ct, hint);
+            if (application is null) {
+                throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.INVALID_REQUEST);
+            }
 
             var validatedHint = hint;
             var hintSubject   = validatedHint.FindFirstValue(IdentityClaims.Subject);
             var hintSession   = validatedHint.FindFirstValue(Claims.SessionId);
-            if (pairwise is not null && application is not null) {
+            if (pairwise is not null) {
                 var caller = new ClaimsPrincipal(new ClaimsIdentity([
                     new(Claims.ClientId, application.ClientId ?? string.Empty),
                 ], "logout-hint"));
                 hintSubject = await pairwise.ToCanonicalAsync(hintSubject, caller, ct);
             }
 
-            var target = new LogoutSessionTarget(hintSubject, hintSession, application!.CanonicalName!);
+            var target = new LogoutSessionTarget(hintSubject, hintSession, application.CanonicalName ?? string.Empty);
             var evidence = sessions is null ? null : await sessions.ResolveLogoutAsync(target, principal, ct);
-            var current = evidence?.MatchesCurrent == true;
-            if (!current) {
+            if (evidence is not { MatchesCurrent: true }) {
                 var sameSubject = string.Equals(hintSubject, subject, StringComparison.Ordinal);
                 var confirmedSubject = string.IsNullOrWhiteSpace(subject) ? hintSubject : subject;
                 var confirmedSession = string.IsNullOrWhiteSpace(subject) ? hintSession : session;
@@ -103,7 +105,7 @@ public sealed class EndSessionHandler<TApp, TSecurity, TToken>(
                     preserveRpAuthority: string.IsNullOrWhiteSpace(subject) || sameSubject, ct, application);
             }
 
-            subject = evidence!.Target.Subject;
+            subject = evidence.Target.Subject;
             session = evidence.Target.SessionId;
         } else {
 

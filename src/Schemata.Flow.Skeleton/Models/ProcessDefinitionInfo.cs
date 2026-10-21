@@ -11,7 +11,7 @@ namespace Schemata.Flow.Skeleton.Models;
 [CanonicalName("definitions/{definition}/versions/{version}")]
 public sealed class ProcessDefinitionInfo : ICanonicalName, IDescriptive
 {
-    public string Version { get; set; } = null!;
+    public required string Version { get; set; }
 
     /// <summary>Optional human-readable display name.</summary>
     public string? DisplayName { get; set; }

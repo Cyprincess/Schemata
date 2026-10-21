@@ -62,9 +62,12 @@ public sealed class ClientSecretJwtAuthentication<TApp, TSecurity, TToken>(
             return null;
         }
 
-        var assertion = form![Parameters.ClientAssertion][0]!;
-        var clientId  = channel.ResolveClientId(form, assertion);
-        var app       = await channel.FindApplicationAsync(apps, clientId, ct);
+        if (form?[Parameters.ClientAssertion] is not [{ } assertion]) {
+            return null;
+        }
+
+        var clientId = channel.ResolveClientId(form, assertion);
+        var app      = await channel.FindApplicationAsync(apps, clientId, ct);
 
         var key = await SelectKeyAsync(app, assertion, ct);
         if (key is null) {

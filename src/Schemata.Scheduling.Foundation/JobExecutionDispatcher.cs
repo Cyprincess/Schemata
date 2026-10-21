@@ -230,7 +230,7 @@ public sealed class JobExecutionDispatcher<TJob, TExecution>(
             lease.ThrowIfOwnershipLost();
             await scheduledJob.ExecuteAsync(context!, ct);
             lease.ThrowIfOwnershipLost();
-            execution.Output = context!.Execution?.Output;
+            execution.Output = context?.Execution?.Output;
         } catch (OperationCanceledException) when (ct.IsCancellationRequested) {
             return;
         } catch (Exception ex) {

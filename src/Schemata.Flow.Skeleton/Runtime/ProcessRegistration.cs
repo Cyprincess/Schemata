@@ -13,7 +13,7 @@ public sealed class ProcessRegistration
     /// <summary>
     ///     The registered name of the process definition.
     /// </summary>
-    public string Name { get; init; } = null!;
+    public required string Name { get; init; }
 
     public string Version { get; init; } = "1";
 
@@ -26,7 +26,7 @@ public sealed class ProcessRegistration
     /// <summary>
     ///     The loaded process definition AST.
     /// </summary>
-    public ProcessDefinition Definition { get; init; } = null!;
+    public required ProcessDefinition Definition { get; init; }
 
 
     /// <summary>Source descriptors keyed by binding name.</summary>

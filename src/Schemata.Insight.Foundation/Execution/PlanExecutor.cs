@@ -161,7 +161,11 @@ public sealed class PlanExecutor
         IAsyncEnumerable<IReadOnlyDictionary<string, object?>> rows;
         int?                                                   estimate = null;
         if (estimateSuperset) {
-            var buffer = await LocalPipelineExecutor.Buffer(sourceRows, scanCap!.Value, ct);
+            if (scanCap is not { } scanLimit) {
+                throw new InvalidOperationException("A local pipeline stage requires a residual scan cap.");
+            }
+
+            var buffer = await LocalPipelineExecutor.Buffer(sourceRows, scanLimit, ct);
 
             estimate = buffer.Count;
             rows     = _local.RunAsync(ToAsync(buffer, ct), source.Alias, localStages, ct);

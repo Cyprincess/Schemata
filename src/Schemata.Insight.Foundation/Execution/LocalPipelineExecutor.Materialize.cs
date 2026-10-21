@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,13 +19,16 @@ public sealed partial class LocalPipelineExecutor
         SelectionNode                                         selection,
         [EnumeratorCancellation] CancellationToken             ct
     ) {
-        var computed = ImmutableArrayExtensions.Where(selection.Items, item => item.Kind is SelectionKind.Expression && item.Expression is not null)
-                                               .Select(item => (item.Alias,
-                                                                Value: ExpressionCache.GetOrAddDelegate(
-                                                                    Compiler(item.Expression!.Language)
-                                                                       .Compile<IReadOnlyDictionary<string, object?>, object>(
-                                                                            item.Expression!.Tree))))
-                                               .ToArray<(string Alias, Func<IReadOnlyDictionary<string, object?>, object> Value)>();
+        var computed = new List<(string Alias, Func<IReadOnlyDictionary<string, object?>, object> Value)>();
+        foreach (var item in selection.Items) {
+            if (item.Kind is not SelectionKind.Expression || item.Expression is not { } expression) {
+                continue;
+            }
+
+            computed.Add((item.Alias, ExpressionCache.GetOrAddDelegate(
+                Compiler(expression.Language)
+                   .Compile<IReadOnlyDictionary<string, object?>, object>(expression.Tree))));
+        }
 
         await foreach (var row in rows.WithCancellation(ct)) {
             if (selection.Items.IsDefaultOrEmpty) {

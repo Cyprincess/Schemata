@@ -104,7 +104,11 @@ public sealed class PurgeJob<TEntity> : IScheduledJob
             }
         }
 
-        await unit!.CommitAsync(ct);
+        if (unit is not { } transaction) {
+            throw new InvalidOperationException("A forced purge requires a write unit of work.");
+        }
+
+        await transaction.CommitAsync(ct);
 
         return result;
 

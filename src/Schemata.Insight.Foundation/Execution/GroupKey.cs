@@ -33,8 +33,8 @@ internal readonly struct GroupKey(object?[] values) : IEquatable<GroupKey>
             var ordinalLookup = dictionary is not null
                 && (dictionary.Comparer == StringComparer.Ordinal || dictionary.Comparer == EqualityComparer<string>.Default);
             foreach (var (key, value) in leftMap) {
-                if (ordinalLookup) {
-                    if (!dictionary!.TryGetValue(key, out var other) || !ValueEquals(value, other)) return false;
+                if (ordinalLookup && dictionary is { } lookup) {
+                    if (!lookup.TryGetValue(key, out var other) || !ValueEquals(value, other)) return false;
                 } else {
                     var found = false;
                     foreach (var entry in rightMap) {

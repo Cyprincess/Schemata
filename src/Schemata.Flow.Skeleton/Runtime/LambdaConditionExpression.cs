@@ -9,13 +9,13 @@ namespace Schemata.Flow.Skeleton.Runtime;
 /// </summary>
 public sealed class LambdaConditionExpression : FlowGraphNode, IConditionExpression
 {
-    private Func<FlowConditionContext, ValueTask<bool>> _lambda = null!;
+    private Func<FlowConditionContext, ValueTask<bool>>? _lambda;
 
     /// <summary>
     ///     Delegate that evaluates the condition against a <see cref="FlowConditionContext" />.
     /// </summary>
-    public Func<FlowConditionContext, ValueTask<bool>> Lambda {
-        get => _lambda;
+    public required Func<FlowConditionContext, ValueTask<bool>> Lambda {
+        get => _lambda ?? throw new InvalidOperationException("The condition lambda has not been assigned.");
         set {
             EnsureMutable();
             _lambda = value;

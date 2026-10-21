@@ -475,6 +475,8 @@ public static class RegistrationMetadataMapper
             return;
         }
 
+        var redirectUris = request.RedirectUris;
+
         if (!Uri.TryCreate(request.SectorIdentifierUri, UriKind.Absolute, out var sector) || sector.Scheme != Uri.UriSchemeHttps) {
             throw OAuthError(OAuthErrors.InvalidClientMetadata, SchemataResources.REGISTRATION_SECTOR_URI_INVALID);
         }
@@ -506,7 +508,7 @@ public static class RegistrationMetadataMapper
 
         // OIDC Registration §2: the sector document is a redirect_uri array; every registered
         // redirect URI must be a member of it by full string, not merely share a host.
-        foreach (var uri in request.RedirectUris!) {
+        foreach (var uri in redirectUris) {
             if (!sectorUris.Contains(uri)) {
                 throw OAuthError(OAuthErrors.InvalidClientMetadata, SchemataResources.REGISTRATION_SECTOR_URI_MEMBER_REQUIRED,
                     Arg("value", uri));
@@ -515,7 +517,11 @@ public static class RegistrationMetadataMapper
     }
 
     private static void ValidateUriHostConsistency(RegisterRequest request) {
-        var hosts = request.RedirectUris!
+        if (request.RedirectUris is not { } redirectUris) {
+            throw OAuthError(OAuthErrors.InvalidRedirectUri, SchemataResources.REGISTRATION_REDIRECT_URIS_REQUIRED);
+        }
+
+        var hosts = redirectUris
             .Select(u => Uri.TryCreate(u, UriKind.Absolute, out var parsed) ? parsed.Host : null)
             .Where(h => !string.IsNullOrEmpty(h))
             .ToHashSet(StringComparer.Ordinal);

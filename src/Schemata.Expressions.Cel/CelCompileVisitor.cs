@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -367,7 +368,7 @@ internal sealed class CelCompileVisitor
         throw new ParseException($"Type '{type}' is not enumerable.", default);
     }
 
-    private static bool TryGetDictionaryKeyType(Type type, out Type keyType) {
+    private static bool TryGetDictionaryKeyType(Type type, [NotNullWhen(true)] out Type? keyType) {
         if (type.IsGenericType) {
             var definition = type.GetGenericTypeDefinition();
             if (definition == typeof(Dictionary<,>)
@@ -390,13 +391,17 @@ internal sealed class CelCompileVisitor
             }
         }
 
-        keyType = null!;
+        keyType = null;
         return false;
     }
 
-    private static bool TryGetDictionaryContainsKey(Type type, out MethodInfo method, out Type keyType) {
-        keyType = null!;
-        method  = null!;
+    private static bool TryGetDictionaryContainsKey(
+        Type                                type,
+        [NotNullWhen(true)] out MethodInfo? method,
+        [NotNullWhen(true)] out Type?       keyType
+    ) {
+        method  = null;
+        keyType = null;
         if (!TryGetDictionaryKeyType(type, out keyType)) {
             return false;
         }
@@ -414,7 +419,11 @@ internal sealed class CelCompileVisitor
 
             var definition = item.GetGenericTypeDefinition();
             if (definition == typeof(IDictionary<,>) || definition == typeof(IReadOnlyDictionary<,>)) {
-                method = item.GetMethod("ContainsKey", [keyType])!;
+                if (item.GetMethod("ContainsKey", [keyType]) is not { } interfaceMethod) {
+                    continue;
+                }
+
+                method = interfaceMethod;
                 return true;
             }
         }
@@ -438,11 +447,11 @@ internal sealed class CelCompileVisitor
         return typeof(object);
     }
 
-    private static bool TryNumericPromotion(Type left, Type right, out Type common) {
+    private static bool TryNumericPromotion(Type left, Type right, [NotNullWhen(true)] out Type? common) {
         var leftValue  = Nullable.GetUnderlyingType(left) ?? left;
         var rightValue = Nullable.GetUnderlyingType(right) ?? right;
         if (!IsNumeric(leftValue) || !IsNumeric(rightValue)) {
-            common = null!;
+            common = null;
             return false;
         }
 
@@ -495,7 +504,7 @@ internal sealed class CelCompileVisitor
         return _options?.ContextAlias is { } alias && string.Equals(name, alias, StringComparison.Ordinal);
     }
 
-    private static bool TryAccess(Expression source, string name, out Expression expression) {
+    private static bool TryAccess(Expression source, string name, [NotNullWhen(true)] out Expression? expression) {
         var member = source.Type.GetMember(name.Pascalize(), BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
         if (member is PropertyInfo property) {
             expression = Expression.Property(source, property);
@@ -507,7 +516,7 @@ internal sealed class CelCompileVisitor
             return true;
         }
 
-        expression = null!;
+        expression = null;
         return false;
     }
 

@@ -933,14 +933,18 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         }
 
         var entry = await FindTokenAsync(user, InternalLoginProvider, RecoveryCodeTokenName, ct);
-        var splitCodes = entry?.Value?.Split(';');
-        if (splitCodes is null || !splitCodes.Contains(code)) {
+        if (entry is not { Value: { } stored }) {
+            return false;
+        }
+
+        var splitCodes = stored.Split(';');
+        if (!splitCodes.Contains(code)) {
             return false;
         }
 
         // One compare-and-update through the Timestamp register: a concurrent redemption of
         // the same code loses the stamp and reports failure instead of double-spending.
-        entry!.Value = string.Join(";", splitCodes.Where(s => s != code));
+        entry.Value = string.Join(";", splitCodes.Where(s => s != code));
         try {
             await using var transaction = UserTokensRepository.Begin();
             if (await UserTokensRepository.UpdateAsync(entry, ct) != MutationResult.Applied) {

@@ -6,7 +6,7 @@ namespace Schemata.Flow.Skeleton.Models;
 public sealed class ProcessConfiguration
 {
     /// <summary>Process definition name (the value used in canonical names and lookup).</summary>
-    public string Name { get; set; } = null!;
+    public required string Name { get; set; }
 
     public string Version { get; set; } = "1";
 

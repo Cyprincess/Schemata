@@ -79,7 +79,8 @@ public sealed class AdviceApplyChildParent<TEntity, TRequest, TDetail> :
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(child.Parent)) {
+        var parent = child.Parent;
+        if (string.IsNullOrWhiteSpace(parent)) {
             return;
         }
 
@@ -88,14 +89,14 @@ public sealed class AdviceApplyChildParent<TEntity, TRequest, TDetail> :
             return;
         }
 
-        foreach (var segment in child.Parent!.Split('/')) {
+        foreach (var segment in parent.Split('/')) {
             if (segment == "-") {
                 throw new ValidationException([
                     new() {
                         Field       = nameof(IChild.Parent).ToLowerInvariant(),
                         Description = LocalizedMessageFormatter.FormatInvariant(
                             SchemataResources.CROSS_PARENT_UNSUPPORTED,
-                            new Dictionary<string, string?> { ["parent"] = child.Parent }),
+                            new Dictionary<string, string?> { ["parent"] = parent }),
                         Reason      = SchemataResources.CROSS_PARENT_UNSUPPORTED,
                     },
                 ]);
@@ -104,7 +105,7 @@ public sealed class AdviceApplyChildParent<TEntity, TRequest, TDetail> :
 
         // ParseCanonicalName expects a full canonical (parent + leaf); a sentinel leaf
         // satisfies the pattern matcher without leaking into the entity.
-        var sentinel = $"{child.Parent}/{descriptor.Collection}/_";
+        var sentinel = $"{parent}/{descriptor.Collection}/_";
         var parsed   = descriptor.ParseCanonicalName(sentinel);
         if (parsed is null) {
             throw new ValidationException([
@@ -112,7 +113,7 @@ public sealed class AdviceApplyChildParent<TEntity, TRequest, TDetail> :
                     Field       = nameof(IChild.Parent).ToLowerInvariant(),
                     Description = LocalizedMessageFormatter.FormatInvariant(
                         SchemataResources.INVALID_PARENT,
-                        new Dictionary<string, string?> { ["parent"] = child.Parent }),
+                        new Dictionary<string, string?> { ["parent"] = parent }),
                     Reason      = SchemataResources.INVALID_PARENT,
                 },
             ]);

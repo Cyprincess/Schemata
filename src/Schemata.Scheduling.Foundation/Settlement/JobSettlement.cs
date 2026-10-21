@@ -121,20 +121,20 @@ internal sealed class JobSettlement<TJob, TExecution> : IJobSettlement<TJob, TEx
         try {
             persisted = await FindJobAsync(jobs, execution, result.Job, ct);
             owned     = persisted is not null && persisted.ScheduleVersion == execution.ScheduleVersion;
-            replayed  = owned ? Replayed(support, persisted!) : 0;
+            replayed  = owned && persisted is not null ? Replayed(support, persisted) : 0;
             Project(result.Job, result, now, support, replayed);
 
-            if (owned) {
-                CopyResult(result.Job, persisted!);
+            if (owned && persisted is not null) {
+                CopyResult(result.Job, persisted);
 
-                if (await mutation.UpdateAsync(persisted!, unit, ct: ct) != MutationResult.Applied) {
+                if (await mutation.UpdateAsync(persisted, unit, ct: ct) != MutationResult.Applied) {
                     failure = new FailedPreconditionException("Job settlement was not applied.");
                     await unit.RollbackAsync(ct);
 
                     return await RecoverExecutionAsync(lease, result, failure, ct);
                 }
 
-                if (persisted!.State == JobState.Active && persisted.NextRunTime is not null) {
+                if (persisted.State == JobState.Active && persisted.NextRunTime is not null) {
                     try {
                         await support.ReplacePendingExecutionAsync(persisted, executions, services, unit, ct);
                     } catch (Exception error) {
@@ -157,7 +157,7 @@ internal sealed class JobSettlement<TJob, TExecution> : IJobSettlement<TJob, TEx
 
             await unit.CommitAsync(ct);
 
-            if (owned && persisted!.State == JobState.Active && persisted.NextRunTime is not null) {
+            if (owned && persisted is not null && persisted.State == JobState.Active && persisted.NextRunTime is not null) {
                 rearmed = persisted;
             }
 
@@ -204,20 +204,20 @@ internal sealed class JobSettlement<TJob, TExecution> : IJobSettlement<TJob, TEx
                 var mutation  = services.GetRequiredService<IResourceMutation<TJob>>();
                 var persisted = await FindJobAsync(jobs, execution, result.Job, ct);
                 var owned     = persisted is not null && persisted.ScheduleVersion == execution.ScheduleVersion;
-                replayed      = owned ? Replayed(support, persisted!) : 0;
+                replayed      = owned && persisted is not null ? Replayed(support, persisted) : 0;
                 Project(result.Job, result, now, support, replayed);
 
-                if (owned) {
-                    CopyResult(result.Job, persisted!);
+                if (owned && persisted is not null) {
+                    CopyResult(result.Job, persisted);
 
                     await using (var unit = jobs.Begin()) {
-                        if (await mutation.UpdateAsync(persisted!, unit, ct: ct) != MutationResult.Applied) {
+                        if (await mutation.UpdateAsync(persisted, unit, ct: ct) != MutationResult.Applied) {
                             failure = new FailedPreconditionException("Job settlement was not applied.");
                             await unit.RollbackAsync(ct);
                         } else {
                             await unit.CommitAsync(ct);
 
-                            if (persisted!.State == JobState.Active && persisted.NextRunTime is not null) {
+                            if (persisted.State == JobState.Active && persisted.NextRunTime is not null) {
                                 if (executions is not null) {
                                     await StagePendingAsync(services, executions, persisted, support, ct);
                                 }

@@ -197,13 +197,17 @@ public sealed class ResourceRegistry
     }
 
     private void Install(Entry entry, Installation installation) {
+        if (_wiring is not { } wiring) {
+            throw new InvalidOperationException("The resource registry is not attached to pipeline wiring.");
+        }
+
         var resource = entry.Registration;
         if (installation.Resource && !installation.Standard) {
-            _wiring!.RegisterResource(installation.Services, resource);
+            wiring.RegisterResource(installation.Services, resource);
             installation.Standard = true;
         }
         if (!ReferenceEquals(installation.Registration, resource)) {
-            var closures = resource.Methods.Select(method => _wiring!.MethodClosure(resource, method)).ToHashSet();
+            var closures = resource.Methods.Select(method => wiring.MethodClosure(resource, method)).ToHashSet();
             foreach (var closure in installation.Methods.Keys.ToArray()) {
                 if (closures.Contains(closure)) continue;
                 var removed = installation.Methods[closure];
@@ -220,38 +224,38 @@ public sealed class ResourceRegistry
             installation.Registration = resource;
         }
         foreach (var method in resource.Methods) {
-            var closure = _wiring!.MethodClosure(resource, method);
+            var closure = wiring.MethodClosure(resource, method);
             if (!installation.Methods.TryGetValue(closure, out var owned)) {
                 owned = new();
                 installation.Methods.Add(closure, owned);
             }
             if (!installation.Resource || owned.Installed) continue;
             Capture(installation.Services, owned.Descriptors, () => owned.Dependencies.AddRange(
-                _wiring.RegisterMethod(installation.Services, resource, method)));
+                wiring.RegisterMethod(installation.Services, resource, method)));
             owned.Installed = true;
         }
-        ApplySecurity(entry, installation);
-        _wiring!.ApplyStageChoices(installation.Services);
+        ApplySecurity(entry, installation, wiring);
+        wiring.ApplyStageChoices(installation.Services);
     }
 
-    private void ApplySecurity(Entry entry, Installation installation) {
+    private void ApplySecurity(Entry entry, Installation installation, ResourcePipelineWiring wiring) {
         var resource = entry.Registration;
         var authentication = _authentication || resource.AuthenticationScheme is not null;
         var authorization = _authorization || _authorizedEntities.Contains(resource.Entity);
-        if (authentication) _wiring!.RegisterAuthentication(installation.Services, resource, []);
-        if (authorization) _wiring!.RegisterAuthorization(installation.Services, resource, []);
+        if (authentication) wiring.RegisterAuthentication(installation.Services, resource, []);
+        if (authorization) wiring.RegisterAuthorization(installation.Services, resource, []);
         foreach (var method in resource.Methods) {
-            var closure = _wiring!.MethodClosure(resource, method);
+            var closure = wiring.MethodClosure(resource, method);
             if (!installation.Methods.TryGetValue(closure, out var owned)) {
                 owned = new();
                 installation.Methods.Add(closure, owned);
             }
             if (authentication && !owned.Authentication) {
-                Capture(installation.Services, owned.Descriptors, () => _wiring.RegisterAuthentication(installation.Services, resource, [method]));
+                Capture(installation.Services, owned.Descriptors, () => wiring.RegisterAuthentication(installation.Services, resource, [method]));
                 owned.Authentication = true;
             }
             if (authorization && !owned.Authorization) {
-                Capture(installation.Services, owned.Descriptors, () => _wiring.RegisterAuthorization(installation.Services, resource, [method]));
+                Capture(installation.Services, owned.Descriptors, () => wiring.RegisterAuthorization(installation.Services, resource, [method]));
                 owned.Authorization = true;
             }
         }
@@ -283,7 +287,7 @@ public sealed class ResourceRegistry
     }
 
     private void ReplaySecurity(IServiceCollection services) {
-        if (_wiring is null) return;
+        if (_wiring is not { } wiring) return;
         foreach (var entry in _ordered) {
             var installation = entry.Installations.FirstOrDefault(item => ReferenceEquals(item.Services, services));
             if (installation is null) {
@@ -291,7 +295,7 @@ public sealed class ResourceRegistry
                 entry.Installations.Add(installation);
             }
             Adopt(entry, installation);
-            ApplySecurity(entry, installation);
+            ApplySecurity(entry, installation, wiring);
         }
     }
 

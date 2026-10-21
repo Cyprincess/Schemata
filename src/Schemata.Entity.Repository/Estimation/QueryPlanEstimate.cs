@@ -28,11 +28,15 @@ public static class QueryPlanEstimate
                     command.CommandText = "EXPLAIN FORMAT=JSON " + sql;
                     break;
                 case QueryEstimateProvider.SqlServer:
-                    return await EstimateSqlServerAsync(command.Connection!, command.CommandTimeout,
+                    if (command.Connection is not { } connection) {
+                        throw new InvalidOperationException("A SQL Server query plan estimate requires a command connection.");
+                    }
+
+                    return await EstimateSqlServerAsync(connection, command.CommandTimeout,
                         async token => await command.ExecuteScalarAsync(token) as string
                             ?? throw new FormatException("The query plan result is not text."),
                         async (text, timeout, token) => {
-                            await using var mode = command.Connection!.CreateCommand();
+                            await using var mode = connection.CreateCommand();
                             mode.Transaction = command.Transaction;
                             mode.CommandTimeout = timeout;
                             mode.CommandText = text;

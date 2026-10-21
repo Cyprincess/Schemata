@@ -226,7 +226,7 @@ internal sealed class ActorInstance<TActor> : IActorRef
         lock (_lifecycle) {
             _retiredTimerWrites.RemoveAll(static task => task.IsCompletedSuccessfully);
             if (!_timers.Remove(name, out var slot)) return;
-            slot.Timer!.Dispose();
+            slot.Timer?.Dispose();
             if (slot.Write is { IsCompleted: false } pending) _retiredTimerWrites.Add(pending);
         }
     }
@@ -235,7 +235,7 @@ internal sealed class ActorInstance<TActor> : IActorRef
         lock (_lifecycle) {
             _retiredTimerWrites.RemoveAll(static task => task.IsCompletedSuccessfully);
             foreach (var slot in _timers.Values) {
-                slot.Timer!.Dispose();
+                slot.Timer?.Dispose();
                 if (slot.Write is { IsCompleted: false } pending) _retiredTimerWrites.Add(pending);
             }
             _timers.Clear();
@@ -260,7 +260,7 @@ internal sealed class ActorInstance<TActor> : IActorRef
         lock (_lifecycle) {
             if (!_timers.TryGetValue(tick.Name, out var slot) || slot.Generation != tick.Generation) return null;
             slot.Pending = false;
-            if (!slot.Periodic) { _timers.Remove(tick.Name); slot.Timer!.Dispose(); }
+            if (!slot.Periodic) { _timers.Remove(tick.Name); slot.Timer?.Dispose(); }
             return slot.Callback;
         }
     }
@@ -441,8 +441,8 @@ internal sealed class ActorInstance<TActor> : IActorRef
 
                 if (stateStore is not null && !_stateLoaded) {
                     var state = await stateStore.LoadAsync(Id, stopping);
-                    if (state is not null) {
-                        await persistent!.LoadStateAsync(context, state, stopping);
+                    if (state is not null && persistent is { } persistentActor) {
+                        await persistentActor.LoadStateAsync(context, state, stopping);
                     }
 
                     _stateLoaded = true;
@@ -454,13 +454,13 @@ internal sealed class ActorInstance<TActor> : IActorRef
                     await _actor.OnReceiveAsync(context, envelope);
                 }
 
-                if (stateStore is not null) {
+                if (stateStore is not null && persistent is { } stateWriter) {
                     // Save point precedes the reply commit below: a caller observing a successful
                     // reply must be able to rely on the state that produced it already being
                     // durable, and a save failure here falls through to the same catch as any
                     // other turn failure - the reply is discarded and the Ask is faulted with the
                     // save's own exception instead.
-                    var toSave = await persistent!.SaveStateAsync(context);
+                    var toSave = await stateWriter.SaveStateAsync(context);
                     if (toSave is not null) {
                         await stateStore.SaveAsync(Id, toSave, stopping);
                     }

@@ -43,9 +43,13 @@ public static class ScheduleDefinitionMapper
             ScheduleType.OneTime  => job.NextRunTime is { } runTime
                 ? new OneTimeSchedule(runTime)
                 : throw new ArgumentOutOfRangeException(nameof(job), "OneTime job requires a NextRunTime."),
-            ScheduleType.Periodic => new PeriodicSchedule(TimeSpan.FromTicks(job.IntervalTicks!.Value), job.AnchorTime),
-            ScheduleType.Cron     => new CronSchedule(job.CronExpression!),
-            var _                 => throw new ArgumentOutOfRangeException(),
+            ScheduleType.Periodic => job.IntervalTicks is { } intervalTicks
+                ? new PeriodicSchedule(TimeSpan.FromTicks(intervalTicks), job.AnchorTime)
+                : throw new ArgumentOutOfRangeException(nameof(job), "Periodic job requires an IntervalTicks."),
+            ScheduleType.Cron     => job.CronExpression is { } cronExpression
+                ? new CronSchedule(cronExpression)
+                : throw new ArgumentOutOfRangeException(nameof(job), "Cron job requires a CronExpression."),
+            var _ => throw new ArgumentOutOfRangeException(),
         };
     }
 }

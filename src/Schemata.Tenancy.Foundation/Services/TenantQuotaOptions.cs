@@ -19,11 +19,18 @@ internal sealed class TenantQuotaOptions : IPostConfigureOptions<RateLimiterOpti
             try {
                 await rejected(context, ct);
             } catch (QuotaExceededException error) when (!supplied && identity.Uid.HasValue) {
-                foreach (var detail in error.Details!.OfType<QuotaFailureDetail>()) {
-                    foreach (var violation in detail.Violations!) {
-                        violation.Subject = $"tenants/{identity.Uid.Value:D}/{violation.Subject}";
+                if (error.Details is { } details) {
+                    foreach (var detail in details.OfType<QuotaFailureDetail>()) {
+                        if (detail.Violations is not { } violations) {
+                            continue;
+                        }
+
+                        foreach (var violation in violations) {
+                            violation.Subject = $"tenants/{identity.Uid.Value:D}/{violation.Subject}";
+                        }
                     }
                 }
+
                 throw;
             }
         };

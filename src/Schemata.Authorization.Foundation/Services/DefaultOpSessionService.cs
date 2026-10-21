@@ -101,7 +101,8 @@ public sealed class DefaultOpSessionService<TToken>(
                 var grant = AuthorizationGrantContexts.Deserialize(token.GrantContext);
                 if (grant?.NativeSessionKind == NativeSessionKinds.Online
                     && (!online || string.IsNullOrWhiteSpace(grant.OnlineSessionAuthority)
-                        || !string.Equals(slot!.Value, grant.OnlineSessionAuthority, StringComparison.Ordinal))) continue;
+                        || slot is not { } onlineSlot
+                        || !string.Equals(onlineSlot.Value, grant.OnlineSessionAuthority, StringComparison.Ordinal))) continue;
                 associated = true;
                 break;
             }
@@ -185,9 +186,9 @@ public sealed class DefaultOpSessionService<TToken>(
         // a synthetic issuance principal carrying a sid is an OP artifact, not login evidence.
         // The evidence subject is the principal's own claim, so a caller naming another
         // subject collides with this trusted fact and the conflict owner rejects below.
-        if (HasHostAuthenticationBasis(principal)) {
-            var host = principal!.FindFirstValue(Schemata.Abstractions.SchemataConstants.IdentityClaims.Subject);
-            trusted.Add(new(host, principal!.FindFirstValue(authorization.Value.SessionIdClaimType), OpSessionProvenance.HostTicket));
+        if (principal is { } hostPrincipal && HasHostAuthenticationBasis(hostPrincipal)) {
+            var host = hostPrincipal.FindFirstValue(Schemata.Abstractions.SchemataConstants.IdentityClaims.Subject);
+            trusted.Add(new(host, hostPrincipal.FindFirstValue(authorization.Value.SessionIdClaimType), OpSessionProvenance.HostTicket));
         }
 
         var mirrorEvidence = new List<OpSessionEvidence>();

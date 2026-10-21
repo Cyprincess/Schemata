@@ -6,11 +6,11 @@ namespace Schemata.Flow.Event.Events;
 public sealed class ProcessStartedEvent : IEvent
 {
     /// <summary>Canonical name of the process instance.</summary>
-    public string ProcessCanonicalName { get; init; } = null!;
+    public required string ProcessCanonicalName { get; init; }
 
     /// <summary>Registered process definition name.</summary>
-    public string DefinitionName { get; init; } = null!;
+    public required string DefinitionName { get; init; }
 
-    public string DefinitionVersion { get; init; } = null!;
+    public required string DefinitionVersion { get; init; }
 
 }

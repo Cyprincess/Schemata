@@ -33,8 +33,12 @@ internal sealed class JobExecutionLease<TJob, TExecution> : IAsyncDisposable
         _execution = execution;
         _duration = duration;
         _time = time;
-        _confirmedExpiry = execution.LeaseExpireTime!.Value.Ticks;
-        var remaining = execution.LeaseExpireTime!.Value - time.GetUtcNow().UtcDateTime;
+        if (execution.LeaseExpireTime is not { } leaseExpireTime) {
+            throw new InvalidOperationException("A claimed execution must carry a lease expiry time.");
+        }
+
+        _confirmedExpiry = leaseExpireTime.Ticks;
+        var remaining = leaseExpireTime - time.GetUtcNow().UtcDateTime;
         _expiry = new(remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero, time);
         _work = CancellationTokenSource.CreateLinkedTokenSource(ct, _expiry.Token);
         try {
@@ -65,11 +69,11 @@ internal sealed class JobExecutionLease<TJob, TExecution> : IAsyncDisposable
     internal async Task<T> TransitionAsync<T>(
         Func<IServiceProvider, IJobExecutionStore<TJob, TExecution>, CancellationToken, Task<T>> transition,
         CancellationToken                                                                ct = default
-    ) {
+    ) where T : struct {
         await _writes.WaitAsync(CancellationToken.None);
         try {
             if (_settled || _expiry.IsCancellationRequested || Volatile.Read(ref _lost) != 0
-                || _time.GetUtcNow().UtcDateTime.Ticks >= Interlocked.Read(ref _confirmedExpiry)) return default!;
+                || _time.GetUtcNow().UtcDateTime.Ticks >= Interlocked.Read(ref _confirmedExpiry)) return default;
             _settled = true;
             _expiry.CancelAfter(Timeout.InfiniteTimeSpan);
             _stop.Cancel();

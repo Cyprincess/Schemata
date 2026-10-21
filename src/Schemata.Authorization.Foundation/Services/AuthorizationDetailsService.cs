@@ -131,13 +131,16 @@ public sealed class AuthorizationDetailsService(IEnumerable<IAuthorizationDetail
 
         var actual = new JsonArray();
         foreach (var request in requests) {
-            var name = request!["type"]!.GetValue<string>();
+            if (request?["type"]?.GetValue<string>() is not { } name) {
+                throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.INVALID_AUTHORIZATION_DETAILS_TYPE_MEMBER);
+            }
+
             var descriptor = _descriptors[name];
             using var requestedDocument = JsonDocument.Parse(request.ToJsonString());
 
             JsonElement? narrowed = null;
             foreach (var candidate in granted) {
-                if (candidate!["type"]?.GetValue<string>() != name) {
+                if (candidate?["type"]?.GetValue<string>() != name) {
                     continue;
                 }
 

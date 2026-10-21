@@ -111,10 +111,14 @@ internal static class WebPushEncryption
 
     private static byte[] ExportPublicKey(ECDiffieHellman key) {
         var parameters = key.ExportParameters(false);
+        if (parameters.Q.X is not { } x || parameters.Q.Y is not { } y) {
+            throw new CryptographicException("The ECDH key does not expose a public point.");
+        }
+
         var result = new byte[PublicKeyLength];
         result[0] = 0x04;
-        parameters.Q.X!.CopyTo(result, 1);
-        parameters.Q.Y!.CopyTo(result, 33);
+        x.CopyTo(result, 1);
+        y.CopyTo(result, 33);
         return result;
     }
 }
