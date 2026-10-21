@@ -24,18 +24,18 @@ public class SchemataFlowEffectIntent : IIdentifier, IConcurrency, ITimestamp
     ///     <c>{token canonical name}/effects/{ordinal}</c>. A re-driven transition reproduces the same
     ///     value, so the external system can answer an outcome query or deduplicate a re-issue by it.
     /// </summary>
-    public virtual string RequestId { get; set; } = null!;
+    public virtual string RequestId { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>Canonical name of the process instance that owns the effect.</summary>
     [ResourceReference(typeof(SchemataProcess))]
-    public virtual string Process { get; set; } = null!;
+    public virtual string Process { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>Canonical name of the token performing the effect.</summary>
     [ResourceReference(typeof(SchemataProcessToken))]
-    public virtual string Token { get; set; } = null!;
+    public virtual string Token { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>Name of the task element whose body performs the effect.</summary>
-    public virtual string Task { get; set; } = null!;
+    public virtual string Task { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>Lifecycle state of the record.</summary>
     public virtual FlowEffectState State { get; set; }

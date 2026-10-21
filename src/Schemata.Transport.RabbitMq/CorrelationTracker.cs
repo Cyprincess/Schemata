@@ -61,7 +61,7 @@ public sealed class CorrelationTracker : IDisposable
                     if (t.Result is TResponse response) {
                         tcs.TrySetResult(response);
                     } else if (t.Result is null) {
-                        tcs.TrySetResult(default!);
+                        tcs.TrySetResult(default!); // nullable response contract: a null reply is a valid result
                     } else {
                         tcs.TrySetException(new InvalidCastException(
                                                 $"Response type mismatch: expected '{

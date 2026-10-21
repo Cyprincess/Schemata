@@ -15,9 +15,9 @@ public class SchemataProcess : IIdentifier, ICanonicalName, IConcurrency, IDescr
                                ISoftDelete, ITimestamp, IStateful, IAnnotatable
 {
     /// <summary>The <see cref="Models.ProcessDefinition.Name" /> of the source definition.</summary>
-    public virtual string DefinitionName { get; set; } = null!;
+    public virtual string DefinitionName { get; set; } = null!; // EF Core materializes this required column.
 
-    public virtual string DefinitionVersion { get; set; } = null!;
+    public virtual string DefinitionVersion { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>
     ///     Per-process idempotency key copied from start options and released once the process

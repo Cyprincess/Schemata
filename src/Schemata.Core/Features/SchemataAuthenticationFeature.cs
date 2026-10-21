@@ -16,8 +16,7 @@ namespace Schemata.Core.Features;
 ///     <see cref="AuthenticationBuilder" />, and
 ///     <see cref="AuthorizationOptions" />. Core registers the native ASP.NET Core
 ///     <see cref="IAuthenticationService" />; a component that needs per-request scheme-scope
-///     routing (for example tenancy's client state profiles) installs its own facade when it
-///     activates.
+///     routing installs its own facade when that component activates.
 /// </summary>
 public sealed class SchemataAuthenticationFeature : FeatureBase
 {

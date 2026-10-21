@@ -10,7 +10,7 @@ namespace Schemata.Flow.Skeleton.Models;
 /// </summary>
 public abstract class FlowElement : FlowGraphNode, IDescriptive
 {
-    private string _name = null!;
+    private string _name = null!; // BPMN AST: the parser assigns the value before use.
 
     /// <summary>
     ///     Canonical element name: the element's identity within its process definition.

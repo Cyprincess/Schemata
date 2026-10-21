@@ -44,7 +44,7 @@ public sealed class InProcessStreamDispatcher(IServiceProvider services, IMessag
         private AdviceContext? _advice;
         private IAsyncEnumerator<TItem>? _inner;
         private bool _finished;
-        private TItem _current = default!;
+        private TItem _current = default!; // definite-assignment sentinel: set by MoveNextAsync before Current is read
 
         internal Enumerator(IMessageExecutionScopeFactory scopes, TRequest request, MessageContext captured,
             ClaimsPrincipal? principal, CancellationToken invocation, CancellationToken enumeration) {

@@ -21,7 +21,7 @@ public sealed class ProcessRegistration
     ///     The engine name (<c>"StateMachine"</c> or <c>"Bpmn"</c>) that
     ///     should execute instances of this process.
     /// </summary>
-    public string Engine { get; init; } = null!;
+    public string Engine { get; init; } = null!; // Wire/registration DTO: the caller assigns the value before use.
 
     /// <summary>
     ///     The loaded process definition AST.

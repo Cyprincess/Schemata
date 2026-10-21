@@ -17,9 +17,9 @@ namespace Schemata.Actor.Skeleton.Entities;
 [Index(nameof(ActorType), nameof(ActorKey), IsUnique = true)]
 public class SchemataActor : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
-    public virtual string ActorType { get; set; } = null!;
+    public virtual string ActorType { get; set; } = null!; // EF Core materializes this required column.
 
-    public virtual string ActorKey { get; set; } = null!;
+    public virtual string ActorKey { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>
     ///     The serialized state last produced by <see cref="IPersistentActor.SaveStateAsync" />,

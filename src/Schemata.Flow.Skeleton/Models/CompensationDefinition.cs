@@ -9,7 +9,7 @@ namespace Schemata.Flow.Skeleton.Models;
 public sealed class CompensationDefinition : FlowGraphNode, IEventDefinition
 {
     private Activity? _activity;
-    private string _name = null!;
+    private string _name = null!; // BPMN AST: the parser assigns the value before use.
 
     /// <summary>
     ///     The activity whose compensation handler should be invoked.

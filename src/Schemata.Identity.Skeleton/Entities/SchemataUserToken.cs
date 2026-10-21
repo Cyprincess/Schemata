@@ -13,11 +13,11 @@ namespace Schemata.Identity.Skeleton.Entities;
 [PrimaryKey(nameof(UserId), nameof(LoginProvider), nameof(Name))]
 public class SchemataUserToken : IdentityUserToken<string>, IConcurrency, ITimestamp
 {
-    public override string UserId { get; set; } = null!;
+    public override string UserId { get; set; } = null!; // EF Core materializes this required column.
 
-    public override string LoginProvider { get; set; } = null!;
+    public override string LoginProvider { get; set; } = null!; // EF Core materializes this required column.
 
-    public override string Name { get; set; } = null!;
+    public override string Name { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>Optimistic-lock register fencing concurrent redemptions of the code list.</summary>
     [ConcurrencyCheck]

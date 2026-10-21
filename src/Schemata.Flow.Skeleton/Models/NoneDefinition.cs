@@ -7,7 +7,7 @@ namespace Schemata.Flow.Skeleton.Models;
 /// </summary>
 public sealed class NoneDefinition : FlowGraphNode, IEventDefinition
 {
-    private string _name = null!;
+    private string _name = null!; // BPMN AST: the parser assigns the value before use.
 
     #region IEventDefinition Members
 

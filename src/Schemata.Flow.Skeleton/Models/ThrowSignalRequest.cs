@@ -10,7 +10,7 @@ namespace Schemata.Flow.Skeleton.Models;
 public sealed class ThrowSignalRequest : ICanonicalName, IRequestIdentification, ICommand<EmptyResourceResponse>, IRequestPrincipal, IResourceDispatchCarrier
 {
     /// <summary>The <see cref="Models.Signal.Name" /> of the signal definition to throw.</summary>
-    public string SignalName { get; set; } = null!;
+    public string SignalName { get; set; } = null!; // Wire DTO: the caller or deserializer assigns the value before use.
 
     /// <summary>Optional serialized signal payload.</summary>
     public string? Payload { get; set; }

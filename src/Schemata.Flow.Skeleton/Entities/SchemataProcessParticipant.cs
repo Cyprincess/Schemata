@@ -15,8 +15,8 @@ public class SchemataProcessParticipant : IIdentifier, IConcurrency, ITimestamp
     [ConcurrencyCheck]
     public virtual Guid Timestamp { get; set; }
     [ResourceReference(typeof(SchemataProcess))]
-    public virtual string Process { get; set; } = null!;
-    public virtual string Subject { get; set; } = null!;
+    public virtual string Process { get; set; } = null!; // EF Core materializes this required column.
+    public virtual string Subject { get; set; } = null!; // EF Core materializes this required column.
     public virtual ProcessParticipationKind Kind { get; set; }
     [ResourceReference(typeof(SchemataProcessToken))]
     public virtual string? Token { get; set; }

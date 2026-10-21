@@ -8,7 +8,7 @@ namespace Schemata.Flow.Skeleton.Models;
 /// </summary>
 public sealed class ParallelDefinition : FlowGraphNode, IEventDefinition
 {
-    private string _name = null!;
+    private string _name = null!; // BPMN AST: the parser assigns the value before use.
 
     /// <summary>
     ///     The contained event definitions - all must match before the event fires.

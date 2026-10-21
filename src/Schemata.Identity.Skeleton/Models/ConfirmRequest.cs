@@ -17,5 +17,5 @@ public class ConfirmRequest
 
     /// <summary>Verification code sent to the email or phone.</summary>
     [Required]
-    public string Code { get; set; } = null!;
+    public string Code { get; set; } = null!; // Wire DTO: the deserializer assigns the value before use.
 }

@@ -12,9 +12,9 @@ namespace Schemata.Identity.Skeleton.Entities;
 [PrimaryKey(nameof(LoginProvider), nameof(ProviderKey))]
 public class SchemataUserLogin : IdentityUserLogin<string>, ITimestamp
 {
-    public override string LoginProvider { get; set; } = null!;
+    public override string LoginProvider { get; set; } = null!; // EF Core materializes this required column.
 
-    public override string ProviderKey { get; set; } = null!;
+    public override string ProviderKey { get; set; } = null!; // EF Core materializes this required column.
 
     #region ITimestamp Members
 

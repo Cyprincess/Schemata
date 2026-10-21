@@ -11,8 +11,8 @@ namespace Schemata.Flow.Skeleton.Models;
 public sealed class ErrorDefinition : FlowGraphNode, IEventDefinition
 {
     private string? _errorCode;
-    private Type _exceptionType = null!;
-    private string _name = null!;
+    private Type _exceptionType = null!; // BPMN AST: the parser assigns the value before use.
+    private string _name = null!; // BPMN AST: the parser assigns the value before use.
 
     /// <summary>
     ///     An optional BPMN error code used alongside the exception type for matching.

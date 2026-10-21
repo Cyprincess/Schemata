@@ -9,11 +9,11 @@ public class LoginRequest
 {
     /// <summary>Account username used for authentication.</summary>
     [Required]
-    public string Username { get; set; } = null!;
+    public string Username { get; set; } = null!; // Wire DTO: the deserializer assigns the value before use.
 
     /// <summary>Account password.</summary>
     [Required]
-    public string Password { get; set; } = null!;
+    public string Password { get; set; } = null!; // Wire DTO: the deserializer assigns the value before use.
 
     /// <summary>TOTP code from an authenticator app for two-factor verification.</summary>
     public string? TwoFactorCode { get; set; }

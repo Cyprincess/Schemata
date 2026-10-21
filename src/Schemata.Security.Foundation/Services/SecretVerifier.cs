@@ -32,6 +32,7 @@ public class SecretVerifier : ISecretVerifier
     public Task<string> HashAsync(string presented, string? algorithm = null, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
 
+        // The native password hasher ignores its user argument; null is the documented contract here.
         return Task.FromResult(Hasher(algorithm).HashPassword(null!, presented));
     }
 
@@ -53,6 +54,7 @@ public class SecretVerifier : ISecretVerifier
             return false;
         }
 
+        // The native password hasher ignores its user argument; null is the documented contract here.
         return Hasher(stored.Algorithm).VerifyHashedPassword(null!, stored.Value, presented)
             is PasswordVerificationResult.Success or PasswordVerificationResult.SuccessRehashNeeded;
     }

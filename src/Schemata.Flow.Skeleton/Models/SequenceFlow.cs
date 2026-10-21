@@ -11,8 +11,8 @@ namespace Schemata.Flow.Skeleton.Models;
 /// </summary>
 public sealed class SequenceFlow : FlowGraphNode, IDescriptive
 {
-    private FlowElement _source = null!;
-    private FlowElement _target = null!;
+    private FlowElement _source = null!; // BPMN AST: the parser assigns the value before use.
+    private FlowElement _target = null!; // BPMN AST: the parser assigns the value before use.
     private IConditionExpression? _condition;
     private bool _isDefault;
 

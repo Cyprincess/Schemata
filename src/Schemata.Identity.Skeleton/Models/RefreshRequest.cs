@@ -9,5 +9,5 @@ public class RefreshRequest
 {
     /// <summary>Opaque refresh token issued for credential renewal.</summary>
     [Required]
-    public string RefreshToken { get; set; } = null!;
+    public string RefreshToken { get; set; } = null!; // Wire DTO: the deserializer assigns the value before use.
 }

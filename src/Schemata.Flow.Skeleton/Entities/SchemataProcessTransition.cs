@@ -76,7 +76,7 @@ public class SchemataProcessTransition : IIdentifier, ICanonicalName, IConcurren
 
     #region ITransition Members
 
-    public virtual string Event { get; set; } = null!;
+    public virtual string Event { get; set; } = null!; // EF Core materializes this required column.
 
     public virtual string? Note { get; set; }
 

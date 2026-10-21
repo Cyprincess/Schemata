@@ -188,7 +188,7 @@ public sealed class TenantActorSystem<TActor>(
                 var scope = await scopes.CreateAsync(context ?? captured, ct);
                 IDisposable? lease = null;
                 Exception? failure = null;
-                TResponse response = default!;
+                TResponse response = default!; // definite-assignment sentinel: assigned on every path before the result is used
                 try {
                     lease = scope.Enter();
                     Validate();

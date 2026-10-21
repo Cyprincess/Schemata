@@ -63,7 +63,7 @@ public class ProcessDefinition : FlowGraphNode, IDescriptive
             EnsureMutable();
             field = value;
         }
-    } = null!;
+    } = null!; // BPMN AST: the parser assigns the value before use.
 
     /// <summary>Human-readable label surfaced in tooling and audit rows.</summary>
     public string? DisplayName { get; set; }

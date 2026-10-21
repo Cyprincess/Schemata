@@ -17,9 +17,9 @@ public class ResetRequest
 
     /// <summary>Password reset code received via email or SMS.</summary>
     [Required]
-    public string Code { get; set; } = null!;
+    public string Code { get; set; } = null!; // Wire DTO: the deserializer assigns the value before use.
 
     /// <summary>New password to set; must satisfy configured password policy.</summary>
     [Required]
-    public string Password { get; set; } = null!;
+    public string Password { get; set; } = null!; // Wire DTO: the deserializer assigns the value before use.
 }

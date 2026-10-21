@@ -41,7 +41,7 @@ public class FlowTransitionContext
     /// </summary>
     public IUnitOfWork? UnitOfWork { get; set; }
 
-    public FlowExecutionContext Execution { get; set; } = null!;
+    public FlowExecutionContext Execution { get; set; } = null!; // Definite-assignment: the observer context is built before notification.
 
     /// <summary>
     ///     The principal that initiated the operation producing this transition, or

@@ -9,8 +9,8 @@ namespace Schemata.Flow.Skeleton.Models;
 /// </summary>
 public sealed class ConditionalDefinition : FlowGraphNode, IEventDefinition
 {
-    private IConditionExpression _condition = null!;
-    private string _name = null!;
+    private IConditionExpression _condition = null!; // BPMN AST: the parser assigns the value before use.
+    private string _name = null!; // BPMN AST: the parser assigns the value before use.
 
     /// <summary>
     ///     The condition expression that must become <c>true</c> for this event to trigger.

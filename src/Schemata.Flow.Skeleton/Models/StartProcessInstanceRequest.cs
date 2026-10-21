@@ -11,7 +11,7 @@ namespace Schemata.Flow.Skeleton.Models;
 public sealed class StartProcessInstanceRequest : ICanonicalName, IRequestIdentification, ICommand<SchemataProcess>, IRequestPrincipal, IResourceDispatchCarrier
 {
     /// <summary>The <see cref="Models.ProcessDefinition.Name" /> of the definition to instantiate.</summary>
-    public string DefinitionName { get; set; } = null!;
+    public string DefinitionName { get; set; } = null!; // Wire DTO: the caller or deserializer assigns the value before use.
 
     public string DefinitionVersion { get; set; } = "1";
 

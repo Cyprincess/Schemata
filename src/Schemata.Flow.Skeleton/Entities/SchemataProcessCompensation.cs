@@ -15,16 +15,16 @@ public class SchemataProcessCompensation : IIdentifier, ICanonicalName, IConcurr
     public virtual Guid Timestamp { get; set; }
 
     /// <summary>Canonical name of the process that owns this compensation binding.</summary>
-    public virtual string Process { get; set; } = null!;
+    public virtual string Process { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>Canonical name of the scope that registered the compensating activity.</summary>
-    public virtual string ScopeOwnerCanonicalName { get; set; } = null!;
+    public virtual string ScopeOwnerCanonicalName { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>Name of the activity invoked when this binding is compensated.</summary>
-    public virtual string ActivityName { get; set; } = null!;
+    public virtual string ActivityName { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>Graph name of the compensation boundary event this binding was registered for.</summary>
-    public virtual string BoundaryName { get; set; } = null!;
+    public virtual string BoundaryName { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>Stable registration order within the owning compensation scope.</summary>
     public virtual int RegistrationOrder { get; set; }

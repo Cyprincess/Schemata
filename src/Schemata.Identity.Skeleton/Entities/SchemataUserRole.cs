@@ -12,9 +12,9 @@ namespace Schemata.Identity.Skeleton.Entities;
 [PrimaryKey(nameof(UserId), nameof(RoleId))]
 public class SchemataUserRole : IdentityUserRole<string>, ITimestamp
 {
-    public override string UserId { get; set; } = null!;
+    public override string UserId { get; set; } = null!; // EF Core materializes this required column.
 
-    public override string RoleId { get; set; } = null!;
+    public override string RoleId { get; set; } = null!; // EF Core materializes this required column.
 
     #region ITimestamp Members
 

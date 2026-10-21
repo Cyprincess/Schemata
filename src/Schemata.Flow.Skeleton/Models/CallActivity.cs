@@ -7,7 +7,7 @@ namespace Schemata.Flow.Skeleton.Models;
 /// </summary>
 public sealed class CallActivity : Activity
 {
-    private string _calledElement = null!;
+    private string _calledElement = null!; // BPMN AST: the parser assigns the value before use.
     private string _definitionVersion = "1";
 
     /// <summary>

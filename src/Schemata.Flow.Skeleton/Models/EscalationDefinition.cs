@@ -9,7 +9,7 @@ namespace Schemata.Flow.Skeleton.Models;
 public sealed class EscalationDefinition : FlowGraphNode, IEventDefinition
 {
     private string? _escalationCode;
-    private string _name = null!;
+    private string _name = null!; // BPMN AST: the parser assigns the value before use.
 
     /// <summary>
     ///     An optional escalation code for matching.

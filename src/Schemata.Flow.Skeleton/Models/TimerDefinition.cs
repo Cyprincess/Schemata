@@ -9,8 +9,8 @@ namespace Schemata.Flow.Skeleton.Models;
 public sealed class TimerDefinition : FlowGraphNode, IEventDefinition
 {
     private TimerType _timerType;
-    private string _timeExpression = null!;
-    private string _name = null!;
+    private string _timeExpression = null!; // BPMN AST: the parser assigns the value before use.
+    private string _name = null!; // BPMN AST: the parser assigns the value before use.
 
     /// <summary>
     ///     Whether the time expression is a fixed date, duration, or cycle.

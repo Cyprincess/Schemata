@@ -9,7 +9,7 @@ namespace Schemata.Flow.Skeleton.Models;
 public class Message : FlowGraphNode, IEventDefinition
 {
     private Type? _payloadType;
-    private string _name = null!;
+    private string _name = null!; // BPMN AST: the parser assigns the value before use.
 
     /// <summary>
     ///     The CLR type of the payload carried by this message.

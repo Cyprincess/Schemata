@@ -17,21 +17,21 @@ public class SchemataProcessSource : IIdentifier, IConcurrency, ITimestamp
 {
     /// <summary>Canonical name of the owning process.</summary>
     [ResourceReference(typeof(SchemataProcess))]
-    public virtual string Process { get; set; } = null!;
+    public virtual string Process { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>Canonical name of the owning token, or <see langword="null" /> for process-level bindings.</summary>
     [ResourceReference(typeof(SchemataProcessToken))]
     public virtual string? Token { get; set; }
 
     /// <summary>Flow binding name used by source-aware DSL and task context APIs.</summary>
-    public virtual string Name { get; set; } = null!;
+    public virtual string Name { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>CLR type name recorded for registry lookup and audit.</summary>
-    public virtual string SourceType { get; set; } = null!;
+    public virtual string SourceType { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>Canonical name of the bound source entity.</summary>
     [ResourceReference]
-    public virtual string Source { get; set; } = null!;
+    public virtual string Source { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>Concurrency timestamp observed on the bound source entity.</summary>
     public virtual Guid? SourceTimestamp { get; set; }

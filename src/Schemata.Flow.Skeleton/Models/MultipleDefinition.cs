@@ -9,7 +9,7 @@ namespace Schemata.Flow.Skeleton.Models;
 /// </summary>
 public sealed class MultipleDefinition : FlowGraphNode, IEventDefinition
 {
-    private string _name = null!;
+    private string _name = null!; // BPMN AST: the parser assigns the value before use.
 
     /// <summary>
     ///     The contained event definitions. At catch: first match wins.

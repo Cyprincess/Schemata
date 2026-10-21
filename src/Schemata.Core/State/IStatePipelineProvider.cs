@@ -43,8 +43,9 @@ public interface IStatePipelineProvider
 ///     Composes the native state middleware over a service provider with a fresh
 ///     <see cref="ApplicationBuilder" /> seeded from the startup application
 ///     properties. The session and antiforgery features register it over the
-///     host application services as the global implementation; a state profile
-///     registers its own instance over profile services for the same contract.
+///     host application services as the global implementation; a consumer that
+///     needs a different per-request branch registers its own instance over the
+///     services of that scope for the same contract.
 /// </summary>
 public sealed class DefaultStatePipelineProvider : IStatePipelineProvider
 {
