@@ -867,7 +867,9 @@ public class JobExecutionDispatcherShould
                                               .AddSchemataSchedulingRepositoryStore()
                                               .Configure<SchemataSchedulingOptions>(options => options.Jobs.Add(
                                                    new JobRegistration(typeof(SignalingJob)) {
-                                                       Lease = TimeSpan.FromMilliseconds(100),
+                                                       // Wide enough that a loaded CI runner cannot expire the
+                                                       // lease before the takeover/renewal race under test.
+                                                       Lease = TimeSpan.FromSeconds(1),
                                                    }))
                                               .BuildServiceProvider();
 
