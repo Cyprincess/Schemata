@@ -66,7 +66,7 @@ public class SchemataAuthenticationHandler<TApp, TSecurity, TToken>(
     /// </summary>
     public static bool IsUserGrant(IDictionary<string, string?> items) {
         items.TryGetValue(Properties.GrantType, out var grant);
-        return grant is GrantTypes.AuthorizationCode or GrantTypes.RefreshToken or GrantTypes.TokenExchange;
+        return grant is GrantTypes.AuthorizationCode or GrantTypes.Implicit or GrantTypes.RefreshToken or GrantTypes.TokenExchange;
     }
 
     /// <summary>

@@ -748,6 +748,43 @@ public class AuthorizationSignInServiceShould
     }
 
 
+    [Theory]
+    [InlineData(ResponseTypes.IdToken)]
+    [InlineData("id_token token")]
+    public async Task Issue_An_Id_Token_For_A_Pure_Implicit_OpenId_Response(string responseType) {
+        using var provider = Provider(out _);
+        var (service, tokens) = Create(provider, application: new SchemataApplication {
+            ClientId = "client-1",
+        });
+        tokens.Setup(value => value.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(),
+                                               It.IsAny<Func<Schemata.Entity.Repository.IUnitOfWork, CancellationToken, Task>?>()))
+              .ReturnsAsync((SchemataToken? token, CancellationToken _, Func<Schemata.Entity.Repository.IUnitOfWork, CancellationToken, Task>? _) => token!);
+        var principal = new ClaimsPrincipal(new ClaimsIdentity([
+            new(IdentityClaims.Subject, "user-1"),
+            new(Claims.ClientId, "client-1"),
+        ], "authorize"));
+
+        var items = new Dictionary<string, string?> {
+            [Properties.GrantType]    = GrantTypes.Implicit,
+            [Properties.GrantProfile] = GrantProfiles.OpenIdConnect,
+            [Properties.ResponseType] = responseType,
+            [Properties.RedirectUri]  = "https://client.example/callback",
+            [Properties.Scope]        = Scopes.OpenId,
+            [Properties.SessionId]    = "sid-1",
+        };
+        var result = await service.IssueAsync(principal, items, AuthorizationSignInResponseKind.Callback);
+
+        Assert.NotNull(result.Callback);
+        Assert.True(result.Callback.Parameters.ContainsKey(Parameters.IdToken));
+        var idToken = new JsonWebTokenHandler().ReadJsonWebToken(result.Callback.Parameters[Parameters.IdToken]);
+        Assert.Equal("sid-1", idToken.Claims.Single(claim => claim.Type == Claims.SessionId).Value);
+        if (responseType.Split(' ').Contains(ResponseTypes.Token, StringComparer.Ordinal)) {
+            Assert.True(result.Callback.Parameters.ContainsKey(Parameters.AccessToken));
+        } else {
+            Assert.False(result.Callback.Parameters.ContainsKey(Parameters.AccessToken));
+        }
+    }
+
     [Fact]
     public async Task Persist_The_Established_Generation_On_An_Online_Grant() {
         var sessions = new Mock<IOpSessionService>();
