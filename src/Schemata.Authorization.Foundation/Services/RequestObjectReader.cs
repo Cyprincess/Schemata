@@ -17,6 +17,7 @@ using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Caching.Skeleton;
+using Schemata.Common;
 using Schemata.Security.Skeleton.Entities;
 using Schemata.Security.Skeleton.Services;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
@@ -244,8 +245,8 @@ public sealed class RequestObjectReader<TApp, TSecurity>(
         merged.RequestUri = target.RequestUri;
         merged.ClientId = clientId;
 
-        foreach (var prop in typeof(AuthorizeRequest).GetProperties()) {
-            prop.SetValue(target, prop.GetValue(merged));
+        foreach (var property in AppDomainTypeCache.GetProperties(typeof(AuthorizeRequest)).Values) {
+            property.SetValue(target, property.GetValue(merged));
         }
     }
 

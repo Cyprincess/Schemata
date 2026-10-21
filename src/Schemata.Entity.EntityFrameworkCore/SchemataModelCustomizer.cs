@@ -6,6 +6,7 @@ using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Schemata.Common;
 using Schemata.Entity.EntityFrameworkCore.Conversions;
 using Schemata.Entity.Repository.Conversions;
 using IndexAttribute = Schemata.Abstractions.Entities.IndexAttribute;
@@ -50,7 +51,7 @@ public sealed class SchemataModelCustomizer : ModelCustomizer
             if (index.Filter is not null) builder.HasFilter(index.Filter);
         }
 
-        foreach (var property in clrType.GetProperties(BindingFlags.Instance | BindingFlags.Public)) {
+        foreach (var property in AppDomainTypeCache.GetProperties(clrType).Values) {
             if (property.GetIndexParameters().Length > 0) {
                 continue;
             }

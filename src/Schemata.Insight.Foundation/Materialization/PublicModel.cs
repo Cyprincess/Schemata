@@ -10,6 +10,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json.Serialization;
 using Humanizer;
 using Schemata.Abstractions;
+using Schemata.Common;
 using Schemata.Insight.Skeleton.Models;
 using Schemata.Insight.Foundation.Planning;
 
@@ -26,9 +27,9 @@ internal sealed class PublicModel
     private PublicModel(Type type) {
         Type = type;
         _bind = BindProperties;
-        var properties = type.GetProperties(BindingFlags.Instance | BindingFlags.Public);
-        _declared = properties.Select(p => p.Name).Concat(type.GetFields(BindingFlags.Instance | BindingFlags.Public).Select(f => f.Name)).ToHashSet(StringComparer.Ordinal);
-        _properties = properties.Where(IsPubliclyReadable).ToDictionary(p => p.Name.Underscore(), StringComparer.Ordinal);
+        var properties = AppDomainTypeCache.GetProperties(type);
+        _declared   = properties.Keys.Concat(AppDomainTypeCache.GetFields(type).Keys).ToHashSet(StringComparer.Ordinal);
+        _properties = properties.Values.Where(IsPubliclyReadable).ToDictionary(p => p.Name.Underscore(), StringComparer.Ordinal);
     }
 
     // [JsonIgnore] without a condition carries Condition = Always; Condition = Never opts the
@@ -52,8 +53,13 @@ internal sealed class PublicModel
         throw Invalid(name);
     }
 
-    internal PropertyInfo[] Bind(ImmutableArray<FieldDescriptor> fields) => _bindings.GetValue(
-        ImmutableCollectionsMarshal.AsArray(fields)!, _bind);
+    internal PropertyInfo[] Bind(ImmutableArray<FieldDescriptor> fields) {
+        if (ImmutableCollectionsMarshal.AsArray(fields) is not { } items) {
+            throw new ArgumentNullException(nameof(fields));
+        }
+
+        return _bindings.GetValue(items, _bind);
+    }
 
     private PropertyInfo[] BindProperties(FieldDescriptor[] fields) {
         var properties = new PropertyInfo[fields.Length];
@@ -85,13 +91,21 @@ internal sealed class PublicModel
         PropertyInfo? keyProperty = null;
         PropertyInfo? valueProperty = null;
         foreach (var pair in (IEnumerable)value) {
-            if (keyProperty is null) {
-                var model = For(pair!.GetType());
-                keyProperty = model.Property("key");
+            if (pair is not { } item) {
+                throw Invalid("null map entry");
+            }
+
+            if (keyProperty is null || valueProperty is null) {
+                var model     = For(item.GetType());
+                keyProperty   = model.Property("key");
                 valueProperty = model.Property("value");
             }
-            if (keyProperty.GetValue(pair) is not string key) throw Invalid("non-string map key");
-            yield return new(key, valueProperty!.GetValue(pair));
+
+            if (keyProperty.GetValue(item) is not string key) {
+                throw Invalid("non-string map key");
+            }
+
+            yield return new(key, valueProperty.GetValue(item));
         }
     }
 

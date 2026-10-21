@@ -5,6 +5,7 @@ using System.Reflection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Resource;
 using Schemata.Abstractions.Linking;
+using Schemata.Common;
 
 namespace Schemata.Transport.Grpc.Linking;
 
@@ -25,7 +26,7 @@ public sealed class ResourcePaginationLinkContributor : IGrpcLinkContributor
         }
 
         var property = NextPageTokens.GetOrAdd(context.Response.GetType(),
-            static type => type.GetProperty(nameof(ListResultBase<object, object>.NextPageToken)));
+            static type => AppDomainTypeCache.GetProperty(type, nameof(ListResultBase<object, object>.NextPageToken)));
         if (property?.GetValue(context.Response) is not string { Length: > 0 } token) {
             return [];
         }

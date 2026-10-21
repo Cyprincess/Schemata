@@ -7,9 +7,22 @@ using System.Reflection;
 namespace Schemata.Common;
 
 /// <summary>
-///     Thread-safe cache of all assemblies, exported types, and property metadata in the current
-///     <see cref="AppDomain" />.
+///     Thread-safe cache of all assemblies, exported types, and property and field metadata in the
+///     current <see cref="AppDomain" />.
 /// </summary>
+/// <remarks>
+///     The cache stores type metadata only and never holds request-scoped state, so one instance is
+///     safe to share across requests and tenants. Assembly discovery is incremental: accessors that
+///     resolve an assembly or type re-scan <see cref="AppDomain.CurrentDomain" /> and index only the
+///     assemblies that were not indexed before, so assemblies loaded after the first touch become
+///     visible while entries indexed by earlier scans are never cleared.
+///     <para>
+///         Closed-generic method reflection (<see cref="Type.GetMethod(string, Type[])" /> and
+///         <see cref="MethodInfo.MakeGenericMethod(Type[])" />) stays direct this round: decision D10
+///         keeps method metadata out of the cache unless a measurement shows the lookup cost matters,
+///         so this class exposes no method accessors.
+///     </para>
+/// </remarks>
 public static class AppDomainTypeCache
 {
     /// <summary>
@@ -27,6 +40,10 @@ public static class AppDomainTypeCache
     /// </summary>
     public static readonly ConcurrentDictionary<RuntimeTypeHandle, Dictionary<string, PropertyInfo>> Properties;
 
+    private static readonly ConcurrentDictionary<RuntimeTypeHandle, Dictionary<string, FieldInfo>> Fields = new();
+
+    private static readonly ConcurrentDictionary<Assembly, byte> IndexedAssemblies = new();
+
     private static readonly ConcurrentDictionary<RuntimeTypeHandle, Dictionary<string, PropertyInfo>> StaticProperties = new();
 
     private static readonly ConcurrentDictionary<RuntimeTypeHandle, PropertyInfo[]> WritableProperties = [];
@@ -36,27 +53,18 @@ public static class AppDomainTypeCache
         Types      = [];
         Properties = [];
 
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
-            if (assembly.IsDynamic) {
-                continue;
-            }
+        Refresh();
+    }
 
-            var name = assembly.GetName().Name;
-            if (string.IsNullOrWhiteSpace(name)) {
-                continue;
-            }
+    /// <summary>
+    ///     Gets every exported type from the assemblies loaded in the current <see cref="AppDomain" />,
+    ///     re-scanning assemblies that were loaded after the previous scan.
+    /// </summary>
+    /// <returns>A snapshot of the cached exported types.</returns>
+    public static IEnumerable<Type> GetAllTypes() {
+        Refresh();
 
-            Assemblies[name] = assembly;
-
-            var types = assembly.GetExportedTypes();
-            foreach (var type in types) {
-                if (string.IsNullOrWhiteSpace(type.FullName)) {
-                    continue;
-                }
-
-                Types[type.FullName] = type;
-            }
-        }
+        return Types.Values;
     }
 
     /// <summary>
@@ -69,9 +77,13 @@ public static class AppDomainTypeCache
             return assembly;
         }
 
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        Refresh();
 
-        assembly = assemblies.FirstOrDefault(a => a.GetName().Name == name);
+        if (Assemblies.TryGetValue(name, out assembly)) {
+            return assembly;
+        }
+
+        assembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == name);
         if (assembly is null) {
             return null;
         }
@@ -94,6 +106,12 @@ public static class AppDomainTypeCache
         type = Type.GetType(name, false);
         if (!string.IsNullOrWhiteSpace(type?.FullName)) {
             Types[type.FullName] = type;
+            return type;
+        }
+
+        Refresh();
+
+        if (Types.TryGetValue(name, out type)) {
             return type;
         }
 
@@ -129,6 +147,23 @@ public static class AppDomainTypeCache
         Properties[type.TypeHandle] = properties;
 
         return properties;
+    }
+
+    /// <summary>
+    ///     Gets all public instance fields for the specified type, cached by type handle.
+    /// </summary>
+    /// <param name="type">The type to inspect.</param>
+    /// <returns>A dictionary of field names to field info.</returns>
+    public static Dictionary<string, FieldInfo> GetFields(Type type) {
+        if (Fields.TryGetValue(type.TypeHandle, out var fields)) {
+            return fields;
+        }
+
+        fields = type.GetFields(BindingFlags.Public | BindingFlags.Instance)
+                     .ToDictionary(m => m.Name, m => m);
+        Fields[type.TypeHandle] = fields;
+
+        return fields;
     }
 
     /// <summary>
@@ -170,5 +205,41 @@ public static class AppDomainTypeCache
             type);
 
         return properties.GetValueOrDefault(name);
+    }
+
+    private static void Refresh() {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
+            Index(assembly);
+        }
+    }
+
+    private static void Index(Assembly assembly) {
+        if (assembly.IsDynamic || !IndexedAssemblies.TryAdd(assembly, 0)) {
+            return;
+        }
+
+        var name = assembly.GetName().Name;
+        if (string.IsNullOrWhiteSpace(name)) {
+            return;
+        }
+
+        Assemblies[name] = assembly;
+
+        IEnumerable<Type> types;
+        try {
+            types = assembly.GetExportedTypes();
+        } catch (ReflectionTypeLoadException exception) {
+            // A late-loaded assembly can reference types whose dependencies are not resolvable yet;
+            // indexing the loadable types keeps the rest of the application working.
+            types = exception.Types.OfType<Type>();
+        }
+
+        foreach (var type in types) {
+            if (string.IsNullOrWhiteSpace(type.FullName)) {
+                continue;
+            }
+
+            Types[type.FullName] = type;
+        }
     }
 }

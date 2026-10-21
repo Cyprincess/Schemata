@@ -111,8 +111,13 @@ public sealed class ResourceLinkContributor(
         var request      = context.HttpContext.Request;
         var target       = UriHelper.GetEncodedPathAndQuery(request);
         var name         = named.CanonicalName;
-        var registration = string.IsNullOrWhiteSpace(name) ? null : ResourceLinkTargets.Match(registry, name) ?? context.Resource;
-        var canonical    = registration is null ? null : ResourceLinkTargets.Canonical(request, registration, name!);
+
+        if (string.IsNullOrWhiteSpace(name)) {
+            return [new(target, "self")];
+        }
+
+        var registration = ResourceLinkTargets.Match(registry, name) ?? context.Resource;
+        var canonical    = registration is null ? null : ResourceLinkTargets.Canonical(request, registration, name);
 
         // A mutation response identifies the written resource, not the collection or method URI
         // that carried the request.
@@ -126,7 +131,7 @@ public sealed class ResourceLinkContributor(
             return links;
         }
 
-        foreach (var child in Children(request, registration, name!)) {
+        foreach (var child in Children(request, registration, name)) {
             links.Add(child);
         }
 
@@ -216,8 +221,8 @@ public sealed class ResourceLinkContributor(
                          .Any(candidate => candidate.IsGenericType
                                         && candidate.GetGenericTypeDefinition() == typeof(IEntitiesResult<,>));
         var paging  = Paging.GetOrAdd(type, static item => (
-            item.GetProperty(nameof(ListResultBase<object, object>.NextPageToken)),
-            item.GetProperty(nameof(ListResultBase<object, object>.TotalSize))));
+            AppDomainTypeCache.GetProperty(item, nameof(ListResultBase<object, object>.NextPageToken)),
+            AppDomainTypeCache.GetProperty(item, nameof(ListResultBase<object, object>.TotalSize))));
 
         nextPageToken = isList ? paging.Next?.GetValue(value) as string : null;
         totalSize     = isList ? paging.Total?.GetValue(value) as int? : null;

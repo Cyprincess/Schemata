@@ -121,7 +121,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     ///     the concrete entity property; the attribute on the interface alone does not propagate.
     /// </summary>
     protected static readonly bool IsConcurrencyControlled = typeof(IConcurrency).IsAssignableFrom(typeof(TEntity))
-                                                          && typeof(TEntity).GetProperty(nameof(IConcurrency.Timestamp))?.GetCustomAttribute<ConcurrencyCheckAttribute>(true) is not null;
+                                                          && AppDomainTypeCache.GetProperty(typeof(TEntity), nameof(IConcurrency.Timestamp))?.GetCustomAttribute<ConcurrencyCheckAttribute>(true) is not null;
 
     // Instance-level monotonic write sequence; advances only after the provider successfully stages
     // or executes a write. _enlistmentStart re-baselines at every enlistment so a per-call delta
@@ -227,13 +227,11 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
             throw new ArgumentException(SchemataResources.GetResourceString(SchemataResources.TABLE_KEY_REQUIRED));
         }
         var parameter = Expression.Parameter(typeof(TEntity), "entity");
-        Expression? predicate = null;
-        foreach (var property in properties) {
-            var equality = Expression.Equal(Expression.Property(parameter, property),
-                Expression.Constant(property.GetValue(entity), property.PropertyType));
-            predicate = predicate is null ? equality : Expression.AndAlso(predicate, equality);
-        }
-        return Expression.Lambda<Func<TEntity, bool>>(predicate!, parameter);
+        var predicate = properties
+            .Select<PropertyInfo, Expression>(property => Expression.Equal(Expression.Property(parameter, property),
+                Expression.Constant(property.GetValue(entity), property.PropertyType)))
+            .Aggregate(Expression.AndAlso);
+        return Expression.Lambda<Func<TEntity, bool>>(predicate, parameter);
     }
 
     protected static void ValidateOriginalProjection<TResult>(Expression<Func<TEntity, TResult>> projection) {

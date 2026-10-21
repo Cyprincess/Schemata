@@ -1,6 +1,5 @@
 using System;
-using System.Collections.Concurrent;
-using System.Reflection;
+using Schemata.Common;
 
 namespace Schemata.Entity.Repository;
 
@@ -16,10 +15,6 @@ public static class DatabaseErrorClassifier
     private const string MySqlDataException = "MySql.Data.MySqlClient.MySqlException";
     private const string MySqlConnectorException = "MySqlConnector.MySqlException";
 
-    private static readonly ConcurrentDictionary<Type, PropertyInfo> ExtendedErrorCodeProperties = new();
-    private static readonly ConcurrentDictionary<Type, PropertyInfo> NumberProperties            = new();
-    private static readonly ConcurrentDictionary<Type, PropertyInfo> SqlStateProperties          = new();
-
     /// <summary>
     ///     Determines whether an exception chain contains a known database unique-constraint violation.
     /// </summary>
@@ -29,27 +24,27 @@ public static class DatabaseErrorClassifier
         for (var current = exception; current is not null; current = current.InnerException) {
             switch (current.GetType().FullName) {
                 case SqliteException:
-                    if (ReadIntProperty(current, ExtendedErrorCodeProperties, "SqliteExtendedErrorCode") is 1555 or 2067) {
+                    if (ReadIntProperty(current, "SqliteExtendedErrorCode") is 1555 or 2067) {
                         return true;
                     }
 
                     break;
                 case MicrosoftSqlException:
                 case SystemSqlException:
-                    if (ReadIntProperty(current, NumberProperties, "Number") is 2601 or 2627) {
+                    if (ReadIntProperty(current, "Number") is 2601 or 2627) {
                         return true;
                     }
 
                     break;
                 case PostgresException:
-                    if (ReadStringProperty(current, SqlStateProperties, "SqlState") == "23505") {
+                    if (ReadStringProperty(current, "SqlState") == "23505") {
                         return true;
                     }
 
                     break;
                 case MySqlDataException:
                 case MySqlConnectorException:
-                    if (ReadIntProperty(current, NumberProperties, "Number") == 1062) {
+                    if (ReadIntProperty(current, "Number") == 1062) {
                         return true;
                     }
 
@@ -60,32 +55,11 @@ public static class DatabaseErrorClassifier
         return false;
     }
 
-    private static int? ReadIntProperty(
-        Exception                                    exception,
-        ConcurrentDictionary<Type, PropertyInfo> properties,
-        string                                       name
-    ) {
-        return GetProperty(exception.GetType(), properties, name)?.GetValue(exception) is int value ? value : null;
+    private static int? ReadIntProperty(Exception exception, string name) {
+        return AppDomainTypeCache.GetProperty(exception.GetType(), name)?.GetValue(exception) is int value ? value : null;
     }
 
-    private static string? ReadStringProperty(
-        Exception                                    exception,
-        ConcurrentDictionary<Type, PropertyInfo> properties,
-        string                                       name
-    ) {
-        return GetProperty(exception.GetType(), properties, name)?.GetValue(exception) as string;
-    }
-
-    private static PropertyInfo? GetProperty(
-        Type                                         type,
-        ConcurrentDictionary<Type, PropertyInfo> properties,
-        string                                       name
-    ) {
-        if (properties.TryGetValue(type, out var property)) {
-            return property;
-        }
-
-        property = type.GetProperty(name, BindingFlags.Instance | BindingFlags.Public);
-        return property is null ? null : properties.GetOrAdd(type, property);
+    private static string? ReadStringProperty(Exception exception, string name) {
+        return AppDomainTypeCache.GetProperty(exception.GetType(), name)?.GetValue(exception) as string;
     }
 }
