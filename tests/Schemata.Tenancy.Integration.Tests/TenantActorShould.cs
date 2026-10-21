@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -38,55 +39,67 @@ public class TenantActorShould
 {
     [Fact]
     public async Task Same_Type_Key_Uses_Separate_Objects_State_And_Bound_Lifecycle_Identity() {
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        var services = new ServiceCollection();
-        services.AddDbContextFactory<Database>(options => options.UseSqlite(connection).ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
-        services.AddRepository<SchemataTenant, EfCoreRepository<Database, SchemataTenant>>();
-        services.AddRepository<SchemataTenantHost, EfCoreRepository<Database, SchemataTenantHost>>();
-        services.AddRepository<TenantSessionActor, EfCoreRepository<Database, TenantSessionActor>>();
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<TenantSessionActor>, ActorName>());
-        new SchemataTenancyFeature<SchemataTenantManager<SchemataTenant, SchemataTenantHost>, SchemataTenant, SchemataTenantHost>()
-            .ConfigureServices(services, new(), new(), new ConfigurationBuilder().Build(), null!);
-        new SchemataActorBuilder(new(), services).Register<Counter>("counter").UsePersistence();
-        services.AddSchemataActor<TenantSessionActor>();
-        new SchemataTenancyBuilder<SchemataTenant>(services).UseActor<SchemataTenant, TenantSessionActor>().UseActorPersistence<SchemataTenant, TenantSessionActor>().UseRepositories(builder
-            => builder.Services.AddTransient<IRepository<TenantSessionActor>, EfCoreRepository<Database, TenantSessionActor>>());
-        await using var root = services.BuildServiceProvider();
-        var a = new SchemataTenant { Name = "a" };
-        var b = new SchemataTenant { Name = "b" };
-        await using (var setup = root.CreateAsyncScope()) {
-            await setup.ServiceProvider.GetRequiredService<Database>().Database.EnsureCreatedAsync();
-            var manager = setup.ServiceProvider.GetRequiredService<ITenantManager<SchemataTenant>>();
-            await manager.CreateAsync(a, default);
-            await manager.CreateAsync(b, default);
+        // A file-backed database gives every scope its own connection; the shared in-memory
+        // connection used by the other fixtures cannot serve actor turns and assertions safely.
+        var databasePath = Path.Combine(Path.GetTempPath(), $"schemata-tenant-actor-{Guid.NewGuid():N}.db");
+        try {
+            var services = new ServiceCollection();
+            services.AddDbContextFactory<Database>(options => options.UseSqlite($"Data Source={databasePath}").ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
+            services.AddRepository<SchemataTenant, EfCoreRepository<Database, SchemataTenant>>();
+            services.AddRepository<SchemataTenantHost, EfCoreRepository<Database, SchemataTenantHost>>();
+            services.AddRepository<TenantSessionActor, EfCoreRepository<Database, TenantSessionActor>>();
+            services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<TenantSessionActor>, ActorName>());
+            new SchemataTenancyFeature<SchemataTenantManager<SchemataTenant, SchemataTenantHost>, SchemataTenant, SchemataTenantHost>()
+                .ConfigureServices(services, new(), new(), new ConfigurationBuilder().Build(), null!);
+            new SchemataActorBuilder(new(), services).Register<Counter>("counter").UsePersistence();
+            services.AddSchemataActor<TenantSessionActor>();
+            new SchemataTenancyBuilder<SchemataTenant>(services).UseActor<SchemataTenant, TenantSessionActor>().UseActorPersistence<SchemataTenant, TenantSessionActor>().UseRepositories(builder
+                => builder.Services.AddTransient<IRepository<TenantSessionActor>, EfCoreRepository<Database, TenantSessionActor>>());
+            await using var root = services.BuildServiceProvider();
+            var a = new SchemataTenant { Name = "a" };
+            var b = new SchemataTenant { Name = "b" };
+            await using (var setup = root.CreateAsyncScope()) {
+                await setup.ServiceProvider.GetRequiredService<Database>().Database.EnsureCreatedAsync();
+                var manager = setup.ServiceProvider.GetRequiredService<ITenantManager<SchemataTenant>>();
+                await manager.CreateAsync(a, default);
+                await manager.CreateAsync(b, default);
+            }
+            var system = root.GetRequiredService<IActorSystem>();
+            Assert.IsType<TenantActorSystem<TenantSessionActor>>(system);
+            IActorRef first;
+            using (TenantContext.Enter(new(a.Uid))) {
+                first = await system.GetAsync(new("counter", "same"));
+                Assert.Equal(1, await first.AskAsync<Increment, int>(new()));
+                Assert.Equal(2, await first.AskAsync<Increment, int>(new()));
+            }
+            using (TenantContext.Enter(new(b.Uid))) {
+                var second = await system.GetAsync(new("counter", "same"));
+                Assert.NotSame(first, second);
+                Assert.Equal(1, await second.AskAsync<Increment, int>(new()));
+                await Assert.ThrowsAsync<InvalidOperationException>(() => first.AskAsync<Increment, int>(new()).AsTask());
+                await system.StopAsync(second.Id);
+            }
+            using (TenantContext.Enter(new(a.Uid))) {
+                await system.StopAsync(first.Id);
+                var restored = await system.GetAsync(new("counter", "same"));
+                Assert.Equal(3, await restored.AskAsync<Increment, int>(new()));
+                await system.StopAsync(restored.Id);
+            }
+
+            // Drain the tenant runtime before the root provider is disposed: stop notifications
+            // create a tenant message scope, and a provider disposed under them would surface as a
+            // shutdown race instead of a test assertion.
+            await ((IActorSystemLifetime)system).ShutdownAsync(CancellationToken.None);
+            await using (var verification = root.CreateAsyncScope()) {
+                var rows = await verification.ServiceProvider.GetRequiredService<Database>().Set<TenantSessionActor>().ToListAsync();
+                Assert.Equal(2, rows.Count);
+                Assert.Equal(3, BitConverter.ToInt32(rows.Single(row => row.TenantUid == a.Uid).State!));
+                Assert.Equal(1, BitConverter.ToInt32(rows.Single(row => row.TenantUid == b.Uid).State!));
+            }
+        } finally {
+            SqliteConnection.ClearAllPools();
+            if (File.Exists(databasePath)) File.Delete(databasePath);
         }
-        var system = root.GetRequiredService<IActorSystem>();
-        Assert.IsType<TenantActorSystem<TenantSessionActor>>(system);
-        IActorRef first;
-        using (TenantContext.Enter(new(a.Uid))) {
-            first = await system.GetAsync(new("counter", "same"));
-            Assert.Equal(1, await first.AskAsync<Increment, int>(new()));
-            Assert.Equal(2, await first.AskAsync<Increment, int>(new()));
-        }
-        using (TenantContext.Enter(new(b.Uid))) {
-            var second = await system.GetAsync(new("counter", "same"));
-            Assert.NotSame(first, second);
-            Assert.Equal(1, await second.AskAsync<Increment, int>(new()));
-            await Assert.ThrowsAsync<InvalidOperationException>(() => first.AskAsync<Increment, int>(new()).AsTask());
-            await system.StopAsync(second.Id);
-        }
-        using (TenantContext.Enter(new(a.Uid))) {
-            await system.StopAsync(first.Id);
-            var restored = await system.GetAsync(new("counter", "same"));
-            Assert.Equal(3, await restored.AskAsync<Increment, int>(new()));
-            await system.StopAsync(restored.Id);
-        }
-        await using var verification = root.CreateAsyncScope();
-        var rows = await verification.ServiceProvider.GetRequiredService<Database>().Set<TenantSessionActor>().ToListAsync();
-        Assert.Equal(2, rows.Count);
-        Assert.Equal(3, BitConverter.ToInt32(rows.Single(row => row.TenantUid == a.Uid).State!));
-        Assert.Equal(1, BitConverter.ToInt32(rows.Single(row => row.TenantUid == b.Uid).State!));
     }
 
     public sealed record Increment : IRequest<int>;

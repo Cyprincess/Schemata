@@ -633,7 +633,16 @@ internal sealed class ActorInstance<TActor> : IActorRef
 
     private async Task NotifyStoppedAsync() {
         var message = _activationContext;
-        var scope = await _turnScopeFactory.CreateAsync(message, CancellationToken.None);
+        MessageExecutionScope scope;
+        try {
+            scope = await _turnScopeFactory.CreateAsync(message, CancellationToken.None);
+        } catch (ObjectDisposedException) {
+            // The owning service provider was disposed before this activation's terminal
+            // notification (container disposal order is not part of the actor system contract).
+            // No turn scope can be restored anymore, so skip the callback instead of surfacing
+            // a disposal race from shutdown.
+            return;
+        }
         IDisposable identity;
         try { identity = scope.Enter(); }
         catch (Exception error) {
