@@ -24,7 +24,6 @@ using Schemata.Entity.Repository.Advisors;
 using Schemata.Messaging.Skeleton;
 using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Foundation.Runtime;
-using Schemata.Scheduling.Repository;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 using Schemata.Tenancy.Actor;

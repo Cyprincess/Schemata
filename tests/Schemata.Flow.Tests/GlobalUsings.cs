@@ -25,7 +25,7 @@ global using ProcessPersistence = Schemata.Flow.Foundation.ProcessPersistence<
     Schemata.Flow.Skeleton.Entities.SchemataProcessTransition,
     Schemata.Flow.Skeleton.Entities.SchemataProcessCompensation,
     Schemata.Flow.Skeleton.Entities.SchemataProcessSource>;
-global using RepositoryFlowEffectRecorder = Schemata.Flow.Repository.RepositoryFlowEffectRecorder<
+global using RepositoryFlowEffectRecorder = Schemata.Flow.Foundation.RepositoryFlowEffectRecorder<
     Schemata.Flow.Skeleton.Entities.SchemataFlowEffectIntent>;
 global using SchemataFlowFeature = Schemata.Flow.Foundation.Features.SchemataFlowFeature<
     Schemata.Flow.Skeleton.Entities.SchemataProcess,

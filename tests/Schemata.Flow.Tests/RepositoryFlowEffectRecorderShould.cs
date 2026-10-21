@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Moq;
 using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository;
-using Schemata.Flow.Repository;
 using Schemata.Flow.Skeleton.Runtime;
 using Xunit;
 

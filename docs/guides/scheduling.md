@@ -10,7 +10,6 @@ Scheduling ships outside the meta target packages, so add it and the default exe
 
 ```shell
 dotnet add package --prerelease Schemata.Scheduling.Foundation
-dotnet add package --prerelease Schemata.Scheduling.Repository
 ```
 
 ## Enable scheduling

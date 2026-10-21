@@ -10,7 +10,6 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
-using Schemata.Flow.Repository;
 using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Observers;

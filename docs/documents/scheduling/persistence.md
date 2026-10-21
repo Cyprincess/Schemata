@@ -343,7 +343,7 @@ Terminal failures remain terminal until an explicit new trigger or schedule.
 
 Ownership implementation: `src/Schemata.Scheduling.Foundation/JobExecutionLease.cs`,
 `Runtime/ActiveExecutionRegistry.cs`, `JobExecutionDispatcher.cs`, `DefaultOperationService.cs`, and
-`src/Schemata.Scheduling.Repository/RepositoryJobExecutionStore.cs`.
+`src/Schemata.Scheduling.Foundation/Repository/RepositoryJobExecutionStore.cs`.
 
 An alternate `IScheduler` backend can own cross-instance timer clustering.
 

@@ -9,7 +9,6 @@ using Schemata.Abstractions.Errors;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Foundation;
 using Schemata.Flow.Integration.Tests.Fixtures;
-using Schemata.Flow.Repository;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;

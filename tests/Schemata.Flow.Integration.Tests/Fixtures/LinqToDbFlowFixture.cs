@@ -12,7 +12,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using Schemata.Entity.LinqToDB;
 using Schemata.Entity.Repository;
-using Schemata.Flow.Repository;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Observers;
 using Schemata.Flow.Skeleton.Runtime;

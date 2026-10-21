@@ -20,7 +20,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Schemata.Expressions.Aip\Schemata.Expressions.Aip.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Flow.Foundation\Schemata.Flow.Foundation.csproj" />
-    <ProjectReference Include="..\..\src\Schemata.Flow.Repository\Schemata.Flow.Repository.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Flow.StateMachine\Schemata.Flow.StateMachine.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Flow.Event\Schemata.Flow.Event.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Flow.Scheduling\Schemata.Flow.Scheduling.csproj" />

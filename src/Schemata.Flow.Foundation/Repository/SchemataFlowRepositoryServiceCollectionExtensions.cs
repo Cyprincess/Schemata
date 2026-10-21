@@ -1,5 +1,5 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Flow.Repository;
+using Schemata.Flow.Foundation;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Runtime;
 

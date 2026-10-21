@@ -12,7 +12,7 @@ using Schemata.Messaging.Skeleton;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 
-namespace Schemata.Scheduling.Repository;
+namespace Schemata.Scheduling.Foundation;
 
 /// <summary>
 ///     Default <see cref="IJobExecutionStore{TJob,TExecution}" /> over the Schemata repository

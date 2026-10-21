@@ -7,7 +7,7 @@ using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Runtime;
 
-namespace Schemata.Flow.Repository;
+namespace Schemata.Flow.Foundation;
 
 /// <summary>
 ///     Default <see cref="IFlowEffectRecorder" /> over the Schemata repository persistence

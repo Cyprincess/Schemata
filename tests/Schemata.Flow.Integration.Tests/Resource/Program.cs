@@ -15,7 +15,6 @@ using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Expressions.Aip;
 using Schemata.Expressions.Order;
-using Schemata.Flow.Repository;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.StateMachine.Extensions;
 using Schemata.Flow.Integration.Tests.Resource;

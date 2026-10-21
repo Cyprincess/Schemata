@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Schemata is a modular .NET application framework for building extensible business applications with AIP-aligned resource primitives and documented compliance gaps. It ships as 90 `Schemata.*` NuGet packages built from `src/`, targeting `net8.0;net10.0` (source generators target `netstandard2.0`). Consumers bootstrap with `WebApplicationBuilder.UseSchemata(...)`; capabilities compose through a three-phase feature lifecycle. The public API is extension methods in the `Microsoft.AspNetCore.Builder` / `Microsoft.Extensions.DependencyInjection` namespaces; there is no `Program.cs` in this repo.
+Schemata is a modular .NET application framework for building extensible business applications with AIP-aligned resource primitives and documented compliance gaps. It ships as 88 `Schemata.*` NuGet packages built from `src/`, targeting `net8.0;net10.0` (source generators target `netstandard2.0`). Consumers bootstrap with `WebApplicationBuilder.UseSchemata(...)`; capabilities compose through a three-phase feature lifecycle. The public API is extension methods in the `Microsoft.AspNetCore.Builder` / `Microsoft.Extensions.DependencyInjection` namespaces; there is no `Program.cs` in this repo.
 
 ## Architecture & Data Flow
 
@@ -27,7 +27,7 @@ Schemata is a modular .NET application framework for building extensible busines
 
 | Path | Purpose |
 |---|---|
-| `src/` | 90 packages, `<Domain>.<Layer>` naming |
+| `src/` | 88 packages, `<Domain>.<Layer>` naming |
 | `src/Schemata.Core/` | Bootstrap, feature engine, `SchemataBuilder`, startup filter, built-in features, resource building kernel (`Building/`: `SchemataResourceBuilder`, `ResourceRegistry`, wiring) |
 | `src/Schemata.Abstractions/` | Contracts: `IAdvisor`, `AdviceContext`, `SchemataConstants`, exceptions, entity traits |
 | `src/Schemata.Advice/` | `Advisor.For`, `AdvicePipeline<T>`, `AdviceRunner` overloads |

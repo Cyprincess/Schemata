@@ -1,5 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Scheduling.Repository;
+using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 
