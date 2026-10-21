@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Schemata.Core.State;
+namespace Schemata.Tenancy.Foundation.State;
 
 /// <summary>
 ///     Scope-routing facade registered as the public <see cref="IAuthenticationService" />.
@@ -18,7 +18,7 @@ namespace Schemata.Core.State;
 /// </summary>
 public sealed class ScopedAuthenticationService : IAuthenticationService
 {
-    /// <summary>Key under which the host authentication feature registers its native service.</summary>
+    /// <summary>Key under which the tenancy feature registers the host native service.</summary>
     public const string HostServiceKey = "Schemata.Authentication.Host";
 
     #region IAuthenticationService Members

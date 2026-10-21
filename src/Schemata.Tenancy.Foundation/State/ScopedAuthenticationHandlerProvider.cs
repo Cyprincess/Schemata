@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Schemata.Core.State;
+namespace Schemata.Tenancy.Foundation.State;
 
 /// <summary>
 ///     Activates authentication handlers through an explicitly selected scope instead of

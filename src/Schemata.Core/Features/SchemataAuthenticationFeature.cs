@@ -6,7 +6,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Schemata.Core.State;
 
 namespace Schemata.Core.Features;
 
@@ -15,10 +14,10 @@ namespace Schemata.Core.Features;
 ///     before final tenant binding and authorization. Consumes deferred configurators for
 ///     <see cref="AuthenticationOptions" />,
 ///     <see cref="AuthenticationBuilder" />, and
-///     <see cref="AuthorizationOptions" />. The public
-///     <see cref="IAuthenticationService" /> is a scope-routing facade over the native
-///     service, which stays resolvable per scope under
-///     <see cref="ScopedAuthenticationService.HostServiceKey" />.
+///     <see cref="AuthorizationOptions" />. Core registers the native ASP.NET Core
+///     <see cref="IAuthenticationService" />; a component that needs per-request scheme-scope
+///     routing (for example tenancy's client state profiles) installs its own facade when it
+///     activates.
 /// </summary>
 public sealed class SchemataAuthenticationFeature : FeatureBase
 {
@@ -33,11 +32,8 @@ public sealed class SchemataAuthenticationFeature : FeatureBase
     public override int Priority => DefaultPriority;
 
     /// <summary>
-    ///     Registers the scope-routing facade and the host native service it routes to. The host
-    ///     native service is constructed with
-    ///     <see cref="ScopedAuthenticationHandlerProvider" /> so host handlers activate from the
-    ///     host request scope; an <see cref="IAuthenticationHandlerProvider" /> registered by a
-    ///     consumer is not consulted for host authentication.
+    ///     Registers the native authentication/authorization services and deferred configurators.
+    ///     Scheme-scope routing is a consumer concern installed by that component's own feature.
     /// </summary>
     public override void ConfigureServices(
         IServiceCollection  services,
@@ -57,14 +53,6 @@ public sealed class SchemataAuthenticationFeature : FeatureBase
         var authorize = configurators.PopOrDefault<AuthorizationOptions>();
         services.AddAuthorization(authorize);
 
-        services.TryAddKeyedScoped<IAuthenticationService>(
-            ScopedAuthenticationService.HostServiceKey,
-            (sp, _) => new AuthenticationService(
-                sp.GetRequiredService<IAuthenticationSchemeProvider>(),
-                new ScopedAuthenticationHandlerProvider(sp, sp.GetRequiredService<IAuthenticationSchemeProvider>()),
-                sp.GetRequiredService<IClaimsTransformation>(),
-                sp.GetRequiredService<IOptions<AuthenticationOptions>>()));
-        services.Replace(ServiceDescriptor.Scoped<IAuthenticationService, ScopedAuthenticationService>());
     }
 
     public override void ConfigureApplication(

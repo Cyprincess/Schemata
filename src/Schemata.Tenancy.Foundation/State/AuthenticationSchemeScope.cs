@@ -1,13 +1,13 @@
 using System;
 using Microsoft.AspNetCore.Http;
 
-namespace Schemata.Core.State;
+namespace Schemata.Tenancy.Foundation.State;
 
 /// <summary>
 ///     Declares that one authentication scheme is owned by the scope that registered the
 ///     native <see cref="Microsoft.AspNetCore.Authentication.IAuthenticationService" /> under
-///     <see cref="ServiceKey" />. The key is a registration identity — a host or a state
-///     profile — never a tenant identity.
+///     <see cref="ServiceKey" />. The key is a registration identity — a host or a tenant/
+///     client state profile.
 /// </summary>
 /// <param name="Scheme">The logical authentication scheme name.</param>
 /// <param name="ServiceKey">The keyed registration of the native service inside the owning scope.</param>

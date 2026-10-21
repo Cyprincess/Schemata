@@ -8,10 +8,10 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
-using Schemata.Core.State;
+using Schemata.Tenancy.Foundation.State;
 using Xunit;
 
-namespace Schemata.Core.Tests;
+namespace Schemata.Tenancy.Tests;
 
 [Trait("Layer", "Unit")]
 public sealed class ScopedAuthenticationServiceShould

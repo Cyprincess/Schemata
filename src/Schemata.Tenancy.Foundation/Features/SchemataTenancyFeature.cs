@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc.Controllers;
 using System;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -12,6 +13,7 @@ using Schemata.Core.Features;
 using Schemata.Tenancy.Foundation.Handlers;
 using Schemata.Tenancy.Foundation.Middlewares;
 using Schemata.Tenancy.Foundation.Services;
+using Schemata.Tenancy.Foundation.State;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
 using static Schemata.Abstractions.SchemataConstants;
@@ -79,6 +81,18 @@ public sealed class SchemataTenancyFeature<TManager, TTenant, TTenantHost> : Fea
 
         services.TryAddSingleton<ITenantServiceProviderFactory<TTenant>>(sp => new SchemataTenantServiceProviderFactory<TTenant>(sp, sp.GetRequiredService<ITenantProviderCache>(), sp.GetRequiredService<IOptions<SchemataTenancyOptions>>()));
 
+        // Client/UA state-profile isolation: each authentication operation runs in the scope that
+        // owns its scheme. Core keeps the native IAuthenticationService; tenancy installs this
+        // facade only when tenancy is actually used. The keyed native host service is resolved
+        // lazily, after the authentication feature has registered its skeleton services.
+        services.TryAddKeyedScoped<IAuthenticationService>(
+            ScopedAuthenticationService.HostServiceKey,
+            (sp, _) => new AuthenticationService(
+                sp.GetRequiredService<IAuthenticationSchemeProvider>(),
+                new ScopedAuthenticationHandlerProvider(sp, sp.GetRequiredService<IAuthenticationSchemeProvider>()),
+                sp.GetRequiredService<IClaimsTransformation>(),
+                sp.GetRequiredService<IOptions<AuthenticationOptions>>()));
+        services.Replace(ServiceDescriptor.Scoped<IAuthenticationService, ScopedAuthenticationService>());
     }
 
     public override void ConfigureApplication(
