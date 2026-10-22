@@ -13,7 +13,7 @@ The foundation that the other features build on.
 | [Overview](core/overview.md)                     | Package layout and the startup sequence                                  |
 | [Feature System](core/feature-system.md)         | `SchemataBuilder`, `FeatureBase`, the three-phase lifecycle, `DependsOn` |
 | [Advice Pipeline](core/advice-pipeline.md)       | `IAdvisor`, `AdviceContext`, `AdviseResult`, pipeline execution          |
-| [Built-in Features](core/built-in-features.md)   | The authoritative priority table for built-in and extension features     |
+| [Built-in Features](core/built-in-features.md)   | The canonical priority table for built-in and extension features        |
 | [JSON Serialization](core/json-serialization.md) | snake_case, long-as-string, polymorphic discriminator                    |
 | [Error Model](core/error-model.md)               | Exception hierarchy and the structured error response                    |
 
@@ -157,7 +157,7 @@ The BPMN process engine.
 | [Validator](flow/validator.md)               | Process-definition validation rules         |
 | [Runtime Services](flow/runtime.md)          | `FlowRunner`, persistence, registration     |
 | [State Machine](flow/state-machine.md)       | The default engine wiring                   |
-| [BPMN Engine](flow/bpmn-engine.md)           | The full BPMN 2.0.2 multi-token engine      |
+| [BPMN Engine](flow/bpmn-engine.md)           | The BPMN 2.0.2 multi-token engine and its construct matrix |
 | [BPMN Inclusive Merge](flow/bpmn-inclusive-merge.md) | Live-token analysis at an inclusive join |
 | [Event Integration](flow/event.md)           | Message and signal catches on the event bus |
 | [Scheduling Integration](flow/scheduling.md) | Timer catches on the scheduler              |

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Schemata is a modular .NET application framework for building extensible business applications with AIP-aligned resource primitives and documented compliance gaps. It ships as 88 `Schemata.*` NuGet packages built from `src/`, targeting `net8.0;net10.0` (source generators target `netstandard2.0`). Consumers bootstrap with `WebApplicationBuilder.UseSchemata(...)`; capabilities compose through a three-phase feature lifecycle. The public API is extension methods in the `Microsoft.AspNetCore.Builder` / `Microsoft.Extensions.DependencyInjection` namespaces; there is no `Program.cs` in this repo.
+Schemata is a modular .NET application framework for building extensible business applications with AIP-aligned resource primitives and documented compliance gaps. It ships as 88 `Schemata.*` NuGet packages built from `src/`, targeting `net8.0;net10.0` (source generators target `netstandard2.0`). Consumers bootstrap with `WebApplicationBuilder.UseSchemata(...)`; capabilities compose through a three-phase feature lifecycle. The public API is extension methods in the `Microsoft.AspNetCore.Builder` / `Microsoft.Extensions.DependencyInjection` namespaces. The framework source has no `Program.cs`; integration-test hosts carry their own (see Testing & QA).
 
 ## Architecture & Data Flow
 
@@ -51,6 +51,8 @@ Schemata is a modular .NET application framework for building extensible busines
 | Standard/custom methods and final wire contracts | `docs/documents/resource/aip-interactions.md` |
 | Business logic, Flow, Scheduling, errors, authorization | `docs/documents/resource/aip-business-logic.md` |
 | Implementing a resource state transition | `docs/cookbook/resource-business-action.md` |
+| Requirement-level standards status (AIP / OAuth 2.0 / OIDC / SCIM) | `docs/documents/resource/aip-modeling.md#requirement-matrix`, `docs/documents/resource/aip-interactions.md`, `docs/documents/resource/aip-business-logic.md`, `docs/documents/authorization.md#standards-compliance`, `docs/documents/scim.md` |
+| Canonical feature priority table | `docs/documents/core/built-in-features.md` |
 
 ## Development Commands
 
@@ -133,7 +135,7 @@ Avoid these AIP errors:
 - **Framework:** xUnit v2 + Moq; assertions are plain `Xunit.Assert` (no FluentAssertions/Shouldly).
 - **Naming:** classes `<Subject>Should` (e.g. `PredicateShould`, `RequestDispatcherShould`); methods `Pascal_Snake_Case` (e.g. `Dispatch_ForACommand_RunsThePipelineChainAroundTheHandler`).
 - **Layers:** `tests/Schemata.*.Tests` (unit/component) and `tests/Schemata.*.Integration.Tests` (integration; `GenerateProgramFile=false`, own `Program`/`WebApplicationFactory`). Integration tests use **local SQLite only** — no Docker, Testcontainers, or live broker. Coverage runs via coverlet (`Coverage=true` for `tests/*`).
-- **Fixtures:** static `*TestHost` helpers for DI setup (`tests/Schemata.Report.Tests/ReportTestHost.cs`); `IAsyncLifetime` fixtures for SQLite integration; `WebApplicationFactory<Program>` via `IClassFixture` for HTTP/gRPC.
+- **Fixtures:** static `*TestHost` helpers for DI setup (`tests/Schemata.Report.Tests/Fixtures/ReportTestHost.cs`); `IAsyncLifetime` fixtures for SQLite integration; `WebApplicationFactory<Program>` via `IClassFixture` for HTTP/gRPC.
 - **Conformance suites** read from `specs/` submodules and are gated:
   - BPMN MIWG (`tests/Schemata.Flow.Bpmn.Conformance.Tests`) runs Windows-only in CI: `dotnet test ... --filter "Speed!=Fast"`; exclusions live in `PendingCatalog.cs`, a guard theory re-runs catalogued vectors to catch stale entries, and `Speed=Fast` picks one vector per MIWG case id for local loops.
   - CEL spec (`tests/Schemata.Expressions.Cel.Tests/Conformance/`) skips cases listed in `cel-spec-skips.txt`.

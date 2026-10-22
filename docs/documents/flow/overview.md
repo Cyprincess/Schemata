@@ -28,7 +28,7 @@ subset of the BPMN 2.0 AST; richer engines plug in as keyed `IFlowRuntime` servi
 | `Schemata.Flow.Skeleton`     | AST, entity types, builders, runtime and observer contracts                         |
 | `Schemata.Flow.Foundation`   | `UseFlow` feature, registry, runner, persistence, lifecycle notifier                |
 | `Schemata.Flow.StateMachine` | Default single-token engine and its validator; activated by `UseStateMachine()`     |
-| `Schemata.Flow.Bpmn`         | Full BPMN 2.0.2 multi-token engine and validator; activated by `UseBpmn()`          |
+| `Schemata.Flow.Bpmn`         | BPMN 2.0.2 multi-token engine and validator; construct coverage and out-of-scope items are in the [BPMN feature matrix](bpmn-engine.md#feature-matrix); activated by `UseBpmn()` |
 | `Schemata.Flow.Event`        | Bridges message/signal catches to the event bus                                     |
 | `Schemata.Flow.Scheduling`   | Bridges timer catches to the scheduler                                              |
 | `Schemata.Flow.Http`         | Process execution and read endpoints over HTTP                                      |
@@ -119,6 +119,9 @@ Without Flow authorization activation, existing unsecured execution remains avai
 Flow handlers never construct one, and a direct entry supplies the context it owns. See [Security](../security.md).
 
 ## Feature priority table
+
+These rows are the Flow slice of the canonical [Built-in Features](../core/built-in-features.md)
+table.
 
 | Feature                           | Activation           | Priority    |
 | --------------------------------- | -------------------- | ----------- |

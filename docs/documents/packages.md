@@ -10,7 +10,7 @@ Runtime packages follow the Skeleton / Foundation / Provider convention:
 - `*.Foundation` packages contain concrete logic, default services, builders, feature registration, and owned cross-package wiring.
 - Named provider and bridge packages (`*.Redis`, `*.RabbitMq`, `*.Http`, `*.Grpc`, `*.Scheduling`, `*.Event`, `*.WebPush`) contain adapters that connect a foundation to a specific transport, broker, storage backend, or neighboring runtime.
 
-This split keeps optional runtimes direct-referenceable. A provider implements the skeleton contract it adapts and references its Foundation when registering through the Foundation builder, as `Schemata.Push.WebPush` registers transports through `SchemataPushBuilder`; a foundation depends on its own skeleton and owns the default feature. Bridge packages join two foundations through a sub-builder, as `Schemata.Push.Scheduling` does for scheduled sends and `Schemata.Flow.Scheduling` does for timer catches.
+This split keeps optional runtimes direct-referenceable. A provider implements the skeleton contract it adapts and references its Foundation when registering through the Foundation builder, as `Schemata.Push.WebPush` registers transports through `SchemataPushBuilder`; a foundation depends on its own skeleton and owns the default feature. Bridge packages join two foundations through a sub-builder, as `Schemata.Push.Scheduling` does for scheduled sends and `Schemata.Flow.Scheduling` does for timer catches. Repository and cache adapters that belong to one component stay in its Foundation: the Flow and Scheduling repository adapters live in `Schemata.Flow.Foundation/Repository` and `Schemata.Scheduling.Foundation/Repository`, and there are no separate `*.Repository` packages.
 
 The current `src/` tree contains 88 source package projects. Generators under `generators/` and the
 10 meta-package projects under `targets/` are separate from that count.
@@ -227,6 +227,6 @@ Reference these packages directly from the host when their runtime is needed:
 
 ## See also
 
-- [Built-in Features](core/built-in-features.md) — the feature priority table
+- [Built-in Features](core/built-in-features.md) — the canonical feature priority table
 - [Modules](modules.md) — `IModule`, `ModuleAttribute`, `UseModular()`
 - [Getting Started](../guides/getting-started.md) — using `Schemata.Application.Complex.Targets`

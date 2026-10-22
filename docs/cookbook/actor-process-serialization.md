@@ -56,7 +56,7 @@ container.
 `SchemataFlowActorFeature.ConfigureServices` replaces the unkeyed
 `IRequestHandler<TRequest,TResponse>` registration for six process-scoped write commands with
 `ActorSerializingHandler<TRequest,TResponse>`
-(`Schemata.Flow.Actor/Internal/ActorSerializingHandler.cs`). The keyed default handler stays
+(`src/Schemata.Actor.Foundation/Handlers/ActorSerializingHandler.cs`). The keyed default handler stays
 registered, untouched, under `FlowConstants.Handlers.Default` — that is what the actor's turn
 will resolve.
 
@@ -83,7 +83,7 @@ Two commands stay unwrapped, on purpose:
 handler and never holds a caller-scoped object across the mailbox boundary.
 
 ```csharp
-// Schemata.Flow.Actor/Handlers/ActorSerializingHandler.cs (shape, paraphrased)
+// src/Schemata.Actor.Foundation/Handlers/ActorSerializingHandler.cs (shape, paraphrased)
 public async Task<TResult> HandleAsync(TRequest request, AdviceContext context, CancellationToken ct = default) {
     var message = MessageContexts.Capture(caller);   // sender side, once, synchronous
     var actor   = await actors.GetAsync(new ActorId("flow", request.ProcessCanonicalName));

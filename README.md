@@ -47,7 +47,7 @@ Add more capabilities from the [Feature Domains](#feature-domains) below.
 - [Mapping](https://nuget.org/packages/Schemata.Mapping.Foundation) — unified object-mapper abstraction (AutoMapper / Mapster)
 - [Modular](https://nuget.org/packages/Schemata.Module.Complex.Targets) — module discovery and loading
 - [Repository](https://nuget.org/packages/Schemata.Entity.Repository) — EF Core / LinqToDB providers with advisor pipeline, unit of work, ownership, query caching
-- [Resource](https://nuget.org/packages/Schemata.Resource.Foundation) — Google AIP-compliant CRUD service over HTTP and gRPC
+- [Resource](https://nuget.org/packages/Schemata.Resource.Foundation) — AIP-aligned CRUD service over HTTP and gRPC (requirement-level status in [AIP Modeling](docs/documents/resource/aip-modeling.md#requirement-matrix) and [AIP Interactions](docs/documents/resource/aip-interactions.md))
 - [Scheduling](https://nuget.org/packages/Schemata.Scheduling.Foundation) — persistent cron / periodic / one-time job scheduler
 - [Tenancy](https://nuget.org/packages/Schemata.Tenancy.Foundation) — multi-tenant resolution and per-tenant DI
 - [Validation](https://nuget.org/packages/Schemata.Validation.FluentValidation) — FluentValidation integration
@@ -62,73 +62,13 @@ Features are characterized by `Order` and `Priority`, both of which are `Int32` 
 
 The range `[100_000_000, 900_000_000]` for `Order` and `Priority` is reserved for built-in features and Schemata extensions.
 
-### Built-in Features
+### Feature priority
 
-A built-in feature can be activated by calling the `UseXXX` method on the `SchemataBuilder` instance. These features may also have additional configuration methods.
-
-| Priority    | Feature                | Description                                                                          |
-| ----------- | ---------------------- | ------------------------------------------------------------------------------------ |
-| 100_000_000 | ForwardedHeaders       | ASP.NET Forwarded Headers Middleware                                                 |
-| 110_000_000 | DeveloperExceptionPage | ASP.NET Developer Exception Page Middleware                                          |
-| 120_000_000 | Logging                | ASP.NET Logging Middleware                                                           |
-| 130_000_000 | HttpLogging            | ASP.NET HTTP Logging Middleware                                                      |
-| 140_000_000 | W3CLogging             | ASP.NET W3C Logging Middleware                                                       |
-| 150_000_000 | Https                  | ASP.NET HTTPS & HTTPS Redirection Middlewares                                        |
-| 160_000_000 | Tenancy                | Multi-tenant isolation middleware (Order: 900_000_000)                               |
-| 170_000_000 | CookiePolicy           | ASP.NET Cookie Policy Middleware                                                     |
-| 180_000_000 | Routing                | ASP.NET Routing Middleware                                                           |
-| 185_000_000 | WellKnown              | `/.well-known/*` routes (+5M sub-feature of Routing)                                 |
-| 200_000_000 | Cors                   | ASP.NET CORS Middleware                                                              |
-| 210_000_000 | Authentication         | ASP.NET Authentication Middleware                                                    |
-| 212_000_000 | Authorization          | ASP.NET Authorization Middleware                                                     |
-| 215_000_000 | Quota                  | ASP.NET Rate Limiter Middleware (partitions after authentication)                    |
-| 220_000_000 | Session                | ASP.NET Session Middleware                                                           |
-| 230_000_000 | Controllers            | ASP.NET MVC Middlewares, without Views                                               |
-| 240_000_000 | JsonSerializer         | Configure System.Text.Json to use snake_case and handle JavaScript's 53-bit integers |
-
-### Extension Features
-
-An extension feature can be activated in the same way as a built-in feature.
-
-| Priority    | Package                            | Feature                  | Description                                                        |
-| ----------- | ---------------------------------- | ------------------------ | ------------------------------------------------------------------ |
-| 400_000_000 | Schemata.Security.Foundation       | Security                 | RBAC/ABAC security policies                                        |
-| 410_000_000 | Schemata.Transport.Http            | Transport.Http           | Shared HTTP plumbing: exception handler, JSON wire-name traits     |
-| 420_000_000 | Schemata.Transport.Grpc            | Transport.Grpc           | Shared gRPC plumbing: `AddCodeFirstGrpc`, interceptor, reflection  |
-| 430_000_000 | Schemata.Identity.Foundation       | Identity                 | ASP.NET Core Identity integration                                  |
-| 440_000_000 | Schemata.Event.Foundation          | Event                    | Pub/sub bus, type registry, publish/consume advisor pipeline       |
-| 450_000_000 | Schemata.Actor.Foundation          | Actor                    | In-process actor system                                            |
-| 450_100_000 | Schemata.Actor.Event               | Actor.Event               | Bridges published events to actor mailboxes via explicit routes    |
-| 450_200_000 | Schemata.Actor.Scheduling          | Actor.Scheduling          | Durable, restart-surviving actor reminders on top of the scheduler |
-| 460_000_000 | Schemata.Authorization.Foundation  | Authorization            | OAuth 2.0 / OpenID Connect server                                  |
-| 460_100_000 | Schemata.Authorization.Identity    | AuthorizationIdentity    | Bridge Identity claims into the authorization server             |
-| 470_000_000 | Schemata.Mapping.Foundation        | Mapping                  | Unified object mapper abstraction                                  |
-| 480_000_000 | Schemata.Scheduling.Foundation     | Scheduling               | Persistent cron / periodic / one-time job scheduler                |
-| 480_100_000 | Schemata.Scheduling.Event          | Scheduling.Event         | Lifecycle event publisher bridging the scheduler to the event bus  |
-| 480_200_000 | Schemata.Scheduling.Http           | Scheduling.Http          | HTTP resource bridge for jobs and long-running operations          |
-| 480_300_000 | Schemata.Scheduling.Grpc           | Scheduling.Grpc          | gRPC resource bridge for jobs and long-running operations          |
-| 490_000_000 | Schemata.Flow.Foundation           | Flow                     | BPMN process engine and state-machine runtime                      |
-| 490_060_000 | Schemata.Flow.Bpmn                 | Flow.Bpmn                | Full BPMN 2.0.2 engine (multi-token, subprocesses, compensation, transactions) |
-| 490_100_000 | Schemata.Flow.Http                 | Flow (`MapHttp`)     | HTTP resource bridge for process instances and transitions         |
-| 490_200_000 | Schemata.Flow.Grpc                 | Flow (`MapGrpc`)     | gRPC resource bridge for process instances and transitions         |
-| 490_300_000 | Schemata.Flow.Event                | Flow.Event               | Bridges BPMN message/signal catches to the event bus               |
-| 490_400_000 | Schemata.Flow.Scheduling           | Flow.Scheduling          | Bridges BPMN timer catches to the scheduler                        |
-| 490_600_000 | Schemata.Flow.Actor                | Flow.Actor               | Per-process serialization: routes process commands through a per-process actor |
-| 500_000_000 | Schemata.Resource.Foundation       | Resource                 | Google AIP-compliant resource service                              |
-| 500_100_000 | Schemata.Resource.Http             | Resource (`MapHttp`)     | HTTP/REST endpoint                                                 |
-| 500_200_000 | Schemata.Resource.Grpc             | Resource (`MapGrpc`)     | gRPC endpoint                                                      |
-| 510_000_000 | Schemata.Insight.Foundation        | Insight                  | Federated query planning and execution over resource entities     |
-| 510_100_000 | Schemata.Insight.Http              | Insight (`MapHttp`)      | HTTP/REST endpoint for federated queries                          |
-| 510_200_000 | Schemata.Insight.Grpc              | Insight (`MapGrpc`)      | gRPC endpoint for federated queries                               |
-| 520_000_000 | Schemata.Push.Foundation           | Push                     | Push notification fan-out                                         |
-| 520_400_000 | Schemata.Push.Scheduling           | Push.Scheduling          | Deferred push dispatch through the scheduler                            |
-| 520_600_000 | Schemata.Push.Actor                | Push.Actor               | Per-subscription serialization: routes subscription writes through a per-key actor |
-| 530_000_000 | Schemata.Report.Foundation         | Report                   | Report definitions, snapshots, and generation                     |
-| 530_100_000 | Schemata.Report.Http               | Report (`MapHttp`)       | HTTP resource bridge for reports and snapshots                    |
-| 530_200_000 | Schemata.Report.Grpc               | Report (`MapGrpc`)       | gRPC resource bridge for reports and snapshots                    |
-| 530_400_000 | Schemata.Report.Scheduling         | Report.Scheduling        | Periodic report generation bridge                                  |
-| 530_600_000 | Schemata.Report.Actor              | Report.Actor             | Per-report serialization: routes report generations through a per-name actor |
-| 540_000_000 | Schemata.Modular                   | Modular                  | Module discovery and loading                                       |
+Each feature declares its `Priority` in code. The single canonical table — every built-in and
+extension feature class, its `Priority`, its `Use*()` activation, and what it registers — lives in
+[Built-in Features](docs/documents/core/built-in-features.md). It is generated from the HEAD feature
+constants and is the only table to update when a priority changes; this README and the documentation
+home link to it instead of duplicating it.
 
 ## Compliance
 
@@ -142,7 +82,12 @@ Schemata targets the latest .NET Long-Term Support (LTS) version and the most re
 
 ### Schemata.Authorization.Foundation
 
-Schemata Authorization Foundation complies with the [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html) specification.
+Schemata Authorization Foundation implements the OAuth 2.0 / OpenID Connect endpoints and rules
+graded requirement by requirement in
+[Authorization § Standards compliance](docs/documents/authorization.md#standards-compliance). That
+matrix records each row as Enforced, Partial, or Application responsibility — the project does not
+claim whole-specification conformance — and discloses the opt-in implicit/hybrid/none degradation
+flows against RFC 9700 and RFC 10017.
 
 ### Schemata.Identity.Foundation
 
@@ -156,7 +101,14 @@ It provides a unified interface for these libraries, enabling developers to swit
 
 ### Schemata.Resource.Foundation
 
-The Schemata Resource Foundation complies with the [API Improvement Proposals - General AIPs](https://google.aip.dev/general) proposals. It builds on `Schemata.Mapping.Foundation` for object mapping and no longer requires `Schemata.Security.Foundation`.
+The Schemata Resource Foundation implements AIP-aligned resource primitives. Each AIP is graded
+requirement by requirement in [AIP Modeling](docs/documents/resource/aip-modeling.md#requirement-matrix),
+[AIP Interactions](docs/documents/resource/aip-interactions.md), and
+[AIP Business Logic](docs/documents/resource/aip-business-logic.md); the matrices state the Partial,
+Not implemented, and application-responsibility rows rather than claiming blanket conformance. The
+package maps through `Schemata.Mapping.Skeleton` (implemented by the `Schemata.Mapping.*` adapters)
+and integrates the shared security seams in `Schemata.Security.Skeleton` / `Schemata.Security.Foundation`;
+resource authorization remains an explicit `UseSecurity()` + `WithAuthorization()` activation.
 
 ### Schemata.Flow.Foundation
 
@@ -168,7 +120,7 @@ The process graph is built with a strongly-typed C# DSL in `Schemata.Flow.Skelet
 
 ### Schemata.Flow.Bpmn
 
-`Schemata.Flow.Bpmn` provides the full BPMN 2.0.2 engine for multi-token execution, including parallel, inclusive, and complex gateways; embedded, event, and transaction subprocesses; `CallActivity`; standard loops; sequential and parallel multi-instance loops; interrupting and non-interrupting boundary events; escalation; and compensation. See [BPMN engine](docs/documents/flow/bpmn-engine.md) for the feature matrix and runtime semantics.
+`Schemata.Flow.Bpmn` is the multi-token BPMN 2.0.2 engine: it executes parallel, inclusive, and complex gateways; embedded, event, and transaction subprocesses; `CallActivity`; standard loops; sequential and parallel multi-instance loops; interrupting and non-interrupting boundary events; escalation; and compensation. The [BPMN feature matrix and limits](docs/documents/flow/bpmn-engine.md#feature-matrix) record every construct and the executable-subset boundaries — collaboration, pools, lanes, link events, data modelling, and ad-hoc subprocesses are explicitly out of scope, so this is a defined BPMN 2.0.2 implementation, not a claim over the whole specification.
 
 The BPMN MIWG conformance suite covers an executable subset of the spec. Collaboration, lane, and related multi-process interchange cases are structurally out of scope for this single-process engine.
 

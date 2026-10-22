@@ -1,0 +1,67 @@
+API Improvement Proposals (AIPs)
+
+必须读取具体 AIP 内容, 不得根据编号和名称猜测或编造内容.
+链接格式: https://google.aip.dev/<number>
+
+121 Resource-oriented design
+122 Resource names
+123 Resource types
+124 Resource association
+127 HTTP and gRPC Transcoding
+128 Declarative-friendly interfaces
+129 Server-Modified Values and Defaults
+
+130 Methods
+131 Standard methods: Get
+132 Standard methods: List
+133 Standard methods: Create
+134 Standard methods: Update
+135 Standard methods: Delete
+136 Custom methods
+
+140 Field names
+146 Generic fields
+147 Sensitive fields
+148 Standard fields
+149 Unset field values
+126 Enumerations
+141 Quantities
+142 Time and duration
+143 Standardized codes
+144 Repeated fields
+145 Ranges
+202 Fields
+213 Common components
+
+154 Resource freshness validation
+155 Request identification
+158 Pagination
+159 Reading across collections
+
+160 Filtering
+161 Field masks
+163 Change validation
+164 Soft delete
+214 Resource expiration
+217 Unreachable resources
+
+190 Naming conventions
+193 Errors (+ https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto + https://github.com/googleapis/googleapis/blob/master/google/rpc/status.proto)
+216 States
+
+211 Authorization checks
+165 Criteria-based delete
+231 Batch methods: Get
+233 Batch methods: Create
+234 Batch methods: Update
+235 Batch methods: Delete
+
+156 Singleton resource
+157 Partial responses
+162 Resource Revisions (Draft)
+
+151 Long-running operations
+152 Jobs
+153 Import and export
+
+194 Automatic retry configuration

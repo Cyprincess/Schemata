@@ -15,14 +15,20 @@ then drive the authorization-code + PKCE flow with `curl`.
 
 - Completed [Getting Started](../guides/getting-started.md) — a working Schemata project with EF
   Core.
-- `Schemata.Authorization.Foundation` and `Schemata.Identity.Foundation` added. The server needs
-  Identity to authenticate the resource owner.
+- `Schemata.Authorization.Foundation`, `Schemata.Security.Foundation` and
+  `Schemata.Identity.Foundation` added. The server needs Identity to authenticate the resource
+  owner, and `UseSecurity()` needs the security package.
+- `Schemata.Authorization.Identity` added. The `.UseIdentity<SchemataUser>()` bridge shown below is
+  defined in that package and is not referenced by the other two; the server still runs without it,
+  but the tutorial's claims (`sub`, `email`, `role`) require the bridge.
 - A signing key. The example seeds an RSA key as a security row under the issuer; production
   deployments rotate rows instead of replacing files.
 
 ```shell
 dotnet add package --prerelease Schemata.Authorization.Foundation
+dotnet add package --prerelease Schemata.Security.Foundation
 dotnet add package --prerelease Schemata.Identity.Foundation
+dotnet add package --prerelease Schemata.Authorization.Identity
 ```
 
 ## Step 1 — Add the authorization and security tables
@@ -62,12 +68,16 @@ tables.
 ## Step 2 — Register the server
 
 ```csharp
+using Microsoft.AspNetCore.Builder;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Authorization.Skeleton.Entities;
-using Schemata.Security.Skeleton.Entities;
 using Schemata.Entity.EntityFrameworkCore;
+using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Identity.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 
 var builder = WebApplication.CreateBuilder(args)
     .UseSchemata(schema => {
@@ -113,6 +123,9 @@ the token and authorization rows the server creates during a flow get one from t
 add advisor, which `Order = 0` runs ahead of canonical-name derivation:
 
 ```csharp
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository;
@@ -127,6 +140,7 @@ public sealed class AdviceAddResourceName<TEntity> : IRepositoryAddAdvisor<TEnti
         AdviceContext        ctx,
         IRepository<TEntity> repository,
         TEntity              entity,
+        MutationOptions      options,
         CancellationToken    ct = default)
     {
         if (entity is ICanonicalName named && string.IsNullOrWhiteSpace(named.Name))
@@ -231,8 +245,11 @@ fields, the same metadata dynamic client registration writes. `Permissions` is a
 and holds endpoint entries prefixed per `AuthorizationConstants.PermissionPrefixes.Endpoint` (`e:`).
 A public client carries no secret, so PKCE is the proof of possession.
 
-**Verify:** after seeding, the discovery document's `scopes_supported` includes `openid`, `profile`,
-and `api`.
+**Verify:** after seeding, the discovery document's `scopes_supported` lists the registered scope rows —
+the example registers `api`, so `api` appears. The protocol scopes `openid`, `profile`, and
+`offline_access` are recognized without rows and are not advertised unless the host registers them
+as well; `openid` must still be listed in the client's `Scope` string to select the OpenID Connect
+profile.
 
 ## Step 4 — Drive the authorization-code + PKCE flow
 
@@ -267,7 +284,9 @@ curl -X POST https://localhost:5001/Connect/Token \
 &code=<AUTH_CODE>&code_verifier=$CODE_VERIFIER"
 ```
 
-The response contains `access_token`, `id_token`, `refresh_token`, and `expires_in`.
+The response contains `access_token`, `id_token`, and `expires_in`. A `refresh_token` is issued only
+when the granted scope contains `offline_access`; add it to the client's `Scope` and to the
+authorization request to exercise the refresh grant (`UseRefreshTokenFlow()` must also be installed).
 
 **Verify:** decode the `access_token`. The `iss` claim equals your `Issuer`; the token carries the
 `sub` from the Identity bridge.

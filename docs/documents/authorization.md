@@ -2,8 +2,9 @@
 
 `Schemata.Authorization.Foundation` is a hand-rolled OAuth 2.0 / OpenID Connect authorization
 server. It builds on `Microsoft.IdentityModel` for key material and JWT handling but pulls in no
-external server framework. The core feature is generic over four entity types — `TApp`, `TAuth`,
-TScope` — and runs at priority 460,000,000. Flows are opt-in: `UseAuthorization()`
+external server framework. The core feature is generic over six parameters — `TApp`, `TAuth`,
+`TScope`, `TSubjectMapping`, `TSecurity`, and `TToken` — and runs at priority 460,000,000. Flows are
+opt-in: `UseAuthorization()`
 registers the core, and each `Use*Flow` / `Use*` call on the returned builder adds one
 `IAuthorizationFlowFeature`.
 
@@ -37,8 +38,12 @@ builder.UseSchemata(schema => {
 });
 ```
 
-`UseAuthorization` has two overloads: a default one over `SchemataApplication`,
-`SchemataAuthorization`, `SchemataScope`, `SchemataToken`, and a generic one for custom subclasses.
+The bridge extension `UseIdentity<TUser>()` on the returned builder lives in the
+`Schemata.Authorization.Identity` package; add that package when the host uses ASP.NET Core Identity
+(the no-Identity server does not need it). `UseAuthorization` has two overloads: a default one over
+`SchemataApplication`, `SchemataAuthorization`, `SchemataScope`, and `SchemataSubjectMapping` (the
+token and security entity types come from the security feature registered by `UseSecurity()`), and a
+generic one for custom subclasses.
 Both take an optional `Action<SchemataAuthorizationOptions>`, store it, add
 `SchemataAuthorizationFeature<...>`, and return a
 `SchemataAuthorizationBuilder<TApp, TAuth, TScope>` for chaining. The feature maps discovery and
@@ -112,6 +117,7 @@ broken still fails at dispatch; route absence never masks that.
 | ------------------------- | --------------------- | ----------------------------------------------------- | ------------------------------------------------------------- |
 | `GET` / `POST`            | `/Connect/Authorize`  | `AuthorizeGet` / `AuthorizePost`                      | RFC 6749 §3.1, Authorization Endpoint                         |
 | `POST`                    | `/Connect/Token`      | `Token`                                               | RFC 6749 §3.2, Token Endpoint                                 |
+| `POST`                    | `/Connect/Par`        | `Par` (when `UsePushedAuthorizationRequests()` is installed) | RFC 9126 §§2-3, Pushed Authorization Request Endpoint |
 | `POST`                    | `/Connect/Device`     | `Device`                                              | RFC 8628 §3.1, Device Authorization Request                   |
 | `GET` / `POST` / `DELETE` | `/Connect/Interact`   | `Interact` / `ApproveInteraction` / `DenyInteraction` | consent interaction                                           |
 | `POST`                    | `/Connect/Introspect` | `Introspect`                                          | RFC 7662 §§2.1–2.2, Introspection Request and Response        |
@@ -140,7 +146,11 @@ metadata `issuer`, token `iss`, and prefix of advertised protocol endpoints. OID
 share one `DiscoveryHandler<TScope>` and `IDiscoveryAdvisor` pipeline. Advisors advertise installed
 host-wide capabilities; they do not scan per-client policy. Optional arrays and feature fields are
 omitted when their source set or feature is absent, while OIDC-required arrays remain present.
-`jwks_uri` points at the issuer-derived JWKS route.
+Installed flow features contribute their metadata through the same chain: the pushed authorization
+request endpoint and `require_pushed_authorization_requests` flag, the JAR request flags and signing
+algorithms, the session check-session iframe, and the implicit response types and `implicit` grant only when an implicit/hybrid flow is
+explicitly installed (see the degradation flows below). `jwks_uri` points at the
+issuer-derived JWKS route.
 
 ## Interaction redirect
 
@@ -200,6 +210,16 @@ endpoints below are the ones the code implements:
 | `UseFrontChannelLogout()`    | front-channel logout metadata                                     | `FrontChannelLogoutFeature`                                             |
 | `UseBackChannelLogout()`     | back-channel logout queue + notifier                              | `BackChannelLogoutFeature`                                              |
 | `UsePairwiseSubjects()`      | pairwise `sub` projection + discovery advertisement (OIDC Core 1.0 §8)  | `PairwiseSubjectsFeature<TApp>`                                                 |
+| `UseImplicitFlow()`          | `token`, `id_token`, `id_token token` at `/Connect/Authorize` (RFC 6749 §4.2; OIDC Core §3.2/§3.3; opt-in degradation, see below) | `ImplicitFlowFeature` |
+| `UseHybridFlow()`            | `code id_token`, `code token`, `code id_token token` at `/Connect/Authorize` (OAuth 2.0 Multiple Response Types 1.0; OIDC Core §3.3; opt-in degradation, see below) | `HybridFlowFeature` |
+| `UseNoneFlow()`              | exclusive `none` response type at `/Connect/Authorize` (OAuth 2.0 Multiple Response Types 1.0) | `NoneFlowFeature` |
+| `UsePushedAuthorizationRequests()` | `POST {issuer}/Connect/Par` (RFC 9126 §§2-3); `request_uri` at `/Connect/Authorize` | `PushedAuthorizationRequestsFeature<TApp, TToken>` |
+| `UseJwtSecuredAuthorizationRequests()` | `request` and `request_uri` at `/Connect/Authorize` (RFC 9101) | `JwtSecuredAuthorizationRequestsFeature<TApp, TSecurity>` |
+| `UseSessionManagement()`     | OIDC Session Management 1.0 `session_state` at `/Connect/Authorize` and the check-session iframe | `SessionManagementFeature<TApp>` |
+
+Registration rotation (`UseRegistrationReplace()` / `UseRegistrationDelete()`), DPoP
+(`UseDemonstratingProofOfPossession()`), and Native SSO (`UseNativeSingleSignOn()`) are separate
+builder activations described in their own sections below rather than grant rows.
 
 `UseClaimsParameter()` owns parameter parsing and final Essential ACR approval checks. Hosts without
 that capability ignore the parameter; the mandatory OAuth/OpenID profile selector does not activate it.
@@ -210,6 +230,34 @@ verified audiences and the authenticated caller's configured resource audiences.
 `UseAuthorizationCodeFlow` and `UseRefreshTokenFlow` accept optional `Action<CodeFlowOptions>` /
 `Action<RefreshTokenFlowOptions>` configurators. `TokenFeature` is shared: any grant that lands on
 `/Connect/Token` pulls it in.
+
+### Degradation flows: implicit, hybrid, and none
+
+`UseImplicitFlow()`, `UseHybridFlow()`, and `UseNoneFlow()` are explicit opt-in **degradation**
+options, in the same category as `RelaxPkce()`: they exist for legacy clients and hosts that accept
+the documented risk, not as recommended defaults. They extend an authorize endpoint registered by
+`UseAuthorizationCodeFlow()` and never activate on their own; an installed degradation flow verifies
+the authorize endpoint at startup and throws `InvalidOperationException` when it is missing, instead
+of silently registering response types that no endpoint reads.
+
+- **RFC 9700 §2.1.2** (OAuth 2.0 Security BCP): clients **SHOULD NOT** use the implicit grant
+  (response type `token`) or other response types issuing access tokens in the authorization
+  response.
+- **RFC 10017 §7.2** (OAuth 2.0 for Browser-Based Applications): the authorization server **MUST
+  NOT** issue access tokens in the authorization response and **MUST** issue access tokens only from
+  the token endpoint.
+- Consequence in Schemata: `token`, `id_token token`, `code token`, and `code id_token token`
+  responses carry access tokens in the authorization response. Enable them only for clients that
+  cannot use the code flow; prefer `UseAuthorizationCodeFlow()` (PKCE on by default) for everything
+  else. `code id_token` returns only an ID token and `none` returns no tokens, so those response
+  types do not leak an access token in the authorization response; they are grouped here because
+  they are legacy response types from the same profile.
+- Discovery: a server that only installs the code flow advertises `authorization_code` and the
+  `code` response type, never the `implicit` grant or an implicit/hybrid response type. Those join
+  the authorize endpoint and `response_types_supported` only through the explicit calls above, and
+  only the installed flows contribute to `grant_types_supported`: `UseImplicitFlow()` and
+  `UseHybridFlow()` advertise `implicit`, while `UseNoneFlow()` carries no grant and therefore
+  advertises none (its `none` response type still appears in `response_types_supported`).
 
 `POST /Connect/Token` dispatches by `grant_type` to the registered `IGrantHandler`. Before the
 grant runs, the `ITokenRequestAdvisor<TApp>` chain validates the request over a `TokenRequestContext<TApp>` carrying the parsed request, the authenticated client, the transport DPoP proof, and the validated proof binding:
@@ -797,8 +845,8 @@ mechanism; the host configures it).
 | RFC 6749 §5.2, OIDC Core §3.1.2.6 | Token-endpoint error-code families | Enforced |
 | RFC 7662 §2/§2.1/§2.2 | Introspection: the caller authenticates as a confidential client holding the `e:/Connect/Introspect` permission; an access token reports active only when a verified `aud` value matches the caller's `IntrospectionResourceAudiences` mapping; unknown, invalid, expired, revoked, and audience-inapplicable tokens all return only `{ "active": false }` | Enforced |
 | RFC 6750 §3, §3.1, RFC 9449 §7.1 | Presented-credential failures at resource endpoints (unknown or status-invalid row, failed signature, expiry, or `typ` validation, unverifiable identity, wrong audience) stage `invalid_token` on the challenge of the scheme the credential was presented with, indistinguishable across failure causes; requests without credentials receive a Bearer challenge carrying a `realm` auth-param (the issuer, or the request host) and no error code | Enforced |
-| RFC 8252 §7.3/§8.3 | Redirect URI matching is exact ordinal string comparison; the single exemption is the loopback port: on `http` URIs whose host is the same loopback IP literal (`127.0.0.1` or `[::1]`) only the explicit port may differ, while scheme spelling, host literal, path, query, and percent encoding must match byte for byte. URIs carrying userinfo or a fragment never match, and registration rejects both with `invalid_redirect_uri`; `localhost` stays excluded per §8.3 | Enforced |
-| RFC 9068 §2.1/§2.2, RFC 8707 §2 | Access token `typ: at+jwt`; `aud` = `DefaultResource ?? Issuer` when no resource parameter is sent | Enforced |
+| RFC 8252 §7.3/§8.3/§8.4 | Redirect URI matching is exact ordinal string comparison; the single exemption is the loopback port: on `http` URIs whose host is the same loopback IP literal (`127.0.0.1` or `[::1]`) only the explicit port may differ, while scheme spelling, host literal, path, query, and percent encoding must match byte for byte. URIs carrying userinfo or a fragment never match, and registration rejects both with `invalid_redirect_uri`; `localhost` stays excluded per §8.3 | Enforced |
+| RFC 9068 §2.1/§3, RFC 8707 §2 | Access token `typ: at+jwt`; `aud` = `DefaultResource ?? Issuer` when no resource parameter is sent | Enforced |
 | OIDC Core §2 | ID token `aud` = `client_id` | Enforced |
 | RFC 9068 §4/§5 | Resource-server validation: presented access tokens pass signature and the `aud` claim must name this server itself (`ResourceAudiences`, defaulting to the non-blank default resource and issuer); tokens audience-restricted to external resources are rejected with `invalid_token`. The profile is read from the cryptographically verified token — the inner signed JWT of a nested encrypted token — and must carry `typ: at+jwt` (or `application/at+jwt`); the outer header alone neither rescues a wrong inner type nor rejects a correct one | Enforced |
 | RFC 7517 §4.5 | JWKS publishes every valid and retired issuer signing row with its `kid`; multi-key sets require `kid` on each row | Enforced |
@@ -807,8 +855,15 @@ mechanism; the host configures it).
 | Front-Channel Logout §2 | `iss` and `sid` appended to `frontchannel_logout_uri` as a pair | Enforced |
 | Back-Channel Logout §2.4 | Logout token `typ: logout+jwt` | Enforced |
 | RP-Initiated Logout §2 | OP session invalidation before RP notifications; failure closes the logout | Enforced |
+| OIDC DCR §§2-3 | Dynamic registration: metadata validation (redirect URIs and `application_type` constraints, `sector_identifier_uri` JSON membership per DCR §5, response/grant/scope/subject/userinfo/request-object algorithms, logout URIs and session flags), 201 creation with paired registration access token + `registration_client_uri` (DCR §3.2 uses SHOULD for 201), Bearer read-back and replace; registration requests pass an initial access token gate satisfied by a host-supplied `IInitialAccessTokenValidator` (anonymous requests rejected with 401); software statements apply to both create and replace when the host supplies a trusting validator, are unapproved otherwise, and their trusted claims take precedence while the submitted statement string is stored and echoed verbatim; OAuth-only registrations (no `openid` scope, redirect URIs, response types, `authorization_code`/`implicit` grants, or OIDC-only metadata such as subject/userinfo algorithms, `default_max_age`, `require_auth_time`, `default_acr_values`, `initiate_login_uri`, or logout URIs/session flags) may omit `redirect_uris` and carry no `authorization_code`/`code` defaults; malformed bodies and wrongly-typed fields return `invalid_client_metadata`/`invalid_software_statement` JSON | Enforced (registration surface) |
+| RFC 8707 §3 | `resource` at the authorize and token endpoints: §2 syntax validation (`invalid_target`), code-payload and refresh-subset grant consistency, access-token `aud` restriction, introspection echo | Enforced |
+| RFC 9396 §§6-7, §9 | `authorization_details` is validated against registered type descriptors and the client's `authorization_details_types` subset (§10). At code exchange and refresh, `IAuthorizationDetailTypeDescriptor.Narrow` owns the type-specific semantic comparison; there is no generic JSON-subset fallback. An omitted token-request parameter retains the grant carried by the code or refresh token, while an accepted narrowing becomes the actual set in the token response JSON array, access-token claim, successor refresh-token lineage, and resource-filtered introspection response. Narrowing never rewrites the original authorization record or authorization-code grant. Without `UseRichAuthorizationRequests()` the bound parameter remains inert and reaches no grant. | Enforced (behind `UseRichAuthorizationRequests()`) |
+| OIDC Core §5.3/§5.5 | UserInfo endpoint over an OpenID Connect bearer token; the configured OAuth profile extension also serves authorized end-user OAuth grants without `openid`, while application grants are rejected by persisted subject provenance; `acr_values` voluntary satisfiability per §5.5.1.1 (level walk, stronger performed authentication covers a weaker request); `claims` request parameter with `userinfo`/`id_token` members parsed and validated (`essential`/`value`/`values`), pinned `sub` mismatch handling, Essential `acr` enforcement, ID-token claim projection, private access-token carriage of requested UserInfo names, discovery `claims_parameter_supported`, and signed or encrypted UserInfo responses per §5.3.2 | Enforced for OpenID Connect; OAuth UserInfo is a Schemata extension |
+| RFC 7523 | Assertion client authentication (`client_secret_jwt`, `private_key_jwt`); §3.1 `jwt-bearer` grant anchored on the `JwtBearerTrustedIssuers` table — an assertion issuer without an entry is rejected, and an empty table leaves the grant unusable | Enforced |
+| RFC 9449 | DPoP proof validation, the [§4.3](https://www.rfc-editor.org/rfc/rfc9449.html#section-4.3) at-most-one DPoP header field rule (`invalid_dpop_proof` on a repeated, empty, or comma-combined value), key-bound tokens, server nonces, discovery metadata, `dpop_jkt` authorize binding, and the [§10.1](https://www.rfc-editor.org/rfc/rfc9449.html#section-10.1) PAR header composition that validates `POST {issuer}/Connect/Par` proofs (no nonce), derives the stored `dpop_jkt` when absent, and rejects a header/parameter mismatch as `invalid_dpop_proof` | Enforced (behind `UseDemonstratingProofOfPossession()`) |
+| RFC 9700 §2.1.2, RFC 10017 §7.2 | Access tokens in the authorization response | Degradation — available only through the explicit `UseImplicitFlow()` / `UseHybridFlow()` opt-in calls; the default code-flow server does not advertise the implicit grant, and a browser-based deployment conforming to RFC 10017 must not enable these flows. See [Degradation flows](#degradation-flows-implicit-hybrid-and-none). |
 
-#### OP session identity binding
+### OP session identity binding
 
 `IOpSessionService` resolves one canonical session identifier from collected evidence: a verified
 host ticket (the principal's `sid` claim) outranks every other source, and a fresh identifier is
@@ -820,12 +875,6 @@ session and rotates the OP user-agent state. Clearing records the cleared state 
 request, so subsequent issuance in the same request cannot resurrect the cleared identifier.
 Token-endpoint grants keep their validated lineage from the request properties; the session
 service is only consulted at the interactive login callback.
-| OIDC DCR §2-§3 | Dynamic registration: full metadata validation, 201 creation with paired registration access token + `registration_client_uri`, Bearer read-back and replace; registration requests pass an initial access token gate satisfied by a host-supplied `IInitialAccessTokenValidator` (anonymous requests rejected with 401); software statements apply to both create and replace when the host supplies a trusting validator, are unapproved otherwise, and their trusted claims take precedence while the submitted statement string is stored and echoed verbatim; OAuth-only registrations (no `openid` scope, redirect URIs, response types, `authorization_code`/`implicit` grants, or OIDC-only metadata such as subject/userinfo algorithms, `default_max_age`, `require_auth_time`, `default_acr_values`, `initiate_login_uri`, or logout URIs/session flags) may omit `redirect_uris` and carry no `authorization_code`/`code` defaults; malformed bodies and wrongly-typed fields return `invalid_client_metadata`/`invalid_software_statement` JSON | Enforced (registration surface) |
-| RFC 8707 §3 | `resource` at the authorize and token endpoints: §2 syntax validation (`invalid_target`), code-payload and refresh-subset grant consistency, access-token `aud` restriction, introspection echo | Enforced |
-| RFC 9396 §§6-7, §9 | `authorization_details` is validated against registered type descriptors and the client's `authorization_details_types` subset (§10). At code exchange and refresh, `IAuthorizationDetailTypeDescriptor.Narrow` owns the type-specific semantic comparison; there is no generic JSON-subset fallback. An omitted token-request parameter retains the grant carried by the code or refresh token, while an accepted narrowing becomes the actual set in the token response JSON array, access-token claim, successor refresh-token lineage, and resource-filtered introspection response. Narrowing never rewrites the original authorization record or authorization-code grant. Without `UseRichAuthorizationRequests()` the bound parameter remains inert and reaches no grant. | Enforced (behind `UseRichAuthorizationRequests()`) |
-| OIDC Core §5.3/§5.5 | UserInfo endpoint over an OpenID Connect bearer token; the configured OAuth profile extension also serves authorized end-user OAuth grants without `openid`, while application grants are rejected by persisted subject provenance; `acr_values` voluntary satisfiability per §5.5.1.1 (level walk, stronger performed authentication covers a weaker request); `claims` request parameter with `userinfo`/`id_token` members parsed and validated (`essential`/`value`/`values`), pinned `sub` mismatch handling, Essential `acr` enforcement, ID-token claim projection, private access-token carriage of requested UserInfo names, discovery `claims_parameter_supported`, and signed or encrypted UserInfo responses per §5.3.2 | Enforced for OpenID Connect; OAuth UserInfo is a Schemata extension |
-| RFC 7523 | Assertion client authentication (`client_secret_jwt`, `private_key_jwt`); §3.1 `jwt-bearer` grant anchored on the `JwtBearerTrustedIssuers` table — an assertion issuer without an entry is rejected, and an empty table leaves the grant unusable | Enforced |
-| RFC 9449 | DPoP proof validation, the [§4.3](https://www.rfc-editor.org/rfc/rfc9449.html#section-4.3) at-most-one DPoP header field rule (`invalid_dpop_proof` on a repeated, empty, or comma-combined value), key-bound tokens, server nonces, discovery metadata, `dpop_jkt` authorize binding, and the [§10.1](https://www.rfc-editor.org/rfc/rfc9449.html#section-10.1) PAR header composition that validates `POST {issuer}/Connect/Par` proofs (no nonce), derives the stored `dpop_jkt` when absent, and rejects a header/parameter mismatch as `invalid_dpop_proof` | Enforced (behind `UseDemonstratingProofOfPossession()`) |
 
 ## Caveats
 

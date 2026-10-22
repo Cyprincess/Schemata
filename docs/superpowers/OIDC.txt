@@ -1,0 +1,66 @@
+对于OAuth2/OIDC相关的标准引用如下,如果涉及的逻辑与这两个标准系列有关,应当以标准为准.
+
+OpenID Connect:
+
+OpenID Connect Core 1.0  https://openid.net/specs/openid-connect-core-1_0.html
+OpenID Connect Discovery 1.0  https://openid.net/specs/openid-connect-discovery-1_0.html
+OAuth 2.0 Multiple Response Types  https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html
+OAuth 2.0 Form Post Response Mode  https://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html
+OpenID Connect RP-Initiated Logout 1.0  https://openid.net/specs/openid-connect-rpinitiated-1_0.html
+OpenID Connect Front-Channel Logout 1.0  https://openid.net/specs/openid-connect-frontchannel-1_0.html
+OpenID Connect Back-Channel Logout 1.0  https://openid.net/specs/openid-connect-backchannel-1_0.html
+OpenID Connect Session Management 1.0 https://openid.net/specs/openid-connect-session-1_0.html
+OpenID Connect Dynamic Client Registration 1.0 incorporating errata set 2 https://openid.net/specs/openid-connect-registration-1_0.html
+
+OpenID Connect Client-Initiated Backchannel Authentication Flow - Core 1.0 https://openid.net/specs/openid-client-initiated-backchannel-authentication-core-1_0.html
+
+OpenID Connect Native SSO for Mobile Apps 1.0 - draft 07 https://openid.net/specs/openid-connect-native-sso-1_0.html
+
+OAuth 2.0 Core:
+
+RFC 6749 -- OAuth 2.0 Framework
+RFC 6750 -- Bearer Token Usage
+RFC 6819 -- OAuth 2.0 Threat Model
+RFC 9700 -- OAuth 2.0 Security Best Current Practice
+
+OAuth 2.0 Extensions:
+
+RFC 7636 -- PKCE
+
+RFC 8252 -- Native Apps
+RFC 8628 -- Device Authorization Grant
+RFC 10017 -- Browser-Based Applications
+
+RFC 9068 -- JWT Profile
+RFC 7662 -- Token Introspection
+RFC 7009 -- Token Revocation
+RFC 8693 -- Token Exchange
+
+RFC 8414 -- Authorization Server Metadata
+RFC 7591 -- Dynamic Client Registration Protocol
+RFC 7592 -- Dynamic Client Registration Management Protocol
+
+RFC 9126 -- Pushed Authorization Requests
+RFC 9449 -- Demonstrating Proof of Possession (DPoP)
+RFC 8705 -- Mutual-TLS Client Authentication and Certificate-Bound Access Tokens
+RFC 7521 -- Assertion Framework
+RFC 7523 -- JWT Assertion Profiles
+
+RFC 7522 -- Security Assertion Markup Language (SAML) 2.0 Profile
+RFC 9207 -- Authorization Server Issuer Identification
+RFC 9396 -- Rich Authorization Requests
+RFC 9470 -- Step Up Authentication Challenge Protocol
+
+RFC 8176 -- Authentication Method Reference
+RFC 9101 -- JWT-Secured Authorization Request (JAR)
+
+Identity Assertion JWT Authorization Grant https://www.ietf.org/archive/id/draft-ietf-oauth-identity-assertion-authz-grant-04.txt
+
+IANA Registries:
+
+OAuth Parameters  https://www.iana.org/assignments/oauth-parameters/oauth-parameters.xhtml
+JSON Web Token Claims  https://www.iana.org/assignments/jwt/jwt.xhtml
+Authentication Method Reference Values  https://www.iana.org/assignments/authentication-method-reference-values/authentication-method-reference-values.xhtml
+
+必须读取具体文件内容, 不得根据编号和名称猜测或编造内容.
+RFC 使用权威路径访问https://www.rfc-editor.org/rfc/rfc<数字编号>.txt

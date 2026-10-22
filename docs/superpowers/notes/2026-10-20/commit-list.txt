@@ -1,0 +1,93 @@
+90ff2a5f chore: remove dead resource and insight surfaces
+fbb532ea refactor(Modular): rename the options extensions
+f1c1b526 feat(Transport): project RFC 8288 links over HTTP and gRPC
+b90bd50a refactor(Identity): pass operation context explicitly
+9b06a7ca refactor(Report): pass report execution parameters explicitly
+d2f88aae refactor(Actor): share one serialization routing handler
+b21ed2fc feat(Authorization): resolve effective response modes and explicit flows
+475f1248 fix(Resource): validate list ordering and endpoint declarations
+155c6c60 refactor(Resource): derive permission names and child parents once
+7c3e0505 refactor(Resource): own the unit of work in resource mutations
+f7e56cb9 fix(Entity): scope cache-eviction suppression to one enlistment
+35d57331 fix(Entity): require a resource resolver for declared references
+2241d5c3 docs: document explicit payloads, tenant isolation and link contracts
+c58c3ff6 refactor(Advice)!: generate typed runners and require explicit advice context
+b4846f8b feat(Identity)!: add RFC 7644 users and groups discovery
+86bc2f39 refactor!: unify the mapper surface and pass handler context explicitly
+343dc00c refactor(Report)!: pass explicit snapshots and host entity types
+10122728 feat(Resource)!: add explicit payloads, idempotency and RFC 8288 links
+337607ab fix(Expressions): honor short-circuit, null and map-admission semantics
+4d000313 feat(Flow)!: settle durable dispatch on host flow entity types
+8d2d6525 feat(Push)!: register push entities and add Web Push delivery
+b8b14221 refactor(Actor)!: register actor entities and align event dispatch boundaries
+871c62f3 refactor(Scheduling)!: settle durable execution and track active runs by type
+4eb24c4e refactor(Identity)!: pass explicit payloads and host entity types
+0f69d3bc refactor(Authorization)!: pass explicit payloads, grants and entity sets
+8e22d7db refactor(Security)!: scope token mutations, authentication and repository boundaries
+810adfcd refactor(Tenancy)!: isolate tenant repositories, caching and runtime services
+6f13d608 refactor!: align core contracts, features and validation surfaces
+d1a6ee9e test(Flow): harden BPMN conformance suite with staleness guard and case-id dedupe
+cefe6f7c feat!: enable security activation and expose identity and authorization management resources
+57d26104 refactor!: run domain advisors and resource aspects on the dispatcher wrap pipeline
+8347e42e feat(Cqrs)!: unify orchestration under the messaging dispatcher with the actor system and domain command-ization
+d38beb33 docs: consolidate per-package AGENTS.md files into the root guide
+1a778202 docs: record the feature assembly rules and realign the knowledge base
+5632e4a1 feat(Transport)!: share one RabbitMQ connection across the event bus
+4df73820 refactor(Flow)!: separate transition advice from catch delivery
+74b17da2 refactor(Resource)!: register resources explicitly
+912bdee2 refactor!: split constants and extract feature wiring into extensions
+7cbd9e48 fix: update compatibility suppressions
+3dbb374b docs: describe resource identity, flow labels, scheduling keys and sign-in
+5e241d3a docs(guides): repair the tutorial chain against the current framework
+7e7919f7 docs: sync the agent knowledge base with the reorganized packages
+a00e9955 perf(Insight): reuse cached delegates in the local pipeline
+31017fb7 feat(Authorization)!: send interactive authorize to the sign-in page
+7a1c6998 fix(Scheduling)!: derive bounded job keys and unify them with job names
+35b34afc fix(Flow): execute compensation handler bodies
+e1c95382 feat(Flow)!: describe the definition graph and rest none tasks on arrival
+ed27d4dc fix(Resource)!: let the URI decide a child resource's parent
+14efde38 refactor(Resource)!: derive resource identity from the canonical name pattern
+be7c5134 feat(Abstractions): declare localized labels through a dedicated attribute
+d165d149 refactor(Repository)!: reopen a repository's own unit of work on commit
+44017b2c fix(Mapping): preserve record targets replaced by Mapster
+3085b597 fix(Core): serialize runtime-typed error details
+5716e141 docs: restructure Report docs and expand cookbook, guides, and AGENTS.md
+91b64ddf fix(Authorization)!: bind token application references to canonical names
+cb0feca4 refactor!: audit post-merge internals, split transport seams, fix latent bugs
+3a6bedb8 feat(Report): add Schemata.Report
+44d14513 feat(Flow)!: add BPMN engine and source-bound process runtime
+d2f34106 refactor: rename advisors
+20780aa5 refactor!: route exception messages through SchemataResources end-to-end
+10edae5a feat(Resource): add IChild trait for AIP-132/133 parent canonical materialization
+e6dc55c5 refactor(Flow)!: run IFlowTransitionAdvisor inside the transition unit of work
+51458eb8 refactor(Event)!: replace IEventSubscriptionStore with IRepository<SchemataEventSubscription>
+b7f66d23 refactor: unify cross-resource fields to canonical names
+0c849832 refactor: align exception model with AIP-193 and google.rpc.error_details.proto
+e47c0f85 docs: expand AGENTS.md hierarchy and add Insight tier
+e1ea29d8 fix(Flow)!: allow same event to be consumed
+202fd3e3 refactor!: align package layers and decouple optional runtimes
+05e7ed25 feat(Flow)!: write process state back to source
+72afbc6a feat(Expressions)!: complete CEL value semantics and conformance
+136e044a feat(Insight): add Insight federated query
+18b08d99 feat(Expressions)!: unify languages and residual
+838b409b feat(Push)!: add Schemata.Push and fold LRO
+b948204a docs: refresh framework documentation
+4244a97e feat!: harden persistence, resources, and runtime durability across the framework
+3706f5f4 feat!: soft-delete lifecycle, read masks, and resource-transport bridges
+3423eeef refactor(Entity)!: redesign repository and unit-of-work contract
+5d7a63dd docs: refresh project documentation across the project
+b755c401 feat!: add event bus, scheduler, and Flow bridge packages
+9ea0395a feat(Resource): gate standard endpoints by Operation whitelist
+55965c3a feat(Resource)!: support AIP-136 custom methods on HTTP and gRPC
+164cf561 feat(Flow)!: replace Workflow with BPMN-style Flow engine
+0cbf9094 refactor!: identifier redesign, identity/auth/tenancy overhaul
+31b1dac1 feat(Expressions): add Schemata.Expressions.{Skeleton,Aip,Cel}
+4a599a62 feat(Entity)!: add UoW & transaction
+ed03fc05 refactor!: rename IEvent to ITransition
+9b15af3a feat: ownership, request sanitize & authorization
+042f3838 refactor(Tenancy)!: per-tenant DI and cache
+ff3ce40f feat(Cache): add Schemata.Cache
+3dbb9e82 docs: update comments & xmldoc
+2e224a3b fix: tests
+4d9b08b4 refactor!: rework Security, Identity, Authorization
+d0191065 docs: document the project

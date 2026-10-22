@@ -166,6 +166,9 @@ The Resource `:purge` method dispatches `PurgeJob<TEntity>` through the schedule
 
 ## Feature priority table
 
+These rows are the Scheduling slice of the canonical [Built-in Features](../core/built-in-features.md)
+table.
+
 | Feature                          | Activation               | Priority    |
 | -------------------------------- | ------------------------ | ----------- |
 | `SchemataSchedulingFeature`      | `schema.UseScheduling()` | 480,000,000 |

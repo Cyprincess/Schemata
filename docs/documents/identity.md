@@ -249,7 +249,7 @@ handlers are absent; a selected handler with broken dependencies fails at use.
 
 | Interface                    | Purpose                                                                |
 | ---------------------------- | ---------------------------------------------------------------------- |
-| `IIdentityRequestAdvisor<TRequest,TResponse>` | Gate or transform any request before the handler runs; a handled advisor writes `IdentityOperationExecution<TResponse>.Response`. |
+| `IIdentityRequestAdvisor<TRequest,TResponse>` | Gate or transform any request before the handler runs; a handled advisor writes the response through `IHandledResponse<TResponse>.SetResponse` on the `IdentityOperationExecution<TResponse>` payload. |
 | `IMailSender<TUser>`         | Register an application implementation for confirmation and reset emails. |
 | `IMessageSender<TUser>`      | Register an application implementation for SMS confirmation/reset codes. |
 | `SchemataUserManager<TUser>` | Subclass for domain-specific user operations.                          |

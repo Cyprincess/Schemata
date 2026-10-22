@@ -35,107 +35,63 @@ See [Getting Started](guides/getting-started.md) for a complete walkthrough buil
 
 ## Package Layers
 
-Packages are organized in layers. Higher layers depend on lower ones; consumers reference the tier that matches their needs.
+The `src/` tree contains **88** runtime package projects; the two generator projects under
+`generators/` and the 10 target meta-packages under `targets/` are separate (the modeling generator
+is listed below for completeness). Packages follow the
+`Schemata.<Domain>.<Layer>` convention: `Skeleton` carries contracts, `Foundation` carries the
+implementation and its `Use{Domain}` registration, `Http`/`Grpc` are transports, and named
+provider/bridge packages connect a component to a transport, broker, storage backend, or neighboring
+runtime.
 
-| Layer             | Packages                                                                              | Purpose                                                              |
-| ----------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| **Abstractions**  | `Schemata.Abstractions`, `Schemata.Common`                                            | Entity traits, advisor interfaces, error types, resource attributes  |
-| **Core**          | `Schemata.Core`, `Schemata.Advice`                                                    | Feature system, advice pipeline runner, builder API                  |
-| **Repository**    | `Schemata.Entity.Repository`, `.EntityFrameworkCore`, `.LinqToDB`, `.Cache`, `.Owner` | Repository pattern, ORM integration, query caching, entity ownership |
-| **Validation**    | `Schemata.Validation.Skeleton`, `.FluentValidation`                                   | Validation advisor pipeline with FluentValidation                    |
-| **Mapping**       | `Schemata.Mapping.Skeleton`, `.Foundation`, `.AutoMapper`, `.Mapster`                 | Object-to-object mapping abstraction with pluggable backends         |
-| **Security**      | `Schemata.Security.Skeleton`, `.Foundation`                                           | Access control and entitlement-based query filtering                 |
-| **Identity**      | `Schemata.Identity.Skeleton`, `.Foundation`                                           | ASP.NET Core Identity integration with advisor-based registration    |
-| **Authorization** | `Schemata.Authorization.Skeleton`, `.Foundation`, `.Identity`                         | OAuth 2.0 / OpenID Connect authorization server                      |
-| **Tenancy**       | `Schemata.Tenancy.Skeleton`, `.Foundation`                                            | Multi-tenant resolution with per-tenant DI isolation                 |
-| **Event**         | `Schemata.Event.Skeleton`, `.Foundation`, `.RabbitMQ`                                 | Event bus with in-process and RabbitMQ transports                    |
-| **Actor**         | `Schemata.Actor.Skeleton`, `.Foundation`, `.Event`, `.Scheduling`, `Schemata.Flow.Actor`, `Schemata.Push.Actor`, `Schemata.Report.Actor` | In-process actor system with event, reminder, and per-module (Flow, Push, Report) serialization bridges |
-| **Scheduling**    | `Schemata.Scheduling.Skeleton`, `.Foundation`, `.Event`, `.Http`, `.Grpc` | Cron, periodic, and one-time jobs with lifecycle event publishing and HTTP/gRPC bridges |
-| **Resource**      | `Schemata.Resource.Foundation`, `.Http`, `.Grpc`                                      | Auto-generated CRUD endpoints (HTTP REST and gRPC)                   |
-| **Flow**          | `Schemata.Flow.Foundation`, `.StateMachine`, `.Bpmn`, `.Http`, `.Grpc`, `.Scheduling`, `.Event`, `Schemata.Flow.Actor` | BPMN 2.0.2 process engine with state-machine and full BPMN runtimes plus HTTP/gRPC, scheduling, event, and actor bridges |
-| **Modular**       | `Schemata.Modular`                                                                    | Module discovery and lifecycle management                            |
-| **Modeling**      | `Schemata.Modeling.Generator`                                                         | SKM schema definition language for `.skm` files                      |
+| Domain             | Packages |
+| ------------------ | -------- |
+| **Abstractions**   | `Schemata.Abstractions`, `Schemata.Common`, `Schemata.Domain.Skeleton`, `Schemata.Messaging.Skeleton` |
+| **Kernel**         | `Schemata.Core`, `Schemata.Advice`, `Schemata.Modular` |
+| **Repository**     | `Schemata.Entity.Repository`, `Schemata.Entity.EntityFrameworkCore`, `Schemata.Entity.LinqToDB`, `Schemata.Entity.Cache`, `Schemata.Entity.Event` |
+| **Validation**     | `Schemata.Validation.Skeleton`, `Schemata.Validation.FluentValidation` |
+| **Mapping**        | `Schemata.Mapping.Skeleton`, `Schemata.Mapping.Foundation`, `Schemata.Mapping.AutoMapper`, `Schemata.Mapping.Mapster` |
+| **Security**       | `Schemata.Security.Skeleton`, `Schemata.Security.Foundation` |
+| **Identity**       | `Schemata.Identity.Skeleton`, `Schemata.Identity.Foundation`, `Schemata.Identity.Http`, `Schemata.Identity.Grpc` |
+| **SCIM**           | `Schemata.Scim`, `Schemata.Identity.Scim` |
+| **Authorization**  | `Schemata.Authorization.Skeleton`, `Schemata.Authorization.Foundation`, `Schemata.Authorization.Http`, `Schemata.Authorization.Grpc`, `Schemata.Authorization.Identity` |
+| **Tenancy**        | `Schemata.Tenancy.Skeleton`, `Schemata.Tenancy.Foundation`, `Schemata.Tenancy.Actor`, `Schemata.Tenancy.Caching`, `Schemata.Tenancy.Messaging` |
+| **Event**          | `Schemata.Event.Skeleton`, `Schemata.Event.Foundation`, `Schemata.Event.RabbitMq` |
+| **Actor**          | `Schemata.Actor.Skeleton`, `Schemata.Actor.Foundation`, `Schemata.Actor.Event`, `Schemata.Actor.Scheduling`; the Flow/Push/Report actor bridges ship in their own domains |
+| **Transport**      | `Schemata.Transport.Http`, `Schemata.Transport.Grpc`, `Schemata.Transport.RabbitMq` |
+| **Scheduling**     | `Schemata.Scheduling.Skeleton`, `Schemata.Scheduling.Foundation`, `Schemata.Scheduling.Event`, `Schemata.Scheduling.Http`, `Schemata.Scheduling.Grpc` |
+| **Flow**           | `Schemata.Flow.Skeleton`, `Schemata.Flow.Foundation`, `Schemata.Flow.StateMachine`, `Schemata.Flow.Bpmn`, `Schemata.Flow.Http`, `Schemata.Flow.Grpc`, `Schemata.Flow.Event`, `Schemata.Flow.Scheduling`, `Schemata.Flow.Actor` |
+| **Resource**       | `Schemata.Resource.Foundation`, `Schemata.Resource.Http`, `Schemata.Resource.Grpc` |
+| **Insight**        | `Schemata.Insight.Skeleton`, `Schemata.Insight.Foundation`, `Schemata.Insight.Http`, `Schemata.Insight.Grpc` |
+| **Push**           | `Schemata.Push.Skeleton`, `Schemata.Push.Foundation`, `Schemata.Push.Http`, `Schemata.Push.Grpc`, `Schemata.Push.Scheduling`, `Schemata.Push.Actor`, `Schemata.Push.WebPush` |
+| **Report**         | `Schemata.Report.Skeleton`, `Schemata.Report.Foundation`, `Schemata.Report.Http`, `Schemata.Report.Grpc`, `Schemata.Report.Scheduling`, `Schemata.Report.Actor` |
+| **Caching**        | `Schemata.Caching.Skeleton`, `Schemata.Caching.Memory`, `Schemata.Caching.Redis` |
+| **Expressions**    | `Schemata.Expressions.Skeleton`, `Schemata.Expressions.Aip`, `Schemata.Expressions.Cel`, `Schemata.Expressions.Order` |
+| **Modeling**       | `Schemata.Modeling.Generator` |
 
-Many feature domains ship two packages: a **Skeleton** package (contracts and abstractions only) and a **Foundation** package (implementation). Both target `net8.0;net10.0`. Business libraries reference Skeleton packages; host applications reference Foundation packages.
+The repository adapters of the Flow and Scheduling foundations live inside
+`Schemata.Flow.Foundation/Repository` and `Schemata.Scheduling.Foundation/Repository`; there are no
+separate `*.Repository` packages. Business libraries reference Skeleton packages; host applications
+reference Foundation packages.
 
 ## Feature Priority Table
 
-Features are ordered by two independent integers. `Order` controls `ConfigureServices` sequence; `Priority` controls `ConfigureApplication` and `ConfigureEndpoints` sequence. The range `[100_000_000, 900_000_000]` is reserved for built-in features and Schemata extensions. User features pick numbers outside that range.
+Features are ordered by two independent integers. `Order` controls the `ConfigureServices` sequence;
+`Priority` controls the `ConfigureApplication` and `ConfigureEndpoints` sequence. The range
+`[100_000_000, 900_000_000]` is reserved for built-in features and Schemata extensions. User
+features pick numbers outside that range.
 
 Several non-`10M` offsets are reserved above extension anchors. Flow engines use `+50K`
 (`Flow.StateMachine`) and `+60K` (`Flow.Bpmn`). Domain-specific transport and bridge slots use
 `+100K`, `+200K`, and `+300K`: `Scheduling.Event` occupies `+100K`, while `Flow.Event` occupies
 `+300K`. Scheduling bridges use `+400K` (`Flow.Scheduling`, `Push.Scheduling`,
 `Report.Scheduling`), and `+600K` is the actor bridge slot (`Flow.Actor`, `Push.Actor`,
-`Report.Actor`). The `+5M` offset
-is reserved separately for a built-in sub-feature; only `WellKnown` uses it.
+`Report.Actor`). The `+5M` offset is reserved for a built-in sub-feature; only `WellKnown` uses it.
 
-### Built-in Features
-
-| Priority    | Feature                | Description                                                  |
-| ----------- | ---------------------- | ------------------------------------------------------------ |
-| 100_000_000 | ForwardedHeaders       | ASP.NET Forwarded Headers middleware                         |
-| 110_000_000 | DeveloperExceptionPage | ASP.NET Developer Exception Page middleware                  |
-| 120_000_000 | Logging                | ASP.NET Request Logging middleware                           |
-| 130_000_000 | HttpLogging            | ASP.NET HTTP Logging middleware                              |
-| 140_000_000 | W3CLogging             | ASP.NET W3C Logging middleware                               |
-| 150_000_000 | Https                  | ASP.NET HTTPS and HTTPS Redirection middlewares              |
-| 170_000_000 | CookiePolicy           | ASP.NET Cookie Policy middleware                             |
-| 180_000_000 | Routing                | ASP.NET Routing middleware                                   |
-| 185_000_000 | WellKnown              | Well-known endpoint sub-feature of Routing (+5M)             |
-| 200_000_000 | Cors                   | ASP.NET CORS middleware                                      |
-| 205_000_000 | Tenancy (Request)      | Request-stage tenant resolution + tenant scope binding       |
-| 210_000_000 | Authentication         | ASP.NET Authentication middleware                            |
-| 211_000_000 | Tenancy (Principal)    | Principal-stage tenant resolution after authentication       |
-| 212_000_000 | Authorization          | ASP.NET Authorization middleware                             |
-| 213_000_000 | Tenancy (Execution)    | Tenant execution middleware and MVC resource filter          |
-| 215_000_000 | Quota                  | ASP.NET Rate Limiter middleware (partitions after authentication) |
-| 220_000_000 | Session                | ASP.NET Session middleware                                   |
-| 230_000_000 | Controllers            | ASP.NET MVC middlewares, without Views                       |
-| 240_000_000 | JsonSerializer         | System.Text.Json with snake_case and 53-bit integer handling |
-
-### Extension Features
-
-| Priority    | Package                           | Feature               | Description                                                            |
-| ----------- | --------------------------------- | --------------------- | ---------------------------------------------------------------------- |
-| 400_000_000 | Schemata.Security.Foundation      | Security              | RBAC/ABAC security policies                                            |
-| 410_000_000 | Schemata.Transport.Http           | Transport.Http        | Shared HTTP plumbing: exception handler, JSON wire-name traits         |
-| 420_000_000 | Schemata.Transport.Grpc           | Transport.Grpc        | Shared gRPC plumbing: code-first protobuf-net, interceptor, reflection |
-| 430_000_000 | Schemata.Identity.Foundation      | Identity              | ASP.NET Core Identity integration                                      |
-| 440_000_000 | Schemata.Event.Foundation         | Event                 | Event bus and dispatch pipeline                                        |
-| 450_000_000 | Schemata.Actor.Foundation         | Actor                 | In-process actor system: per-instance mailbox serialization            |
-| 450_100_000 | Schemata.Actor.Event              | Actor.Event           | Bridge: Actor + Event (+100K)                                          |
-| 450_200_000 | Schemata.Actor.Scheduling         | Actor.Scheduling      | Bridge: Actor + Scheduling (+200K)                                     |
-| 460_000_000 | Schemata.Authorization.Foundation | Authorization         | OAuth 2.0 / OpenID Connect server                                      |
-| 460_100_000 | Schemata.Authorization.Identity   | AuthorizationIdentity | Bridge: Authorization + Identity (+100K)                               |
-| 470_000_000 | Schemata.Mapping.Foundation       | Mapping               | Unified object mapper abstraction                                      |
-| 480_000_000 | Schemata.Scheduling.Foundation    | Scheduling            | Cron and periodic job scheduler                                        |
-| 480_100_000 | Schemata.Scheduling.Event         | Scheduling.Event      | Bridge: Scheduling + Event (+100K)                                     |
-| 480_200_000 | Schemata.Scheduling.Http           | Scheduling.Http        | Bridge: Scheduling + HTTP transport (+200K)                            |
-| 480_300_000 | Schemata.Scheduling.Grpc           | Scheduling.Grpc        | Bridge: Scheduling + gRPC transport (+300K)                            |
-| 490_000_000 | Schemata.Flow.Foundation          | Flow                  | BPMN process engine                                                    |
-| 490_050_000 | Schemata.Flow.StateMachine        | Flow.StateMachine     | Default state-machine engine on Flow (+50K)                            |
-| 490_060_000 | Schemata.Flow.Bpmn                | Flow.Bpmn             | Full BPMN 2.0.2 engine on Flow (+60K)                                  |
-| 490_100_000 | Schemata.Flow.Http                | Flow.Http             | Flow HTTP transport (+100K)                                            |
-| 490_200_000 | Schemata.Flow.Grpc                | Flow.Grpc             | Flow gRPC transport (+200K)                                            |
-| 490_300_000 | Schemata.Flow.Event               | Flow.Event            | Bridge: Flow + Event (+300K)                                           |
-| 490_400_000 | Schemata.Flow.Scheduling          | Flow.Scheduling       | Bridge: Flow + Scheduling (+400K)                                      |
-| 490_600_000 | Schemata.Flow.Actor               | Flow.Actor            | Bridge: Flow + Actor (+600K)                                           |
-| 500_000_000 | Schemata.Resource.Foundation      | Resource              | Google AIP-compliant resource service                                  |
-| 500_100_000 | Schemata.Resource.Http            | Resource.Http         | HTTP/REST endpoint generation (+100K)                                  |
-| 500_200_000 | Schemata.Resource.Grpc            | Resource.Grpc         | gRPC endpoint generation (+200K)                                       |
-| 510_000_000 | Schemata.Insight.Foundation       | Insight               | Federated query planning and execution over resource entities         |
-| 510_100_000 | Schemata.Insight.Http             | Insight.Http          | Insight HTTP transport (+100K)                                         |
-| 510_200_000 | Schemata.Insight.Grpc             | Insight.Grpc          | Insight gRPC transport (+200K)                                         |
-| 520_000_000 | Schemata.Push.Foundation          | Push                  | Push notification fan-out                                              |
-| 520_400_000 | Schemata.Push.Scheduling          | Push.Scheduling       | Bridge: Push + Scheduling (+400K)                                      |
-| 520_600_000 | Schemata.Push.Actor               | Push.Actor            | Bridge: Push + Actor (+600K)                                          |
-| 530_000_000 | Schemata.Report.Foundation        | Report                | Report definitions, snapshots, and generation                         |
-| 530_100_000 | Schemata.Report.Http              | Report.Http           | Report HTTP transport (+100K)                                          |
-| 530_200_000 | Schemata.Report.Grpc              | Report.Grpc           | Report gRPC transport (+200K)                                          |
-| 530_400_000 | Schemata.Report.Scheduling        | Report.Scheduling     | Bridge: Report + Scheduling (+400K)                                    |
-| 530_600_000 | Schemata.Report.Actor             | Report.Actor          | Bridge: Report + Actor (+600K)                                        |
-| 540_000_000 | Schemata.Modular                  | Modular               | Module discovery and lifecycle management                                |
+The single canonical table — every built-in and extension feature class, its exact `Priority`, its
+`Use*()` activation, and what it registers — is
+[Built-in Features](documents/core/built-in-features.md). It is generated from the feature constants
+at HEAD and is the only table to update when a priority changes; this page and the README link to it
+instead of duplicating it.
 
 ## Documentation
 

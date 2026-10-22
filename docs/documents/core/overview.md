@@ -104,5 +104,5 @@ feature claim a delegate via `Pop` so it applies exactly once.
 ## See also
 
 - [Feature System](feature-system.md) — lifecycle, `DependsOn`, `Order` vs `Priority`
-- [Built-in Features](built-in-features.md) — the authoritative priority table
+- [Built-in Features](built-in-features.md) — the canonical priority table
 - [Advice Pipeline](advice-pipeline.md) — `IAdvisor`, `AdviceContext`, `AdviseResult`

@@ -75,7 +75,7 @@ pending `Operation`. The job writes the eventual snapshot reference or inline re
 
 For `Sync = true`, the handler calls `IOperationService.ExecuteAsync`. That service commits a
 `Running` execution before invoking inline work. The callback receives the persisted operation,
-sets `ReportExecutionContext.Operation` to its canonical name, and dispatches `RunReportRequest`.
+passes its canonical name on `RunReportRequest.Operation`, and dispatches `RunReportRequest`.
 The snapshot can therefore reference the actual operation while materialization is running. The
 same execution row receives the terminal output or error; cancellation records `Cancelled` and
 rethrows. See [Inline operations](../scheduling/persistence.md#inline-operations).

@@ -218,9 +218,11 @@ runtime catalog of registered process definitions; there is no separate reflecti
 - The definition graph describes the declared process. Boundary and event-sub-process
   subscriptions armed while a token is active are visible as elements but are not implied by the
   token's current wait.
-- Response links cover the process, its definition, tokens, and transitions. A catch link is
-  deferred until a catch resource endpoint exists: catches are graph elements, and the framework
-  serves no catch resource to link to.
+- Response links cover the process, the process-definitions catalog, tokens, and transitions. The
+  definition link targets the definitions catalog; the catalog has no name/version filter, so a
+  specific definition cannot be located through a link at HEAD (issue #201 is not applicable). A
+  catch link is deferred until a catch resource endpoint exists: catches are graph elements, and the
+  framework serves no catch resource to link to.
 
 ## See also
 
