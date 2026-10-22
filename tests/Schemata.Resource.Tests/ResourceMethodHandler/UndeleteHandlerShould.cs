@@ -33,7 +33,8 @@ public class UndeleteHandlerShould
             PurgeTime     = DateTime.UtcNow.AddDays(7),
         };
 
-        var repository = new Mock<IRepository<TrashStudent>>();
+        var unit       = UnitOfWorkMock.Create();
+        var repository = UnitOfWorkMock.Repository<TrashStudent>(unit);
         repository.Setup(r => r.SingleOrDefaultAsync(
                              It.IsAny<Func<IQueryable<TrashStudent>, IQueryable<TrashStudent>>>(),
                              It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
@@ -53,6 +54,8 @@ public class UndeleteHandlerShould
         Assert.Same(entity, detail);
         Assert.Null(entity.DeleteTime);
         Assert.Null(entity.PurgeTime);
+        owner.Verify(o => o.UpdateAsync(entity, unit.Object, Operations.Undelete, It.IsAny<CancellationToken>()), Times.Once);
+        unit.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
         repository.Verify(r => r.UpdateAsync(It.IsAny<TrashStudent>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()), Times.Never);
         repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -93,7 +96,8 @@ public class UndeleteHandlerShould
             PurgeTime     = DateTime.UtcNow.AddDays(7),
         };
 
-        var repository = new Mock<IRepository<TrashStudent>>();
+        var unit       = UnitOfWorkMock.Create();
+        var repository = UnitOfWorkMock.Repository<TrashStudent>(unit);
         repository.Setup(r => r.SingleOrDefaultAsync(
                              It.IsAny<Func<IQueryable<TrashStudent>, IQueryable<TrashStudent>>>(),
                              It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
@@ -115,6 +119,41 @@ public class UndeleteHandlerShould
 
         Assert.Null(detail);
         mapper.Verify(m => m.Map<TrashStudent, TrashStudent>(It.IsAny<TrashStudent>()), Times.Never);
+        unit.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Invoke_WhenDetailMappingThrows_DoesNotCommitTheRestore() {
+        var entity = new TrashStudent {
+            Name          = "alice-1",
+            CanonicalName = "trashStudents/alice-1",
+            DeleteTime    = DateTime.UtcNow,
+            PurgeTime     = DateTime.UtcNow.AddDays(7),
+        };
+
+        var unit       = UnitOfWorkMock.Create();
+        var repository = UnitOfWorkMock.Repository<TrashStudent>(unit);
+        repository.Setup(r => r.SingleOrDefaultAsync(
+                             It.IsAny<Func<IQueryable<TrashStudent>, IQueryable<TrashStudent>>>(),
+                             It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns(ValueTask.FromResult<TrashStudent?>(entity));
+        var owner = ResourceMutationMock.Create<TrashStudent>();
+
+        var mappedBeforeCommit = false;
+        var mapper = new Mock<ISimpleMapper>();
+        mapper.Setup(m => m.Map<TrashStudent, TrashStudent>(entity))
+              .Callback(() => mappedBeforeCommit = !unit.Invocations.Any(invocation
+                  => invocation.Method.Name == nameof(IUnitOfWork.CommitAsync)))
+              .Throws(new InvalidOperationException("detail mapping failed"));
+        var handler = new UndeleteHandler<TrashStudent, TrashStudent>(repository.Object, owner.Object, mapper.Object);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.HandleAsync(
+            new() { CanonicalName = entity.CanonicalName }, EmptyAdvice(),
+            CancellationToken.None));
+
+        Assert.True(mappedBeforeCommit, "The restored detail must be mapped before the dispatch commits.");
+        unit.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private static AdviceContext EmptyAdvice() => new(new ServiceCollection().BuildServiceProvider());

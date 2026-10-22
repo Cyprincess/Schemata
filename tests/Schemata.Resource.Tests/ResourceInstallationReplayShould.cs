@@ -50,7 +50,7 @@ public class ResourceInstallationReplayShould
             new(Name, StaleTag, null));
         var mutation = Mock.Get(scope.ServiceProvider.GetRequiredService<IResourceMutation<Widget>>());
         mutation.Verify(m => m.UpdateAsync(It.IsAny<Widget>(), It.Is<IUnitOfWork?>(unit => unit != null), Operations.Update, It.IsAny<CancellationToken>()), Times.Once);
-        mutation.Verify(m => m.DeleteAsync(It.IsAny<Widget>(), null, Operations.Delete, It.IsAny<CancellationToken>()), Times.Once);
+        mutation.Verify(m => m.DeleteAsync(It.IsAny<Widget>(), It.Is<IUnitOfWork?>(unit => unit != null), Operations.Delete, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Theory]

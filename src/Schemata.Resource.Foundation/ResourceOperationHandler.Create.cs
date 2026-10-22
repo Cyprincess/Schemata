@@ -95,8 +95,8 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         var mutation = _sp.GetRequiredService<IResourceMutation<TEntity>>();
 
         return await ExecuteOwnedAsync(
+            (transaction, token) => MutateCreateAsync(mutation, entity, transaction, execution, token),
             execution,
-            transaction => MutateCreateAsync(mutation, entity, transaction, execution, ct),
             ct);
     }
 
@@ -115,7 +115,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         }
 
         var detail = RequireDetail(_mapper.Map<TEntity, TDetail>(entity));
-        SyncStamp(entity, detail, transaction);
+        ResourceCommitOwner.SyncStamp(entity, detail, transaction);
 
         return new() { Detail = detail };
     }

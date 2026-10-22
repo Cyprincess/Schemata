@@ -110,7 +110,20 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         }
 
         var mutation = _sp.GetRequiredService<IResourceMutation<TEntity>>();
-        var outcome = await mutation.DeleteAsync(entity, null, Operations.Delete, ct.Value);
+
+        return await ExecuteOwnedAsync(
+            (transaction, token) => MutateDeleteAsync(mutation, entity, transaction, token),
+            null,
+            ct.Value);
+    }
+
+    private async Task<DeleteResultBase<TDetail>> MutateDeleteAsync(
+        IResourceMutation<TEntity> mutation,
+        TEntity                    entity,
+        IUnitOfWork                transaction,
+        CancellationToken          ct
+    ) {
+        var outcome = await mutation.DeleteAsync(entity, transaction, Operations.Delete, ct);
 
         // NoWrite means no removal or nested soft-delete update was staged, so no tombstone
         // exists to report.
@@ -119,10 +132,15 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         }
 
         // The remove advisors turn the removal into an update for ISoftDelete entities;
-        // a populated DeleteTime after commit identifies the soft path, whose response
-        // carries the updated resource per AIP-164.
+        // a populated DeleteTime after the mutation identifies the soft path, whose response
+        // carries the updated resource per AIP-164. The detail is mapped before this dispatch's
+        // commit, so a mapper failure rolls the removal back instead of reporting an error for a
+        // persisted delete.
         if (entity is ISoftDelete { DeleteTime: not null }) {
             var detail = _mapper.Map<TEntity, TDetail>(entity);
+            if (detail is not null) {
+                ResourceCommitOwner.SyncStamp(entity, detail, transaction);
+            }
 
             return new() { Detail = detail };
         }

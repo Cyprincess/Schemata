@@ -75,7 +75,7 @@ public class ResourceMutationNoWriteShould
     public async Task Delete_NoWrite_ReturnsEmptyResult() {
         var entity = new Student { Name = "s1", CanonicalName = "students/s1" };
 
-        var (repository, _) = LoadedRepository(entity);
+        var (repository, unit) = LoadedRepository(entity);
         var owner = new Mock<IResourceMutation<Student>>(MockBehavior.Strict);
         owner.Setup(o => o.DeleteAsync(entity, It.IsAny<IUnitOfWork?>(), Operations.Delete, It.IsAny<CancellationToken>()))
              .ReturnsAsync(MutationResult.NoWrite);
@@ -87,7 +87,8 @@ public class ResourceMutationNoWriteShould
         var result = await handler.DeleteAsync("students/s1", null, null, advice, CancellationToken.None);
 
         Assert.Null(result.Detail);
-        owner.Verify(o => o.DeleteAsync(entity, null, Operations.Delete,  It.IsAny<CancellationToken>()), Times.Once);
+        owner.Verify(o => o.DeleteAsync(entity, unit.Object, Operations.Delete, It.IsAny<CancellationToken>()), Times.Once);
+        unit.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Trait("Layer", "Unit")]
@@ -132,9 +133,13 @@ public class ResourceMutationNoWriteShould
         var entity = new TrashStudent { Name = "t1", CanonicalName = "trashStudents/t1" };
         var detail = new TrashStudent { Name = "t1", CanonicalName = "trashStudents/t1" };
 
-        var (repository, _) = LoadedRepository(entity);
+        var (repository, unit) = LoadedRepository(entity);
+        var mappedBeforeCommit = false;
         var mapper = new Mock<ISimpleMapper>(MockBehavior.Strict);
-        mapper.Setup(m => m.Map<TrashStudent, TrashStudent>(entity)).Returns(detail);
+        mapper.Setup(m => m.Map<TrashStudent, TrashStudent>(entity))
+              .Callback(() => mappedBeforeCommit = !unit.Invocations.Any(invocation
+                  => invocation.Method.Name == nameof(IUnitOfWork.CommitAsync)))
+              .Returns(detail);
 
         var deletedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var owner = new Mock<IResourceMutation<TrashStudent>>(MockBehavior.Strict);
@@ -151,7 +156,9 @@ public class ResourceMutationNoWriteShould
 
         Assert.Same(detail, result.Detail);
         Assert.Equal(deletedAt, entity.DeleteTime);
-        owner.Verify(o => o.DeleteAsync(entity, null, Operations.Delete,  It.IsAny<CancellationToken>()), Times.Once);
+        Assert.True(mappedBeforeCommit, "The tombstone detail must be mapped before the dispatch commits.");
+        owner.Verify(o => o.DeleteAsync(entity, unit.Object, Operations.Delete, It.IsAny<CancellationToken>()), Times.Once);
+        unit.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private static TrashStudent Tombstone(DateTime deletedAt) {

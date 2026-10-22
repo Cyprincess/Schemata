@@ -229,8 +229,9 @@ public class ResourceMethodEnvelopeShould
 
     [Fact]
     public async Task Delete_Dispatch_Derives_Parent_And_Sets_Weak_ETag() {
-        var detail = new SoftDetail { CanonicalName = "tenants/t1/hosts/h1", Timestamp = Timestamp };
-        var repository = new Mock<IRepository<SoftEntity>>();
+        var detail     = new SoftDetail { CanonicalName = "tenants/t1/hosts/h1", Timestamp = Timestamp };
+        var unit       = UnitOfWorkMock.Create();
+        var repository = UnitOfWorkMock.Repository<SoftEntity>(unit);
         repository.Setup(r => r.SingleOrDefaultAsync(
                        It.IsAny<Func<IQueryable<SoftEntity>, IQueryable<SoftEntity>>>(),
                        It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))

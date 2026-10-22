@@ -53,8 +53,21 @@ public sealed class ExpungeHandler<TEntity> : IRequestHandler<ExpungeResourceReq
                 "Resource is not deleted.");
         }
 
-        // The expunge intent passes IgnoreSoftDelete to the repository the mutation stages through.
-        await _mutation.DeleteAsync(entity, null, Operations.Expunge, ct);
+        return await ResourceCommitOwner.ExecuteAsync<TEntity, EmptyResourceResponse>(
+            _repository,
+            null,
+            (transaction, token) => MutateExpungeAsync(entity, transaction, token),
+            ct);
+    }
+
+    private async Task<EmptyResourceResponse> MutateExpungeAsync(
+        TEntity          entity,
+        IUnitOfWork      transaction,
+        CancellationToken ct
+    ) {
+        // The expunge intent passes IgnoreSoftDelete to the repository the mutation stages through;
+        // this dispatch's unit of work remains the only commit owner.
+        await _mutation.DeleteAsync(entity, transaction, Operations.Expunge, ct);
 
         return new();
     }

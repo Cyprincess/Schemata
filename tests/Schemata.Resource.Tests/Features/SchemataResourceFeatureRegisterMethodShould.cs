@@ -21,6 +21,7 @@ using Schemata.Messaging.Skeleton.Commands;
 using Schemata.Messaging.Skeleton.Runtime;
 using Schemata.Messaging.Skeleton.Advisors;
 using Schemata.Resource.Foundation.Advisors;
+using Schemata.Resource.Tests.Fixtures;
 
 using Schemata.Abstractions.Advisors;
 namespace Schemata.Resource.Tests.Features;
@@ -347,13 +348,14 @@ public class SchemataResourceFeatureRegisterMethodShould
             });
         });
         var services = host.Services;
-        var archived = new SoftEntity { Name = "archived", CanonicalName = "softEntities/archived", DeleteTime = new DateTime(2026, 1, 1) };
-        var repository = new Mock<IRepository<SoftEntity>>();
+        var archived   = new SoftEntity { Name = "archived", CanonicalName = "softEntities/archived", DeleteTime = new DateTime(2026, 1, 1) };
+        var unit       = UnitOfWorkMock.Create();
+        var repository = UnitOfWorkMock.Repository<SoftEntity>(unit);
         repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<SoftEntity>, IQueryable<SoftEntity>>>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
             .Returns((Func<IQueryable<SoftEntity>, IQueryable<SoftEntity>> query, CancellationToken _, QueryOptions _) =>
                 new ValueTask<SoftEntity?>(query(new[] { archived }.AsQueryable()).SingleOrDefault()));
         var mutation = new Mock<IResourceMutation<SoftEntity>>();
-        mutation.Setup(m => m.DeleteAsync(archived, null, Operations.Expunge, It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
+        mutation.Setup(m => m.DeleteAsync(archived, It.IsAny<IUnitOfWork?>(), Operations.Expunge, It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
         services.AddSingleton(repository.Object);
         services.AddSingleton(mutation.Object);
         services.AddSingleton(Mock.Of<IRepository<PlainEntity>>());
@@ -369,7 +371,8 @@ public class SchemataResourceFeatureRegisterMethodShould
         var dispatcher = new InProcessRequestDispatcher(provider);
         await dispatcher.SendAsync<ResourceMethodRequest<PlainEntity, ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>, EmptyResourceResponse>(
             new("removeArchived", null, new() { CanonicalName = "softEntities/archived" }, null));
-        mutation.Verify(m => m.DeleteAsync(archived, null, Operations.Expunge, It.IsAny<CancellationToken>()), Times.Once);
+        mutation.Verify(m => m.DeleteAsync(archived, unit.Object, Operations.Expunge, It.IsAny<CancellationToken>()), Times.Once);
+        unit.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
         var expunge = await Assert.ThrowsAsync<InvalidOperationException>(() => dispatcher.SendAsync<
             ResourceMethodRequest<SoftEntity, ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>, EmptyResourceResponse>(
                 new("expunge", null, new(), null)));
@@ -388,13 +391,14 @@ public class SchemataResourceFeatureRegisterMethodShould
             });
             AddRunDependencies(schema.Services);
         });
-        var archived = new SoftEntity { CanonicalName = "softEntities/application", DeleteTime = new DateTime(2026, 1, 1) };
-        var repository = new Mock<IRepository<SoftEntity>>();
+        var archived   = new SoftEntity { CanonicalName = "softEntities/application", DeleteTime = new DateTime(2026, 1, 1) };
+        var unit       = UnitOfWorkMock.Create();
+        var repository = UnitOfWorkMock.Repository<SoftEntity>(unit);
         repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<SoftEntity>, IQueryable<SoftEntity>>>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
             .Returns((Func<IQueryable<SoftEntity>, IQueryable<SoftEntity>> query, CancellationToken _, QueryOptions _) =>
                 new ValueTask<SoftEntity?>(query(new[] { archived }.AsQueryable()).SingleOrDefault()));
         var mutation = new Mock<IResourceMutation<SoftEntity>>();
-        mutation.Setup(m => m.DeleteAsync(archived, null, Operations.Expunge, It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
+        mutation.Setup(m => m.DeleteAsync(archived, It.IsAny<IUnitOfWork?>(), Operations.Expunge, It.IsAny<CancellationToken>())).ReturnsAsync(MutationResult.Applied);
         var application = new ExpungeHandler<SoftEntity>(repository.Object, mutation.Object);
         host.Services.AddSingleton<IRequestHandler<ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>>(application);
         new SchemataResourceBuilder(options!, host.Services).Use<SoftEntity, SoftEntity, SoftEntity, SoftEntity>(null,
@@ -419,7 +423,8 @@ public class SchemataResourceFeatureRegisterMethodShould
         Assert.Empty(provider.GetServices<IRequestPipelineAdvisor<ResourceMethodRequest<SoftEntity, ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>, EmptyResourceResponse>>());
         Assert.Empty(provider.GetServices<IResourceMethodAdvisor<SoftEntity, ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>>());
         await dispatcher.SendAsync<ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>(new() { CanonicalName = "softEntities/application" });
-        mutation.Verify(m => m.DeleteAsync(archived, null, Operations.Expunge, It.IsAny<CancellationToken>()), Times.Once);
+        mutation.Verify(m => m.DeleteAsync(archived, unit.Object, Operations.Expunge, It.IsAny<CancellationToken>()), Times.Once);
+        unit.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private static void AddRunDependencies(IServiceCollection services) {

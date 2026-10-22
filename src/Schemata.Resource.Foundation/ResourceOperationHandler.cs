@@ -125,51 +125,22 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     }
 
     /// <summary>
-    ///     Runs one mutation as the commit owner: this handler begins the unit of work through the
-    ///     injected repository, the mutation joins and stages through it, fail-able response
-    ///     preparation runs inside <paramref name="mutate" /> before the provider commit, and an
-    ///     identified dispatch records the transaction outcome through the unit of work's commit and
-    ///     rollback sinks.
+    ///     Runs one mutation through <see cref="ResourceCommitOwner" />: this handler's injected
+    ///     repository begins the unit of work, the mutation joins and stages through it, fail-able
+    ///     response preparation runs inside <paramref name="mutate" /> before the provider commit, and
+    ///     an identified dispatch records the transaction outcome through the unit of work's commit
+    ///     and rollback sinks.
     /// </summary>
-    private async Task<TResponse> ExecuteOwnedAsync<TResponse>(
-        ResourceDispatchExecution?          execution,
-        Func<IUnitOfWork, Task<TResponse>> mutate,
-        CancellationToken                  ct
+    /// <typeparam name="TResponse">The response the mutate delegate shapes from the committed write.</typeparam>
+    /// <param name="mutate">The mutation and every fail-able response preparation before the commit.</param>
+    /// <param name="execution">The identified dispatch execution, or <see langword="null" />.</param>
+    /// <param name="ct">A cancellation token.</param>
+    /// <returns>The value produced by <paramref name="mutate" /> after the commit completes.</returns>
+    private Task<TResponse> ExecuteOwnedAsync<TResponse>(
+        Func<IUnitOfWork, CancellationToken, Task<TResponse>> mutate,
+        ResourceDispatchExecution?                            execution,
+        CancellationToken                                    ct
     ) {
-        await using var transaction = _repository.Begin();
-
-        if (execution is not null) {
-            // The stamp sink registers ahead of the mutation's join and its repository notifications,
-            // so a throwing post-commit sink can never leave a persisted dispatch recorded as unwritten.
-            execution.MarkReached();
-            transaction.AddCommitSink(CommitOrders.Repository - 1, _ => {
-                execution.MarkCommitted();
-                return Task.CompletedTask;
-            });
-            transaction.AddRollbackSink(execution.MarkRolledBack);
-        }
-
-        var response = await mutate(transaction);
-
-        // CommitAsync resolving normally is the owner's completion evidence: the provider
-        // transaction ended committed before the sinks ran.
-        await transaction.CommitAsync(ct);
-        execution?.MarkCommitted();
-
-        return response;
-    }
-
-    /// <summary>
-    ///     Copies the final concurrency stamp from the staged entity onto the response detail once
-    ///     provider-generated write values are final: immediately on immediate-execution providers,
-    ///     after stamp rotation on buffered ones. Keeps the pre-commit mapped detail's ETag equal to
-    ///     the persisted row's stamp.
-    /// </summary>
-    private static void SyncStamp(TEntity entity, TDetail detail, IUnitOfWork transaction) {
-        transaction.AddSavePreparation(() => {
-            if (entity is IConcurrency source && detail is IConcurrency stamped) {
-                stamped.Timestamp = source.Timestamp;
-            }
-        });
+        return ResourceCommitOwner.ExecuteAsync(_repository, execution, mutate, ct);
     }
 }

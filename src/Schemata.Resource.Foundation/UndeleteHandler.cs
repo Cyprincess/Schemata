@@ -61,7 +61,15 @@ public sealed class UndeleteHandler<TEntity, TDetail>
         entity.DeleteTime = null;
         entity.PurgeTime  = null;
 
-        var outcome = await _mutation.UpdateAsync(entity, null, Operations.Undelete, ct);
+        return await ResourceCommitOwner.ExecuteAsync<TEntity, TDetail?>(
+            _repository,
+            null,
+            (transaction, token) => MutateUndeleteAsync(entity, transaction, token),
+            ct);
+    }
+
+    private async Task<TDetail?> MutateUndeleteAsync(TEntity entity, IUnitOfWork transaction, CancellationToken ct) {
+        var outcome = await _mutation.UpdateAsync(entity, transaction, Operations.Undelete, ct);
 
         // An advisor handled the restore without staging: no restored detail exists to report,
         // and the transport renders the absent detail as no content.
@@ -69,12 +77,16 @@ public sealed class UndeleteHandler<TEntity, TDetail>
             return null;
         }
 
+        // The detail is mapped before this dispatch's commit, so a mapper failure rolls the restore
+        // back instead of reporting an error for a persisted restore.
         var map = _mapper.Map<TEntity, TDetail>(entity);
         if (map is null) {
             throw new InvalidOperationException(
                 $"Could not map '{typeof(TEntity).FullName}' to '{typeof(TDetail).FullName}'."
             );
         }
+
+        ResourceCommitOwner.SyncStamp(entity, map, transaction);
 
         return map;
     }
