@@ -1,21 +1,20 @@
 # Event
 
-The event subsystem is a publish/subscribe and request/reply bus with an explicit wire-name
-registry, a transactional outbox, an advisor pipeline for publish and consume hooks, and pluggable
-transport backends. Every event type carries a wire name registered through
-`Schemata.Event.Skeleton.IEventTypeRegistry`. That name is what the transport routes on, what
-`EventContext.EventType` exposes, and what the `SchemataEvent.EventType` audit column stores — one
-string end to end. Publishing a type with no registration throws at the publish call.
+The event subsystem is a broadcast bus with an explicit wire-name registry, publish and consume
+advisors, lifecycle audit records, and pluggable transport backends. In-process publishing awaits
+handlers inline; RabbitMQ publishing awaits broker confirmation. Every event type carries a wire
+name registered through `Schemata.Event.Skeleton.IEventTypeRegistry`. The transport, `EventContext`,
+and `SchemataEvent.EventType` use that same name. Publishing an unregistered type throws.
 
 ## Where the code lives
 
 | Package                     | Key files                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Schemata.Messaging.Skeleton` | `IMessage.cs`, `IRequest.cs`, `IRequestHandler.cs`, `IRequestDispatcher.cs`, `MessageContext.cs`, `IMessageContextPropagator.cs`, `MessageContexts.cs` |
-| `Schemata.Event.Skeleton`   | `IEventBus.cs`, `IEvent.cs`, `IEventHandler.cs`, `IHasPendingEvents.cs`, `IEventTypeRegistry.cs`, `EventContext.cs`, `EventRouting.cs`, `IEventLifecycleObserver.cs`, `IEventOutboxPublisher.cs`, `EventOutboxMessage.cs`, `EventOutboxDelivery.cs`, `EventSourceContract.cs`, `IEventDispatchContext.cs`, `Entities/SchemataEvent.cs`, `Entities/EventState.cs`, `Entities/SchemataEventSubscription.cs`, `Advisors/IEventPublishAdvisor.cs`, `Advisors/IEventConsumeAdvisor.cs` |
-| `Schemata.Event.Foundation` | `Features/SchemataEventFeature.cs`, `Builders/EventBuilder.cs`, `Builders/EventProducerBuilder.cs`, `Builders/EventConsumerBuilder.cs`, `Extensions/SchemataBuilderExtensions.cs`, `Observers/SchemataEventAuditObserver.cs`, `EventOutboxDispatcher.cs`, `Internal/InProcessEventBus.cs`, `Internal/InProcessEventOutboxPublisher.cs`, `Internal/DefaultEventTypeRegistry.cs`, `SchemataEventSubscriptionExtensions.cs`, `Internal/HandlerResolver.cs`                                        |
-| `Schemata.Event.RabbitMq`   | `RabbitMqEventOptions.cs`, `Internal/RabbitMqEventBus.cs`, `Internal/RabbitMqConsumerHost.cs`, `Internal/RabbitMqEventOutboxPublisher.cs`, `Extensions/EventProducerBuilderRabbitMqExtensions.cs`, `Extensions/EventConsumerBuilderRabbitMqExtensions.cs`                                                                                                                                                                                                                                |
-| `Schemata.Transport.RabbitMq` | `RabbitMqConnectionOptions.cs`, `IRabbitMqConnectionProvider.cs`, `CorrelationTracker.cs`, `Internal/RabbitMqConnectionProvider.cs`, `Extensions/ServiceCollectionExtensions.cs`                                                                                                                                                                                                                                                                                                    |
+| `Schemata.Event.Skeleton` | `IEventBus.cs`, `IEvent.cs`, `IEventHandler.cs`, `IHasPendingEvents.cs`, `IEventTypeRegistry.cs`, `EventContext.cs`, `EventRouting.cs`, `IEventLifecycleObserver.cs`, `EventSourceContract.cs`, `IEventDispatchContext.cs`, `Entities/SchemataEvent.cs`, `Entities/EventState.cs`, `Entities/SchemataEventSubscription.cs`, `Advisors/IEventPublishAdvisor.cs`, `Advisors/IEventConsumeAdvisor.cs` |
+| `Schemata.Event.Foundation` | `Features/SchemataEventFeature.cs`, `Builders/EventBuilder.cs`, `Builders/EventProducerBuilder.cs`, `Builders/EventConsumerBuilder.cs`, `Extensions/SchemataBuilderExtensions.cs`, `Observers/SchemataEventAuditObserver.cs`, `Runtime/InProcessEventBus.cs`, `Runtime/DefaultEventTypeRegistry.cs`, `SchemataEventSubscriptionExtensions.cs`, `Runtime/HandlerResolver.cs` |
+| `Schemata.Event.RabbitMq` | `RabbitMqEventOptions.cs`, `Runtime/RabbitMqEventBus.cs`, `Runtime/RabbitMqConsumerHost.cs`, `Extensions/EventProducerBuilderRabbitMqExtensions.cs`, `Extensions/EventConsumerBuilderRabbitMqExtensions.cs` |
+| `Schemata.Transport.RabbitMq` | `RabbitMqConnectionOptions.cs`, `IRabbitMqConnectionProvider.cs`, `CorrelationTracker.cs`, `Runtime/RabbitMqConnectionProvider.cs`, `Extensions/ServiceCollectionExtensions.cs` |
 
 ## Wire names
 
@@ -38,6 +37,8 @@ members.
 chaining on the returned builder:
 
 ```csharp
+using Microsoft.AspNetCore.Builder;
+
 builder.UseSchemata(schema => {
     schema.UseEvent()
           .RegisterEvent<OrderPlaced>("orders/order-placed")
@@ -51,8 +52,6 @@ builder.UseSchemata(schema => {
 
 1. `IEventTypeRegistry` as a singleton, built from the accumulated `EventTypeRegistryConfiguration`.
 2. `SchemataEventAuditObserver` as a scoped `IEventLifecycleObserver` (`TryAddEnumerable`).
-3. `InProcessEventOutboxPublisher` as the default `IEventOutboxPublisher` singleton.
-4. `EventOutboxDispatcher` as a singleton and a hosted service.
 
 The `IEventPublishAdvisor` and `IEventConsumeAdvisor` sockets stay open for application pipelines;
 no built-in advisor ships.
@@ -72,13 +71,21 @@ no built-in advisor ships.
 ## IEventBus
 
 ```csharp
+using System.Threading;
+using System.Threading.Tasks;
+using Schemata.Event.Skeleton;
+
 public interface IEventBus
 {
     Task PublishAsync<TEvent>(TEvent @event, CancellationToken ct = default)
         where TEvent : IEvent;
 
     Task PublishAsync<TEvent>(TEvent @event, object sourceEntity, CancellationToken ct = default)
-        where TEvent : IEvent;
+        where TEvent : IEvent
+    {
+        EventSourceContract.Ensure(sourceEntity);
+        return PublishAsync(@event, ct);
+    }
 
 }
 ```
@@ -88,9 +95,10 @@ public interface IEventBus
 instead. A request is a message, not an event, so request/reply is usable without taking on the event
 domain at all. See [Messaging](../messaging/overview.md).
 
-`PublishAsync` is fire-and-forget (one-to-many). It does not run handlers inline: it records an
-outbox audit row and returns. The `EventOutboxDispatcher` drains that row and invokes handlers. See
-[Dispatch Pipeline](dispatch-pipeline.md).
+`PublishAsync` awaits the selected provider: in-process handlers finish before it returns, while
+RabbitMQ confirms broker acceptance without waiting for consumers. The bus supplies neither a
+transactional outbox nor automatic publish retries. An audit row is a lifecycle record, not a
+durable delivery work item. See [Dispatch Pipeline](dispatch-pipeline.md).
 
 The `(@event, sourceEntity, ct)` overload attaches an originating business entity to the publish.
 `sourceEntity` must implement both `Schemata.Abstractions.Entities.ICanonicalName` and
@@ -99,7 +107,7 @@ offending type otherwise. The audit observer captures the
 source's `CanonicalName` and concurrency `Timestamp` onto the `SchemataEvent` row so consumers can
 compare the publish snapshot against the source's current state.
 
-All three calls require the type registered in `IEventTypeRegistry` first.
+Both overloads require the event type registered in `IEventTypeRegistry` first.
 
 ## EventContext
 
@@ -112,10 +120,9 @@ All three calls require the type registered in `IEventTypeRegistry` first.
 | `string? Payload`             | Serialized event body for audit and transport.                                              |
 | `string? CorrelationId`       | End-to-end correlation identifier.                                                          |
 | `SchemataEvent? Record`       | Audit row attached by the audit observer on publish.                                        |
-| `bool RequiresOutboxDelivery` | Set by the bus when delivery runs through a durable broker; drives the initial audit state. |
 | `object? Source`              | Optional originating business entity from the source-entity overload.                       |
-| `object? Result`              | Handler outcome (request response or publish acknowledgement).                              |
-| `Exception? Exception`        | Exception thrown by the handler, if any.                                                    |
+| `object? Result` | Consume outcome (`true` after successful dispatch) or a publish-advisor result. |
+| `Exception? Exception` | Handler or consume-observer failure captured during dispatch. |
 
 ## SchemataEvent audit entity
 
@@ -129,9 +136,8 @@ All three calls require the type registered in `IEventTypeRegistry` first.
 | `Payload`         | Serialized event body.                                      |
 | `State`           | `EventState` lifecycle value.                               |
 | `CorrelationId`   | Correlation identifier copied from the context.             |
-| `ResponsePayload` | Serialized handler response (request/reply).                |
-| `RecentError`     | Last error from a failed handler dispatch.                  |
-| `RetryCount`      | Number of outbox redelivery attempts.                       |
+| `ResponsePayload` | Serialized consume outcome from `EventContext.Result`. |
+| `RecentError` | Error recorded by the consume lifecycle observer. |
 | `SourceType`      | CLR full name of the source business entity.                |
 | `Source`          | Canonical name of the source entity.                        |
 | `SourceTimestamp` | Concurrency token captured from the source at publish time. |
@@ -141,15 +147,16 @@ All three calls require the type registered in `IEventTypeRegistry` first.
 ```csharp
 public enum EventState
 {
-    Recorded   = 0,  // accepted by the transport or dispatched in-process; awaiting consume
-    Succeeded  = 1,  // the handler completed successfully
-    Failed     = 2,  // the handler threw
-    Pending    = 3,  // outbox row awaiting broker delivery or retry
-    Publishing = 4,  // an outbox dispatcher has claimed the row and is publishing it
+    Recorded   = 0,
+    Succeeded  = 1,
+    Failed     = 2,
 }
 ```
 
-Ordinals are persisted; the enum is append-only.
+`Recorded` is written before dispatch or broker acceptance; it does not prove delivery. A consume
+callback sets `Succeeded` or `Failed`. A consumer in another process can update the producer's row
+only when its repository can find that row by `CorrelationId`. Broker confirmation alone leaves
+the audit state `Recorded`.
 
 ## EventRouting
 
@@ -170,17 +177,19 @@ stored in `IEventTypeRegistry` alongside the wire name, and read back through `G
   encryption, or short-circuit via `Block`/`Handle`.
 - Implement `IEventConsumeAdvisor` (`TryAddEnumerable`) for consume-time hooks: metrics or
   dead-letter routing.
-- Implement `IEventLifecycleObserver` (`TryAddEnumerable`) to react to settled publish/deliver/consume
-  transitions alongside the built-in audit observer.
+- Implement `IEventLifecycleObserver` (`TryAddEnumerable`) to observe publish, broker confirmation,
+  and consume callbacks alongside the built-in audit observer.
 - Implement `IEventBus` (scoped) to replace the transport.
-- Implement `IEventOutboxPublisher` (singleton) to replay outbox rows over a custom broker.
 - Durable subscriptions persist through `IRepository<SchemataEventSubscription>`; point the
   repository provider at a different store to relocate them.
 
 ## Caveats
 
-- `PublishAsync` does not invoke handlers before it returns. Handlers run when the outbox dispatcher
-  drains the row, so delivery is asynchronous and at-least-once; handlers must be idempotent.
+- In-process handler failures propagate from `PublishAsync`. RabbitMQ publish failures also
+  propagate, but a failure after broker acceptance can leave delivery uncertain. Caller-owned
+  retries need idempotent consumers.
+- Publishing after a business commit does not make the two operations atomic. A crash or publish
+  failure can leave committed data without a delivered event.
 - `RequireName(type)` throws for unregistered types. Register every event type used in
   `PublishAsync` during startup.
 - The source-entity overload throws before publishing if the source does not implement both

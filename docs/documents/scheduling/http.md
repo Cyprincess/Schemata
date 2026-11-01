@@ -65,7 +65,7 @@ caller polls `/v1/operations/{name}` or calls `:wait` for terminal state.
 
 `SchemataTransportHttpFeature` (pulled in by the resource HTTP transport) configures
 `SchemataJsonTraits.Apply`, which projects `ICanonicalName.Name` away, renames
-`CanonicalName` to `name`, `IFreshness.EntityTag` to `etag`, and `IEntitiesResult<T>.Entities` to
+`CanonicalName` to `name`, `IFreshness.EntityTag` to `etag`, and `IEntitiesResult<TEntity, TItem>.Entities` to
 the resource's plural (`jobs`, `operations`). Property names then go through snake_case via the
 configured `PropertyNamingPolicy`.
 

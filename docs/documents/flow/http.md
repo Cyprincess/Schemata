@@ -151,6 +151,7 @@ using Schemata.Abstractions.Resource;
 public sealed class StartProcessInstanceRequest : ICanonicalName, IRequestIdentification
 {
     public string  DefinitionName { get; set; } = null!;
+    public string  DefinitionVersion { get; set; } = "1";
     public string? DisplayName    { get; set; }
     public string? Description    { get; set; }
     public string? Source         { get; set; }
@@ -217,6 +218,9 @@ runtime catalog of registered process definitions; there is no separate reflecti
 - The definition graph describes the declared process. Boundary and event-sub-process
   subscriptions armed while a token is active are visible as elements but are not implied by the
   token's current wait.
+- Response links cover the process, its definition, tokens, and transitions. A catch link is
+  deferred until a catch resource endpoint exists: catches are graph elements, and the framework
+  serves no catch resource to link to.
 
 ## See also
 

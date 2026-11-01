@@ -8,6 +8,7 @@ Custom methods add named resource verbs that do not fit standard CRUD. The HTTP 
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Messaging.Skeleton;
@@ -36,7 +37,7 @@ public sealed class RunJobResponse : ICanonicalName
 
 public sealed class RunJobHandler : IRequestHandler<RunJobRequest, RunJobResponse>
 {
-    public Task<RunJobResponse> HandleAsync(RunJobRequest request, CancellationToken ct = default)
+    public Task<RunJobResponse> HandleAsync(RunJobRequest request, AdviceContext context, CancellationToken ct = default)
         => Task.FromResult(new RunJobResponse {
             Name = request.Name,
             CanonicalName = request.CanonicalName,
@@ -66,13 +67,13 @@ ResourceMethodController (HTTP) / ResourceCustomMethod (gRPC)
               -> IRequestHandler<TRequest,TResponse>
 ```
 
-`ResourceMethodOperationHandler` writes the target canonical name to an `ICanonicalName` request before its Resource handler stages run. The instance handler loads the target under soft-delete suppression and throws `NotFoundException` if it is absent. Collection methods skip that load.
+`ResourceMethodOperationHandler` writes the target canonical name to an `ICanonicalName` request before its Resource handler stages run. The instance handler loads the target with `QueryOptions(IgnoreSoftDelete: true)` and throws `NotFoundException` if it is absent. Collection methods skip that load.
 
-The envelope lets wrap advisors use the verb for `[Anonymous]` matching, permission resolution, and idempotency. The method idempotency wrap partitions its cache key by request ID, verb, resource type, principal, target, and payload hash. It replays a finalized response or reserves a pending key before calling the remainder of the pipeline; it commits the response after response shaping.
+The envelope lets wrap advisors use the verb for `[Anonymous]` matching, permission resolution, and idempotency. The method idempotency wrap installs only when the method's request DTO implements `IResourceDispatchCarrier`; that carrier passes the dispatch execution to the handler, which reports transaction completion back through it. The wrap partitions its cache key by request ID, verb, resource type, principal, and target; the payload hash travels with the cached value. It replays a finalized response or reserves a pending key before calling the remainder of the pipeline; a replay with a changed payload fails validation on `request_id`. Settlement reads the dispatch report, never the return value: a confirmed `NotWritten` or `RolledBack` dispatch releases the reservation, and a committed dispatch swaps the shaped response into the finalized slot; a dispatch that reached the owner with no completion report keeps the reservation pending, so a retry is rejected instead of replaying an uncertified response. When the pipeline throws, the same report governs: confirmed no-write or rollback releases the reservation before the failure propagates, and any other outcome leaves it pending so a retry cannot repeat the write.
 
 ## Handler extension points
 
-Implement `IResourceMethodRequestAdvisor<TEntity,TRequest>` for method request stages such as query shaping. Implement `IResourceMethodAdvisor<TEntity,TRequest,TResponse>` for logic that needs the loaded instance. Register either with `TryAddEnumerable`.
+Implement `IResourceMethodRequestAdvisor<TEntity,TRequest,TResponse>` for method request stages such as query shaping. Implement `IResourceMethodAdvisor<TEntity,TRequest,TResponse>` for logic that needs the loaded instance. Both receive a `ResourceMethodExecution<TEntity,TRequest,TResponse>` carrying the verb, instance target, request, caller, loaded entity, and handled response; an advisor that short-circuits writes `execution.Response` and returns `AdviseResult.Handle`. Register either with `TryAddEnumerable`.
 
 Authentication and coarse authorization run on the envelope. Instance access runs after an instance load, and entitlement expressions apply to the request container. Configure the shared security extensions on the domain builder; see [Security](../security.md).
 

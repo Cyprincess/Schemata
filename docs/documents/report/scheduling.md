@@ -23,7 +23,7 @@ builder.UseSchemata(schema => {
 `SchemataReportSchedulingFeature<TReport, TSnapshot, TChunk>` depends on both
 `SchemataReportFeature<TReport, TSnapshot, TChunk>` and `SchemataSchedulingFeature`. It registers
 `ReportSchedulingInitializer` as an `IHostedService` and
-`AdviceReportScheduleSync<TReport>` as an `IRepositoryCommittedAdvisor<TReport>`.
+`AdviceReportScheduleSync<TReport>` as an `IResourceMutationCommittedAdvisor<TReport>`.
 
 ## Periodic definitions
 
@@ -46,25 +46,67 @@ builder.UseSchemata(schema => {
 });
 ```
 
-The initializer reads `IReportDefinitionStore.ListPeriodicAsync` on host startup. The composite
-store lists configuration definitions before database definitions and suppresses duplicate names, so
+The initializer reads `IReportDefinitionStore.ListPeriodicAsync` on host startup and arms active
+periodic projections. The composite store lists configuration definitions before database definitions
+and suppresses duplicate names. Conflicting entity triples fail through that actual enumeration with
+`FAILED_PRECONDITION`; host construction succeeds, but startup propagates the failure.
 
 | `ReportScheduleKind` | Required definition value | Scheduler definition |
 | --- | --- | --- |
 | `Cron` | `CronExpression` | `CronSchedule` |
 | `Periodic` | Positive `IntervalTicks` | `PeriodicSchedule` |
 
-Each armed job has canonical name `jobs/report-{name}`, job key `schemata.report.generate`, and a
-`report` variable carrying the report name. `ReportGenerationJob<TReport, TSnapshot, TChunk>` turns
-that variable into `ReportRequest { Name = name, Persist = true }` and labels the result
-`ReportRunKind.Scheduled`.
+Each armed job has schedule-slot `Key = report:{canonical}`: persisted definitions use the report's
+canonical name; configuration-only definitions use their public name. The dispatch `JobKey` is
+`schemata.report.generate`. The `report` variable carries the same canonical target for persisted
+definitions and the public name for configuration-only definitions. Its resource `Name` is assigned
+by the application's repository add advisor before canonical-name derivation; the slot key does not
+determine its public URI. `ReportGenerationJob<TReport, TSnapshot, TChunk>` turns the variable into
+`ReportRequest { Name = target, Persist = true }` and labels the result `ReportRunKind.Scheduled`.
+
+## Execution identity
+
+Periodic and asynchronous generation start with a null principal. Applications needing protected
+source rows register their own `IMessageContextPropagator` and `IReportGenerateAdvisor`: the
+propagator carries an application identity reference in Scheduling's persisted generic message
+context, and the advisor resolves and revalidates it in the restored execution scope before assigning
+the materialization principal. Register advisors through `TryAddEnumerable`; register tenant-specific
+constructor dependencies explicitly in the tenant container.
+
+Configuration-only periodic definitions are armed during startup. Their application propagator must
+provide the intended service reference at that scheduling boundary; a request user is not available
+there. Persisted definitions armed after a mutation use the state captured by that scheduling call.
+Applications must reject absent or revoked references rather than publish an unprotected snapshot.
+See [Generation](generation.md#runasync) for scope restoration and principal ownership.
+
 
 ## Definition changes
 
-`AdviceReportScheduleSync<TReport>` runs after a successful persisted report-definition commit. For
-each updated definition it unschedules `jobs/report-{name}` and arms a new job when `Periodic` is
-true. For each removed definition it unschedules that job. `ReportSchedulingInitializer` re-arms
-persisted periodic definitions after a host restart.
+`AdviceReportScheduleSync<TReport>` prepares a post-commit callback for each staged report-definition
+mutation: it captures the definition's name, `Periodic` flag, soft-delete state, and schedule
+configuration at staging time, and the captured projection decides the schedule action instead of
+the entity's later state. A created or undeleted active periodic definition arms its job after the commit.
+An update disarms the existing slot and re-arms when the captured state is active and periodic, so
+disabling `Periodic` removes the schedule. A delete, expunge, or purge disarms the slot; soft-delete
+is staged as a delete operation and disarms the same way. A mutation that rolls back or stages no
+write runs no schedule action. When one unit of work mutates the same definition several times, the
+last Applied mutation's callback wins because callbacks run in registration order. Arming targets the
+slot `Key = report:{canonical}`, so re-arming replaces the single scheduler entry instead of
+duplicating it; `ReportSchedulingInitializer` re-arms persisted periodic definitions after a host
+restart against the same slot key.
+
+Register naming advisors for both `SchemataJob` and `SchemataJobExecution`; neither the report bridge
+nor the scheduler supplies a resource-name fallback. See
+[Scheduling persistence](../scheduling/persistence.md#resource-naming).
+
+Job writes run in independent transactions after the Report transaction has committed. A scheduling
+write failure reaches the mutation caller while the committed Report data remains persisted. The
+owning unit of work attempts later callbacks and aggregates multiple failures. The bridge provides
+neither cross-transaction atomicity nor automatic replay of the Report mutation.
+
+Implementation: `src/Schemata.Report.Scheduling/Advisors/AdviceReportScheduleSync.cs`,
+`src/Schemata.Report.Scheduling/Runtime/ReportSchedule.cs`, and
+`src/Schemata.Entity.Repository/ResourceMutation.cs`.
 
 ## Retention
 

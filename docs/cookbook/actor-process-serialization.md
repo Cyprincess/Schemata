@@ -83,11 +83,11 @@ Two commands stay unwrapped, on purpose:
 handler and never holds a caller-scoped object across the mailbox boundary.
 
 ```csharp
-// Schemata.Flow.Actor/Internal/ActorSerializingHandler.cs (shape, paraphrased)
-public async Task<TResult> HandleAsync(TRequest request, CancellationToken ct = default) {
-    var context = MessageContexts.Capture(caller);   // sender side, once, synchronous
+// Schemata.Flow.Actor/Handlers/ActorSerializingHandler.cs (shape, paraphrased)
+public async Task<TResult> HandleAsync(TRequest request, AdviceContext context, CancellationToken ct = default) {
+    var message = MessageContexts.Capture(caller);   // sender side, once, synchronous
     var actor   = await actors.GetAsync(new ActorId("flow", request.ProcessCanonicalName));
-    return await actor.AskAsync<TRequest, TResult>(request, context, ct: ct);
+    return await actor.AskAsync<TRequest, TResult>(request, message, ct: ct);
 }
 ```
 
@@ -111,15 +111,13 @@ sender down to the mailbox's own processing rate instead of ballooning memory.
 ## Step 5: How the turn runs
 
 The actor registered for the `flow` route is the shared `RequestDispatchingActor`
-(`Schemata.Actor.Foundation/Internal/RequestDispatchingActor.cs`). Its turn is a four-step loop:
+(`Schemata.Actor.Foundation/Runtime/RequestDispatchingActor.cs`). Its turn is a four-step loop:
 
-1. Build a fresh DI scope from the injected `IActorTurnScopeFactory` — never from
-   `IServiceScopeFactory.CreateAsyncScope` directly, since multi-tenancy replaces the factory with
-   one that builds the scope from the tenant-isolated provider.
-2. Restore ambient state: every registered `IMessageContextPropagator` runs against the new scope
-   (the tenancy propagator reinitializes `ITenantContextInitializer<TTenant>` from the captured
-   tenant id, so a turn built in a background mailbox still resolves repositories against the
-   right tenant).
+1. Build a fresh DI scope from the injected `IMessageExecutionScopeFactory`.
+   `tenancy.UseActor()` selects independent tenant runtimes and enables
+   `TenantMessageExecutionScopeFactory<TTenant>` for the turn's tenant-bound provider.
+2. Enter the returned synchronous lease after awaiting creation, then call
+   `scope.RestoreAsync(envelope.Context, ct)` to run registered propagators against the selected scope.
 3. Resolve the *keyed* default handler (`FlowConstants.Handlers.Default`) inside that fresh scope,
    call it, and `ReplyAsync` with the result. `ClaimsPrincipal` already travels on the request
    record itself, so it does not need to round-trip through `MessageContext`.
@@ -157,14 +155,13 @@ the keyed default handler reloads the aggregate inside the turn. Stuffing a trac
 `SchemataProcess` into a custom request breaks the contract. For Flow, the corollary is to keep new
 command records flat: name + payload, never an entity.
 
-**Ambient state crosses only through `MessageContext`.** Capture happens once, in the sender's
-scope, before enqueue (`MessageContexts.Capture(caller)`). Restore happens once, inside the
-turn's fresh scope, through the resolved `IMessageContextPropagator` collection. With no
-propagator registered, capture returns an empty context and every restore is a no-op. With
-`Schemata.Tenancy.Foundation`, `TenantMessageContextPropagator<TTenant>` plus
-`TenantActorTurnScopeFactory<TTenant>` rebuilds the turn scope from the tenant-isolated provider —
-a mailbox- or scheduler-originated turn still resolves the right tenant's repositories instead of
-the wrong or default ones.
+**Ambient state crosses only through `MessageContext`.** Capture happens in the sender's scope
+before enqueue (`MessageContexts.Capture(caller)`) by running registered propagators. Restore
+uses the turn's selected execution scope. Install `Schemata.Tenancy.Actor` and enable
+`tenancy.UseActor()` for independent tenant runtimes, captured references and tenant-bound turn
+services. Persisted state needs an `ITenant` subtype: use
+`tenancy.UseActor<Tenant, TenantActor>()` and `UseActorPersistence<Tenant, TenantActor>()`, and
+register `IRepository<TenantActor>` plus `IResourceMutation<TenantActor>` in each tenant.
 
 **Resolving the keyed default handler yourself reintroduces the race.** Keyed defaults exist for
 the turn to resolve. Calling them from application code, or from anywhere that is not the actor's

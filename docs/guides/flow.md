@@ -44,6 +44,107 @@ schema.UseFlow()
       .Use<GraduationProcess>();
 ```
 
+## Register tenant-owned rows
+
+Tenant isolation is driven by the `ITenant` trait, and the shipped Flow entities do not implement
+it. A tenancy host declares one subtype per persisted row and closes the engine on them:
+
+```csharp
+using Schemata.Abstractions.Entities;
+using Schemata.Flow.Skeleton.Entities;
+
+public sealed class TenantProcess : SchemataProcess, ITenant { public Guid? TenantUid { get; set; } }
+public sealed class TenantProcessToken : SchemataProcessToken, ITenant { public Guid? TenantUid { get; set; } }
+public sealed class TenantProcessTransition : SchemataProcessTransition, ITenant { public Guid? TenantUid { get; set; } }
+public sealed class TenantProcessCompensation : SchemataProcessCompensation, ITenant { public Guid? TenantUid { get; set; } }
+public sealed class TenantProcessParticipant : SchemataProcessParticipant, ITenant { public Guid? TenantUid { get; set; } }
+public sealed class TenantProcessSource : SchemataProcessSource, ITenant { public Guid? TenantUid { get; set; } }
+public sealed class TenantFlowEffectIntent : SchemataFlowEffectIntent, ITenant { public Guid? TenantUid { get; set; } }
+```
+
+Close the engine on those types instead of the defaults:
+
+```csharp
+schema.UseFlow<TenantProcess, TenantProcessToken, TenantProcessTransition,
+               TenantProcessCompensation, TenantProcessParticipant, TenantProcessSource,
+               TenantFlowEffectIntent>()
+      .UseStateMachine()
+      .Use<EnrollmentProcess>();
+```
+
+Each tenant container then needs the closed repository, its native source, and the closed resource
+mutation for every row type:
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Schemata.Entity.EntityFrameworkCore;
+using Schemata.Entity.Repository;
+using Schemata.Tenancy.Foundation;
+using Schemata.Tenancy.Foundation.Repository;
+using Schemata.Tenancy.Skeleton.Entities;
+
+void ConfigureFlowTenancy(SchemataTenancyBuilder<SchemataTenant> tenancy)
+{
+    tenancy.UseRepositories(tenant => {
+        TenantRow<TenantProcess>(tenant);
+        TenantRow<TenantProcessToken>(tenant);
+        TenantRow<TenantProcessTransition>(tenant);
+        TenantRow<TenantProcessParticipant>(tenant);
+        TenantRow<TenantProcessSource>(tenant);
+        TenantRow<TenantProcessCompensation>(tenant);
+        TenantRow<TenantFlowEffectIntent>(tenant);
+        tenant.Services.AddDbContextFactory<AppDbContext>(options => options.UseSqlite(tenantConnectionString)
+            .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
+    });
+}
+
+static void TenantRow<TEntity>(TenantRepositoryBuilder<SchemataTenant> tenant)
+    where TEntity : class
+{
+    tenant.Services.AddTransient<IRepository<TEntity>, EfCoreRepository<AppDbContext, TEntity>>();
+    tenant.Services.AddScoped<IResourceMutation<TEntity>, ResourceMutation<TEntity>>();
+}
+```
+
+`tenantConnectionString` is the tenant's connection; `TenantRepositoryBuilder<TTenant>.TenantUid`
+selects it. `UseDatabase` in [Repository isolation](../documents/tenancy.md#database-per-tenant)
+registers the repository and source together when each tenant owns a database; it does not require
+`ITenant`, so it suits a tenancy host that keeps the shipped entity types unchanged.
+
+Use your application's tenant type in place of `SchemataTenant` when configuring a custom catalog.
+`UseRepositories` installs Tenancy-owned add, query, update, and remove advisors bound to the
+verified tenant identity at container composition; the advisors apply to rows implementing
+`ITenant`. A tenant row carries the subtype's nullable tenant identifier; null identifies a host
+row. A host-registered repository resolves through the host binding, so it sees `TenantUid IS NULL`
+rows only; tenant queries see only their tenant's rows.
+Keep the identifier out of JSON and protobuf business models through the serializers' ignore
+metadata. Parent and source associations continue to use canonical names.
+
+A tenant that registers only the repository resolves the host open-generic mutation, which binds
+the host repository and refuses to join a tenant unit of work. `UseFlow()` and the `ITenant` trait
+alone do not activate repository isolation; the explicit per-tenant registration does. Omitting a
+row type leaves that repository outside the tenant boundary, including direct child record reads
+and writes. Tenant catalog and host records remain shared metadata and must not be registered as
+tenant-owned repositories. Keep consumer name generation configured independently.
+
+### Database uniqueness
+
+The shipped entities declare unique indexes: process idempotency on
+`(DefinitionName, IdempotencyKey)`, effect request IDs on `RequestId`, and source bindings on
+`(Process, Name)` for `Token IS NULL` plus `(Process, Token, Name)` for `Token IS NOT NULL`. A
+tenant subtype inherits them, and an inherited index that the subtype does not restate keeps its
+host definition and still constrains tenant rows. Restate each property list with the tenant filter
+and add the tenant-partition constraints; `SchemataModelCustomizer` replaces an inherited
+declaration when the subtype declares the same property list.
+
+EF Core applies the entities' generic `IndexAttribute.Filter` SQL through `HasFilter`. Filter SQL
+uses the declared column names; consumers must adapt it when their provider or naming convention
+requires different identifiers or lacks filtered indexes. LinqToDB `CreateTable` does not create
+these indexes from the annotations. Consumers own their production schema DDL, including equivalent
+host/tenant and process/token unique constraints. Framework registration supplies neither schema
+migrations nor data migration tools.
+
 ## Define the process
 
 Create `EnrollmentProcess.cs`. Subclass `ProcessDefinition`, declare each BPMN element as a

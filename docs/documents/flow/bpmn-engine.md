@@ -72,7 +72,8 @@ current executable subset. `Subset` means the element class is supported with ex
 | Multiple event definition                                              | Event         | Not supported | `FlowEventMatcher.Matches` matches single definitions only.                                                                                                       |
 | Parallel event definition                                              | Event         | Subset        | `EventBasedGateway.Parallel` mode forks one child per matched catch; arbitrary parallel catch events are outside the subset.                                     |
 | None task                                                              | Task          | Full          | `BpmnEngine.ResolveTargetAsync` returns the activity as the next state.                                                                                          |
-| Service / User / Send / Receive / Script / Manual / Business rule task | Task          | Full          | Same `ResolveTargetAsync` activity case; task subtype is engine-neutral.                                                                                         |
+| Service / User / Send / Receive / Manual task | Task | Full | `ResolveTargetAsync` returns the activity as the next state. |
+| `ScriptTask<TInput, TResult>` / `BusinessRuleTask<TInput, TResult>` | Task | Full | The `ProcedureTaskBase` path executes typed bindings and then resolves the outgoing flow. |
 | Exclusive gateway                                                      | Gateway       | Full          | `BpmnEngine.ResolveExclusiveAsync` evaluates guarded flows in order, falls back to default.                                                                      |
 | Parallel gateway, fork                                                 | Gateway       | Full          | `ParallelGatewayHandler.ForkFromTokenAsync` splits the arriving token; `BpmnEngine.SpawnFromGatewayAsync` is the engine-level helper.                            |
 | Parallel gateway, join                                                 | Gateway       | Full          | `ParallelGatewayHandler.ArriveAtJoinAsync` parks until `waitingHere.Count + 1 == incomingCount`, then `BpmnEngine.FireJoinAsync` fires.                          |
@@ -93,6 +94,20 @@ current executable subset. `Subset` means the element class is supported with ex
 | Lane                                                                   | Collaboration | Not supported | Lane modeling is outside the engine scope.                                                                                                                       |
 | Data object / I/O metadata                                             | Data          | Not supported | Data object and I/O specification are non-executable and outside the engine scope.                                                                               |
 | Text annotation / association                                          | Annotation    | Not supported | Non-executable notation is outside runtime execution.                                                                                                            |
+
+## Typed task execution
+
+Script tasks use the keyed Expressions compiler selected by `Language`. Rule tasks use the keyed
+application `IFlowRuleHandler<TInput, TResult>` selected by `(Key, Version)`. Both require explicit
+input/output bindings and run in the Flow outer unit of work. Their output is visible to the following
+condition before automatic progression. `NoMatch.Continue` progresses without output; `NoMatch.Fail`
+and invalid bindings fail the operation.
+
+Forks, joins, boundary paths, and sub-process starts establish the output token before executing an
+automatic task. The task context and following guard address that same child token. Its annotations
+remain independent of its parent's annotations. Persistence owns commit and rollback for all staged
+rows. The typed execution contract is defined in `ProcedureTaskBase.cs`, `ScriptTask.cs`, and
+`BusinessRuleTask.cs`; child staging is implemented by `BpmnEngine.cs` and its runtime executors.
 
 ## Token lifecycle
 

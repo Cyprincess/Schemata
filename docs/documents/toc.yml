@@ -55,8 +55,6 @@
   items:
     - name: Overview
       href: caching/overview.md
-    - name: Distributed
-      href: caching/distributed.md
     - name: Redis
       href: caching/redis.md
 - name: Resource
@@ -216,6 +214,13 @@
   href: security.md
 - name: Identity
   href: identity.md
+- name: SCIM
+  href: scim.md
+  items:
+    - name: Overview
+      href: scim.md
+    - name: Surface Matrix
+      href: scim-surface-matrix.md
 - name: Authorization
   href: authorization.md
 - name: Tenancy

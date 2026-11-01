@@ -88,19 +88,29 @@ to `IHasPendingEvents`, which both shapes satisfy.
 
 | Aspect | Behaviour |
 |---|---|
-| When | After the unit of work commits. Committed advisors run from the commit sink; rollback runs a separate sink and never reaches this advisor. |
-| What | Every entity in `Added`, `Updated` **and** `Removed`. A deleted aggregate can have raised events before it was removed. |
-| Order | `Orders.Max - 1_000` — just before `Schemata.Entity.Cache` evicts at `Orders.Max`. |
+| When | After the mutation's unit of work commits. The advisor prepares a callback at staging time; the unit of work runs it after the transaction commits. Rollback never reaches the callback. |
+| What | Every entity staged through `IResourceMutation<TEntity>` whose mutation applied — creates, updates, **and** deletes. A deleted aggregate can have raised events before it was removed. Writes that bypass `IResourceMutation<TEntity>` (direct repository writes) do not flush pending events. |
+| Order | The resource segment (`CommitOrders.Resource`) — after type-level repository notifications such as cache eviction, before domain-owner sinks. Within the segment the advisor orders itself at `Orders.Max - 1_000`. |
 | Failure | An exception from `IEventBus.PublishAsync` propagates. The commit has already landed, so a failed publish does not roll the data back. |
+
+`Prepare` is side-effect free: it captures the entity and returns the publishing callback, so a
+rolled-back transaction publishes nothing. Draining happens in the callback, after the commit is
+durable; when several staged mutations capture the same entity, only the first callback observes
+the buffered events.
 
 ## Common pitfalls
 
 - **Publishing from a mutation advisor.** `IRepositoryAddAdvisor` and friends run *before* the
   commit. Events raised there escape even when the transaction rolls back. Use this bridge instead.
-- **Expecting the commit to roll back when a subscriber throws.** It cannot: the data is already
-  committed by the time the advisor runs. Treat delivery as at-most-once unless you pair it with the
-  event outbox.
-- **Registering the advisor by hand with `AddScoped(typeof(...))`.** That replaces the advisor chain
-  rather than joining it, silently disabling every other committed advisor. Call `UseEvent()`.
+- **Expecting direct repository writes to flush events.** The bridge listens on the resource
+  mutation path. Route writes through `IResourceMutation<TEntity>` (the resource layer does this
+  for you) when the entity buffers events.
+- **Expecting the commit to roll back when a subscriber throws.** The data is already committed
+  when the callback runs. In-process publishing awaits handlers; RabbitMQ publishing awaits broker
+  confirmation. The event bus provides neither a transactional outbox nor automatic publish retry,
+  so applications must handle the gap between the business commit and successful publication.
+- **Registering the advisor by hand with `AddScoped(typeof(...))`.** That replaces the advisor
+  chain rather than joining it, silently disabling every other committed advisor. Call
+  `UseEvent()`.
 - **Reusing an entity instance across two commits and expecting the events twice.** The buffer is
   drained on the first commit by design.

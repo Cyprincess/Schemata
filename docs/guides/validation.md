@@ -38,6 +38,7 @@ dotnet add package --prerelease Schemata.Validation.FluentValidation
 
 ```csharp
 using FluentValidation;
+using Schemata.Abstractions.Entities;
 
 public sealed class StudentRequestValidator : AbstractValidator<StudentRequest>
 {
@@ -45,7 +46,21 @@ public sealed class StudentRequestValidator : AbstractValidator<StudentRequest>
     {
         RuleFor(x => x.FullName)
             .NotEmpty()
-            .MaximumLength(100);
+            .MaximumLength(100)
+            .When((request, context) => {
+                // Validation sees the unmapped request DTO, so a partial update must not
+                // require fields its mask leaves untouched.
+                if (context.RootContextData[nameof(Operations)] is not Operations.Update) {
+                    return true; // Create: the new row needs a name.
+                }
+
+                var mask = request.UpdateMask?.Split(',',
+                    StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+                // An omitted or `*` mask merges, keeping the stored value for a null field;
+                // only a mask that names full_name writes it authoritatively.
+                return mask is not null && mask.Contains("full_name");
+            });
 
         RuleFor(x => x.Age)
             .InclusiveBetween(1, 150);
@@ -54,7 +69,10 @@ public sealed class StudentRequestValidator : AbstractValidator<StudentRequest>
 ```
 
 The validator targets `StudentRequest`, the `TRequest` type in the resource pipeline. Validation
-runs against the request DTO, before it is mapped onto the `Student` entity.
+runs against the request DTO, before it is mapped onto the `Student` entity — an update whose
+`update_mask` leaves `full_name` out therefore validates only the fields it carries. The advisor
+passes the CRUD `Operations` kind through the validation context's `RootContextData`, which the
+`When` guard above reads to separate create and update semantics.
 
 ## Register the validator
 

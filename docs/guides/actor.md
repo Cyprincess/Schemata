@@ -1,4 +1,4 @@
-# Actor
+﻿# Actor
 
 Route every write to a given process or other actor-backed domain instance through one mailbox so
 concurrent callers serialize instead of racing on an optimistic-concurrency token. This guide
@@ -124,6 +124,13 @@ concurrent callers never interleave their reads and writes of `_count`.
 resolve that same table entry. A turn triggered by `TellAsync` has `CorrelationId == Guid.Empty`,
 and both calls are no-ops there.
 
+The envelope retains the declared `TRequest` and `TResponse`. `RequestDispatchingActor` uses
+that pair to resolve the keyed handler in the turn scope, including when a base request carries
+a derived payload or the payload implements multiple `IRequest<TResponse>` contracts. Its
+one-way request dispatch uses the declared `TellAsync<T>` type; a type with multiple response
+contracts must select one explicitly through `TellAsync<IRequest<TResponse>>` and register the
+handler for that interface, or use `AskAsync<TRequest, TResponse>`.
+
 The reply commits only after the turn ends: it is recorded once `OnReceiveAsync` returns without
 throwing, so a reply recorded earlier in the same turn is discarded if the turn subsequently
 throws — the caller's `Ask` faults with the turn's own exception instead, never the earlier reply.
@@ -168,6 +175,13 @@ same convention `Flow.Foundation`/`Scheduling.Foundation` use for their own enti
 persistence without registering that repository surfaces as a DI resolution failure the first
 time a persistent actor's turn runs, not at startup.
 
+The stored lookup identity is the unique `(SchemataActor.ActorType, SchemataActor.ActorKey)` pair,
+independent of resource `Name`. Register a consumer `IRepositoryAddAdvisor<SchemataActor>` through
+`TryAddEnumerable` before `AdviceAddCanonicalName.DefaultOrder` (120,000,000) to assign missing
+names. See the
+[persistence reference](../documents/actor/overview.md#persistence-is-opt-in-and-the-actor-never-holds-authoritative-state)
+for the current storage identity and naming contract.
+
 Neither callback runs for an actor that does not implement `IPersistentActor`. The mailbox itself
 is never persisted: a message sitting in a stopped process's channel is gone on restart, with no
 recovery semantics.
@@ -202,9 +216,9 @@ schema.UseActor(a => a
 for that event. Multiple routes for one event type each get their own delivery attempt.
 
 `Schemata.Actor.Scheduling`'s `UseScheduling()` implements `IActorReminders` on top of the
-scheduler: `IActorContext.ScheduleAsync(message, delay)` schedules durable, delayed delivery to
-the same actor, surviving a process restart. Calling it without `UseScheduling()` installed
-throws, naming the missing capability, rather than becoming a silent no-op.
+scheduler: `IActorContext.ScheduleAsync(message, delay, reminderName)` returns an `ActorReminder`
+bound to the tenant and actor. Pass it to `IActorReminders.CancelAsync` to suppress pending delivery.
+Scheduling without the Actor.Scheduling capability throws at use. Already executing delivery may finish.
 
 `Schemata.Flow.Actor` bridges the opposite direction: it replaces the Flow module's own write-path
 handler registration so concurrent writers to the same `SchemataProcess` serialize through a
@@ -237,18 +251,47 @@ never an entity a caller already loaded or tracks. A handler reloads the entity 
 own turn instead. `MessageContexts.Capture(callerProvider)` flattens the sender's ambient state
 before the message is queued; the turn's own scope restores it through the registered
 `IMessageContextPropagator` implementations before any handler runs, the same boundary rule
-[Messaging](messaging.md#distributed-dispatch) uses for a thread or process hop.
+[Messaging](messaging.md#rabbitmq-dispatch) uses for a thread or process hop.
 
-Ambient `AdviceContext` does not cross the mailbox: every turn is its own pipeline root. The
-runtime constructs a fresh `AdviceContext` and calls `AdviceContext.Establish` immediately after
-the turn's scope is built, before `OnReceiveAsync` runs — an actor turn never continues whatever
-`AdviceContext` happened to be ambient on the sender's side.
+`AdviceContext` does not cross the mailbox: every turn is its own pipeline root.
+`RequestDispatchingActor.DispatchAsync`, called from `OnReceiveAsync`, constructs
+`new AdviceContext(ctx.Services)` from the turn scope and passes it to the keyed handler it resolves; a
+turn never inherits the sender's context.
 
-Multi-tenancy resolves the tenant through the propagator and a two-phase turn scope:
-`IActorTurnScopeFactory`'s default builds a scope from the host root, but a tenant-isolated
-provider has to be resolved before that scope exists, so `Tenancy.Foundation`'s override runs a
-short bootstrap scope first, resolves the tenant, and only then builds the real turn scope from
-the tenant's own provider.
+Install `Schemata.Tenancy.Actor` and call `tenancy.UseActor()` after configuring the ordinary
+actor capability. The Tenancy-owned decorator selects an independent in-process runtime for
+each bound tenant while `ActorId` keeps its business `Type` and `Key`. Actor references capture
+generic `MessageContext`; using a reference under another tenant fails before enqueueing.
+The bridge enables tenant message propagation and turn-scope restoration.
+
+Persisted actor state needs a tenanted row type, because the shipped `SchemataActor` implements no
+`ITenant`. Declare the subtype, close the tenancy actor bridge on it, and register its repository
+and mutation in every tenant container:
+
+```csharp
+using Schemata.Abstractions.Entities;
+
+public sealed class TenantActor : SchemataActor, ITenant
+{
+    public Guid? TenantUid { get; set; }
+}
+
+tenancy.UseActor<Tenant, TenantActor>()
+       .UseActorPersistence<Tenant, TenantActor>()
+       .UseRepositories(tenant => {
+           tenant.Services.AddTransient<IRepository<TenantActor>, EfCoreRepository<AppDbContext, TenantActor>>();
+           tenant.Services.AddScoped<IResourceMutation<TenantActor>, ResourceMutation<TenantActor>>();
+       });
+```
+
+`UseActorPersistence<Tenant, TenantActor>()` registers `ActorStateStore<TenantActor>` in every
+tenant container; the state row itself needs the repository and mutation pairing above, plus any
+repository constructor collaborators registered explicitly. Application target packages can opt in
+with `UseTenantActor=true`.
+Constructors retain activation-lifetime dependencies; per-turn dependencies come from
+`IActorContext.Services`. Startup, timer callbacks and shutdown restore the activation's captured
+context through the same execution-scope factory. The hosted lifecycle collects idle activations
+and drains every selected runtime on shutdown.
 
 The in-process actor system removes the race between two callers in the same process. A
 multi-instance deployment still relies on the entity's own `IConcurrency` optimistic-concurrency
@@ -260,8 +303,8 @@ token — the actor mailbox is not a distributed lock.
   the faulted instance and constructs a fresh one from `Props` — only `IPersistentActor`'s durable
   state, with `UsePersistence()` on, survives a restart.
 - **Calling `IServiceScopeFactory.CreateAsyncScope()` directly instead of injecting
-  `IActorTurnScopeFactory`.** Multi-tenancy, and any capability that needs a turn to descend from
-  a different provider, overrides that seam with `Replace`; bypassing it skips the override.
+  `IMessageExecutionScopeFactory`.** Multi-tenancy, and any capability that needs a turn to descend
+  from a different provider, overrides that seam with `Replace`; bypassing it skips the override.
 - **Expecting `IActorContext.ScheduleAsync` to become a no-op without `Actor.Scheduling`
   installed.** It throws instead.
 - **Resolving a business module's keyed default handler outside a turn.** The keyed registration

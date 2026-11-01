@@ -16,7 +16,7 @@ Choose the canonical parent first. A child belongs below that parent only when t
 
 Define one canonical resource-name pattern for every public resource. The pattern supplies collection segments, the leaf identifier, routes, service names, and parent scoping. Schemata requires an addressable `[CanonicalName]` pattern when registering an `ICanonicalName` resource. Registration is explicit: adding `[Resource]` metadata alone creates neither endpoints nor resource-name resolution. Register every public resource through `AddResource<T>()` or `Use<...>()` while configuring services.
 
-Use a resource reference for an independent resource's canonical name. Decide separately whether the application must verify that the referenced row exists. See [Resource Naming](../documents/resource/resource-naming.md) and the canonical-name, parent, and reference requirements in [AIP Modeling](../documents/resource/aip-modeling.md).
+Use a resource reference for an independent resource's canonical name. `[ResourceReference]` is declarative: the framework performs no write-time type or existence validation, so the application decides whether and how to verify the referenced resource (business logic or its own repository advisor). See [Resource Naming](../documents/resource/resource-naming.md) and the canonical-name, parent, and reference requirements in [AIP Modeling](../documents/resource/aip-modeling.md).
 
 ## 3. Separate the API shapes
 

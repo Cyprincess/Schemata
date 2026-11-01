@@ -27,8 +27,10 @@ public interface IReportService
 
 `RunAsync` dispatches `RunReportRequest`. `RunReportHandler<TReport, TSnapshot, TChunk>` invokes
 `IReportGenerateAdvisor`, resolves the named or inline definition, invokes `IReportDefinitionAdvisor`,
-builds an Insight plan, and materializes it under the supplied principal. Insight applies its source
-access and entitlement providers during that materialization.
+builds an Insight plan, and runs `IInsightPlanAdvisor` rewrites on it. The rewritten plan is what
+materializes under the supplied principal; a rejecting advisor stops inline runs, persisted snapshot
+generation, and scheduled generation alike. Insight applies its source access and entitlement
+providers during that materialization.
 
 | Request shape | Result |
 | --- | --- |
@@ -38,8 +40,31 @@ access and entitlement providers during that materialization.
 An inline result that reaches `MaxInlineRows` throws `ReportException` with reason
 `INLINE_ROW_LIMIT` and asks the caller to rerun with `Persist=true`.
 
-`ReportGenerateContext.Principal` begins as the caller principal. Dispatched and scheduled jobs pass
-`null`; an `IReportGenerateAdvisor` can replace that principal before Insight execution.
+`ReportGenerateContext.Principal` begins as the caller principal for `RunAsync` and immediate
+`Sync = true` generation. Background generation begins with `null`; Scheduling persists generic
+message-context strings and request arguments, not a `ClaimsPrincipal`.
+
+The application registers an `IMessageContextPropagator` that captures an identity reference and
+restores application-owned scoped state. `ReportGenerationJob<TReport, TSnapshot, TChunk>` selects
+an execution scope from the persisted execution's `MessageContext`, enters it, and restores its
+propagators before resolving the Report dispatcher. Cancellation polling follows the same scope
+selection and restoration path before resolving the execution repository. Scope services are disposed
+while the execution lease remains entered.
+
+Register an explicit `IReportGenerateAdvisor` with `TryAddEnumerable` to resolve that reference
+against the application's current user or service records at execution time, reject absent or revoked
+identities, and assign `ReportGenerateContext.Principal`. Insight materialization receives that
+principal and applies source access and entitlement providers. An advisor exception stops generation
+before definition resolution and snapshot publication. The framework supplies no background service
+principal or identity-reference API.
+
+Tenant-specific constructor dependencies require explicit tenant registration of the application
+advisor and its collaborators. Host registrations retain host construction; scope selection does not
+retarget the host service graph. The Report job itself depends only on the generic execution-scope
+factory, options, and report registration.
+
+Implementation: `src/Schemata.Report.Foundation/Jobs/ReportGenerationJob.cs` and
+`src/Schemata.Report.Foundation/Handlers/RunReportHandler.cs`.
 
 ## `GenerateAsync` and operations
 
@@ -47,6 +72,22 @@ An inline result that reaches `MaxInlineRows` throws `ReportException` with reas
 `GenerateHandler<TReport, TSnapshot, TChunk>` resolves `IScheduler`, serializes the `ReportRequest`
 into a `JobContext`, triggers `ReportGenerationJob<TReport, TSnapshot, TChunk>`, and returns the
 pending `Operation`. The job writes the eventual snapshot reference or inline response.
+
+For `Sync = true`, the handler calls `IOperationService.ExecuteAsync`. That service commits a
+`Running` execution before invoking inline work. The callback receives the persisted operation,
+sets `ReportExecutionContext.Operation` to its canonical name, and dispatches `RunReportRequest`.
+The snapshot can therefore reference the actual operation while materialization is running. The
+same execution row receives the terminal output or error; cancellation records `Cancelled` and
+rethrows. See [Inline operations](../scheduling/persistence.md#inline-operations).
+
+The application supplies execution names through an
+`IRepositoryAddAdvisor<SchemataJobExecution>` before `AdviceAddCanonicalName.DefaultOrder`
+(120,000,000). `ExecutionUid` is storage identity only. Both generation paths return the persisted
+operation name, rather than predicting `operations/{uid}`; `OperationMapper` has no UID fallback.
+The snapshot and chunk repositories also need consumer naming advisors when `Persist = true`.
+
+Implementation: `src/Schemata.Report.Foundation/Handlers/GenerateHandler.cs` and
+`src/Schemata.Scheduling.Foundation/DefaultOperationService.cs`.
 
 [AIP-151](https://google.aip.dev/151) directs methods that may take significant time to return a
 `google.longrunning.Operation` and use the shared Operations service. Report follows that operation

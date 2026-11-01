@@ -83,6 +83,8 @@ public class AppDbContext : DbContext
 ## Step 3: Register Insight sources
 
 ```csharp
+using System.Linq;
+using System.Collections.Generic;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -92,12 +94,16 @@ using Schemata.Expressions.Aip;
 using Schemata.Expressions.Cel;
 using Schemata.Expressions.Order;
 using Schemata.Insight.Foundation;
+using Schemata.Insight.Foundation.Drivers;
 
 builder.UseSchemata(schema => {
     var insight = schema.UseInsight(i => {
         i.WithTotalSize(TotalSizeMode.Exact);
-        i.AddRepositorySource("customers", "customers")
-         .AddRepositorySource("purchases", "purchases")
+        i.AddRepositorySource<Customer, CustomerRow>("customers",
+                c => new CustomerRow { FullName = c.FullName, Id = c.Id,
+                    Orders = c.Orders.Select(o => new OrderRow { Number = o.Number, Status = o.Status, Amount = o.Amount, Placed = o.Placed }).ToList() })
+         .AddRepositorySource<Purchase, PurchaseRow>("purchases",
+                p => new PurchaseRow { CustomerId = p.CustomerId, Amount = p.Amount, Status = p.Status })
          .AddSourceDriver<RepositoryDriver>(RepositoryDriver.DriverName);
     });
 
@@ -108,7 +114,31 @@ builder.UseSchemata(schema => {
     schema.Services.AddRepository<Customer, EfCoreRepository<AppDbContext, Customer>>();
     schema.Services.AddRepository<Purchase, EfCoreRepository<AppDbContext, Purchase>>();
 });
+
+public sealed class CustomerRow
+{
+    public string? FullName { get; set; }
+    public int     Id       { get; set; }
+    public List<OrderRow> Orders { get; set; } = [];
+}
+
+public sealed class OrderRow
+{
+    public int Number { get; set; }
+    public string? Status { get; set; }
+    public int Amount { get; set; }
+    public int Placed { get; set; }
+}
+
+public sealed class PurchaseRow
+{
+    public int     CustomerId { get; set; }
+    public int     Amount     { get; set; }
+    public string? Status     { get; set; }
+}
 ```
+
+`AddRepositorySource<TEntity, TPublic>(name, projection)` registers a keyed `RepositorySource<TEntity, TPublic>` under `name` and stores `Params["binding"] = name`. The driver looks the binding up through DI rather than resolving the resource collection by name. Each source's `TPublic` properties are the field set for filters, ordering, and selections; the entity types still back entitlement and repository queries. The driver does not scan `ICanonicalName` types to map a name to an entity.
 
 **Assertion:** the application starts and `POST /v1/insight:query` is available.
 
@@ -227,6 +257,14 @@ Content-Type: application/json
 
 **Forgetting the driver registration.** `AddRepositorySource` creates a source binding, but the keyed
 `RepositoryDriver` must also be registered with `AddSourceDriver<RepositoryDriver>`.
+
+**Filtering on the public shape, not the entity.** `TPublic` properties are the field set for the
+source. `RepositoryDriver` compiles pushed filters against `TPublic`, so a filter on an
+`ICanonicalName` property that the public row does not project is rejected.
+
+**Referencing a property the public shape hides with `[JsonIgnore]`.** `PublicModel` reads only
+public instance properties without a `JsonIgnoreAttribute`. Filtering or ordering a `[JsonIgnore]`
+property fails public-shape validation.
 
 **Using value expressions with AIP only.** Compute fields need a value-capable language. Use CEL for
 computed values or set another value-capable language on the expression slot.

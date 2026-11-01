@@ -78,8 +78,7 @@ schema.ConfigureServices(services => {
     services.AddRepository<SchemataReportSnapshotChunk, EfCoreRepository<AppDbContext, SchemataReportSnapshotChunk>>();
     services.AddRepository<SchemataJob, EfCoreRepository<AppDbContext, SchemataJob>>();
     services.AddRepository<SchemataJobExecution, EfCoreRepository<AppDbContext, SchemataJobExecution>>();
-    services.AddDistributedMemoryCache();
-    services.AddDistributedCache();
+    services.AddMemoryCacheProvider();
 });
 ```
 
@@ -98,11 +97,13 @@ using Schemata.Expressions.Aip;
 using Schemata.Expressions.Cel;
 using Schemata.Expressions.Order;
 using Schemata.Insight.Foundation;
+using Schemata.Insight.Foundation.Drivers;
 
 builder.UseSchemata(schema => {
     schema.UseInsight(insight => {
         insight.UseAip().UseCel().UseOrdering();
-        insight.AddRepositorySource("students", "students");
+        insight.AddRepositorySource<Student, StudentRow>("students",
+                s => new StudentRow { FullName = s.FullName, Age = s.Age });
         insight.AddSourceDriver<RepositoryDriver>(RepositoryDriver.DriverName);
     });
 
@@ -117,6 +118,12 @@ builder.UseSchemata(schema => {
         .Retain(days: 30, count: 90));
     reports.UseScheduling();
 });
+
+public sealed class StudentRow
+{
+    public string? FullName { get; set; }
+    public int     Age      { get; set; }
+}
 ```
 
 `Periodic(cron:)` records `ReportScheduleKind.Cron` and the cron expression. `Retain(days:, count:)`

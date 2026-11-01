@@ -6,7 +6,7 @@ the persistence setup from [Getting Started](getting-started.md).
 
 ## Add the package
 
-Scheduling ships outside the meta target packages, so add it explicitly:
+Scheduling ships outside the meta target packages, so add it and the default execution-store provider explicitly:
 
 ```shell
 dotnet add package --prerelease Schemata.Scheduling.Foundation
@@ -14,9 +14,11 @@ dotnet add package --prerelease Schemata.Scheduling.Foundation
 
 ## Enable scheduling
 
-`UseScheduling()` takes no delegate and returns a `SchedulingBuilder`:
+`UseScheduling()` takes no delegate and returns a `SchedulingBuilder`. The dispatcher executes jobs through an `IJobExecutionStore` backend, so install the repository-backed default alongside:
 
 ```csharp
+builder.Services.AddSchemataSchedulingRepositoryStore();
+
 schema.UseScheduling()
       .WithJob<StudentReportJob>("*/5 * * * *");
 ```

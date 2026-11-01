@@ -7,7 +7,7 @@ row, normal queries exclude deleted rows automatically, and the built-in
 `:undelete` method brings a resource back. The recipe uses the `Student` entity
 from [Getting Started](../guides/getting-started.md) and walks through the
 three advisors that provide Schemata's AIP-164-aligned soft-delete behavior,
-plus the suppression markers you use when purging or listing tombstoned rows
+plus the query and mutation options you use when purging or listing tombstoned rows
 from application code.
 
 ## Prerequisites
@@ -72,7 +72,7 @@ database query confirms the row still exists with `DeleteTime` set.
 When `repository.RemoveAsync(entity, ct)` is called, `AdviceRemoveSoftDelete`
 intercepts it:
 
-1. Checks `ctx.Has<SoftDeleteSuppressed>()` — if present, skips and lets the
+1. Checks `MutationOptions.IgnoreSoftDelete` — if set, skips and lets the
    physical delete proceed.
 2. Casts `entity` to `ISoftDelete`. If the entity doesn't implement it,
    skips.
@@ -106,50 +106,49 @@ rides the ordinary update path end to end.
 **Verify:** After deleting a student, `POST /v1/students/{name}:undelete`
 returns 200 and the student reappears in `GET /v1/students`.
 
-## Step 4 — Suppress soft delete for physical deletes
+## Step 4 — Bypass soft delete for physical deletes
 
 On the HTTP surface, `POST /v1/students/{name}:expunge` physically removes an
 already-tombstoned row — it is registered automatically alongside `:undelete`.
-For application code that needs to permanently remove a row, bypass the
-soft-delete advisor by scoping `SuppressSoftDelete()` around the remove:
+For application code that needs to permanently remove a row, call the
+resource mutation owner with the `Expunge` intent:
 
 ```csharp
 public async Task PurgeAsync(Student student, CancellationToken ct)
 {
-    using (repository.SuppressSoftDelete())
-    {
-        await repository.RemoveAsync(student, ct);
-    }
-    await repository.CommitAsync(ct);
+    await mutation.DeleteAsync(student, null, Operations.Expunge, ct);
 }
 ```
 
-`SuppressSoftDelete()` sets `SoftDeleteSuppressed` in the `AdviceContext`.
-`AdviceRemoveSoftDelete` checks `ctx.Has<SoftDeleteSuppressed>()` at the top
-of `AdviseAsync` and returns `Continue`, letting the physical delete proceed.
+`mutation` is an `IResourceMutation<Student>` constructor-injected into the
+calling service. `Expunge` and `Purge` pass `MutationOptions(IgnoreSoftDelete: true)`
+through the mutation, run the domain delete pipeline, and commit; a plain `Delete`
+of a row that does not implement `ISoftDelete` needs no override because
+`AdviceRemoveSoftDelete` skips it. The caller never sets the option or calls
+`CommitAsync` itself.
+
+
 
 **Verify:** After calling `PurgeAsync`, the row is gone from the database
 entirely.
 
 ## Step 5 — List deleted entities (admin view)
 
-To list soft-deleted students, suppress the query filter and add an explicit
+To list soft-deleted students, pass `QueryOptions(IgnoreSoftDelete: true)` and add an explicit
 `DeleteTime != null` predicate:
 
 ```csharp
 public async Task<List<Student>> ListDeletedAsync(CancellationToken ct)
 {
-    using (repository.SuppressQuerySoftDelete())
-    {
-        return await repository
-            .ListAsync<Student>(q => q.Where(s => s.DeleteTime != null), ct)
-            .ToListAsync(ct);
-    }
+    return await repository
+        .ListAsync<Student>(q => q.Where(s => s.DeleteTime != null), ct,
+            new QueryOptions(IgnoreSoftDelete: true))
+        .ToListAsync(ct);
 }
 ```
 
 The explicit `s => s.DeleteTime != null` predicate filters to only deleted
-rows. Without it, suppressing the filter would return live and deleted rows
+rows. Without it, ignoring the filter would return live and deleted rows
 together.
 
 **Verify:** `ListDeletedAsync` returns only students with a non-null
@@ -164,14 +163,12 @@ runs after `AdviceRemoveSoftDelete` (Order > 900M), it will not be called
 because the pipeline short-circuits on `Handle`. Place custom remove advisors
 at a lower `Order` value.
 
-**Scope `SuppressQuerySoftDelete` with `using`.** The returned `IDisposable`
-restores the prior state on dispose, so the filter applies normally again after
-the block. Leaving the marker set on a long-lived repository would expose
-tombstoned rows to later queries.
+**Pass `QueryOptions(IgnoreSoftDelete: true)` per call.** The option applies to
+that read only, so a later query on the same repository hides tombstones again.
 
 **`AdviceAddSoftDelete` clears `DeleteTime` on insert.** Seeding data with a
 pre-set `DeleteTime` (e.g., importing archived records) loses it unless you
-scope `SuppressSoftDelete()` around the `AddAsync`.
+pass `MutationOptions(IgnoreSoftDelete: true)` to the `AddAsync` call.
 
 **`PurgeTime` is a convention field.** The framework stores it and leaves
 time-based enforcement to you. The built-in `POST /v1/students:purge` method
@@ -182,7 +179,7 @@ a child-resource purge. With `force = false`, the completed operation output
 contains the count and a sample of up to 100 matching resource names, and the
 job leaves every row intact. Time-based reaping needs a scheduled job of your
 own that queries for rows where `PurgeTime <= UtcNow` and calls `RemoveAsync`
-with `SuppressSoftDelete()` scoped around it.
+with `MutationOptions(IgnoreSoftDelete: true)` on the `RemoveAsync` call.
 
 **Undelete rides the update pipeline.** The restore goes through the update
 advisor pipeline, so add-time advisors such as `AdviceAddSoftDelete` stay out
@@ -199,4 +196,4 @@ first created.
 - [Mutation Pipeline document](../documents/repository/mutation-pipeline.md)
   — advisor execution order for add, update, and remove
 - [Query Pipeline document](../documents/repository/query-pipeline.md) —
-  `BuildQuery` advisor chain and suppression markers
+  `BuildQuery` advisor chain and per-operation options

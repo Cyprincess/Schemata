@@ -74,7 +74,7 @@ nullable view field = qualified name, "?", identifier,
                       [ "=", expression ] ;
 
 typed view field = qualified name, identifier,
-                   ( view options | "{" | "=" ),
+                   ? next non-space character is "[", "{", or "=" ?,
                    [ view options ],
                    [ "{", { note | view field }, "}" ],
                    [ "=", expression ] ;

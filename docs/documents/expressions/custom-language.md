@@ -1,12 +1,12 @@
 # Custom Expression Language
 
-A custom filter language supplies an `IExpressionCompiler`, an `ExpressionLanguageDescriptor`, and a `Use*` extension over `IExpressionLanguageBuilder`. Add an `IExpressionPushdownPlanner` when the language can split filters for backend execution and local residual evaluation.
+A custom filter language supplies an `IExpressionCompiler`, an `ExpressionLanguageDescriptor`, and a `Use*` extension over `IExpressionLanguageBuilder`. Add an `IExpressionPushdownPlanner` when the language can split filters for backend execution and local residual evaluation. Add an `IExpressionReferenceProvider` when the language is used as an Insight filter or selection expression so `PublicPlanValidator` can walk the expression's references and result shape against the source's public shape.
 
 ## Where the code lives
 
 | Package                         | Key files                                                                                                                                |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `Schemata.Expressions.Skeleton` | `IExpressionCompiler.cs`, `IExpressionTree.cs`, `ExpressionCompileOptions.cs`, `ExpressionFunction.cs`                                   |
+| `Schemata.Expressions.Skeleton` | `IExpressionCompiler.cs`, `IExpressionTree.cs`, `ExpressionCompileOptions.cs`, `ExpressionFunction.cs`, `IExpressionReferenceProvider.cs` |
 | `Schemata.Expressions.Skeleton` | `ExpressionLanguageProfile.cs`, `ExpressionLanguageDescriptor.cs`, `IExpressionLanguageBuilder.cs`, `FilteringMode.cs`                   |
 | `Schemata.Expressions.Skeleton` | `IExpressionPushdownPlanner.cs`, `ExpressionPushdownPlan.cs`, `ExpressionCapabilities.cs`, `ExpressionCache.cs`, `ExpressionCacheKey.cs` |
 
@@ -92,6 +92,7 @@ public static class MyServiceCollectionExtensions
         configure?.Invoke(options);
 
         services.AddKeyedSingleton<IExpressionCompiler, MyCompiler>(MyLanguage.Name);
+        services.AddKeyedSingleton<IExpressionReferenceProvider, MyReferenceProvider>(MyLanguage.Name);
         services.AddKeyedSingleton(
             MyLanguage.Name,
             new ExpressionLanguageDescriptor(
@@ -105,7 +106,50 @@ public static class MyServiceCollectionExtensions
 }
 ```
 
-Use `SupportsValues: false` for predicate-only languages. Use `SupportsValues: true` when the compiler supports scalar values for modules that evaluate conditions or computed expressions.
+Use `SupportsValues: false` for predicate-only languages. Use `SupportsValues: true` when the compiler supports scalar values for modules that evaluate conditions or computed expressions. Register the reference provider when the language is used as an Insight filter or selection expression; a missing provider makes `PublicPlanValidator` reject the language with `Language '<name>' does not provide query field references.`
+
+## Provide a reference provider
+
+`IExpressionReferenceProvider.Analyze` walks the parsed tree and returns the references the expression
+reads plus the structural provenance of its result:
+
+```csharp
+public interface IExpressionReferenceProvider
+{
+    ExpressionReferences Analyze(IExpressionTree tree);
+}
+
+public sealed record ExpressionReferences(IReadOnlyList<ExpressionReference> References, ExpressionShape Result);
+```
+
+`References` contains source-rooted `ExpressionReference` paths. String segments name members;
+constant index segments retain their original value type, and `ExpressionPathMarker` distinguishes
+element/key iteration from user keys. Literal ambiguity, repeated-field traversal and type-literal
+metadata preserve language resolution rules. `Result` carries scalar, null, reference, sequence,
+literal-map, map-value, concatenation or alternative provenance so computed aliases retain their
+field boundary. Analyze before compiler optimizations can erase accesses such as `has(secret)`.
+
+A predicate-only language can return `new ExpressionReferences(references, new ExpressionShape.Scalar())`
+when every reference is a direct field read. Languages whose result may be a list, map, or null
+return the matching `ExpressionShape` cases so the validator can bind them correctly:
+
+```csharp
+public sealed class MyReferenceProvider : IExpressionReferenceProvider
+{
+    public ExpressionReferences Analyze(IExpressionTree tree) {
+        if (tree is not MyTree node) {
+            throw new ArgumentException("Tree must be a MyTree.", nameof(tree));
+        }
+
+        var references = new List<ExpressionReference>();
+        var result     = MyAnalyzer.Walk(node, references);
+        return new ExpressionReferences(references, result);
+    }
+}
+```
+
+Register the reference provider under the same language key as the compiler and pushdown planner.
+A language registered only with a compiler cannot validate against an Insight public shape.
 
 ## Add the language-builder seam
 

@@ -67,8 +67,8 @@ Descriptors are cached per `RuntimeTypeHandle` in a `ConcurrentDictionary`. Get 
 | Property             | Description                                                                                                                     |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `Pattern`            | The full pattern, or `null` when no attribute is present                                                                        |
-| `Singular`           | Pascalized leaf placeholder, e.g. `"Book"`; throws `InvalidOperationException` when the type declares no addressable pattern     |
-| `Plural`             | Pascalized collection segment, e.g. `"Books"`; throws alongside `Singular`; pluralizes the singular when the pattern is a bare placeholder |
+| `Singular`           | Pascalized leaf placeholder, e.g. `"Book"`; falls back to the CLR type name when no attribute is present; otherwise throws `InvalidOperationException` for a non-addressable pattern     |
+| `Plural`             | Pascalized collection segment, e.g. `"Books"`; pluralizes the singular when the pattern is a bare placeholder; falls back to the pluralized CLR type name when no attribute is present; otherwise throws alongside `Singular` |
 | `Collection`         | The last collection segment, e.g. `"books"`; empty when the type declares no pattern or the pattern is a bare placeholder                                       |
 | `CollectionPath`     | Everything up to and including the last collection segment, e.g. `"publishers/{publisher}/books"` — the basis of the HTTP route; empty alongside `Collection` |
 | `Package`            | The `[ResourcePackage]` value (route and gRPC service prefix), or `null`                                                        |
@@ -90,13 +90,13 @@ Descriptors are cached per `RuntimeTypeHandle` in a `ConcurrentDictionary`. Get 
 
 ## Wire-name rules
 
-`ResourceWireNameRules.Resolve(owner, propertyName, pluralName)` maps a CLR property to its wire field for both
+`ResourceWireNameRules.ResolveWireName(owner, propertyName)` maps a CLR property to its wire field for both
 transports:
 
 - `ICanonicalName.Name` returns `null` — the property is suppressed on the wire.
 - `ICanonicalName.CanonicalName` returns `name` (AIP-122).
 - `IFreshness.EntityTag` returns `etag` (AIP-154).
-- `IEntitiesResult<TItem>.Entities` returns the plural collection name of `TItem` (AIP-140). AIP-132 requires the
+- `IEntitiesResult<TEntity, TItem>.Entities` returns the plural collection name of `TEntity` (AIP-140). AIP-132 requires the
   repeated resource field but does not prescribe its plural form.
 - Any other property returns its own name; the transport's naming policy (snake_case) applies on top.
 

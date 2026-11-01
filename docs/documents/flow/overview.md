@@ -1,4 +1,4 @@
-# Flow
+﻿# Flow
 
 Schemata Flow models business processes as strongly-typed C# classes and runs them against a
 persistent store. A `Schemata.Flow.Skeleton.Models.ProcessDefinition` subclass declares a BPMN
@@ -89,7 +89,34 @@ schema.UseFlow()
       .MapHttp();
 ```
 
-Flow method envelopes carry verbs such as `start`, `complete`, and `signal` through the dispatcher. Authentication and coarse authorization wrap those envelopes. Instance access and entitlement remain in Flow's Resource handler stages. `IFlowTransitionAdvisor` and `IFlowSourceAdvisor` continue the ambient `AdviceContext` when a dispatch established one; a direct Flow entry creates its local context only when none exists. See [Security](../security.md).
+`WithAuthorization()` installs Flow-owned target admission, process/token/transition read entitlement,
+and current-eligibility checks in the default mutation handlers. It activates only those Flow resources.
+Register `IRepository<SchemataProcessParticipant>` using the same provider as the process repositories.
+
+- Get/List permit the operation's global read permission or valid historical `Participation` rows.
+  Tenant and participant predicates reach the database before pagination and counting.
+- Start requires `start` permission. A successful user start records historical participation in its unit of work.
+- Complete, correlate, signal delivery, and cancel require the action permission and valid `Eligibility`
+  for the selected live token and its current activity. Historical participation alone grants no mutation.
+- Terminate requires process-wide eligibility (no token/activity) or the explicit `administer` permission.
+  Administration replaces eligibility, not the requested action permission.
+- Expired (including exact expiry), revoked, and other-tenant rows cannot authorize access. Enable
+  Tenancy repository advisors for tenant-isolated entities; those advisors own tenant stamping and
+  query/mutation isolation. Flow persistence stages resource mutations in its joined unit of work.
+
+`FlowParticipantManager.GrantAsync` and `RevokeAsync` require `administer`; applications use them to
+maintain participation and task assignments. The association uses a repository-assigned Uid and canonical
+process/token/subject references. `IFlowSubjectResolver` returns a canonical actor and verified group
+references; its default uses authenticated `sub` and supplies no groups. Supply an application resolver
+for external subject mapping or group membership. Successful actions record the resolved actor, not groups.
+
+HTTP, gRPC, and direct dispatched commands share these policies. The installed event/timer bridges use
+an internal infrastructure identity; a null principal on an ordinary direct call does not bypass policy.
+Application-owned authentication middleware and permission services still need normal host registration.
+Without Flow authorization activation, existing unsecured execution remains available.
+
+`IFlowTransitionAdvisor` and `IFlowSourceAdvisor` receive the dispatch's `AdviceContext` as a parameter;
+Flow handlers never construct one, and a direct entry supplies the context it owns. See [Security](../security.md).
 
 ## Feature priority table
 
@@ -161,7 +188,9 @@ request record (`StartProcessRequest`, `CompleteActivityRequest`, `CorrelateMess
 is dispatched by the public bridge facade `FlowRunner.RunEventAsync` and, directly (not through the
 facade), by `Flow.Scheduling`'s `FlowTimerJob` on a timer catch's fire. `Flow.Event`'s
 `FlowEventHandler` dispatches the other two bridge-relevant requests instead — `CorrelateMessageRequest`
-for a matched message correlation and `ThrowSignalRequest` for a matched signal — not `RunEventRequest`.
+for a matched subscription row carrying a `CorrelationKey` and `DeliverSignalRequest` for a signal
+target — working from the subscription rows the bus already matched on event type plus correlation
+filter (one signal delivery per target process), not `RunEventRequest`.
 
 `FlowRunner` is a thin request constructor. `CompleteAsync(process, token, principal, ct)` resolves `IRequestDispatcher` and sends `CompleteActivityRequest`. The registered Flow handlers load a process, resolve an engine, run a transition, arm catch handlers, and persist the snapshot.
 
@@ -213,7 +242,7 @@ created.
   (parallel / inclusive / complex gateways, sub-processes, multi-instance loops, non-interrupting
   boundary events) at registration, so a definition that uses them fails fast at startup.
 - `SchemataProcess` implements `ISoftDelete`; the default query filter hides tombstoned
-  instances. Read them inside a `using (repository.SuppressQuerySoftDelete())` scope.
+  instances. Read them with `QueryOptions(IgnoreSoftDelete: true)` on the query.
 - `SchemataProcessToken.Bookkeeping` is an engine-private `Dictionary<string, int>` (loop
   counters, execution metadata) persisted as a JSON column through the provider dictionary
   conversion. Engines mutate it directly; application code must not.

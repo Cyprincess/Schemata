@@ -14,10 +14,17 @@ a terminal selection, and wraps the plan in a top-level `LimitNode` for request 
 4. Fold `JoinSpec` entries into `JoinNode` trees.
 5. Apply top-level transformations in request order.
 6. Build terminal `SelectionItem` entries from `SelectionSpec`.
-7. Return `LimitNode(selection, request.Skip, request.PageSize)`.
+7. Validate the complete public field contract, then return `LimitNode(selection, request.Skip, request.PageSize)`.
 
 Each node carries `SourceSet`, the aliases referenced by its subtree. `PlanExecutor` uses it to choose
 single-source driver execution or multi-source local execution.
+
+Repository sources explicitly bind an entity to a public query type and projection. The validator
+derives admitted fields from that public type, recursively excluding `JsonIgnore` members. It checks
+selection, filtering, ordering, joins, grouping, aggregation, computed aliases and nested pipelines
+before source execution. `PlanExecutor.ExecuteAsync` and `MaterializeAsync` validate direct plans too;
+disabling row-security enforcement never disables the public field contract. Language-owned
+`IExpressionReferenceProvider` analysis preserves references before lossy compiler lowering.
 
 ## SourceNode
 
@@ -196,7 +203,11 @@ language in this order:
 
 1. `InsightExpression.Language`
 2. `QueryInsightRequest.Language`
-3. `SchemataInsightOptions.DefaultLanguage`
+3. The first enabled language in `SchemataInsightOptions.Expressions.Languages`
+
+The requested language must be enabled in the module's `Expressions` profile. The profile and its
+per-language entries supply filtering-mode and residual-scan overrides through the shared
+`ExpressionLanguageResolver`.
 
 The resolved language must have a keyed `IExpressionCompiler`. Missing compilers throw
 `UNKNOWN_EXPRESSION_LANGUAGE` with metadata `language`. Parser failures from `ExpressionException` or
@@ -214,16 +225,66 @@ The resolved language must have a keyed `IExpressionCompiler`. Missing compilers
 Predicate slots compile to boolean tests. Value slots compile to scalar values and require a
 value-capable language descriptor.
 
+## Bounded execution and continuation
+
+The effective `MaxResidualScanRows` from `SchemataInsightOptions.Expressions` bounds residual
+execution and local materialization. Fully pushed repository queries have no residual scan cap.
+Repository residuals count every backend row before testing the predicate, including nonmatches.
+Local ordering, grouping and estimated-total materialization use the strictest cap of their local
+stage languages. A local join caps both the buffered input and the streamed input using its language's
+effective cap. These policies are resolved in `InsightLanguagePolicy.cs` and applied by
+`Execution/PlanExecutor.cs`, `Execution/LocalPipelineExecutor.cs` and `Drivers/RepositorySource.cs`.
+An overflowing scan reads at most the configured cap plus one row, then disposes the source enumerator
+and reports `INVALID_ARGUMENT` with reason `INSIGHT_SCAN_LIMIT_EXCEEDED`.
+
+Group keys compare public values structurally. Scalar type and value both participate; null, NUL
+strings, separator-containing strings and numeric/string values form distinct groups. Lists compare
+ordered members, byte arrays compare bytes, and string-keyed maps compare their entries independently
+of insertion order. Grouping uses equality as well as hashes, so hash collisions preserve distinct
+groups. These boundaries live in `Drivers/RepositorySource.cs` and `Execution/LocalPipelineExecutor.*`
+under `src/Schemata.Insight.Foundation/`.
+
+Insight continuation tokens use the shared `Schemata.Common.ProtectedContinuation` codec and an
+Insight-specific DataProtection purpose. The protected payload binds the ordered sources, joins,
+transformations, selections, language, normalized initial skip and page size, total-size mode and scan
+policy, together with caller identity. `ProtectedContinuationCaller` in
+`src/Schemata.Common/` captures the executing principal's default identity, authentication state and
+authentication type. An authenticated identity uses its nonblank name-identifier claim, then `sub`,
+then `Identity.Name`; the name fallback also binds its name-claim type. Anonymous identities share
+an anonymous binding regardless of their claims. The token and principal object are excluded from
+request serialization. Resuming requires the same query, caller and paging policy; changed bindings,
+tampered or truncated payloads and negative or overflowing offsets report `INVALID_ARGUMENT`.
+An authenticated identity with no usable identifier or name can execute a terminal query, but
+creating or resuming a continuation reports `INVALID_ARGUMENT` using the `INVALID_PAGE_TOKEN` message.
+
+`AddSchemataInsight` installs DataProtection. Configure the application's persistent key ring when
+pages must survive host restarts, and share that key ring and application discriminator across hosts
+that accept each other's continuations. `Execution/InsightPageToken.cs` owns the binding and offset
+checks; `Execution/PlanExecutor.cs` applies them before opening a source. Tokens are opaque: clients
+return the response's `next_page_token` unchanged in the next request.
+
+Tenancy's installed DataProtection decorator binds each protection operation to the current host or
+tenant purpose. Cross-tenant replay fails before a source opens and reports the same invalid-token
+error; Insight carries no tenant data in its payload. See [Tenancy protection boundaries](../tenancy.md#cache-data-protection-and-state-boundaries).
+
 ## Validation reasons
 
 | Reason                                  | Raised when                                                                                    |
 | --------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `UNKNOWN_SOURCE_NAME`                   | no catalog resolves a source name, or `RepositoryDriver` cannot resolve a resource collection  |
+| `UNKNOWN_SOURCE_NAME`                   | no catalog resolves a source name, or `RepositoryDriver` cannot resolve the binding name to a registered `RepositorySource` |
 | `UNKNOWN_EXPRESSION_LANGUAGE`           | no keyed `IExpressionCompiler` exists for the resolved language                                |
 | `INVALID_EXPRESSION`                    | expression parsing fails                                                                       |
 | `INVALID_ARGUMENT`                      | malformed source aliases, joins, selections, order syntax, page token, or transformation shape |
 | `UNIMPLEMENTED`                         | a requested plan shape has no implementation in the current phase                              |
 | `EXPRESSION_LANGUAGE_NOT_VALUE_CAPABLE` | a value expression uses a predicate-only language                                              |
+
+`InsightValidationException(reason, resourceKey, metadata, innerException)` carries canonical
+`Code`/`Status` and an `ErrorInfo` with the Insight reason, `schemata.insight` domain and structured
+metadata. The resource key supplies the invariant and localized message template; descriptions
+from expression failures remain in the inner diagnostic cause. HTTP and gRPC use the shared
+exception boundary. See [Transports](transports.md#dynamic-value-table) for schema-guided dynamic
+value encodings.
+
 
 ## See also
 
