@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Resource;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Common;
@@ -12,7 +13,7 @@ using Schemata.Common;
 namespace Schemata.Resource.Foundation.Advisors;
 
 /// <summary>
-///     Default order constants for <see cref="AdviceApplyChildParent{TEntity, TRequest}" />.
+///     Default order constants for <see cref="AdviceApplyChildParent{TEntity,TRequest,TDetail}" />.
 /// </summary>
 public static class AdviceApplyChildParent
 {
@@ -47,22 +48,24 @@ public static class AdviceApplyChildParent
 /// </remarks>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type; reverse-parsing fires only when it implements <see cref="IChild" />.</typeparam>
-public sealed class AdviceApplyChildParent<TEntity, TRequest> :
-    IResourceCreateAdvisor<TEntity, TRequest>,
-    IResourceUpdateAdvisor<TEntity, TRequest>
+/// <typeparam name="TDetail">The detail DTO type.</typeparam>
+public sealed class AdviceApplyChildParent<TEntity, TRequest, TDetail> :
+    IResourceUpdateAdvisor<TEntity, TRequest, TDetail>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
+    where TDetail : class, ICanonicalName
 {
     /// <inheritdoc cref="AdviceApplyChildParent" />
     public int Order => AdviceApplyChildParent.DefaultOrder;
 
-    #region IResourceCreateAdvisor<TEntity,TRequest> Members
+    #region IResourceUpdateAdvisor<TEntity,TRequest,TDetail> Members
 
     public Task<AdviseResult> AdviseAsync(
         AdviceContext     ctx,
         TRequest          request,
         TEntity           entity,
         ClaimsPrincipal?  principal,
+        HandledResponse<UpdateResultBase<TDetail>> handled,
         CancellationToken ct = default
     ) {
         Apply(request, entity);
@@ -71,12 +74,13 @@ public sealed class AdviceApplyChildParent<TEntity, TRequest> :
 
     #endregion
 
-    private static void Apply(TRequest request, TEntity entity) {
+    internal static void Apply(TRequest request, TEntity entity) {
         if (request is not IChild child) {
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(child.Parent)) {
+        var parent = child.Parent;
+        if (string.IsNullOrWhiteSpace(parent)) {
             return;
         }
 
@@ -85,14 +89,14 @@ public sealed class AdviceApplyChildParent<TEntity, TRequest> :
             return;
         }
 
-        foreach (var segment in child.Parent!.Split('/')) {
+        foreach (var segment in parent.Split('/')) {
             if (segment == "-") {
                 throw new ValidationException([
                     new() {
                         Field       = nameof(IChild.Parent).ToLowerInvariant(),
                         Description = LocalizedMessageFormatter.FormatInvariant(
                             SchemataResources.CROSS_PARENT_UNSUPPORTED,
-                            new Dictionary<string, string?> { ["parent"] = child.Parent }),
+                            new Dictionary<string, string?> { ["parent"] = parent }),
                         Reason      = SchemataResources.CROSS_PARENT_UNSUPPORTED,
                     },
                 ]);
@@ -101,7 +105,7 @@ public sealed class AdviceApplyChildParent<TEntity, TRequest> :
 
         // ParseCanonicalName expects a full canonical (parent + leaf); a sentinel leaf
         // satisfies the pattern matcher without leaking into the entity.
-        var sentinel = $"{child.Parent}/{descriptor.Collection}/_";
+        var sentinel = $"{parent}/{descriptor.Collection}/_";
         var parsed   = descriptor.ParseCanonicalName(sentinel);
         if (parsed is null) {
             throw new ValidationException([
@@ -109,7 +113,7 @@ public sealed class AdviceApplyChildParent<TEntity, TRequest> :
                     Field       = nameof(IChild.Parent).ToLowerInvariant(),
                     Description = LocalizedMessageFormatter.FormatInvariant(
                         SchemataResources.INVALID_PARENT,
-                        new Dictionary<string, string?> { ["parent"] = child.Parent }),
+                        new Dictionary<string, string?> { ["parent"] = parent }),
                     Reason      = SchemataResources.INVALID_PARENT,
                 },
             ]);

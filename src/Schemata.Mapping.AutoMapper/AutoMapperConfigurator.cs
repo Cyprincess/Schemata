@@ -26,8 +26,12 @@ public static class AutoMapperConfigurator
     ) {
         var method = typeof(AutoMapperConfigurator).GetMethod(nameof(Map),
                                                               BindingFlags.Static | BindingFlags.NonPublic);
+        if (method is null) {
+            throw new MissingMethodException(typeof(AutoMapperConfigurator).FullName, nameof(Map));
+        }
+
         foreach (var group in options.Mappings.GroupBy(m => (m.SourceType, m.DestinationType))) {
-            var invoke = method!.MakeGenericMethod(group.Key.SourceType, group.Key.DestinationType);
+            var invoke = method.MakeGenericMethod(group.Key.SourceType, group.Key.DestinationType);
             invoke.Invoke(null, [config, group]);
         }
 

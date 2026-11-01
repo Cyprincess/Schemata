@@ -22,8 +22,12 @@ public static class MapsterConfigurator
     /// <returns>The configuration for chaining.</returns>
     public static TypeAdapterConfig Configure(TypeAdapterConfig config, SchemataMappingOptions options) {
         var method = typeof(MapsterConfigurator).GetMethod(nameof(Map), BindingFlags.Static | BindingFlags.NonPublic);
+        if (method is null) {
+            throw new MissingMethodException(typeof(MapsterConfigurator).FullName, nameof(Map));
+        }
+
         foreach (var group in options.Mappings.GroupBy(m => (m.SourceType, m.DestinationType))) {
-            var invoke = method!.MakeGenericMethod(group.Key.SourceType, group.Key.DestinationType);
+            var invoke = method.MakeGenericMethod(group.Key.SourceType, group.Key.DestinationType);
             invoke.Invoke(null, [config, group]);
         }
 

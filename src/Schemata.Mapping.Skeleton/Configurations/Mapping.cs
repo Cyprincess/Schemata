@@ -14,6 +14,8 @@ public sealed class Mapping<TSource, TDestination> : IMapping
     internal Mapping(Map<TSource, TDestination> map) { Map = map; }
 
     internal Mapping(Map<TSource, TDestination> map, Expression<Func<TDestination, object?>> destinationField) {
+        ArgumentNullException.ThrowIfNull(destinationField);
+
         Map              = map;
         DestinationField = destinationField;
     }
@@ -42,7 +44,8 @@ public sealed class Mapping<TSource, TDestination> : IMapping
 
     public bool HasSourceField => SourceField is not null;
 
-    public string DestinationFieldName => DestinationField!.ToString();
+    public string DestinationFieldName => DestinationField?.ToString()
+        ?? throw new InvalidOperationException("Converter-only mappings do not have a destination field.");
 
     public void Invoke(Action<Expression?, Expression?, Expression?, Expression?, bool> action) {
         action.Invoke(WithExpression, DestinationField, SourceField, IgnoreCondition, IsIgnored);

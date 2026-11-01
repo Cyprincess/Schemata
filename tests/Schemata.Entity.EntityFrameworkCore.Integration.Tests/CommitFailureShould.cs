@@ -5,6 +5,7 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.EntityFrameworkCore.Integration.Tests.Fixtures;
 using Schemata.Entity.Repository.Advisors;
 using Xunit;
+using Schemata.Entity.Repository;
 
 namespace Schemata.Entity.EntityFrameworkCore.Integration.Tests;
 
@@ -28,17 +29,17 @@ public class CommitFailureShould : IAsyncLifetime
         {
             var (repository, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
-                // Suppress the optimistic pre-check so the duplicate primary key reaches the database;
+                // Bypass the optimistic pre-check so the duplicate primary key reaches the database;
                 // EF Core buffers the insert and the collision surfaces at commit time.
-                using (repository.AdviceContext.Use<UniquenessSuppressed>()) {
-                    await repository.AddAsync(new() {
-                                                  Uid      = existing,
-                                                  FullName = "duplicate",
-                                                  Name     = "duplicate",
-                                                  Age      = 1,
-                                                  Grade    = 1,
-                                              });
-                }
+                await repository.AddAsync(new() {
+                                              Uid      = existing,
+                                              FullName = "duplicate",
+                                              Name     = "duplicate",
+                                              Age      = 1,
+                                              Grade    = 1,
+                                          },
+                                          default,
+                                          new MutationOptions(IgnoreUniqueness: true));
 
                 await Assert.ThrowsAsync<AlreadyExistsException>(() => repository.CommitAsync());
             }

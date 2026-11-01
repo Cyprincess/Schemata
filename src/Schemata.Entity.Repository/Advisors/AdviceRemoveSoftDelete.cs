@@ -24,7 +24,7 @@ public static class AdviceRemoveSoftDelete
 /// <remarks>
 ///     Runs last in the remove pipeline. Returns <see cref="AdviseResult.Handle" /> to prevent
 ///     the physical delete. Only activates for entities implementing <see cref="ISoftDelete" />.
-///     Suppressed by <see cref="SoftDeleteSuppressed" />.
+///     Skipped when the call passes <see cref="MutationOptions.IgnoreSoftDelete" />.
 /// </remarks>
 public sealed class AdviceRemoveSoftDelete<TEntity>(TimeProvider? time = null) : IRepositoryRemoveAdvisor<TEntity>
     where TEntity : class
@@ -39,9 +39,10 @@ public sealed class AdviceRemoveSoftDelete<TEntity>(TimeProvider? time = null) :
         AdviceContext        ctx,
         IRepository<TEntity> repository,
         TEntity              entity,
+        MutationOptions      options,
         CancellationToken    ct
     ) {
-        if (ctx.Has<SoftDeleteSuppressed>()) {
+        if (options.IgnoreSoftDelete) {
             return AdviseResult.Continue;
         }
 
@@ -52,7 +53,7 @@ public sealed class AdviceRemoveSoftDelete<TEntity>(TimeProvider? time = null) :
         trash.DeleteTime = _time.GetUtcNow().UtcDateTime;
 
         // Persist as an update so the row is retained.
-        await repository.UpdateAsync(entity, ct);
+        await repository.UpdateAsync(entity, ct, options);
 
         // Handle signals the pipeline that the remove has been handled;
         // the provider skips the physical delete.

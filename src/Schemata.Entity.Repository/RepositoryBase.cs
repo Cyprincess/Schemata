@@ -15,6 +15,7 @@ using Schemata.Abstractions.Entities;
 using Schemata.Advice;
 using Schemata.Common;
 using Schemata.Entity.Repository.Advisors;
+using Schemata.Entity.Repository.Conversions;
 
 namespace Schemata.Entity.Repository;
 
@@ -120,16 +121,23 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     ///     the concrete entity property; the attribute on the interface alone does not propagate.
     /// </summary>
     protected static readonly bool IsConcurrencyControlled = typeof(IConcurrency).IsAssignableFrom(typeof(TEntity))
-                                                          && typeof(TEntity).GetProperty(nameof(IConcurrency.Timestamp))?.GetCustomAttribute<ConcurrencyCheckAttribute>(true) is not null;
+                                                          && AppDomainTypeCache.GetProperty(typeof(TEntity), nameof(IConcurrency.Timestamp))?.GetCustomAttribute<ConcurrencyCheckAttribute>(true) is not null;
 
-    private readonly List<TEntity> _added   = [];
-    private readonly List<TEntity> _removed = [];
-    private readonly List<TEntity> _updated = [];
+    // Instance-level monotonic write sequence; advances only after the provider successfully stages
+    // or executes a write. _enlistmentStart re-baselines at every enlistment so a per-call delta
+    // yields the MutationResult and the join guard reads a scalar fact instead of entity lists.
+    private long _writeSequence;
+    private long _enlistmentStart;
 
     private bool _completed;
     private bool _disposed;
 
+    // The scope of the current enlistment; its sinks read the cache-eviction request when that one
+    // enlistment completes, so a request never reaches a later commit.
+    private CommitScope? _commitScope;
+
     private IUnitOfWork? _uow;
+    private IUnitOfWork? _writeUnitOfWork;
 
     /// <summary>
     ///     Initializes repository base state with the service provider and a new advice context.
@@ -152,13 +160,15 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
     public virtual AdviceContext AdviceContext { get; }
 
-    internal bool HasOpenWriteUnitOfWork => !_completed && (_uow is not null || _added.Count > 0 || _updated.Count > 0 || _removed.Count > 0);
+    internal bool HasOpenWriteUnitOfWork => !_disposed && !_completed && _writeUnitOfWork is not null;
 
     public virtual async IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        [EnumeratorCancellation] CancellationToken      ct = default
+        [EnumeratorCancellation] CancellationToken      ct      = default,
+        QueryOptions                                    options = default
     ) {
-        var query = await BuildQueryAsync(predicate, ct);
+        TrackEvictionSuppression(options.IgnoreCacheEviction);
+        var query = await BuildQueryAsync(predicate, ct, options);
 
         var enumerable = AsAsyncEnumerable(query, ct);
 
@@ -168,11 +178,11 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         }
     }
 
-    public virtual ValueTask<TEntity?> GetAsync(TEntity? entity, CancellationToken ct = default) {
-        return GetAsync<TEntity>(entity, ct);
+    public virtual ValueTask<TEntity?> GetAsync(TEntity? entity, CancellationToken ct = default, QueryOptions options = default) {
+        return GetAsync<TEntity>(entity, ct, options);
     }
 
-    public virtual ValueTask<TResult?> GetAsync<TResult>(TEntity? entity, CancellationToken ct = default) {
+    public virtual ValueTask<TResult?> GetAsync<TResult>(TEntity? entity, CancellationToken ct = default, QueryOptions options = default) {
         if (entity is null) {
             return ValueTask.FromResult(default(TResult));
         }
@@ -194,14 +204,53 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
             keys.Add(value);
         }
 
-        return FindAsync<TResult>([.. keys], ct);
+        return FindAsync<TResult>([.. keys], ct, options);
     }
 
-    public virtual ValueTask<TEntity?> FindAsync(object[] keys, CancellationToken ct = default) {
-        return FindAsync<TEntity>(keys, ct);
+    public virtual async ValueTask<OriginalResult<TResult>> GetOriginalAsync<TResult>(
+        TEntity entity,
+        Expression<Func<TEntity, TResult>> projection,
+        CancellationToken ct = default,
+        QueryOptions options = default
+    ) {
+        ValidateOriginalProjection(projection);
+        TrackEvictionSuppression(options.IgnoreCacheEviction);
+        var keys = OriginalKeyPredicate(entity);
+        var query = await BuildQueryAsync(q => q.Where(keys).Select(projection)
+            .Select(value => new OriginalResult<TResult>(true, value)), ct, options);
+        return await SingleOrDefaultAsync(query, ct);
     }
 
-    public virtual async ValueTask<TResult?> FindAsync<TResult>(object[] keys, CancellationToken ct = default) {
+    protected static Expression<Func<TEntity, bool>> OriginalKeyPredicate(TEntity entity) {
+        var properties = KeyPropertiesCache(typeof(TEntity));
+        if (properties.Count == 0) {
+            throw new ArgumentException(SchemataResources.GetResourceString(SchemataResources.TABLE_KEY_REQUIRED));
+        }
+        var parameter = Expression.Parameter(typeof(TEntity), "entity");
+        var predicate = properties
+            .Select<PropertyInfo, Expression>(property => Expression.Equal(Expression.Property(parameter, property),
+                Expression.Constant(property.GetValue(entity), property.PropertyType)))
+            .Aggregate(Expression.AndAlso);
+        return Expression.Lambda<Func<TEntity, bool>>(predicate, parameter);
+    }
+
+    protected static void ValidateOriginalProjection<TResult>(Expression<Func<TEntity, TResult>> projection) {
+        if (projection.Body is not MemberExpression { Member: PropertyInfo property } member
+         || member.Expression != projection.Parameters[0]
+         || property.DeclaringType?.IsInterface != false
+         || property.GetMethod is not { IsPublic: true, IsStatic: false }
+         || property.SetMethod is null || property.GetIndexParameters().Length != 0
+         || property.HasCustomAttribute<NotMappedAttribute>(false)
+         || !JsonColumnTypes.IsScalar(Nullable.GetUnderlyingType(typeof(TResult)) ?? typeof(TResult))) {
+            throw new ArgumentException("An original query requires a direct mapped scalar property projection.", nameof(projection));
+        }
+    }
+
+    public virtual ValueTask<TEntity?> FindAsync(object[] keys, CancellationToken ct = default, QueryOptions options = default) {
+        return FindAsync<TEntity>(keys, ct, options);
+    }
+
+    public virtual async ValueTask<TResult?> FindAsync<TResult>(object[] keys, CancellationToken ct = default, QueryOptions options = default) {
         ct.ThrowIfCancellationRequested();
 
         var type = typeof(TEntity);
@@ -222,7 +271,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         for (var i = 0; i < properties.Count; i++) {
             var info     = properties[i];
             var property = Expression.Property(instance, info);
-            var value    = Expression.Constant(keys[i]);
+            var value    = Expression.Constant(keys[i], property.Type);
             var equality = Expression.Equal(property, value);
 
             var lambda = Expression.Lambda<Func<TEntity, bool>>(equality, instance);
@@ -230,16 +279,18 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
             predicate = predicate.And(lambda);
         }
 
-        return await SingleOrDefaultAsync<TResult>(q => q.Where(predicate).OfType<TResult>(), ct);
+        return await SingleOrDefaultAsync<TResult>(q => q.Where(predicate).OfType<TResult>(), ct, options);
     }
 
     public virtual async ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
+        CancellationToken                               ct      = default,
+        QueryOptions                                    options = default
     ) {
-        var query = await BuildQueryAsync(predicate, ct);
+        TrackEvictionSuppression(options.IgnoreCacheEviction);
+        var query = await BuildQueryAsync(predicate, ct, options);
 
-        var context = new QueryContext<TEntity, TResult, TResult>(this, query);
+        var context = new QueryContext<TEntity, TResult, TResult>(this, QueryOperation.FirstOrDefault, query, options);
 
         switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, TResult>>()
                              .RunAsync(AdviceContext, context, ct)) {
@@ -269,11 +320,13 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
     public virtual async ValueTask<TResult?> SingleOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
+        CancellationToken                               ct      = default,
+        QueryOptions                                    options = default
     ) {
-        var query = await BuildQueryAsync(predicate, ct);
+        TrackEvictionSuppression(options.IgnoreCacheEviction);
+        var query = await BuildQueryAsync(predicate, ct, options);
 
-        var context = new QueryContext<TEntity, TResult, TResult>(this, query);
+        var context = new QueryContext<TEntity, TResult, TResult>(this, QueryOperation.SingleOrDefault, query, options);
 
         switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, TResult>>()
                              .RunAsync(AdviceContext, context, ct)) {
@@ -303,11 +356,13 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
     public virtual async ValueTask<bool> AnyAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
+        CancellationToken                               ct      = default,
+        QueryOptions                                    options = default
     ) {
-        var query = await BuildQueryAsync(predicate, ct);
+        TrackEvictionSuppression(options.IgnoreCacheEviction);
+        var query = await BuildQueryAsync(predicate, ct, options);
 
-        var context = new QueryContext<TEntity, TResult, bool>(this, query);
+        var context = new QueryContext<TEntity, TResult, bool>(this, QueryOperation.Any, query, options);
 
         switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, bool>>()
                              .RunAsync(AdviceContext, context, ct)) {
@@ -337,11 +392,13 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
     public virtual async ValueTask<int> CountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
+        CancellationToken                               ct      = default,
+        QueryOptions                                    options = default
     ) {
-        var query = await BuildQueryAsync(predicate, ct);
+        TrackEvictionSuppression(options.IgnoreCacheEviction);
+        var query = await BuildQueryAsync(predicate, ct, options);
 
-        var context = new QueryContext<TEntity, TResult, int>(this, query);
+        var context = new QueryContext<TEntity, TResult, int>(this, QueryOperation.Count, query, options);
 
         switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, int>>()
                              .RunAsync(AdviceContext, context, ct)) {
@@ -371,11 +428,13 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
     public virtual async ValueTask<long> LongCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
+        CancellationToken                               ct      = default,
+        QueryOptions                                    options = default
     ) {
-        var query = await BuildQueryAsync(predicate, ct);
+        TrackEvictionSuppression(options.IgnoreCacheEviction);
+        var query = await BuildQueryAsync(predicate, ct, options);
 
-        var context = new QueryContext<TEntity, TResult, long>(this, query);
+        var context = new QueryContext<TEntity, TResult, long>(this, QueryOperation.LongCount, query, options);
 
         switch (await Advisor.For<IRepositoryQueryAdvisor<TEntity, TResult, long>>()
                              .RunAsync(AdviceContext, context, ct)) {
@@ -403,30 +462,33 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return context.Result;
     }
 
-    public virtual ValueTask<long> EstimateCountAsync<TResult>(
+    public virtual ValueTask<long?> EstimateCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
+        CancellationToken                               ct      = default,
+        QueryOptions                                    options = default
     ) {
-        return LongCountAsync(predicate, ct);
+        ct.ThrowIfCancellationRequested();
+        TrackEvictionSuppression(options.IgnoreCacheEviction);
+        return ValueTask.FromResult<long?>(null);
     }
 
-    public abstract Task AddAsync(TEntity entity, CancellationToken ct = default);
+    public abstract Task<MutationResult> AddAsync(TEntity entity, CancellationToken ct = default, MutationOptions options = default);
 
-    public virtual async Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default) {
+    public virtual async Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default, MutationOptions options = default) {
         foreach (var entity in entities) {
             ct.ThrowIfCancellationRequested();
-            await AddAsync(entity, ct);
+            await AddAsync(entity, ct, options);
         }
     }
 
-    public abstract Task UpdateAsync(TEntity entity, CancellationToken ct = default);
+    public abstract Task<MutationResult> UpdateAsync(TEntity entity, CancellationToken ct = default, MutationOptions options = default);
 
-    public abstract Task RemoveAsync(TEntity entity, CancellationToken ct = default);
+    public abstract Task<MutationResult> RemoveAsync(TEntity entity, CancellationToken ct = default, MutationOptions options = default);
 
-    public virtual async Task RemoveRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default) {
+    public virtual async Task RemoveRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default, MutationOptions options = default) {
         foreach (var entity in entities) {
             ct.ThrowIfCancellationRequested();
-            await RemoveAsync(entity, ct);
+            await RemoveAsync(entity, ct, options);
         }
     }
 
@@ -445,17 +507,9 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
             throw new InvalidOperationException("Repository is enlisted in a unit of work. Call IUnitOfWork.CommitAsync instead.");
         }
 
-        // Owned but never mutated: a degenerate commit. Dispatch the empty snapshot so committed
-        // advisors observe the no-op commit on the same footing as the enlisted path.
-        await DispatchCommittedAsync(SnapshotChanges(), ct);
+        // Owned but never mutated: a degenerate commit sends no committed notification.
         Reopen();
     }
-
-    public virtual IDisposable SuppressAddValidation()    { return AdviceContext.Use<AddValidationSuppressed>(); }
-    public virtual IDisposable SuppressUpdateValidation() { return AdviceContext.Use<UpdateValidationSuppressed>(); }
-    public virtual IDisposable SuppressQuerySoftDelete()  { return AdviceContext.Use<QuerySoftDeleteSuppressed>(); }
-    public virtual IDisposable SuppressSoftDelete()       { return AdviceContext.Use<SoftDeleteSuppressed>(); }
-    public virtual IDisposable SuppressTimestamp()        { return AdviceContext.Use<TimestampSuppressed>(); }
 
     public virtual IUnitOfWork Begin() {
         var uow = CreateUnitOfWork();
@@ -465,13 +519,16 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         return uow;
     }
 
+
+
     public virtual void Join(IUnitOfWork uow) {
         ArgumentNullException.ThrowIfNull(uow);
+        if (ReferenceEquals(_writeUnitOfWork, uow) && !_completed) return;
         if (!OwnsContext) {
             throw new InvalidOperationException("Repository is already enlisted in a unit of work.");
         }
 
-        if (_added.Count > 0 || _updated.Count > 0 || _removed.Count > 0) {
+        if (_writeSequence != _enlistmentStart) {
             throw new InvalidOperationException("Cannot enlist a repository with uncommitted work. "
                                               + "Call CommitAsync before Join, or resolve a fresh IRepository<T> instance.");
         }
@@ -492,10 +549,6 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
             DisposeContext();
         }
 
-        _added.Clear();
-        _updated.Clear();
-        _removed.Clear();
-
         GC.SuppressFinalize(this);
     }
 
@@ -508,10 +561,6 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         } else if (OwnsContext) {
             await DisposeContextAsync();
         }
-
-        _added.Clear();
-        _updated.Clear();
-        _removed.Clear();
 
         GC.SuppressFinalize(this);
     }
@@ -576,44 +625,59 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     protected abstract Task<long> LongCountAsync<TResult>(IQueryable<TResult> query, CancellationToken ct);
 
     /// <summary>
-    ///     Captures the current add/update/remove tracking lists into a snapshot and then clears
-    ///     them so the next commit starts with empty lists.
+    ///     The instance-level monotonic write sequence. Providers compare it around a call to
+    ///     produce the per-call <see cref="MutationResult" />.
     /// </summary>
-    protected CommitChanges<TEntity> SnapshotChanges() {
-        var snapshot = new CommitChanges<TEntity> {
-            Added = [.. _added], Updated = [.. _updated], Removed = [.. _removed],
-        };
+    protected long WriteSequence => _writeSequence;
 
-        _added.Clear();
-        _updated.Clear();
-        _removed.Clear();
+    /// <summary>
+    ///     Records a successfully staged or executed provider write: advances the write sequence. The
+    ///     per-enlistment commit sink registered by <see cref="Join" />/<c>EnsureWriteUnitOfWork</c>
+    ///     reads the sequence delta to decide whether the type-level committed notification runs.
+    /// </summary>
+    protected void StageWrite() { _writeSequence++; }
 
-        return snapshot;
+    /// <summary>
+    ///     Resolves the per-call result from the write-sequence delta since <paramref name="mark" />.
+    ///     A no-write <see cref="AdviseResult.Handle" /> yields <see cref="MutationResult.NoWrite" />;
+    ///     a handled operation whose advisors staged a nested write on this repository (e.g.
+    ///     soft-delete) yields <see cref="MutationResult.Applied" />; blocking after a staged write
+    ///     is a contract violation and throws.
+    /// </summary>
+    protected MutationResult ResolveWriteResult(long mark, AdviseResult result) {
+        if (_writeSequence == mark) {
+            return MutationResult.NoWrite;
+        }
+
+        if (result == AdviseResult.Block) {
+            throw new InvalidOperationException("An advisor blocked the write after staging changes. Return AdviseResult.Handle for writes that intentionally replace staging.");
+        }
+
+        return MutationResult.Applied;
     }
 
     /// <summary>
-    ///     Runs the <see cref="IRepositoryCommittedAdvisor{TEntity}" /> pipeline against the
-    ///     given change snapshot.
+    ///     Completes the repository's enlistment after the unit of work commits. The type-level
+    ///     <see cref="IRepositoryCommittedAdvisor{TEntity}" /> pipeline runs only when this
+    ///     enlistment staged at least one write; a pure-read or fully handled enlistment completes
+    ///     without notifying.
     /// </summary>
-    protected async Task DispatchCommittedAsync(CommitChanges<TEntity> changes, CancellationToken ct) {
+    private async Task DispatchCommittedAsync(CommitScope scope, CancellationToken ct) {
+        _completed = true;
+
+        var ignoreCacheEviction = scope.IgnoreCacheEviction;
+        scope.IgnoreCacheEviction = false;
+        if (ReferenceEquals(_commitScope, scope)) {
+            _commitScope = null;
+        }
+
+        if (_writeSequence == _enlistmentStart) {
+            return;
+        }
+
         await Advisor.For<IRepositoryCommittedAdvisor<TEntity>>()
-                     .RunAsync(AdviceContext, this, changes, ct);
+                     .RunAsync(AdviceContext, this, new MutationOptions(IgnoreCacheEviction: ignoreCacheEviction), ct);
     }
-
-    /// <summary>
-    ///     Clears the add/update/remove tracking lists during rollback.
-    /// </summary>
-    protected void ResetTracking() {
-        _added.Clear();
-        _updated.Clear();
-        _removed.Clear();
-    }
-
-    /// <summary>
-    ///     Rollback callback enlisted with the unit of work. Discards the pending change snapshot
-    ///     so a rolled-back commit does not replay its tracking on a later commit.
-    /// </summary>
-    protected virtual void OnRollback() { ResetTracking(); }
 
     /// <summary>
     ///     Ensures the repository writes through a unit of work before its first standalone
@@ -641,22 +705,34 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     ///     and the next write replaces it with a fresh unit-of-work context.
     /// </summary>
     private void Reopen() {
-        _uow        = null;
-        _completed  = false;
-        OwnsContext = true;
-        ResetTracking();
+        _uow             = null;
+        _writeUnitOfWork = null;
+        _enlistmentStart = _writeSequence;
+        _completed       = false;
+        _commitScope     = null;
+        OwnsContext      = true;
     }
 
     private void Enlist(IUnitOfWork uow) {
         AttachContext(uow);
+        _writeUnitOfWork = uow;
+        _enlistmentStart = _writeSequence;
 
-        uow.AddCommitSink(ct => {
-            _completed = true;
-            return DispatchCommittedAsync(SnapshotChanges(), ct);
-        });
+        // One scope per enlistment: the sinks registered below read the request this enlistment
+        // collected, and clearing it on completion keeps a later commit unaffected.
+        var scope = new CommitScope();
+        _commitScope = scope;
+
+        // Enlistment completion is registered independently of any staged write: a pure-read or
+        // fully handled enlistment must still observe the outer commit and complete, while the
+        // type-level notification stays gated on the write-sequence delta inside the sink.
+        uow.AddCommitSink(CommitOrders.Repository, ct => DispatchCommittedAsync(scope, ct));
         uow.AddRollbackSink(() => {
-            OnRollback();
             _completed = true;
+            scope.IgnoreCacheEviction = false;
+            if (ReferenceEquals(_commitScope, scope)) {
+                _commitScope = null;
+            }
         });
 
         OwnsContext = false;
@@ -664,48 +740,31 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
 
     /// <summary>
     ///     Runs the <see cref="IRepositoryAddAdvisor{TEntity}" /> chain for a single entity and
-    ///     stages it for the committed-advisor snapshot. Returns <see langword="false" /> when an
-    ///     advisor blocked or handled the add, so callers skip persistence.
+    ///     returns its advise result, so callers skip persistence unless the chain continues.
     /// </summary>
-    protected async Task<bool> RunAddAdvisorsAsync(TEntity entity, CancellationToken ct) {
-        switch (await Advisor.For<IRepositoryAddAdvisor<TEntity>>()
-                             .RunAsync(AdviceContext, this, entity, ct)) {
-            case AdviseResult.Block:
-            case AdviseResult.Handle:
-                return false;
-            case AdviseResult.Continue:
-            default:
-                break;
-        }
-
-        TrackAdd(entity);
-
-        return true;
+    protected async Task<AdviseResult> RunAddAdvisorsAsync(TEntity entity, MutationOptions options, CancellationToken ct) {
+        return await Advisor.For<IRepositoryAddAdvisor<TEntity>>()
+                            .RunAsync(AdviceContext, this, entity, options, ct);
     }
-
-    /// <summary>
-    ///     Stages an added entity for the committed-advisor snapshot.
-    /// </summary>
-    /// <param name="entity">The added entity.</param>
-    protected void TrackAdd(TEntity entity) { _added.Add(entity); }
-
-    /// <summary>
-    ///     Stages an updated entity for the committed-advisor snapshot.
-    /// </summary>
-    /// <param name="entity">The updated entity.</param>
-    protected void TrackUpdate(TEntity entity) { _updated.Add(entity); }
-
-    /// <summary>
-    ///     Stages a removed entity for the committed-advisor snapshot.
-    /// </summary>
-    /// <param name="entity">The removed entity.</param>
-    protected void TrackRemove(TEntity entity) { _removed.Add(entity); }
 
     /// <summary>
     ///     Returns the provider query root for <typeparamref name="TEntity" />.
     /// </summary>
     /// <returns>The provider queryable for the entity set.</returns>
     protected abstract IQueryable<TEntity> AsQueryable();
+
+    /// <summary>
+    ///     Records the caller's cache-eviction suppression on the current enlistment. A read
+    ///     contributes to work already in progress; a write tracks after enlisting, so its request
+    ///     reaches the unit of work that write opens. With no enlistment there is no commit to
+    ///     suppress.
+    /// </summary>
+    /// <param name="ignore">Whether the operation requested eviction suppression.</param>
+    protected void TrackEvictionSuppression(bool ignore) {
+        if (ignore) {
+            _commitScope?.IgnoreCacheEviction = true;
+        }
+    }
 
     /// <summary>
     ///     Creates the provider's unit of work for this repository's context. Used by
@@ -732,14 +791,30 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     /// <typeparam name="TResult">The projected result type.</typeparam>
     /// <param name="predicate">An optional query transformation.</param>
     /// <param name="ct">A cancellation token.</param>
+    /// <param name="options">Per-call query behavior overrides.</param>
     /// <returns>The built queryable.</returns>
     protected async Task<IQueryable<TResult>> BuildQueryAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct
+        CancellationToken                               ct,
+        QueryOptions                                    options = default
+    ) {
+        return await BuildQueryAsync(null, predicate, ct, options);
+    }
+
+    protected async Task<IQueryable<TResult>> BuildQueryAsync<TResult>(
+        QueryContainer<TEntity>? container,
+        Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
+        CancellationToken ct,
+        QueryOptions options = default
     ) {
         ct.ThrowIfCancellationRequested();
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
-        var container = AsQueryContainer();
+        if (_completed) {
+            throw new InvalidOperationException("Repository's unit of work has already completed. Resolve a fresh IRepository<T> to start new work.");
+        }
+
+        container ??= AsQueryContainer(options);
 
         switch (await Advisor.For<IRepositoryBuildQueryAdvisor<TEntity>>()
                              .RunAsync(AdviceContext, container, ct)) {
@@ -748,7 +823,6 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
             default:
                 break;
             case AdviseResult.Block:
-                container = AsQueryContainer();
                 container.ApplyModification(q => q.Where(_ => false));
                 break;
         }
@@ -759,11 +833,12 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     /// <summary>
     ///     Creates a query container from the provider query root.
     /// </summary>
+    /// <param name="options">Per-call query behavior overrides.</param>
     /// <returns>A query container for the current repository.</returns>
-    protected virtual QueryContainer<TEntity> AsQueryContainer() {
+    protected virtual QueryContainer<TEntity> AsQueryContainer(QueryOptions options) {
         var query = AsQueryable();
 
-        var container = new QueryContainer<TEntity>(this, query);
+        var container = new QueryContainer<TEntity>(this, query, options);
 
         return container;
     }
@@ -799,4 +874,17 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         DisposeContext();
         return ValueTask.CompletedTask;
     }
+
+    #region Nested type: CommitScope
+
+    /// <summary>
+    ///     Carries the cache-eviction request of exactly one enlistment from the operations inside
+    ///     that enlistment to its commit and rollback sinks.
+    /// </summary>
+    private sealed class CommitScope
+    {
+        public bool IgnoreCacheEviction { get; set; }
+    }
+
+    #endregion
 }

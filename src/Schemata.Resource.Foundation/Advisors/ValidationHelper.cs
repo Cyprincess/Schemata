@@ -5,41 +5,28 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
-using Schemata.Abstractions.Resource;
 using Schemata.Advice;
 using Schemata.Validation.Skeleton.Advisors;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
 /// <summary>
-///     Shared request validation execution for create and update advisors.
+///     Shared request validation execution for create and update advisors. The
+///     <c>ValidateOnly</c> dry-run termination is a separate pipeline stage installed alongside.
 /// </summary>
 internal static class ValidationHelper
 {
     /// <summary>
     ///     Runs all registered <see cref="IValidationAdvisor{TRequest}" /> implementations against the request.
-    ///     Supports <c>ValidateOnly</c> dry-runs and per-operation suppression via the
-    ///     <paramref name="suppressed" /> flag. On validation failure, throws
-    ///     <see cref="ValidationException" /> with the collected errors.
+    ///     On validation failure, throws <see cref="ValidationException" /> with the collected errors.
     /// </summary>
     public static async Task<AdviseResult> ValidateAsync<TRequest>(
         AdviceContext     ctx,
         TRequest          request,
         Operations        operation,
-        bool              suppressed,
         CancellationToken ct = default
     )
         where TRequest : class {
-        var only = request is IValidation { ValidateOnly: true };
-
-        if (suppressed) {
-            if (only) {
-                throw new NoContentException();
-            }
-
-            return AdviseResult.Continue;
-        }
-
         var errors = new List<ErrorFieldViolation>();
         switch (await Advisor.For<IValidationAdvisor<TRequest>>()
                              .RunAsync(ctx, operation, request, errors, ct)) {
@@ -49,10 +36,6 @@ internal static class ValidationHelper
             case AdviseResult.Continue:
             default:
                 break;
-        }
-
-        if (only) {
-            throw new NoContentException();
         }
 
         return AdviseResult.Continue;

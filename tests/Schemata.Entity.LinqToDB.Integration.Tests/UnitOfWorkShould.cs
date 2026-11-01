@@ -1,6 +1,10 @@
 using System;
+using System.Data.Common;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using LinqToDB;
+using LinqToDB.Data;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Entity.LinqToDB.Integration.Tests.Fixtures;
 using Schemata.Entity.Repository;
@@ -20,6 +24,51 @@ public class UnitOfWorkShould : IAsyncLifetime
     public Task DisposeAsync() { return _fixture.DisposeAsync(); }
 
     #endregion
+
+    [Trait("Layer", "Integration")]
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ShareWriteTransaction_UsesOwnerCommitOrRollback(bool commit) {
+        var (students, courses, _, scope) = _fixture.CreateScopeWithUoW();
+        using (scope) {
+            await using var transaction = students.Begin();
+            courses.Join(transaction);
+            courses.Join(transaction);
+            await students.AddAsync(new() { Uid = Guid.NewGuid(), Name = "shared-owner", FullName = "Owner", Age = 20, Grade = 1 });
+            await courses.AddAsync(new() { Uid = Guid.NewGuid(), Name = "shared-child", Title = "Child", Credits = 3 });
+            await Assert.ThrowsAsync<InvalidOperationException>(() => courses.CommitAsync());
+            if (commit) await transaction.CommitAsync();
+            else await transaction.RollbackAsync();
+        }
+
+        var (verifyStudents, studentScope) = _fixture.CreateScopeWithRepository();
+        using (studentScope) {
+            Assert.Equal(commit ? 1 : 0, await verifyStudents.CountAsync(q => q.Where(s => s.Name == "shared-owner")));
+        }
+        var (verifyCourses, courseScope) = _fixture.CreateScopeWithCourseRepository();
+        using (courseScope) {
+            Assert.Equal(commit ? 1 : 0, await verifyCourses.CountAsync(q => q.Where(c => c.Name == "shared-child")));
+        }
+    }
+
+    [Trait("Layer", "Integration")]
+    [Fact]
+    public async Task Begin_PreservesExternalCommitOwnership() {
+        var (students, courses, transaction, scope) = _fixture.CreateScopeWithUoW();
+        using (scope) {
+            students.Join(transaction);
+            courses.Join(transaction);
+            await courses.AddAsync(new() { Uid = Guid.NewGuid(), Name = "external-child", Title = "External", Credits = 2 });
+            await Assert.ThrowsAsync<InvalidOperationException>(() => students.CommitAsync());
+            await transaction.RollbackAsync();
+            Assert.Throws<InvalidOperationException>(() => students.Begin());
+        }
+        var (verify, verifyScope) = _fixture.CreateScopeWithCourseRepository();
+        using (verifyScope) {
+            Assert.Equal(0, await verify.CountAsync(q => q.Where(c => c.Name == "external-child")));
+        }
+    }
 
     [Fact]
     public async Task CommitAsync_CommitsMultipleOperations() {
@@ -295,6 +344,223 @@ public class UnitOfWorkShould : IAsyncLifetime
         using (scope) {
             await uow.CommitAsync();
             await Assert.ThrowsAsync<InvalidOperationException>(async () => await uow.CommitAsync());
+        }
+    }
+
+    [Trait("Layer", "Integration")]
+    [Fact]
+    public async Task JoinedPureRead_CommitCompletesEnlistment_AndRejectsFurtherUse() {
+        var (students, _, transaction, scope) = _fixture.CreateScopeWithUoW();
+        using (scope) {
+            students.Join(transaction);
+
+            // Pure read on the joined repository: no write stages, so no type-level committed
+            // notification is enlisted, but the outer commit must still complete the enlistment.
+            _ = await students.CountAsync(q => q);
+
+            await transaction.CommitAsync();
+
+            await Assert.ThrowsAsync<InvalidOperationException>(async () => await students.CountAsync(q => q));
+            Assert.Throws<InvalidOperationException>(() => students.Begin());
+        }
+
+        // A fresh scope resolves a repository that reads normally.
+        var (fresh, freshScope) = _fixture.CreateScopeWithRepository();
+        using (freshScope) {
+            _ = await fresh.CountAsync(q => q);
+        }
+    }
+
+    [Trait("Layer", "Integration")]
+    [Fact]
+    public async Task SavePreparation_RunsAtRegistration_ProjectionPersists() {
+        var (seed, seedScope) = _fixture.CreateScopeWithRepository();
+        using (seedScope) {
+            await seed.AddAsync(new() { FullName = "Prep Target", Age = 1, Grade = 1, Name = "prep-target" });
+            await seed.CommitAsync();
+        }
+
+        var original = Guid.Empty;
+        var observed = Guid.Empty;
+        var ran      = false;
+        var (students, _, transaction, scope) = _fixture.CreateScopeWithUoW();
+        using (scope) {
+            students.Join(transaction);
+            var entity = await students.FirstOrDefaultAsync(q => q.Where(s => s.Name == "prep-target"));
+            Assert.NotNull(entity);
+            original = entity.Timestamp;
+
+            entity.Age = 2;
+            await students.UpdateAsync(entity);
+
+            // Immediate-execution provider: the staged write already ran inside the transaction,
+            // so the preparation executes synchronously at registration and observes the final
+            // stamp; the dependent write below persists the projected value.
+            transaction.AddSavePreparation(() => {
+                ran           = true;
+                observed      = entity.Timestamp;
+                entity.Grade  = 9;
+            });
+            Assert.True(ran);
+            Assert.NotEqual(original, observed);
+
+            await students.UpdateAsync(entity);
+            await transaction.CommitAsync();
+        }
+
+        var (verifier, verifyScope) = _fixture.CreateScopeWithRepository();
+        using (verifyScope) {
+            var persisted = await verifier.FirstOrDefaultAsync(q => q.Where(s => s.Name == "prep-target"));
+            Assert.NotNull(persisted);
+            Assert.Equal(2, persisted.Age);
+            Assert.Equal(9, persisted.Grade);
+        }
+    }
+
+    [Trait("Layer", "Integration")]
+    [Fact]
+    public async Task SavePreparation_Throws_RegistrationFails_DisposalRollsBack() {
+        var (seed, seedScope) = _fixture.CreateScopeWithRepository();
+        using (seedScope) {
+            await seed.AddAsync(new() { FullName = "Prep Fail", Age = 1, Grade = 1, Name = "prep-fail" });
+            await seed.CommitAsync();
+        }
+
+        var (students, _, transaction, scope) = _fixture.CreateScopeWithUoW();
+        using (scope) {
+            students.Join(transaction);
+            var entity = await students.FirstOrDefaultAsync(q => q.Where(s => s.Name == "prep-fail"));
+            Assert.NotNull(entity);
+
+            entity.Age = 3;
+            await students.UpdateAsync(entity);
+
+            // The preparation runs synchronously at registration, so the failure surfaces here;
+            // disposing the uncommitted unit of work rolls the staged update back.
+            Assert.Throws<InvalidOperationException>(
+                () => transaction.AddSavePreparation(() => throw new InvalidOperationException("projection failed")));
+        }
+
+        var (verifier, verifyScope) = _fixture.CreateScopeWithRepository();
+        using (verifyScope) {
+            var persisted = await verifier.FirstOrDefaultAsync(q => q.Where(s => s.Name == "prep-fail"));
+            Assert.NotNull(persisted);
+            Assert.Equal(1, persisted.Age);
+        }
+    }
+
+    [Trait("Layer", "Integration")]
+    [Fact]
+    public async Task SavePreparation_AfterCompleted_ThrowsInvalidOperation() {
+        var (_, _, transaction, scope) = _fixture.CreateScopeWithUoW();
+        using (scope) {
+            await transaction.CommitAsync();
+            Assert.Throws<InvalidOperationException>(() => transaction.AddSavePreparation(() => { }));
+        }
+    }
+
+    [Fact]
+    public void Context_RetriesInitialization_AfterFactoryFailure() {
+        using var provider = new ServiceCollection().BuildServiceProvider();
+
+        var calls = 0;
+        using var uow = new LinqToDbUnitOfWork<TestDataConnection>(
+            () => {
+                if (++calls == 1) {
+                    throw new InvalidOperationException("connection construction failed");
+                }
+
+                return new TestDataConnection(new DataOptions().UseSQLite("Data Source=:memory:"));
+            },
+            provider);
+
+        Assert.Throws<InvalidOperationException>(() => _ = uow.Context);
+
+        var context = uow.Context;
+
+        Assert.Same(context, uow.Context);
+        Assert.Equal(2, calls);
+    }
+
+    [Fact]
+    public void Context_NeverExposesNonTransactionalContext_WhenBeginTransactionFails() {
+        using var provider = new ServiceCollection().BuildServiceProvider();
+
+        var path    = Path.Combine(Path.GetTempPath(), "schemata-uow-missing", $"{Guid.NewGuid():n}", "data.db");
+        var options = new DataOptions().UseSQLite($"Data Source={path}");
+
+        var creations = 0;
+        using var uow = new LinqToDbUnitOfWork<TestDataConnection>(
+            () => {
+                creations++;
+                return new TestDataConnection(options);
+            },
+            provider);
+
+        Assert.ThrowsAny<DbException>(() => _ = uow.Context);
+        Assert.ThrowsAny<DbException>(() => _ = uow.Context);
+        Assert.Equal(2, creations);
+    }
+
+    [Trait("Layer", "Integration")]
+    [Fact]
+    public async Task Join_FromADifferentSource_Fails_AndKeepsTheRepositoryUsable() {
+        var (students, scope) = _fixture.CreateScopeWithRepository();
+        using (scope) {
+            var otherPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():n}.db");
+            try {
+                using var root = new ServiceCollection().BuildServiceProvider();
+                using var other = new LinqToDbUnitOfWork<TestDataConnection>(
+                    () => new TestDataConnection(new DataOptions().UseSQLite($"Data Source={otherPath};Pooling=False")),
+                    root);
+
+                var error = Assert.Throws<InvalidOperationException>(() => students.Join(other));
+                Assert.Contains("source", error.Message, StringComparison.OrdinalIgnoreCase);
+
+                await students.AddAsync(new() { Uid = Guid.NewGuid(), Name = "survivor", FullName = "Survivor", Age = 1, Grade = 1 });
+                await students.CommitAsync();
+                Assert.Equal(1, await students.CountAsync(q => q.Where(s => s.Name == "survivor")));
+            } finally {
+                File.Delete(otherPath);
+            }
+        }
+    }
+
+    [Trait("Layer", "Integration")]
+    [Fact]
+    public async Task Join_WithADifferentBinding_OnTheSameSource_Fails() {
+        var (students, scope) = _fixture.CreateScopeWithRepository();
+        using (scope) {
+            var factory = scope.ServiceProvider.GetRequiredService<Func<TestDataConnection>>();
+
+            var bound = new ServiceCollection();
+            bound.AddSingleton(new RepositoryBinding("other-binding"));
+            using var boundRoot = bound.BuildServiceProvider();
+
+            using var transaction = new LinqToDbUnitOfWork<TestDataConnection>(factory, boundRoot);
+
+            var error = Assert.Throws<InvalidOperationException>(() => students.Join(transaction));
+            Assert.Contains("source", error.Message, StringComparison.OrdinalIgnoreCase);
+
+            Assert.Equal(0, await students.CountAsync(q => q));
+        }
+    }
+
+    [Trait("Layer", "Integration")]
+    [Fact]
+    public async Task Join_WhenTheConnectionCreationFails_KeepsTheRepositoryUsable() {
+        var (students, scope) = _fixture.CreateScopeWithRepository();
+        using (scope) {
+            using var root = new ServiceCollection().BuildServiceProvider();
+            using var transaction = new LinqToDbUnitOfWork<TestDataConnection>(
+                () => throw new InvalidOperationException("connection construction failed"),
+                root);
+
+            Assert.Throws<InvalidOperationException>(() => students.Join(transaction));
+
+            await students.AddAsync(new() { Uid = Guid.NewGuid(), Name = "after-fail", FullName = "After Fail", Age = 2, Grade = 1 });
+            await students.CommitAsync();
+            Assert.Equal(1, await students.CountAsync(q => q.Where(s => s.Name == "after-fail")));
         }
     }
 }

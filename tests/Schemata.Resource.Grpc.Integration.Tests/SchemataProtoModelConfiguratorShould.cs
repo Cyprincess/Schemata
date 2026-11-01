@@ -1,6 +1,12 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text.Json;
 using ProtoBuf.Meta;
+using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Resource;
+using Schemata.Common;
 using Schemata.Transport.Grpc.Proto;
 using Xunit;
 
@@ -33,6 +39,44 @@ public class SchemataProtoModelConfiguratorShould
         Assert.Equal("en", result.Values["language"]);
     }
 
+    [Fact]
+    public void List_Result_Field_Names_Follow_The_Entity_Identity() {
+        var model = RuntimeTypeModel.Create();
+        SchemataProtoModelConfigurator.ConfigureListResultType(model, typeof(StudentEntity), typeof(NamelessSummary));
+        var expected = new[] { "students", "total_size", "next_page_token" };
+        var fields   = model[typeof(ListResultBase<StudentEntity, NamelessSummary>)].GetFields().Select(f => f.Name)
+                                                                                    .OrderBy(n => n, StringComparer.Ordinal);
+
+        Assert.Equal(expected.OrderBy(n => n, StringComparer.Ordinal), fields);
+    }
+
+    [Fact]
+    public void Shared_Summary_List_Types_Resolve_Per_Entity_Identity() {
+        var model = RuntimeTypeModel.Create();
+        SchemataProtoModelConfigurator.ConfigureListTypes(model, [
+            (typeof(StudentEntity), typeof(NamelessSummary)),
+            (typeof(PersonEntity), typeof(NamelessSummary)),
+        ]);
+
+        Assert.Contains(model[typeof(ListResultBase<StudentEntity, NamelessSummary>)].GetFields(), f => f.Name == "students");
+        Assert.Contains(model[typeof(ListResultBase<PersonEntity, NamelessSummary>)].GetFields(), f => f.Name == "people");
+    }
+
+    [Fact]
+    public void Http_And_Grpc_Name_The_List_Field_Alike() {
+        var listType = typeof(ListResultBase<StudentEntity, NamelessSummary>);
+        var http     = JsonNamingPolicy.SnakeCaseLower.ConvertName(
+            ResourceWireNameRules.ResolveWireName(listType, nameof(IEntitiesResult<,>.Entities))!);
+
+        var model = RuntimeTypeModel.Create();
+        SchemataProtoModelConfigurator.ConfigureListResultType(model, typeof(StudentEntity), typeof(NamelessSummary));
+
+        var fields = model[listType].GetFields().Select(f => f.Name).ToHashSet();
+
+        Assert.Contains(http, fields);
+        Assert.Equal("students", http);
+    }
+
     private static RuntimeTypeModel CreateModel<T>() {
         var model = RuntimeTypeModel.Create();
         SchemataProtoModelConfigurator.ConfigureType(model, typeof(T));
@@ -58,5 +102,28 @@ public class SchemataProtoModelConfiguratorShould
     private sealed class MapMessage
     {
         public Dictionary<string, string> Values { get; set; } = [];
+    }
+
+    [CanonicalName("students/{student}")]
+    private sealed class StudentEntity : ICanonicalName
+    {
+        public string? Name { get; set; }
+
+        public string? CanonicalName { get; set; }
+    }
+
+    [CanonicalName("people/{person}")]
+    private sealed class PersonEntity : ICanonicalName
+    {
+        public string? Name { get; set; }
+
+        public string? CanonicalName { get; set; }
+    }
+
+    private sealed class NamelessSummary : ICanonicalName
+    {
+        public string? Name { get; set; }
+
+        public string? CanonicalName { get; set; }
     }
 }

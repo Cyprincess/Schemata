@@ -10,7 +10,7 @@ using Schemata.Common.Errors;
 namespace Schemata.Resource.Foundation.Advisors;
 
 /// <summary>
-///     Default order constants for <see cref="AdviceUpdateFreshness{TEntity,TRequest}" />.
+///     Default order constants for <see cref="AdviceUpdateFreshness{TEntity,TRequest,TDetail}" />.
 /// </summary>
 public static class AdviceUpdateFreshness
 {
@@ -33,17 +33,16 @@ public static class AdviceUpdateFreshness
 ///         strong-format or malformed tags — raises <see cref="AbortedException" /> with the
 ///         <c>CONCURRENCY_MISMATCH</c> reason. Only an absent or whitespace tag opts out.
 ///     </para>
-///     <para>
-///         Suppressed when <see cref="FreshnessSuppressed" /> is present.
-///     </para>
 /// </remarks>
 /// <typeparam name="TEntity">The entity type.</typeparam>
 /// <typeparam name="TRequest">The request DTO type.</typeparam>
-public sealed class AdviceUpdateFreshness<TEntity, TRequest> : IResourceUpdateAdvisor<TEntity, TRequest>
+/// <typeparam name="TDetail">The detail DTO type.</typeparam>
+public sealed class AdviceUpdateFreshness<TEntity, TRequest, TDetail> : IResourceUpdateAdvisor<TEntity, TRequest, TDetail>
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
+    where TDetail : class, ICanonicalName
 {
-    #region IResourceUpdateAdvisor<TEntity,TRequest> Members
+    #region IResourceUpdateAdvisor<TEntity,TRequest,TDetail> Members
 
     public int Order => AdviceUpdateFreshness.DefaultOrder;
 
@@ -52,9 +51,10 @@ public sealed class AdviceUpdateFreshness<TEntity, TRequest> : IResourceUpdateAd
         TRequest          request,
         TEntity           entity,
         ClaimsPrincipal?  principal,
+        HandledResponse<UpdateResultBase<TDetail>> handled,
         CancellationToken ct = default
     ) {
-        if (!FreshnessHelper.TryGetEntityTag(ctx, entity, out var expected)) {
+        if (!FreshnessHelper.TryGetEntityTag(entity, out var expected)) {
             return Task.FromResult(AdviseResult.Continue);
         }
 

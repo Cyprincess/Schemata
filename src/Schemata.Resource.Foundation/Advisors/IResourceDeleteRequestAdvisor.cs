@@ -12,5 +12,8 @@ namespace Schemata.Resource.Foundation.Advisors;
 ///     loaded.
 /// </summary>
 /// <typeparam name="TEntity">The entity type.</typeparam>
-public interface IResourceDeleteRequestAdvisor<TEntity> : IAdvisor<DeleteRequest, ResourceRequestContainer<TEntity>, ClaimsPrincipal?>
-    where TEntity : class, ICanonicalName;
+/// <typeparam name="TDetail">The detail DTO type.</typeparam>
+public interface IResourceDeleteRequestAdvisor<TEntity, TDetail>
+    : IAdvisor<DeleteRequest, ResourceRequestContainer<TEntity>, ClaimsPrincipal?, HandledResponse<DeleteResultBase<TDetail>>>
+    where TEntity : class, ICanonicalName
+    where TDetail : class, ICanonicalName;

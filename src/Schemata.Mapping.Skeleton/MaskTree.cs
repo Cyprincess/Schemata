@@ -128,6 +128,7 @@ public sealed class MaskTree
         }
 
         if (index == segments.Length - 1) {
+            node._isTerminal = true;
             return;
         }
 
@@ -214,6 +215,8 @@ public sealed class MaskTree
 
         private readonly Dictionary<string, MaskNode> _children = new(StringComparer.Ordinal);
 
+        internal bool _isTerminal;
+
         /// <summary>
         ///     CLR property name for this segment.
         /// </summary>
@@ -230,14 +233,15 @@ public sealed class MaskTree
         public Type TraversalType { get; }
 
         /// <summary>
-        ///     Child nodes keyed by CLR property name. Empty children mean this node is a leaf.
+        ///     Child nodes keyed by CLR property name.
         /// </summary>
         public IReadOnlyDictionary<string, MaskNode> Children => new ReadOnlyDictionary<string, MaskNode>(_children);
 
         /// <summary>
-        ///     Indicates that this node names a whole field subtree.
+        ///     Indicates that this node names a whole field subtree: an explicitly selected
+        ///     whole field dominates any supplied descendant paths, in any order.
         /// </summary>
-        public bool IsLeaf => _children.Count == 0;
+        public bool IsLeaf => _isTerminal || _children.Count == 0;
 
         internal Dictionary<string, MaskNode> MutableChildren => _children;
 

@@ -13,14 +13,21 @@ public sealed class QueryContainer<TEntity>
     where TEntity : class
 {
     /// <summary>
-    ///     Initializes a container with the repository and the raw queryable.
+    ///     Initializes a container with the repository, the raw queryable, and the per-call options.
     /// </summary>
     /// <param name="repository">The repository that initiated this query.</param>
     /// <param name="query">The initial queryable, before build-query advisors run.</param>
-    public QueryContainer(IRepository<TEntity> repository, IQueryable<TEntity> query) {
+    /// <param name="options">Per-call query behavior overrides.</param>
+    public QueryContainer(IRepository<TEntity> repository, IQueryable<TEntity> query, QueryOptions options = default) {
         Repository = repository;
         Query      = query;
+        Options    = options;
     }
+
+    /// <summary>
+    ///     The per-call query behavior overrides.
+    /// </summary>
+    public QueryOptions Options { get; }
 
     /// <summary>
     ///     The repository that initiated this query, exposed so advisors can inspect the

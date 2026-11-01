@@ -63,7 +63,7 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
         request.Parent ??= ResourceNameDescriptor.ForType<TEntity>().ResolveParent(HttpContext.Request.RouteValues);
 
         var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
-        var result = await dispatcher.SendAsync<ListResourceQueryRequest<TEntity, TSummary>, ListResultBase<TSummary>>(
+        var result = await dispatcher.SendAsync<ListResourceQueryRequest<TEntity, TSummary>, ListResultBase<TEntity, TSummary>>(
             new(request, HttpContext.User), HttpContext.RequestAborted);
 
         return new JsonResult(result, JsonOptions);
@@ -97,8 +97,13 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
         var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
         var result = await dispatcher.SendAsync<CreateResourceRequest<TEntity, TRequest, TDetail>, CreateResultBase<TDetail>>(
             new(request, HttpContext.User), HttpContext.RequestAborted);
+        if (result.Detail is null) {
+            // The mutation was handled without a write; an empty response reports that
+            // outcome instead of a created resource.
+            return NoContent();
+        }
 
-        HttpContext.Response.Headers.Location = Url.Action("Get", new { name = result.Detail!.Name });
+        HttpContext.Response.Headers.Location = Url.Action("Get", new { name = result.Detail.Name });
 
         return new JsonResult(result.Detail, JsonOptions) { StatusCode = StatusCodes.Status201Created };
     }
@@ -125,6 +130,10 @@ public class ResourceController<TEntity, TRequest, TDetail, TSummary> : Controll
         var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
         var result = await dispatcher.SendAsync<UpdateResourceRequest<TEntity, TRequest, TDetail>, UpdateResultBase<TDetail>>(
             new(BuildFullName(name), request, HttpContext.User), HttpContext.RequestAborted);
+
+        if (result.Detail is null) {
+            return NoContent();
+        }
 
         return new JsonResult(result.Detail, JsonOptions);
     }

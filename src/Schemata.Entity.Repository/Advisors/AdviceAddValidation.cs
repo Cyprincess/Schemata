@@ -26,7 +26,7 @@ public static class AdviceAddValidation
 /// </summary>
 /// <typeparam name="TEntity">The entity type being added.</typeparam>
 /// <remarks>
-///     Suppressed by <see cref="AddValidationSuppressed" />.
+///     Skipped when the call passes <see cref="MutationOptions.IgnoreValidation" />.
 /// </remarks>
 public sealed class AdviceAddValidation<TEntity> : IRepositoryAddAdvisor<TEntity>
     where TEntity : class
@@ -39,9 +39,10 @@ public sealed class AdviceAddValidation<TEntity> : IRepositoryAddAdvisor<TEntity
         AdviceContext        ctx,
         IRepository<TEntity> repository,
         TEntity              entity,
+        MutationOptions      options,
         CancellationToken    ct
     ) {
-        if (ctx.Has<AddValidationSuppressed>()) {
+        if (options.IgnoreValidation) {
             return AdviseResult.Continue;
         }
 
@@ -51,7 +52,6 @@ public sealed class AdviceAddValidation<TEntity> : IRepositoryAddAdvisor<TEntity
             case AdviseResult.Block:
                 throw new ValidationException(errors);
             case AdviseResult.Handle:
-                return AdviseResult.Handle;
             case AdviseResult.Continue:
             default:
                 break;

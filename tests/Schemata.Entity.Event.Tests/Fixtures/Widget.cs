@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Schemata.Abstractions.Entities;
 using Schemata.Event.Skeleton;
 
 namespace Schemata.Entity.Event.Tests.Fixtures;
@@ -7,11 +8,7 @@ namespace Schemata.Entity.Event.Tests.Fixtures;
 ///     Buffers events without implementing any aggregate marker — the flush mechanism is
 ///     deliberately available to plain entities, not only to DDD aggregates.
 /// </summary>
-/// <remarks>
-///     Public, and in its own file, because Moq has to build an <c>IRepository&lt;Widget&gt;</c>
-///     proxy: Castle DynamicProxy cannot see a type nested privately in the test class.
-/// </remarks>
-public sealed class Widget : IHasPendingEvents
+public sealed class Widget : IHasPendingEvents, ICanonicalName
 {
     private readonly List<IEvent> _pending = [];
 
@@ -22,6 +19,13 @@ public sealed class Widget : IHasPendingEvents
         _pending.Clear();
         return snapshot;
     }
+
+    #endregion
+    #region ICanonicalName Members
+
+    public string? Name { get; set; }
+
+    public string? CanonicalName { get; set; }
 
     #endregion
 

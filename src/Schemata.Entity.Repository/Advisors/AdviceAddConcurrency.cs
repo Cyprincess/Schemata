@@ -36,6 +36,7 @@ public sealed class AdviceAddConcurrency<TEntity> : IRepositoryAddAdvisor<TEntit
         AdviceContext        ctx,
         IRepository<TEntity> repository,
         TEntity              entity,
+        MutationOptions      options,
         CancellationToken    ct
     ) {
         if (entity is not IConcurrency concurrency) {

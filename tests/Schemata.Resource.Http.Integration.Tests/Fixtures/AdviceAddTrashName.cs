@@ -17,6 +17,7 @@ internal sealed class AdviceAddTrashName : IRepositoryAddAdvisor<Trash>
         AdviceContext      ctx,
         IRepository<Trash> repository,
         Trash              entity,
+        MutationOptions      options,
         CancellationToken  ct
     ) {
         if (string.IsNullOrWhiteSpace(entity.Name)) {

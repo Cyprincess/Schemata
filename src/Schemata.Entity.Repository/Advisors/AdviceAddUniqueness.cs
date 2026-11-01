@@ -29,7 +29,7 @@ public static class AdviceAddUniqueness
 ///     <para>
 ///         The protection is optimistic: a concurrent insert between the lookup and the
 ///         commit still surfaces as the provider's own constraint error.
-///         Suppressed when <see cref="UniquenessSuppressed" /> is present.
+///         Skipped when the call passes <see cref="MutationOptions.IgnoreUniqueness" />.
 ///     </para>
 /// </remarks>
 /// <typeparam name="TEntity">The entity type being added.</typeparam>
@@ -44,16 +44,14 @@ public sealed class AdviceAddUniqueness<TEntity> : IRepositoryAddAdvisor<TEntity
         AdviceContext        ctx,
         IRepository<TEntity> repository,
         TEntity              entity,
+        MutationOptions      options,
         CancellationToken    ct = default
     ) {
-        if (ctx.Has<UniquenessSuppressed>()) {
+        if (options.IgnoreUniqueness) {
             return AdviseResult.Continue;
         }
 
-        TEntity? existing;
-        using (repository.SuppressQuerySoftDelete()) {
-            existing = await repository.GetAsync(entity, ct);
-        }
+        var existing = await repository.GetAsync(entity, ct, new QueryOptions(IgnoreSoftDelete: true));
 
         if (existing is not null) {
             var name = (entity as ICanonicalName)?.CanonicalName;

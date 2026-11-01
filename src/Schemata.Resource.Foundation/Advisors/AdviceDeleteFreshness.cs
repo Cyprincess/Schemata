@@ -11,7 +11,7 @@ using static Schemata.Abstractions.SchemataConstants;
 namespace Schemata.Resource.Foundation.Advisors;
 
 /// <summary>
-///     Default order constants for <see cref="AdviceDeleteFreshness{TEntity}" />.
+///     Default order constants for <see cref="AdviceDeleteFreshness{TEntity,TDetail}" />.
 /// </summary>
 public static class AdviceDeleteFreshness
 {
@@ -33,15 +33,14 @@ public static class AdviceDeleteFreshness
 ///         raises <see cref="AbortedException" /> with the <c>CONCURRENCY_MISMATCH</c> reason.
 ///         Only an absent or whitespace tag opts out.
 ///     </para>
-///     <para>
-///         Suppressed when <see cref="FreshnessSuppressed" /> is present.
-///     </para>
 /// </remarks>
 /// <typeparam name="TEntity">The entity type.</typeparam>
-public sealed class AdviceDeleteFreshness<TEntity> : IResourceDeleteAdvisor<TEntity>
+/// <typeparam name="TDetail">The detail DTO type.</typeparam>
+public sealed class AdviceDeleteFreshness<TEntity, TDetail> : IResourceDeleteAdvisor<TEntity, TDetail>
     where TEntity : class, ICanonicalName
+    where TDetail : class, ICanonicalName
 {
-    #region IResourceDeleteAdvisor<TEntity> Members
+    #region IResourceDeleteAdvisor<TEntity,TDetail> Members
 
     public int Order => AdviceDeleteFreshness.DefaultOrder;
 
@@ -50,9 +49,10 @@ public sealed class AdviceDeleteFreshness<TEntity> : IResourceDeleteAdvisor<TEnt
         DeleteRequest     request,
         TEntity           entity,
         ClaimsPrincipal?  principal,
+        HandledResponse<DeleteResultBase<TDetail>> handled,
         CancellationToken ct = default
     ) {
-        if (!FreshnessHelper.TryGetEntityTag(ctx, entity, out var expected)) {
+        if (!FreshnessHelper.TryGetEntityTag(entity, out var expected)) {
             return Task.FromResult(AdviseResult.Continue);
         }
 

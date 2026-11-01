@@ -21,8 +21,8 @@ public static class AdviceAddSoftDelete
 /// <typeparam name="TEntity">The entity type being added.</typeparam>
 /// <remarks>
 ///     Runs last in the add pipeline (after validation). Only activates for entities
-///     implementing <see cref="ISoftDelete" />. Suppressed by
-///     <see cref="SoftDeleteSuppressed" />.
+///     implementing <see cref="ISoftDelete" />. Skipped when the call passes
+///     <see cref="MutationOptions.IgnoreSoftDelete" />.
 /// </remarks>
 public sealed class AdviceAddSoftDelete<TEntity> : IRepositoryAddAdvisor<TEntity>
     where TEntity : class
@@ -35,9 +35,10 @@ public sealed class AdviceAddSoftDelete<TEntity> : IRepositoryAddAdvisor<TEntity
         AdviceContext        ctx,
         IRepository<TEntity> repository,
         TEntity              entity,
+        MutationOptions      options,
         CancellationToken    ct
     ) {
-        if (ctx.Has<SoftDeleteSuppressed>()) {
+        if (options.IgnoreSoftDelete) {
             return Task.FromResult(AdviseResult.Continue);
         }
 

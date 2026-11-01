@@ -8,8 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
-using Schemata.Entity.Owner;
-using Schemata.Entity.Owner.Advisors;
+using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Xunit;
 
@@ -27,8 +26,6 @@ public class AdvisorOrderShould
                 120_000_000,
                 121_000_000,
                 130_000_000,
-                140_000_000,
-                150_000_000,
                 160_000_000,
                 900_000_000,
             ],
@@ -39,8 +36,6 @@ public class AdvisorOrderShould
                 AdviceAddCanonicalName.DefaultOrder,
                 AdviceAddOwner.DefaultOrder,
                 AdviceAddValidation.DefaultOrder,
-                AdviceValidateResourceReferences.DefaultOrder,
-                AdviceValidateResourceReferenceExistence.DefaultOrder,
                 AdviceAddUniqueness.DefaultOrder,
                 AdviceAddSoftDelete.DefaultOrder,
             ]);
@@ -64,8 +59,6 @@ public class AdvisorOrderShould
             advisor => Assert.IsType<AdviceAddCanonicalName<AdvisorEntity>>(advisor),
             advisor => Assert.IsType<AdviceAddOwner<AdvisorEntity>>(advisor),
             advisor => Assert.IsType<AdviceAddValidation<AdvisorEntity>>(advisor),
-            advisor => Assert.IsType<AdviceValidateResourceReferences<AdvisorEntity>>(advisor),
-            advisor => Assert.IsType<AdviceValidateResourceReferenceExistence<AdvisorEntity>>(advisor),
             advisor => Assert.IsType<AdviceAddUniqueness<AdvisorEntity>>(advisor),
             advisor => Assert.IsType<AdviceAddSoftDelete<AdvisorEntity>>(advisor));
 
@@ -76,11 +69,14 @@ public class AdvisorOrderShould
 
     private sealed class TestRepository(System.IServiceProvider serviceProvider) : RepositoryBase<AdvisorEntity>(serviceProvider)
     {
-        public override Task AddAsync(AdvisorEntity entity, CancellationToken ct = default) => Task.CompletedTask;
+        public override Task<MutationResult> AddAsync(AdvisorEntity entity, CancellationToken ct = default, MutationOptions options = default)
+            => Task.FromResult(MutationResult.Applied);
 
-        public override Task UpdateAsync(AdvisorEntity entity, CancellationToken ct = default) => Task.CompletedTask;
+        public override Task<MutationResult> UpdateAsync(AdvisorEntity entity, CancellationToken ct = default, MutationOptions options = default)
+            => Task.FromResult(MutationResult.Applied);
 
-        public override Task RemoveAsync(AdvisorEntity entity, CancellationToken ct = default) => Task.CompletedTask;
+        public override Task<MutationResult> RemoveAsync(AdvisorEntity entity, CancellationToken ct = default, MutationOptions options = default)
+            => Task.FromResult(MutationResult.Applied);
 
         protected override ConfiguredCancelableAsyncEnumerable<TResult> AsAsyncEnumerable<TResult>(
             IQueryable<TResult> query,

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Entity.Repository.Advisors;
@@ -10,22 +11,23 @@ namespace Schemata.Entity.Repository;
 
 /// <summary>
 ///     Non-generic repository contract carrying the entity-agnostic surface (advisor
-///     context, unit-of-work enlistment, commit, and suppression scopes). Entity-agnostic
-///     coordination code depends on this interface; entity-specific work uses
-///     <see cref="IRepository{TEntity}" />.
+///     context, unit-of-work enlistment, and commit). Entity-agnostic coordination code
+///     depends on this interface; entity-specific work uses
+///     <see cref="IRepository{TEntity}" />, whose operations carry explicit
+///     <see cref="QueryOptions" /> and <see cref="MutationOptions" />.
 /// </summary>
 public interface IRepository : IAsyncDisposable, IDisposable
 {
     /// <summary>
-    ///     Carries the advice context that gates advisor execution and holds suppression
-    ///     flags for this repository instance.
+    ///     Carries the advice context that gates advisor execution for this repository instance.
     /// </summary>
     AdviceContext AdviceContext { get; }
 
     /// <summary>
-    ///     Begins a unit of work bound to this repository's data context. The first
-    ///     <see cref="Join" /> on the returned unit of work opens the underlying connection
-    ///     and transaction; subsequent enlistments share that context.
+    ///     Begins a caller-owned unit of work bound to this repository's data context and enlists
+    ///     this repository in it. The returned unit of work is one-shot and caller-owned: after
+    ///     <see cref="IUnitOfWork.CommitAsync" /> / <see cref="IUnitOfWork.RollbackAsync" /> /
+    ///     disposal it never reopens; resolve a fresh repository to start new work.
     /// </summary>
     /// <returns>A new unit of work that callers must commit, roll back, or dispose.</returns>
     IUnitOfWork Begin();
@@ -38,40 +40,13 @@ public interface IRepository : IAsyncDisposable, IDisposable
     void Join(IUnitOfWork uow);
 
     /// <summary>
-    ///     Persists all pending changes to the underlying data store.
+    ///     Persists all pending changes through the repository's implicit write unit of work and
+    ///     reopens the repository for subsequent work. Throws when the repository is enlisted in a
+    ///     caller-owned unit of work — commit that unit of work instead. A commit with no staged
+    ///     writes sends no committed notification.
     /// </summary>
     /// <param name="ct">A cancellation token.</param>
     Task CommitAsync(CancellationToken ct = default);
-
-    /// <summary>
-    ///     Suppresses the add-side validation advisor for the duration of the returned
-    ///     scope. Disposing the returned handle restores the previous state.
-    /// </summary>
-    IDisposable SuppressAddValidation();
-
-    /// <summary>
-    ///     Suppresses the update-side validation advisor for the duration of the returned
-    ///     scope. Disposing the returned handle restores the previous state.
-    /// </summary>
-    IDisposable SuppressUpdateValidation();
-
-    /// <summary>
-    ///     Suppresses the soft-delete filter on build-query for the duration of the
-    ///     returned scope. Disposing the returned handle restores the previous state.
-    /// </summary>
-    IDisposable SuppressQuerySoftDelete();
-
-    /// <summary>
-    ///     Suppresses the soft-delete behavior on add and remove for the duration of the
-    ///     returned scope. Disposing the returned handle restores the previous state.
-    /// </summary>
-    IDisposable SuppressSoftDelete();
-
-    /// <summary>
-    ///     Suppresses the timestamp advisors (add and update) for the duration of the
-    ///     returned scope. Disposing the returned handle restores the previous state.
-    /// </summary>
-    IDisposable SuppressTimestamp();
 }
 
 /// <summary>
@@ -103,9 +78,11 @@ public interface IRepository<TEntity> : IRepository
     ///     to calling <see cref="Queryable.OfType{TResult}" /> on the advisor-processed queryable.
     /// </param>
     /// <param name="ct">A cancellation token.</param>
+    /// <param name="options">Per-call query behavior overrides.</param>
     IAsyncEnumerable<TResult> ListAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
+        CancellationToken                               ct      = default,
+        QueryOptions                                    options = default
     );
 
     /// <summary>
@@ -117,8 +94,9 @@ public interface IRepository<TEntity> : IRepository
     ///     non-key fields.
     /// </param>
     /// <param name="ct">A cancellation token.</param>
+    /// <param name="options">Per-call query behavior overrides.</param>
     /// <returns>The matching entity or <see langword="null" />.</returns>
-    ValueTask<TEntity?> GetAsync(TEntity? entity, CancellationToken ct = default);
+    ValueTask<TEntity?> GetAsync(TEntity? entity, CancellationToken ct = default, QueryOptions options = default);
 
     /// <summary>
     ///     Retrieves an entity by its keys and projects it to <typeparamref name="TResult" />.
@@ -126,14 +104,28 @@ public interface IRepository<TEntity> : IRepository
     /// <typeparam name="TResult">The projected result type.</typeparam>
     /// <param name="entity">An entity whose key properties provide the lookup values.</param>
     /// <param name="ct">A cancellation token.</param>
-    ValueTask<TResult?> GetAsync<TResult>(TEntity? entity, CancellationToken ct = default);
+    /// <param name="options">Per-call query behavior overrides.</param>
+    ValueTask<TResult?> GetAsync<TResult>(TEntity? entity, CancellationToken ct = default, QueryOptions options = default);
+
+    /// <summary>
+    ///     Selects a direct immutable scalar property by primary key through build-query advisors.
+    ///     EF Core supplies the admission value for the same still-Added entity in its unit of work.
+    ///     Found distinguishes a null scalar from a missing or filtered row.
+    /// </summary>
+    ValueTask<OriginalResult<TResult>> GetOriginalAsync<TResult>(
+        TEntity entity,
+        Expression<Func<TEntity, TResult>> projection,
+        CancellationToken                  ct      = default,
+        QueryOptions                       options = default
+    );
 
     /// <summary>
     ///     Finds an entity by its primary key values.
     /// </summary>
     /// <param name="keys">The primary key values in property declaration order.</param>
     /// <param name="ct">A cancellation token.</param>
-    ValueTask<TEntity?> FindAsync(object[] keys, CancellationToken ct = default);
+    /// <param name="options">Per-call query behavior overrides.</param>
+    ValueTask<TEntity?> FindAsync(object[] keys, CancellationToken ct = default, QueryOptions options = default);
 
     /// <summary>
     ///     Finds an entity by its primary key values and projects it to
@@ -142,7 +134,8 @@ public interface IRepository<TEntity> : IRepository
     /// <typeparam name="TResult">The projected result type.</typeparam>
     /// <param name="keys">The primary key values in property declaration order.</param>
     /// <param name="ct">A cancellation token.</param>
-    ValueTask<TResult?> FindAsync<TResult>(object[] keys, CancellationToken ct = default);
+    /// <param name="options">Per-call query behavior overrides.</param>
+    ValueTask<TResult?> FindAsync<TResult>(object[] keys, CancellationToken ct = default, QueryOptions options = default);
 
     /// <summary>
     ///     Returns the first matching result or <see langword="null" />, after build-query
@@ -151,9 +144,11 @@ public interface IRepository<TEntity> : IRepository
     /// <typeparam name="TResult">The projected result type.</typeparam>
     /// <param name="predicate">An optional query transformation.</param>
     /// <param name="ct">A cancellation token.</param>
+    /// <param name="options">Per-call query behavior overrides.</param>
     ValueTask<TResult?> FirstOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
+        CancellationToken                               ct      = default,
+        QueryOptions                                    options = default
     );
 
     /// <summary>
@@ -163,9 +158,11 @@ public interface IRepository<TEntity> : IRepository
     /// <typeparam name="TResult">The projected result type.</typeparam>
     /// <param name="predicate">An optional query transformation.</param>
     /// <param name="ct">A cancellation token.</param>
+    /// <param name="options">Per-call query behavior overrides.</param>
     ValueTask<TResult?> SingleOrDefaultAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
+        CancellationToken                               ct      = default,
+        QueryOptions                                    options = default
     );
 
     /// <summary>
@@ -175,9 +172,11 @@ public interface IRepository<TEntity> : IRepository
     /// <typeparam name="TResult">The projected result type.</typeparam>
     /// <param name="predicate">An optional query transformation.</param>
     /// <param name="ct">A cancellation token.</param>
+    /// <param name="options">Per-call query behavior overrides.</param>
     ValueTask<bool> AnyAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
+        CancellationToken                               ct      = default,
+        QueryOptions                                    options = default
     );
 
     /// <summary>
@@ -187,9 +186,11 @@ public interface IRepository<TEntity> : IRepository
     /// <typeparam name="TResult">The projected result type.</typeparam>
     /// <param name="predicate">An optional query transformation.</param>
     /// <param name="ct">A cancellation token.</param>
+    /// <param name="options">Per-call query behavior overrides.</param>
     ValueTask<int> CountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
+        CancellationToken                               ct      = default,
+        QueryOptions                                    options = default
     );
 
     /// <summary>
@@ -199,24 +200,28 @@ public interface IRepository<TEntity> : IRepository
     /// <typeparam name="TResult">The projected result type.</typeparam>
     /// <param name="predicate">An optional query transformation.</param>
     /// <param name="ct">A cancellation token.</param>
+    /// <param name="options">Per-call query behavior overrides.</param>
     ValueTask<long> LongCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
+        CancellationToken                               ct      = default,
+        QueryOptions                                    options = default
     );
 
     /// <summary>
-    ///     Estimates the number of entities matching the predicate. Defaults to the exact
-    ///     <see cref="LongCountAsync{TResult}" />; providers with cheaper statistics
-    ///     (e.g. table cardinality estimates) can override.
+    ///     Estimates the number of results after query scoping. Returns <see langword="null" />
+    ///     when the provider or query shape cannot supply an estimate.
     /// </summary>
     /// <typeparam name="TResult">The projected result type.</typeparam>
     /// <param name="predicate">An optional query transformation.</param>
     /// <param name="ct">A cancellation token.</param>
-    ValueTask<long> EstimateCountAsync<TResult>(
+    /// <param name="options">Per-call query behavior overrides.</param>
+    ValueTask<long?> EstimateCountAsync<TResult>(
         Func<IQueryable<TEntity>, IQueryable<TResult>>? predicate,
-        CancellationToken                               ct = default
+        CancellationToken                               ct      = default,
+        QueryOptions                                    options = default
     ) {
-        return LongCountAsync(predicate, ct);
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult<long?>(null);
     }
 
     /// <summary>
@@ -225,14 +230,16 @@ public interface IRepository<TEntity> : IRepository
     /// </summary>
     /// <param name="entity">The entity to persist.</param>
     /// <param name="ct">A cancellation token.</param>
-    Task AddAsync(TEntity entity, CancellationToken ct = default);
+    /// <param name="options">Per-call mutation behavior overrides.</param>
+    Task<MutationResult> AddAsync(TEntity entity, CancellationToken ct = default, MutationOptions options = default);
 
     /// <summary>
     ///     Drives each entity through the add advisor pipeline before persistence.
     /// </summary>
     /// <param name="entities">The entities to persist.</param>
     /// <param name="ct">A cancellation token.</param>
-    Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default);
+    /// <param name="options">Per-call mutation behavior overrides.</param>
+    Task AddRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default, MutationOptions options = default);
 
     /// <summary>
     ///     Drives the entity through the update advisor pipeline
@@ -240,7 +247,8 @@ public interface IRepository<TEntity> : IRepository
     /// </summary>
     /// <param name="entity">The entity to persist with updated values.</param>
     /// <param name="ct">A cancellation token.</param>
-    Task UpdateAsync(TEntity entity, CancellationToken ct = default);
+    /// <param name="options">Per-call mutation behavior overrides.</param>
+    Task<MutationResult> UpdateAsync(TEntity entity, CancellationToken ct = default, MutationOptions options = default);
 
     /// <summary>
     ///     Drives the entity through the remove advisor pipeline
@@ -251,12 +259,14 @@ public interface IRepository<TEntity> : IRepository
     /// </summary>
     /// <param name="entity">The entity to remove.</param>
     /// <param name="ct">A cancellation token.</param>
-    Task RemoveAsync(TEntity entity, CancellationToken ct = default);
+    /// <param name="options">Per-call mutation behavior overrides.</param>
+    Task<MutationResult> RemoveAsync(TEntity entity, CancellationToken ct = default, MutationOptions options = default);
 
     /// <summary>
     ///     Drives each entity through the remove advisor pipeline.
     /// </summary>
     /// <param name="entities">The entities to remove.</param>
     /// <param name="ct">A cancellation token.</param>
-    Task RemoveRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default);
+    /// <param name="options">Per-call mutation behavior overrides.</param>
+    Task RemoveRangeAsync(IEnumerable<TEntity> entities, CancellationToken ct = default, MutationOptions options = default);
 }

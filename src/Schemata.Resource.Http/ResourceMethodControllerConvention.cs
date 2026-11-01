@@ -73,11 +73,20 @@ public sealed class ResourceMethodControllerConvention(
             }
         }
 
+        var resource = registry.GetResource(entity);
+        if (resource is not null) {
+            foreach (var action in controller.Actions) {
+                foreach (var selector in action.Selectors) {
+                    selector.EndpointMetadata.Add(resource);
+                }
+            }
+        }
+
         ResourceHttpConventionHelper.ApplyRateLimit(controller, entity);
-        ResourceHttpConventionHelper.ApplyAuthorization(controller, registry.GetResource(entity)?.AuthenticationScheme ?? scheme);
+        ResourceHttpConventionHelper.ApplyAuthorization(controller, entity, resource?.AuthenticationScheme ?? scheme);
     }
 
-    private static void ConfigureMethodAction(ActionModel action, ResourceMethodAttribute method, string controllerRoute) {
+    private static void ConfigureMethodAction(ActionModel action, ResourceMethodRegistration method, string controllerRoute) {
         action.ActionName = $"Invoke_{method.Verb}";
 
         var actionTemplate = method.Scope == ResourceMethodScope.Instance

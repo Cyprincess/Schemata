@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Schemata.Abstractions.Entities;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Commands;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Resource.Foundation.Handlers;
 
@@ -22,8 +23,8 @@ public sealed class ResourceMethodDispatchHandler<TEntity, TRequest, TResponse>(
 {
     #region IRequestHandler<ResourceMethodRequest<TEntity,TRequest,TResponse>,TResponse> Members
 
-    public Task<TResponse> HandleAsync(ResourceMethodRequest<TEntity, TRequest, TResponse> request, CancellationToken ct = default) {
-        return operation.InvokeCoreAsync(request.Verb, request.Name, request.Request, request.Principal, ct);
+    public Task<TResponse> HandleAsync(ResourceMethodRequest<TEntity, TRequest, TResponse> request, AdviceContext context, CancellationToken ct = default) {
+        return operation.InvokeCoreAsync(request.Verb, request.Name, request.Request, request.Principal, context, ct);
     }
 
     #endregion

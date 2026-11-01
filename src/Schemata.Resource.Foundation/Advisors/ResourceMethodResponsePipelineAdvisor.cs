@@ -17,7 +17,7 @@ namespace Schemata.Resource.Foundation.Advisors;
 /// <typeparam name="TEntity">The resource entity type behind the method.</typeparam>
 /// <typeparam name="TRequest">The custom method's request DTO type.</typeparam>
 /// <typeparam name="TResponse">The custom method's response type.</typeparam>
-public sealed class ResourceMethodResponsePipelineAdvisor<TEntity, TRequest, TResponse>(IEntityTagProvider entityTags)
+public sealed class ResourceMethodResponsePipelineAdvisor<TEntity, TRequest, TResponse>
     : IRequestPipelineAdvisor<ResourceMethodRequest<TEntity, TRequest, TResponse>, TResponse>
     where TEntity : class, ICanonicalName
     where TRequest : class, IRequest<TResponse>
@@ -34,7 +34,7 @@ public sealed class ResourceMethodResponsePipelineAdvisor<TEntity, TRequest, TRe
         CancellationToken                                   ct
     ) {
         var response = await next(ct);
-        ResourceDetailResponsePipelineAdvisor.Shape<TEntity, TResponse>(entityTags, ctx, response);
+        ResourceDetailResponsePipelineAdvisor.Shape<TEntity, TResponse>(ctx, response);
         return response;
     }
 

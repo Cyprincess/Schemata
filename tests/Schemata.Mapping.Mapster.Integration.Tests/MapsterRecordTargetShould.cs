@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Mapping.Mapster.Integration.Tests.Fixtures;
@@ -39,7 +38,7 @@ public class MapsterRecordTargetShould
         Assert.Equal("Original", destination.Description);
         Assert.Equal(5, destination.Count);
         Assert.True(destination.Active);
-        Assert.Equal(new List<string> { "keep" }, destination.Tags);
+        Assert.Equal(new() { "keep" }, destination.Tags);
         Assert.Equal("note", destination.Note);
     }
 
@@ -64,7 +63,7 @@ public class MapsterRecordTargetShould
 
         mapper.Map(source, destination, ["Tags"]);
 
-        Assert.Equal(new List<string> { "a", "b" }, destination.Tags);
+        Assert.Equal(new() { "a", "b" }, destination.Tags);
         Assert.Equal(0.1m, destination.Rate);
         Assert.Equal("Original", destination.Description);
     }
@@ -118,5 +117,21 @@ public class MapsterRecordTargetShould
         Assert.Equal("Updated", destination.DisplayName);
         Assert.Equal("old", destination.Bio);
         Assert.Equal("en", destination.Locale);
+    }
+
+    [Fact]
+    public void MaskedRecordUpdate_Every_Member_Replaces_The_Record_State() {
+        var mapper      = CreateMapper();
+        var source      = new RecordSource("Updated", 0.2m, 9, false, ["a", "b"], "changed");
+        var destination = Existing();
+
+        mapper.Map(source, destination, ["Description", "Rate", "Count", "Active", "Tags", "Note"]);
+
+        Assert.Equal("Updated", destination.Description);
+        Assert.Equal(0.2m, destination.Rate);
+        Assert.Equal(9, destination.Count);
+        Assert.False(destination.Active);
+        Assert.Equal(new() { "a", "b" }, destination.Tags);
+        Assert.Equal("changed", destination.Note);
     }
 }

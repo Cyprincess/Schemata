@@ -4,6 +4,9 @@ using FluentValidation;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Validation.FluentValidation.Advisors;
 using Schemata.Validation.Skeleton.Advisors;
+using Schemata.Abstractions.Entities;
+using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Advisors;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -13,9 +16,29 @@ namespace Microsoft.Extensions.DependencyInjection;
 /// </summary>
 public static class ServiceCollectionExtensions
 {
+    public static IServiceCollection AddRequestValidation<TRequest, TResponse>(
+        this IServiceCollection services, Operations operation) where TRequest : IRequest<TResponse> {
+        services.TryAddKeyedScoped<IRequestPipelineAdvisor<TRequest, TResponse>>(
+            RequestPipelineStages.Validation, (_, _) => new RequestValidationPipelineAdvisor<TRequest, TResponse>(operation));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IValidationAdvisor<>), typeof(AdviceValidationErrors<>)));
+        return services;
+    }
+
+    public static IServiceCollection AddStreamValidation<TRequest, TItem>(
+        this IServiceCollection services, Operations operation) where TRequest : IStreamRequest<TItem> {
+        services.TryAddKeyedScoped<IStreamPipelineAdvisor<TRequest, TItem>>(
+            RequestPipelineStages.Validation, (_, _) => new StreamValidationPipelineAdvisor<TRequest, TItem>(operation));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IValidationAdvisor<>), typeof(AdviceValidationErrors<>)));
+        return services;
+    }
+
     /// <summary>
-    ///     Registers a FluentValidation validator and auto-registers <see cref="AdviceValidation{T}" /> and
-    ///     <see cref="AdviceValidationErrors{T}" />.
+    ///     Registers a FluentValidation validator under every closed <see cref="IValidator{T}" />
+    ///     interface it implements and auto-registers <see cref="AdviceValidation{T}" /> and
+    ///     <see cref="AdviceValidationErrors{T}" />. Each distinct implementation registered for the
+    ///     same message type cooperates: <see cref="AdviceValidation{T}" /> runs every registered
+    ///     validator once. Re-registering the same implementation for the same message type is
+    ///     idempotent.
     /// </summary>
     /// <typeparam name="TValidator">The validator implementation type.</typeparam>
     /// <param name="services">The service collection.</param>
@@ -27,17 +50,20 @@ public static class ServiceCollectionExtensions
     )
         where TValidator : class, IValidator {
         var implementationType = typeof(TValidator);
-        var validatorType = implementationType.GetInterfaces()
-                                              .FirstOrDefault(t => t.IsGenericType && t.GetGenericTypeDefinition() == typeof(IValidator<>));
+        var validatorTypes = implementationType.GetInterfaces()
+                                               .Where(t => t.IsGenericType && t.GetGenericTypeDefinition() == typeof(IValidator<>))
+                                               .Distinct()
+                                               .ToList();
 
-        if (validatorType is null) {
-            throw new AggregateException(implementationType.Name + "is not implement with IValidator<>.");
+        if (validatorTypes.Count == 0) {
+            throw new AggregateException(implementationType.Name + " does not implement IValidator<>.");
         }
 
-        var messageType = validatorType.GetGenericArguments().First();
-        var serviceType = typeof(IValidator<>).MakeGenericType(messageType);
+        foreach (var validatorType in validatorTypes) {
+            AddValidator(services, validatorType, implementationType, lifetime);
+        }
 
-        return AddValidator(services, serviceType, implementationType, lifetime);
+        return services;
     }
 
     /// <summary>
@@ -62,7 +88,7 @@ public static class ServiceCollectionExtensions
         Type               implementation,
         ServiceLifetime    lifetime = ServiceLifetime.Scoped
     ) {
-        services.TryAdd(new ServiceDescriptor(service, implementation, lifetime));
+        services.TryAddEnumerable(new ServiceDescriptor(service, implementation, lifetime));
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IValidationAdvisor<>), typeof(AdviceValidation<>)));
         services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IValidationAdvisor<>), typeof(AdviceValidationErrors<>)));

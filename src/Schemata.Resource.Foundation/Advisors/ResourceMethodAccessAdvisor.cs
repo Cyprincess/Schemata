@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
@@ -7,7 +6,7 @@ using Schemata.Security.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
 
-public sealed class ResourceMethodAccessAdvisor<TEntity, TRequest, TResponse>(IAccessProvider<TEntity, TRequest> access)
+public sealed class ResourceMethodAccessAdvisor<TEntity, TRequest, TResponse>(IAccessProvider<TEntity, TRequest> access, IPermissionResolver permissions)
     : IResourceMethodAdvisor<TEntity, TRequest, TResponse>
     where TEntity : class, ICanonicalName
     where TRequest : class
@@ -16,19 +15,17 @@ public sealed class ResourceMethodAccessAdvisor<TEntity, TRequest, TResponse>(IA
     public int Order => ResourceSecurityAdvisorOrders.Access;
 
     public async Task<AdviseResult> AdviseAsync(
-        AdviceContext     ctx,
-        TRequest          request,
-        TEntity           entity,
-        ClaimsPrincipal?  principal,
-        CancellationToken ct = default
+        AdviceContext                                         ctx,
+        ResourceMethodExecution<TEntity, TRequest, TResponse> execution,
+        CancellationToken                                     ct = default
     ) {
-        if (!ctx.TryGet<ResourceMethodVerb>(out var method) || method is null
-                                                            || AnonymousAccess.IsAnonymous<TEntity>(method.Verb)) {
+        if (AnonymousAccess.IsAnonymous<TEntity>(execution.Verb)) {
             return AdviseResult.Continue;
         }
 
-        await AuthorizeHelper.EnsureAsync(access, entity,
-                                          new() { Operation = method.Verb, Request = request }, entity.CanonicalName ?? string.Empty, principal, ct);
+        var entity = execution.Entity!;
+        await AuthorizeHelper.EnsureAsync(access, permissions, entity,
+                                          new() { Operation = execution.Verb, Request = execution.Request, Stage = AccessStage.Instance, Name = entity.CanonicalName }, entity.CanonicalName ?? string.Empty, execution.Principal, ct);
         return AdviseResult.Continue;
     }
 }

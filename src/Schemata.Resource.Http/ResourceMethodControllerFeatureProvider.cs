@@ -23,12 +23,16 @@ public sealed class ResourceMethodControllerFeatureProvider : IApplicationFeatur
     #region IApplicationFeatureProvider<ControllerFeature> Members
 
     public void PopulateFeature(IEnumerable<ApplicationPart> parts, ControllerFeature feature) {
-        foreach (var resource in Registry?.Resources ?? []) {
+        if (Registry is not { } registry) {
+            return;
+        }
+
+        foreach (var resource in registry.Resources) {
             if (!HttpResourceHelper.IsHttpEnabled(resource)) {
                 continue;
             }
 
-            foreach (var method in Registry!.GetMethods(resource.Entity)) {
+            foreach (var method in registry.GetMethods(resource.Entity)) {
                 var descriptor = ResourceMethodHandlerHelper.Describe(resource.Entity, method.Handler);
                 if (descriptor is null) {
                     continue;

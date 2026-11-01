@@ -6,6 +6,7 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Abstractions.Resource;
 using Schemata.Common;
 using Schemata.Resource.Foundation.Advisors;
 using Xunit;
@@ -18,9 +19,9 @@ public class AdviceApplyChildParentShould
     public async Task NonChildRequest_IsNoOp() {
         var entity  = new HostEntity { Tenant = "preset", Name = "h" };
         var request = new PlainRequest { Name = "h" };
-        var advisor = new AdviceApplyChildParent<HostEntity, PlainRequest>();
+        var advisor = new AdviceApplyChildParent<HostEntity, PlainRequest, HostRequest>();
 
-        var result = await advisor.AdviseAsync(EmptyContext(), request, entity, null);
+        var result = await advisor.AdviseAsync(EmptyContext(), request, entity, null, new HandledResponse<UpdateResultBase<HostRequest>>());
 
         Assert.Equal(AdviseResult.Continue, result);
         Assert.Equal("preset", entity.Tenant);
@@ -30,9 +31,9 @@ public class AdviceApplyChildParentShould
     public async Task BlankParent_IsNoOp() {
         var entity  = new HostEntity { Tenant = "preset", Name = "h" };
         var request = new HostRequest { Parent = null, Name = "h" };
-        var advisor = new AdviceApplyChildParent<HostEntity, HostRequest>();
+        var advisor = new AdviceApplyChildParent<HostEntity, HostRequest, HostRequest>();
 
-        var result = await advisor.AdviseAsync(EmptyContext(), request, entity, null);
+        var result = await advisor.AdviseAsync(EmptyContext(), request, entity, null, new HandledResponse<UpdateResultBase<HostRequest>>());
 
         Assert.Equal(AdviseResult.Continue, result);
         Assert.Equal("preset", entity.Tenant);
@@ -42,10 +43,10 @@ public class AdviceApplyChildParentShould
     public async Task WildcardParent_Throws_CrossParentUnsupported() {
         var entity  = new HostEntity { Tenant = "preset", Name = "h" };
         var request = new HostRequest { Parent = "tenants/-", Name = "h" };
-        var advisor = new AdviceApplyChildParent<HostEntity, HostRequest>();
+        var advisor = new AdviceApplyChildParent<HostEntity, HostRequest, HostRequest>();
 
         var ex = await Assert.ThrowsAsync<ValidationException>(
-            () => advisor.AdviseAsync(EmptyContext(), request, entity, null));
+            () => advisor.AdviseAsync(EmptyContext(), request, entity, null, new HandledResponse<UpdateResultBase<HostRequest>>()));
 
         Assert.NotNull(ex.Details);
         var violation = Assert.Single(ex.Details!,
@@ -59,10 +60,10 @@ public class AdviceApplyChildParentShould
     public async Task MalformedParent_Throws_InvalidParent() {
         var entity  = new HostEntity { Tenant = "preset", Name = "h" };
         var request = new HostRequest { Parent = "wrong-collection/x", Name = "h" };
-        var advisor = new AdviceApplyChildParent<HostEntity, HostRequest>();
+        var advisor = new AdviceApplyChildParent<HostEntity, HostRequest, HostRequest>();
 
         var ex = await Assert.ThrowsAsync<ValidationException>(
-            () => advisor.AdviseAsync(EmptyContext(), request, entity, null));
+            () => advisor.AdviseAsync(EmptyContext(), request, entity, null, new HandledResponse<UpdateResultBase<HostRequest>>()));
 
         Assert.NotNull(ex.Details);
         var violation = Assert.Single(ex.Details!,
@@ -76,9 +77,9 @@ public class AdviceApplyChildParentShould
     public async Task ValidParent_Writes_StructuralField() {
         var entity  = new HostEntity { Tenant = "preset", Name = "h" };
         var request = new HostRequest { Parent = "tenants/acme", Name = "h" };
-        var advisor = new AdviceApplyChildParent<HostEntity, HostRequest>();
+        var advisor = new AdviceApplyChildParent<HostEntity, HostRequest, HostRequest>();
 
-        var result = await advisor.AdviseAsync(EmptyContext(), request, entity, null);
+        var result = await advisor.AdviseAsync(EmptyContext(), request, entity, null, new HandledResponse<UpdateResultBase<HostRequest>>());
 
         Assert.Equal(AdviseResult.Continue, result);
         Assert.Equal("acme", entity.Tenant);
@@ -100,10 +101,10 @@ public class AdviceApplyChildParentShould
     public async Task PreferTheRouteParent_OverTheCreateBodyParent() {
         var entity  = new HostEntity { Name = "h" };
         var request = new HostRequest { Parent = "tenants/b", Name = "h" };
-        var advisor = new AdviceApplyChildParent<HostEntity, HostRequest>();
+        var advisor = new AdviceApplyChildParent<HostEntity, HostRequest, HostRequest>();
 
         Descriptor().SetParentFromRouteValues(request, new Dictionary<string, object?> { ["tenant"] = "a" });
-        await advisor.AdviseAsync(EmptyContext(), request, entity, null);
+        await advisor.AdviseAsync(EmptyContext(), request, entity, null, new HandledResponse<UpdateResultBase<HostRequest>>());
 
         Assert.Equal("tenants/a", request.Parent);
         Assert.Equal("a", entity.Tenant);
@@ -113,10 +114,10 @@ public class AdviceApplyChildParentShould
     public async Task KeepTheCreateBodyParent_WhenTheRouteCarriesNoParent() {
         var entity  = new HostEntity { Name = "h" };
         var request = new HostRequest { Parent = "tenants/b", Name = "h" };
-        var advisor = new AdviceApplyChildParent<HostEntity, HostRequest>();
+        var advisor = new AdviceApplyChildParent<HostEntity, HostRequest, HostRequest>();
 
         Descriptor().SetParentFromRouteValues(request, new Dictionary<string, object?>());
-        await advisor.AdviseAsync(EmptyContext(), request, entity, null);
+        await advisor.AdviseAsync(EmptyContext(), request, entity, null, new HandledResponse<UpdateResultBase<HostRequest>>());
 
         Assert.Equal("b", entity.Tenant);
     }

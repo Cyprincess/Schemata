@@ -10,6 +10,7 @@ using Schemata.Messaging.Skeleton;
 using Schemata.Resource.Foundation.Commands;
 using Schemata.Scheduling.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Resource.Foundation;
 
@@ -32,6 +33,7 @@ public sealed class PurgeHandler<TEntity> : IRequestHandler<PurgeResourceRequest
 
     public async Task<Operation> HandleAsync(
         PurgeResourceRequest<TEntity> request,
+        AdviceContext                 advice,
         CancellationToken             ct = default
     ) {
         _ = PurgeFilter.Compile<TEntity>(_services, request.Filter, request.Language);

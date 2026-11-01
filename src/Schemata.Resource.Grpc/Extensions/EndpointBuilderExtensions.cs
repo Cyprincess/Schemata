@@ -26,7 +26,7 @@ public static class EndpointBuilderExtensions
     /// <summary>
     ///     Maps a resource service for every gRPC-enabled resource in <paramref name="registry" />,
     ///     applying the resource's rate-limit policy and authentication scheme. A resource that
-    ///     declares its own <see cref="ResourceAttribute.AuthenticationScheme" /> overrides
+    ///     declares its own <see cref="ResourceRegistration.AuthenticationScheme" /> overrides
     ///     <paramref name="scheme" />.
     /// </summary>
     /// <param name="endpoints">The endpoint route builder.</param>
@@ -46,11 +46,15 @@ public static class EndpointBuilderExtensions
                 continue;
             }
 
-            var service = typeof(ResourceService<,,,>).MakeGenericType(resource.Entity, resource.Request!, resource.Detail!, resource.Summary!);
+            var service = typeof(ResourceService<,,,>).MakeGenericType(resource.Entity, resource.Request, resource.Detail, resource.Summary);
 
             if (MapGrpcService(endpoints, service) is not IEndpointConventionBuilder builder) {
-                continue;
+                throw new InvalidOperationException(
+                    $"Mapping gRPC service '{service.FullName}' for resource '{resource.Entity.FullName}' returned no endpoint builder; "
+                    + "the resource's endpoints would be silently dropped.");
             }
+
+            builder.WithMetadata(resource);
 
             var quota = resource.Entity.GetCustomAttribute<RateLimitPolicyAttribute>();
             if (quota is not null) {
@@ -59,8 +63,10 @@ public static class EndpointBuilderExtensions
 
             var required = resource.AuthenticationScheme ?? scheme;
             if (!string.IsNullOrWhiteSpace(required)) {
+                // A declared scheme means authentication must succeed; [Anonymous] operations are
+                // exempted per method by the service method provider, matching the HTTP filter.
                 var policy = new AuthorizationPolicyBuilder(required)
-                            .RequireAssertion(_ => true)
+                            .RequireAuthenticatedUser()
                             .Build();
                 builder.RequireAuthorization(policy);
             }
@@ -70,6 +76,18 @@ public static class EndpointBuilderExtensions
     }
 
     private static object? MapGrpcService(IEndpointRouteBuilder endpoints, Type serviceType) {
-        return MapGrpcServiceMethod?.MakeGenericMethod(serviceType).Invoke(null, [endpoints]);
+        if (MapGrpcServiceMethod is null) {
+            throw new InvalidOperationException(
+                $"{typeof(GrpcEndpointRouteBuilderExtensions).FullName}.{nameof(GrpcEndpointRouteBuilderExtensions.MapGrpcService)} "
+                + "could not be located; the gRPC server dependencies may be missing or incompatible.");
+        }
+
+        try {
+            return MapGrpcServiceMethod.MakeGenericMethod(serviceType).Invoke(null, [endpoints]);
+        } catch (TargetInvocationException e) when (e.InnerException is not null) {
+            // Propagate the actual binder failure instead of swallowing the resource's endpoints.
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(e.InnerException).Throw();
+            throw;
+        }
     }
 }

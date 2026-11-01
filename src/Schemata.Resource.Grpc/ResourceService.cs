@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoBuf.Grpc;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Messaging.Skeleton;
 using Schemata.Resource.Foundation.Commands;
@@ -37,6 +40,13 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary>
     protected readonly IServiceProvider                                                    Services;
 
     /// <summary>
+    ///     The scope the current request executes in. gRPC service activation happens over the
+    ///     provider captured at endpoint setup; request-bound infrastructure (tenant state) lives
+    ///     in <c>HttpContext.RequestServices</c>, so request work resolves from it when present.
+    /// </summary>
+    protected IServiceProvider RequestServices => Http?.RequestServices ?? Services;
+
+    /// <summary>
     ///     Initializes a new instance with the scoped service provider and HTTP context accessor.
     /// </summary>
     /// <param name="services">The scoped service provider used to resolve request handlers.</param>
@@ -56,40 +66,56 @@ public class ResourceService<TEntity, TRequest, TDetail, TSummary>
 
     #region IResourceService<TEntity,TRequest,TDetail,TSummary> Members
 
-    public virtual async ValueTask<ListResultBase<TSummary>> ListAsync(ListRequest request, CallContext context = default) {
-        var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
-        return await dispatcher.SendAsync<ListResourceQueryRequest<TEntity, TSummary>, ListResultBase<TSummary>>(
+    public virtual async ValueTask<ListResultBase<TEntity, TSummary>> ListAsync(ListRequest request, CallContext context = default) {
+        var dispatcher = RequestServices.GetRequiredService<IRequestDispatcher>();
+        return await dispatcher.SendAsync<ListResourceQueryRequest<TEntity, TSummary>, ListResultBase<TEntity, TSummary>>(
             new(request, Http?.User), context.CancellationToken);
     }
 
     public virtual async ValueTask<TDetail> GetAsync(GetRequest request, CallContext context = default) {
-        var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
+        var dispatcher = RequestServices.GetRequiredService<IRequestDispatcher>();
         var result = await dispatcher.SendAsync<GetResourceQueryRequest<TEntity, TDetail>, GetResultBase<TDetail>>(
             new(request, Http?.User), context.CancellationToken);
 
         return result.Detail!;
     }
 
-    public virtual async ValueTask<TDetail> CreateAsync(TRequest request, CallContext context = default) {
-        var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
+    public virtual async ValueTask<TDetail?> CreateAsync(TRequest request, CallContext context = default) {
+        var dispatcher = RequestServices.GetRequiredService<IRequestDispatcher>();
         var result = await dispatcher.SendAsync<CreateResourceRequest<TEntity, TRequest, TDetail>, CreateResultBase<TDetail>>(
             new(request, Http?.User), context.CancellationToken);
 
-        return result.Detail!;
+        return result.Detail;
     }
 
-    public virtual async ValueTask<TDetail> UpdateAsync(TRequest request, CallContext context = default) {
-        var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
-        var result = await dispatcher.SendAsync<UpdateResourceRequest<TEntity, TRequest, TDetail>, UpdateResultBase<TDetail>>(
-            new(request.CanonicalName!, request, Http?.User), context.CancellationToken);
+    public virtual async ValueTask<TDetail?> UpdateAsync(TRequest request, CallContext context = default) {
+        if (string.IsNullOrWhiteSpace(request.CanonicalName)) {
+            throw new InvalidArgumentException(
+                SchemataResources.REQUEST_FIELD_REQUIRED,
+                new Dictionary<string, string?> {
+                    ["field"] = $"{typeof(TRequest).Name}.{nameof(ICanonicalName.CanonicalName)}",
+                });
+        }
 
-        return result.Detail!;
+        var dispatcher = RequestServices.GetRequiredService<IRequestDispatcher>();
+        var result = await dispatcher.SendAsync<UpdateResourceRequest<TEntity, TRequest, TDetail>, UpdateResultBase<TDetail>>(
+            new(request.CanonicalName, request, Http?.User), context.CancellationToken);
+
+        return result.Detail;
     }
 
     public virtual async ValueTask<TDetail?> DeleteAsync(DeleteRequest request, CallContext context = default) {
-        var dispatcher = Services.GetRequiredService<IRequestDispatcher>();
+        if (string.IsNullOrWhiteSpace(request.CanonicalName)) {
+            throw new InvalidArgumentException(
+                SchemataResources.REQUEST_FIELD_REQUIRED,
+                new Dictionary<string, string?> {
+                    ["field"] = $"{nameof(DeleteRequest)}.{nameof(ICanonicalName.CanonicalName)}",
+                });
+        }
+
+        var dispatcher = RequestServices.GetRequiredService<IRequestDispatcher>();
         var result = await dispatcher.SendAsync<DeleteResourceRequest<TEntity, TDetail>, DeleteResultBase<TDetail>>(
-            new(request.CanonicalName!, request.Etag, Http?.User, request.AllowMissing), context.CancellationToken);
+            new(request.CanonicalName, request.Etag, Http?.User, request.AllowMissing), context.CancellationToken);
 
         return result.Detail;
     }

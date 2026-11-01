@@ -4,6 +4,8 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Entity.Repository.Advisors;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Event.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Entities;
@@ -25,6 +27,9 @@ public sealed class RepositoryFixture : IAsyncLifetime
         await _connection.OpenAsync();
 
         var services = new ServiceCollection();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IRepositoryAddAdvisor<SchemataProcess>, Schemata.Flow.Tests.FlowTestCreation.NameAdvisor<SchemataProcess>>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IRepositoryAddAdvisor<SchemataProcessToken>, Schemata.Flow.Tests.FlowTestCreation.NameAdvisor<SchemataProcessToken>>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IRepositoryAddAdvisor<SchemataProcessTransition>, Schemata.Flow.Tests.FlowTestCreation.NameAdvisor<SchemataProcessTransition>>());
 
         services.AddDbContextFactory<TestDbContext>(opts => opts.UseSqlite(_connection)
                                                        .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());

@@ -9,6 +9,7 @@ using Schemata.Messaging.Skeleton;
 using Schemata.Resource.Http;
 using Xunit;
 
+using Schemata.Abstractions.Advisors;
 namespace Schemata.Resource.Tests.Http;
 
 public class ResourceMethodControllerFeatureProviderShould
@@ -80,7 +81,7 @@ public class ResourceMethodControllerFeatureProviderShould
     [Fact]
     public void SkipMethods_WhenResourceIsNotRegistered() {
         var provider = new ResourceMethodControllerFeatureProvider {
-            Registry = new ResourceRegistry(),
+            Registry = new(),
         };
         var feature = new ControllerFeature();
 
@@ -118,6 +119,7 @@ public class ResourceMethodControllerFeatureProviderShould
     {
         public Task<ResponseA> HandleAsync(
             RequestA        request,
+AdviceContext context,
             CancellationToken ct = default
         ) {
             return Task.FromResult(new ResponseA());
@@ -132,6 +134,7 @@ public class ResourceMethodControllerFeatureProviderShould
     {
         public Task<ResponseA> HandleAsync(
             RequestB        request,
+AdviceContext context,
             CancellationToken ct = default
         ) {
             return Task.FromResult(new ResponseA());

@@ -22,7 +22,7 @@ public static class AdviceUpdateTimestamp
 /// <typeparam name="TEntity">The entity type being updated.</typeparam>
 /// <remarks>
 ///     Runs first in the update pipeline. Only activates for entities implementing
-///     <see cref="ITimestamp" />. Suppressed by <see cref="TimestampSuppressed" />.
+///     <see cref="ITimestamp" />.
 /// </remarks>
 public sealed class AdviceUpdateTimestamp<TEntity>(TimeProvider? time = null) : IRepositoryUpdateAdvisor<TEntity>
     where TEntity : class
@@ -37,12 +37,9 @@ public sealed class AdviceUpdateTimestamp<TEntity>(TimeProvider? time = null) : 
         AdviceContext        ctx,
         IRepository<TEntity> repository,
         TEntity              entity,
+        MutationOptions      options,
         CancellationToken    ct
     ) {
-        if (ctx.Has<TimestampSuppressed>()) {
-            return Task.FromResult(AdviseResult.Continue);
-        }
-
         if (entity is not ITimestamp time) {
             return Task.FromResult(AdviseResult.Continue);
         }

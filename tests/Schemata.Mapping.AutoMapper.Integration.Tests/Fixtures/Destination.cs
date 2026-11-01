@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Schemata.Mapping.AutoMapper.Integration.Tests.Fixtures;
 
 public class Destination
@@ -13,4 +15,12 @@ public class Destination
     public string? Nickname { get; set; }
 
     public DestinationProfile? Profile { get; set; }
+
+    public string? Title { get; set; }
+
+    public DestinationAddress? Address { get; set; }
+
+    public DestinationSettings? Settings { get; set; }
+
+    public List<string>? Tags { get; set; }
 }

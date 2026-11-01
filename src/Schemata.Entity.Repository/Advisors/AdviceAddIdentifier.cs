@@ -27,6 +27,7 @@ public sealed class AdviceAddIdentifier<TEntity> : IRepositoryAddAdvisor<TEntity
         AdviceContext        ctx,
         IRepository<TEntity> repository,
         TEntity              entity,
+        MutationOptions      options,
         CancellationToken    ct
     ) {
         if (entity is IIdentifier { Uid: var uid } identified && uid == Guid.Empty) {

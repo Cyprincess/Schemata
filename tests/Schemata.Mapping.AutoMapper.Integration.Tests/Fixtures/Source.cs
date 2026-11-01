@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Schemata.Mapping.AutoMapper.Integration.Tests.Fixtures;
 
 public class Source
@@ -13,4 +15,10 @@ public class Source
     public string? Nickname { get; set; }
 
     public SourceProfile? Profile { get; set; }
+
+    public SourceAddress? Address { get; set; }
+
+    public SourceSettings? Settings { get; set; }
+
+    public List<string>? Tags { get; set; }
 }

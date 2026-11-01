@@ -21,7 +21,7 @@ public class AdviceAddTimestampShould
         var repository = new Mock<IRepository<Student>>().Object;
         var entity     = new Student { CreateTime = null, UpdateTime = null };
 
-        var result = await advisor.AdviseAsync(ctx, repository, entity, CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, repository, entity, default, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
         Assert.Equal(now.UtcDateTime, entity.CreateTime);
@@ -35,7 +35,7 @@ public class AdviceAddTimestampShould
         var repository = new Mock<IRepository<Student>>().Object;
         var entity     = new Student { CreateTime = null, UpdateTime = null };
 
-        await advisor.AdviseAsync(ctx, repository, entity, CancellationToken.None);
+        await advisor.AdviseAsync(ctx, repository, entity, default, CancellationToken.None);
 
         Assert.Equal(entity.CreateTime, entity.UpdateTime);
     }
@@ -47,23 +47,8 @@ public class AdviceAddTimestampShould
         var repository = new Mock<IRepository<PlainEntity>>().Object;
         var entity     = new PlainEntity();
 
-        var result = await advisor.AdviseAsync(ctx, repository, entity, CancellationToken.None);
+        var result = await advisor.AdviseAsync(ctx, repository, entity, default, CancellationToken.None);
 
         Assert.Equal(AdviseResult.Continue, result);
-    }
-
-    [Fact]
-    public async Task Advise_Suppressed_DoesNotSetTimes() {
-        var advisor = new AdviceAddTimestamp<Student>();
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
-        ctx.Set(new TimestampSuppressed());
-        var repository = new Mock<IRepository<Student>>().Object;
-        var entity     = new Student { CreateTime = null, UpdateTime = null };
-
-        var result = await advisor.AdviseAsync(ctx, repository, entity, CancellationToken.None);
-
-        Assert.Equal(AdviseResult.Continue, result);
-        Assert.Null(entity.CreateTime);
-        Assert.Null(entity.UpdateTime);
     }
 }
