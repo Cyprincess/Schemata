@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Messaging.Skeleton.Commands;
 
@@ -23,7 +24,7 @@ public sealed class ResourceMethodForwardHandler<TEntity, TRequest, TResponse>(I
 {
     #region IRequestHandler<ResourceMethodRequest<TEntity,TRequest,TResponse>,TResponse> Members
 
-    public Task<TResponse> HandleAsync(ResourceMethodRequest<TEntity, TRequest, TResponse> request, CancellationToken ct = default) {
+    public Task<TResponse> HandleAsync(ResourceMethodRequest<TEntity, TRequest, TResponse> request, AdviceContext context, CancellationToken ct = default) {
         if (request.Request is IRequestPrincipal principal) {
             principal.Principal = request.Principal;
         }

@@ -11,12 +11,12 @@ namespace Schemata.Transport.Grpc;
 public interface IProtoTypeContributor
 {
     /// <summary>
-    ///     Entity / summary types registered both standalone and wrapped as
-    ///     <c>ListResultBase&lt;TSummary&gt;</c> per AIP-132.
+    ///     Identity / item type pairs whose item is registered standalone and whose
+    ///     <c>ListResultBase&lt;TEntity, TItem&gt;</c> wrapper is registered per AIP-132.
     /// </summary>
     /// <param name="serviceProvider">The application service provider.</param>
-    /// <returns>The summary types to configure.</returns>
-    IReadOnlyList<Type> GetSummaryTypes(IServiceProvider serviceProvider);
+    /// <returns>The list type pairs to configure.</returns>
+    IReadOnlyList<(Type Identity, Type Item)> GetListTypes(IServiceProvider serviceProvider);
 
     /// <summary>
     ///     Request / response DTOs that need trait field renames without a

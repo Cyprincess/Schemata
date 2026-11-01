@@ -11,6 +11,7 @@ using ProtoBuf.Grpc.Configuration;
 using Schemata.Common;
 using Schemata.Transport.Grpc;
 using Schemata.Transport.Grpc.Interceptors;
+using Schemata.Transport.Grpc.Linking;
 using ProtoServiceDescriptor = Google.Protobuf.Reflection.ServiceDescriptor;
 
 // ReSharper disable once CheckNamespace
@@ -48,9 +49,21 @@ public static class ServicesExtensions
     public static IServiceCollection AddSchemataGrpcTransport(this IServiceCollection services) {
         services.AddHttpContextAccessor();
 
-        services.AddCodeFirstGrpc(options => { options.Interceptors.Add<ExceptionMappingInterceptor>(); });
+        services.AddCodeFirstGrpc(null);
+        services.PostConfigure<GrpcServiceOptions>(options => {
+            if (!options.Interceptors.Any(interceptor => interceptor.Type == typeof(ExceptionMappingInterceptor))) {
+                options.Interceptors.Add<ExceptionMappingInterceptor>();
+            }
+
+            if (!options.Interceptors.Any(interceptor => interceptor.Type == typeof(GrpcLinkMetadataInterceptor))) {
+                options.Interceptors.Add<GrpcLinkMetadataInterceptor>();
+            }
+        });
 
         services.TryAddSingleton<ExceptionMappingInterceptor>();
+        services.TryAddSingleton<GrpcLinkMetadataInterceptor>();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IGrpcLinkContributor, ResourcePaginationLinkContributor>());
 
         services.TryAddSingleton(sp => new ReflectionServiceImpl(MergeDescriptors(sp)));
         services.TryAddSingleton(sp => new ReflectionV1ServiceImpl(MergeDescriptors(sp)));
@@ -59,18 +72,18 @@ public static class ServicesExtensions
     }
 
     private static ProtoServiceDescriptor[] MergeDescriptors(IServiceProvider sp) {
+        var epd = sp.GetRequiredService<EndpointDataSource>();
+        var protoFirst = ResolveProtoFirstDescriptors(epd).ToArray();
         var contributed = sp.GetServices<IGrpcServiceDescriptorContributor>()
                             .SelectMany(c => c.GetServiceDescriptors(sp));
-        var epd        = sp.GetRequiredService<EndpointDataSource>();
-        var protoFirst = ResolveProtoFirstDescriptors(epd);
         return contributed.Concat(protoFirst).ToArray();
     }
 
     private static IEnumerable<ProtoServiceDescriptor> ResolveProtoFirstDescriptors(EndpointDataSource epd) {
         return epd.Endpoints
                   .Select(e => e.Metadata.GetMetadata<GrpcMethodMetadata>())
-                  .Where(m => m is not null)
-                  .Select(m => m!.ServiceType)
+                  .OfType<GrpcMethodMetadata>()
+                  .Select(m => m.ServiceType)
                   .Distinct()
                   .Select(GetServiceDescriptor)
                   .Where(d => d is not null)

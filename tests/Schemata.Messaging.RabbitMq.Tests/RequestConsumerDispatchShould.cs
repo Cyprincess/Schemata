@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,16 +18,15 @@ namespace Schemata.Messaging.RabbitMq.Tests;
 ///     <see cref="InProcessRequestDispatcher" /> — never the interface <see cref="IRequestDispatcher" />
 ///     slot, which a configured outbound transport (e.g. RabbitMQ's own dispatcher) could own — and
 ///     calls <c>SendAsync</c> instead of resolving <see cref="IRequestHandler{TRequest, TResponse}" />
-///     directly, so command/query advisors run against the exact same ambient
-///     <see cref="AdviceContext" /> instance the handler observes via
-///     <see cref="AdviceContext.Current" />. Invokes the consumer host's private generic dispatch
+///     directly, so command/query advisors and the handler receive the same explicit
+///     <see cref="AdviceContext" /> instance. Invokes the consumer host's private generic dispatch
 ///     method directly (the exact code path <c>HandleAsync</c> calls through reflection), so no
 ///     broker connection, channel, or delivery is needed.
 /// </summary>
 public class RequestConsumerDispatchShould
 {
     [Fact]
-    public async Task RouteAConsumedCommand_ThroughTheScopedDispatcher_SoItsAdvisorRunsAndAmbientContextIsEstablished() {
+    public async Task RouteAConsumedCommand_ThroughTheScopedDispatcher_SoItsAdvisorAndHandlerShareOneContext() {
         var advisor = new RecordingCommandAdvisor();
 
         AdviceContext? observedByHandler = null;
@@ -36,16 +35,18 @@ public class RequestConsumerDispatchShould
         services.AddScoped<InProcessRequestDispatcher>();
         services.AddSingleton<IRequestPipelineAdvisor<Ping, Unit>>(advisor);
         services.AddScoped<IRequestHandler<Ping, Unit>>(
-            _ => new PingHandler(() => observedByHandler = AdviceContext.Current));
+            _ => new PingHandler(context => observedByHandler = context));
 
         await using var provider = services.BuildServiceProvider();
         await using var scope    = provider.CreateAsyncScope();
 
         var method = typeof(RabbitMqRequestConsumerHost)
-                    .GetMethod("InvokeHandlerAsync", BindingFlags.NonPublic | BindingFlags.Static)!
-                    .MakeGenericMethod(typeof(Ping), typeof(Unit));
+                    .GetMethod("InvokeHandlerAsync", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        var invoke = method.MakeGenericMethod(typeof(Ping), typeof(Unit));
 
-        var task = (Task<object?>)method.Invoke(null, [scope.ServiceProvider, new Ping(), CancellationToken.None])!;
+        var task = Assert.IsAssignableFrom<Task<object?>>(
+            invoke.Invoke(null, [scope.ServiceProvider, new Ping(), CancellationToken.None]));
         await task;
 
         Assert.True(advisor.Invoked);
@@ -67,20 +68,23 @@ public class RequestConsumerDispatchShould
         services.AddRabbitMqRequestDispatcher(_ => { });
         services.AddSingleton<IRequestPipelineAdvisor<Ping, Unit>>(advisor);
         services.AddScoped<IRequestHandler<Ping, Unit>>(
-            _ => new PingHandler(() => observedByHandler = AdviceContext.Current));
+            _ => new PingHandler(context => observedByHandler = context));
 
         await using var provider = services.BuildServiceProvider();
         await using var scope    = provider.CreateAsyncScope();
 
         var method = typeof(RabbitMqRequestConsumerHost)
-                    .GetMethod("InvokeHandlerAsync", BindingFlags.NonPublic | BindingFlags.Static)!
-                    .MakeGenericMethod(typeof(Ping), typeof(Unit));
+                    .GetMethod("InvokeHandlerAsync", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        var invoke = method.MakeGenericMethod(typeof(Ping), typeof(Unit));
 
-        var task = (Task<object?>)method.Invoke(null, [scope.ServiceProvider, new Ping(), CancellationToken.None])!;
+        var task = Assert.IsAssignableFrom<Task<object?>>(
+            invoke.Invoke(null, [scope.ServiceProvider, new Ping(), CancellationToken.None]));
         await task;
 
         Assert.True(advisor.Invoked);
         Assert.NotNull(observedByHandler);
+        Assert.Same(advisor.ObservedContext, observedByHandler);
     }
 
     private sealed record Ping : ICommand;
@@ -104,10 +108,10 @@ public class RequestConsumerDispatchShould
         }
     }
 
-    private sealed class PingHandler(Action onHandle) : IRequestHandler<Ping, Unit>
+    private sealed class PingHandler(Action<AdviceContext> onHandle) : IRequestHandler<Ping, Unit>
     {
-        public Task<Unit> HandleAsync(Ping request, CancellationToken ct = default) {
-            onHandle();
+        public Task<Unit> HandleAsync(Ping request, AdviceContext context, CancellationToken ct = default) {
+            onHandle(context);
             return Task.FromResult(Unit.Value);
         }
     }

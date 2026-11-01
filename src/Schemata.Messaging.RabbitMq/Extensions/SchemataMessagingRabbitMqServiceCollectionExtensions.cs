@@ -51,11 +51,13 @@ public static class SchemataMessagingRabbitMqServiceCollectionExtensions
         services.TryAddScoped<IRequestDispatcher>(sp => sp.GetRequiredService<RabbitMqRequestDispatcher>());
         services.TryAddScoped<ICommandDispatcher>(sp => sp.GetRequiredService<RabbitMqRequestDispatcher>());
         services.TryAddScoped<IQueryDispatcher>(sp => sp.GetRequiredService<RabbitMqRequestDispatcher>());
+        services.Replace(ServiceDescriptor.Scoped<IStreamDispatcher>(sp => sp.GetRequiredService<RabbitMqRequestDispatcher>()));
 
         // The consumer host resolves this concrete type directly (never the interfaces above) to
         // run a consumed request's local pipeline; self-register it so a standalone configuration
         // (RabbitMQ transport with no domain module) still has it available.
         services.TryAddScoped<InProcessRequestDispatcher>();
+        services.TryAddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>();
 
         services.AddHostedService<RabbitMqRequestConsumerHost>();
 

@@ -13,11 +13,8 @@ public class RabbitMqEventOptions
     /// <summary>Exchange type (<c>topic</c>, <c>direct</c>, <c>fanout</c>, <c>headers</c>).</summary>
     public string ExchangeType { get; set; } = "topic";
 
-    /// <summary>Queue the consumer host declares and binds to <see cref="ExchangeName"/>.</summary>
+    /// <summary>Queue the consumer host declares and binds to <see cref="ExchangeName" />.</summary>
     public string QueueName { get; set; } = "schemata.consumer";
-
-    /// <summary>Request/response wait-for-reply timeout in milliseconds.</summary>
-    public int RequestTimeoutMs { get; set; } = 30000;
 
     /// <summary>
     ///     Number of messages the broker may deliver before the consumer must acknowledge.

@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -30,13 +32,13 @@ internal sealed class RabbitMqRequestConsumerHost : BackgroundService
     private readonly JsonSerializerOptions                    _json;
     private readonly ILogger<RabbitMqRequestConsumerHost>?    _logger;
     private readonly IOptions<RabbitMqRequestOptions>         _options;
-    private readonly IServiceScopeFactory                     _scopes;
+    private readonly IMessageExecutionScopeFactory _scopes;
     private          IChannel?                                _channel;
 
     public RabbitMqRequestConsumerHost(
         IOptions<RabbitMqRequestOptions>       options,
         IRabbitMqConnectionProvider            connections,
-        IServiceScopeFactory                   scopes,
+        IMessageExecutionScopeFactory         scopes,
         IOptions<JsonSerializerOptions>?       json   = null,
         ILogger<RabbitMqRequestConsumerHost>?  logger = null
     ) {
@@ -47,16 +49,6 @@ internal sealed class RabbitMqRequestConsumerHost : BackgroundService
         _logger      = logger;
     }
 
-    public override async Task StopAsync(CancellationToken ct) {
-        if (_channel is { } channel) {
-            _channel = null;
-            await channel.CloseAsync(ct);
-            channel.Dispose();
-        }
-
-        await base.StopAsync(ct);
-    }
-
     protected override async Task ExecuteAsync(CancellationToken ct) {
         var queue = _options.Value.QueueName;
         if (string.IsNullOrWhiteSpace(queue)) {
@@ -64,7 +56,8 @@ internal sealed class RabbitMqRequestConsumerHost : BackgroundService
         }
 
         var connection = await _connections.GetConnectionAsync(ct);
-        _channel = await connection.CreateChannelAsync(cancellationToken: ct);
+        await using var channel = await connection.CreateChannelAsync(cancellationToken: ct);
+        _channel = channel;
 
         await _channel.ExchangeDeclareAsync(_options.Value.ExchangeName, _options.Value.ExchangeType, true,
                                             cancellationToken: ct);
@@ -75,9 +68,22 @@ internal sealed class RabbitMqRequestConsumerHost : BackgroundService
         }
 
         var consumer = new AsyncEventingBasicConsumer(_channel);
-        consumer.ReceivedAsync += (_, ea) => HandleAsync(ea, ct);
+        var failure = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        consumer.ReceivedAsync += async (_, ea) => {
+            try {
+                await HandleAsync(ea, ct);
+            } catch (Exception ex) {
+                failure.TrySetException(ex);
+                throw;
+            }
+        };
 
         await _channel.BasicConsumeAsync(queue, true, consumer, ct);
+        try {
+            await failure.Task.WaitAsync(ct);
+        } finally {
+            _channel = null;
+        }
     }
 
     private async Task HandleAsync(BasicDeliverEventArgs ea, CancellationToken ct) {
@@ -87,15 +93,15 @@ internal sealed class RabbitMqRequestConsumerHost : BackgroundService
             return;
         }
 
+        object? result;
         try {
-            // One scope per message. The handler and everything it resolves must come from a scope
-            // that carries the caller's context, not from the host's root provider.
-            await using var scope = _scopes.CreateAsyncScope();
-
-            var items = MessageContextHeaders.Read(ea.BasicProperties.Headers);
-            foreach (var propagator in scope.ServiceProvider.GetServices<IMessageContextPropagator>()) {
-                await propagator.RestoreAsync(items, scope.ServiceProvider, ct);
-            }
+            var context = new MessageContext(MessageContextHeaders.Read(ea.BasicProperties.Headers));
+            var scope = await _scopes.CreateAsync(context, ct);
+            IDisposable? execution = null;
+            Exception? failure = null;
+            try {
+                execution = scope.Enter();
+            await scope.RestoreAsync(context, ct);
 
             var body    = Encoding.UTF8.GetString(ea.Body.Span);
             var request = JsonSerializer.Deserialize(body, binding.Request, _json);
@@ -104,14 +110,29 @@ internal sealed class RabbitMqRequestConsumerHost : BackgroundService
             }
 
             var invoke = InvokeHandler.MakeGenericMethod(binding.Request, binding.Response);
-            var task   = (Task<object?>)invoke.Invoke(null, [scope.ServiceProvider, request, ct])!;
-            var result = await task;
-
-            await ReplyAsync(ea, result, ct);
+            var task   = (Task<object?>)invoke.Invoke(null, [scope.Services, request, ct])!;
+            result = await task;
+            } catch (Exception error) {
+                failure = error;
+                throw;
+            } finally {
+                Exception? cleanup = null;
+                try { await scope.DisposeAsync(); }
+                catch (Exception error) { cleanup = error; }
+                try { execution?.Dispose(); }
+                catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
+                if (cleanup is not null) {
+                    ExceptionDispatchInfo.Capture(failure is null ? cleanup : new AggregateException(failure, cleanup)).Throw();
+                }
+            }
         } catch (Exception ex) {
-            // A handler failure must not take the consumer loop down; the caller sees a timeout.
+            // Handler failures are returned to the caller through the error envelope.
             _logger?.LogError(ex, "Request {RoutingKey} failed.", ea.RoutingKey);
+            await ReplyErrorAsync(ea, ex, ct);
+            return;
         }
+
+        await ReplyAsync(ea, result, ct);
     }
 
     private static async Task<object?> InvokeHandlerAsync<TRequest, TResponse>(
@@ -148,6 +169,26 @@ internal sealed class RabbitMqRequestConsumerHost : BackgroundService
         var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(result, _json));
 
         // Replies go through the default exchange straight to the caller's exclusive reply queue.
+        await channel.BasicPublishAsync(string.Empty, replyTo, true, props, body, ct);
+    }
+
+    private async Task ReplyErrorAsync(BasicDeliverEventArgs ea, Exception ex, CancellationToken ct) {
+        var replyTo = ea.BasicProperties.ReplyTo;
+        if (string.IsNullOrEmpty(replyTo) || _channel is not { } channel) {
+            return;
+        }
+
+        var props = new BasicProperties {
+            ContentType   = "application/json",
+            CorrelationId = ea.BasicProperties.CorrelationId,
+            Headers       = new Dictionary<string, object?> { [RequestErrorHeaders.RemoteError] = true },
+        };
+
+        // Only the stable reason code crosses the wire; the server's exception details must not
+        // leak to the caller.
+        var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(
+            new RemoteRequestError(ex is OperationCanceledException ? "cancelled" : "internal"), _json));
+
         await channel.BasicPublishAsync(string.Empty, replyTo, true, props, body, ct);
     }
 }

@@ -12,6 +12,7 @@ public sealed class RabbitMqConnectionProvider : IRabbitMqConnectionProvider, IA
     private readonly SemaphoreSlim                       _initializationLock = new(1, 1);
     private readonly IOptions<RabbitMqConnectionOptions> _options;
     private          IConnection?                        _connection;
+    private          bool                                _disposed;
 
     /// <summary>Initializes a provider that connects lazily on the first request.</summary>
     public RabbitMqConnectionProvider(IOptions<RabbitMqConnectionOptions> options) {
@@ -23,6 +24,8 @@ public sealed class RabbitMqConnectionProvider : IRabbitMqConnectionProvider, IA
     public async ValueTask DisposeAsync() {
         await _initializationLock.WaitAsync();
         try {
+            if (_disposed) return;
+            _disposed = true;
             if (_connection is { } connection) {
                 _connection = null;
                 await connection.DisposeAsync();
@@ -37,12 +40,9 @@ public sealed class RabbitMqConnectionProvider : IRabbitMqConnectionProvider, IA
     #region IRabbitMqConnectionProvider Members
 
     public async ValueTask<IConnection> GetConnectionAsync(CancellationToken ct = default) {
-        if (_connection is { } existingConnection) {
-            return existingConnection;
-        }
-
         await _initializationLock.WaitAsync(ct);
         try {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             if (_connection is { } initializedConnection) {
                 return initializedConnection;
             }

@@ -1,6 +1,5 @@
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Messaging.RabbitMq.Runtime;
 using Schemata.Messaging.Skeleton;
 using Schemata.Messaging.Skeleton.Runtime;
@@ -41,8 +40,6 @@ public class DispatcherRegistrationShould
         services.AddRabbitMqTransport();
         services.AddRabbitMqRequestDispatcher(_ => { });
 
-        // The four-line block every module capability extension (AddSchemataFlow and friends)
-        // adds. TryAdd means the RabbitMQ registration staged above wins.
         AddModuleInProcessDispatcherBlock(services);
 
         await using var provider = services.BuildServiceProvider();
@@ -67,9 +64,8 @@ public class DispatcherRegistrationShould
     }
 
     private static void AddModuleInProcessDispatcherBlock(IServiceCollection services) {
-        services.TryAddScoped<InProcessRequestDispatcher>();
-        services.TryAddScoped<IRequestDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<ICommandDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
-        services.TryAddScoped<IQueryDispatcher>(sp => sp.GetRequiredService<InProcessRequestDispatcher>());
+        // The registration every module capability extension (AddSchemataFlow and friends) shares.
+        // TryAdd inside means the RabbitMQ registration staged above wins.
+        services.AddInProcessRequestDispatcher();
     }
 }

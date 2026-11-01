@@ -17,8 +17,7 @@ public interface IEventLifecycleObserver
     Task OnPublishedAsync(EventContext context, CancellationToken ct = default);
 
     /// <summary>
-    ///     Fires after the broker confirms a durable publish (the outbox delivery path).
-    ///     Marks the audit row delivered for transports with a confirmation step.
+    ///     Fires after the broker confirms a durable publish.
     /// </summary>
     Task OnDeliveredAsync(EventContext context, CancellationToken ct = default) {
         return Task.CompletedTask;

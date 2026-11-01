@@ -153,22 +153,23 @@ public static class SchemataProtoModelConfigurator
     }
 
     /// <summary>
-    ///     Registers <see cref="ListResultBase{TSummary}" /> for the given
-    ///     <paramref name="summary" /> on <paramref name="model" />.
+    ///     Registers <see cref="ListResultBase{TEntity,TSummary}" /> for the given identity
+    ///     and item on <paramref name="model" />.
     /// </summary>
-    public static void ConfigureListResultType(RuntimeTypeModel model, Type summary) {
-        var response = typeof(ListResultBase<>).MakeGenericType(summary);
+    public static void ConfigureListResultType(RuntimeTypeModel model, Type identity, Type item) {
+        var response = typeof(ListResultBase<,>).MakeGenericType(identity, item);
         ConfigureType(model, response);
     }
 
     /// <summary>
-    ///     Registers each summary type and its <see cref="ListResultBase{TSummary}" />
+    ///     Registers each item type and its <see cref="ListResultBase{TEntity,TSummary}" />
     ///     wrapper on <paramref name="model" />.
     /// </summary>
-    public static void ConfigureSummaryTypes(RuntimeTypeModel model, IEnumerable<Type> summaryTypes) {
-        foreach (var type in summaryTypes) {
-            ConfigureType(model, type);
-            ConfigureListResultType(model, type);
+    public static void ConfigureListTypes(RuntimeTypeModel model, IEnumerable<(Type Identity, Type Item)> listTypes) {
+        foreach (var (identity, item) in listTypes) {
+            ConfigureType(model, item);
+            ConfigureListResultType(model, identity, item);
         }
     }
+
 }

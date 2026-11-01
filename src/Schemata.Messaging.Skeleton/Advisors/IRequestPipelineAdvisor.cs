@@ -11,8 +11,8 @@ namespace Schemata.Messaging.Skeleton.Advisors;
 /// </summary>
 /// <remarks>
 ///     The dispatcher composes registered advisors into a chain in ascending
-///     <see cref="IAdvisor.Order" />, with the handler at the tail, and shares one ambient
-///     <see cref="AdviceContext" /> across the whole chain and the handler. An advisor that does not
+///     <see cref="IAdvisor.Order" />, with the handler at the tail, and passes one
+///     <see cref="AdviceContext" /> through the whole chain and the handler. An advisor that does not
 ///     call <c>next</c> short-circuits: it returns a response it constructs, or throws to abort. The
 ///     request envelope is not passed to <c>next</c>, so an advisor cannot substitute the request
 ///     subject downstream.
@@ -25,7 +25,7 @@ public interface IRequestPipelineAdvisor<in TRequest, TResponse> : IAdvisor
     /// <summary>
     ///     Wraps the continuation for one dispatch of <paramref name="request" />.
     /// </summary>
-    /// <param name="ctx">The ambient <see cref="AdviceContext" /> shared with the handler.</param>
+    /// <param name="ctx">The dispatch's <see cref="AdviceContext" />, shared with the handler.</param>
     /// <param name="request">The request being dispatched.</param>
     /// <param name="next">The remainder of the pipeline; omit the call to short-circuit.</param>
     /// <param name="ct">A cancellation token.</param>

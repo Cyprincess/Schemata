@@ -14,6 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Schemata.Event.Foundation\Schemata.Event.Foundation.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Event.Skeleton\Schemata.Event.Skeleton.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Event.RabbitMq\Schemata.Event.RabbitMq.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Entity.EntityFrameworkCore\Schemata.Entity.EntityFrameworkCore.csproj" />
   </ItemGroup>
 

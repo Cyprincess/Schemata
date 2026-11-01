@@ -4,7 +4,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Core;
 using Schemata.Core.Features;
-using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Transport.Http.Features;
 
@@ -20,7 +19,7 @@ public sealed class SchemataTransportHttpFeature : FeatureBase
     /// <summary>
     ///     Default priority for the shared HTTP transport feature.
     /// </summary>
-    public const int DefaultPriority = Orders.Extension + 10_000_000;
+    public const int DefaultPriority = SchemataCorsFeature.DefaultPriority + 1_000_000;
 
     public override int Priority => DefaultPriority;
 
@@ -30,11 +29,13 @@ public sealed class SchemataTransportHttpFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) => services.AddSchemataJsonTraits();
+    ) => services.AddSchemataJsonTraits()
+                 .AddSchemataLinkHeaderShaping();
 
     public override void ConfigureApplication(
         IApplicationBuilder app,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) => app.UseSchemataExceptionHandler();
+    ) => app.UseSchemataRequestCulture()
+             .UseSchemataExceptionHandler();
 }

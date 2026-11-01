@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Schemata.Abstractions.Entities;
@@ -14,19 +15,26 @@ namespace Schemata.Event.Skeleton.Entities;
 public class SchemataEventSubscription : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
     /// <summary>Wire-format event name matched by this subscription.</summary>
-    public virtual string EventType { get; set; } = null!;
+    public virtual string EventType { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>Optional correlation key for one-to-one delivery.</summary>
     public virtual string? CorrelationKey { get; set; }
 
+    /// <summary>
+    ///     Optional business correlation filter. When set, the subscription matches only events whose
+    ///     <see cref="Schemata.Event.Skeleton.EventContext.Correlation" /> metadata contains every pair here (ordinal
+    ///     comparison); a null or empty filter matches every event of <see cref="EventType" />.
+    /// </summary>
+    public virtual Dictionary<string, string>? CorrelationFilter { get; set; }
+
     /// <summary>Subscription target identifier consumed by the delivering handler.</summary>
-    public virtual string Target { get; set; } = null!;
+    public virtual string Target { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>Canonical name of the token targeted by a message subscription.</summary>
     public virtual string? Token { get; set; }
 
     /// <summary>Stable subscription identifier; the unique lookup key used by the dispatcher.</summary>
-    public virtual string SubscriptionId { get; set; } = null!;
+    public virtual string SubscriptionId { get; set; } = null!; // EF Core materializes this required column.
 
     #region ICanonicalName Members
 

@@ -23,7 +23,7 @@ public interface IMessageContextPropagator
     /// <param name="source">The provider of the scope the message is being sent from.</param>
     void Capture(IDictionary<string, string?> items, IServiceProvider source);
 
-    /// <summary>Rebuilds this propagator's ambient state inside <paramref name="target" />.</summary>
+    /// <summary>Restores scoped state under the execution lease synchronously entered by the caller.</summary>
     /// <param name="items">The flattened state produced by <see cref="Capture" />.</param>
     /// <param name="target">The provider of the scope the message is being handled in.</param>
     /// <param name="ct">A cancellation token.</param>

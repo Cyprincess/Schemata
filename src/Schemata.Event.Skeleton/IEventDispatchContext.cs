@@ -9,7 +9,7 @@ namespace Schemata.Event.Skeleton;
 /// </summary>
 public interface IEventDispatchContext
 {
-    /// <summary>Subscriptions matched by the bus before handler invocation.</summary>
+    /// <summary>Subscriptions matched by the bus (event type and correlation filter) before handler invocation.</summary>
     IReadOnlyList<SchemataEventSubscription>? MatchedSubscriptions { get; }
 
     /// <summary>Assigns the matched subscriptions; called by the bus, not by handlers.</summary>

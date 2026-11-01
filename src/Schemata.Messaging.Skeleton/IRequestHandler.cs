@@ -1,5 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Messaging.Skeleton;
 
@@ -9,6 +10,11 @@ namespace Schemata.Messaging.Skeleton;
 public interface IRequestHandler<in TRequest, TResponse>
     where TRequest : IRequest<TResponse>
 {
-    /// <summary>Processes <paramref name="request" /> and returns the response.</summary>
-    Task<TResponse> HandleAsync(TRequest request, CancellationToken ct = default);
+    /// <summary>
+    ///     Processes <paramref name="request" /> and returns the response.
+    /// </summary>
+    /// <param name="request">The request to process.</param>
+    /// <param name="context">The dispatch's advisor context, shared with the request pipeline.</param>
+    /// <param name="ct">A cancellation token.</param>
+    Task<TResponse> HandleAsync(TRequest request, AdviceContext context, CancellationToken ct = default);
 }
