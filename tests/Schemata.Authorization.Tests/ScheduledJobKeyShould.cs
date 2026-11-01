@@ -1,5 +1,5 @@
 using Schemata.Authorization.Foundation.Services;
-using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Scheduling.Foundation.Runtime;
 using Xunit;
 
@@ -10,7 +10,7 @@ public class ScheduledJobKeyShould
     private static readonly char[] Unaddressable = ['`', '[', ']', ',', '=', ' ', '/'];
 
     [Fact]
-    public void KeepTheTokenCleanupKeyWithinThePersistedColumn() {
+    public void Keep_The_Token_Cleanup_Key_Within_The_Persisted_Column() {
         var registry = new DefaultScheduledJobRegistry();
         registry.RegisterAll([typeof(TokenCleanupJob<SchemataToken>)]);
 
@@ -22,7 +22,7 @@ public class ScheduledJobKeyShould
     }
 
     [Fact]
-    public void ResolveTheTokenCleanupJobBackFromItsPersistedKey() {
+    public void Resolve_The_Token_Cleanup_Job_Back_From_Its_Persisted_Key() {
         var registry = new DefaultScheduledJobRegistry();
         registry.RegisterAll([typeof(TokenCleanupJob<SchemataToken>)]);
 
@@ -31,14 +31,14 @@ public class ScheduledJobKeyShould
     }
 
     [Fact]
-    public void KeepTheBackChannelLogoutKeyAddressable() {
+    public void Keep_The_Back_Channel_Logout_Key_Addressable() {
         var registry = new DefaultScheduledJobRegistry();
-        registry.RegisterAll([typeof(BackChannelLogoutJob)]);
+        registry.RegisterAll([typeof(BackChannelLogoutJob<SchemataSecurity>)]);
 
-        var key = registry.ResolveKey(typeof(BackChannelLogoutJob))!;
+        var key = registry.ResolveKey(typeof(BackChannelLogoutJob<SchemataSecurity>))!;
 
         Assert.Equal("schemata.authorization.logout.backchannel", key);
-        Assert.Equal(typeof(BackChannelLogoutJob), registry.Resolve(key));
+        Assert.Equal(typeof(BackChannelLogoutJob<SchemataSecurity>), registry.Resolve(key));
         Assert.Equal(-1, key.IndexOfAny(Unaddressable));
     }
 }

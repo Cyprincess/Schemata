@@ -1,8 +1,10 @@
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Skeleton;
@@ -24,6 +26,12 @@ public class TokenHandlerShould
         return new(services.BuildServiceProvider());
     }
 
+    private static readonly IServiceProvider EmptyProvider = new ServiceCollection().BuildServiceProvider();
+
+    private static AdviceContext NewContext() {
+        return new(EmptyProvider);
+    }
+
     private static Mock<IGrantHandler> MockGrant(string grantType) {
         var mock = new Mock<IGrantHandler>(MockBehavior.Strict);
         mock.Setup(h => h.GrantType).Returns(grantType);
@@ -32,76 +40,81 @@ public class TokenHandlerShould
 
     [Fact]
     public async Task Routes_ToMatchingGrantHandler() {
+        var advice = NewContext();
         var grant = MockGrant(GrantTypes.ClientCredentials);
         grant.Setup(h => h.HandleAsync(It.IsAny<TokenRequest>(), It.IsAny<Dictionary<string, List<string?>>?>(),
-                                       It.IsAny<CancellationToken>()))
+                                       It.IsAny<string?>(),It.IsAny<AdviceContext>(),  It.IsAny<CancellationToken>()))
              .ReturnsAsync(AuthorizationResult.Content(new { }));
 
         var handler = CreateHandler((GrantTypes.ClientCredentials, grant));
         var request = new TokenRequest { GrantType = GrantTypes.ClientCredentials };
 
-        await handler.HandleAsync(request, null, CancellationToken.None);
+        await handler.HandleAsync(request, null, advice, CancellationToken.None);
 
-        grant.Verify(h => h.HandleAsync(request, null, CancellationToken.None), Times.Once);
+        grant.Verify(h => h.HandleAsync(request, null, null,advice,  CancellationToken.None), Times.Once);
     }
 
     [Fact]
     public async Task ThrowsUnsupportedGrantType_WhenNoMatchingHandler() {
+        var advice = NewContext();
         var grant   = MockGrant(GrantTypes.ClientCredentials);
         var handler = CreateHandler((GrantTypes.ClientCredentials, grant));
         var request = new TokenRequest { GrantType = "unknown" };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
-                                                              request, null, CancellationToken.None));
+                                                              request, null,advice,  CancellationToken.None));
 
         Assert.Equal(OAuthErrors.UnsupportedGrantType, ex.Status);
     }
 
     [Fact]
     public async Task ThrowsUnsupportedGrantType_WhenGrantTypeNull() {
+        var advice = NewContext();
         var grant   = MockGrant(GrantTypes.ClientCredentials);
         var handler = CreateHandler((GrantTypes.ClientCredentials, grant));
         var request = new TokenRequest { GrantType = null };
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => handler.HandleAsync(
-                                                              request, null, CancellationToken.None));
+                                                              request, null,advice,  CancellationToken.None));
 
         Assert.Equal(OAuthErrors.UnsupportedGrantType, ex.Status);
     }
 
     [Fact]
     public async Task Returns_ResultFromMatchedHandler() {
+        var advice = NewContext();
         var expected = AuthorizationResult.Content(new { token = "abc" });
         var grant    = MockGrant(GrantTypes.RefreshToken);
         grant.Setup(h => h.HandleAsync(It.IsAny<TokenRequest>(), It.IsAny<Dictionary<string, List<string?>>?>(),
-                                       It.IsAny<CancellationToken>()))
+                                       It.IsAny<string?>(),It.IsAny<AdviceContext>(),  It.IsAny<CancellationToken>()))
              .ReturnsAsync(expected);
 
         var handler = CreateHandler((GrantTypes.RefreshToken, grant));
         var request = new TokenRequest { GrantType = GrantTypes.RefreshToken };
 
-        var result = await handler.HandleAsync(request, null, CancellationToken.None);
+        var result = await handler.HandleAsync(request, null, advice, CancellationToken.None);
 
         Assert.Same(expected, result);
     }
 
     [Fact]
     public async Task RoutesToCorrectHandler_WhenMultipleRegistered() {
+        var advice = NewContext();
         var cc      = MockGrant(GrantTypes.ClientCredentials);
         var refresh = MockGrant(GrantTypes.RefreshToken);
 
         refresh.Setup(h => h.HandleAsync(It.IsAny<TokenRequest>(), It.IsAny<Dictionary<string, List<string?>>?>(),
-                                         It.IsAny<CancellationToken>()))
+                                         It.IsAny<string?>(),It.IsAny<AdviceContext>(),  It.IsAny<CancellationToken>()))
                .ReturnsAsync(AuthorizationResult.Content(new { }));
 
         var handler = CreateHandler((GrantTypes.ClientCredentials, cc), (GrantTypes.RefreshToken, refresh));
         var request = new TokenRequest { GrantType = GrantTypes.RefreshToken };
 
-        await handler.HandleAsync(request, null, CancellationToken.None);
+        await handler.HandleAsync(request, null, advice, CancellationToken.None);
 
-        refresh.Verify(h => h.HandleAsync(request, null, CancellationToken.None), Times.Once);
+        refresh.Verify(h => h.HandleAsync(request, null, null, It.IsAny<AdviceContext>(), CancellationToken.None), Times.Once);
         cc.Verify(
             h => h.HandleAsync(It.IsAny<TokenRequest>(), It.IsAny<Dictionary<string, List<string?>>?>(),
-                               It.IsAny<CancellationToken>()), Times.Never);
+                               It.IsAny<string?>(),It.IsAny<AdviceContext>(),  It.IsAny<CancellationToken>()), Times.Never);
     }
 }

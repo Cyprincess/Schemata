@@ -8,12 +8,16 @@ using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Authorization.Skeleton.Extensions;
 using Schemata.Authorization.Skeleton.Handlers;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
+using Schemata.Authorization.Skeleton.Services;
 using Schemata.Common;
 using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
@@ -31,17 +35,18 @@ namespace Schemata.Authorization.Foundation.Handlers;
 /// </summary>
 public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
     IApplicationManager<TApp>              apps,
-    ITokenManager<TToken>                  tokens,
+    ITokenStore<TToken>                    tokens,
     IScopeManager<TScope>                  scopes,
     IAuthorizationManager<TAuth>           auths,
     IOptions<SchemataAuthorizationOptions> options,
     IOptions<JsonSerializerOptions>        json,
-    TimeProvider?                          time = null
+    TimeProvider?                          time = null,
+    IAuthenticationContextProvider?        contexts = null
 ) : IInteractionHandler
     where TApp : SchemataApplication
     where TAuth : SchemataAuthorization, new()
     where TScope : SchemataScope
-    where TToken : SchemataToken
+    where TToken : SchemataToken, new()
 {
     private readonly TimeProvider _time = time ?? TimeProvider.System;
 
@@ -66,18 +71,14 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
          || token.Type != TokenTypes.UserCode
             || (token.ExpireTime.HasValue && token.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime)
          || string.IsNullOrWhiteSpace(token.Payload)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
-        var uc = JsonSerializer.Deserialize<UserCodePayload>(token.Payload, json.Value);
+        var clear = token.Payload;
+
+        var uc = JsonSerializer.Deserialize<UserCodePayload>(clear, json.Value);
         if (string.IsNullOrWhiteSpace(uc?.DeviceCodeName)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         var device = await tokens.FindByNameAsync(uc.DeviceCodeName, ct);
@@ -85,26 +86,19 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
          || device.Type != TokenTypes.DeviceCode
             || (device.ExpireTime.HasValue && device.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime)
          || string.IsNullOrWhiteSpace(device.Payload)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
-        var payload = JsonSerializer.Deserialize<DeviceCodePayload>(device.Payload, json.Value);
+        var deviceClear = device.Payload;
+
+        var payload = JsonSerializer.Deserialize<DeviceCodePayload>(deviceClear, json.Value);
         if (string.IsNullOrWhiteSpace(payload?.ClientId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         var application = await apps.FindByClientIdAsync(payload.ClientId, ct);
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         var requested = ScopeParser.Parse(payload.Scope);
@@ -144,10 +138,7 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
     ) {
         var subject = principal.FindFirstValue(IdentityClaims.Subject);
         if (string.IsNullOrWhiteSpace(subject)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.USER_IDENTITY_REQUIRED)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.USER_IDENTITY_REQUIRED);
         }
 
         var token = await tokens.FindByReferenceIdAsync(request.UserCode, ct);
@@ -155,18 +146,14 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
          || token.Type != TokenTypes.UserCode
             || (token.ExpireTime.HasValue && token.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime)
          || string.IsNullOrWhiteSpace(token.Payload)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
-        var uc = JsonSerializer.Deserialize<UserCodePayload>(token.Payload, json.Value);
+        var clear = token.Payload;
+
+        var uc = JsonSerializer.Deserialize<UserCodePayload>(clear, json.Value);
         if (string.IsNullOrWhiteSpace(uc?.DeviceCodeName)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         var device = await tokens.FindByNameAsync(uc.DeviceCodeName, ct);
@@ -174,30 +161,22 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
          || device.Type != TokenTypes.DeviceCode
             || (device.ExpireTime.HasValue && device.ExpireTime.Value <= _time.GetUtcNow().UtcDateTime)
          || string.IsNullOrWhiteSpace(device.Payload)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
-        var payload = JsonSerializer.Deserialize<DeviceCodePayload>(device.Payload, json.Value);
+        var deviceClear = device.Payload;
+
+        var payload = JsonSerializer.Deserialize<DeviceCodePayload>(deviceClear, json.Value);
         if (string.IsNullOrWhiteSpace(payload?.ClientId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         var application = await apps.FindByClientIdAsync(payload.ClientId, ct);
         if (string.IsNullOrWhiteSpace(application?.ClientId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         var authorization = new TAuth {
-            Name        = Guid.NewGuid().ToString("n"),
             Application = application.CanonicalName,
             Subject     = subject,
             Type        = AuthorizationTypes.Device,
@@ -207,13 +186,20 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
         await auths.CreateAsync(authorization, ct);
 
         var sid = principal.FindFirstValue(options.Value.SessionIdClaimType);
+        var authentication = contexts is null
+            ? AuthenticationContextExtensions.Read(principal.Claims)
+            : await contexts.GetContextAsync(principal, ct);
+        var grant = AuthorizationGrantContexts.Create(
+            subject, payload.Scope, sid, GrantTypes.DeviceCode, authentication, GrantProfiles.OAuth);
 
-        device.Subject       = subject;
+        device.Parent        = subject;
         device.Status        = TokenStatuses.Authorized;
         device.Authorization = authorization.CanonicalName;
         device.SessionId     = sid;
+        device.GrantContext  = AuthorizationGrantContexts.Serialize(grant);
 
-        await tokens.UpdateAsync(device, ct);
+        await tokens.UpdateAsync(device, ct,
+            (transaction, cancellation) => apps.EnlistTokenPublicationAsync(transaction, [device], cancellation));
         await tokens.RevokeAsync(token, ct);
 
         throw new NoContentException();
@@ -228,26 +214,19 @@ public sealed class DeviceInteractionHandler<TApp, TAuth, TScope, TToken>(
     public async Task DenyAsync(InteractRequest request, CancellationToken ct) {
         var token = await tokens.FindByReferenceIdAsync(request.UserCode, ct);
         if (token?.Type != TokenTypes.UserCode || string.IsNullOrWhiteSpace(token.Payload)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
-        var uc = JsonSerializer.Deserialize<UserCodePayload>(token.Payload, json.Value);
+        var clear = token.Payload;
+
+        var uc = JsonSerializer.Deserialize<UserCodePayload>(clear, json.Value);
         if (string.IsNullOrWhiteSpace(uc?.DeviceCodeName)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         var device = await tokens.FindByNameAsync(uc.DeviceCodeName, ct);
         if (device?.Type != TokenTypes.DeviceCode) {
-            throw new OAuthException(
-                OAuthErrors.InvalidGrant,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_GRANT)
-            );
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
         }
 
         device.Status = TokenStatuses.Denied;

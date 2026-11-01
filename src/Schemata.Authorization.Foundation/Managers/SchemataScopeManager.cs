@@ -1,7 +1,11 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Abstractions.Entities;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Entity.Repository;
@@ -10,16 +14,21 @@ namespace Schemata.Authorization.Foundation.Managers;
 
 /// <summary>
 ///     Default implementation of <see cref="IScopeManager{TScope}" /> backed by an
-///     <see cref="IRepository{TEntity}" />.
+///     <see cref="IRepository{TEntity}" /> for reads and the open-generic
+///     <see cref="IResourceMutation{TScope}" /> owner for writes.
 /// </summary>
 /// <typeparam name="TScope">The scope entity type, must derive from <see cref="SchemataScope" />.</typeparam>
-/// <seealso cref="SchemataApplicationManager{TApplication}" />
+/// <seealso cref="SchemataApplicationManager{TApplication,TAuthorization}" />
 public class SchemataScopeManager<TScope> : IScopeManager<TScope>
     where TScope : SchemataScope
 {
-    private readonly IRepository<TScope> _scopes;
+    private readonly IServiceProvider _services;
+    private readonly IResourceMutation<TScope> _mutation;
 
-    public SchemataScopeManager(IRepository<TScope> scopes) { _scopes = scopes; }
+    public SchemataScopeManager(IServiceProvider services, IResourceMutation<TScope> mutation) {
+        _services = services;
+        _mutation = mutation;
+    }
 
     #region IScopeManager<TScope> Members
 
@@ -30,17 +39,18 @@ public class SchemataScopeManager<TScope> : IScopeManager<TScope>
             return null;
         }
 
-        return await _scopes.SingleOrDefaultAsync(q => q.Where(s => s.Name == name), ct);
+        await using var scopes = _services.GetRequiredService<IRepository<TScope>>();
+        return await scopes.SingleOrDefaultAsync(q => q.Where(s => s.Name == name), ct);
     }
 
-    public IAsyncEnumerable<TScope> ListAsync(IEnumerable<string>? names = null, CancellationToken ct = default) {
+    public async IAsyncEnumerable<TScope> ListAsync(IEnumerable<string>? names = null,
+        [EnumeratorCancellation] CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
-
-        if (names is null) {
-            return _scopes.ListAsync<TScope>(null, ct);
+        await using var scopes = _services.GetRequiredService<IRepository<TScope>>();
+        await foreach (var scope in scopes.ListAsync<TScope>(names is null ? null
+                           : q => q.Where(s => names.Contains(s.Name)), ct)) {
+            yield return scope;
         }
-
-        return _scopes.ListAsync(q => q.Where(s => names.Contains(s.Name)), ct);
     }
 
     public async Task<TScope?> CreateAsync(TScope? scope, CancellationToken ct = default) {
@@ -50,8 +60,7 @@ public class SchemataScopeManager<TScope> : IScopeManager<TScope>
             return null;
         }
 
-        await _scopes.AddAsync(scope, ct);
-        await _scopes.CommitAsync(ct);
+        await _mutation.CreateAsync(scope, null, ct);
 
         return scope;
     }
@@ -63,8 +72,7 @@ public class SchemataScopeManager<TScope> : IScopeManager<TScope>
             return;
         }
 
-        await _scopes.UpdateAsync(scope, ct);
-        await _scopes.CommitAsync(ct);
+        await _mutation.UpdateAsync(scope, null, Operations.Update, ct);
     }
 
     public async Task DeleteAsync(TScope? scope, CancellationToken ct = default) {
@@ -74,8 +82,7 @@ public class SchemataScopeManager<TScope> : IScopeManager<TScope>
             return;
         }
 
-        await _scopes.RemoveAsync(scope, ct);
-        await _scopes.CommitAsync(ct);
+        await _mutation.DeleteAsync(scope, null, Operations.Delete, ct);
     }
 
     public Task SetDisplayNameAsync(TScope? scope, string? name, CancellationToken ct = default) {

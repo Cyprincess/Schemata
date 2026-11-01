@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json.Serialization;
+using Schemata.Abstractions;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Models;
@@ -9,7 +10,7 @@ namespace Schemata.Identity.Foundation.Commands;
 
 /// <summary>Requests authentication of an identity user.</summary>
 public sealed record LoginUserRequest<TUser>(LoginRequest Request, ClaimsPrincipal? Principal)
-    : ICommand<IdentityResult<ClaimsPrincipal>>, IRequestPrincipal
+    : ICommand<IdentityResult<Unit>>, IRequestPrincipal
     where TUser : SchemataUser, new()
 {
     [JsonIgnore]

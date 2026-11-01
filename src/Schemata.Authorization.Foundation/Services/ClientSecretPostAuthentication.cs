@@ -9,6 +9,8 @@ using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Services;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Services;
@@ -23,19 +25,25 @@ namespace Schemata.Authorization.Foundation.Services;
 ///     Reads <c>client_id</c> and <c>client_secret</c> from the form body,
 ///     looks up the application, and validates the client secret.
 /// </summary>
-public sealed class ClientSecretPostAuthentication<TApp>(
+public sealed class ClientSecretPostAuthentication<TApp, TSecurity>(
     IApplicationManager<TApp>              apps,
-    IOptions<SchemataAuthorizationOptions> options
+    IOptions<SchemataAuthorizationOptions> options,
+    ISecurityStore<TSecurity>              securities,
+    ISecretVerifier                        verifier
 ) : IClientAuthentication<TApp>
     where TApp : SchemataApplication
+    where TSecurity : SchemataSecurity, new()
 {
     #region IClientAuthentication<TApp> Members
+
+    public string Method => ClientAuthMethods.ClientSecretPost;
 
     public async Task<TApp?> AuthenticateAsync(
         Dictionary<string, List<string?>>? query,
         Dictionary<string, List<string?>>? form,
         Dictionary<string, List<string?>>? headers,
-        CancellationToken                  ct
+        CancellationToken                  ct,
+        string? endpointAudience = null
     ) {
         if (!options.Value.AllowedClientAuthMethods.Contains(ClientAuthMethods.ClientSecretPost)) {
             return null;
@@ -48,18 +56,12 @@ public sealed class ClientSecretPostAuthentication<TApp>(
         }
 
         if (ids.Count != 1) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.ClientId)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.NOT_EMPTY, new Dictionary<string, string?> { ["value"] = Parameters.ClientId });
         }
 
         var id = ids.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(id)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.ClientId)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.NOT_EMPTY, new Dictionary<string, string?> { ["value"] = Parameters.ClientId });
         }
 
         form.TryGetValue(Parameters.ClientSecret, out var secrets);
@@ -67,25 +69,17 @@ public sealed class ClientSecretPostAuthentication<TApp>(
 
         var app = await apps.FindByClientIdAsync(id, ct);
         if (app is null) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
-        if (!string.IsNullOrWhiteSpace(secret)) {
-            if (!await apps.ValidateClientSecretAsync(app, secret, ct)) {
-                throw new OAuthException(
-                    OAuthErrors.InvalidClient,
-                    SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-                );
-            }
-        } else if (app.ClientType == ClientTypes.Confidential) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.CLIENT_SECRET_REQUIRED)
-            );
+        // An identification-only request (no secret) for a client registered `none` belongs to the
+        // none authenticator; claiming it here would misreport the client's method as
+        // client_secret_post.
+        if (string.IsNullOrWhiteSpace(secret) && app.TokenEndpointAuthMethod == ClientAuthMethods.None) {
+            return null;
         }
+
+        await ClientSecretValidator.ValidateAsync(securities, verifier, app, secret, ct);
 
         return app;
     }

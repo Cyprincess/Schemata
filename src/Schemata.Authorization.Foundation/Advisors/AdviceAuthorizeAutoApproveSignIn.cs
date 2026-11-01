@@ -6,12 +6,15 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Foundation.Commands;
+using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
-using Schemata.Common;
+using Schemata.Authorization.Skeleton.Models;
+using Schemata.Authorization.Skeleton.Services;
 using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
@@ -36,7 +39,9 @@ public static class AdviceAuthorizeAutoApproveSignIn
 /// <seealso cref="AdviceAuthorizeConsent" />
 public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
     IOptions<SchemataAuthorizationOptions> authOptions,
-    IAuthorizationManager<TAuth>           authorizations
+    IAuthorizationManager<TAuth>           authorizations,
+    IAuthenticationContextProvider?        contexts = null,
+    IOpSessionService?                     sessions = null
 ) : IAuthorizeAdvisor<TApp>
     where TApp : SchemataApplication
     where TAuth : SchemataAuthorization, new()
@@ -58,7 +63,13 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
             return AdviseResult.Continue;
         }
 
-        if (string.IsNullOrWhiteSpace(authz.Application?.ClientId)) {
+        var application = authz.Application;
+        if (application is null || string.IsNullOrWhiteSpace(application.ClientId)) {
+            return AdviseResult.Continue;
+        }
+
+        var request = authz.Request;
+        if (request is null) {
             return AdviseResult.Continue;
         }
 
@@ -72,46 +83,72 @@ public sealed class AdviceAuthorizeAutoApproveSignIn<TApp, TAuth>(
 
         var claims = new List<Claim> {
             new(IdentityClaims.Subject, subject),
-            new(Claims.ClientId, authz.Application.ClientId),
+            new(Claims.ClientId, application.ClientId),
         };
 
+        var sid = authz.Principal?.FindFirstValue(authOptions.Value.SessionIdClaimType)
+                  ?? request.OpSessionId;
+        if (string.IsNullOrWhiteSpace(sid) && sessions is not null) {
+            // The host principal is authenticated and consent covers the request, so the OP
+            // session is established here rather than minting a synthetic principal without one.
+            sid = await sessions.IssueAsync(authz.Principal, subject, ct);
+        }
         var response = new ClaimsPrincipal(new ClaimsIdentity(claims, SchemataAuthorizationSchemes.Bearer));
 
-        var sid = authz.Principal?.FindFirstValue(authOptions.Value.SessionIdClaimType);
-        var at  = authz.Principal?.FindFirstValue(Claims.AuthTime);
-
+        // The validating advisor owns the parameter: without its accepted grant set on the
+        // context, the request carries no authorization details.
+        var json = request.AuthorizationDetails;
         var authorization = new TAuth {
-            Name                = Guid.NewGuid().ToString("n"),
-            Application         = authz.Application.CanonicalName,
-            Subject             = subject,
-            Type                = AuthorizationTypes.AdHoc,
-            Status              = TokenStatuses.Valid,
-            Scopes              = authz.Request?.Scope,
-            RedirectUri         = authz.Request?.RedirectUri,
-            ResponseType        = authz.Request?.ResponseType,
-            CodeChallengeMethod = authz.Request?.CodeChallengeMethod,
-            AcrValues           = authz.Request?.AcrValues,
+            Application          = application.CanonicalName,
+            Subject              = subject,
+            Type                 = AuthorizationTypes.AdHoc,
+            Status               = TokenStatuses.Valid,
+            Scopes               = request.Scope,
+            RedirectUri          = request.RedirectUri,
+            ResponseType         = request.ResponseType,
+            CodeChallengeMethod  = request.CodeChallengeMethod,
+            AcrValues            = request.AcrValues,
+            AuthorizationDetails = json,
         };
 
         await authorizations.CreateAsync(authorization, ct);
 
+        var authentication = await AuthenticationContextExtensions.ResolveAsync(
+            authz.Principal,
+            request.Authentication,
+            sid,
+            authOptions.Value.SessionIdClaimType,
+            contexts,
+            ct);
+        request.Authentication = authentication;
+        var grantType = AuthorizationGrantContexts.SourceForResponseTypes(request.ResponseTypes);
+        var grant = AuthorizationGrantContexts.Create(
+            subject, request.Scope, sid, grantType, authentication,
+            request.GrantProfile);
+
         var properties = new Dictionary<string, string?> {
-            [Properties.GrantType]           = GrantTypes.AuthorizationCode,
-            [Properties.Scope]               = authz.Request?.Scope,
-            [Properties.ResponseType]        = authz.Request?.ResponseType,
-            [Properties.Nonce]               = authz.Request?.Nonce,
-            [Properties.RedirectUri]         = authz.Request?.RedirectUri,
-            [Properties.ResponseMode]        = authz.ResponseMode,
-            [Properties.State]               = authz.Request?.State,
-            [Properties.CodeChallenge]       = authz.Request?.CodeChallenge,
-            [Properties.CodeChallengeMethod] = authz.Request?.CodeChallengeMethod,
-            [Properties.AuthorizationName]   = authorization.CanonicalName,
-            [Properties.SessionId]           = sid,
-            [Properties.MaxAge]              = authz.Request?.MaxAge,
-            [Properties.AuthTime]            = at,
+            [Properties.GrantType]            = grantType,
+            [Properties.Scope]                = request.Scope,
+            [Properties.Resources]            = request.Resource is { Count: > 0 } ? string.Join(" ", request.Resource) : null,
+            [Properties.ResponseType]         = request.ResponseType,
+            [Properties.Nonce]                = request.Nonce,
+            [Properties.RedirectUri]          = request.RedirectUri,
+            [Properties.ResponseMode]         = authz.ResponseMode,
+            [Properties.State]                = request.State,
+            [Properties.CodeChallenge]        = request.CodeChallenge,
+            [Properties.CodeChallengeMethod]  = request.CodeChallengeMethod,
+            [Properties.DpopJkt]              = request.DpopJkt,
+            [Properties.AuthorizationName]    = authorization.CanonicalName,
+            [Properties.SessionId]            = sid,
+            [Properties.GrantContext]         = AuthorizationGrantContexts.Serialize(grant),
+            [Properties.GrantProfile]         = grant.Profile,
+            [Properties.MaxAge]               = request.MaxAge,
+            [Properties.ClaimsRequest]        = request.RequestedClaims is not null ? request.Claims : null,
+            [Properties.SessionStateSalt]     = request.SessionStateSalt,
+            [Properties.AuthorizationDetails] = json,
         };
 
-        ctx.Set(AuthorizationResult.SignIn(response, properties));
+        authz.Result = AuthorizationResult.SignIn(response, properties);
 
         return AdviseResult.Handle;
     }

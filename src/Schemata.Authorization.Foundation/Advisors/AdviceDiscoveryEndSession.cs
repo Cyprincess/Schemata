@@ -31,7 +31,7 @@ public sealed class AdviceDiscoveryEndSession : IDiscoveryAdvisor
         var issuer = discovery.Issuer;
 
         discovery.Document                    ??= new();
-        discovery.Document.EndSessionEndpoint =   $"{issuer}{Endpoints.EndSession}";
+        discovery.Document.EndSessionEndpoint =   CanonicalIssuer.Combine(issuer, Endpoints.EndSession);
 
         return Task.FromResult(AdviseResult.Continue);
     }

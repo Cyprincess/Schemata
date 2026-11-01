@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Schemata.Authorization.Foundation.Features;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Core;
 using Schemata.Scheduling.Foundation.Features;
 using Schemata.Scheduling.Skeleton;
@@ -17,7 +18,7 @@ namespace Schemata.Authorization.Tests
         [Fact]
         public void UseBackChannelLogout_DoesNotRegisterSchedulingFeature() {
             var builder = new SchemataBuilder(new ConfigurationBuilder().Build(), null!);
-            builder.UseAuthorization().UseBackChannelLogout();
+            builder.UseSecurity().UseAuthorization().UseBackChannelLogout();
 
             Assert.False(builder.Options.HasFeature<SchemataSchedulingFeature>());
         }
@@ -26,17 +27,17 @@ namespace Schemata.Authorization.Tests
         public void ConfigureServices_WithoutScheduling_DeclaresBackChannelLogoutJob() {
             var services = new ServiceCollection();
             var options  = new SchemataOptions();
-            var feature  = new BackChannelLogoutFeature<SchemataApplication, SchemataToken>();
+            var feature  = new BackChannelLogoutFeature<SchemataApplication, SchemataSubjectMapping, SchemataSecurity, SchemataToken>();
 
-            feature.ConfigureServices(services, options, new Configurators());
+            feature.ConfigureServices(services, options, new());
 
             Assert.False(options.HasFeature<SchemataSchedulingFeature>());
-            Assert.Contains(services, descriptor => descriptor.ServiceType == typeof(BackChannelLogoutJob));
+            Assert.Contains(services, descriptor => descriptor.ServiceType == typeof(BackChannelLogoutJob<SchemataSecurity>));
 
             using var provider = services.BuildServiceProvider();
             var registration = Assert.Single(
                 provider.GetRequiredService<IOptions<SchemataSchedulingOptions>>().Value.Jobs,
-                job => job.JobType == typeof(BackChannelLogoutJob));
+                job => job.JobType == typeof(BackChannelLogoutJob<SchemataSecurity>));
 
             Assert.Null(registration.Schedule);
         }
@@ -45,7 +46,7 @@ namespace Schemata.Authorization.Tests
         public void ConfigureServices_WithoutScheduling_DeclaresScheduledTokenCleanupJob() {
             var services = new ServiceCollection();
 
-            ConfigureAuthorization(services, new SchemataOptions());
+            ConfigureAuthorization(services, new());
 
             Assert.Contains(services, descriptor => descriptor.ServiceType == typeof(TokenCleanupJob<SchemataToken>));
 
@@ -59,8 +60,8 @@ namespace Schemata.Authorization.Tests
         }
 
         private static void ConfigureAuthorization(IServiceCollection services, SchemataOptions options) {
-            new SchemataAuthorizationFeature<SchemataApplication, SchemataAuthorization, SchemataScope, SchemataToken>()
-                .ConfigureServices(services, options, new Configurators(), new ConfigurationBuilder().Build(), null!);
+            new SchemataAuthorizationFeature<SchemataApplication, SchemataAuthorization, SchemataScope, SchemataSubjectMapping, SchemataSecurity, SchemataToken>()
+                .ConfigureServices(services, options, new(), new ConfigurationBuilder().Build(), null!);
         }
     }
 }

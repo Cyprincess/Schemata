@@ -1,30 +1,28 @@
 using System;
-using System.Security.Claims;
-using Schemata.Abstractions.Entities;
-using Schemata.Abstractions.Exceptions;
+using Schemata.Common.Errors;
 
 namespace Schemata.Security.Skeleton.Advisors;
 
+/// <summary>
+///     Builds the AIP-211 failure for a coarse permission denial: every authorization failure is a
+///     PERMISSION_DENIED carrying the request name, resource type, and the missing permission. A
+///     same-entity Get probe is not an AIP-211 parent-resource check and is never performed; NOT_FOUND
+///     belongs to lookup misses that occur after authorization succeeds.
+/// </summary>
 internal static class PermissionProbe
 {
     public static Exception Create(
-        string              operation,
-        Type                entity,
-        IPermissionResolver resolver,
-        IPermissionMatcher  matcher,
-        ClaimsPrincipal?    principal
+        string  operation,
+        Type    entity,
+        string? permission,
+        string? name
     ) {
-        if (operation == nameof(Operations.Get)) {
-            return new NotFoundException();
-        }
-
-        if (operation is nameof(Operations.Update) or nameof(Operations.Delete)) {
-            var permission = resolver.Resolve(nameof(Operations.Get), entity);
-            return principal is not null && matcher.IsMatch(principal, permission)
-                ? new PermissionDeniedException()
-                : new NotFoundException();
-        }
-
-        return new PermissionDeniedException();
+        return SchemataResourceErrors.PermissionDenied(
+            entity,
+            name,
+            description: string.Format(
+                SchemataResourceErrors.PermissionDeniedTemplate,
+                permission ?? operation,
+                name ?? entity.Name));
     }
 }

@@ -1,28 +1,23 @@
+using Microsoft.AspNetCore.Identity;
+
 namespace Schemata.Identity.Foundation;
 
 /// <summary>Configures Schemata identity endpoints.</summary>
 public sealed class SchemataIdentityOptions
 {
-    /// <summary>Whether the registration endpoint is enabled. Default: true.</summary>
-    public bool AllowRegistration { get; set; } = true;
+    /// <summary>
+    ///     Scheme receiving the application cookie sign-in. The global default is the native
+    ///     Identity application scheme; a tenant profile composes its own <c>UseCookie</c>
+    ///     scheme name here so its sign-in and sign-out address the tenant closure.
+    /// </summary>
+    public string ApplicationScheme { get; set; } = IdentityConstants.ApplicationScheme;
 
-    /// <summary>Whether the email/phone confirmation endpoint is enabled. Default: true.</summary>
-    public bool AllowAccountConfirmation { get; set; } = true;
-
-    /// <summary>Whether the forgot-password / reset-password flow is enabled. Default: true.</summary>
-    public bool AllowPasswordReset { get; set; } = true;
-
-    /// <summary>Whether authenticated users can change their password. Default: true.</summary>
-    public bool AllowPasswordChange { get; set; } = true;
-
-    /// <summary>Whether authenticated users can change their email address. Default: true.</summary>
-    public bool AllowEmailChange { get; set; } = true;
-
-    /// <summary>Whether authenticated users can change their phone number. Default: true.</summary>
-    public bool AllowPhoneNumberChange { get; set; } = true;
-
-    /// <summary>Whether the 2FA enrollment and downgrade endpoints are enabled. Default: true.</summary>
-    public bool AllowTwoFactorAuthentication { get; set; } = true;
+    /// <summary>
+    ///     Scheme receiving the bearer ticket issued by the sign-in and refresh endpoints. The
+    ///     global default is the native Identity bearer scheme; a tenant profile that enables
+    ///     the tenant bearer closure names its own scheme here.
+    /// </summary>
+    public string BearerScheme { get; set; } = IdentityConstants.BearerScheme;
 
     /// <summary>
     ///     Sign-in page a browser hitting an <c>[Authorize]</c> endpoint without a cookie session is

@@ -9,7 +9,7 @@ public class RegisterRequest
 {
     /// <summary>Desired username for the new account.</summary>
     [Required]
-    public string Username { get; set; } = null!;
+    public string Username { get; set; } = null!; // Wire DTO: the deserializer assigns the value before use.
 
     /// <summary>Email address for the new account; used for verification and recovery.</summary>
     [EmailAddress]
@@ -21,7 +21,7 @@ public class RegisterRequest
 
     /// <summary>Password for the new account; must satisfy configured password policy.</summary>
     [Required]
-    public string Password { get; set; } = null!;
+    public string Password { get; set; } = null!; // Wire DTO: the deserializer assigns the value before use.
 
     /// <summary>Requests cookie-based sign-in after registration.</summary>
     public bool? UseCookies { get; set; }

@@ -1,13 +1,16 @@
-using Schemata.Identity.Tests.Fixtures;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Identity;
 using Moq;
+using Schemata.Abstractions.Errors;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Entities;
-using Schemata.Identity.Skeleton.Models;
 using Xunit;
 using AspNetIdentityResult = Microsoft.AspNetCore.Identity.IdentityResult;
+using Schemata.Identity.Tests.Fixtures;
 
 namespace Schemata.Identity.Tests;
 
@@ -56,13 +59,59 @@ public class IdentityCredentialHandlerShould
     }
 
     [Fact]
+    public async Task Confirm_From_An_Authenticated_Initiator_Changes_That_Account_With_The_Requested_Contact() {
+        using var host = new IdentityHandlerTestHost();
+        host.Users.Setup(value => value.GetUserAsync(Principal)).ReturnsAsync(User);
+        host.Users.Setup(value => value.ChangeEmailAsync(User, "new@example.com", "email-code"))
+                  .ReturnsAsync(AspNetIdentityResult.Success);
+
+        var result = await host.Handler.ConfirmAsync(
+            new() { EmailAddress = "new@example.com", Code = "email-code" }, Principal, CancellationToken.None);
+
+        Assert.Equal(IdentityStatus.Success, result.Status);
+        // The initiating account receives the change; the requested contact never resolves a
+        // different account.
+        host.Users.Verify(value => value.ChangeEmailAsync(User, "new@example.com", "email-code"), Times.Once);
+        host.Users.Verify(value => value.FindByEmailAsync("new@example.com"), Times.Never);
+    }
+
+    [Fact]
+    public async Task Confirm_From_An_Anonymous_Caller_Resolves_The_Account_By_The_Current_Contact() {
+        using var host = new IdentityHandlerTestHost();
+        var anonymous = new ClaimsPrincipal(new ClaimsIdentity());
+        host.Users.Setup(value => value.FindByEmailAsync("alice@example.com")).ReturnsAsync(User);
+        host.Users.Setup(value => value.ChangeEmailAsync(User, "alice@example.com", "email-code"))
+                  .ReturnsAsync(AspNetIdentityResult.Success);
+
+        var result = await host.Handler.ConfirmAsync(
+            new() { EmailAddress = "alice@example.com", Code = "email-code" }, anonymous, CancellationToken.None);
+
+        Assert.Equal(IdentityStatus.Success, result.Status);
+        host.Users.Verify(value => value.ChangeEmailAsync(User, "alice@example.com", "email-code"), Times.Once);
+    }
+
+    [Fact]
+    public async Task Confirm_With_A_Code_That_Fails_Verification_Shapes_As_Missing_Account() {
+        using var host = new IdentityHandlerTestHost();
+        host.Users.Setup(value => value.GetUserAsync(Principal)).ReturnsAsync(User);
+        // A token minted for another purpose or contact fails the UserManager's verification.
+        host.Users.Setup(value => value.ChangeEmailAsync(User, "new@example.com", "wrong-purpose-code"))
+                  .ReturnsAsync(AspNetIdentityResult.Failed(new IdentityError { Code = "x", Description = "y" }));
+
+        var error = await Assert.ThrowsAsync<NoContentException>(() => host.Handler.ConfirmAsync(
+            new() { EmailAddress = "new@example.com", Code = "wrong-purpose-code" }, Principal, CancellationToken.None));
+
+        Assert.NotNull(error);
+    }
+
+    [Fact]
     public async Task ChangePassword_Uses_Old_And_New_Password() {
         using var host = new IdentityHandlerTestHost();
         host.Users.Setup(value => value.GetUserAsync(Principal)).ReturnsAsync(User);
         host.Users.Setup(value => value.ChangePasswordAsync(User, "old-secret", "new-secret"))
                   .ReturnsAsync(AspNetIdentityResult.Success);
 
-        var result = await host.Handler.ChangePasswordAsync(new ProfileRequest {
+        var result = await host.Handler.ChangePasswordAsync(new() {
             OldPassword = "old-secret",
             NewPassword = "new-secret",
         }, Principal, CancellationToken.None);
@@ -96,9 +145,36 @@ public class IdentityCredentialHandlerShould
                   .ReturnsAsync(AspNetIdentityResult.Success);
 
         var result = await host.Handler.EnrollAsync(
-            new AuthenticatorRequest(), Principal, CancellationToken.None);
+            new(), Principal, CancellationToken.None);
 
         Assert.Equal(IdentityStatus.Success, result.Status);
         host.Users.Verify(value => value.SetTwoFactorEnabledAsync(User, true), Times.Once);
+    }
+
+    [Fact]
+    public async Task Surface_A_Failed_Two_Factor_Mutation_As_A_Validation_Error_Instead_Of_Success() {
+        using var host = new IdentityHandlerTestHost();
+        host.Users.Setup(value => value.GetUserAsync(Principal)).ReturnsAsync(User);
+        host.Users.Setup(value => value.GetTwoFactorEnabledAsync(User)).ReturnsAsync(false);
+        host.Users.Setup(value => value.VerifyTwoFactorTokenAsync(User, It.IsAny<string>(), "123456"))
+                  .ReturnsAsync(true);
+        var failed = AspNetIdentityResult.Failed(new IdentityError {
+            Code = "ConcurrencyFailure", Description = "Optimistic concurrency failure",
+        });
+        host.Users.Setup(value => value.ResetAuthenticatorKeyAsync(User)).ReturnsAsync(failed);
+        host.Users.Setup(value => value.SetTwoFactorEnabledAsync(User, false)).ReturnsAsync(failed);
+
+        var authenticator = await Assert.ThrowsAsync<ValidationException>(
+            () => host.Handler.AuthenticatorAsync(Principal, CancellationToken.None));
+        var downgrade = await Assert.ThrowsAsync<ValidationException>(
+            () => host.Handler.DowngradeAsync(new() { TwoFactorCode = "123456" }, Principal, CancellationToken.None));
+
+        Assert.NotNull(authenticator.Details);
+        Assert.NotNull(downgrade.Details);
+        foreach (var violation in authenticator.Details.OfType<BadRequestDetail>().Single().FieldViolations!
+                                  .Concat(downgrade.Details.OfType<BadRequestDetail>().Single().FieldViolations!)) {
+            Assert.Equal("CONCURRENCY_FAILURE", violation.Reason);
+            Assert.Equal("Optimistic concurrency failure", violation.Description);
+        }
     }
 }

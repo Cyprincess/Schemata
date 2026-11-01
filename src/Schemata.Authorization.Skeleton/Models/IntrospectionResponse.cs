@@ -1,3 +1,7 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Collections.Generic;
+
 namespace Schemata.Authorization.Skeleton.Models;
 
 /// <summary>
@@ -27,23 +31,69 @@ public class IntrospectionResponse
     public string? TokenType { get; set; }
 
     /// <summary>Expiration time as a Unix timestamp in seconds.</summary>
+    [JsonConverter(typeof(Json.ProtocolNumberConverter))]
     public long? Exp { get; set; }
 
     /// <summary>Issuance time as a Unix timestamp in seconds.</summary>
+    [JsonConverter(typeof(Json.ProtocolNumberConverter))]
     public long? Iat { get; set; }
 
     /// <summary>Not-before time as a Unix timestamp in seconds.</summary>
+    [JsonConverter(typeof(Json.ProtocolNumberConverter))]
     public long? Nbf { get; set; }
 
     /// <summary>Subject identifier of the resource owner.</summary>
     public string? Sub { get; set; }
 
-    /// <summary>Audience the token is intended for.</summary>
-    public string? Aud { get; set; }
+    /// <summary>Audiences the token is intended for, serialized as a JSON array.</summary>
+    public IReadOnlyList<string>? Aud { get; set; }
+
+    /// <summary>
+    ///     Granted authorization details, a JSON array filtered for the introspecting resource
+    ///     server, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9396.html#section-9.2">
+    ///         RFC 9396: OAuth 2.0 Rich Authorization
+    ///         Requests §9.2: Token Introspection
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public JsonElement? AuthorizationDetails { get; set; }
 
     /// <summary>Issuer of the token.</summary>
     public string? Iss { get; set; }
 
     /// <summary>Unique identifier for the token.</summary>
     public string? Jti { get; set; }
+
+    /// <summary>
+    ///     Confirmation of the proof-of-possession key bound to the token,
+    ///     a top-level JSON object member,
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9449.html#section-6.2">
+    ///         RFC 9449: OAuth 2.0 Demonstrating Proof of Possession (DPoP)
+    ///         §6.2: JWK Thumbprint Confirmation Method in Token Introspection
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public JsonElement? Cnf { get; set; }
+
+    /// <summary>
+    ///     Authentication Context Class Reference satisfied by the user-authentication event
+    ///     that produced the token,
+    ///     per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9470.html#section-6.2">
+    ///         RFC 9470: OAuth 2.0 Step Up Authentication Challenge Protocol
+    ///         §6.2: OAuth 2.0 Token Introspection
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public string? Acr { get; set; }
+
+    /// <summary>
+    ///     Time the user authentication occurred, as Unix seconds,
+    ///     per RFC 9470 §6.2. RFC 9470 defines no <c>amr</c> introspection member, so
+    ///     authentication methods are not echoed here.
+    /// </summary>
+    [JsonConverter(typeof(Json.ProtocolNumberConverter))]
+    public long? AuthTime { get; set; }
 }

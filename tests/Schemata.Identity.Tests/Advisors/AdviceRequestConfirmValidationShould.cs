@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Threading.Tasks;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Identity.Foundation.Advisors;
@@ -13,13 +14,20 @@ public class AdviceRequestConfirmValidationShould
 {
     private static readonly ClaimsPrincipal Anonymous = new();
 
+    private static IdentityOperationExecution<IdentityResult<Unit>> Execution(
+        IdentityOperation operation,
+        ClaimsPrincipal?  principal = null
+    ) {
+        return new() { Operation = operation, Principal = principal ?? Anonymous };
+    }
+
     [Fact]
     public async Task Continues_WhenEmailAndCodeProvided() {
         var advisor = new AdviceRequestConfirmValidation();
         var ctx     = new AdviceContext(null!);
         var request = new ConfirmRequest { EmailAddress = "a@b.c", Code = "123456" };
 
-        var result = await advisor.AdviseAsync(ctx, request, IdentityOperation.Confirm, Anonymous);
+        var result = await advisor.AdviseAsync(ctx, request, Execution(IdentityOperation.Confirm));
 
         Assert.Equal(AdviseResult.Continue, result);
     }
@@ -30,7 +38,7 @@ public class AdviceRequestConfirmValidationShould
         var ctx     = new AdviceContext(null!);
         var request = new ConfirmRequest { PhoneNumber = "+15551234567", Code = "123456" };
 
-        var result = await advisor.AdviseAsync(ctx, request, IdentityOperation.Confirm, Anonymous);
+        var result = await advisor.AdviseAsync(ctx, request, Execution(IdentityOperation.Confirm));
 
         Assert.Equal(AdviseResult.Continue, result);
     }
@@ -45,7 +53,7 @@ public class AdviceRequestConfirmValidationShould
         var request = new ConfirmRequest { EmailAddress = "a@b.c", Code = code! };
 
         await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(
-                                                          ctx, request, IdentityOperation.Confirm, Anonymous));
+                                                          ctx, request, Execution(IdentityOperation.Confirm)));
     }
 
     [Fact]
@@ -55,7 +63,7 @@ public class AdviceRequestConfirmValidationShould
         var request = new ConfirmRequest { Code = "123456" };
 
         await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(
-                                                          ctx, request, IdentityOperation.Confirm, Anonymous));
+                                                          ctx, request, Execution(IdentityOperation.Confirm)));
     }
 
     [Fact]
@@ -64,7 +72,7 @@ public class AdviceRequestConfirmValidationShould
         var ctx     = new AdviceContext(null!);
         var request = new ConfirmRequest();
 
-        var result = await advisor.AdviseAsync(ctx, request, IdentityOperation.Login, Anonymous);
+        var result = await advisor.AdviseAsync(ctx, request, Execution(IdentityOperation.Login));
 
         Assert.Equal(AdviseResult.Continue, result);
     }

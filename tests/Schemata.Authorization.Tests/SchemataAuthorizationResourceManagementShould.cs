@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Resource;
 using Schemata.Authorization.Skeleton.Entities;
-using Schemata.Resource.Foundation;
+using Schemata.Security.Skeleton.Entities;
 using Xunit;
 
 namespace Schemata.Authorization.Tests;
@@ -14,7 +14,7 @@ public class SchemataAuthorizationResourceManagementShould
     [Fact]
     public void UseAuthorization_Without_ResourceTransport_Does_Not_Register_Management_Resources() {
         var builder = WebApplication.CreateBuilder();
-        builder.UseSchemata(schema => schema.UseAuthorization(options => Configure(options)));
+        builder.UseSchemata(schema => schema.UseSecurity().UseAuthorization(options => Configure(options)));
 
         using var app = builder.Build();
 
@@ -26,24 +26,32 @@ public class SchemataAuthorizationResourceManagementShould
     [Fact]
     public void MapHttp_And_MapGrpc_Register_Application_Scope_And_Token_Management_Resources() {
         var builder = WebApplication.CreateBuilder();
-        builder.UseSchemata(schema => schema.UseAuthorization(options => Configure(options)).MapHttp().MapGrpc());
+        builder.UseSchemata(schema => schema.UseSecurity().UseAuthorization(options => Configure(options)).MapHttp().MapGrpc());
 
         using var app = builder.Build();
         var registry = app.Services.GetRequiredService<ResourceRegistry>();
 
+        var application = registry.GetResource(typeof(SchemataApplication));
+        Assert.NotNull(application);
+        Assert.NotNull(application.Endpoints);
         Assert.Equal(
             [HttpResourceAttribute.Name, GrpcResourceAttribute.Name],
-            registry.GetResource(typeof(SchemataApplication))!.Endpoints!.OrderBy(endpoint => endpoint, System.StringComparer.Ordinal));
+            application.Endpoints.OrderBy(endpoint => endpoint, System.StringComparer.Ordinal));
+        var scope = registry.GetResource(typeof(SchemataScope));
+        Assert.NotNull(scope);
+        Assert.NotNull(scope.Endpoints);
         Assert.Equal(
             [HttpResourceAttribute.Name, GrpcResourceAttribute.Name],
-            registry.GetResource(typeof(SchemataScope))!.Endpoints!.OrderBy(endpoint => endpoint, System.StringComparer.Ordinal));
+            scope.Endpoints.OrderBy(endpoint => endpoint, System.StringComparer.Ordinal));
+        var token = registry.GetResource(typeof(SchemataToken));
+        Assert.NotNull(token);
+        Assert.NotNull(token.Endpoints);
         Assert.Equal(
             [HttpResourceAttribute.Name, GrpcResourceAttribute.Name],
-            registry.GetResource(typeof(SchemataToken))!.Endpoints!.OrderBy(endpoint => endpoint, System.StringComparer.Ordinal));
+            token.Endpoints.OrderBy(endpoint => endpoint, System.StringComparer.Ordinal));
     }
 
-    private static void Configure(Schemata.Authorization.Foundation.Authentication.SchemataAuthorizationOptions options) {
+    private static void Configure(Foundation.Authentication.SchemataAuthorizationOptions options) {
         options.Issuer = "https://issuer.example";
-        options.SigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(new byte[32]);
     }
 }

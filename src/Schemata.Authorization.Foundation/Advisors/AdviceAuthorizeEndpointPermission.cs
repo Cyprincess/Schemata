@@ -34,7 +34,7 @@ public sealed class AdviceAuthorizeEndpointPermission<TApp>(IApplicationManager<
         AuthorizeContext<TApp> authz,
         CancellationToken      ct = default
     ) {
-        await PermissionAdvice.RequireAsync(
+        await Permissions.RequireAsync(
             manager, authz.Application, PermissionPrefixes.Endpoint + Endpoints.Authorize, ct,
             code: 403,
             configure: exception => {

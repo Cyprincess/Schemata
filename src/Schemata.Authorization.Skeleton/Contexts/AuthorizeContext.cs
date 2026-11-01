@@ -14,13 +14,23 @@ public sealed class AuthorizeContext<TApplication>
     /// <summary>Parsed authorization request parameters.</summary>
     public AuthorizeRequest? Request { get; set; }
 
+    public AuthorizationRequestStage Stage { get; set; }
+    public string? DpopProof { get; set; }
+    public AuthorizationResult? Result { get; set; }
+    public string? ResolvedRequestUri { get; set; }
+    public string? ResolvedRequestObject { get; set; }
+
     /// <summary>Resolved client application.</summary>
     public TApplication? Application { get; set; }
 
     /// <summary>Authenticated resource owner principal after successful authentication.</summary>
     public ClaimsPrincipal? Principal { get; set; }
 
-    /// <summary>Negotiated response mode, e.g. <c>"query"</c>, <c>"fragment"</c>, or <c>"form_post"</c>.</summary>
+    /// <summary>
+    ///     The validated effective response mode, set once by the client/redirect advisor after
+    ///     PAR/JAR normalization and redirect validation. A non-null value also marks the point
+    ///     after which failures may use <see cref="Request" />'s validated redirect and state.
+    /// </summary>
     public string? ResponseMode { get; set; }
 
     /// <summary>Current consent decision for this authorization request.</summary>

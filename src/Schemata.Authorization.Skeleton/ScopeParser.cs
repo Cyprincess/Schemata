@@ -21,7 +21,7 @@ public static class ScopeParser
     public static HashSet<string> Parse(string? scope) {
         return string.IsNullOrWhiteSpace(scope)
             ? new(StringComparer.Ordinal)
-            : new HashSet<string>(scope!.Split(Separator, StringSplitOptions.RemoveEmptyEntries), StringComparer.Ordinal);
+            : new HashSet<string>(scope.Split(Separator, StringSplitOptions.RemoveEmptyEntries), StringComparer.Ordinal);
     }
 
     /// <summary>

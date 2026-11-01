@@ -6,11 +6,9 @@ namespace Schemata.Authorization.Foundation.Features;
 /// <summary>Marks a class as an authorization flow feature that can be registered and ordered in the DI pipeline.</summary>
 /// <remarks>
 ///     Flow features are sorted by <see cref="Order" /> and executed in sequence during feature configuration.
-///     Extensions like <c>UseCodeFlow()</c> call
-///     <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope, TToken}.AddFlowFeature{T}" />
+///     Extensions like <c>UseAuthorizationCodeFlow()</c> call
 ///     to register implementations of this interface.
 /// </remarks>
-/// <seealso cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope, TToken}" />
 public interface IAuthorizationFlowFeature
 {
     /// <summary>The execution order (lower values run first).</summary>

@@ -2,6 +2,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Authorization.Skeleton.Advisors;
+using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
@@ -35,12 +36,11 @@ public sealed class AdviceDeviceAuthorizeEndpointPermission<TApp>(IApplicationMa
     public int Order => AdviceDeviceAuthorizeEndpointPermission.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(
-        AdviceContext          ctx,
-        TApp                   application,
-        DeviceAuthorizeRequest request,
-        CancellationToken      ct = default
+        AdviceContext                     ctx,
+        DeviceAuthorizeContext<TApp>      request,
+        CancellationToken                 ct = default
     ) {
-        await PermissionAdvice.RequireAsync(manager, application, PermissionPrefixes.Endpoint + Endpoints.Device, ct, code: 403);
+        await Permissions.RequireAsync(manager, request.Application!, PermissionPrefixes.Endpoint + Endpoints.Device, ct, code: 403);
 
         return AdviseResult.Continue;
     }

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -49,18 +50,20 @@ public sealed class AdviceAuthorizeResponseMode<TApp>(IOptions<CodeFlowOptions> 
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        if (string.IsNullOrWhiteSpace(authz.Request?.ResponseType)) {
+        var request = authz.Request;
+        if (request is null) {
             return Task.FromResult(AdviseResult.Continue);
         }
 
-        var responseTypes = authz.Request.ResponseType.Split(' ');
+        if (string.IsNullOrWhiteSpace(request.ResponseType)) {
+            return Task.FromResult(AdviseResult.Continue);
+        }
+
+        var responseTypes = request.ResponseTypes;
 
         if ((responseTypes.Contains(ResponseTypes.Token) || responseTypes.Contains(ResponseTypes.IdToken))
          && authz.ResponseMode == ResponseModes.Query) {
-            throw new OAuthException(
-                OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), Parameters.ResponseMode)
-            ) {
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED, new Dictionary<string, string?> { ["value"] = Parameters.ResponseMode }) {
                 RedirectUri  = authz.Request?.RedirectUri,
                 State        = authz.Request?.State,
                 ResponseMode = ResponseModes.Fragment,

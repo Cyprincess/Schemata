@@ -5,6 +5,7 @@ using Schemata.Identity.Foundation.Commands;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Messaging.Skeleton;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Identity.Foundation.Handlers;
 
@@ -14,6 +15,13 @@ internal sealed class ChangeUserPhoneHandler<TUser>(IdentityOperationHandler<TUs
 {
     public Task<IdentityResult<Unit>> HandleAsync(
         ChangeUserPhoneRequest<TUser> request,
+        AdviceContext                 context,
         CancellationToken             ct = default
-    ) => operations.ChangePhoneAsync(IdentityRequestHandler.Require(request).Request, request.Principal!, ct);
+    ) {
+        if (request.Principal is null) {
+            return Task.FromResult(IdentityResult<Unit>.Challenge());
+        }
+
+        return operations.ChangePhoneAsync(IdentityRequestHandler.Require(request).Request, request.Principal, context, ct);
+    }
 }

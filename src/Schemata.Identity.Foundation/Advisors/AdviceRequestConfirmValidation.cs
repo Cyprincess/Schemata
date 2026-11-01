@@ -1,6 +1,6 @@
-using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Identity.Skeleton;
@@ -10,23 +10,22 @@ using Schemata.Identity.Skeleton.Models;
 namespace Schemata.Identity.Foundation.Advisors;
 
 /// <summary>Validates account-confirmation requests.</summary>
-public sealed class AdviceRequestConfirmValidation : IIdentityRequestAdvisor<ConfirmRequest>
+public sealed class AdviceRequestConfirmValidation : IIdentityRequestAdvisor<ConfirmRequest, IdentityResult<Unit>>
 {
     /// <summary>Default order for account-confirmation request validation.</summary>
-    public const int DefaultOrder = AdviceRequestFeature.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = Schemata.Abstractions.SchemataConstants.Orders.Base + 10_000_000;
 
-    #region IIdentityRequestAdvisor<ConfirmRequest> Members
+    #region IIdentityRequestAdvisor<ConfirmRequest, IdentityResult<Unit>> Members
 
     public int Order => DefaultOrder;
 
     public Task<AdviseResult> AdviseAsync(
-        AdviceContext     ctx,
-        ConfirmRequest    request,
-        IdentityOperation op,
-        ClaimsPrincipal   principal,
-        CancellationToken ct = default
+        AdviceContext                                    ctx,
+        ConfirmRequest                                   request,
+        IdentityOperationExecution<IdentityResult<Unit>> execution,
+        CancellationToken                                ct = default
     ) {
-        if (op is not IdentityOperation.Confirm) {
+        if (execution.Operation is not IdentityOperation.Confirm) {
             return Task.FromResult(AdviseResult.Continue);
         }
 

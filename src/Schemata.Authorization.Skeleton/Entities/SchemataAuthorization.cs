@@ -36,6 +36,16 @@ public class SchemataAuthorization : IIdentifier, ICanonicalName, IConcurrency, 
     /// <summary>Space-delimited scopes granted in this authorization.</summary>
     public virtual string? Scopes { get; set; }
 
+    /// <summary>
+    ///     Granted fine-grained authorization details serialized as a JSON array, per
+    ///     <seealso href="https://www.rfc-editor.org/rfc/rfc9396.html#section-2">
+    ///         RFC 9396: OAuth 2.0 Rich Authorization
+    ///         Requests §2: Request Parameter "authorization_details"
+    ///     </seealso>
+    ///     .
+    /// </summary>
+    public virtual string? AuthorizationDetails { get; set; }
+
     /// <summary>The redirect URI associated with this authorization.</summary>
     public virtual string? RedirectUri { get; set; }
 

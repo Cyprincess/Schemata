@@ -24,19 +24,21 @@ internal sealed partial class IdentityOperationHandler<TUser>
     /// <summary>Builds the authenticated user's profile claims.</summary>
     public async Task<IdentityResult<ClaimsStore>> ProfileAsync(
         ClaimsPrincipal   principal,
+        AdviceContext     context,
         CancellationToken ct = default
     ) {
-        var ctx = AdviceContext.Require();
 
-        switch (await Advisor.For<IIdentityRequestAdvisor<Unit>>()
-                             .RunAsync(ctx, Unit.Value, IdentityOperation.Profile, principal, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<ClaimsStore>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        var execution = new IdentityOperationExecution<IdentityResult<ClaimsStore>> {
+            Operation = IdentityOperation.Profile,
+            Principal = principal,
+        };
+
+        var handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityRequestAdvisor<Unit, IdentityResult<ClaimsStore>>>()
+                         .RunAsync(context, Unit.Value, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
@@ -49,15 +51,12 @@ internal sealed partial class IdentityOperationHandler<TUser>
             claims.AddClaim(claim.Type, claim.Value);
         }
 
-        switch (await Advisor.For<IIdentityProfileResponseAdvisor<TUser>>()
-                             .RunAsync(ctx, found, claims, principal, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<ClaimsStore>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityProfileResponseAdvisor<TUser>>()
+                         .RunAsync(context, found, claims, principal, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         return IdentityResult<ClaimsStore>.Success(claims);
@@ -67,19 +66,21 @@ internal sealed partial class IdentityOperationHandler<TUser>
     public async Task<IdentityResult<Unit>> ChangeEmailAsync(
         ProfileRequest    request,
         ClaimsPrincipal   principal,
+        AdviceContext     context,
         CancellationToken ct = default
     ) {
-        var ctx = AdviceContext.Require();
 
-        switch (await Advisor.For<IIdentityRequestAdvisor<ProfileRequest>>()
-                             .RunAsync(ctx, request, IdentityOperation.ChangeEmail, principal, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<Unit>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        var execution = new IdentityOperationExecution<IdentityResult<Unit>> {
+            Operation = IdentityOperation.ChangeEmail,
+            Principal = principal,
+        };
+
+        var handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityRequestAdvisor<ProfileRequest, IdentityResult<Unit>>>()
+                         .RunAsync(context, request, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
@@ -88,15 +89,12 @@ internal sealed partial class IdentityOperationHandler<TUser>
 
         await SendConfirmationCodeAsync(found, request.EmailAddress, null);
 
-        switch (await Advisor.For<IIdentityProfileChangeAdvisor>()
-                             .RunAsync(ctx, found, IdentityOperation.ChangeEmail, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<Unit>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityProfileChangeAdvisor>()
+                         .RunAsync(context, found, IdentityOperation.ChangeEmail, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         return IdentityResult<Unit>.Success(null);
@@ -106,19 +104,21 @@ internal sealed partial class IdentityOperationHandler<TUser>
     public async Task<IdentityResult<Unit>> ChangePhoneAsync(
         ProfileRequest    request,
         ClaimsPrincipal   principal,
+        AdviceContext     context,
         CancellationToken ct = default
     ) {
-        var ctx = AdviceContext.Require();
 
-        switch (await Advisor.For<IIdentityRequestAdvisor<ProfileRequest>>()
-                             .RunAsync(ctx, request, IdentityOperation.ChangePhone, principal, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<Unit>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        var execution = new IdentityOperationExecution<IdentityResult<Unit>> {
+            Operation = IdentityOperation.ChangePhone,
+            Principal = principal,
+        };
+
+        var handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityRequestAdvisor<ProfileRequest, IdentityResult<Unit>>>()
+                         .RunAsync(context, request, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
@@ -127,15 +127,12 @@ internal sealed partial class IdentityOperationHandler<TUser>
 
         await SendConfirmationCodeAsync(found, null, request.PhoneNumber);
 
-        switch (await Advisor.For<IIdentityProfileChangeAdvisor>()
-                             .RunAsync(ctx, found, IdentityOperation.ChangePhone, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<Unit>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityProfileChangeAdvisor>()
+                         .RunAsync(context, found, IdentityOperation.ChangePhone, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         return IdentityResult<Unit>.Success(null);
@@ -145,19 +142,21 @@ internal sealed partial class IdentityOperationHandler<TUser>
     public async Task<IdentityResult<Unit>> ChangePasswordAsync(
         ProfileRequest    request,
         ClaimsPrincipal   principal,
+        AdviceContext     context,
         CancellationToken ct = default
     ) {
-        var ctx = AdviceContext.Require();
 
-        switch (await Advisor.For<IIdentityRequestAdvisor<ProfileRequest>>()
-                             .RunAsync(ctx, request, IdentityOperation.ChangePassword, principal, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<Unit>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        var execution = new IdentityOperationExecution<IdentityResult<Unit>> {
+            Operation = IdentityOperation.ChangePassword,
+            Principal = principal,
+        };
+
+        var handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityRequestAdvisor<ProfileRequest, IdentityResult<Unit>>>()
+                         .RunAsync(context, request, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
@@ -172,15 +171,12 @@ internal sealed partial class IdentityOperationHandler<TUser>
             }));
         }
 
-        switch (await Advisor.For<IIdentityProfileChangeAdvisor>()
-                             .RunAsync(ctx, found, IdentityOperation.ChangePassword, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<Unit>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityProfileChangeAdvisor>()
+                         .RunAsync(context, found, IdentityOperation.ChangePassword, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         return IdentityResult<Unit>.Success(null);
@@ -189,19 +185,21 @@ internal sealed partial class IdentityOperationHandler<TUser>
     /// <summary>Builds two-factor authenticator enrollment state for the authenticated user.</summary>
     public async Task<IdentityResult<AuthenticatorResponse>> AuthenticatorAsync(
         ClaimsPrincipal   principal,
+        AdviceContext     context,
         CancellationToken ct = default
     ) {
-        var ctx = AdviceContext.Require();
 
-        switch (await Advisor.For<IIdentityRequestAdvisor<Unit>>()
-                             .RunAsync(ctx, Unit.Value, IdentityOperation.Authenticator, principal, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<AuthenticatorResponse>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        var execution = new IdentityOperationExecution<IdentityResult<AuthenticatorResponse>> {
+            Operation = IdentityOperation.Authenticator,
+            Principal = principal,
+        };
+
+        var handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityRequestAdvisor<Unit, IdentityResult<AuthenticatorResponse>>>()
+                         .RunAsync(context, Unit.Value, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
@@ -211,7 +209,7 @@ internal sealed partial class IdentityOperationHandler<TUser>
         var result = new AuthenticatorResponse { IsTwoFactorEnabled = await _users.GetTwoFactorEnabledAsync(found) };
 
         if (!result.IsTwoFactorEnabled) {
-            await _users.ResetAuthenticatorKeyAsync(found);
+            RequireSucceeded(await _users.ResetAuthenticatorKeyAsync(found));
             var key = await _users.GetAuthenticatorKeyAsync(found);
             if (string.IsNullOrWhiteSpace(key)) {
                 throw new NotSupportedException(SchemataResources.GetResourceString(SchemataResources.AUTHENTICATOR_KEY_REQUIRED));
@@ -233,36 +231,34 @@ internal sealed partial class IdentityOperationHandler<TUser>
     public async Task<IdentityResult<Unit>> EnrollAsync(
         AuthenticatorRequest request,
         ClaimsPrincipal      principal,
+        AdviceContext        context,
         CancellationToken    ct = default
     ) {
-        var ctx = AdviceContext.Require();
+        var execution = new IdentityOperationExecution<IdentityResult<Unit>> {
+            Operation = IdentityOperation.Enroll,
+            Principal = principal,
+        };
 
-        switch (await Advisor.For<IIdentityRequestAdvisor<AuthenticatorRequest>>()
-                             .RunAsync(ctx, request, IdentityOperation.Enroll, principal, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<Unit>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        var handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityRequestAdvisor<AuthenticatorRequest, IdentityResult<Unit>>>()
+                         .RunAsync(context, request, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
             throw SchemataResourceErrors.NotFound<TUser>(principal.FindFirstValue(IdentityClaims.Subject));
         }
 
-        await _users.SetTwoFactorEnabledAsync(found, true);
+        RequireSucceeded(await _users.SetTwoFactorEnabledAsync(found, true));
 
-        switch (await Advisor.For<IIdentityTwoFactorAdvisor>()
-                             .RunAsync(ctx, found, IdentityOperation.Enroll, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<Unit>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityTwoFactorAdvisor>()
+                         .RunAsync(context, found, IdentityOperation.Enroll, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         return IdentityResult<Unit>.Success(null);
@@ -272,19 +268,20 @@ internal sealed partial class IdentityOperationHandler<TUser>
     public async Task<IdentityResult<Unit>> DowngradeAsync(
         AuthenticatorRequest request,
         ClaimsPrincipal      principal,
+        AdviceContext        context,
         CancellationToken    ct = default
     ) {
-        var ctx = AdviceContext.Require();
+        var execution = new IdentityOperationExecution<IdentityResult<Unit>> {
+            Operation = IdentityOperation.Downgrade,
+            Principal = principal,
+        };
 
-        switch (await Advisor.For<IIdentityRequestAdvisor<AuthenticatorRequest>>()
-                             .RunAsync(ctx, request, IdentityOperation.Downgrade, principal, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<Unit>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        var handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityRequestAdvisor<AuthenticatorRequest, IdentityResult<Unit>>>()
+                         .RunAsync(context, request, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         if (await _users.GetUserAsync(principal) is not { } found) {
@@ -301,18 +298,15 @@ internal sealed partial class IdentityOperationHandler<TUser>
             throw new InvalidArgumentException();
         }
 
-        await _users.SetTwoFactorEnabledAsync(found, false);
-        await _users.ResetAuthenticatorKeyAsync(found);
+        RequireSucceeded(await _users.SetTwoFactorEnabledAsync(found, false));
+        RequireSucceeded(await _users.ResetAuthenticatorKeyAsync(found));
 
-        switch (await Advisor.For<IIdentityTwoFactorAdvisor>()
-                             .RunAsync(ctx, found, IdentityOperation.Downgrade, ct)) {
-            case AdviseResult.Continue:
-                break;
-            case AdviseResult.Handle when ctx.TryGet<IdentityResult<Unit>>(out var response):
-                return response!;
-            case AdviseResult.Block:
-            default:
-                throw new PermissionDeniedException();
+        handled = await RunStageAsync(
+            execution,
+            () => Advisor.For<IIdentityTwoFactorAdvisor>()
+                         .RunAsync(context, found, IdentityOperation.Downgrade, execution, ct));
+        if (handled is not null) {
+            return handled;
         }
 
         return IdentityResult<Unit>.Success(null);

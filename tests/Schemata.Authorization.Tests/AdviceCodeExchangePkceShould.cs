@@ -1,3 +1,6 @@
+using Schemata.Abstractions;
+using Schemata.Abstractions.Errors;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -7,6 +10,7 @@ using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Models;
 using Xunit;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
@@ -19,7 +23,7 @@ public class AdviceCodeExchangePkceShould
     private const string Verifier      = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
     private const string ChallengeS256 = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
 
-    private static AdviceCodeExchangePkce<SchemataApplication, SchemataToken> CreateAdvisor(
+    private static AdviceCodeExchangePkce<SchemataApplication> CreateAdvisor(
         bool requireS256         = true,
         bool downgradeProtection = true
     ) {
@@ -31,7 +35,7 @@ public class AdviceCodeExchangePkceShould
 
     private static AdviceContext CreateContext() { return new(new ServiceCollection().BuildServiceProvider()); }
 
-    private static CodeExchangeContext<SchemataApplication, SchemataToken> Exchange(
+    private static CodeExchangeContext<SchemataApplication> Exchange(
         TokenRequest     request,
         AuthorizeRequest payload
     ) {
@@ -57,11 +61,12 @@ public class AdviceCodeExchangePkceShould
     [Fact]
     public async Task ThrowsInvalidGrant_WhenS256Challenge_DoesNotMatchVerifier() {
         var advisor = CreateAdvisor();
-        var exchange = Exchange(new() { CodeVerifier  = "wrong-verifier" },
+        var exchange = Exchange(new() { CodeVerifier  = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" },
                                 new() { CodeChallenge = ChallengeS256, CodeChallengeMethod = PkceMethods.S256 });
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(CreateContext(), exchange));
         Assert.Equal(OAuthErrors.InvalidGrant, ex.Status);
+        Assert.Equal(SchemataResources.PKCE_VERIFIER_MISMATCH, Reason(ex));
     }
 
     [Fact]
@@ -71,6 +76,7 @@ public class AdviceCodeExchangePkceShould
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(CreateContext(), exchange));
         Assert.Equal(OAuthErrors.InvalidGrant, ex.Status);
+        Assert.Equal(SchemataResources.PKCE_VERIFIER_REQUIRED, Reason(ex));
     }
 
     [Fact]
@@ -102,5 +108,23 @@ public class AdviceCodeExchangePkceShould
 
         var ex = await Assert.ThrowsAsync<OAuthException>(() => advisor.AdviseAsync(CreateContext(), exchange));
         Assert.Equal(OAuthErrors.InvalidGrant, ex.Status);
+        Assert.Equal(SchemataResources.PKCE_VERIFIER_UNEXPECTED, Reason(ex));
     }
-}
+
+    private static string Reason(OAuthException ex) {
+        return Assert.Single(ex.Details!.OfType<ErrorInfoDetail>()).Reason!;
+    }
+
+    [Fact]
+    public async Task ThrowsInvalidGrant_WhenVerifierMalformed() {
+        var exchange = Exchange(new() { CodeVerifier  = "short" },
+                                new() { CodeChallenge = ChallengeS256, CodeChallengeMethod = PkceMethods.S256 });
+
+        var ex = await Assert.ThrowsAsync<OAuthException>(
+            () => CreateAdvisor().AdviseAsync(CreateContext(), exchange));
+
+        Assert.Equal(OAuthErrors.InvalidGrant, ex.Status);
+        Assert.Equal(SchemataResources.PKCE_VERIFIER_INVALID, Reason(ex));
+    }
+
+    }

@@ -6,4 +6,4 @@ namespace Schemata.Identity.Skeleton.Advisors;
 /// <summary>
 ///     Advises refresh-token principals before issuing refreshed credentials.
 /// </summary>
-public interface IIdentityRefreshAdvisor : IAdvisor<ClaimsPrincipal>;
+public interface IIdentityRefreshAdvisor : IAdvisor<ClaimsPrincipal, IHandledResponse<IdentityResult<ClaimsPrincipal>>>;

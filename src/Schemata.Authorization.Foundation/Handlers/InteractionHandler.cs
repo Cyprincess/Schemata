@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using System.Security.Claims;
 using System.Threading;
@@ -26,10 +27,7 @@ public sealed class InteractionHandler(IServiceProvider sp) : InteractionEndpoin
     ) {
         var handler = sp.GetKeyedService<IInteractionHandler>(request.CodeType);
         if (handler is null) {
-            throw new OAuthException(
-                OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), request.CodeType)
-            );
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED, new Dictionary<string, string?> { ["value"] = request.CodeType });
         }
 
         return handler.GetDetailsAsync(request, issuer, ct);
@@ -43,10 +41,7 @@ public sealed class InteractionHandler(IServiceProvider sp) : InteractionEndpoin
     ) {
         var handler = sp.GetKeyedService<IInteractionHandler>(request.CodeType);
         if (handler is null) {
-            throw new OAuthException(
-                OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), request.CodeType)
-            );
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED, new Dictionary<string, string?> { ["value"] = request.CodeType });
         }
 
         return handler.ApproveAsync(request, principal, issuer, ct);
@@ -55,10 +50,7 @@ public sealed class InteractionHandler(IServiceProvider sp) : InteractionEndpoin
     public override async Task DenyAsync(InteractRequest request, CancellationToken ct) {
         var handler = sp.GetKeyedService<IInteractionHandler>(request.CodeType);
         if (handler is null) {
-            throw new OAuthException(
-                OAuthErrors.InvalidRequest,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_SUPPORTED), request.CodeType)
-            );
+            throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED, new Dictionary<string, string?> { ["value"] = request.CodeType });
         }
 
         await handler.DenyAsync(request, ct);

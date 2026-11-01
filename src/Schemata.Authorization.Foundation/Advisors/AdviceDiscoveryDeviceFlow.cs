@@ -36,7 +36,7 @@ public sealed class AdviceDiscoveryDeviceFlow : IDiscoveryAdvisor
 
         discovery.Document                             ??= new();
         discovery.Document.GrantTypesSupported         ??= [];
-        discovery.Document.DeviceAuthorizationEndpoint =   $"{issuer}{Endpoints.Device}";
+        discovery.Document.DeviceAuthorizationEndpoint =   CanonicalIssuer.Combine(issuer, Endpoints.Device);
         discovery.Document.GrantTypesSupported.Add(GrantTypes.DeviceCode);
 
         return Task.FromResult(AdviseResult.Continue);

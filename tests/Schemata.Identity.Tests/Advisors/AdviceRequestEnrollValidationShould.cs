@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Identity.Foundation.Advisors;
@@ -26,6 +27,13 @@ public class AdviceRequestEnrollValidationShould
     private static readonly ClaimsPrincipal Alice = new(
         new ClaimsIdentity([new(ClaimTypes.NameIdentifier, "42")], "test"));
 
+    private static IdentityOperationExecution<IdentityResult<Unit>> Execution(
+        IdentityOperation operation,
+        ClaimsPrincipal?  principal = null
+    ) {
+        return new() { Operation = operation, Principal = principal ?? Anonymous };
+    }
+
     private static SchemataUserManager<SchemataUser> MockUserManager() {
         var store = new Mock<ICompositeUserStore>();
         store.Setup(s => s.FindByIdAsync("42", It.IsAny<CancellationToken>()))
@@ -43,7 +51,7 @@ public class AdviceRequestEnrollValidationShould
         var request = new AuthenticatorRequest { TwoFactorCode = "123456" };
 
         await Assert.ThrowsAsync<NotFoundException>(() => advisor.AdviseAsync(
-                                                        ctx, request, IdentityOperation.Enroll, Anonymous));
+                                                        ctx, request, Execution(IdentityOperation.Enroll)));
     }
 
     [Fact]
@@ -54,7 +62,7 @@ public class AdviceRequestEnrollValidationShould
         var request = new AuthenticatorRequest();
 
         await Assert.ThrowsAsync<ValidationException>(() => advisor.AdviseAsync(
-                                                          ctx, request, IdentityOperation.Enroll, Alice));
+                                                          ctx, request, Execution(IdentityOperation.Enroll, Alice)));
     }
 
     [Fact]
@@ -64,7 +72,7 @@ public class AdviceRequestEnrollValidationShould
         var ctx     = new AdviceContext(null!);
         var request = new AuthenticatorRequest();
 
-        var result = await advisor.AdviseAsync(ctx, request, IdentityOperation.Downgrade, Anonymous);
+        var result = await advisor.AdviseAsync(ctx, request, Execution(IdentityOperation.Downgrade));
 
         Assert.Equal(AdviseResult.Continue, result);
     }

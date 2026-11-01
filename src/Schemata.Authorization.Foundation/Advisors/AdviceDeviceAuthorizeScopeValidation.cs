@@ -5,6 +5,7 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
+using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
@@ -42,29 +43,25 @@ public sealed class AdviceDeviceAuthorizeScopeValidation<TApp>(
     public int Order => AdviceDeviceAuthorizeScopeValidation.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(
-        AdviceContext          ctx,
-        TApp                   application,
-        DeviceAuthorizeRequest request,
-        CancellationToken      ct = default
+        AdviceContext                     ctx,
+        DeviceAuthorizeContext<TApp>      request,
+        CancellationToken                 ct = default
     ) {
-        if (string.IsNullOrWhiteSpace(request.Scope)) {
+        if (request.Application is null || string.IsNullOrWhiteSpace(request.Request?.Scope)) {
             return AdviseResult.Continue;
         }
 
-        var requested = ScopeParser.Parse(request.Scope);
+        var requested = ScopeParser.Parse(request.Request.Scope);
         if (requested.Count == 0) {
             return AdviseResult.Continue;
         }
 
         if (requested.Contains(Scopes.OpenId)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidScope,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_SCOPE)
-            );
+            throw new OAuthException(OAuthErrors.InvalidScope, SchemataResources.INVALID_SCOPE);
         }
 
         foreach (var s in requested) {
-            await PermissionAdvice.RequireAsync(apps, application, PermissionPrefixes.Scope + s, ct,
+            await Permissions.RequireTrueAsync(await apps.HasScopeAsync(request.Application, s, ct),
                 OAuthErrors.InvalidScope, SchemataResources.INVALID_SCOPE);
         }
 

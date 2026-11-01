@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
@@ -35,6 +37,12 @@ public class SchemataUserClaimsPrincipalFactory<TUser, TRole> : UserClaimsPrinci
     protected override async Task<ClaimsIdentity> GenerateClaimsAsync(TUser user) {
         var identity = await base.GenerateClaimsAsync(user);
 
+        // Provisioning markers describe row ownership, not the caller's authority; keeping them would
+        // put internal SCIM state in every cookie and token issued to a member of a managed group.
+        foreach (var claim in identity.FindAll(ProvisioningClaims.ScimGroup).ToList()) {
+            identity.RemoveClaim(claim);
+        }
+
         // The base factory issues IdentityClaims.Subject from user.Id.ToString() via
         // IdentityOptions.ClaimsIdentity.UserIdClaimType. Overwrite that value with the
         // canonical name so every Schemata code path reading `sub` sees the "users/{uid}" form.
@@ -43,9 +51,8 @@ public class SchemataUserClaimsPrincipalFactory<TUser, TRole> : UserClaimsPrinci
             identity.RemoveClaim(existing);
         }
 
-        var canonical = !string.IsNullOrWhiteSpace(user.CanonicalName)
-            ? user.CanonicalName!
-            : $"users/{user.Uid}";
+        var canonical = user.CanonicalName
+                     ?? throw new InvalidOperationException("The user must have a canonical resource name before issuing claims.");
         identity.AddClaim(new(Options.ClaimsIdentity.UserIdClaimType, canonical));
 
         return identity;

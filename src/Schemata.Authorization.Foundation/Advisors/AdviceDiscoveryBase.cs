@@ -1,8 +1,12 @@
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Advisors;
+using Schemata.Authorization.Foundation.Commands;
+using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
+using Schemata.Messaging.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
@@ -34,9 +38,20 @@ public sealed class AdviceDiscoveryBase : IDiscoveryAdvisor
     ) {
         var issuer = discovery.Issuer;
 
-        discovery.Document               ??= new();
-        discovery.Document.TokenEndpoint =   $"{issuer}{Endpoints.Token}";
-        discovery.Document.JwksUri       =   $"{issuer}/.well-known/{Endpoints.Jwks}";
+        // Endpoint metadata is advertised only when the endpoint's closed request handler is
+        // installed — the same activation fact that keeps the route in the MVC application model.
+        var activation = ctx.ServiceProvider.GetRequiredService<IServiceProviderIsService>();
+
+        discovery.Document             ??= new();
+        discovery.Document.TokenEndpoint = activation.IsService(typeof(IRequestHandler<TokenEndpointRequest, AuthorizationResult>))
+                                               ? CanonicalIssuer.Combine(issuer, Endpoints.Token)
+                                               : null;
+        discovery.Document.JwksUri       =   CanonicalIssuer.Combine(issuer, Endpoints.Jwks);
+        if (!activation.IsService(typeof(IRequestHandler<AuthorizeEndpointRequest, AuthorizationResult>))) {
+            discovery.Document.ResponseTypesSupported = null;
+            discovery.Document.ResponseModesSupported = null;
+            discovery.Document.AuthorizationResponseIssParameterSupported = null;
+        }
 
         return Task.FromResult(AdviseResult.Continue);
     }

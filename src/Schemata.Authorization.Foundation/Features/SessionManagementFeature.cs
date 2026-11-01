@@ -1,0 +1,60 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Foundation.Advisors;
+using Schemata.Authorization.Foundation.Commands;
+using Schemata.Authorization.Foundation.Handlers;
+using Schemata.Authorization.Foundation.Services;
+using Schemata.Authorization.Skeleton.Advisors;
+using Schemata.Authorization.Skeleton.Services;
+using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Authorization.Skeleton.Handlers;
+using Schemata.Common;
+using Schemata.Core;
+using Schemata.Messaging.Skeleton;
+
+using Schemata.Authorization.Foundation.Controllers;
+
+namespace Schemata.Authorization.Foundation.Features;
+
+/// <summary>
+///     Registers OpenID Connect Session Management state, cookies, discovery, and check-session iframe.
+/// </summary>
+/// <remarks>
+///     Installed by <c>UseSessionManagement()</c>; behavior is configured through
+///     <see cref="SessionManagementOptions" />.
+/// </remarks>
+public sealed class SessionManagementFeature<TApp> : IAuthorizationFlowFeature
+    where TApp : SchemataApplication
+{
+    public int Order => SessionManagementFeature.DefaultOrder;
+
+    public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
+
+        services.AddHttpContextAccessor();
+
+        services.AddOptions<SessionManagementOptions>()
+                .Validate(options => !string.IsNullOrWhiteSpace(options.OpStateCookieName), "OP state cookie name is required.");
+
+        // The host profile owns the unprefixed cookie namespace; a tenant state profile registers
+        // its own fixed BrowserCookieNames, and browser-state consumers read it from the executing
+        // request scope.
+        services.TryAddSingleton(new BrowserCookieNames(string.Empty));
+
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IOpSessionStore, OpSessionStore>());
+        services.TryAddScoped<SessionStateFormulator>();
+
+        services.TryAddScoped<SessionManagementEndpoint, SessionManagementHandler<TApp>>();
+        services.TryAddScoped<
+            IRequestHandler<CheckSessionEndpointRequest, string>,
+            EndpointDispatchHandler<CheckSessionEndpointRequest, SessionManagementEndpoint, string>>();
+
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeAdvisor<TApp>, AdviceAuthorizeSessionState<TApp>>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoverySessionManagement>());
+    }
+}
+
+internal static class SessionManagementFeature
+{
+    public const int DefaultOrder = BackChannelLogoutFeature.DefaultOrder + 100;
+}

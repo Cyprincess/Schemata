@@ -84,6 +84,18 @@ public class SubjectIdentifierServiceShould
     }
 
     [Fact]
+    public void Resolve_PairwiseType_Length_Frames_The_Salted_Sector_Tuple() {
+        var service = CreateService(SubjectTypes.Pairwise, Salt);
+        var alpha   = CreateApplication(redirectUri: "https://a.example/callback");
+        var beta    = CreateApplication(redirectUri: "https://a.examplex/callback");
+
+        var first  = service.Resolve("x123", alpha);
+        var second = service.Resolve("123", beta);
+
+        Assert.NotEqual(first, second);
+    }
+
+    [Fact]
     public void Resolve_AppOverride_UsesAppSubjectType() {
         var service     = CreateService(SubjectTypes.Public, Salt);
         var application = CreateApplication(SubjectTypes.Pairwise);

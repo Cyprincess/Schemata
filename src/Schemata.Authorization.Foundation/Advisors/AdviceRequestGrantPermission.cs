@@ -1,7 +1,11 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Authorization.Skeleton.Advisors;
+using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Models;
@@ -27,7 +31,7 @@ public static class AdviceRequestGrantPermission
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
 /// <seealso cref="AdviceRequestEndpointPermission{TApp}" />
-/// <seealso cref="AdviceRequestDeviceCodePolling{TApp}" />
+/// <c>AdviceRequestDeviceCodePolling</c>
 public sealed class AdviceRequestGrantPermission<TApp>(IApplicationManager<TApp> manager) : ITokenRequestAdvisor<TApp>
     where TApp : SchemataApplication
 {
@@ -36,14 +40,16 @@ public sealed class AdviceRequestGrantPermission<TApp>(IApplicationManager<TApp>
     public int Order => AdviceRequestGrantPermission.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(
-        AdviceContext     ctx,
-        TApp              application,
-        TokenRequest      request,
-        CancellationToken ct = default
+        AdviceContext             ctx,
+        TokenRequestContext<TApp> request,
+        CancellationToken         ct = default
     ) {
-        var grant = request.GrantType;
-
-        await PermissionAdvice.RequireAsync(manager, application, PermissionPrefixes.GrantType + grant, ct);
+        var application = request.Application
+            ?? throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
+        var grantType = request.Request?.GrantType
+            ?? throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_EMPTY, new Dictionary<string, string?> { ["value"] = Parameters.GrantType });
+        // The registered grant_types metadata is the runtime authority.
+        await Permissions.RequireTrueAsync(await manager.HasGrantTypeAsync(application, grantType, ct));
 
         return AdviseResult.Continue;
     }

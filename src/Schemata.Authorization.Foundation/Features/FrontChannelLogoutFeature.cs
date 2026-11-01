@@ -5,6 +5,7 @@ using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Core;
 
 namespace Schemata.Authorization.Foundation.Features;
@@ -21,16 +22,15 @@ namespace Schemata.Authorization.Foundation.Features;
 /// <typeparam name="TToken">The token entity type.</typeparam>
 /// <remarks>
 ///     Installed via <c>UseFrontChannelLogout()</c> on
-///     <see cref="SchemataAuthorizationBuilder{TApp, TAuth, TScope, TToken}" />.
+///     <c>SchemataAuthorizationBuilder</c>.
 /// </remarks>
-/// <seealso cref="BackChannelLogoutFeature{TApp, TToken}" />
 public sealed class FrontChannelLogoutFeature<TApp, TToken> : IAuthorizationFlowFeature
     where TApp : SchemataApplication
-    where TToken : SchemataToken
+    where TToken : SchemataToken, new()
 {
     #region IAuthorizationFlowFeature Members
 
-    public int Order => 60_100;
+    public int Order => FrontChannelLogoutFeature.DefaultOrder;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ILogoutNotifier, FrontChannelLogoutService<TApp, TToken>>());
@@ -38,4 +38,15 @@ public sealed class FrontChannelLogoutFeature<TApp, TToken> : IAuthorizationFlow
     }
 
     #endregion
+}
+
+
+/// <summary>
+///     Ordering anchor for <see cref="FrontChannelLogoutFeature" /> so successor features can chain
+///     off its <c>DefaultOrder</c> without naming type arguments.
+/// </summary>
+internal static class FrontChannelLogoutFeature
+{
+    /// <summary>The default feature ordering value (chained after its predecessor).</summary>
+    public const int DefaultOrder = EndSessionFeature.DefaultOrder + 100;
 }

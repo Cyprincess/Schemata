@@ -3,12 +3,13 @@ using System.Threading.Tasks;
 using Schemata.Abstractions.Advisors;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Security.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Models;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
-/// <summary>Order constants for <see cref="AdviceRevocationTokenValidation{TApp, TToken}" />.</summary>
+/// <summary>Order constants for <see cref="AdviceRevocationTokenValidation{TApp}" />.</summary>
 public static class AdviceRevocationTokenValidation
 {
     /// <summary>The default advisor ordering value.</summary>
@@ -25,18 +26,15 @@ public static class AdviceRevocationTokenValidation
 ///     .
 /// </summary>
 /// <typeparam name="TApp">The application entity type.</typeparam>
-/// <typeparam name="TToken">The token entity type.</typeparam>
 /// <remarks>
 ///     Only access tokens and refresh tokens are revocable. Rejecting an
 ///     already-revoked or foreign application's token with <see cref="AdviseResult.Block" /> results in
 ///     an indistinguishable response.
 /// </remarks>
-/// <seealso cref="AdviceRevocationEndpointPermission{TApp, TToken}" />
-public sealed class AdviceRevocationTokenValidation<TApp, TToken> : IRevocationAdvisor<TApp, TToken>
+public sealed class AdviceRevocationTokenValidation<TApp> : IRevocationAdvisor<TApp>
     where TApp : SchemataApplication
-    where TToken : SchemataToken
 {
-    #region IRevocationAdvisor<TApp,TToken> Members
+    #region IRevocationAdvisor<TApp> Members
 
     public int Order => AdviceRevocationTokenValidation.DefaultOrder;
 
@@ -44,7 +42,7 @@ public sealed class AdviceRevocationTokenValidation<TApp, TToken> : IRevocationA
         AdviceContext     ctx,
         TApp              application,
         RevokeRequest     request,
-        TToken            token,
+        SchemataToken            token,
         CancellationToken ct = default
     ) {
         if (string.IsNullOrWhiteSpace(token.Application) || token.Application != application.CanonicalName) {

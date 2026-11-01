@@ -12,6 +12,8 @@ using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Services;
+using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Services;
@@ -27,19 +29,25 @@ namespace Schemata.Authorization.Foundation.Services;
 ///     header, URL-decodes them, looks up the application, and validates the
 ///     client secret.  Public clients may omit the secret.
 /// </summary>
-public sealed class ClientSecretBasicAuthentication<TApp>(
+public sealed class ClientSecretBasicAuthentication<TApp, TSecurity>(
     IApplicationManager<TApp>              apps,
-    IOptions<SchemataAuthorizationOptions> options
+    IOptions<SchemataAuthorizationOptions> options,
+    ISecurityStore<TSecurity>              securities,
+    ISecretVerifier                        verifier
 ) : IClientAuthentication<TApp>
     where TApp : SchemataApplication
+    where TSecurity : SchemataSecurity, new()
 {
     #region IClientAuthentication<TApp> Members
+
+    public string Method => ClientAuthMethods.ClientSecretBasic;
 
     public async Task<TApp?> AuthenticateAsync(
         Dictionary<string, List<string?>>? query,
         Dictionary<string, List<string?>>? form,
         Dictionary<string, List<string?>>? headers,
-        CancellationToken                  ct
+        CancellationToken                  ct,
+        string? endpointAudience = null
     ) {
         if (!options.Value.AllowedClientAuthMethods.Contains(ClientAuthMethods.ClientSecretBasic)) {
             return null;
@@ -58,53 +66,27 @@ public sealed class ClientSecretBasicAuthentication<TApp>(
         try {
             decoded = Encoding.UTF8.GetString(Convert.FromBase64String(header[(Schemes.Basic + " ").Length..].Trim()));
         } catch (FormatException) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
         var colon = decoded.IndexOf(':');
         if (colon < 0) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
         var id     = WebUtility.UrlDecode(decoded[..colon]);
         var secret = WebUtility.UrlDecode(decoded[(colon + 1)..]);
 
         if (string.IsNullOrWhiteSpace(id)) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), Parameters.ClientId)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.NOT_EMPTY, new Dictionary<string, string?> { ["value"] = Parameters.ClientId });
         }
 
         var app = await apps.FindByClientIdAsync(id, ct);
         if (app is null) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-            );
+            throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
 
-        // Confidential clients MUST present a valid secret (RFC 6749 §2.3.1);
-        // public clients may authenticate without one.
-        if (!string.IsNullOrWhiteSpace(secret)) {
-            if (!await apps.ValidateClientSecretAsync(app, secret, ct)) {
-                throw new OAuthException(
-                    OAuthErrors.InvalidClient,
-                    SchemataResources.GetResourceString(SchemataResources.INVALID_CLIENT_CREDENTIALS)
-                );
-            }
-        } else if (app.ClientType == ClientTypes.Confidential) {
-            throw new OAuthException(
-                OAuthErrors.InvalidClient,
-                SchemataResources.GetResourceString(SchemataResources.CLIENT_SECRET_REQUIRED)
-            );
-        }
+        await ClientSecretValidator.ValidateAsync(securities, verifier, app, secret, ct);
 
         return app;
     }

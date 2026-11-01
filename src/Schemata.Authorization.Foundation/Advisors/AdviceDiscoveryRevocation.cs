@@ -20,7 +20,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 public sealed class AdviceDiscoveryRevocation : IDiscoveryAdvisor
 {
     /// <summary>The default advisor ordering value.</summary>
-    public const int DefaultOrder = AdviceDiscoveryIntrospection.DefaultOrder + 10_000_000;
+    public const int DefaultOrder = AdviceDiscoveryRegistration.DefaultOrder + 10_000_000;
 
     #region IDiscoveryAdvisor Members
 
@@ -34,7 +34,7 @@ public sealed class AdviceDiscoveryRevocation : IDiscoveryAdvisor
         var issuer = discovery.Issuer;
 
         discovery.Document                    ??= new();
-        discovery.Document.RevocationEndpoint =   $"{issuer}{Endpoints.Revoke}";
+        discovery.Document.RevocationEndpoint =   CanonicalIssuer.Combine(issuer, Endpoints.Revoke);
 
         return Task.FromResult(AdviseResult.Continue);
     }

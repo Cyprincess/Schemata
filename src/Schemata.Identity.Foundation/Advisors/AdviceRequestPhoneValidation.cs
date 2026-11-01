@@ -1,7 +1,7 @@
 using System;
-using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Identity.Skeleton;
@@ -21,25 +21,24 @@ public static class AdviceRequestPhoneValidation
 
 /// <summary>Validates phone-change profile requests.</summary>
 /// <typeparam name="TUser">User entity type handled by the user manager.</typeparam>
-public sealed class AdviceRequestPhoneValidation<TUser>(SchemataUserManager<TUser> users) : IIdentityRequestAdvisor<ProfileRequest>
+public sealed class AdviceRequestPhoneValidation<TUser>(SchemataUserManager<TUser> users) : IIdentityRequestAdvisor<ProfileRequest, IdentityResult<Unit>>
     where TUser : SchemataUser, new()
 {
-    #region IIdentityRequestAdvisor<ProfileRequest> Members
+    #region IIdentityRequestAdvisor<ProfileRequest, IdentityResult<Unit>> Members
 
     public int Order => AdviceRequestPhoneValidation.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(
-        AdviceContext     ctx,
-        ProfileRequest    request,
-        IdentityOperation op,
-        ClaimsPrincipal   principal,
-        CancellationToken ct = default
+        AdviceContext                                    ctx,
+        ProfileRequest                                   request,
+        IdentityOperationExecution<IdentityResult<Unit>> execution,
+        CancellationToken                                ct = default
     ) {
-        if (op is not IdentityOperation.ChangePhone) {
+        if (execution.Operation is not IdentityOperation.ChangePhone) {
             return AdviseResult.Continue;
         }
 
-        var user = await IdentityValidation.RequireUserAsync(users, principal);
+        var user = await IdentityValidation.RequireUserAsync(users, execution.Principal);
 
         IdentityValidation.RequireNotEmpty(request.PhoneNumber, nameof(request.PhoneNumber));
 

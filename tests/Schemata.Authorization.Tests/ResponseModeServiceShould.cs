@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Schemata.Authorization.Foundation.Services;
 using Xunit;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
+using System;
 
 namespace Schemata.Authorization.Tests;
 
@@ -86,12 +87,12 @@ public class ResponseModeServiceShould
     }
 
     [Fact]
-    public void CreateCallback_UnknownMode_FallsBackToQuery() {
-        var result = ResponseModeService.CreateCallback("https://client.example.com/cb", Params(("code", "abc")),
-                                                        "unknown_mode");
-
-        var redirect = Assert.IsType<RedirectResult>(result);
-        Assert.StartsWith("https://client.example.com/cb?", redirect.Url);
+    public void CreateCallback_UnknownMode_Rejects_Instead_Of_Guessing_Query() {
+        // Issue #135: the renderer handles resolved, supported modes only - an unresolved mode is
+        // an unvalidated pipeline path and must never silently encode as a query callback.
+        Assert.Throws<InvalidOperationException>(
+            () => ResponseModeService.CreateCallback("https://client.example.com/cb", Params(("code", "abc")),
+                                                     "unknown_mode"));
     }
 
     [Theory]
@@ -116,6 +117,35 @@ public class ResponseModeServiceShould
     public void ResolveMode_TreatsEmptyModeAsUnspecified() {
         Assert.Equal(ResponseModes.Query, ResponseModeService.ResolveMode("", "code"));
         Assert.Equal(ResponseModes.Fragment, ResponseModeService.ResolveMode("", "token"));
+    }
+
+    [Fact]
+    public void ResolveAllowedMode_OmittedCodeMode_UsesFormPostWhenOnlyFormPostIsAllowed() {
+        var allowed = new HashSet<string> { ResponseModes.FormPost };
+
+        Assert.Equal(ResponseModes.FormPost, ResponseModeService.ResolveAllowedMode(null, "code", allowed));
+    }
+
+    [Fact]
+    public void ResolveAllowedMode_OmittedTokenMode_UsesFragmentWhenFragmentIsAllowed() {
+        var allowed = new HashSet<string> { ResponseModes.FormPost, ResponseModes.Fragment };
+
+        Assert.Equal(ResponseModes.Fragment, ResponseModeService.ResolveAllowedMode(null, "token", allowed));
+    }
+
+    [Fact]
+    public void ResolveAllowedMode_ExplicitModeOutsideAllowList_ReturnsNull() {
+        var allowed = new HashSet<string> { ResponseModes.FormPost };
+
+        Assert.Null(ResponseModeService.ResolveAllowedMode("query", "code", allowed));
+    }
+
+    [Fact]
+    public void ResolveAllowedMode_EmptyAllowList_UsesInferredMode() {
+        Assert.Equal(ResponseModes.Query,
+                     ResponseModeService.ResolveAllowedMode(null, "code", new HashSet<string>()));
+        Assert.Equal(ResponseModes.Fragment,
+                     ResponseModeService.ResolveAllowedMode(null, "token", new HashSet<string>()));
     }
 
     [Fact]

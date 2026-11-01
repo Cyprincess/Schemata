@@ -1,6 +1,6 @@
 using Schemata.Abstractions.Advisors;
+using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Entities;
-using Schemata.Authorization.Skeleton.Models;
 
 namespace Schemata.Authorization.Skeleton.Advisors;
 
@@ -14,5 +14,5 @@ namespace Schemata.Authorization.Skeleton.Advisors;
 ///     </seealso>
 ///     .
 /// </summary>
-public interface IDeviceAuthorizeAdvisor<TApplication> : IAdvisor<TApplication, DeviceAuthorizeRequest>
+public interface IDeviceAuthorizeAdvisor<TApplication> : IAdvisor<DeviceAuthorizeContext<TApplication>>
     where TApplication : SchemataApplication;

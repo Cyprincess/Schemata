@@ -1,4 +1,3 @@
-using System.Net.Mime;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -24,16 +23,13 @@ public partial class ConnectController
         var result = await dispatcher.SendAsync<EndSessionEndpointRequest, AuthorizationResult>(
             new(request, HttpContext.User), ct);
 
-        return result.Status switch {
-            AuthorizationStatus.Redirect when !string.IsNullOrWhiteSpace(result.RedirectUri) => Redirect(
-                result.RedirectUri
-            ),
-            AuthorizationStatus.Content when result.Data is string html => new ContentResult {
-                Content     = html,
-                ContentType = MediaTypeNames.Text.Html,
-                StatusCode  = 200,
-            },
-            var _ => NoContent(),
-        };
+        // The built-in logout completion reports an empty successful outcome (content with no
+        // data) when neither a post-logout redirect nor a front-channel page applies; the
+        // shared adapter's content branch would otherwise serialize that null.
+        if (result.Status == AuthorizationStatus.Content && result.Data is null) {
+            return NoContent();
+        }
+
+        return await MapResult(result, ct);
     }
 }
