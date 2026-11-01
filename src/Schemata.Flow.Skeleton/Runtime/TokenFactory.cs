@@ -5,12 +5,15 @@ using Schemata.Flow.Skeleton.Models;
 namespace Schemata.Flow.Skeleton.Runtime;
 
 /// <summary>
-///     Engine-neutral helpers that build and mutate <see cref="SchemataProcessToken" /> and
-///     <see cref="SchemataProcess" /> rows from a resolved <see cref="TargetState" />. The state-machine
-///     engine and the BPMN engine share these helpers so token canonical names, scope wiring, and
-///     lifecycle state strings stay in one place.
+///     Engine-neutral helpers that build and mutate <typeparamref name="TToken" /> and
+///     <typeparamref name="TProcess" /> rows from a resolved <see cref="TargetState" />. The
+///     state-machine engine and the BPMN engine share scope wiring and lifecycle state strings.
 /// </summary>
-public static class TokenFactory
+/// <typeparam name="TProcess">The persisted process entity type registered by the host.</typeparam>
+/// <typeparam name="TToken">The persisted token entity type registered by the host.</typeparam>
+public static class TokenFactory<TProcess, TToken>
+    where TProcess : SchemataProcess
+    where TToken : SchemataProcessToken, new()
 {
     /// <summary>
     ///     Creates a root token (no <see cref="SchemataProcessToken.Spawner" />) sitting in the process
@@ -18,20 +21,15 @@ public static class TokenFactory
     /// </summary>
     /// <param name="process">The owning process aggregate.</param>
     /// <param name="resolved">The target state the engine resolved for the first element.</param>
-    /// <returns>A new token with a fresh leaf id and root scope.</returns>
-    public static SchemataProcessToken NewRootToken(SchemataProcess process, TargetState resolved) {
+    /// <returns>An unnamed token in the root scope, ready for repository creation.</returns>
+    public static TToken NewRootToken(TProcess process, TargetState resolved) {
         ArgumentNullException.ThrowIfNull(process);
         ArgumentNullException.ThrowIfNull(resolved);
 
-        var leaf      = Guid.NewGuid().ToString("n");
-        var canonical = $"{process.CanonicalName}/tokens/{leaf}";
-
         return new() {
-            Name          = leaf,
-            CanonicalName = canonical,
             Process       = process.Name!,
             Spawner       = null,
-            ScopeName     = process.Name!,
+            ScopeName     = string.Empty,
             StateName     = resolved.StateName,
             WaitingAtName = resolved.WaitingAtName,
             State         = TokenAggregator.TokenStateFor(resolved),
@@ -43,21 +41,12 @@ public static class TokenFactory
     ///     by the BPMN engine whenever a multi-token shape (fork, boundary, MI, sub-process) opens a new
     ///     execution path.
     /// </summary>
-    public static SchemataProcessToken NewChildToken(
-        SchemataProcess      process,
-        TargetState          resolved,
-        SchemataProcessToken spawner
-    ) {
+    public static TToken NewChildToken(TProcess process, TargetState resolved, TToken spawner) {
         ArgumentNullException.ThrowIfNull(process);
         ArgumentNullException.ThrowIfNull(resolved);
         ArgumentNullException.ThrowIfNull(spawner);
 
-        var leaf      = Guid.NewGuid().ToString("n");
-        var canonical = $"{process.CanonicalName}/tokens/{leaf}";
-
         return new() {
-            Name          = leaf,
-            CanonicalName = canonical,
             Process       = process.Name!,
             Spawner       = spawner.CanonicalName,
             ScopeName     = spawner.ScopeName,

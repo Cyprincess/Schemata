@@ -18,6 +18,7 @@ internal sealed class AdviceAddStudentName : IRepositoryAddAdvisor<Student>
         AdviceContext        ctx,
         IRepository<Student> repository,
         Student              entity,
+        MutationOptions      options,
         CancellationToken    ct
     ) {
         if (string.IsNullOrWhiteSpace(entity.Name)) {

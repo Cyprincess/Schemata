@@ -29,4 +29,11 @@ public class SchemataSchedulingOptions
 
     /// <summary>Interval between persisted operation state reads while waiting in-process.</summary>
     public TimeSpan OperationPollInterval { get; set; } = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>
+    ///     Default renewable ownership lease for scheduled claims and inline operations.
+    ///     A job registration overrides scheduled execution duration with <see cref="JobRegistration.Lease" />.
+    ///     Defaults to 5 minutes.
+    /// </summary>
+    public TimeSpan ExecutionLease { get; set; } = TimeSpan.FromMinutes(5);
 }

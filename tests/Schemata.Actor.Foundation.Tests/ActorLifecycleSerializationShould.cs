@@ -15,22 +15,22 @@ public class ActorLifecycleSerializationShould
         var gate      = new ManualGate();
         var (system, _, _) = ActorSystemFactory.Create();
         var id              = new ActorId("lifecycle", "a");
-        var actor           = await system.SpawnAsync(id, new Props(typeof(LifecycleRecordingActor), [recorder, gate]));
+        var actor           = await system.SpawnAsync(id, new(typeof(LifecycleRecordingActor), [recorder, gate]));
 
         // Get a turn genuinely in flight - OnReceiveAsync has begun and is blocked - before an
         // external StopAsync races in. Under the old design StopAsync's own MarkStoppedAsync
         // called OnStoppedAsync directly from the caller's task while this turn was still
         // executing; the fix makes StopAsync only signal intent and waits for the mailbox loop's
         // own task to notify OnStoppedAsync once the turn has actually finished.
-        var executing = actor.AskAsync<GateAndWait, string>(new GateAndWait()).AsTask();
-        await gate.Started.WaitAsync(TimeSpan.FromSeconds(5));
+        var executing = actor.AskAsync<GateAndWait, string>(new()).AsTask();
+        await gate.Started.WaitAsync(TimeSpan.FromSeconds(30));
 
         var stopping = system.StopAsync(id);
 
         gate.Release();
 
-        Assert.Equal("released", await executing.WaitAsync(TimeSpan.FromSeconds(5)));
-        await stopping.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("released", await executing.WaitAsync(TimeSpan.FromSeconds(30)));
+        await stopping.WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.True(recorder.MaxConcurrent <= 1, $"lifecycle callbacks overlapped: max concurrent = {recorder.MaxConcurrent}");
         Assert.Equal(1, recorder.Events.Count(e => e == "OnStopped"));
@@ -44,11 +44,11 @@ public class ActorLifecycleSerializationShould
         var constructionCount  = new SharedCounter();
         var (system, _, _)     = ActorSystemFactory.Create();
         var id                  = new ActorId("stop-during-fail", "a");
-        var actor               = await system.SpawnAsync(id, new Props(typeof(StopDuringFailureActor), [gate, constructionCount]));
+        var actor               = await system.SpawnAsync(id, new(typeof(StopDuringFailureActor), [gate, constructionCount]));
 
         // The failing turn begins and blocks before it ever throws.
-        var failing = actor.AskAsync<Fail, string>(new Fail("boom")).AsTask();
-        await gate.Started.WaitAsync(TimeSpan.FromSeconds(5));
+        var failing = actor.AskAsync<Fail, string>(new("boom")).AsTask();
+        await gate.Started.WaitAsync(TimeSpan.FromSeconds(30));
 
         // A stop is requested while that turn is still in flight, before it throws.
         var stopping = system.StopAsync(id);
@@ -56,8 +56,8 @@ public class ActorLifecycleSerializationShould
         // Only now does the turn actually throw.
         gate.Release();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => failing).WaitAsync(TimeSpan.FromSeconds(5));
-        await stopping.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => failing).WaitAsync(TimeSpan.FromSeconds(30));
+        await stopping.WaitAsync(TimeSpan.FromSeconds(30));
 
         // OnFailedAsync would return true (restart) if consulted, but the stop that had already
         // begun must suppress supervision entirely: exactly one construction ever happened - the

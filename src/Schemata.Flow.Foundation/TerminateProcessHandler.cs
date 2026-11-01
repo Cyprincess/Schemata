@@ -5,6 +5,7 @@ using Schemata.Flow.Skeleton.Models;
 using Schemata.Messaging.Skeleton;
 using TerminateProcessCommand = Schemata.Flow.Foundation.Commands.TerminateProcessRequest;
 using Schemata.Flow.Foundation.Commands;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Flow.Foundation;
 
@@ -16,6 +17,7 @@ public sealed class TerminateProcessHandler(IRequestDispatcher dispatcher)
 {
     public async Task<ProcessSnapshot> HandleAsync(
         TerminateProcessResourceRequest request,
+        AdviceContext context,
         CancellationToken ct = default)
     {
         var canonicalName = request.CanonicalName

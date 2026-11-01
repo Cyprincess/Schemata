@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Data.Sqlite;
@@ -7,7 +8,11 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Actor.Skeleton;
+using Schemata.Abstractions.Resource;
 using Schemata.Core;
+using Schemata.Core.Building;
+using Schemata.Resource.Foundation;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
@@ -48,6 +53,7 @@ public sealed class ActorConcurrencyHarness : IAsyncDisposable
         connection.Open();
 
         var services = new ServiceCollection();
+        Schemata.Flow.Tests.FlowTestCreation.Register(services);
         services.AddLogging();
         services.AddDbContextFactory<TestDbContext>(options => options
                      .UseSqlite(connectionString)
@@ -58,6 +64,16 @@ public sealed class ActorConcurrencyHarness : IAsyncDisposable
         services.AddRepository<SchemataProcessSource, EfCoreRepository<TestDbContext, SchemataProcessSource>>();
         services.AddRepository<SchemataProcessCompensation, EfCoreRepository<TestDbContext, SchemataProcessCompensation>>();
         services.AddScoped<IUnitOfWork<TestDbContext>, EfCoreUnitOfWork<TestDbContext>>();
+        var registry = new ResourceRegistry();
+        foreach (var type in new[] {
+                     typeof(SchemataProcess), typeof(SchemataProcessToken), typeof(SchemataProcessTransition),
+                     typeof(SchemataProcessSource), typeof(SchemataProcessCompensation),
+                 }) {
+            registry.Add(new(type), []);
+        }
+
+        services.TryAddSingleton(registry);
+        services.TryAddSingleton<IResourceTypeResolver, DefaultResourceTypeResolver>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowCatchHandler, PermissiveFlowCatchHandler>());
 
 
@@ -86,8 +102,17 @@ public sealed class ActorConcurrencyHarness : IAsyncDisposable
     #region IAsyncDisposable Members
 
     public async ValueTask DisposeAsync() {
-        await Root.DisposeAsync();
-        await Connection.DisposeAsync();
+        Exception? failure = null;
+        try {
+            if (Root.GetService<IActorSystem>() is IActorSystemLifetime lifetime) {
+                await lifetime.ShutdownAsync(default);
+            }
+        } catch (Exception error) { failure = error; }
+        try { await Root.DisposeAsync(); }
+        catch (Exception error) { failure = failure is null ? error : new AggregateException(failure, error); }
+        try { await Connection.DisposeAsync(); }
+        catch (Exception error) { failure = failure is null ? error : new AggregateException(failure, error); }
+        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
     #endregion

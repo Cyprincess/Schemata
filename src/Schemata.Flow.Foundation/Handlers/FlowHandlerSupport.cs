@@ -15,6 +15,7 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Common;
 using Schemata.Entity.Repository;
+using Schemata.Common.Errors;
 using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
@@ -23,20 +24,38 @@ using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Foundation.Handlers;
 
-internal sealed class FlowHandlerSupport(
-    IProcessRegistry              registry,
-    ProcessPersistence            persistence,
-    ProcessLifecycleNotifier      notifier,
-    IServiceProvider              services,
-    IServiceScopeFactory          scopes,
-    IOptions<SchemataFlowOptions> options
+/// <summary>
+///     Runtime support shared by the resource-method handlers: process loading, joined persistence,
+///     engine resolution, advisor and catch pipelines, and source-binding writes. Entity access is
+///     closed on the types the host registered through <c>UseFlow</c>.
+/// </summary>
+/// <typeparam name="TProcess">The persisted process entity type registered by the host.</typeparam>
+/// <typeparam name="TToken">The persisted token entity type registered by the host.</typeparam>
+/// <typeparam name="TTransition">The persisted transition entity type registered by the host.</typeparam>
+/// <typeparam name="TCompensation">The persisted compensation entity type registered by the host.</typeparam>
+/// <typeparam name="TParticipant">The persisted participant entity type registered by the host.</typeparam>
+/// <typeparam name="TSource">The persisted source-binding entity type registered by the host.</typeparam>
+internal sealed class FlowHandlerSupport<TProcess, TToken, TTransition, TCompensation, TParticipant, TSource>(
+    IProcessRegistry                               registry,
+    ProcessPersistence<TProcess, TToken, TTransition, TCompensation, TSource> persistence,
+    ProcessLifecycleNotifier                       notifier,
+    IServiceProvider                               services,
+    IServiceScopeFactory                           scopes,
+    IOptions<SchemataFlowOptions>                  options
 )
+    where TProcess : SchemataProcess, new()
+    where TToken : SchemataProcessToken, new()
+    where TTransition : SchemataProcessTransition, new()
+    where TCompensation : SchemataProcessCompensation, new()
+    where TParticipant : SchemataProcessParticipant, new()
+    where TSource : SchemataProcessSource, new()
 {
     private static readonly ConcurrentDictionary<Type, ISourceWorker?> SourceWorkers = new();
 
-    internal ProcessPersistence Persistence => persistence;
+    internal ProcessPersistence<TProcess, TToken, TTransition, TCompensation, TSource> Persistence => persistence;
 
     internal ProcessLifecycleNotifier Notifier => notifier;
+    internal FlowAccessPolicy<TProcess, TToken, TParticipant>? Access => services.GetService<FlowAccessPolicy<TProcess, TToken, TParticipant>>();
 
     internal IServiceProvider Services => services;
 
@@ -44,7 +63,7 @@ internal sealed class FlowHandlerSupport(
 
     internal int SignalBroadcastConcurrency => Math.Max(1, options.Value.SignalBroadcastConcurrency);
 
-    internal async ValueTask<SchemataProcess> LoadProcessAsync(string canonicalName, CancellationToken ct) {
+    internal async ValueTask<TProcess> LoadProcessAsync(string canonicalName, CancellationToken ct) {
         var process = await persistence.FindAsync(services, canonicalName, ct);
         if (process is null) {
             throw new NotFoundException(
@@ -56,8 +75,9 @@ internal sealed class FlowHandlerSupport(
         return process;
     }
 
-    internal ProcessRegistration ResolveRegistration(string definitionName) {
-        var registration = registry.GetRegistration(definitionName);
+    internal ProcessRegistration ResolveRegistration(string definitionName, string version) {
+        if (string.IsNullOrWhiteSpace(version)) throw new InvalidArgumentException(SchemataResources.FLOW_DEFINITION_VERSION_REQUIRED);
+        var registration = registry.GetRegistration(definitionName, version);
         if (registration is null) {
             throw new NotFoundException(
                 SchemataResources.PROCESS_NOT_REGISTERED,
@@ -68,12 +88,17 @@ internal sealed class FlowHandlerSupport(
         return registration;
     }
 
-    internal ProcessRegistration? FindRegistration(string definitionName) {
-        return registry.GetRegistration(definitionName);
+    internal ProcessRegistration ResolveRegistration(SchemataProcess process) {
+        if (string.IsNullOrWhiteSpace(process.DefinitionVersion) || process.DefinitionVersion == "latest") {
+            throw new FailedPreconditionException(SchemataResources.FLOW_DEFINITION_VERSION_UNBOUND);
+        }
+        return registry.GetRegistration(process.DefinitionName, process.DefinitionVersion)
+            ?? throw new FailedPreconditionException(SchemataResources.FLOW_DEFINITION_VERSION_NOT_REGISTERED,
+                new Dictionary<string, string?> { ["name"] = process.DefinitionName, ["version"] = process.DefinitionVersion });
     }
 
-    internal IFlowRuntime ResolveEngine(ProcessRegistration registration) {
-        var engine = services.GetKeyedService<IFlowRuntime>(registration.Engine);
+    internal IFlowRuntime<TProcess, TToken, TTransition> ResolveEngine(ProcessRegistration registration) {
+        var engine = services.GetKeyedService<IFlowRuntime<TProcess, TToken, TTransition>>(registration.Engine);
         if (engine is null) {
             throw new FailedPreconditionException(
                 SchemataResources.FLOW_RUNTIME_NOT_REGISTERED,
@@ -85,9 +110,9 @@ internal sealed class FlowHandlerSupport(
     }
 
     internal async ValueTask ExecuteWithNotificationAsync(
-        SchemataProcess                                     process,
-        Func<FlowPersistenceScope, CancellationToken, Task> action,
-        CancellationToken                                  ct
+        SchemataProcess                                                                                 process,
+        Func<FlowPersistenceScope<TProcess, TToken, TTransition, TCompensation, TSource>, CancellationToken, Task> action,
+        CancellationToken                                                                              ct
     ) {
         try {
             await persistence.ExecuteAsync(services, action, ct);
@@ -98,31 +123,44 @@ internal sealed class FlowHandlerSupport(
     }
 
     internal async ValueTask<ProcessSnapshot> TriggerAddressedAsync(
-        SchemataProcess     process,
-        ProcessRegistration registration,
-        IFlowRuntime        engine,
-        IEventDefinition    trigger,
-        object?             payload,
-        string?             token,
-        bool                resolveTarget,
-        ClaimsPrincipal?    principal,
-        CancellationToken   ct
+        TProcess                                            process,
+        ProcessRegistration                                 registration,
+        IFlowRuntime<TProcess, TToken, TTransition>         engine,
+        IEventDefinition                                    trigger,
+        object?                                             payload,
+        string?                                             token,
+        bool                                                resolveTarget,
+        ClaimsPrincipal?                                    principal,
+        AdviceContext                                       advice,
+        CancellationToken                                   ct
     ) {
         ProcessSnapshot? snapshot = null;
 
         await ExecuteWithNotificationAsync(process, async (scope, current) => {
             var tokens    = await LoadTokensAsync(scope, process.Name!, current);
-            var context   = await CreateExecutionContextAsync(scope, process, principal, current);
+            var context   = await CreateExecutionContextAsync(scope, process, principal, advice, current);
             var tokenName = resolveTarget
                 ? await ResolveTargetAsync(
                     engine, registration.Definition, process, tokens, context, trigger, token, current)
                 : token;
+            if (Access is { } access && principal is not null) {
+                // Participant eligibility judges callers only; caller-free continuations are
+                // admitted by the engine's live-token and generation checks below.
+                if (tokenName is null) {
+                    var live = tokens.Where(candidate => TokenStates.Live.Contains(candidate.State!)).ToArray();
+                    if (live.Length == 1) tokenName = live[0].CanonicalName;
+                }
+                var targets = tokens.Where(candidate => candidate.CanonicalName == tokenName).ToArray();
+                await access.RequireEligibilityAsync(resolveTarget ? FlowOperations.Correlate : FlowOperations.RunEvent,
+                    process, targets, principal, scope.UnitOfWork, current);
+            }
             var before = WaitingMap(tokens);
             snapshot = await engine.TriggerAsync(
                 registration.Definition, process, tokens, context, trigger, payload, tokenName, current);
             EnsureCatchesHaveHandlers(registration.Definition, snapshot);
-            await RunAdvisorsAsync(registration, scope, context, snapshot, before, current);
+            await RunAdvisorsAsync(registration, scope, context, snapshot, before, advice, current);
             await persistence.PersistSnapshotAsync(scope, snapshot, current);
+            if (Access is { } history) await history.RecordParticipationAsync(process, principal, scope.UnitOfWork, current);
         }, ct);
 
         await NotifyTransitionResultAsync(snapshot!, ct);
@@ -130,12 +168,39 @@ internal sealed class FlowHandlerSupport(
     }
 
     internal async Task RunAdvisorsAsync(
-        ProcessRegistration                  registration,
-        FlowPersistenceScope                 scope,
-        FlowExecutionContext                 execution,
-        ProcessSnapshot                      snapshot,
-        IReadOnlyDictionary<string, string?> before,
-        CancellationToken                    ct
+        ProcessRegistration                                                 registration,
+        FlowPersistenceScope<TProcess, TToken, TTransition, TCompensation, TSource> scope,
+        FlowExecutionContext                                                execution,
+        ProcessSnapshot                                                     snapshot,
+        IReadOnlyDictionary<string, string?>                                before,
+        AdviceContext                                                       advice,
+        CancellationToken                                                   ct
+    ) {
+        await RunSnapshotAdvisorsAsync(registration, scope, execution, snapshot, before, true, advice, ct);
+    }
+
+    internal async Task RunCalledSnapshotAdvisorsAsync(
+        ProcessRegistration                                                 registration,
+        FlowPersistenceScope<TProcess, TToken, TTransition, TCompensation, TSource> scope,
+        FlowExecutionContext                                                execution,
+        ProcessSnapshot                                                     snapshot,
+        AdviceContext                                                       advice,
+        CancellationToken                                                   ct
+    ) {
+        // The called snapshot runs inside the caller's transition: its sources flush once with the
+        // outer snapshot, so this run advises without flushing the shared touched-source set.
+        await RunSnapshotAdvisorsAsync(registration, scope, execution, snapshot, new Dictionary<string, string?>(), false, advice, ct);
+    }
+
+    private async Task RunSnapshotAdvisorsAsync(
+        ProcessRegistration                                                 registration,
+        FlowPersistenceScope<TProcess, TToken, TTransition, TCompensation, TSource> scope,
+        FlowExecutionContext                                                execution,
+        ProcessSnapshot                                                     snapshot,
+        IReadOnlyDictionary<string, string?>                                before,
+        bool                                                                flushSources,
+        AdviceContext                                                       advice,
+        CancellationToken                                                   ct
     ) {
         var tokens = snapshot.Transitions
                              .Select(transition => transition.Token)
@@ -149,6 +214,7 @@ internal sealed class FlowHandlerSupport(
             }
 
             var context = new FlowTransitionContext {
+                Execution = execution,
                 Definition            = registration.Definition,
                 Snapshot              = snapshot,
                 Token                 = TokenSnapshotFactory.From(token),
@@ -156,10 +222,12 @@ internal sealed class FlowHandlerSupport(
                 UnitOfWork            = scope.UnitOfWork,
                 Principal             = execution.Principal,
             };
-            await RunSourceAdvisorsAsync(registration, scope, execution, context, ct);
+            await RunSourceAdvisorsAsync(registration, scope, execution, context, advice, ct);
         }
 
-        await FlushTouchedSourcesAsync(scope, execution, snapshot.Process.CanonicalName ?? string.Empty, ct);
+        if (flushSources) {
+            await FlushTouchedSourcesAsync(scope, execution, snapshot.Process.CanonicalName ?? string.Empty, ct);
+        }
 
         var handlers = services.GetServices<IFlowCatchHandler>().ToList();
         foreach (var transition in snapshot.Transitions) {
@@ -169,6 +237,7 @@ internal sealed class FlowHandlerSupport(
             }
 
             var context = new FlowTransitionContext {
+                Execution = execution,
                 Definition            = registration.Definition,
                 Snapshot              = snapshot,
                 Token                 = TokenSnapshotFactory.From(token),
@@ -180,8 +249,7 @@ internal sealed class FlowHandlerSupport(
                 Principal  = execution.Principal,
             };
 
-            var ctx = AdviceContext.Current ?? new AdviceContext(services);
-            await Advisor.For<IFlowTransitionAdvisor>().RunAsync(ctx, context, ct);
+            await Advisor.For<IFlowTransitionAdvisor>().RunAsync(advice, context, ct);
             foreach (var handler in handlers) {
                 await handler.ArmAsync(context, ct);
             }
@@ -215,34 +283,40 @@ internal sealed class FlowHandlerSupport(
                 }
 
                 throw new FailedPreconditionException(
-                    message: $"Flow catch '{catchEvent.Name}' waits on a {kind} event, but no registered "
-                           + $"{nameof(IFlowCatchHandler)} delivers that kind; the token would wait forever.");
+                    SchemataResources.FLOW_CATCH_HANDLER_NOT_REGISTERED,
+                    new Dictionary<string, string?> {
+                        ["name"] = catchEvent.Name,
+                        ["kind"] = kind.Value.ToString(),
+                    });
             }
         }
     }
 
     internal async Task BindStartSourceAsync(
-        FlowPersistenceScope scope,
-        ProcessRegistration  registration,
-        SchemataProcess      process,
-        object?              source,
-        Type?                sourceType,
-        string?              sourceName,
-        CancellationToken    ct
+        FlowPersistenceScope<TProcess, TToken, TTransition, TCompensation, TSource> scope,
+        ProcessRegistration                                                         registration,
+        TProcess                                                                    process,
+        object?                                                                     source,
+        Type?                                                                       sourceType,
+        string?                                                                     sourceName,
+        CancellationToken                                                           ct
     ) {
         if (source is null && string.IsNullOrEmpty(sourceName)) {
             return;
         }
 
         var (name, type, canonical, stamp) = StartSource(registration, source, sourceType, sourceName);
-        await scope.Sources.AddAsync(new SchemataProcessSource {
-            Process         = process.CanonicalName!,
-            Token           = null,
-            Name            = name,
-            SourceType      = type,
-            Source          = canonical,
-            SourceTimestamp = stamp,
-        }, ct);
+        var binding = new TSource {
+            Process = process.CanonicalName!, Token = null, Name = name,
+            SourceType = type, Source = canonical, SourceTimestamp = stamp,
+        };
+        if (stamp is not null) {
+            var worker = SourceWorkers.GetOrAdd(registration.SourceTypes[name].SourceType, CreateSourceWorker)!;
+            await worker.ValidateStartAsync(services, scope.UnitOfWork, binding, ct);
+        }
+        if (await scope.Mutation<TSource>().CreateAsync(binding, scope.UnitOfWork, ct) == MutationResult.Applied) {
+            scope.TrackSourceBinding(binding);
+        }
     }
 
     internal static (string Name, string Type, string Canonical, Guid? Stamp) StartSource(
@@ -252,6 +326,15 @@ internal sealed class FlowHandlerSupport(
         string?             sourceName
     ) {
         if (source is ICanonicalName canonicalSource) {
+            if (canonicalSource.CanonicalName is null) {
+                throw new FailedPreconditionException(
+                    SchemataResources.FLOW_PROCESS_SOURCE_NAME_REQUIRED,
+                    new Dictionary<string, string?> {
+                        ["name"]   = registration.Name,
+                        ["source"] = canonicalSource.GetType().Name,
+                    });
+            }
+
             if (sourceType is null) {
                 throw new FailedPreconditionException(
                     SchemataResources.PROCESS_SOURCE_BINDING_AMBIGUOUS,
@@ -276,41 +359,30 @@ internal sealed class FlowHandlerSupport(
             return (
                 binding.BindingName,
                 FlowSourceTypeNames.ToName(sourceType),
-                canonicalSource.CanonicalName!,
+                canonicalSource.CanonicalName,
                 source is IConcurrency concurrency ? concurrency.Timestamp : null);
         }
 
         var types = registration.SourceTypes.ToList();
         if (types.Count != 1) {
             throw new FailedPreconditionException(
-                message: $"Process '{registration.Name}' binds {types.Count} source types; specify a source name.");
+                SchemataResources.FLOW_PROCESS_SOURCE_AMBIGUOUS,
+                new Dictionary<string, string?> {
+                    ["name"]  = registration.Name,
+                    ["count"] = types.Count.ToString(),
+                });
         }
 
-        return (types[0].Key, FlowSourceTypeNames.ToName(types[0].Value.SourceType), sourceName!, null);
-    }
-
-    internal static object? DeserializePayload(object? payload, Type? type) {
-        if (payload is TypedPayload typed) {
-            return typed.Value;
+        if (sourceName is null) {
+            throw new FailedPreconditionException(
+                SchemataResources.FLOW_PROCESS_SOURCE_NAME_REQUIRED,
+                new Dictionary<string, string?> {
+                    ["name"]   = registration.Name,
+                    ["source"] = types[0].Key,
+                });
         }
 
-        if (payload is not string text) {
-            return payload;
-        }
-
-        if (string.IsNullOrEmpty(text)) {
-            return null;
-        }
-
-        if (type is null) {
-            throw new InvalidArgumentException(SchemataResources.INVALID_PAYLOAD);
-        }
-
-        return JsonSerializer.Deserialize(text, type, SchemataJson.Default);
-    }
-
-    internal static object? PreserveTypedPayload(object? payload) {
-        return payload is string ? new TypedPayload(payload) : payload;
+        return (types[0].Key, FlowSourceTypeNames.ToName(types[0].Value.SourceType), sourceName, null);
     }
 
     internal static Dictionary<string, string?> WaitingMap(IEnumerable<SchemataProcessToken> tokens) {
@@ -319,7 +391,7 @@ internal sealed class FlowHandlerSupport(
                           token => token.CanonicalName!, token => token.WaitingAtName, StringComparer.Ordinal);
     }
 
-    internal static SchemataProcessTransition CancelTransition(
+    internal static TTransition CancelTransition(
         SchemataProcess      process,
         SchemataProcessToken token,
         string?              previous,
@@ -328,7 +400,6 @@ internal sealed class FlowHandlerSupport(
         ClaimsPrincipal?     principal
     ) {
         return new() {
-            Name      = NewLeafId(),
             Process   = process.Name,
             Token     = token.CanonicalName,
             Kind      = TransitionKind.Cancel,
@@ -347,53 +418,113 @@ internal sealed class FlowHandlerSupport(
         return targets.Contains(requested, StringComparer.Ordinal) ? [requested] : [];
     }
 
-    internal static async ValueTask<IReadOnlyList<SchemataProcessToken>> LoadTokensAsync(
-        FlowPersistenceScope scope,
-        string               processName,
-        CancellationToken    ct
+    internal static async ValueTask<IReadOnlyList<TToken>> LoadTokensAsync(
+        FlowPersistenceScope<TProcess, TToken, TTransition, TCompensation, TSource> scope,
+        string                                                                      processName,
+        CancellationToken                                                           ct
     ) {
-        var list = new List<SchemataProcessToken>();
-        await foreach (var token in scope.Tokens.ListAsync<SchemataProcessToken>(
-                           query => query.Where(current => current.Process == processName), ct)) {
+        var list = new List<TToken>();
+        await foreach (var token in scope.Tokens.ListAsync<TToken>(
+                           query => query.Where(current => current.Process == processName), ct,
+                           new QueryOptions(IgnoreOwner: true))) {
             list.Add(token);
         }
+        scope.IndexTokens(processName, list);
 
         return list;
     }
 
     internal async ValueTask<FlowExecutionContext> CreateExecutionContextAsync(
-        FlowPersistenceScope scope,
-        SchemataProcess      process,
-        ClaimsPrincipal?     principal,
-        CancellationToken    ct
+        FlowPersistenceScope<TProcess, TToken, TTransition, TCompensation, TSource> scope,
+        TProcess                                                                    process,
+        ClaimsPrincipal?                                                            principal,
+        AdviceContext                                                               advice,
+        CancellationToken                                                           ct
     ) {
         var bindings = new List<ProcessCompensationBinding>();
         if (!string.IsNullOrEmpty(process.CanonicalName)) {
-            await foreach (var binding in scope.Compensations.ListAsync<SchemataProcessCompensation>(
+            await foreach (var binding in scope.Compensations.ListAsync<TCompensation>(
                                query => query.Where(row => row.Process == process.CanonicalName)
                                              .OrderBy(row => row.ScopeOwnerCanonicalName)
                                              .ThenBy(row => row.RegistrationOrder)
-                                             .ThenBy(row => row.ActivityName), ct)) {
+                                             .ThenBy(row => row.ActivityName), ct,
+                               new QueryOptions(IgnoreOwner: true))) {
                 bindings.Add(new(
                     binding.ScopeOwnerCanonicalName,
                     binding.ActivityName,
+                    binding.BoundaryName,
                     binding.RegistrationOrder));
             }
         }
 
-        return new(scope.UnitOfWork, services) {
+        FlowExecutionContext? context = null;
+        context = new(scope.UnitOfWork, services) {
             LoadedCompensationBindings = bindings,
             Principal                  = principal,
-            SourceReadGuard            = FlowSourceReadScope.Enter,
+            FindTokenAsync = async (processName, tokenName, token) => {
+                var index = await scope.GetTokenIndexAsync(processName, token);
+                return index.TryGetValue(tokenName, out var entity) ? entity : null;
+            },
+            FindSourceBinding = scope.FindSourceBinding,
+            NewSourceBinding = (processName, tokenName, name) => new TSource {
+                Process = processName, Token = tokenName, Name = name,
+            },
+            FindPersistedSourceAsync = async (processName, tokenName, name, token) => {
+                return await scope.Sources.SingleOrDefaultAsync(
+                    query => query.Where(binding => binding.Process == processName
+                                                 && binding.Token == tokenName
+                                                 && binding.Name == name), token,
+                    new QueryOptions(IgnoreOwner: true));
+            },
+            ListSourceBindingsAsync = (processName, canonicalName, sourceTypeName, token) =>
+                scope.Sources.ListAsync<TSource>(
+                    query => query.Where(binding => binding.Process == processName
+                                                 && binding.Source == canonicalName
+                                                 && binding.SourceType == sourceTypeName), token,
+                    new QueryOptions(IgnoreOwner: true)),
+            CreateSourceBindingAsync = async (row, token) =>
+                await scope.Mutation<TSource>().CreateAsync((TSource)row, scope.UnitOfWork, token),
+            UpdateSourceBindingAsync = async (row, token) =>
+                await scope.Mutation<TSource>().UpdateAsync((TSource)row, scope.UnitOfWork, ct: token),
+            TrackSourceBinding = row => scope.TrackSourceBinding((TSource)row),
+            ValidateSourceAsync = async (processName, sourceType, canonical, initial, token) => {
+                var type = FlowSourceTypeNames.ToName(sourceType);
+                await foreach (var row in scope.Sources.ListAsync<TSource>(
+                                   query => query.Where(binding => (binding.Process == processName || binding.Process == process.CanonicalName)
+                                                               && binding.SourceType == type
+                                                               && binding.Source == canonical), token,
+                                   new QueryOptions(IgnoreOwner: true))) {
+                    if (scope.FindSourceBinding(row.Process, row.Token, row.Name)?.Uid == row.Uid) continue;
+                    RequireSourceStamp(row, initial, canonical);
+                }
+            },
+            CreateProcessAsync = (entity, token) => scope.CreateProcessAsync((TProcess)entity, token),
+            CreateTokenAsync   = (entity, token) => scope.CreateTokenAsync((TToken)entity, token),
+            PersistSnapshotAsync = (snapshot, token) => RouteCalledSnapshotAsync(scope, context!, snapshot, advice, token),
         };
+
+        return context;
     }
 
-    internal static SchemataProcess NewProcess(string definitionName, StartProcessOptions? startOptions) {
-        var leaf = NewLeafId();
+    private async Task RouteCalledSnapshotAsync(
+        FlowPersistenceScope<TProcess, TToken, TTransition, TCompensation, TSource> scope,
+        FlowExecutionContext                                                        execution,
+        ProcessSnapshot                                                             snapshot,
+        AdviceContext                                                               advice,
+        CancellationToken                                                           ct
+    ) {
+        // A called child process snapshot flows through the same catch-handler, advisor, and
+        // persistence owners as any other snapshot; its tokens had no prior waiting state.
+        var registration = ResolveRegistration(snapshot.Process);
+        EnsureCatchesHaveHandlers(registration.Definition, snapshot);
+        await RunCalledSnapshotAdvisorsAsync(registration, scope, execution, snapshot, advice, ct);
+        await persistence.PersistSnapshotAsync(scope, snapshot, ct);
+    }
+
+    internal static TProcess NewProcess(ProcessRegistration registration, StartProcessOptions? startOptions) {
         return new() {
-            Name           = leaf,
-            CanonicalName  = $"processes/{leaf}",
-            DefinitionName = definitionName,
+            DefinitionName = registration.Name,
+            DefinitionVersion = registration.Version,
             DisplayName    = string.IsNullOrWhiteSpace(startOptions?.DisplayName) ? null : startOptions.DisplayName,
             Description    = string.IsNullOrWhiteSpace(startOptions?.Description) ? null : startOptions.Description,
             IdempotencyKey = string.IsNullOrWhiteSpace(startOptions?.IdempotencyKey) ? null : startOptions.IdempotencyKey,
@@ -420,9 +551,6 @@ internal sealed class FlowHandlerSupport(
         return principal.Identity?.Name;
     }
 
-    internal static string NewLeafId() {
-        return Guid.NewGuid().ToString("n");
-    }
 
     private static IEnumerable<FlowEvent> ResolveExternalCatches(
         ProcessDefinition    definition,
@@ -459,15 +587,15 @@ internal sealed class FlowHandlerSupport(
     }
 
     private async Task FlushTouchedSourcesAsync(
-        FlowPersistenceScope scope,
-        FlowExecutionContext execution,
-        string               process,
-        CancellationToken    ct
+        FlowPersistenceScope<TProcess, TToken, TTransition, TCompensation, TSource> scope,
+        FlowExecutionContext                                                        execution,
+        string                                                                      process,
+        CancellationToken                                                           ct
     ) {
         foreach (var ((sourceType, _), entity) in execution.TouchedSources) {
             var worker = SourceWorkers.GetOrAdd(sourceType, CreateSourceWorker);
             if (worker is not null) {
-                await worker.FlushAsync(services, scope.UnitOfWork, entity, process, ct);
+                await worker.FlushAsync(services, scope, execution, entity, process, ct);
             }
         }
 
@@ -475,11 +603,12 @@ internal sealed class FlowHandlerSupport(
     }
 
     private async Task RunSourceAdvisorsAsync(
-        ProcessRegistration  registration,
-        FlowPersistenceScope scope,
-        FlowExecutionContext execution,
-        FlowTransitionContext context,
-        CancellationToken    ct
+        ProcessRegistration                                                         registration,
+        FlowPersistenceScope<TProcess, TToken, TTransition, TCompensation, TSource> scope,
+        FlowExecutionContext                                                        execution,
+        FlowTransitionContext                                                       context,
+        AdviceContext                                                               advice,
+        CancellationToken                                                           ct
     ) {
         var process = context.Snapshot.Process.CanonicalName;
         if (string.IsNullOrEmpty(process)) {
@@ -487,11 +616,18 @@ internal sealed class FlowHandlerSupport(
         }
 
         var token    = context.Token.CanonicalName;
-        var bindings = new List<SchemataProcessSource>();
-        await foreach (var binding in scope.Sources.ListAsync<SchemataProcessSource>(
+        var bindings = new List<TSource>();
+        await foreach (var binding in scope.Sources.ListAsync<TSource>(
                            query => query.Where(source => source.Process == process
-                                                      && (source.Token == null || source.Token == token)), ct)) {
+                                                      && (source.Token == null || source.Token == token)), ct,
+                           new QueryOptions(IgnoreOwner: true))) {
             bindings.Add(binding);
+        }
+        foreach (var staged in scope.StagedSourceBindings) {
+            if (staged.Process != process || (staged.Token is not null && staged.Token != token)) continue;
+            var index = bindings.FindIndex(row => row.Uid == staged.Uid);
+            if (index < 0) bindings.Add(staged);
+            else bindings[index] = staged;
         }
 
         foreach (var binding in bindings) {
@@ -502,20 +638,20 @@ internal sealed class FlowHandlerSupport(
 
             var worker = SourceWorkers.GetOrAdd(descriptor.SourceType, CreateSourceWorker);
             if (worker is not null) {
-                await worker.AdviseAsync(services, scope.UnitOfWork, execution, context, binding.Source, ct);
+                await worker.AdviseAsync(services, scope.UnitOfWork, execution, context, binding.Source, advice, ct);
             }
         }
     }
 
     private static async ValueTask<string?> ResolveTargetAsync(
-        IFlowRuntime                        engine,
-        ProcessDefinition                   definition,
-        SchemataProcess                     process,
-        IReadOnlyList<SchemataProcessToken> tokens,
-        FlowExecutionContext                context,
-        IEventDefinition                    trigger,
-        string?                             requested,
-        CancellationToken                   ct
+        IFlowRuntime<TProcess, TToken, TTransition> engine,
+        ProcessDefinition                           definition,
+        TProcess                                    process,
+        IReadOnlyList<TToken>                       tokens,
+        FlowExecutionContext                        context,
+        IEventDefinition                            trigger,
+        string?                                     requested,
+        CancellationToken                           ct
     ) {
         var targets = await engine.FindTriggerTargetsAsync(definition, process, tokens, context, trigger, ct);
         if (!string.IsNullOrEmpty(requested)) {
@@ -535,125 +671,173 @@ internal sealed class FlowHandlerSupport(
         return targets[0];
     }
 
+    private static void RequireSourceStamp(SchemataProcessSource binding, Guid initial, string canonical) {
+        if (binding.SourceTimestamp is { } expected && expected != initial) {
+            throw new FailedPreconditionException(
+                SchemataResources.FLOW_SOURCE_MODIFIED_CONCURRENTLY,
+                new Dictionary<string, string?> { ["name"] = canonical });
+        }
+    }
+
     private static ISourceWorker? CreateSourceWorker(Type type) {
         if (!typeof(ICanonicalName).IsAssignableFrom(type)) {
             return null;
         }
 
-        return Activator.CreateInstance(typeof(SourceWorker<>).MakeGenericType(type)) as ISourceWorker;
+        var create = typeof(FlowHandlerSupport<TProcess, TToken, TTransition, TCompensation, TParticipant, TSource>)
+            .GetMethod(nameof(CreateSourceWorkerCore), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        return (ISourceWorker?)create.MakeGenericMethod(type).Invoke(null, null);
     }
 
-    private sealed record TypedPayload(object Value);
+    private static ISourceWorker CreateSourceWorkerCore<TSourceEntity>()
+        where TSourceEntity : class, ICanonicalName {
+        return new SourceWorker<TSourceEntity>();
+    }
 
     private interface ISourceWorker
     {
+        Task ValidateStartAsync(
+            IServiceProvider provider,
+            IUnitOfWork unitOfWork,
+            SchemataProcessSource binding,
+            CancellationToken ct
+        );
+
         Task AdviseAsync(
             IServiceProvider      provider,
             IUnitOfWork           unitOfWork,
             FlowExecutionContext  execution,
             FlowTransitionContext context,
             string                source,
+            AdviceContext         advice,
             CancellationToken     ct
         );
 
         Task FlushAsync(
-            IServiceProvider provider,
-            IUnitOfWork      unitOfWork,
-            object           entity,
-            string           process,
-            CancellationToken ct
+            IServiceProvider                                                            provider,
+            FlowPersistenceScope<TProcess, TToken, TTransition, TCompensation, TSource> scope,
+            FlowExecutionContext                                                        execution,
+            object                                                                      entity,
+            string                                                                      process,
+            CancellationToken                                                           ct
         );
     }
 
-    private sealed class SourceWorker<TSource> : ISourceWorker
-        where TSource : class, ICanonicalName
+    private sealed class SourceWorker<TSourceEntity> : ISourceWorker
+        where TSourceEntity : class, ICanonicalName
     {
+        public async Task ValidateStartAsync(
+            IServiceProvider provider,
+            IUnitOfWork unitOfWork,
+            SchemataProcessSource binding,
+            CancellationToken ct
+        ) {
+            var repository = provider.GetRequiredService<IRepository<TSourceEntity>>();
+            repository.Join(unitOfWork);
+            var entity = await repository.FirstOrDefaultAsync(
+                query => query.Where(source => source.CanonicalName == binding.Source), ct,
+                new QueryOptions(IgnoreOwner: true, IgnoreSoftDelete: true));
+            if (entity is null) {
+                throw SchemataResourceErrors.NotFound<TSourceEntity>(binding.Source);
+            }
+            if (entity is IConcurrency concurrency) {
+                RequireSourceStamp(binding, concurrency.Timestamp, binding.Source);
+            }
+        }
+
         public async Task AdviseAsync(
             IServiceProvider      provider,
             IUnitOfWork           unitOfWork,
             FlowExecutionContext  execution,
             FlowTransitionContext context,
             string                source,
+            AdviceContext         advice,
             CancellationToken     ct
         ) {
-            var repository = provider.GetRequiredService<IRepository<TSource>>();
+            var repository = provider.GetRequiredService<IRepository<TSourceEntity>>();
 
-            TSource? entity;
-            if (execution.TouchedSources.TryGetValue((typeof(TSource), source), out var touched)) {
-                entity = (TSource)touched;
+            TSourceEntity? entity;
+            if (execution.TouchedSources.TryGetValue((typeof(TSourceEntity), source), out var touched)) {
+                entity = (TSourceEntity)touched;
             } else {
                 repository.Join(unitOfWork);
-                using (FlowSourceReadScope.Enter(repository)) {
-                    entity = await repository.FirstOrDefaultAsync(
-                        query => query.Where(current => current.CanonicalName == source), ct);
-                }
+                entity = await repository.FirstOrDefaultAsync(
+                    query => query.Where(current => current.CanonicalName == source), ct,
+                    new QueryOptions(IgnoreOwner: true, IgnoreSoftDelete: true));
             }
 
             if (entity is null) {
                 return;
             }
 
-            var advice = AdviceContext.Current ?? new AdviceContext(provider);
-            advice.Set(new FlowSourceWriteBack(execution));
-            await Advisor.For<IFlowSourceAdvisor<TSource>>().RunAsync(advice, context, entity, ct);
+            if (entity is IConcurrency concurrency) {
+                await execution.TrackSourceStampAsync(context.Snapshot.Process.CanonicalName!, typeof(TSourceEntity), source, concurrency.Timestamp, ct);
+            }
+
+            await Advisor.For<IFlowSourceAdvisor<TSourceEntity>>().RunAsync(advice, context, entity, ct);
         }
 
         public async Task FlushAsync(
-            IServiceProvider provider,
-            IUnitOfWork      unitOfWork,
-            object           entity,
-            string           process,
-            CancellationToken ct
+            IServiceProvider                                                            provider,
+            FlowPersistenceScope<TProcess, TToken, TTransition, TCompensation, TSource> scope,
+            FlowExecutionContext                                                        execution,
+            object                                                                      entity,
+            string                                                                      process,
+            CancellationToken                                                           ct
         ) {
-            var source   = (TSource)entity;
-            var sources  = provider.GetRequiredService<IRepository<TSource>>();
-            var bindings = provider.GetRequiredService<IRepository<SchemataProcessSource>>();
+            var unitOfWork = scope.UnitOfWork;
+            var source   = (TSourceEntity)entity;
+            var sources  = provider.GetRequiredService<IRepository<TSourceEntity>>();
             sources.Join(unitOfWork);
-            bindings.Join(unitOfWork);
 
             var canonical = source.CanonicalName;
             if (string.IsNullOrEmpty(canonical)) {
                 return;
             }
 
-            var type = FlowSourceTypeNames.ToName(typeof(TSource));
-            var rows = new List<SchemataProcessSource>();
-            await foreach (var row in bindings.ListAsync<SchemataProcessSource>(
+            var type = FlowSourceTypeNames.ToName(typeof(TSourceEntity));
+            var rows = new List<TSource>();
+            await foreach (var row in scope.Sources.ListAsync<TSource>(
                                query => query.Where(binding => binding.Process == process
                                                            && binding.Source == canonical
-                                                           && binding.SourceType == type), ct)) {
+                                                           && binding.SourceType == type), ct,
+                               new QueryOptions(IgnoreOwner: true))) {
                 rows.Add(row);
+            }
+            foreach (var staged in scope.StagedSourceBindings) {
+                if (staged.Source != canonical || staged.SourceType != type) continue;
+                var index = rows.FindIndex(row => row.Uid == staged.Uid);
+                if (index < 0) rows.Add(staged);
+                else rows[index] = staged;
             }
 
             if (source is IConcurrency concurrent) {
+                var initial = execution.InitialSourceStamps.TryGetValue((typeof(TSourceEntity), canonical), out var stamp)
+                    ? stamp : concurrent.Timestamp;
                 foreach (var row in rows) {
-                    if (row.SourceTimestamp is { } expected && concurrent.Timestamp != expected) {
-                        throw new FailedPreconditionException(
-                            SchemataResources.FLOW_SOURCE_MODIFIED_CONCURRENTLY,
-                            new Dictionary<string, string?> { ["name"] = canonical });
-                    }
+                    if (scope.FindSourceBinding(row.Process, row.Token, row.Name)?.Uid == row.Uid) continue;
+                    RequireSourceStamp(row, initial, canonical);
                 }
             }
 
-            await sources.UpdateAsync(source, ct);
+            // The bound business entity is a resource: write-back enters the mutation pipeline so
+            // its committed advisors fire, staged on the outer flow unit of work.
+            var applied = await provider.GetRequiredService<IResourceMutation<TSourceEntity>>().UpdateAsync(source, unitOfWork, ct: ct);
 
-            if (source is not IConcurrency) {
+            if (applied != MutationResult.Applied || source is not IConcurrency stamped) {
                 return;
             }
 
-            TSource? persisted;
-            using (FlowSourceReadScope.Enter(sources)) {
-                persisted = await sources.FirstOrDefaultAsync(
-                    query => query.Where(current => current.CanonicalName == canonical), ct);
-            }
-
-            if (persisted is not IConcurrency stamped) {
-                return;
-            }
-
+            // The new concurrency stamp is final only at the provider's write boundary: LinqToDB
+            // rotates it when the staged SQL executes, EF at unit-of-work commit. The save
+            // preparation projects the final stamp onto each binding row inside the same
+            // transaction, after rotation and before the save.
+            var bindingMutation = scope.Mutation<TSource>();
             foreach (var row in rows) {
-                row.SourceTimestamp = stamped.Timestamp;
-                await bindings.UpdateAsync(row, ct);
+                unitOfWork.AddSavePreparation(() => row.SourceTimestamp = stamped.Timestamp);
+                if (await bindingMutation.UpdateAsync(row, unitOfWork, ct: ct) == MutationResult.Applied) {
+                    scope.TrackSourceBinding(row);
+                }
             }
         }
     }

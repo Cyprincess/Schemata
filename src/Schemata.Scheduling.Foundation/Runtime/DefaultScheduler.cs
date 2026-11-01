@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,18 +11,23 @@ using Schemata.Scheduling.Skeleton.Entities;
 namespace Schemata.Scheduling.Foundation.Runtime;
 
 /// <summary>
-///     In-memory <see cref="IScheduler" /> acting as a materializer and timer. Every fire — cron,
-///     periodic, one-time, <see cref="TriggerAsync{TJob}" />, or durable operation — persists a
-///     <see cref="ExecutionState.Pending" /> <see cref="SchemataJobExecution" /> row up front,
-///     carrying its due time in <see cref="SchemataJobExecution.StartTime" />. An in-memory timer
-///     signals <see cref="JobExecutionDispatcher" /> when a row comes due; the dispatcher is the
-///     single executor that runs the job body and advances recurring schedules. The scheduler never
-///     runs a job body itself.
+///     In-memory <see cref="IScheduler{TJob,TExecution}" /> acting as a materializer and timer.
+///     Every fire — cron, periodic, one-time, <see cref="IScheduler.TriggerAsync{TJob}" />, or
+///     durable operation — persists an <see cref="ExecutionState.Pending" />
+///     <typeparamref name="TExecution" /> row up front, carrying its due time in
+///     <see cref="SchemataJobExecution.StartTime" />. An in-memory timer signals
+///     <see cref="JobExecutionDispatcher{TJob,TExecution}" /> when a row comes due; the dispatcher
+///     is the single executor that runs the job body and advances recurring schedules. The
+///     scheduler never runs a job body itself.
 /// </summary>
-public sealed partial class DefaultScheduler : IScheduler
+/// <typeparam name="TJob">The persisted job entity type registered by the host.</typeparam>
+/// <typeparam name="TExecution">The persisted execution entity type registered by the host.</typeparam>
+public sealed partial class DefaultScheduler<TJob, TExecution> : IScheduler<TJob, TExecution>
+    where TJob : SchemataJob, new()
+    where TExecution : SchemataJobExecution, new()
 {
     private readonly SemaphoreSlim                                _lock    = new(1, 1);
-    private readonly ILogger<DefaultScheduler>?                   _logger;
+    private readonly ILogger<DefaultScheduler<TJob, TExecution>>? _logger;
     private readonly IOptions<SchemataSchedulingOptions>          _options;
     private readonly IServiceProvider                             _services;
     private readonly ConcurrentDictionary<string, ScheduledEntry> _entries = new();
@@ -35,7 +40,7 @@ public sealed partial class DefaultScheduler : IScheduler
 
     internal SemaphoreSlim Gate => _lock;
 
-    internal ILogger<DefaultScheduler>? Logger => _logger;
+    internal ILogger<DefaultScheduler<TJob, TExecution>>? Logger => _logger;
 
     internal IOptions<SchemataSchedulingOptions> Options => _options;
 
@@ -46,10 +51,10 @@ public sealed partial class DefaultScheduler : IScheduler
     internal TimeProvider Time => _time;
 
     public DefaultScheduler(
-        IServiceProvider                    services,
-        IOptions<SchemataSchedulingOptions> options,
-        ILogger<DefaultScheduler>?          logger       = null,
-        TimeProvider?                       time = null
+        IServiceProvider                             services,
+        IOptions<SchemataSchedulingOptions>          options,
+        ILogger<DefaultScheduler<TJob, TExecution>>? logger       = null,
+        TimeProvider?                                time = null
     ) {
         _services = services;
         _options  = options;
@@ -90,21 +95,31 @@ public sealed partial class DefaultScheduler : IScheduler
 
     /// <summary>Signals the dispatcher that a row has come due, when one is registered.</summary>
     internal void SignalDispatcher() {
-        _services.GetService<JobExecutionDispatcher>()?.NotifyPending();
+        _services.GetService<JobExecutionDispatcher<TJob, TExecution>>()?.NotifyPending();
     }
 
     internal sealed class ScheduledEntry
     {
-        public ScheduledEntry(SchemataJob job, CancellationTokenSource cts, int replayedMisses = 0) {
+        public ScheduledEntry(TJob job, CancellationTokenSource cts, int replayedMisses = 0, string? key = null) {
             Job            = job;
             Cts            = cts;
+            Token          = cts.Token;
             ReplayedMisses = replayedMisses;
+            Key            = key;
         }
 
-        public SchemataJob             Job { get; }
+        public TJob                    Job { get; }
 
         public CancellationTokenSource Cts { get; }
 
+        public CancellationToken Token { get; }
+
         public int ReplayedMisses { get; }
+
+        /// <summary>
+        ///     Key this entry is registered under in <see cref="Entries" />, or
+        ///     <see langword="null" /> for entries built outside the timer-arming support.
+        /// </summary>
+        public string? Key { get; }
     }
 }

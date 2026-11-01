@@ -14,15 +14,18 @@ public sealed record CompensationInvocationContext
     /// <param name="definition">The active process definition.</param>
     /// <param name="token">The token whose compensation scope is being invoked.</param>
     /// <param name="execution">The execution context of the run that fired the compensation.</param>
+    /// <param name="tokens">The operation's mutable token set, shared with compensation continuations.</param>
     public CompensationInvocationContext(
         SchemataProcess      process,
         ProcessDefinition    definition,
         SchemataProcessToken token,
-        FlowExecutionContext execution) {
+        FlowExecutionContext execution,
+        List<SchemataProcessToken> tokens) {
         Process     = process;
         Definition  = definition;
         Token       = token;
         Execution   = execution;
+        Tokens      = tokens;
         Scope       = TokenSnapshotFactory.From(token);
         Bookkeeping = new Dictionary<string, int>(token.Bookkeeping, StringComparer.Ordinal);
     }
@@ -38,6 +41,9 @@ public sealed record CompensationInvocationContext
 
     /// <summary>The execution context of the run that fired the compensation.</summary>
     public FlowExecutionContext Execution { get; init; }
+
+    /// <summary>The operation's token set, including tokens spawned by compensation.</summary>
+    public List<SchemataProcessToken> Tokens { get; init; }
 
     /// <summary>The token snapshot associated with the compensation invocation.</summary>
     public TokenSnapshot Scope { get; init; }

@@ -51,7 +51,7 @@ public static class BpmnValidator
     private static void ValidateUnsupportedShapes(ProcessDefinition definition) {
         foreach (var element in definition.AllElements) {
             var unsupported = element is AdHocSubProcess
-                           || element is FlowEvent { Definition: LinkDefinition or MultipleDefinition };
+                           || element is FlowEvent { Definition: LinkDefinition or MultipleDefinition or ParallelDefinition };
             if (unsupported) {
                 throw new InvalidOperationException($"BPMN definition shape '{element.GetType().Name}' is not supported.");
             }
@@ -261,8 +261,9 @@ public static class BpmnValidator
     }
 
     private static void ValidateExclusiveGateways(ProcessDefinition definition) {
-        foreach (var gateway in definition.Elements.OfType<ExclusiveGateway>()) {
-            var outgoing = definition.Flows.Where(sf => sf.Source == gateway).ToList();
+        var flows = definition.AllFlows;
+        foreach (var gateway in definition.AllElements.OfType<ExclusiveGateway>()) {
+            var outgoing = flows.Where(sf => sf.Source == gateway).ToList();
             if (outgoing.Count == 0) {
                 throw new FailedPreconditionException(
                     SchemataResources.STATE_MACHINE_EXCLUSIVE_GATEWAY_NO_OUTGOING,

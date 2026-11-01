@@ -23,23 +23,25 @@ public interface IOperationService
     ValueTask<Operation> WaitAsync(string operation, CancellationToken ct = default);
 
     /// <summary>Cancels a pending operation and removes its scheduler entry when one exists.</summary>
+    /// <remarks>
+    ///     Cancelling a running execution invokes its cancellation callbacks synchronously on the
+    ///     calling thread; <see cref="CancellationTokenSource" /> aggregates their failures into an
+    ///     <see cref="AggregateException" />. Failures raised while disposing the scopes used by the
+    ///     cancellation may be aggregated with it as well.
+    /// </remarks>
     /// <param name="operation">The canonical or leaf operation name.</param>
     /// <param name="ct">Cancellation token for the cancellation request.</param>
     /// <returns>The terminal cancelled operation snapshot.</returns>
     ValueTask<Operation> CancelAsync(string operation, CancellationToken ct = default);
 
-    /// <summary>Persists an already-completed operation for inline work.</summary>
-    /// <param name="method">The custom method that completed the operation.</param>
-    /// <param name="output">Serialized success output.</param>
-    /// <param name="error">Failure message; a non-null value marks the operation as failed.</param>
-    /// <param name="uid">Optional preallocated operation identifier.</param>
-    /// <param name="ct">Cancellation token for the write.</param>
+    /// <summary>Runs inline work after persisting its operation identity, then records the terminal outcome.</summary>
+    /// <param name="method">The custom method executing the operation.</param>
+    /// <param name="execute">Inline work receiving the persisted operation and returning serialized output.</param>
+    /// <param name="ct">Cancellation token controlling the work.</param>
     /// <returns>The persisted terminal operation.</returns>
-    ValueTask<Operation> CreateTerminalAsync(
+    ValueTask<Operation> ExecuteAsync(
         string method,
-        string? output,
-        string? error,
-        Guid? uid = null,
+        Func<Operation, CancellationToken, ValueTask<string?>> execute,
         CancellationToken ct = default
     );
 }

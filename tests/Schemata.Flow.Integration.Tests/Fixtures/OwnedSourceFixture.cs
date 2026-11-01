@@ -2,13 +2,12 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using Schemata.Entity.EntityFrameworkCore;
-using Schemata.Entity.Owner;
-using Schemata.Entity.Owner.Advisors;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Flow.Bpmn;
@@ -31,6 +30,7 @@ public sealed class OwnedSourceFixture : IAsyncLifetime
 
     public async Task InitializeAsync() {
         var services = new ServiceCollection();
+        Schemata.Flow.Tests.FlowTestCreation.Register(services);
         _connection = new(_connectionString);
         await _connection.OpenAsync();
 
@@ -61,8 +61,12 @@ public sealed class OwnedSourceFixture : IAsyncLifetime
 
         services.AddSchemataFlow();
 
-        services.TryAddKeyedSingleton<IFlowRuntime, StateMachineEngine>(FlowConstants.Engines.StateMachine);
-        services.TryAddKeyedSingleton<IFlowRuntime, BpmnEngine>(FlowConstants.Engines.Bpmn);
+        services.TryAddKeyedSingleton<IFlowRuntime<SchemataProcess, SchemataProcessToken, SchemataProcessTransition>, StateMachineEngine>(FlowConstants.Engines.StateMachine);
+        services.TryAddKeyedSingleton<IFlowRuntime>(FlowConstants.Engines.StateMachine,
+            (sp, _) => sp.GetRequiredKeyedService<IFlowRuntime<SchemataProcess, SchemataProcessToken, SchemataProcessTransition>>(FlowConstants.Engines.StateMachine));
+        services.TryAddKeyedSingleton<IFlowRuntime<SchemataProcess, SchemataProcessToken, SchemataProcessTransition>, BpmnEngine>(FlowConstants.Engines.Bpmn);
+        services.TryAddKeyedSingleton<IFlowRuntime>(FlowConstants.Engines.Bpmn,
+            (sp, _) => sp.GetRequiredKeyedService<IFlowRuntime<SchemataProcess, SchemataProcessToken, SchemataProcessTransition>>(FlowConstants.Engines.Bpmn));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowEngineValidator, StateMachineFlowEngineValidator>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowEngineValidator, BpmnFlowEngineValidator>());
 

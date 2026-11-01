@@ -5,6 +5,7 @@ using Schemata.Messaging.Skeleton;
 using Schemata.Scheduling.Foundation.Commands;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Scheduling.Foundation;
 
@@ -17,7 +18,8 @@ public sealed class CancelOperationHandler(IOperationService operations)
 {
     public async Task<Operation> HandleAsync(
         CancelOperationRequest request,
-        CancellationToken ct = default
+        AdviceContext          context,
+        CancellationToken      ct = default
     ) {
         return await operations.CancelAsync(request.CanonicalName ?? string.Empty, ct);
     }

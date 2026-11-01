@@ -59,6 +59,8 @@ public class BpmnEngineSmokeShould
         Assert.Equal(SchemataResources.BPMN_CALL_ACTIVITY_REQUIRES_SERVICES, ex.Details?.OfType<ErrorInfoDetail>().FirstOrDefault()?.Reason);
     }
 
+    // Contract pinned here: BpmnValidator owns syntactic well-formedness and accepts this fork shape, while the
+    // engine owns runtime semantics and rejects execution-unsupported shapes. Moving checks between them must update this test on purpose.
     [Fact]
     public void BpmnValidator_AllowsParallelGateway_DeferringExecutionRejectionToEngine() {
         var start    = new FlowEvent { Name = "start", Position = EventPosition.Start };

@@ -9,6 +9,28 @@ namespace Schemata.Flow.Bpmn.Tests;
 
 public class BpmnEngine_EventSubProcessShould
 {
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task Discovery_WaitingCatch_UsesSameEventSubProcessEligibilityAsTrigger() {
+        var scenario = NonInterruptingScenario();
+        var engine = new BpmnEngine();
+        var snapshot = await engine.StartAsync(scenario.Definition, NewProcess(scenario.Definition.Name));
+        var token = snapshot.Tokens.Single(current => current.StateName == "task-a");
+        var wait = new FlowEvent { Name = "direct-wait", Position = EventPosition.IntermediateCatch, Definition = new Message { Name = "other" } };
+        scenario.Definition.Elements.Add(wait);
+        token.StateName = wait.Name;
+        token.WaitingAtName = wait.Name;
+        token.State = "Waiting";
+        var before = snapshot.Tokens.Select(current => (current.CanonicalName, current.StateName, current.WaitingAtName, current.State)).ToArray();
+
+        var targets = await engine.FindTriggerTargetsAsync(scenario.Definition, snapshot.Process, snapshot.Tokens, BpmnEngineTestExtensions.Context([]), scenario.Trigger);
+
+        Assert.Contains(token.CanonicalName, targets);
+        Assert.Equal(before, snapshot.Tokens.Select(current => (current.CanonicalName, current.StateName, current.WaitingAtName, current.State)).ToArray());
+        var fired = await engine.TriggerAsync(scenario.Definition, snapshot.Process, snapshot.Tokens, scenario.Trigger, null, token.CanonicalName);
+        Assert.Single(fired.Tokens, current => current.StateName == "event-task");
+    }
+
     [Fact]
     public async Task Trigger_InterruptingEventSubProcess_CancelsAllParentScopeTokens() {
         var scenario = InterruptingScenario();
@@ -23,7 +45,7 @@ public class BpmnEngine_EventSubProcessShould
             null,
             token.CanonicalName,
             CancellationToken.None);
-        var parentTokens = fired.Tokens.Where(t => t.ScopeName == started.Process.Name).ToList();
+        var parentTokens = fired.Tokens.Where(t => string.IsNullOrEmpty(t.ScopeName)).ToList();
         Assert.Equal(2, parentTokens.Count);
         Assert.All(parentTokens, parent => Assert.Equal("Cancelled", parent.State));
         var cancelRows = fired.Transitions.Where(t => t.Kind == TransitionKind.Cancel).ToList();
@@ -94,7 +116,7 @@ public class BpmnEngine_EventSubProcessShould
             null,
             token.CanonicalName,
             CancellationToken.None);
-        var parentTokens = fired.Tokens.Where(t => t.ScopeName == started.Process.Name).ToList();
+        var parentTokens = fired.Tokens.Where(t => string.IsNullOrEmpty(t.ScopeName)).ToList();
         Assert.Equal(2, parentTokens.Count);
         Assert.All(parentTokens, parent => Assert.Equal("Active", parent.State));
         Assert.DoesNotContain(fired.Transitions, t => t.Kind == TransitionKind.Cancel);
@@ -119,7 +141,7 @@ public class BpmnEngine_EventSubProcessShould
             token.CanonicalName,
             CancellationToken.None);
         var child = snapshot.Tokens.Single(t => t.ScopeName == "event-sub");
-        foreach (var parent in snapshot.Tokens.Where(t => t.ScopeName == snapshot.Process.Name).ToList()) {
+        foreach (var parent in snapshot.Tokens.Where(t => string.IsNullOrEmpty(t.ScopeName)).ToList()) {
             snapshot = await engine.AdvanceAsync(
                 scenario.Definition,
                 snapshot.Process,
@@ -161,7 +183,7 @@ public class BpmnEngine_EventSubProcessShould
             CancellationToken.None);
         Assert.Equal("Running", snapshot.Process.State);
         Assert.Equal("Completed", snapshot.Tokens.Single(t => t.CanonicalName == child.CanonicalName).State);
-        foreach (var parent in snapshot.Tokens.Where(t => t.ScopeName == snapshot.Process.Name).ToList()) {
+        foreach (var parent in snapshot.Tokens.Where(t => string.IsNullOrEmpty(t.ScopeName)).ToList()) {
             snapshot = await engine.AdvanceAsync(
                 scenario.Definition,
                 snapshot.Process,

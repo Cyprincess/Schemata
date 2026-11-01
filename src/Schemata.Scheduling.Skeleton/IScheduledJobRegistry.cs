@@ -7,9 +7,10 @@ namespace Schemata.Scheduling.Skeleton;
 public interface IScheduledJobRegistry
 {
     /// <summary>Registers a concrete job type under a stable key.</summary>
+    /// <exception cref="InvalidOperationException">The key or type already belongs to a different registration.</exception>
     void Register(Type jobType, string key);
 
-    /// <summary>Registers a concrete job type using the supplied key or its full type name.</summary>
+    /// <summary>Registers a concrete job type using the supplied key or its declared/derived key.</summary>
     void Register<T>(string? key = null)
         where T : class, IScheduledJob;
 

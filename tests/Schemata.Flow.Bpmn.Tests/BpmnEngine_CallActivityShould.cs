@@ -8,9 +8,11 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Entity.Repository;
+using Schemata.Flow.Bpmn.Runtime.SubProcesses;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Runtime;
+using Schemata.Flow.Skeleton.Utilities;
 using Xunit;
 
 namespace Schemata.Flow.Bpmn.Tests;
@@ -34,7 +36,7 @@ public class BpmnEngine_CallActivityShould
 
         var snapshot = await harness.StartParentAsync();
 
-        var parent = Assert.Single(snapshot.Tokens);
+        var parent = Assert.Single(snapshot.Tokens, token => token.State == "Waiting");
         Assert.Equal("Waiting", parent.State);
         Assert.Equal("call", parent.StateName);
         Assert.Equal("call", parent.WaitingAtName);
@@ -49,9 +51,13 @@ public class BpmnEngine_CallActivityShould
         var transition = Assert.Single(harness.Transitions, t => t.Process == snapshot.Process.Name
                                                        && t.Kind == TransitionKind.Spawn);
         var child = Assert.Single(harness.Processes, p => p.DefinitionName == "called");
-        Assert.Equal(snapshot.Tokens[0].CanonicalName, transition.Token);
+        var waiter = Assert.Single(snapshot.Tokens, token => token.State == "Waiting");
+        Assert.Equal(waiter.CanonicalName, transition.Token);
         Assert.Equal(child.CanonicalName, transition.Posterior);
         Assert.Equal("call", transition.Note);
+        Assert.False(string.IsNullOrEmpty(transition.Activation));
+        Assert.NotEqual(transition.CanonicalName, transition.Activation);
+        Assert.Equal(transition.Activation, waiter.CurrentCallActivation);
     }
 
     [Fact]
@@ -62,7 +68,7 @@ public class BpmnEngine_CallActivityShould
 
         var resumed = await harness.AdvanceParentAsync(parent);
 
-        var token = Assert.Single(resumed.Tokens);
+        var token = Assert.Single(resumed.Tokens, current => current.State == "Active");
         Assert.Equal("Active", token.State);
         Assert.Equal("after-call", token.StateName);
         Assert.Null(token.WaitingAtName);
@@ -76,11 +82,222 @@ public class BpmnEngine_CallActivityShould
 
         var failed = await harness.AdvanceParentAsync(parent);
 
-        var token = Assert.Single(failed.Tokens);
+        var token = Assert.Single(failed.Tokens, current => current.State == "Failed");
         Assert.Equal("Failed", token.State);
         Assert.Equal("call", token.StateName);
         Assert.Equal("Failed", failed.Process.State);
         Assert.Contains(failed.Transitions, t => t.Kind == TransitionKind.Fail && t.Token == token.CanonicalName);
+    }
+
+    [Fact]
+    public async Task Start_ThroughExclusiveGateway_SpawnsChildProcessRow() {
+        var harness = Harness.Create(GatewayParentDefinition());
+
+        var snapshot = await harness.StartParentAsync();
+
+        var child = Assert.Single(harness.Processes, p => p.DefinitionName == "called");
+        Assert.StartsWith("processes/", child.CanonicalName, StringComparison.Ordinal);
+        Assert.Single(harness.Transitions, t => t.Process == snapshot.Process.Name && t.Kind == TransitionKind.Spawn);
+        var parent = Assert.Single(snapshot.Tokens, token => token.State == "Waiting");
+        Assert.Equal("call", parent.WaitingAtName);
+    }
+
+    [Fact]
+    public async Task Complete_ChildOfGatewayRoutedCall_ResumesParentToken() {
+        var harness = Harness.Create(GatewayParentDefinition());
+        var parent  = await harness.StartParentAsync();
+        await harness.CompleteChildAsync();
+
+        var resumed = await harness.AdvanceParentAsync(parent);
+
+        var token = Assert.Single(resumed.Tokens, current => current.State == "Active");
+        Assert.Equal("Active", token.State);
+        Assert.Equal("after-call", token.StateName);
+    }
+
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task ReenterCall_WaitsForCurrentChildAndRetainsHistoricSpawn() {
+        var definition = ParentDefinition();
+        var after = definition.FindElementByName("after-call")!;
+        var call = definition.FindElementByName("call")!;
+        definition.Flows.Remove(definition.Flows.Single(flow => flow.Source == after));
+        definition.Flows.Add(new() { Source = after, Target = call });
+        var harness = Harness.Create(definition);
+        var snapshot = await harness.StartParentAsync();
+        var firstWaiter = snapshot.Tokens.Single(token => token.State == "Waiting");
+        await harness.CompleteChildAsync();
+        snapshot = await harness.AdvanceParentAsync(snapshot);
+        snapshot = await harness.AdvanceParentAsync(snapshot);
+        var secondWaiter = snapshot.Tokens.Single(token => token.State == "Waiting");
+
+        Assert.NotEqual(firstWaiter.CanonicalName, secondWaiter.CanonicalName);
+        Assert.NotEqual(firstWaiter.CurrentCallActivation, secondWaiter.CurrentCallActivation);
+        Assert.Null(firstWaiter.CurrentCallActivation);
+        snapshot = await harness.AdvanceParentAsync(snapshot);
+        Assert.Equal("Waiting", secondWaiter.State);
+        Assert.Equal("call", secondWaiter.WaitingAtName);
+        Assert.Equal(2, harness.Transitions.Count(row => row.Kind == TransitionKind.Spawn && row.Note == "call"));
+
+        await harness.CompleteChildAsync();
+        snapshot = await harness.AdvanceParentAsync(snapshot);
+        Assert.Equal("after-call", Assert.Single(snapshot.Tokens, token => token.State == "Active").StateName);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task TryComplete_StaleActivationAfterReactivation_DoesNotResumeCurrentWaiter() {
+        var definition = ParentDefinition();
+        var after = definition.FindElementByName("after-call")!;
+        var call = (CallActivity)definition.FindElementByName("call")!;
+        definition.Flows.Remove(definition.Flows.Single(flow => flow.Source == after));
+        definition.Flows.Add(new() { Source = after, Target = call });
+        var harness = Harness.Create(definition);
+        var snapshot = await harness.StartParentAsync();
+        var firstWaiter = Assert.Single(snapshot.Tokens, token => token.State == "Waiting");
+        var firstActivation = firstWaiter.CurrentCallActivation;
+
+        await harness.CompleteChildAsync();
+        snapshot = await harness.AdvanceParentAsync(snapshot);
+        snapshot = await harness.AdvanceParentAsync(snapshot);
+        var secondWaiter = Assert.Single(snapshot.Tokens, token => token.State == "Waiting");
+        var currentActivation = secondWaiter.CurrentCallActivation;
+        Assert.NotEqual(firstActivation, currentActivation);
+
+        var executor = new CallActivityExecutor<SchemataProcess, SchemataProcessToken, SchemataProcessTransition>(harness.Services);
+        var process = snapshot.Process;
+        var currentChild = Assert.Single(harness.Processes, present => present.DefinitionName == "called" && !TokenStates.IsTerminal(present.State));
+        Assert.Null(await executor.TryCompleteAsync(process, secondWaiter, firstActivation, CancellationToken.None));
+        Assert.Null(await executor.TryCompleteAsync(process, secondWaiter, null, CancellationToken.None));
+
+        await harness.CompleteChildAsync();
+        Assert.Null(await executor.TryCompleteAsync(process, secondWaiter, firstActivation, CancellationToken.None));
+
+        var completion = await executor.TryCompleteAsync(process, secondWaiter, currentActivation, CancellationToken.None);
+        Assert.NotNull(completion);
+        Assert.Equal(currentChild.CanonicalName, completion.ChildProcess);
+        Assert.Null(secondWaiter.CurrentCallActivation);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task TryComplete_SelectsSpawnRowByActivation_NotFirstSpawnForTheToken() {
+        var harness  = Harness.Create();
+        var snapshot = await harness.StartParentAsync();
+        await harness.CompleteChildAsync();
+        var waiter     = Assert.Single(snapshot.Tokens, token => token.State == "Waiting");
+        var firstSpawn = Assert.Single(harness.Transitions, row => row.Kind == TransitionKind.Spawn);
+        var failedChild = new SchemataProcess {
+            Name           = "failed-child",
+            CanonicalName  = "processes/failed-child",
+            DefinitionName = "called",
+            State          = "Failed",
+        };
+        harness.Processes.Add(failedChild);
+        harness.Transitions.Add(new() {
+            Process    = firstSpawn.Process,
+            Token      = firstSpawn.Token,
+            Kind       = TransitionKind.Spawn,
+            Previous   = firstSpawn.Previous,
+            Posterior  = failedChild.CanonicalName,
+            Event      = firstSpawn.Event,
+            Note       = firstSpawn.Note,
+            Activation = "activation-2",
+        });
+        waiter.CurrentCallActivation = "activation-2";
+
+        var executor = new CallActivityExecutor<SchemataProcess, SchemataProcessToken, SchemataProcessTransition>(harness.Services);
+        var completion = await executor.TryCompleteAsync(snapshot.Process, waiter, "activation-2", CancellationToken.None);
+
+        Assert.NotNull(completion);
+        Assert.True(completion.Failed);
+        Assert.Equal(failedChild.CanonicalName, completion.ChildProcess);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task TerminateScope_CancelsCallWaiterAndClearsActivation() {
+        var start     = new FlowEvent { Name = "start", Position = EventPosition.Start };
+        var fork      = new ParallelGateway { Name = "fork" };
+        var call      = new CallActivity { Name = "call", CalledElement = "called" };
+        var finish    = new NoneTask { Name = "finish" };
+        var terminate = new FlowEvent { Name = "terminate", Position = EventPosition.End, IsTerminate = true };
+        var end       = new FlowEvent { Name = "end", Position = EventPosition.End };
+        var definition = new ProcessDefinition {
+            Name     = "parent",
+            Elements = { start, fork, call, finish, terminate, end },
+            Flows = {
+                new() { Source = start,  Target = fork },
+                new() { Source = fork,   Target = call },
+                new() { Source = fork,   Target = finish },
+                new() { Source = call,   Target = end },
+                new() { Source = finish, Target = terminate },
+            },
+        };
+        var harness  = Harness.Create(definition);
+        var snapshot = await harness.StartParentAsync();
+        var waiter   = Assert.Single(snapshot.Tokens, token => token.State == "Waiting");
+        Assert.NotNull(waiter.CurrentCallActivation);
+        var finishing = Assert.Single(snapshot.Tokens, token => token.StateName == "finish");
+
+        var completed = await harness.AdvanceParentAsync(snapshot, finishing.CanonicalName);
+
+        var cancelled = Assert.Single(completed.Tokens, token => token.CanonicalName == waiter.CanonicalName);
+        Assert.Equal("Cancelled", cancelled.State);
+        Assert.Null(cancelled.CurrentCallActivation);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task CallCompletion_FinalChild_ResumesEnclosingSubProcess() {
+        var start = new FlowEvent { Name = "start", Position = EventPosition.Start };
+        var innerStart = new FlowEvent { Name = "inner-start", Position = EventPosition.Start };
+        var call = new CallActivity { Name = "call", CalledElement = "called" };
+        var innerEnd = new FlowEvent { Name = "inner-end", Position = EventPosition.End };
+        var sub = new EmbeddedSubProcess { Name = "sub", Children = { innerStart, call, innerEnd }, ChildFlows = {
+            new() { Source = innerStart, Target = call }, new() { Source = call, Target = innerEnd },
+        } };
+        var end = new FlowEvent { Name = "end", Position = EventPosition.End };
+        var definition = new ProcessDefinition { Name = "parent", Elements = { start, sub, end }, Flows = {
+            new() { Source = start, Target = sub }, new() { Source = sub, Target = end },
+        } };
+        var harness = Harness.Create(definition);
+        var snapshot = await harness.StartParentAsync();
+        await harness.CompleteChildAsync();
+        var waiter = snapshot.Tokens.Single(token => token.WaitingAtName == "call");
+
+        snapshot = await harness.AdvanceParentAsync(snapshot, waiter.CanonicalName);
+
+        Assert.Equal("Completed", snapshot.Process.State);
+        Assert.Equal("end", snapshot.Tokens.Single(token => string.IsNullOrEmpty(token.ScopeName)).StateName);
+        Assert.All(snapshot.Tokens, token => Assert.Equal("Completed", token.State));
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task CallFailure_DoesNotInvokeEnclosingSuccessProcedure() {
+        var calls = 0;
+        var start = new FlowEvent { Name = "start", Position = EventPosition.Start };
+        var innerStart = new FlowEvent { Name = "inner-start", Position = EventPosition.Start };
+        var call = new CallActivity { Name = "call", CalledElement = "called" };
+        var innerEnd = new FlowEvent { Name = "inner-end", Position = EventPosition.End };
+        var sub = new EmbeddedSubProcess { Name = "sub", Children = { innerStart, call, innerEnd }, ChildFlows = {
+            new() { Source = innerStart, Target = call }, new() { Source = call, Target = innerEnd },
+        } };
+        var after = new ProcedureTask { Name = "after", Body = (_, _) => { calls++; return ValueTask.CompletedTask; } };
+        var definition = new ProcessDefinition { Name = "parent", Elements = { start, sub, after }, Flows = {
+            new() { Source = start, Target = sub }, new() { Source = sub, Target = after },
+        } };
+        var harness = Harness.Create(definition);
+        var snapshot = await harness.StartParentAsync();
+        harness.FailChild();
+        var waiter = snapshot.Tokens.Single(token => token.WaitingAtName == "call");
+        snapshot = await harness.AdvanceParentAsync(snapshot, waiter.CanonicalName);
+        Assert.Equal(0, calls);
+        Assert.Equal("Failed", snapshot.Process.State);
+        Assert.Equal("Failed", snapshot.Tokens.Single(token => token.StateName == "sub").State);
+        Assert.Contains(snapshot.Transitions, transition => transition.Kind == TransitionKind.Fail && transition.Token == waiter.CanonicalName);
     }
 
     private static ProcessDefinition ParentDefinition() {
@@ -94,6 +311,25 @@ public class BpmnEngine_CallActivityShould
             Elements = { start, call, after, endEvent },
             Flows = {
                 new() { Source = start, Target = call },
+                new() { Source = call, Target = after },
+                new() { Source = after, Target = endEvent },
+            },
+        };
+    }
+
+    private static ProcessDefinition GatewayParentDefinition() {
+        var start   = new FlowEvent { Name = "start", Position = EventPosition.Start };
+        var gateway = new ExclusiveGateway { Name = "decide" };
+        var call    = new CallActivity { Name = "call", CalledElement = "called" };
+        var after   = new NoneTask { Name = "after-call" };
+        var endEvent = new FlowEvent { Name = "end", Position = EventPosition.End };
+
+        return new() {
+            Name     = "parent",
+            Elements = { start, gateway, call, after, endEvent },
+            Flows = {
+                new() { Source = start, Target = gateway },
+                new() { Source = gateway, Target = call, IsDefault = true },
                 new() { Source = call, Target = after },
                 new() { Source = after, Target = endEvent },
             },
@@ -117,8 +353,8 @@ public class BpmnEngine_CallActivityShould
 
     private sealed class Harness
     {
-        private Harness() {
-            ParentDefinition = ParentDefinition();
+        private Harness(ProcessDefinition parentDefinition) {
+            ParentDefinition = parentDefinition;
             CalledDefinition = CalledDefinition();
 
             Processes   = [];
@@ -129,18 +365,20 @@ public class BpmnEngine_CallActivityShould
                 Registration("called", CalledDefinition),
             };
             var processRegistry = new Mock<IProcessRegistry>();
-            processRegistry.Setup(r => r.GetRegistration(It.IsAny<string>()))
-                           .Returns((string name) => registry.FirstOrDefault(r => r.Name == name));
-            processRegistry.Setup(r => r.IsRegistered(It.IsAny<string>()))
-                           .Returns((string name) => registry.Any(r => r.Name == name));
+            processRegistry.Setup(r => r.GetRegistration(It.IsAny<string>(), "1"))
+                           .Returns((string name, string version) => registry.FirstOrDefault(r => r.Name == name && r.Version == version));
+            processRegistry.Setup(r => r.IsRegistered(It.IsAny<string>(), "1"))
+                           .Returns((string name, string version) => registry.Any(r => r.Name == name && r.Version == version));
 
             var services = new ServiceCollection();
             services.AddSingleton<IProcessRegistry>(processRegistry.Object);
             services.AddSingleton<IRepository<SchemataProcess>>(CreateRepository(Processes).Object);
             services.AddSingleton<IRepository<SchemataProcessToken>>(CreateRepository(Tokens).Object);
             services.AddSingleton<IRepository<SchemataProcessTransition>>(CreateRepository(Transitions).Object);
-            Services = services.BuildServiceProvider();
             Engine   = new();
+            services.AddKeyedSingleton<IFlowRuntime<SchemataProcess, SchemataProcessToken, SchemataProcessTransition>>(FlowConstants.Engines.Bpmn, Engine);
+            services.AddKeyedSingleton<IFlowRuntime>(FlowConstants.Engines.Bpmn, Engine);
+            Services = services.BuildServiceProvider();
         }
 
         public ProcessDefinition ParentDefinition { get; }
@@ -155,9 +393,9 @@ public class BpmnEngine_CallActivityShould
 
         public List<SchemataProcessTransition> Transitions { get; }
 
-        private ServiceProvider Services { get; }
+        public ServiceProvider Services { get; }
 
-        public static Harness Create() { return new(); }
+        public static Harness Create(ProcessDefinition? parentDefinition = null) { return new(parentDefinition ?? ParentDefinition()); }
 
         public async Task<ProcessSnapshot> StartParentAsync() {
             var process = new SchemataProcess {
@@ -166,11 +404,13 @@ public class BpmnEngine_CallActivityShould
                 DefinitionName = "parent",
             };
 
-            return await Engine.StartAsync(ParentDefinition, process, Context(), CancellationToken.None);
+            var snapshot = await Engine.StartAsync(ParentDefinition, process, Context(), CancellationToken.None);
+            await PersistAsync(snapshot, CancellationToken.None);
+            return snapshot;
         }
 
         public async Task CompleteChildAsync() {
-            var child = Processes.Single(p => p.DefinitionName == "called");
+            var child = Processes.Single(p => p.DefinitionName == "called" && !TokenStates.IsTerminal(p.State));
             var childTokens = Tokens.Where(t => t.Process == child.Name).ToList();
             var completed = await Engine.AdvanceAsync(CalledDefinition, child, childTokens, Context(), childTokens[0].CanonicalName, CancellationToken.None);
             Upsert(Processes, completed.Process, p => p.CanonicalName);
@@ -183,14 +423,13 @@ public class BpmnEngine_CallActivityShould
             }
         }
 
-        public async Task<ProcessSnapshot> AdvanceParentAsync(ProcessSnapshot parent) {
-            return await Engine.AdvanceAsync(
-                ParentDefinition,
-                parent.Process,
-                parent.Tokens,
-                Context(),
-                parent.Tokens[0].CanonicalName,
+        public async Task<ProcessSnapshot> AdvanceParentAsync(ProcessSnapshot parent, string? tokenName = null) {
+            var snapshot = await Engine.AdvanceAsync(
+                ParentDefinition, parent.Process, parent.Tokens, Context(),
+                tokenName ?? parent.Tokens.Single(token => TokenStates.Live.Contains(token.State!)).CanonicalName,
                 CancellationToken.None);
+            await PersistAsync(snapshot, CancellationToken.None);
+            return snapshot;
         }
 
         public void FailChild() {
@@ -207,11 +446,25 @@ public class BpmnEngine_CallActivityShould
                 Name          = name,
                 Engine        = FlowConstants.Engines.Bpmn,
                 Definition    = definition,
-                Configuration = new() { Name = name, Engine = FlowConstants.Engines.Bpmn },
             };
         }
 
-        private FlowExecutionContext Context() { return new(new Mock<IUnitOfWork>(MockBehavior.Strict).Object, Services); }
+        private FlowExecutionContext Context() {
+            return Schemata.Flow.Tests.FlowTestCreation.Context(
+                new Mock<IUnitOfWork>(MockBehavior.Strict).Object, Services, persist: PersistAsync);
+        }
+
+        private Task PersistAsync(ProcessSnapshot snapshot, CancellationToken ct) {
+            Upsert(Processes, snapshot.Process, p => p.CanonicalName);
+            foreach (var token in snapshot.Tokens) {
+                Upsert(Tokens, token, t => t.CanonicalName);
+            }
+            foreach (var transition in snapshot.Transitions) {
+                Schemata.Flow.Tests.FlowTestCreation.Assign(transition);
+                Transitions.Add(transition);
+            }
+            return Task.CompletedTask;
+        }
 
         private static Mock<IRepository<TEntity>> CreateRepository<TEntity>(List<TEntity> rows)
             where TEntity : class {
@@ -219,20 +472,20 @@ public class BpmnEngine_CallActivityShould
             repository.Setup(value => value.Join(It.IsAny<IUnitOfWork>()));
             repository.Setup(value => value.FirstOrDefaultAsync<TEntity>(
                           It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
-                          It.IsAny<CancellationToken>()))
-                      .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>>? predicate, CancellationToken _) =>
+                          It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                      .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>>? predicate, CancellationToken _, QueryOptions _) =>
                           ValueTask.FromResult<TEntity?>(
                               (predicate is null ? rows.AsQueryable() : predicate(rows.AsQueryable())).FirstOrDefault()));
             repository.Setup(value => value.ListAsync<TEntity>(
                           It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
-                          It.IsAny<CancellationToken>()))
-                      .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>>? predicate, CancellationToken ct) =>
+                          It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                      .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>>? predicate, CancellationToken ct, QueryOptions _) =>
                           ToAsync<TEntity>(predicate is null ? rows : predicate(rows.AsQueryable()), ct));
-            repository.Setup(value => value.AddAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
-                      .Callback<TEntity, CancellationToken>((entity, _) => rows.Add(entity))
-                      .Returns(Task.CompletedTask);
-            repository.Setup(value => value.UpdateAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
-                      .Returns(Task.CompletedTask);
+            repository.Setup(value => value.AddAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
+                      .Callback<TEntity, CancellationToken, MutationOptions>((entity, _, _) => rows.Add(entity))
+                      .ReturnsAsync(MutationResult.Applied);
+            repository.Setup(value => value.UpdateAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
+                      .ReturnsAsync(MutationResult.Applied);
             return repository;
         }
 

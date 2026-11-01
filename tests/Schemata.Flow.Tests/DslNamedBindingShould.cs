@@ -32,7 +32,7 @@ public class DslNamedBindingShould
         var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1" };
         var token   = Token("processes/p1/tokens/a", definition.Review.Name);
 
-        var snapshot = await engine.AdvanceAsync(definition, process, [token], new(Mock.Of<IUnitOfWork>(), services));
+        var snapshot = await engine.AdvanceAsync(definition, process, [token], FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), services));
 
         Assert.Equal(definition.Paid.Name, snapshot.Tokens[0].StateName);
     }
@@ -60,7 +60,7 @@ public class DslNamedBindingShould
                       .BuildServiceProvider();
         var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1" };
 
-        await engine.StartAsync(definition, process, new(Mock.Of<IUnitOfWork>(), services));
+        await engine.StartAsync(definition, process, FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), services));
 
         Assert.Equal(["orders/o1"], definition.Seen);
     }
@@ -70,7 +70,7 @@ public class DslNamedBindingShould
             Name          = canonical[(canonical.LastIndexOf('/') + 1)..],
             CanonicalName = canonical,
             Process       = "p1",
-            ScopeName     = "p1",
+            ScopeName     = string.Empty,
             StateName     = stateName,
             WaitingAtName = waitingAtName,
             State         = waitingAtName is not null ? "Waiting" : "Active",
@@ -83,8 +83,8 @@ public class DslNamedBindingShould
         var repository = new Mock<IRepository<T>>();
         repository.Setup(r => r.Join(It.IsAny<IUnitOfWork>()));
         repository.Setup(r => r.AdviceContext).Returns(new AdviceContext(new ServiceCollection().BuildServiceProvider()));
-        repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new(predicate(data.AsQueryable()).SingleOrDefault()));
+        repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _, QueryOptions _) => new(predicate(data.AsQueryable()).SingleOrDefault()));
         return repository;
     }
 
@@ -117,8 +117,8 @@ public class DslNamedBindingShould
         public AnonymousProcedureProcess() {
             this.Start().Go(Current);
             this.During(Current)
-                .OnEnter(_ => ValueTask.CompletedTask)
-                .OnLeave(_ => ValueTask.CompletedTask)
+                .OnEnter((_, ct) => { ct.ThrowIfCancellationRequested(); return ValueTask.CompletedTask; })
+                .OnLeave((_, ct) => { ct.ThrowIfCancellationRequested(); return ValueTask.CompletedTask; })
                 .Go(Next);
             this.During(Next).End();
         }
@@ -136,7 +136,8 @@ public class DslNamedBindingShould
     {
         public TypedEnterProcess() {
             this.Start().Go(Current);
-            this.During(Current).OnEnter<Order>((_, order) => {
+            this.During(Current).OnEnter<Order>((_, order, ct) => {
+                ct.ThrowIfCancellationRequested();
                 Seen.Add(order.CanonicalName!);
                 return ValueTask.CompletedTask;
             }).End();

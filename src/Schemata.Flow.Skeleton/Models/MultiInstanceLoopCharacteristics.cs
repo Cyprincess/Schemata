@@ -10,25 +10,65 @@ namespace Schemata.Flow.Skeleton.Models;
 /// </summary>
 public sealed class MultiInstanceLoopCharacteristics : LoopCharacteristics
 {
+    private IConditionExpression? _loopCardinality;
+    private IConditionExpression? _completionCondition;
+    private bool _isSequential;
+    private MIEventBehavior _oneCompletedEventBehavior;
+
     /// <summary>
     ///     The expression that determines how many instances to create.
     /// </summary>
-    public IConditionExpression? LoopCardinality { get; set; }
+    public IConditionExpression? LoopCardinality {
+        get => _loopCardinality;
+        set {
+            EnsureMutable();
+            _loopCardinality = value;
+        }
+    }
 
     /// <summary>
     ///     An optional condition that can trigger early completion of all instances.
     /// </summary>
-    public IConditionExpression? CompletionCondition { get; set; }
+    public IConditionExpression? CompletionCondition {
+        get => _completionCondition;
+        set {
+            EnsureMutable();
+            _completionCondition = value;
+        }
+    }
 
     /// <summary>
     ///     When <c>true</c>, instances execute one at a time.
     ///     When <c>false</c>, instances execute in parallel.
     /// </summary>
-    public bool IsSequential { get; set; }
+    public bool IsSequential {
+        get => _isSequential;
+        set {
+            EnsureMutable();
+            _isSequential = value;
+        }
+    }
 
     /// <summary>
     ///     Determines how individual instance-completion events are aggregated
     ///     into the overall activity completion.
     /// </summary>
-    public MIEventBehavior OneCompletedEventBehavior { get; set; }
+    public MIEventBehavior OneCompletedEventBehavior {
+        get => _oneCompletedEventBehavior;
+        set {
+            EnsureMutable();
+            _oneCompletedEventBehavior = value;
+        }
+    }
+
+    /// <inheritdoc />
+    protected internal override void FreezeCore() {
+        if (LoopCardinality is FlowGraphNode loop) {
+            loop.Freeze();
+        }
+
+        if (CompletionCondition is FlowGraphNode completion) {
+            completion.Freeze();
+        }
+    }
 }

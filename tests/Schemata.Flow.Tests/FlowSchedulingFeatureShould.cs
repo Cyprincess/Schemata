@@ -20,7 +20,7 @@ public sealed class FlowSchedulingFeatureShould
 {
     [Fact]
     public async Task Create_Cycle_Timer_Preserves_Cron_And_Correlated_Payload() {
-        var scheduler = new Mock<IScheduler>(MockBehavior.Strict);
+        var scheduler = new Mock<IScheduler<SchemataJob, SchemataJobExecution>>(MockBehavior.Strict);
         SchemataJob?                            scheduled = null;
         IReadOnlyDictionary<string, string?>? variables = null;
         scheduler.Setup(current => current.ScheduleAsync(
@@ -39,8 +39,9 @@ public sealed class FlowSchedulingFeatureShould
         await handler.ArmAsync(Context(), CancellationToken.None);
 
         Assert.NotNull(scheduled);
-        Assert.Equal("flow-p1-timer-t1", scheduled!.Name);
-        Assert.Equal(FlowTimerJob.JobKey, scheduled.JobKey);
+        Assert.Equal("flow-p1-timer-t1", scheduled!.Key);
+        Assert.Null(scheduled.Name);
+        Assert.Equal(FlowTimerJob<SchemataJob>.JobKey, scheduled.JobKey);
         Assert.Equal(ScheduleType.Cron, scheduled.ScheduleType);
         Assert.Equal("*/5 * * * *", scheduled.CronExpression);
         Assert.NotNull(variables);
@@ -54,11 +55,11 @@ public sealed class FlowSchedulingFeatureShould
         scheduler.VerifyNoOtherCalls();
     }
 
-    private static ServiceProvider CreateServices(Mock<IScheduler> scheduler) {
+    private static ServiceProvider CreateServices(Mock<IScheduler<SchemataJob, SchemataJobExecution>> scheduler) {
         var services = new ServiceCollection();
         services.AddSingleton(scheduler.Object);
         services.AddSingleton<IScheduledJobRegistry, DefaultScheduledJobRegistry>();
-        new SchemataFlowSchedulingFeature().ConfigureServices(
+        new SchemataFlowSchedulingFeature<SchemataJob, SchemataJobExecution>().ConfigureServices(
             services, new(), new(), new ConfigurationBuilder().Build(), null!);
         return services.BuildServiceProvider();
     }
@@ -80,7 +81,7 @@ public sealed class FlowSchedulingFeatureShould
             },
             Token = new() {
                 CanonicalName = "processes/p1/tokens/t1",
-                ScopeName     = "p1",
+                ScopeName     = string.Empty,
                 StateName     = "timer",
                 WaitingAtName = "timer",
                 Status        = "Waiting",

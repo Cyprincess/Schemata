@@ -6,7 +6,7 @@ namespace Schemata.Flow.Event.Events;
 public sealed class TransitionMadeEvent : IEvent
 {
     /// <summary>Canonical name of the process instance.</summary>
-    public string ProcessCanonicalName { get; init; } = null!;
+    public required string ProcessCanonicalName { get; init; }
 
     /// <summary>Previous element name.</summary>
     public string? FromStateName { get; init; }

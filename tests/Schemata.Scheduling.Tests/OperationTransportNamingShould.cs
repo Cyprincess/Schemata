@@ -9,7 +9,7 @@ namespace Schemata.Scheduling.Tests;
 public class OperationTransportNamingShould
 {
     [Fact]
-    public void ExposeTheExecutionRowAsTheOperationResource() {
+    public void Expose_The_Execution_Row_As_The_Operation_Resource() {
         var descriptor = ResourceNameDescriptor.ForType<SchemataJobExecution>();
 
         Assert.Equal("Operation", descriptor.Singular);
@@ -19,7 +19,7 @@ public class OperationTransportNamingShould
     }
 
     [Fact]
-    public void NameTheGrpcServiceAndListRpcAfterTheResource() {
+    public void Name_The_Grpc_Service_And_List_Rpc_After_The_Resource() {
         var descriptor = ResourceNameDescriptor.ForType<SchemataJobExecution>();
 
         Assert.Equal("OperationService", GrpcResourceNaming.ServiceName(descriptor));
@@ -29,7 +29,7 @@ public class OperationTransportNamingShould
     }
 
     [Fact]
-    public void KeepTheJobResourceNamesDistinctFromTheOperationResource() {
+    public void Keep_The_Job_Resource_Names_Distinct_From_The_Operation_Resource() {
         var descriptor = ResourceNameDescriptor.ForType<SchemataJob>();
 
         Assert.Equal("Job", descriptor.Singular);

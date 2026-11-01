@@ -1,3 +1,5 @@
+using System;
+using System.Threading;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -15,6 +17,31 @@ namespace Schemata.Flow.Tests;
 
 public class EventOnEnterShould
 {
+    [Trait("Layer", "Unit")]
+    [Theory]
+    [Trait("Category", "Unit")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DSL_Entry_And_Leave_Bodies_Receive_Operation_Cancellation(bool leave) {
+        using var cancellation = new CancellationTokenSource();
+        var definition = new CancellationProcess(cancellation, leave);
+        var engine = new StateMachineEngine();
+        var process = new SchemataProcess { Name = "cancel", CanonicalName = "processes/cancel" };
+        var context = Context();
+        var started = await engine.StartAsync(definition, process, context);
+        Func<Task> operation;
+        if (leave) {
+            operation = () => engine.AdvanceAsync(definition, process, started.Tokens, context, null, cancellation.Token).AsTask();
+        } else {
+            var waiting = await engine.AdvanceAsync(definition, process, started.Tokens, context);
+            operation = () => engine.TriggerAsync(definition, process, waiting.Tokens, context, definition.Pay, null, null, cancellation.Token).AsTask();
+        }
+        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(operation);
+        Assert.True(definition.Invoked);
+        Assert.Equal(cancellation.Token, error.CancellationToken);
+        Assert.NotEqual("Completed", process.State);
+    }
+
     [Fact]
     public void Insert_Procedure_Task_Before_End_Event() {
         var definition = new EndEnterProcess([]);
@@ -76,7 +103,34 @@ public class EventOnEnterShould
     }
 
     private static FlowExecutionContext Context() {
-        return new(Mock.Of<IUnitOfWork>(), new ServiceCollection().BuildServiceProvider());
+        return FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), new ServiceCollection().BuildServiceProvider());
+    }
+
+    private sealed class CancellationProcess : ProcessDefinition
+    {
+        public CancellationProcess(CancellationTokenSource cancellation, bool leave) {
+            this.Start().Go(Work);
+            if (leave) {
+                this.During(Work).OnLeave((_, ct) => {
+                    Invoked = true;
+                    cancellation.Cancel();
+                    ct.ThrowIfCancellationRequested();
+                    return ValueTask.CompletedTask;
+                }).Go(Done);
+            } else {
+                this.During(Work).Await(this.On(Pay).OnEnter((_, ct) => {
+                    Invoked = true;
+                    cancellation.Cancel();
+                    ct.ThrowIfCancellationRequested();
+                    return ValueTask.CompletedTask;
+                }).Go(Done));
+            }
+            this.During(Done).End();
+        }
+        public bool Invoked { get; private set; }
+        public UserTask Work { get; } = null!;
+        public UserTask Done { get; } = null!;
+        public Message Pay { get; } = null!;
     }
 
     #region Nested type: EndEnterProcess
@@ -84,7 +138,8 @@ public class EventOnEnterShould
     private sealed class EndEnterProcess : ProcessDefinition
     {
         public EndEnterProcess(List<string> log) {
-            this.During(Finish).OnEnter(_ => {
+            this.During(Finish).OnEnter((_, ct) => {
+                ct.ThrowIfCancellationRequested();
                 log.Add("end");
                 return ValueTask.CompletedTask;
             });
@@ -104,7 +159,8 @@ public class EventOnEnterShould
     {
         public CatchEnterProcess(List<string> log) {
             this.Start().Go(New);
-            this.During(New).Await(this.On(Pay).OnEnter(_ => {
+            this.During(New).Await(this.On(Pay).OnEnter((_, ct) => {
+                ct.ThrowIfCancellationRequested();
                 log.Add("catch");
                 return ValueTask.CompletedTask;
             }).Go(Done));

@@ -6,7 +6,12 @@ namespace Schemata.Flow.Skeleton.Models;
 public sealed class ProcessConfiguration
 {
     /// <summary>Process definition name (the value used in canonical names and lookup).</summary>
-    public string Name { get; set; } = null!;
+    public required string Name { get; set; }
+
+    public string Version { get; set; } = "1";
+
+    /// <summary>Selects this version for new starts requesting "latest".</summary>
+    public bool IsLatest { get; set; }
 
     /// <summary>Engine that executes this definition.  Defaults to the state-machine engine.</summary>
     public string Engine { get; set; } = FlowConstants.Engines.StateMachine;

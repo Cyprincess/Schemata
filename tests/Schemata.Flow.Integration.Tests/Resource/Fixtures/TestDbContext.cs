@@ -23,4 +23,6 @@ public class TestDbContext : DbContext
     public DbSet<Skeleton.Entities.SchemataProcessSource> ProcessSources { get; set; } = null!;
 
     public DbSet<Skeleton.Entities.SchemataProcessCompensation> ProcessCompensations { get; set; } = null!;
+
+    public DbSet<Skeleton.Entities.SchemataProcessParticipant> Participants { get; set; } = null!;
 }

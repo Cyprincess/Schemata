@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Resource;
 using Schemata.Flow.Foundation.Commands;
+using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Messaging.Skeleton;
 
@@ -13,7 +14,7 @@ namespace Schemata.Flow.Http.Controllers;
 
 /// <summary>Lists Flow process definitions over HTTP.</summary>
 [ApiController]
-[Route("~/v1/processes:definitions")]
+[Route("~" + FlowConstants.Routes.Definitions)]
 public sealed class ProcessDefinitionsController(
     IQueryDispatcher                dispatcher,
     IOptions<JsonSerializerOptions> json
@@ -23,7 +24,7 @@ public sealed class ProcessDefinitionsController(
     [HttpGet]
     public async Task<IActionResult> ListProcessDefinitions() {
         var results = await dispatcher.SendAsync<ListProcessDefinitionsQuery, IReadOnlyList<ProcessDefinitionInfo>>(
-            new ListProcessDefinitionsQuery(), HttpContext.RequestAborted);
-        return new JsonResult(new ListResultBase<ProcessDefinitionInfo> { Entities = results.ToList() }, json.Value);
+            new(), HttpContext.RequestAborted);
+        return new JsonResult(new ListResultBase<ProcessDefinitionInfo, ProcessDefinitionInfo> { Entities = results.ToList() }, json.Value);
     }
 }

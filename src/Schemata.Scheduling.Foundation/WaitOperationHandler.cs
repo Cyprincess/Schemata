@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Schemata.Messaging.Skeleton;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Scheduling.Foundation;
 
@@ -28,7 +29,8 @@ public sealed class WaitOperationHandler(IOperationService operations, TimeProvi
 
     public async Task<Operation> HandleAsync(
         WaitOperationRequest request,
-        CancellationToken ct = default
+        AdviceContext        context,
+        CancellationToken    ct = default
     ) {
         var operation = request.CanonicalName ?? string.Empty;
         using var deadline = new CancellationTokenSource(GetEffectiveTimeout(request.Timeout), _time);
@@ -36,7 +38,7 @@ public sealed class WaitOperationHandler(IOperationService operations, TimeProvi
 
         try {
             return await operations.WaitAsync(operation, bounded.Token);
-        } catch (OperationCanceledException) when (!ct.IsCancellationRequested) {
+        } catch (OperationCanceledException) when (deadline.IsCancellationRequested && !ct.IsCancellationRequested) {
             return await operations.GetAsync(operation, ct);
         }
     }

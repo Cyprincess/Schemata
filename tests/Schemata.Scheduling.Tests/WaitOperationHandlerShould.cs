@@ -1,7 +1,9 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Resource;
 using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Skeleton;
@@ -23,14 +25,14 @@ public class WaitOperationHandlerShould
         operations.Setup(s => s.WaitAsync(entity.CanonicalName, It.IsAny<CancellationToken>()))
                   .Returns(async (string _, CancellationToken ct) => {
                       await Task.Delay(Timeout.InfiniteTimeSpan, ct);
-                      return new Operation();
+                      return new();
                   });
         operations.Setup(s => s.GetAsync(entity.CanonicalName, It.IsAny<CancellationToken>()))
                   .Returns(new ValueTask<Operation>(OperationMapper.FromExecution(entity)));
         var handler = new WaitOperationHandler(operations.Object);
 
         var result = await handler.HandleAsync(
-            new() { CanonicalName = entity.CanonicalName, Timeout = TimeSpan.FromMilliseconds(10) },
+            new() { CanonicalName = entity.CanonicalName, Timeout = TimeSpan.FromMilliseconds(10) }, EmptyAdvice(),
             CancellationToken.None);
 
         Assert.False(result.Done);
@@ -39,9 +41,22 @@ public class WaitOperationHandlerShould
     }
 
     [Fact]
+    public async Task Propagate_Unrelated_Cancellation_Before_The_Deadline() {
+        var operations = new Mock<IOperationService>();
+        operations.Setup(s => s.WaitAsync("operations/test", It.IsAny<CancellationToken>()))
+                  .ThrowsAsync(new OperationCanceledException());
+        var handler = new WaitOperationHandler(operations.Object);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => handler.HandleAsync(
+            new() { CanonicalName = "operations/test", Timeout = TimeSpan.FromSeconds(30) }, EmptyAdvice()));
+        operations.Verify(s => s.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public void CapRequestedTimeout_AtThirtySeconds() {
         Assert.Equal(TimeSpan.FromSeconds(30), WaitOperationHandler.GetEffectiveTimeout(TimeSpan.FromMinutes(5)));
         Assert.Equal(TimeSpan.FromSeconds(2), WaitOperationHandler.GetEffectiveTimeout(TimeSpan.FromSeconds(2)));
         Assert.Equal(TimeSpan.FromSeconds(30), WaitOperationHandler.GetEffectiveTimeout(null));
     }
+
+    private static AdviceContext EmptyAdvice() => new(new ServiceCollection().BuildServiceProvider());
 }

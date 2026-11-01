@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
+using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Foundation;
@@ -52,15 +53,19 @@ public class FlowRunnerTerminationShould
     }
 
     [Fact]
-    public async Task Terminate_AlsoCancelsTokensThatWereAlreadyTerminal() {
-        // Terminate is unconditional: it does not skip finished tokens, so the post-state is
-        // uniform regardless of what each token was doing.
-        var harness = CreateHarness(Token("t1", "Completed"), Token("t2", "Waiting"));
+    public async Task Terminate_Preserves_Already_Terminal_Token_Outcomes() {
+        // Terminate retires live work only: a Completed token keeps its recorded outcome and
+        // contributes no cancellation transition of its own.
+        var harness = CreateHarness(Token("t1", "Completed"), Token("t2", "Waiting", "await-approval"));
 
         var snapshot = await harness.Runner.TerminateAsync(harness.Process, null, CancellationToken.None);
 
-        Assert.All(snapshot.Tokens, t => Assert.Equal("Cancelled", t.State));
-        Assert.Equal(2, snapshot.Transitions.Count);
+        Assert.Equal("Terminated", snapshot.Process.State);
+        Assert.Equal("Completed", snapshot.Tokens.Single(t => t.Name == "t1").State);
+        Assert.Equal("Cancelled", snapshot.Tokens.Single(t => t.Name == "t2").State);
+        Assert.Null(snapshot.Tokens.Single(t => t.Name == "t2").WaitingAtName);
+        Assert.Single(snapshot.Transitions);
+        Assert.Equal("processes/p1/tokens/t2", snapshot.Transitions[0].Token);
     }
 
     [Fact]
@@ -145,21 +150,21 @@ public class FlowRunnerTerminationShould
             Name          = "termination-process",
             Engine        = FlowConstants.Engines.StateMachine,
             Definition    = new TerminationProcess(),
-            Configuration = new ProcessConfiguration(),
         };
 
         var harness = new Harness { Tokens = tokens };
 
         var registry = new Mock<IProcessRegistry>();
-        registry.Setup(r => r.GetRegistration("termination-process")).Returns(registration);
+        registry.Setup(r => r.GetRegistration("termination-process", "1")).Returns(registration);
 
         var engine = new Mock<IFlowRuntime>();
 
         var process = new SchemataProcess {
-            Name           = "p1",
-            CanonicalName  = "processes/p1",
-            DefinitionName = "termination-process",
-            State          = "Running",
+            Name              = "p1",
+            CanonicalName     = "processes/p1",
+            DefinitionName    = "termination-process",
+            DefinitionVersion = "1",
+            State             = "Running",
         };
         harness.Process = process;
 
@@ -169,6 +174,7 @@ public class FlowRunnerTerminationShould
 
         var collection = new ServiceCollection()
                         .AddLogging()
+                        .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                         .AddSingleton(registry.Object)
                         .AddSingleton<IOptions<SchemataFlowOptions>>(Options.Create(new SchemataFlowOptions()))
                         .AddSingleton(processes.Object)
@@ -189,23 +195,25 @@ public class FlowRunnerTerminationShould
         where T : class {
         var data       = items.ToList();
         var repository = new Mock<IRepository<T>>();
+        repository.Setup(r => r.AdviceContext).Returns(new AdviceContext(new ServiceCollection().BuildServiceProvider()));
         repository.Setup(r => r.Join(It.IsAny<IUnitOfWork>()));
         repository.Setup(r => r.Begin()).Returns(Mock.Of<IUnitOfWork>());
-        repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>()))
-                  .Returns((T entity, CancellationToken _) => {
+        repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
+                  .ReturnsAsync((T entity, CancellationToken _, MutationOptions _) => {
+                      FlowTestCreation.Assign(entity);
                       data.Add(entity);
-                      return Task.CompletedTask;
+                      return MutationResult.Applied;
                   });
-        repository.Setup(r => r.UpdateAsync(It.IsAny<T>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        repository.Setup(r => r.ListAsync<T>(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) =>
+        repository.Setup(r => r.UpdateAsync(It.IsAny<T>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>())).ReturnsAsync(MutationResult.Applied);
+        repository.Setup(r => r.ListAsync<T>(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _, QueryOptions _) =>
                                Async(predicate(data.AsQueryable()).ToList()));
-        repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) =>
-                               new ValueTask<T?>(predicate(data.AsQueryable()).SingleOrDefault()));
-        repository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) =>
-                               new ValueTask<T?>(predicate(data.AsQueryable()).FirstOrDefault()));
+        repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _, QueryOptions _) =>
+                               new(predicate(data.AsQueryable()).SingleOrDefault()));
+        repository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _, QueryOptions _) =>
+                               new(predicate(data.AsQueryable()).FirstOrDefault()));
         return repository;
     }
 

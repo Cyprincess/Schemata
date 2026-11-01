@@ -60,6 +60,28 @@ public class BpmnEngine_MultiInstanceShould
         Assert.Equal(5, ReadInt(parent, "nrOfCompletedInstances"));
     }
 
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task Complete_ParallelGuardRetry_DoesNotRepeatBodiesOrCounters() {
+        var calls = 0;
+        var guard = new Mock<IConditionExpression>();
+        var allowed = false;
+        guard.Setup(value => value.Evaluate(It.IsAny<FlowConditionContext>())).Returns(() => new ValueTask<bool>(allowed));
+        var definition = MultiInstanceProcedureDefinition(2, false, () => calls++);
+        definition.Flows.Single(flow => flow.Source.Name == "multi").Condition = guard.Object;
+        var harness = Harness.Create(definition);
+        var snapshot = await harness.CompleteSiblingsAsync(await harness.StartAsync(), 2);
+        var parent = Assert.Single(snapshot.Tokens, token => token.Spawner is null);
+        Assert.Equal("Waiting", parent.State);
+        allowed = true;
+        snapshot = await harness.AdvanceAsync(snapshot, parent.CanonicalName!);
+        Assert.Equal("after", parent.StateName);
+        Assert.Equal(2, calls);
+        Assert.Equal(2, ReadInt(parent, "nrOfCompletedInstances"));
+        Assert.Equal(0, ReadInt(parent, "nrOfActiveInstances"));
+        Assert.Single(snapshot.Transitions, transition => transition.Kind == TransitionKind.Join);
+    }
+
     [Fact]
     public async Task Execute_ParallelWithCompletionConditionAfterTwo_TerminatesRemaining() {
         var harness = Harness.Create(MultiInstanceDefinition(5, false, 2));
@@ -126,6 +148,31 @@ public class BpmnEngine_MultiInstanceShould
     }
 
     [Fact]
+    public async Task Execute_SequentialProcedureBody_RunsOncePerInstance() {
+        var invocations = 0;
+        var harness     = Harness.Create(MultiInstanceProcedureDefinition(3, true, () => invocations++));
+
+        var snapshot = await harness.StartAsync();
+
+        Assert.Equal(3, invocations);
+        Assert.Equal(3, ReadInt(snapshot.Tokens.Single(), "nrOfCompletedInstances"));
+    }
+
+    [Fact]
+    public async Task Complete_ParallelProcedureBody_RunsOncePerInstance() {
+        var invocations = 0;
+        var harness     = Harness.Create(MultiInstanceProcedureDefinition(3, false, () => invocations++));
+
+        var snapshot = await harness.StartAsync();
+        Assert.Equal(0, invocations);
+
+        snapshot = await harness.CompleteSiblingsAsync(snapshot, 3);
+
+        Assert.Equal(3, invocations);
+        Assert.Equal("after", Assert.Single(snapshot.Tokens, t => t.Spawner is null).StateName);
+    }
+
+    [Fact]
     public async Task Execute_OneCompletedEventBehaviorOne_ThrowsNotSupported() {
         var definition = MultiInstanceDefinition(1, false, behavior: MIEventBehavior.One);
         var harness    = Harness.Create(definition);
@@ -156,6 +203,33 @@ public class BpmnEngine_MultiInstanceShould
 
         return new() {
             Name     = $"multi-{cardinality}-{sequential}",
+            Elements = { start, multi, after, endEvent },
+            Flows = {
+                new() { Source = start, Target = multi },
+                new() { Source = multi, Target = after },
+                new() { Source = after, Target = endEvent },
+            },
+        };
+    }
+
+    private static ProcessDefinition MultiInstanceProcedureDefinition(int cardinality, bool sequential, Action body) {
+        var start    = new FlowEvent { Name = "start", Position = EventPosition.Start };
+        var after    = new NoneTask { Name = "after" };
+        var endEvent = new FlowEvent { Name = "end", Position = EventPosition.End };
+        var multi = new ProcedureTask {
+            Name = "multi",
+            Body = (_, _) => {
+                body();
+                return ValueTask.CompletedTask;
+            },
+            LoopCharacteristics = new MultiInstanceLoopCharacteristics {
+                LoopCardinality = new CardinalityExpression(cardinality),
+                IsSequential    = sequential,
+            },
+        };
+
+        return new() {
+            Name     = $"multi-procedure-{cardinality}-{sequential}",
             Elements = { start, multi, after, endEvent },
             Flows = {
                 new() { Source = start, Target = multi },
@@ -252,6 +326,12 @@ public class BpmnEngine_MultiInstanceShould
             return current;
         }
 
+        public async Task<ProcessSnapshot> AdvanceAsync(ProcessSnapshot snapshot, string token) {
+            var current = await Engine.AdvanceAsync(Definition, snapshot.Process, snapshot.Tokens, Context(), token, CancellationToken.None);
+            Upsert(current);
+            return current;
+        }
+
         public void BindSources(ProcessSnapshot snapshot, Func<int, string> name) {
             foreach (var sibling in snapshot.Tokens.Where(t => t.Spawner is not null)) {
                 var source = new SourceEntity {
@@ -269,7 +349,7 @@ public class BpmnEngine_MultiInstanceShould
             }
         }
 
-        private FlowExecutionContext Context() { return new(new Mock<IUnitOfWork>(MockBehavior.Strict).Object, Services); }
+        private FlowExecutionContext Context() { return Schemata.Flow.Tests.FlowTestCreation.Context(new Mock<IUnitOfWork>(MockBehavior.Strict).Object, Services); }
 
         private static SchemataProcessToken NextSibling(ProcessSnapshot snapshot) {
             return snapshot.Tokens.Where(t => t.Spawner is not null && t.State == "Active")
@@ -283,6 +363,7 @@ public class BpmnEngine_MultiInstanceShould
             }
 
             foreach (var transition in snapshot.Transitions) {
+                Schemata.Flow.Tests.FlowTestCreation.Assign(transition);
                 if (Transitions.All(row => row.Name != transition.Name)) {
                     Transitions.Add(transition);
                 }
@@ -296,26 +377,26 @@ public class BpmnEngine_MultiInstanceShould
         repository.Setup(value => value.Join(It.IsAny<IUnitOfWork>()));
         repository.Setup(value => value.FirstOrDefaultAsync<TEntity>(
                       It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
-                      It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>>? predicate, CancellationToken _) =>
+                      It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>>? predicate, CancellationToken _, QueryOptions _) =>
                       ValueTask.FromResult<TEntity?>(
                           (predicate is null ? rows.AsQueryable() : predicate(rows.AsQueryable())).FirstOrDefault()));
         repository.Setup(value => value.SingleOrDefaultAsync<TEntity>(
                       It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
-                      It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>>? predicate, CancellationToken _) =>
+                      It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>>? predicate, CancellationToken _, QueryOptions _) =>
                       ValueTask.FromResult<TEntity?>(
                           (predicate is null ? rows.AsQueryable() : predicate(rows.AsQueryable())).SingleOrDefault()));
         repository.Setup(value => value.ListAsync<TEntity>(
                       It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
-                      It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>>? predicate, CancellationToken ct) =>
+                      It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>>? predicate, CancellationToken ct, QueryOptions _) =>
                       ToAsync<TEntity>(predicate is null ? rows : predicate(rows.AsQueryable()), ct));
-        repository.Setup(value => value.AddAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
-                  .Callback<TEntity, CancellationToken>((entity, _) => rows.Add(entity))
-                  .Returns(Task.CompletedTask);
-        repository.Setup(value => value.UpdateAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
-                  .Returns(Task.CompletedTask);
+        repository.Setup(value => value.AddAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
+                  .Callback<TEntity, CancellationToken, MutationOptions>((entity, _, _) => rows.Add(entity))
+                  .ReturnsAsync(MutationResult.Applied);
+        repository.Setup(value => value.UpdateAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
+                  .ReturnsAsync(MutationResult.Applied);
         return repository;
     }
 

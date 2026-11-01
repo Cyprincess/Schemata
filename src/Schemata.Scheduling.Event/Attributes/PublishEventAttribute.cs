@@ -11,15 +11,9 @@ namespace Schemata.Scheduling.Event.Attributes;
 [AttributeUsage(AttributeTargets.Class)]
 public sealed class PublishEventAttribute : Attribute
 {
-    /// <summary>Initializes the attribute with a publish gate and an execution-interception flag.</summary>
-    public PublishEventAttribute(AdviseResult result = AdviseResult.Continue, bool interceptExecution = false) {
-        Result             = result;
-        InterceptExecution = interceptExecution;
-    }
+    /// <summary>Initializes the attribute with a publish gate.</summary>
+    public PublishEventAttribute(AdviseResult result = AdviseResult.Continue) { Result = result; }
 
     /// <summary>Gate controlling whether lifecycle events are published for the job.</summary>
     public AdviseResult Result { get; }
-
-    /// <summary>When <c>true</c>, the trigger hook returns <c>Skip</c> after publishing <c>JobTriggered</c>.</summary>
-    public bool InterceptExecution { get; }
 }

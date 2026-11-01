@@ -34,7 +34,7 @@ public sealed class SchemataFlowEventFeature : FeatureBase
     ) {
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowCatchHandler, FlowEventCatchHandler>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IProcessLifecycleObserver, ProcessEventLifecycleObserver>());
-        services.TryAddScoped<IEventHandler<IEvent>, FlowEventHandler>();
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IEventHandler<IEvent>, FlowEventHandler>());
 
         services.Configure<EventTypeRegistryConfiguration>(options => {
             options.Registrations.Add((typeof(ProcessStartedEvent), "schemata/flow/process.started"));

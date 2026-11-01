@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
@@ -11,11 +12,17 @@ using Schemata.Flow.Skeleton.Utilities;
 namespace Schemata.Flow.Bpmn.Runtime.Gateways;
 
 /// <summary>
-///     Encapsulates the event-based-gateway trigger dispatch and arrival parking. BpmnEngine
+///     Encapsulates the event-based-gateway trigger dispatch and arrival parking. <see cref="BpmnEngine{TProcess,TToken,TTransition}" />
 ///     delegates to this handler so the event matching, single-route vs parallel-fork decision,
 ///     and wait-state parking stay out of the engine surface.
 /// </summary>
-public static class EventBasedGatewayHandler
+/// <typeparam name="TProcess">The persisted process entity type registered by the host.</typeparam>
+/// <typeparam name="TToken">The persisted token entity type registered by the host.</typeparam>
+/// <typeparam name="TTransition">The persisted transition entity type registered by the host.</typeparam>
+public static class EventBasedGatewayHandler<TProcess, TToken, TTransition>
+    where TProcess : SchemataProcess, new()
+    where TToken : SchemataProcessToken, new()
+    where TTransition : SchemataProcessTransition, new()
 {
     /// <summary>
     ///     Dispatches a trigger to an event-based gateway: finds the matching catch event
@@ -23,7 +30,7 @@ public static class EventBasedGatewayHandler
     ///     all matched catches (parallel mode).
     /// </summary>
     public static async ValueTask<ProcessSnapshot> TriggerAsync(
-        BpmnEngine                engine,
+        BpmnEngine<TProcess, TToken, TTransition>                engine,
         ProcessDefinition         definition,
         SchemataProcess           process,
         SchemataProcessToken      token,
@@ -31,7 +38,8 @@ public static class EventBasedGatewayHandler
         EventBasedGateway         gateway,
         IEventDefinition          trigger,
         object?                    payload,
-        FlowExecutionContext      execution
+        FlowExecutionContext      execution,
+        CancellationToken         ct = default
     ) {
         var outgoing = definition.Outgoing(gateway).ToList();
         var matched  = outgoing
@@ -49,10 +57,10 @@ public static class EventBasedGatewayHandler
         }
 
         if (gateway.Parallel) {
-            return await engine.SpawnFromEventBasedAsync(definition, process, token, working, gateway, matched, trigger, payload, execution);
+            return await engine.SpawnFromEventBasedAsync(definition, process, token, working, gateway, matched, trigger, payload, execution, ct);
         }
 
-        return await engine.RouteSingleEventBasedAsync(definition, process, token, working, gateway, matched[0], trigger, payload, execution);
+        return await engine.RouteSingleEventBasedAsync(definition, process, token, working, gateway, matched[0], trigger, payload, execution, ct);
     }
 
     /// <summary>
@@ -69,7 +77,7 @@ public static class EventBasedGatewayHandler
         FlowExecutionContext       execution
     ) {
         var parked = previousState ?? eb.Name;
-        var arrivalTransition = BpmnEngine.NewTransition(
+        var arrivalTransition = BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
             process.Name!,
             token.CanonicalName,
             previousState,
@@ -81,8 +89,8 @@ public static class EventBasedGatewayHandler
         token.StateName     = parked;
         token.WaitingAtName = eb.Name;
 
-        BpmnEngine.ApplyAggregateState(process, working);
+        BpmnEngine<TProcess, TToken, TTransition>.ApplyAggregateState(process, working);
 
-        return BpmnEngine.Snapshot(process, working, [arrivalTransition], execution);
+        return BpmnEngine<TProcess, TToken, TTransition>.Snapshot(process, working, [arrivalTransition], execution);
     }
 }

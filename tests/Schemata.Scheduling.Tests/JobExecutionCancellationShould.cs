@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -12,6 +11,7 @@ using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Foundation.Runtime;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
+using Schemata.Scheduling.Skeleton.Services;
 using Xunit;
 
 namespace Schemata.Scheduling.Tests;
@@ -26,28 +26,33 @@ public class JobExecutionCancellationShould
             JobKey = "jobs.blocking", State = ExecutionState.Pending, StartTime = DateTime.UtcNow.AddMinutes(-1),
         };
         var executions = new Mock<IRepository<SchemataJobExecution>>();
-        executions.Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> query, CancellationToken _) => ToAsync(query(new[] { execution }.AsQueryable())));
-        executions.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>?>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>? query, CancellationToken _) => new ValueTask<SchemataJobExecution?>(query!(new[] { execution }.AsQueryable()).SingleOrDefault()));
-        executions.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        executions.Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> query, CancellationToken _, QueryOptions _) => ToAsync(query(new[] { execution }.AsQueryable())));
+        executions.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>?>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>? query, CancellationToken _, QueryOptions _) => {
+                      Assert.NotNull(query);
+                      return new(query(new[] { execution }.AsQueryable()).SingleOrDefault());
+                  });
+        executions.Setup(r => r.UpdateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>())).ReturnsAsync(MutationResult.Applied);
         executions.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        executions.Setup(r => r.Begin()).Returns(CommittingUnit);
         var registry = new DefaultScheduledJobRegistry();
         registry.Register<BlockingJob>("jobs.blocking");
         var job = new BlockingJob();
         var jobs = new Mock<IRepository<SchemataJob>>();
         jobs.Setup(r => r.FirstOrDefaultAsync(
                        It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(),
-                       It.IsAny<CancellationToken>()))
+                       It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
             .Returns(ValueTask.FromResult<SchemataJob?>(null));
-        var running = new ConcurrentDictionary<string, CancellationTokenSource>();
         var scheduler = new Mock<IScheduler>();
-        var services = new ServiceCollection().AddSingleton(executions.Object).AddSingleton<IScheduledJobRegistry>(registry)
-                                              .AddSingleton(job).AddSingleton(running).AddSingleton(jobs.Object)
+        var services = new ServiceCollection().AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
+                                              .AddSingleton(executions.Object).AddSingleton<IScheduledJobRegistry>(registry)
+                                              .AddSingleton(job).AddSingleton(jobs.Object)
                                               .AddSingleton<IScheduler>(scheduler.Object).AddSchemataScheduling()
+                                              .AddSchemataSchedulingRepositoryStore()
                                               .BuildServiceProvider();
-        var dispatcher = new JobExecutionDispatcher(services);
-        var operation = new DefaultOperationService(services.GetRequiredService<IServiceScopeFactory>(), Options.Create(new SchemataSchedulingOptions()), scheduler.Object);
+        var dispatcher = new JobExecutionDispatcher<SchemataJob, SchemataJobExecution>(services);
+        var operation = new DefaultOperationService<SchemataJob, SchemataJobExecution>(services, Options.Create(new SchemataSchedulingOptions()), scheduler.Object);
 
         var dispatch = dispatcher.DispatchPendingAsync(CancellationToken.None);
         await job.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
@@ -56,6 +61,7 @@ public class JobExecutionCancellationShould
         await dispatch;
 
         Assert.Equal(ExecutionState.Cancelled, execution.State);
+        Assert.False(services.GetRequiredService<IActiveExecutionRegistry>().Cancel(execution.Uid.ToString("n")));
     }
 
     private static async IAsyncEnumerable<SchemataJobExecution> ToAsync(IEnumerable<SchemataJobExecution> rows) {
@@ -63,6 +69,13 @@ public class JobExecutionCancellationShould
             yield return row;
             await Task.CompletedTask;
         }
+    }
+
+    private static IUnitOfWork CommittingUnit() {
+        var unit = new Mock<IUnitOfWork>(MockBehavior.Strict);
+        unit.Setup(u => u.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        unit.Setup(u => u.DisposeAsync()).Returns(ValueTask.CompletedTask);
+        return unit.Object;
     }
 
     private sealed class BlockingJob : IScheduledJob

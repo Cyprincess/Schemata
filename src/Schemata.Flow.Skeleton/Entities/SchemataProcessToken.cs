@@ -19,7 +19,7 @@ public class SchemataProcessToken : IIdentifier, ICanonicalName, IConcurrency, I
                                     IAnnotatable
 {
     /// <summary>Bare leaf id of the owning process (AIP structural parent, mode A).</summary>
-    public virtual string Process { get; set; } = null!;
+    public virtual string Process { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>
     ///     Full canonical name of the token that spawned this token (mode B cross-resource FK).
@@ -30,16 +30,22 @@ public class SchemataProcessToken : IIdentifier, ICanonicalName, IConcurrency, I
     public virtual string? Spawner { get; set; }
 
     /// <summary>
-    ///     Owning scope key: the process instance name for the root scope (both engines), or the
-    ///     SubProcess / Transaction / EventSubProcess element name for BPMN sub-scopes.
+    ///     Empty for the structural root; otherwise the SubProcess / Transaction / EventSubProcess element name.
     /// </summary>
-    public virtual string ScopeName { get; set; } = null!;
+    public virtual string ScopeName { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>Name of the element the token sits on.</summary>
-    public virtual string StateName { get; set; } = null!;
+    public virtual string StateName { get; set; } = null!; // EF Core materializes this required column.
 
     /// <summary>Name of the waiting element; non-null when the token is suspended at a catch event or boundary.</summary>
     public virtual string? WaitingAtName { get; set; }
+
+    /// <summary>
+    ///     Activation id of the call-activity child this token waits on; equals the spawn transition's
+    ///     <see cref="SchemataProcessTransition.Activation" />. A completion naming any other activation
+    ///     belongs to a prior invocation and must not resume the token.
+    /// </summary>
+    public virtual string? CurrentCallActivation { get; set; }
 
     /// <summary>Engine-private counters used for loop and execution metadata.</summary>
     public virtual Dictionary<string, int> Bookkeeping { get; set; } = [];

@@ -22,8 +22,8 @@ public static class ProcedureTaskPayloadValidator
                 continue;
             }
 
-            var catchTypes = IncomingCatchPayloadTypes(definition, task).ToList();
-            if (catchTypes.Count == 0 || catchTypes.Any(t => t != payloadType)) {
+            var (catchTypes, payloadFreePath) = IncomingPayloadTrace(definition, task, []);
+            if (payloadFreePath || catchTypes.Count == 0 || catchTypes.Any(t => t != payloadType)) {
                 result.Add(new(task, payloadType, catchTypes));
             }
         }
@@ -48,17 +48,46 @@ public static class ProcedureTaskPayloadValidator
             : null;
     }
 
-    private static IEnumerable<Type> IncomingCatchPayloadTypes(ProcessDefinition definition, FlowElement target) {
+    private static (IReadOnlyList<Type> Types, bool HasPayloadFreePath) IncomingPayloadTrace(
+        ProcessDefinition       definition,
+        FlowElement             target,
+        HashSet<FlowElement>    visited
+    ) {
+        var types = new List<Type>();
+        var payloadFree = false;
+        var walkedIncoming = false;
+
+        // The walk is bounded by a visited set: a legal durable cycle (typed catch → task → waiting
+        // user task → gateway → back to the catch) revisits elements, and without the bound the
+        // recursion never terminates.
         foreach (var flow in definition.AllFlows.Where(f => f.Target == target)) {
-            if (flow.Source is FlowEvent { Position: EventPosition.IntermediateCatch, Definition: Message { PayloadType: not null } message }) {
-                yield return message.PayloadType;
-            } else if (flow.Source is FlowEvent { Position: EventPosition.IntermediateCatch, Definition: Signal { PayloadType: not null } signal }) {
-                yield return signal.PayloadType;
-            } else {
-                foreach (var type in IncomingCatchPayloadTypes(definition, flow.Source)) {
-                    yield return type;
-                }
+            walkedIncoming = true;
+            switch (flow.Source) {
+                case FlowEvent { Position: EventPosition.IntermediateCatch, Definition: Message { PayloadType: not null } message }:
+                    types.Add(message.PayloadType);
+                    break;
+                case FlowEvent { Position: EventPosition.IntermediateCatch, Definition: Signal { PayloadType: not null } signal }:
+                    types.Add(signal.PayloadType);
+                    break;
+                case null:
+                    payloadFree = true;
+                    break;
+                default:
+                    if (visited.Add(flow.Source)) {
+                        var (sourceTypes, sourcePayloadFree) = IncomingPayloadTrace(definition, flow.Source, visited);
+                        types.AddRange(sourceTypes);
+                        payloadFree |= sourcePayloadFree;
+                    }
+                    break;
             }
         }
+
+        // An element with no incoming flows (a start event, or a boundary-style root) contributes a
+        // path that reaches the task without any typed catch delivering the payload.
+        if (!walkedIncoming) {
+            payloadFree = true;
+        }
+
+        return (types, payloadFree);
     }
 }

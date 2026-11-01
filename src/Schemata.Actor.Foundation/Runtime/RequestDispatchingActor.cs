@@ -1,11 +1,11 @@
 using System;
-using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Actor.Skeleton;
 using Schemata.Messaging.Skeleton;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Actor.Foundation.Runtime;
 
@@ -29,8 +29,12 @@ public sealed class RequestDispatchingActor(object handlerKey) : IActor
     public ValueTask OnStartedAsync(IActorContext ctx) => ValueTask.CompletedTask;
 
     public async ValueTask OnReceiveAsync(IActorContext ctx, Envelope envelope) {
-        var requestType  = envelope.Payload.GetType();
-        var responseType = ResolveResponseType(requestType);
+        var requestType = envelope.RequestType
+                       ?? throw new InvalidOperationException("Request dispatch requires a declared request type in the envelope.");
+        if (!requestType.IsInstanceOfType(envelope.Payload)) {
+            throw new InvalidOperationException($"The envelope payload is not assignable to '{requestType}'.");
+        }
+        var responseType = envelope.ResponseType ?? ResolveResponseType(requestType);
         var dispatch     = DispatchMethod.MakeGenericMethod(requestType, responseType);
 
         // An uncaught exception here is left to the shared turn dispatcher: it faults this turn's
@@ -50,18 +54,27 @@ public sealed class RequestDispatchingActor(object handlerKey) : IActor
     private static async Task DispatchAsync<TRequest, TResponse>(IActorContext ctx, object key, TRequest request, CancellationToken ct)
         where TRequest : IRequest<TResponse> {
         var handler  = ctx.Services.GetRequiredKeyedService<IRequestHandler<TRequest, TResponse>>(key);
-        var response = await handler.HandleAsync(request, ct);
+        var response = await handler.HandleAsync(request, new AdviceContext(ctx.Services), ct);
         await ctx.ReplyAsync(response, ct);
     }
 
     private static Type ResolveResponseType(Type requestType) {
-        var requestInterface = requestType.GetInterfaces()
-                                           .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IRequest<>));
-
-        if (requestInterface is null) {
-            throw new InvalidOperationException($"'{requestType}' does not implement {typeof(IRequest<>)}.");
+        if (requestType.IsGenericType && requestType.GetGenericTypeDefinition() == typeof(IRequest<>)) {
+            return requestType.GetGenericArguments()[0];
         }
 
-        return requestInterface.GetGenericArguments()[0];
+        Type? responseType = null;
+        foreach (var contract in requestType.GetInterfaces()) {
+            if (!contract.IsGenericType || contract.GetGenericTypeDefinition() != typeof(IRequest<>)) {
+                continue;
+            }
+            if (responseType is not null) {
+                throw new InvalidOperationException($"'{requestType}' declares multiple request response types. Use Ask or Tell with an explicit IRequest<TResponse> contract.");
+            }
+            responseType = contract.GetGenericArguments()[0];
+        }
+
+        return responseType
+            ?? throw new InvalidOperationException($"'{requestType}' does not implement {typeof(IRequest<>)}.");
     }
 }

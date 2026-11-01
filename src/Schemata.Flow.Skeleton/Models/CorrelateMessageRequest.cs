@@ -9,7 +9,7 @@ namespace Schemata.Flow.Skeleton.Models;
 public sealed class CorrelateMessageRequest : ICanonicalName, ICommand<ProcessSnapshot>, IRequestPrincipal
 {
     /// <summary>The <see cref="Models.Message.Name" /> of the message definition to correlate.</summary>
-    public string MessageName { get; set; } = null!;
+    public string MessageName { get; set; } = null!; // Wire DTO: the caller or deserializer assigns the value before use.
 
     /// <summary>Optional serialized message payload.</summary>
     public string? Payload { get; set; }

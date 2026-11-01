@@ -62,9 +62,10 @@ public sealed class SourceOwnerSuppressionShould : IClassFixture<OwnedSourceFixt
         var       repository = scope.ServiceProvider.GetRequiredService<IRepository<OwnedOrder>>();
 
         OwnedOrder? loaded;
-        using (repository.SuppressQuerySoftDelete()) {
+        {
             loaded = await repository.SingleOrDefaultAsync(
-                q => q.Where(e => e.CanonicalName == order.CanonicalName), default);
+                q => q.Where(e => e.CanonicalName == order.CanonicalName), default,
+                new QueryOptions(IgnoreSoftDelete: true));
         }
 
         Assert.Null(loaded);
@@ -159,11 +160,11 @@ public sealed class SourceOwnerSuppressionShould : IClassFixture<OwnedSourceFixt
         using var scope      = _fixture.CreateScope();
         var       repository = scope.ServiceProvider.GetRequiredService<IRepository<OwnedOrder>>();
         OwnedOrder? persisted;
-        using (repository.SuppressQuerySoftDelete()) {
-            persisted = await repository.SingleOrDefaultAsync(q => q.Where(e => e.Uid == uid), default);
+        {
+            persisted = await repository.SingleOrDefaultAsync(q => q.Where(e => e.Uid == uid), default, new QueryOptions(IgnoreSoftDelete: true));
         }
 
         Assert.NotNull(persisted);
-        return persisted!;
+        return persisted;
     }
 }

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
@@ -11,8 +10,9 @@ namespace Schemata.Scheduling.Foundation.Runtime;
 /// <summary>Thread-safe registry that maps scheduled job keys to concrete job types.</summary>
 public sealed class DefaultScheduledJobRegistry : IScheduledJobRegistry
 {
-    private readonly ConcurrentDictionary<string, Type>   _byKey  = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<Type, string>   _byType = new();
+    private readonly object _gate = new();
+    private readonly Dictionary<string, Type> _byKey = new(StringComparer.Ordinal);
+    private readonly Dictionary<Type, string> _byType = new();
     private readonly IReadOnlyList<IScheduledJobKeyResolver> _resolvers;
 
     public DefaultScheduledJobRegistry(IEnumerable<IScheduledJobKeyResolver>? resolvers = null) {
@@ -27,8 +27,14 @@ public sealed class DefaultScheduledJobRegistry : IScheduledJobRegistry
             return;
         }
 
-        _byKey[key]      = jobType;
-        _byType[jobType] = key;
+        lock (_gate) {
+            if (_byKey.TryGetValue(key, out var registered) && registered != jobType
+                || _byType.TryGetValue(jobType, out var existing) && existing != key) {
+                throw new InvalidOperationException($"Job type '{jobType}' and key '{key}' conflict with an existing registration.");
+            }
+            _byKey[key] = jobType;
+            _byType[jobType] = key;
+        }
     }
 
     public void Register<T>(string? key = null)
@@ -38,8 +44,8 @@ public sealed class DefaultScheduledJobRegistry : IScheduledJobRegistry
 
     public Type? Resolve(string key) {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        if (_byKey.TryGetValue(key, out var jobType)) {
-            return jobType;
+        lock (_gate) {
+            if (_byKey.TryGetValue(key, out var jobType)) return jobType;
         }
 
         foreach (var resolver in _resolvers) {
@@ -54,8 +60,8 @@ public sealed class DefaultScheduledJobRegistry : IScheduledJobRegistry
 
     public string? ResolveKey(Type jobType) {
         ArgumentNullException.ThrowIfNull(jobType);
-        if (_byType.TryGetValue(jobType, out var key)) {
-            return key;
+        lock (_gate) {
+            if (_byType.TryGetValue(jobType, out var key)) return key;
         }
 
         foreach (var resolver in _resolvers) {
@@ -78,7 +84,7 @@ public sealed class DefaultScheduledJobRegistry : IScheduledJobRegistry
                 continue;
             }
 
-            Register(jobType, DeclaredKey(jobType));
+            ResolveKey(jobType);
         }
     }
 

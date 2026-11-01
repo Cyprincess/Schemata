@@ -2,16 +2,21 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
+using ProtoBuf;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 
 namespace Schemata.Scheduling.Skeleton.Entities;
 
 /// <summary>
-///     Long-running operation backing row. <see cref="IScheduler.TriggerAsync{TJob}" /> writes
-///     the Pending row directly so the returned execution is immediately addressable; cron and
-///     periodic fires upsert through <see cref="IJobLifecycleObserver" />. The public wire form
-///     is <see cref="Schemata.Abstractions.Resource.Operation" /> and external callers see
+///     Durable execution backing row. Its purpose is framework-internal reliable scheduling and
+///     audit: <see cref="IScheduler.TriggerAsync{TJob}" /> writes the Pending row directly so the
+///     returned execution is immediately addressable, cron and periodic fires upsert through
+///     <see cref="IJobLifecycleObserver" />, and the execution-store provider contract
+///     (<see cref="IJobExecutionStore{TJob,TExecution}" />) carries the lease, retry-ceiling, and crash-recovery
+///     semantics of the dispatch lifecycle. The public wire form is
+///     <see cref="Schemata.Abstractions.Resource.Operation" /> and external callers see
 ///     read / list / delete only.
 /// </summary>
 [Table("SchemataJobExecutions")]
@@ -19,6 +24,9 @@ namespace Schemata.Scheduling.Skeleton.Entities;
 [PrimaryKey(nameof(Uid))]
 public class SchemataJobExecution : IIdentifier, ICanonicalName, IConcurrency, ISoftDelete, ITimestamp
 {
+    [JsonIgnore, ProtoIgnore]
+    public virtual Dictionary<string, string?>? MessageContext { get; set; }
+
     /// <summary>
     ///     AIP-122 canonical name of the originating <see cref="SchemataJob" />, or
     ///     <see langword="null" /> when this execution does not correspond to a persistent
@@ -27,6 +35,8 @@ public class SchemataJobExecution : IIdentifier, ICanonicalName, IConcurrency, I
     /// </summary>
     [ResourceReference(typeof(SchemataJob))]
     public virtual string? Job { get; set; }
+
+    public virtual Guid ScheduleVersion { get; set; }
 
     /// <summary>
     ///     The custom method verb that dispatched this execution as a long-running
@@ -67,6 +77,20 @@ public class SchemataJobExecution : IIdentifier, ICanonicalName, IConcurrency, I
     ///     observer persists it alongside the terminal state.
     /// </summary>
     public virtual string? Output { get; set; }
+
+    /// <summary>
+    ///     Number of times this execution has been claimed. The store increments it atomically
+    ///     with every claim, including crash-recovery reclaims, so the retry ceiling configured on
+    ///     the job registration keeps counting across attempts.
+    /// </summary>
+    public virtual int Attempt { get; set; }
+
+    /// <summary>
+    ///     Instant at which execution ownership lapses. Scheduled jobs renew from claim through
+    ///     setup and termination and may be reclaimed after expiry. Inline operations renew the
+    ///     same lease and fail after expiry because their callbacks cannot be replayed.
+    /// </summary>
+    public virtual DateTime? LeaseExpireTime { get; set; }
 
     #region ICanonicalName Members
 

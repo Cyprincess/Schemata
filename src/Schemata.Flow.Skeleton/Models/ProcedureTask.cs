@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Flow.Skeleton.Runtime;
 
@@ -9,11 +10,20 @@ namespace Schemata.Flow.Skeleton.Models;
 /// </summary>
 public sealed class ProcedureTask : ProcedureTaskBase
 {
-    /// <summary>The delegate executed when the token enters this task.</summary>
-    public Func<FlowTaskContext, ValueTask>? Body { get; set; }
+    private Func<FlowTaskContext, CancellationToken, ValueTask>? _body;
 
-    protected internal override ValueTask InvokeAsync(FlowTaskContext context) {
-        return Body?.Invoke(context) ?? ValueTask.CompletedTask;
+    /// <summary>The delegate executed when the token enters this task.</summary>
+    public Func<FlowTaskContext, CancellationToken, ValueTask>? Body {
+        get => _body;
+        set {
+            EnsureMutable();
+            _body = value;
+        }
+    }
+
+    protected internal override ValueTask InvokeAsync(FlowTaskContext context, CancellationToken ct) {
+        ct.ThrowIfCancellationRequested();
+        return Body?.Invoke(context, ct) ?? ValueTask.CompletedTask;
     }
 }
 
@@ -23,16 +33,25 @@ public sealed class ProcedureTask : ProcedureTaskBase
 /// <typeparam name="TPayload">The payload type accepted by this task.</typeparam>
 public sealed class ProcedureTask<TPayload> : ProcedureTaskBase
 {
-    /// <summary>The delegate executed when the token enters this task.</summary>
-    public Func<FlowTaskContext, TPayload, ValueTask>? Body { get; set; }
+    private Func<FlowTaskContext, TPayload, CancellationToken, ValueTask>? _body;
 
-    protected internal override ValueTask InvokeAsync(FlowTaskContext context) {
+    /// <summary>The delegate executed when the token enters this task.</summary>
+    public Func<FlowTaskContext, TPayload, CancellationToken, ValueTask>? Body {
+        get => _body;
+        set {
+            EnsureMutable();
+            _body = value;
+        }
+    }
+
+    protected internal override ValueTask InvokeAsync(FlowTaskContext context, CancellationToken ct) {
+        ct.ThrowIfCancellationRequested();
         if (Body is null) {
             return ValueTask.CompletedTask;
         }
 
         if (context.Payload is TPayload payload) {
-            return Body(context, payload);
+            return Body(context, payload, ct);
         }
 
         throw new InvalidOperationException($"Procedure task '{Name}' requires payload type '{typeof(TPayload).FullName}'.");

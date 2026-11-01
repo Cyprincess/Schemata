@@ -50,7 +50,12 @@ public interface IActorContext
     /// </remarks>
     /// <param name="message">The message to redeliver to this actor.</param>
     /// <param name="delay">The delay before redelivery.</param>
-    Task ScheduleAsync(IMessage message, TimeSpan delay);
+    /// <param name="reminderName">Stable name within this actor's reminder slots.</param>
+    Task<ActorReminder> ScheduleAsync(IMessage message, TimeSpan delay, string reminderName);
+
+    void RegisterTimer(string name, Func<IActorContext, ValueTask> callback, TimeSpan dueTime, TimeSpan? period = null);
+
+    void CancelTimer(string name);
 
     /// <summary>
     ///     Records <paramref name="response" /> as this turn's reply to its <c>Ask</c>. A no-op

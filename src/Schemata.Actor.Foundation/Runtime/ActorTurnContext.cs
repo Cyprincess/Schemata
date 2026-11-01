@@ -3,15 +3,18 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Actor.Skeleton;
+using Schemata.Actor.Skeleton.Entities;
 using Schemata.Messaging.Skeleton;
 
 namespace Schemata.Actor.Foundation.Runtime;
 
 /// <summary>The per-turn <see cref="IActorContext" />: built fresh for every turn, disposed of - along with its scope - the moment the turn ends.</summary>
-internal sealed class ActorTurnContext(
+/// <typeparam name="TActor">The persisted actor-state entity type of the owning instance.</typeparam>
+internal sealed class ActorTurnContext<TActor>(
     ActorId    self,   IServiceProvider services, CancellationToken stopping,
-    IActorRef? sender, ActorInstance    owner,    Guid              correlationId
+    IActorRef? sender, ActorInstance<TActor> owner, Guid   correlationId
 ) : IActorContext
+    where TActor : SchemataActor, new()
 {
     private object?    _recordedResponse;
     private Exception? _recordedFault;
@@ -27,17 +30,22 @@ internal sealed class ActorTurnContext(
 
     public IActorRef? Sender { get; } = sender;
 
-    public Task<IActorRef> SpawnAsync(Props props) => owner.SpawnChildAsync(props);
+    public Task<IActorRef> SpawnAsync(Props props) => owner.SpawnChildAsync(props, Services);
 
-    public Task ScheduleAsync(IMessage message, TimeSpan delay) {
+    public Task<ActorReminder> ScheduleAsync(IMessage message, TimeSpan delay, string reminderName) {
         var reminders = Services.GetService<IActorReminders>();
         if (reminders is null) {
             throw new InvalidOperationException(
                 "IActorContext.ScheduleAsync requires the Actor.Scheduling capability: no IActorReminders is registered.");
         }
 
-        return reminders.ScheduleAsync(Self, message, delay, Guid.NewGuid().ToString("N"));
+        return reminders.ScheduleAsync(Self, message, delay, reminderName);
     }
+
+    public void RegisterTimer(string name, Func<IActorContext, ValueTask> callback, TimeSpan dueTime, TimeSpan? period = null) =>
+        owner.RegisterTimer(name, callback, dueTime, period);
+
+    public void CancelTimer(string name) => owner.CancelTimer(name);
 
     public ValueTask ReplyAsync<TResponse>(TResponse response, CancellationToken ct = default) {
         if (correlationId != Guid.Empty) {

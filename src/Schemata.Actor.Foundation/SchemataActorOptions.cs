@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Schemata.Actor.Skeleton;
 
@@ -17,6 +18,9 @@ public class SchemataActorOptions
     ///     rather than growing the queue or dropping messages.
     /// </summary>
     public int MailboxCapacity { get; set; } = 1024;
+
+    public TimeSpan IdleTimeout { get; set; } = TimeSpan.FromMinutes(15);
+    public TimeSpan IdleScanInterval { get; set; } = TimeSpan.FromMinutes(1);
 
     /// <summary>
     ///     Actor-type registrations staged by <see cref="SchemataActorBuilder.Register{TActor}" />,

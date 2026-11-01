@@ -1,6 +1,7 @@
 using System;
 using Schemata.Actor.Foundation;
 using Schemata.Actor.Foundation.Features;
+using Schemata.Actor.Skeleton.Entities;
 using Schemata.Core;
 
 // ReSharper disable once CheckNamespace
@@ -12,16 +13,33 @@ namespace Microsoft.AspNetCore.Builder;
 public static class SchemataBuilderExtensions
 {
     /// <summary>
-    ///     Enables the <see cref="SchemataActorFeature" /> and returns a
+    ///     Enables the <see cref="SchemataActorFeature{TActor}" /> for the default persisted
+    ///     actor-state entity <see cref="SchemataActor" /> and returns a
     ///     <see cref="SchemataActorBuilder" /> for registering actor types, optionally configured
     ///     inline through <paramref name="configure" />.
     /// </summary>
     /// <param name="builder">The Schemata builder.</param>
     /// <param name="configure">An optional callback that configures the actor builder.</param>
     /// <returns>The actor builder for chaining, e.g. by an actor bridge package's own <c>Use...</c> extension.</returns>
-    /// <seealso cref="SchemataActorFeature" />
+    /// <seealso cref="SchemataActorFeature{TActor}" />
     public static SchemataActorBuilder UseActor(this SchemataBuilder builder, Action<SchemataActorBuilder>? configure = null) {
-        builder.AddFeature<SchemataActorFeature>();
+        return builder.UseActor<SchemataActor>(configure);
+    }
+
+    /// <summary>
+    ///     Enables the <see cref="SchemataActorFeature{TActor}" /> for the host-defined
+    ///     persisted actor-state entity type <typeparamref name="TActor" /> and returns a
+    ///     <see cref="SchemataActorBuilder" /> for registering actor types, optionally configured
+    ///     inline through <paramref name="configure" />.
+    /// </summary>
+    /// <typeparam name="TActor">The persisted actor-state entity type registered by the host.</typeparam>
+    /// <param name="builder">The Schemata builder.</param>
+    /// <param name="configure">An optional callback that configures the actor builder.</param>
+    /// <returns>The actor builder for chaining, e.g. by an actor bridge package's own <c>Use...</c> extension.</returns>
+    /// <seealso cref="SchemataActorFeature{TActor}" />
+    public static SchemataActorBuilder UseActor<TActor>(this SchemataBuilder builder, Action<SchemataActorBuilder>? configure = null)
+        where TActor : SchemataActor, new() {
+        builder.AddFeature<SchemataActorFeature<TActor>>();
 
         var actor = new SchemataActorBuilder(builder.Options, builder.Services);
         configure?.Invoke(actor);

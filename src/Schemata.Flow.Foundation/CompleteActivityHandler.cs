@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Messaging.Skeleton;
 using CompleteProcessRequest = Schemata.Flow.Foundation.Commands.CompleteActivityRequest;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Flow.Foundation;
 
@@ -15,6 +16,7 @@ public sealed class CompleteActivityHandler(IRequestDispatcher dispatcher)
 {
     public async Task<ProcessSnapshot> HandleAsync(
         CompleteActivityRequest request,
+        AdviceContext context,
         CancellationToken ct = default)
     {
         var canonicalName = request.CanonicalName

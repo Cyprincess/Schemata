@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Hosting;
+﻿using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -9,13 +9,18 @@ using Schemata.Flow.Scheduling.Handlers;
 using Schemata.Flow.Scheduling.Runtime;
 using Schemata.Flow.Skeleton.Runtime;
 using Schemata.Scheduling.Foundation.Features;
+using Schemata.Scheduling.Skeleton.Entities;
 
 namespace Schemata.Flow.Scheduling.Features;
 
 /// <summary>Bridges BPMN timer catches to the persistent scheduler.</summary>
+/// <typeparam name="TJob">The persisted job entity type registered by the host.</typeparam>
+/// <typeparam name="TExecution">The persisted execution entity type registered by the host.</typeparam>
 [DependsOn<SchemataFlowFeature>]
 [DependsOn<SchemataSchedulingFeature>]
-public sealed class SchemataFlowSchedulingFeature : FeatureBase
+public sealed class SchemataFlowSchedulingFeature<TJob, TExecution> : FeatureBase
+    where TJob : SchemataJob, new()
+    where TExecution : SchemataJobExecution, new()
 {
     /// <summary>Default <see cref="FeatureBase.Priority"/> for the Flow.Scheduling feature.</summary>
     public const int DefaultPriority = SchemataFlowFeature.DefaultPriority + 400_000;
@@ -29,7 +34,7 @@ public sealed class SchemataFlowSchedulingFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowCatchHandler, FlowTimerCatchHandler>());
-        services.AddScheduledJob<FlowTimerJob>();
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IFlowCatchHandler, FlowTimerCatchHandler<TJob, TExecution>>());
+        services.AddScheduledJob<FlowTimerJob<TJob>>();
     }
 }

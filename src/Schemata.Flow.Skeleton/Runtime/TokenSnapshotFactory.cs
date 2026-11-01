@@ -32,7 +32,7 @@ public static class TokenSnapshotFactory
 
         return new() {
             CanonicalName = string.Empty,
-            ScopeName     = process.Name ?? string.Empty,
+            ScopeName     = string.Empty,
             StateName     = string.Empty,
             Status        = "Active",
         };

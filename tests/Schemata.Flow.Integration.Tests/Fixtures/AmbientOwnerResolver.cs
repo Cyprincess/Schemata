@@ -1,6 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Entity.Owner;
+using Schemata.Entity.Repository;
 
 namespace Schemata.Flow.Integration.Tests.Fixtures;
 

@@ -3,6 +3,9 @@ namespace Schemata.Flow.Foundation;
 /// <summary>Options applied when starting a Flow process instance.</summary>
 public sealed class StartProcessOptions
 {
+    /// <summary>An exact version, or "latest" to select the registry's explicit latest version.</summary>
+    public string DefinitionVersion { get; init; } = "1";
+
     /// <summary>Copied onto the process row's display name at start.</summary>
     public string? DisplayName { get; init; }
 

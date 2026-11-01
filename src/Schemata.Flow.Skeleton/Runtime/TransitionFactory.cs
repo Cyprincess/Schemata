@@ -1,14 +1,14 @@
-using System;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Runtime;
 
 /// <summary>Creates persisted transition rows emitted by Flow runtimes.</summary>
-public static class TransitionFactory
+/// <typeparam name="TTransition">The persisted transition entity type registered by the host.</typeparam>
+public static class TransitionFactory<TTransition>
+    where TTransition : SchemataProcessTransition, new()
 {
-    /// <summary>Creates a transition row with a fresh transition name.</summary>
-    public static SchemataProcessTransition New(
+    public static TTransition New(
         string         processName,
         string?        tokenCanonical,
         string?        previous,
@@ -17,7 +17,6 @@ public static class TransitionFactory
         string         eventName
     ) {
         return new() {
-            Name      = Guid.NewGuid().ToString("n"),
             Process   = processName,
             Token     = tokenCanonical,
             Kind      = kind,

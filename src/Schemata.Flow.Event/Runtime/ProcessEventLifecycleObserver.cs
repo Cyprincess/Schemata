@@ -25,6 +25,7 @@ public sealed class ProcessEventLifecycleObserver : IProcessLifecycleObserver
         await PublishAsync(new ProcessStartedEvent {
             ProcessCanonicalName = process.CanonicalName!,
             DefinitionName       = process.DefinitionName,
+            DefinitionVersion    = process.DefinitionVersion,
         }, process, ct);
     }
 
@@ -44,6 +45,7 @@ public sealed class ProcessEventLifecycleObserver : IProcessLifecycleObserver
         await PublishAsync(new ProcessCompletedEvent {
             ProcessCanonicalName = process.CanonicalName!,
             DefinitionName       = process.DefinitionName,
+            DefinitionVersion    = process.DefinitionVersion,
         }, process, ct);
     }
 
@@ -51,6 +53,7 @@ public sealed class ProcessEventLifecycleObserver : IProcessLifecycleObserver
         await PublishAsync(new ProcessFailedEvent {
             ProcessCanonicalName = process.CanonicalName!,
             DefinitionName       = process.DefinitionName,
+            DefinitionVersion    = process.DefinitionVersion,
             ErrorMessage         = exception.Message,
         }, process, ct);
     }

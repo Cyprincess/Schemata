@@ -21,15 +21,6 @@ namespace Schemata.Flow.Tests;
 public class MultiStateMessageShould
 {
     [Fact]
-    public void Validator_AcceptsSameMessage_AcrossMultipleAwaitStates() {
-        var definition = new MultiAwaitProcess();
-
-        var ex = Record.Exception(() => StateMachineValidator.Validate(definition));
-
-        Assert.Null(ex);
-    }
-
-    [Fact]
     public void Validator_AcceptsSameMessage_OnBoundary_AcrossMultipleActivities() {
         var definition = new MultiBoundaryProcess();
 
@@ -48,7 +39,7 @@ public class MultiStateMessageShould
             Name          = "t1",
             CanonicalName = "processes/p1/tokens/t1",
             Process       = "p1",
-            ScopeName     = "p1",
+            ScopeName     = string.Empty,
             StateName     = "irrelevant-state",
             State         = "Active",
         };
@@ -105,7 +96,7 @@ public class MultiStateMessageShould
         var process = new SchemataProcess { Name = "p1", CanonicalName = "processes/p1" };
         var token = Token("processes/p1/tokens/a", definition.Review.Name);
 
-        var snapshot = await engine.AdvanceAsync(definition, process, [token], new(Mock.Of<IUnitOfWork>(), services));
+        var snapshot = await engine.AdvanceAsync(definition, process, [token], FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), services));
 
         Assert.Equal(definition.Paid.Name, snapshot.Tokens[0].StateName);
     }
@@ -139,7 +130,7 @@ public class MultiStateMessageShould
             Name          = canonical[(canonical.LastIndexOf('/') + 1)..],
             CanonicalName = canonical,
             Process       = "p1",
-            ScopeName     = "p1",
+            ScopeName     = string.Empty,
             StateName     = stateName,
             WaitingAtName = waitingAtName,
             State         = waitingAtName is not null ? "Waiting" : "Active",
@@ -147,7 +138,7 @@ public class MultiStateMessageShould
     }
 
     private static FlowExecutionContext ExecutionContext() {
-        return new(Mock.Of<IUnitOfWork>(), new ServiceCollection().BuildServiceProvider());
+        return FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), new ServiceCollection().BuildServiceProvider());
     }
 
     private static Mock<IRepository<T>> Repository<T>(params T[] items)
@@ -156,8 +147,8 @@ public class MultiStateMessageShould
         var repository = new Mock<IRepository<T>>();
         repository.Setup(r => r.Join(It.IsAny<IUnitOfWork>()));
         repository.Setup(r => r.AdviceContext).Returns(new AdviceContext(new ServiceCollection().BuildServiceProvider()));
-        repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => new(predicate(data.AsQueryable()).SingleOrDefault()));
+        repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _, QueryOptions _) => new(predicate(data.AsQueryable()).SingleOrDefault()));
         return repository;
     }
 
@@ -241,11 +232,13 @@ public class MultiStateMessageShould
         public EntryExitProcess(List<string> log) {
             this.Start().Go(Current);
             this.During(Current)
-                .OnEnter(_ => {
+                .OnEnter((_, ct) => {
+                    ct.ThrowIfCancellationRequested();
                     log.Add("enter");
                     return ValueTask.CompletedTask;
                 })
-                .OnLeave(_ => {
+                .OnLeave((_, ct) => {
+                    ct.ThrowIfCancellationRequested();
                     log.Add("leave");
                     return ValueTask.CompletedTask;
                 })

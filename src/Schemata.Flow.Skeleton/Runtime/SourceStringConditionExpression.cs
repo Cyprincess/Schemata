@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Entities;
+using Schemata.Flow.Skeleton.Models;
 
 namespace Schemata.Flow.Skeleton.Runtime;
 
@@ -11,7 +12,7 @@ namespace Schemata.Flow.Skeleton.Runtime;
 /// </summary>
 /// <typeparam name="TSource">The source entity type.</typeparam>
 public sealed class SourceStringConditionExpression<TSource>
-    : IConditionExpression, ISourceCondition, IStringConditionExpression
+    : FlowGraphNode, IConditionExpression, ISourceCondition, IStringConditionExpression
     where TSource : class, ICanonicalName
 {
     private Func<TSource, bool>? _predicate;
@@ -53,6 +54,12 @@ public sealed class SourceStringConditionExpression<TSource>
     bool IStringConditionExpression.Compiled => _predicate is not null;
 
     void IStringConditionExpression.Bind(Delegate predicate) {
+        EnsureMutable();
+        if (_predicate is not null) {
+            throw new InvalidOperationException(
+                $"Condition expression '{Expression}' has already been compiled; rebinding is not supported.");
+        }
+
         _predicate = (Func<TSource, bool>)predicate;
     }
 

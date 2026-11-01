@@ -32,7 +32,7 @@ public class NestedEnterTaskShould
             Scope.ChildFlows.Add(new() { Source = NestedSource, Target = NestedTarget });
             Flows.Add(new() { Source = RootSource, Target = NestedTarget });
 
-            this.During(NestedTarget).OnEnter(_ => ValueTask.CompletedTask);
+            this.During(NestedTarget).OnEnter((_, ct) => { ct.ThrowIfCancellationRequested(); return ValueTask.CompletedTask; });
         }
 
         public UserTask           RootSource   { get; } = null!;

@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 using Schemata.Flow.Skeleton;
 using System;
 using System.Collections.Generic;
@@ -35,7 +35,7 @@ public class FlowTransportSourceBindingShould
         var principal = Mock.Of<ClaimsPrincipal>();
 
         var process = await harness.StartHandler.HandleAsync(
-            Request(principal), CancellationToken.None);
+            Request(principal), new AdviceContext(harness.Services), CancellationToken.None);
 
         Assert.Equal("approval", process.DefinitionName);
         var source = Assert.Single(harness.Sources);
@@ -52,7 +52,7 @@ public class FlowTransportSourceBindingShould
         var harness = new Harness(false);
 
         await Assert.ThrowsAsync<NotFoundException>(() =>
-            harness.StartHandler.HandleAsync(Request(Mock.Of<ClaimsPrincipal>()), CancellationToken.None));
+            harness.StartHandler.HandleAsync(Request(Mock.Of<ClaimsPrincipal>()), new AdviceContext(harness.Services), CancellationToken.None));
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public class FlowTransportSourceBindingShould
         var harness = new Harness(resolvedType: typeof(Customer));
 
         await Assert.ThrowsAsync<NotFoundException>(() =>
-            harness.StartHandler.HandleAsync(Request(Mock.Of<ClaimsPrincipal>()), CancellationToken.None));
+            harness.StartHandler.HandleAsync(Request(Mock.Of<ClaimsPrincipal>()), new AdviceContext(harness.Services), CancellationToken.None));
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public class FlowTransportSourceBindingShould
         var harness = new Harness(registerOrderRepository: false);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            harness.StartHandler.HandleAsync(Request(Mock.Of<ClaimsPrincipal>()), CancellationToken.None));
+            harness.StartHandler.HandleAsync(Request(Mock.Of<ClaimsPrincipal>()), new AdviceContext(harness.Services), CancellationToken.None));
 
         Assert.Contains(nameof(IRepository<Order>), exception.Message);
     }
@@ -126,7 +126,7 @@ public class FlowTransportSourceBindingShould
     }
 
     [Fact]
-    public async Task Dispatch_Continues_The_Ambient_Context_Into_Source_Advisors() {
+    public async Task Dispatch_Passes_One_Context_Into_Source_Advisors() {
         var observed = (AdviceContext?)null;
         var advisor  = new Mock<IFlowSourceAdvisor<Order>>();
         advisor.Setup(a => a.AdviseAsync(
@@ -143,8 +143,7 @@ public class FlowTransportSourceBindingShould
         await harness.Runner.StartAsync("approval", harness.Order);
 
         Assert.NotNull(observed);
-        Assert.True(observed.TryGet<Marker>(out var value));
-        Assert.Same(harness.StartPrincipalAdvisor.Value, value);
+        Assert.Same(harness.StartPrincipalAdvisor.Context, observed);
     }
 
     private static StartProcessInstanceRequest Request(ClaimsPrincipal? principal = null) {
@@ -169,6 +168,7 @@ public class FlowTransportSourceBindingShould
 
             var services = new ServiceCollection()
                           .AddLogging()
+                          .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
                           .AddSingleton(Registry.Object)
                           .AddSingleton<IOptions<SchemataFlowOptions>>(Options.Create(new SchemataFlowOptions()));
             if (registerOrderRepository) {
@@ -215,7 +215,7 @@ public class FlowTransportSourceBindingShould
     {
         public int Order => 0;
 
-        public Marker Value { get; } = new();
+        public AdviceContext? Context { get; private set; }
 
         public ClaimsPrincipal? Principal { get; private set; }
 
@@ -224,25 +224,22 @@ public class FlowTransportSourceBindingShould
             StartProcessRequest                       request,
             RequestHandlerContinuation<SchemataProcess> next,
             CancellationToken                         ct = default) {
-            ctx.Set(Value);
+            Context   = ctx;
             Principal = request.Principal;
             return next(ct);
         }
     }
-
-    private sealed record Marker;
 
     private static Mock<IProcessRegistry> RegistryMock(IReadOnlyDictionary<string, FlowSourceDescriptor>? sourceTypes = null) {
         var registration = new ProcessRegistration {
             Name          = "approval",
             Engine        = "StateMachine",
             Definition    = new() { Name = "approval" },
-            Configuration = new() { Name = "approval" },
             SourceTypes = sourceTypes ?? new Dictionary<string, FlowSourceDescriptor> { ["order"] = Descriptor("order") },
         };
 
         var registry = new Mock<IProcessRegistry>(MockBehavior.Strict);
-        registry.Setup(r => r.GetRegistration("approval")).Returns(registration);
+        registry.Setup(r => r.GetRegistration("approval", "1")).Returns(registration);
         return registry;
     }
 
@@ -268,21 +265,21 @@ public class FlowTransportSourceBindingShould
         }
 
         repository.Setup(r => r.Join(It.IsAny<IUnitOfWork>()));
-        repository.Setup(r => r.SuppressQuerySoftDelete()).Returns(Mock.Of<IDisposable>());
-        repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) =>
+        repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _, QueryOptions _) =>
                       new(predicate(data.AsQueryable()).SingleOrDefault()));
-        repository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) =>
+        repository.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _, QueryOptions _) =>
                       new(predicate(data.AsQueryable()).FirstOrDefault()));
-        repository.Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _) => EnumerateAsync(predicate(data.AsQueryable())));
-        repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>()))
-                  .Returns((T entity, CancellationToken _) => {
+        repository.Setup(r => r.ListAsync(It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<T>, IQueryable<T>> predicate, CancellationToken _, QueryOptions _) => EnumerateAsync(predicate(data.AsQueryable())));
+        repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
+                  .ReturnsAsync((T entity, CancellationToken _, MutationOptions _) => {
+                      FlowTestCreation.Assign(entity);
                       data.Add(entity);
-                      return Task.CompletedTask;
+                      return MutationResult.Applied;
                   });
-        repository.Setup(r => r.UpdateAsync(It.IsAny<T>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        repository.Setup(r => r.UpdateAsync(It.IsAny<T>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>())).ReturnsAsync(MutationResult.Applied);
         return repository;
     }
 
@@ -322,12 +319,12 @@ public class FlowTransportSourceBindingShould
                        Name          = "root",
                        CanonicalName = $"{process.CanonicalName}/tokens/root",
                        Process       = process.Name!,
-                       ScopeName     = process.Name!,
+                       ScopeName     = string.Empty,
                        StateName     = "review",
                        WaitingAtName = "review",
                        State         = "Waiting",
                    };
-                   return new ValueTask<ProcessSnapshot>(new ProcessSnapshot { Process = process, Tokens = [token], Transitions = [] });
+                   return new(new ProcessSnapshot { Process = process, Tokens = [token], Transitions = [] });
                });
         return runtime.Object;
     }
@@ -347,16 +344,16 @@ public class FlowTransportSourceBindingShould
                        Name          = "root",
                        CanonicalName = $"{process.CanonicalName}/tokens/root",
                        Process       = process.Name!,
-                       ScopeName     = process.Name!,
+                       ScopeName     = string.Empty,
                        StateName     = "review",
                        State         = "Active",
                    };
-                   return new ValueTask<ProcessSnapshot>(new ProcessSnapshot {
+                   return new(new ProcessSnapshot {
                        Process = process,
                        Tokens = [token],
                        Transitions = [
-                           new() { Token = token.CanonicalName, Event = "Start" },
-                           new() { Token = token.CanonicalName, Event = "Start" },
+                           new() { Process = token.Process, Token = token.CanonicalName, Event = "Start" },
+                           new() { Process = token.Process, Token = token.CanonicalName, Event = "Start" },
                        ],
                    });
                });

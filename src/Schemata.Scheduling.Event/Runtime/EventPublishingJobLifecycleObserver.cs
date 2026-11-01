@@ -103,30 +103,30 @@ public sealed class EventPublishingJobLifecycleObserver : IJobLifecycleObserver
 
     private Task PublishIfAllowedAsync<TEvent>(SchemataJob job, Func<TEvent> factory, CancellationToken ct)
         where TEvent : IEvent {
-        return ResolveConfig(job).Result == AdviseResult.Block
+        return ResolveGate(job) == AdviseResult.Block
             ? Task.CompletedTask
             : _eventBus.PublishAsync(factory(), ct);
     }
 
-    private (AdviseResult Result, bool InterceptExecution) ResolveConfig(SchemataJob job) {
+    private AdviseResult ResolveGate(SchemataJob job) {
         if (string.IsNullOrEmpty(job.JobKey)) {
-            return (_options.DefaultPublishEventResult, false);
+            return _options.DefaultPublishEventResult;
         }
 
         var jobType = _registry.Resolve(job.JobKey);
         if (jobType is null) {
-            return (_options.DefaultPublishEventResult, false);
+            return _options.DefaultPublishEventResult;
         }
 
         if (_options.Jobs.TryGetValue(jobType, out var registration)) {
-            return (registration.Result, registration.InterceptExecution);
+            return registration.Result;
         }
 
         var attr = jobType.GetCustomAttribute<PublishEventAttribute>();
         if (attr != null) {
-            return (attr.Result, attr.InterceptExecution);
+            return attr.Result;
         }
 
-        return (_options.DefaultPublishEventResult, false);
+        return _options.DefaultPublishEventResult;
     }
 }

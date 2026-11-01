@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Flow.Skeleton.Runtime;
 
 namespace Schemata.Flow.Skeleton.Observers;
 
@@ -17,7 +18,7 @@ public class FlowTransitionContext
     ///     Engine-produced view of the transition outcome, carrying the new token set and transition rows.
     ///     The mutated process row lives at <c>Snapshot.Process</c>.
     /// </summary>
-    public ProcessSnapshot Snapshot { get; set; } = null!;
+    public required ProcessSnapshot Snapshot { get; set; }
 
     /// <summary>
     ///     The specific token this transition advances. Required for both engines: the state-machine
@@ -39,6 +40,8 @@ public class FlowTransitionContext
     ///     Set by the runtime just before the advisor pipeline runs.
     /// </summary>
     public IUnitOfWork? UnitOfWork { get; set; }
+
+    public FlowExecutionContext Execution { get; set; } = null!; // Definite-assignment: the observer context is built before notification.
 
     /// <summary>
     ///     The principal that initiated the operation producing this transition, or

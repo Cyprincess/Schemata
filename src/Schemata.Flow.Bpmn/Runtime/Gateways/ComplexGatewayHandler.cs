@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Flow.Skeleton.Entities;
@@ -16,7 +17,13 @@ namespace Schemata.Flow.Bpmn.Runtime.Gateways;
 ///     the gateway, and once it passes (or when none is configured) the split resolves through
 ///     the inclusive-gateway branch logic.
 /// </summary>
-public static class ComplexGatewayHandler
+/// <typeparam name="TProcess">The persisted process entity type registered by the host.</typeparam>
+/// <typeparam name="TToken">The persisted token entity type registered by the host.</typeparam>
+/// <typeparam name="TTransition">The persisted transition entity type registered by the host.</typeparam>
+public static class ComplexGatewayHandler<TProcess, TToken, TTransition>
+    where TProcess : SchemataProcess, new()
+    where TToken : SchemataProcessToken, new()
+    where TTransition : SchemataProcessTransition, new()
 {
     /// <summary>
     ///     Branches the active token at a complex gateway by reusing the inclusive-gateway
@@ -24,18 +31,19 @@ public static class ComplexGatewayHandler
     ///     first; the token parks at the gateway until it passes.
     /// </summary>
     public static async ValueTask<ProcessSnapshot> FromTokenAsync(
-        BpmnEngine                engine,
+        BpmnEngine<TProcess, TToken, TTransition>                engine,
         ProcessDefinition         definition,
         SchemataProcess           process,
         SchemataProcessToken      token,
         List<SchemataProcessToken> working,
         ComplexGateway            cg,
         string?                   previousState,
-        FlowExecutionContext      execution
+        FlowExecutionContext      execution,
+        CancellationToken         ct = default
     ) {
         if (cg.ActivationCount is not null) {
             var bookkeeping = token.Bookkeeping;
-            var ctx         = engine.BuildConditionContext(definition, BpmnEngine.TokenView(token), cg.Name, execution, bookkeeping, process, token);
+            var ctx         = engine.BuildConditionContext(definition, BpmnEngine<TProcess, TToken, TTransition>.TokenView(token), cg.Name, execution, bookkeeping, process, token);
             var ready = await cg.ActivationCount.Evaluate(ctx);
             if (!ready) {
                 return engine.ParkAtGateway(process, token, working, cg, previousState, execution);
@@ -48,7 +56,7 @@ public static class ComplexGatewayHandler
             definition,
             cg,
             outgoing,
-            BpmnEngine.TokenView(token),
+            BpmnEngine<TProcess, TToken, TTransition>.TokenView(token),
             variables,
             execution,
             process,
@@ -61,6 +69,6 @@ public static class ComplexGatewayHandler
         }
 
         return await engine.BranchFromTokenAsync(
-            definition, process, token, working, cg, matched, previousState, TransitionKind.Fork, execution);
+            definition, process, token, working, cg, matched, previousState, TransitionKind.Fork, execution, ct);
     }
 }

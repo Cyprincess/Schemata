@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Messaging.Skeleton;
 using CorrelateProcessRequest = Schemata.Flow.Foundation.Commands.CorrelateMessageRequest;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Flow.Foundation;
 
@@ -15,6 +16,7 @@ public sealed class CorrelateMessageHandler(IRequestDispatcher dispatcher)
 {
     public async Task<ProcessSnapshot> HandleAsync(
         CorrelateMessageRequest request,
+        AdviceContext context,
         CancellationToken ct = default)
     {
         var canonicalName = request.CanonicalName

@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
+using Schemata.Expressions.Cel;
 using Schemata.Flow.Bpmn.Conformance.Tests.Adapters;
 using Schemata.Flow.Bpmn.Conformance.Tests.Traits;
 using Schemata.Flow.Skeleton.Entities;
@@ -32,7 +33,7 @@ public class BpmnConformanceShould
     [Trait(ConformanceTraits.Category, ConformanceTraits.Conformance)]
     [Trait(ConformanceTraits.Speed, "Full")]
     [MemberData(nameof(Vectors.AllVectors), MemberType = typeof(Vectors))]
-    public async Task ExecutesAccordingToVector(string vectorPath) {
+    public async Task Executes_According_To_Vector(string vectorPath) {
         var (outcome, reason) = await TryExecuteVector(vectorPath);
         Assert.True(outcome == Outcome.Terminal, outcome == Outcome.NonTerminal
             ? $"Vector '{vectorPath}' ended in '{reason}'."
@@ -43,13 +44,13 @@ public class BpmnConformanceShould
     [Trait(ConformanceTraits.Category, ConformanceTraits.Conformance)]
     [Trait(ConformanceTraits.Speed, "Fast")]
     [MemberData(nameof(Vectors.FastSubset), MemberType = typeof(Vectors))]
-    public Task ExecutesAccordingToVectorFast(string vectorPath) { return ExecutesAccordingToVector(vectorPath); }
+    public Task Executes_According_To_Vector_Fast(string vectorPath) { return Executes_According_To_Vector(vectorPath); }
 
     [Theory(DisplayName = "Catalogued MIWG BPMN vector stays outside the executable subset")]
     [Trait(ConformanceTraits.Category, ConformanceTraits.Conformance)]
     [Trait(ConformanceTraits.Speed, "Full")]
     [MemberData(nameof(Vectors.PendingVectors), MemberType = typeof(Vectors))]
-    public async Task StaysOutsideExecutableSubset(string vectorPath) {
+    public async Task Stays_Outside_Executable_Subset(string vectorPath) {
         var (outcome, _) = await TryExecuteVector(vectorPath);
         Assert.True(outcome != Outcome.Terminal,
             $"Stale pending entry: '{vectorPath}' executes to a terminal state; remove it from PendingCatalog.");
@@ -98,9 +99,10 @@ public class BpmnConformanceShould
             DefinitionName = definition.Name,
         };
 
-        var execution = new FlowExecutionContext(
+        using var services = new ServiceCollection().AddCelExpressions().BuildServiceProvider();
+        var execution = Schemata.Flow.Tests.FlowTestCreation.Context(
             new Mock<IUnitOfWork>(MockBehavior.Strict).Object,
-            new ServiceCollection().BuildServiceProvider());
+            services);
         var snapshot = await engine.StartAsync(definition, process, execution, CancellationToken.None);
         for (var i = 0; i < 64 && !TerminalStates.Contains(snapshot.Process.State ?? string.Empty); i++) {
             var active = snapshot.Tokens.FirstOrDefault(token => string.Equals(token.State, "Active", StringComparison.OrdinalIgnoreCase));
@@ -108,7 +110,7 @@ public class BpmnConformanceShould
                 return null;
             }
 
-            snapshot = await engine.AdvanceAsync(definition, snapshot.Process, snapshot.Tokens, execution, active!.CanonicalName, CancellationToken.None);
+            snapshot = await engine.AdvanceAsync(definition, snapshot.Process, snapshot.Tokens, execution, active.CanonicalName, CancellationToken.None);
         }
 
         return snapshot;

@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.ExceptionServices;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 
@@ -11,7 +12,7 @@ namespace Schemata.Actor.Foundation.Runtime;
 /// <remarks>
 ///     Purely mechanical: it owns the drain loop, the queued-cancel skip check, and disposing
 ///     every item it dequeues, nothing about what a turn does.
-///     <see cref="ActorInstance" /> supplies <paramref name="processItem" /> and owns every
+///     <c>ActorInstance&lt;TActor&gt;</c> supplies <paramref name="processItem" /> and owns every
 ///     actor-specific concern (scope, ambient context, supervision, the Ask protocol).
 /// </remarks>
 /// <remarks>
@@ -27,6 +28,7 @@ internal sealed class MailboxLoop(ChannelReader<MailboxItem> reader, Func<Mailbo
     public async Task RunAsync() {
         while (await reader.WaitToReadAsync()) {
             while (reader.TryRead(out var item)) {
+                Exception? failure = null;
                 try {
                     if (item.TryBeginExecuting()) {
                         await processItem(item);
@@ -37,9 +39,16 @@ internal sealed class MailboxLoop(ChannelReader<MailboxItem> reader, Func<Mailbo
                     // back out of the channel once written, so this CAS is what makes "canceled
                     // while queued" observable and skips the item instead of running its handler
                     // for a listener that is no longer there.
-                } finally {
-                    item.Dispose();
+                } catch (Exception error) {
+                    failure = error;
                 }
+                try {
+                    await item.DisposeAsync();
+                } catch (Exception error) {
+                    if (failure is not null) throw new AggregateException(failure, error);
+                    throw;
+                }
+                if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
             }
         }
     }

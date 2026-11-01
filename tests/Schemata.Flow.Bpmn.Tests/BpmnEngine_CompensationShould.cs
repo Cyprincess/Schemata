@@ -35,6 +35,21 @@ public class BpmnEngine_CompensationShould
         Assert.DoesNotContain(compensations, t => t.Previous == "b" || t.Posterior == "undo-b");
     }
 
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task EndCompensation_FinalChild_ResumesAllEnclosingScopes() {
+        var scenario = NestedScenario(true);
+        var inner = scenario.Definition.AllElements.OfType<SubProcess>().Single(scope => scope.Name == "inner");
+        var thrown = inner.Children.OfType<FlowEvent>().Single(value => value.Name == "inner-throw");
+        thrown.Position = EventPosition.End;
+        var snapshot = await RunToInnerThrowAsync(scenario);
+
+        Assert.Equal("Completed", snapshot.Process.State);
+        Assert.All(snapshot.Tokens, token => Assert.Equal("Completed", token.State));
+        Assert.Equal(2, snapshot.Transitions.Count(row => row.Kind == TransitionKind.Compensate));
+        Assert.Contains(snapshot.Transitions, row => row.Event == "ExitSubProcess" && row.Posterior == "root-end");
+    }
+
     [Fact]
     public async Task Throw_NestedSubProcesses_InnerThrowOnlyFiresInnerScopeHandlers() {
         var scenario = NestedScenario(true);
@@ -84,7 +99,8 @@ public class BpmnEngine_CompensationShould
     [Fact]
     public async Task Throw_ProcedureCompensationTarget_RunsTargetBodyOnce() {
         var log = new List<string>();
-        var (engine, definition, process) = ProcedureScenario(_ => {
+        var (engine, definition, process) = ProcedureScenario((_, ct) => {
+            ct.ThrowIfCancellationRequested();
             log.Add("undo");
             return ValueTask.CompletedTask;
         });
@@ -105,7 +121,8 @@ public class BpmnEngine_CompensationShould
     [Fact]
     public async Task Throw_FailingCompensationTarget_PropagatesFailureWithoutRecordingCompensation() {
         var attempts = 0;
-        var (engine, definition, process) = ProcedureScenario(_ => {
+        var (engine, definition, process) = ProcedureScenario((_, ct) => {
+            ct.ThrowIfCancellationRequested();
             attempts++;
             throw new InvalidOperationException("boom");
         });
@@ -121,8 +138,28 @@ public class BpmnEngine_CompensationShould
         Assert.Equal("Failed", snapshot.Tokens.Single().State);
     }
 
+    [Trait("Layer", "Unit")]
+    [Fact]
+    [Trait("Category", "Unit")]
+    public async Task Compensation_Procedure_Cancellation_Stops_Target_Progression() {
+        using var cancellation = new CancellationTokenSource();
+        var invoked = false;
+        var (engine, definition, process) = ProcedureScenario((_, ct) => {
+            invoked = true;
+            cancellation.Cancel();
+            ct.ThrowIfCancellationRequested();
+            return ValueTask.CompletedTask;
+        });
+        var started = await engine.StartAsync(definition, process, CancellationToken.None);
+        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => engine.AdvanceAsync(
+            definition, process, started.Tokens, started.Tokens.Single().CanonicalName, cancellation.Token).AsTask());
+        Assert.True(invoked);
+        Assert.Equal(cancellation.Token, error.CancellationToken);
+        Assert.DoesNotContain(started.Tokens, token => token.StateName == "after");
+    }
+
     private static (BpmnEngine Engine, ProcessDefinition Definition, SchemataProcess Process) ProcedureScenario(
-        Func<FlowTaskContext, ValueTask> undoBody) {
+        Func<FlowTaskContext, CancellationToken, ValueTask> undoBody) {
         var start = new FlowEvent { Name = "start", Position = EventPosition.Start };
         var a     = new NoneTask { Name = "a" };
         var throwEvent = new FlowEvent {

@@ -202,7 +202,7 @@ public class CompensationBoundaryHandlerShould
                 StateName       = "host",
                 State         = "Compensating",
             },
-            BpmnEngineTestExtensions.Context([]));
+            BpmnEngineTestExtensions.Context([]), []);
     }
 
     private sealed record BoundaryTestScenario(

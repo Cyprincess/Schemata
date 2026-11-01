@@ -13,7 +13,13 @@ namespace Schemata.Flow.Bpmn.Runtime.Loops;
 ///     Executes BPMN <see cref="StandardLoopCharacteristics" /> for one activity token using
 ///     sequential while or do-while semantics.
 /// </summary>
-public sealed class StandardLoopExecutor
+/// <typeparam name="TProcess">The persisted process entity type registered by the host.</typeparam>
+/// <typeparam name="TToken">The persisted token entity type registered by the host.</typeparam>
+/// <typeparam name="TTransition">The persisted transition entity type registered by the host.</typeparam>
+public sealed class StandardLoopExecutor<TProcess, TToken, TTransition>
+    where TProcess : SchemataProcess, new()
+    where TToken : SchemataProcessToken, new()
+    where TTransition : SchemataProcessTransition, new()
 {
     private const string LoopCounterName = "loopCounter";
 
@@ -22,7 +28,7 @@ public sealed class StandardLoopExecutor
     ///     then routes the token through the activity's outgoing flow.
     /// </summary>
     public async ValueTask<ProcessSnapshot> ExecuteAsync(
-        BpmnEngine                engine,
+        BpmnEngine<TProcess, TToken, TTransition>                engine,
         ProcessDefinition         definition,
         SchemataProcess           process,
         SchemataProcessToken      token,
@@ -44,14 +50,11 @@ public sealed class StandardLoopExecutor
         ArgumentNullException.ThrowIfNull(loop);
 
         var transitions = new List<SchemataProcessTransition>();
-        var counter     = ReadCounter(token);
-
-        if (loop.TestBefore && !await CanEnterAsync(engine, definition, process, token, activity, loop, counter, execution)) {
-            return await ExitAsync(engine, definition, process, token, working, activity, previousState, arrivalEvent, transitions, execution);
-        }
+        var counter = 0;
+        WriteCounter(token, counter);
 
         if (includeArrival) {
-            transitions.Add(BpmnEngine.NewTransition(
+            transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
                 process.Name!,
                 token.CanonicalName,
                 previousState,
@@ -76,13 +79,15 @@ public sealed class StandardLoopExecutor
                 token.WaitingAtName = null;
                 token.State         = "Active";
 
-                transitions.Add(BpmnEngine.NewTransition(
+                transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
                     process.Name!,
                     token.CanonicalName,
                     activity.Name,
                     activity.Name,
                     TransitionKind.Move,
                     "StandardLoop"));
+
+                await engine.InvokeActivityBodyAsync(definition, process, token, activity, execution, ct);
 
                 counter++;
                 WriteCounter(token, counter);
@@ -104,7 +109,7 @@ public sealed class StandardLoopExecutor
             token.StateName     = activity.Name;
             token.WaitingAtName = null;
 
-            var fail = BpmnEngine.NewTransition(
+            var fail = BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
                 process.Name!,
                 token.CanonicalName,
                 activity.Name,
@@ -114,38 +119,44 @@ public sealed class StandardLoopExecutor
             fail.Note = ex.Message;
             transitions.Add(fail);
 
-            BpmnEngine.ApplyAggregateState(process, working);
-            return BpmnEngine.Snapshot(process, working, transitions, execution);
+            BpmnEngine<TProcess, TToken, TTransition>.ApplyAggregateState(process, working);
+            return BpmnEngine<TProcess, TToken, TTransition>.Snapshot(process, working, transitions, execution);
         }
 
-        return await ExitAsync(engine, definition, process, token, working, activity, activity.Name, "ExitStandardLoop", transitions, execution);
+        return await ExitAsync(engine, definition, process, token, working, activity, activity.Name, "ExitStandardLoop", transitions, execution, ct);
     }
 
     private static async ValueTask<ProcessSnapshot> ExitAsync(
-        BpmnEngine                         engine,
+        BpmnEngine<TProcess, TToken, TTransition>                         engine,
         ProcessDefinition                  definition,
         SchemataProcess                    process,
         SchemataProcessToken               token,
-        IReadOnlyList<SchemataProcessToken> working,
+        List<SchemataProcessToken> working,
         Activity                           activity,
         string?                            previousState,
         string                             eventName,
         List<SchemataProcessTransition>    transitions,
-        FlowExecutionContext               execution
+        FlowExecutionContext               execution,
+        CancellationToken                  ct
     ) {
-        var outgoing = definition.FirstOutgoing(activity);
+        if (ReadCounter(token) > 0) {
+            engine.RegisterCompensationBoundaries(definition, process, token, working, activity, execution);
+        }
+        var outgoing = await engine.ResolveOutgoingAsync(definition, activity, BpmnEngine<TProcess, TToken, TTransition>.TokenView(token), token.Bookkeeping, execution, process, token);
         if (outgoing is null) {
-            token.State         = "Completed";
-            token.WaitingAtName = null;
-            BpmnEngine.ApplyAggregateState(process, working);
-            return BpmnEngine.Snapshot(process, working, transitions, execution);
+            if (definition.Outgoing(activity).Count == 0) {
+                token.State = "Completed";
+                token.WaitingAtName = null;
+            }
+            BpmnEngine<TProcess, TToken, TTransition>.ApplyAggregateState(process, working);
+            return BpmnEngine<TProcess, TToken, TTransition>.Snapshot(process, working, transitions, execution);
         }
 
         var bookkeeping = token.Bookkeeping;
-        var resolved    = await engine.ResolveTargetAsync(definition, outgoing.Target, bookkeeping, BpmnEngine.TokenView(token), execution, process, token);
+        var resolved = await engine.ResolveTargetAsync(definition, outgoing.Target, bookkeeping, BpmnEngine<TProcess, TToken, TTransition>.TokenView(token), execution, working, process, token, ct: ct);
 
-        BpmnEngine.ApplyResolvedToToken(token, resolved);
-        transitions.Add(BpmnEngine.NewTransition(
+        BpmnEngine<TProcess, TToken, TTransition>.ApplyResolvedToToken(token, resolved);
+        transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
             process.Name!,
             token.CanonicalName,
             previousState,
@@ -153,26 +164,12 @@ public sealed class StandardLoopExecutor
             TransitionKind.Move,
             eventName));
 
-        BpmnEngine.ApplyAggregateState(process, working);
-        return BpmnEngine.Snapshot(process, working, transitions, execution);
-    }
-
-    private static async ValueTask<bool> CanEnterAsync(
-        BpmnEngine                  engine,
-        ProcessDefinition           definition,
-        SchemataProcess             process,
-        SchemataProcessToken        token,
-        Activity                    activity,
-        StandardLoopCharacteristics loop,
-        int                         counter,
-        FlowExecutionContext        execution
-    ) {
-        return !MaximumReached(loop, counter)
-            && await EvaluateConditionAsync(engine, definition, process, token, activity, loop, execution);
+        BpmnEngine<TProcess, TToken, TTransition>.ApplyAggregateState(process, working);
+        return BpmnEngine<TProcess, TToken, TTransition>.Snapshot(process, working, transitions, execution);
     }
 
     private static async ValueTask<bool> EvaluateConditionAsync(
-        BpmnEngine                  engine,
+        BpmnEngine<TProcess, TToken, TTransition>                  engine,
         ProcessDefinition           definition,
         SchemataProcess             process,
         SchemataProcessToken        token,
@@ -184,7 +181,7 @@ public sealed class StandardLoopExecutor
             return true;
         }
 
-        var ctx = engine.BuildConditionContext(definition, BpmnEngine.TokenView(token), activity.Name, execution, token.Bookkeeping, process, token);
+        var ctx = engine.BuildConditionContext(definition, BpmnEngine<TProcess, TToken, TTransition>.TokenView(token), activity.Name, execution, token.Bookkeeping, process, token);
         return await loop.LoopCondition.Evaluate(ctx);
     }
 

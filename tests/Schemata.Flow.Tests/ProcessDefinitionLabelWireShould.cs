@@ -11,9 +11,8 @@ public class ProcessDefinitionLabelWireShould
     [Theory]
     [InlineData(typeof(ProcessDefinitionInfo))]
     [InlineData(typeof(ProcessDefinitionElementInfo))]
-    [InlineData(typeof(ProcessDefinitionFlowInfo))]
     [InlineData(typeof(ProcessDefinitionMessageInfo))]
-    public void CarryLocalizedLabelsOverGrpcAsProto3Maps(System.Type type) {
+    public void Carry_Localized_Labels_Over_Grpc_As_Proto3_Maps(System.Type type) {
         var model = RuntimeTypeModel.Create();
         SchemataProtoModelConfigurator.ConfigureType(model, type);
 

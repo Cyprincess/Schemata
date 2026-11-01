@@ -3,6 +3,9 @@ using Microsoft.Extensions.Options;
 using Schemata.Actor.Foundation;
 using Schemata.Actor.Foundation.Runtime;
 using Schemata.Actor.Skeleton;
+using Schemata.Actor.Skeleton.Entities;
+using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Runtime;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -13,16 +16,31 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    ///     Registers <see cref="SchemataActorOptions" />, the actor registry (seeded from
-    ///     registrations staged on <see cref="SchemataActorOptions.Registrations" />), the
-    ///     in-process actor system, and the default turn-scope factory.
+    ///     Registers the actor runtime closed on the default persisted actor-state entity
+    ///     <see cref="SchemataActor" />.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddSchemataActor(this IServiceCollection services) {
+        return services.AddSchemataActor<SchemataActor>();
+    }
+
+    /// <summary>
+    ///     Registers <see cref="SchemataActorOptions" />, the actor registry (seeded from
+    ///     registrations staged on <see cref="SchemataActorOptions.Registrations" />), the
+    ///     in-process actor system factory closed on <typeparamref name="TActor" />, and the default
+    ///     turn-scope factory.
+    /// </summary>
+    /// <typeparam name="TActor">The persisted actor-state entity type registered by the host.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddSchemataActor<TActor>(this IServiceCollection services)
+        where TActor : SchemataActor, new() {
         services.AddOptions<SchemataActorOptions>();
 
-        services.TryAddSingleton<IActorSystem, InProcessActorSystem>();
+        services.TryAddSingleton<IActorSystemFactory, InProcessActorSystemFactory<TActor>>();
+        services.TryAddSingleton<IActorSystem>(sp => sp.GetRequiredService<IActorSystemFactory>().Create(sp));
+        services.AddHostedService<ActorHostedService>();
 
         services.TryAddSingleton<IActorRegistry>(sp => {
             var registry      = new ActorRegistry();
@@ -34,9 +52,21 @@ public static class ServiceCollectionExtensions
             return registry;
         });
 
-        // Default (host-root) turn-scope factory: registered with TryAdd so a capability such as
-        // multi-tenancy can override it with Replace (see IActorTurnScopeFactory's own remarks).
-        services.TryAddSingleton<IActorTurnScopeFactory, InProcessActorTurnScopeFactory>();
+        services.TryAddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>();
+
+        return services;
+    }
+
+    /// <summary>
+    ///     Registers <typeparamref name="TFactory" /> as the factory that creates the host
+    ///     <see cref="IActorSystem" />.
+    /// </summary>
+    /// <typeparam name="TFactory">The factory that owns the hosted actor system.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddSchemataActorSystem<TFactory>(this IServiceCollection services)
+        where TFactory : class, IActorSystemFactory {
+        services.Replace(ServiceDescriptor.Singleton<IActorSystemFactory, TFactory>());
 
         return services;
     }

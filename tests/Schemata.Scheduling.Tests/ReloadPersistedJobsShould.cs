@@ -19,7 +19,7 @@ public class ReloadPersistedJobsShould
 {
     [Fact]
     public async Task PausedPersistedJob_IsNotRearmedOrMaterialized() {
-        var clock = new MutableClock(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var clock = new MutableClock(new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         var job = new SchemataJob {
             Name          = "durable",
             CanonicalName = "jobs/durable",
@@ -31,35 +31,48 @@ public class ReloadPersistedJobsShould
             State         = JobState.Active,
         };
         var jobs = new Mock<IRepository<SchemataJob>>();
+        jobs.Setup(r => r.Begin()).Returns(CommittingUnitOfWork());
         jobs.Setup(r => r.FirstOrDefaultAsync(
                        It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(),
-                       It.IsAny<CancellationToken>()))
-            .Returns((Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>> query, CancellationToken _) =>
+                       It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+            .Returns((Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>> query, CancellationToken _, QueryOptions _) =>
                          ValueTask.FromResult<SchemataJob?>(query(new[] { job }.AsQueryable()).FirstOrDefault()));
         jobs.Setup(r => r.ListAsync(
                        It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(),
-                       It.IsAny<CancellationToken>()))
-            .Returns((Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>> query, CancellationToken _) =>
+                       It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+            .Returns((Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>> query, CancellationToken _, QueryOptions _) =>
                          ToAsyncJobs(query(new[] { job }.AsQueryable())));
-        jobs.Setup(r => r.UpdateAsync(job, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        jobs.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        var jobMutation = new Mock<IResourceMutation<SchemataJob>>();
+        jobMutation.Setup(m => m.UpdateAsync(
+                              It.IsAny<SchemataJob>(), It.IsAny<IUnitOfWork?>(),
+                              It.IsAny<Schemata.Abstractions.Entities.Operations>(), It.IsAny<CancellationToken>()))
+                   .ReturnsAsync(MutationResult.Applied);
 
         var executions = new Mock<IRepository<SchemataJobExecution>>();
         executions.Setup(r => r.ListAsync(
                              It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(),
-                             It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> _, CancellationToken _) =>
+                             It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>> _, CancellationToken _, QueryOptions _) =>
                                EmptyExecutions());
+
+        var executionMutation = new Mock<IResourceMutation<SchemataJobExecution>>();
+        executionMutation.Setup(m => m.CreateAsync(
+                                    It.IsAny<SchemataJobExecution>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()))
+                         .ReturnsAsync(MutationResult.Applied);
 
         await using var services = new ServiceCollection()
             .AddSingleton<IRepository<SchemataJob>>(jobs.Object)
             .AddSingleton<IRepository<SchemataJobExecution>>(executions.Object)
+            .AddSingleton(jobMutation.Object)
+            .AddSingleton(executionMutation.Object)
             .AddSingleton<IOptions<SchemataSchedulingOptions>>(Options.Create(new SchemataSchedulingOptions()))
             .AddSingleton<TimeProvider>(clock)
             .AddSchemataScheduling()
+            .AddSchemataSchedulingRepositoryStore()
             .BuildServiceProvider();
-        var scheduler = services.GetRequiredService<DefaultScheduler>();
-        var initializer = new SchedulingInitializer(
+        var scheduler = services.GetRequiredService<DefaultScheduler<SchemataJob, SchemataJobExecution>>();
+        var initializer = new SchedulingInitializer<SchemataJob, SchemataJobExecution>(
             scheduler,
             services.GetRequiredService<IOptions<SchemataSchedulingOptions>>(),
             services,
@@ -73,14 +86,25 @@ public class ReloadPersistedJobsShould
         await scheduler.UnscheduleAsync(job.CanonicalName!, CancellationToken.None);
 
         Assert.Equal(JobState.Paused, job.State);
-        jobs.Verify(r => r.UpdateAsync(job, It.IsAny<CancellationToken>()), Times.Once);
+        jobMutation.Verify(
+            m => m.UpdateAsync(job, It.IsAny<IUnitOfWork?>(), It.IsAny<Schemata.Abstractions.Entities.Operations>(), It.IsAny<CancellationToken>()),
+            Times.Once);
 
         await initializer.ReloadPersistedJobsAsync(CancellationToken.None);
 
         Assert.Equal(0, scheduler.EntryCount);
-        executions.Verify(r => r.AddAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()), Times.Never);
+        executionMutation.Verify(
+            m => m.CreateAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
 
         await scheduler.StopAsync(CancellationToken.None);
+    }
+
+    private static IUnitOfWork CommittingUnitOfWork() {
+        var unit = new Mock<IUnitOfWork>();
+        unit.Setup(work => work.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        unit.Setup(work => work.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        return unit.Object;
     }
 
     private static async IAsyncEnumerable<SchemataJob> ToAsyncJobs(IEnumerable<SchemataJob> rows) {

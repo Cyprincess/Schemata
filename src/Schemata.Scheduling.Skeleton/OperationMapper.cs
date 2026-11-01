@@ -16,8 +16,8 @@ public static class OperationMapper
     /// <summary>Creates an AIP-151 operation envelope from a scheduler execution row.</summary>
     public static Operation FromExecution(SchemataJobExecution execution) {
         var operation = new Operation {
-            Name          = execution.Name ?? execution.Uid.ToString("n"),
-            CanonicalName = execution.CanonicalName ?? $"operations/{execution.Uid:n}",
+            Name          = execution.Name,
+            CanonicalName = execution.CanonicalName,
             Done          = execution.State.IsTerminal(),
             Metadata = new() {
                 Method    = execution.Method,
@@ -33,6 +33,16 @@ public static class OperationMapper
             operation.Error = new() { Code = CodeUnknown, Message = execution.RecentError };
         } else if (execution.State == ExecutionState.Cancelled) {
             operation.Error = new() { Code = CodeCancelled, Message = execution.RecentError ?? "Operation was cancelled." };
+        } else if (execution.State == ExecutionState.Blocked) {
+            operation.Error = new() {
+                Code    = CodeUnknown,
+                Message = execution.RecentError ?? "Operation was blocked before the job body ran.",
+            };
+        } else if (execution.State == ExecutionState.Skipped) {
+            operation.Error = new() {
+                Code    = CodeUnknown,
+                Message = execution.RecentError ?? "Operation was skipped before the job body ran.",
+            };
         }
 
         return operation;

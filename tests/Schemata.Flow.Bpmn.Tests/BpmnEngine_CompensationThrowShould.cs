@@ -65,6 +65,87 @@ public class BpmnEngine_CompensationThrowShould
         Assert.Equal(new[] { "E", "D", "C", "B", "A" }, order);
     }
 
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task ProcedureToCompensationEnd_InvokesRegisteredHandler() {
+        var scenario = CompensationScenario(1, null, true);
+        var flow = scenario.Definition.Flows.Single(value => value.Source.Name == "A");
+        var end = flow.Target;
+        var procedure = new ProcedureTask { Name = "before-throw", Body = (_, _) => ValueTask.CompletedTask };
+        scenario.Definition.Elements.Add(procedure);
+        flow.Target = procedure;
+        scenario.Definition.Flows.Add(new() { Source = procedure, Target = end });
+        var snapshot = await AdvanceIntoThrowAsync(scenario);
+        Assert.Single(snapshot.Transitions, transition => transition.Kind == TransitionKind.Compensate && transition.Posterior == "undo-A");
+        Assert.Equal("Completed", snapshot.Process.State);
+        Assert.Equal("throw-end", Assert.Single(snapshot.Tokens).StateName);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Theory]
+    [InlineData(true, "direct")]
+    [InlineData(false, "direct")]
+    [InlineData(true, "procedure")]
+    [InlineData(false, "procedure")]
+    [InlineData(true, "gateway")]
+    [InlineData(false, "gateway")]
+    public async Task Compensation_SubProcessOwnerSurvivesThrowerContinuation(bool atEnd, string route) {
+        var scenario = CompensationScenario(1, null, atEnd);
+        var innerStart = new FlowEvent { Name = "undo-start", Position = EventPosition.Start };
+        var task = new NoneTask { Name = "undo-task" };
+        var innerEnd = new FlowEvent { Name = "undo-end", Position = EventPosition.End };
+        var sub = new EmbeddedSubProcess { Name = "undo-sub", Children = { innerStart, task, innerEnd }, ChildFlows = {
+            new() { Source = innerStart, Target = task }, new() { Source = task, Target = innerEnd },
+        } };
+        scenario.Definition.Elements.Add(sub);
+        FlowElement target = sub;
+        if (route != "direct") {
+            target = route == "procedure"
+                ? new ProcedureTask { Name = "undo-prefix", Body = (_, _) => ValueTask.CompletedTask }
+                : new ExclusiveGateway { Name = "undo-prefix" };
+            scenario.Definition.Elements.Add(target);
+            scenario.Definition.Flows.Add(new() { Source = target, Target = sub });
+        }
+        scenario.Definition.Flows.Single(flow => flow.Source.Name == "compensate-A").Target = target;
+        var snapshot = await AdvanceIntoThrowAsync(scenario);
+        var thrower = snapshot.Tokens.Single(token => token.StateName == (atEnd ? "throw-end" : "after"));
+        var owner = snapshot.Tokens.Single(token => token.WaitingAtName == "undo-sub");
+        Assert.NotEqual(thrower.CanonicalName, owner.CanonicalName);
+        Assert.Equal(atEnd ? "Completed" : "Active", thrower.State);
+        var child = snapshot.Tokens.Single(token => token.StateName == "undo-task");
+        snapshot = await scenario.Engine.AdvanceAsync(scenario.Definition, snapshot.Process, snapshot.Tokens, child.CanonicalName, CancellationToken.None);
+        Assert.Equal("Completed", owner.State);
+        Assert.Equal(atEnd ? "throw-end" : "after", thrower.StateName);
+        Assert.Equal(atEnd ? "Completed" : "Running", snapshot.Process.State);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Theory]
+    [InlineData("gateway")]
+    [InlineData("procedure")]
+    public async Task Throw_ReachThroughRecursiveRoute_FiresCompensationAndContinues(string route) {
+        // The throw is not the advance's immediate outgoing target: recursive target resolution
+        // through the interceptor must dispatch it through the same owner as a direct advance.
+        var scenario = CompensationScenario(3, "A", false);
+        FlowElement interceptor = route == "procedure"
+            ? new ProcedureTask { Name = "throw-prefix", Body = (_, _) => ValueTask.CompletedTask }
+            : new ExclusiveGateway { Name = "throw-prefix" };
+        scenario.Definition.Elements.Add(interceptor);
+        var intoThrow = scenario.Definition.Flows.Single(flow => flow.Source.Name == "C");
+        scenario.Definition.Flows.Remove(intoThrow);
+        scenario.Definition.Flows.Add(new() { Source = intoThrow.Source, Target = interceptor });
+        scenario.Definition.Flows.Add(new() { Source = interceptor, Target = intoThrow.Target });
+
+        var snapshot = await AdvanceIntoThrowAsync(scenario);
+
+        var transition = Assert.Single(snapshot.Transitions, t => t.Kind == TransitionKind.Compensate);
+        Assert.Equal("A", transition.Previous);
+        Assert.Equal("undo-A", transition.Posterior);
+        Assert.Equal("after", Assert.Single(snapshot.Tokens).StateName);
+        Assert.Equal("Active", snapshot.Tokens.Single().State);
+        Assert.Contains(snapshot.Transitions, t => t is { Kind: TransitionKind.Move, Previous: "throw", Posterior: "after" });
+    }
+
     private static async Task<ProcessSnapshot> AdvanceIntoThrowAsync(CompensationEngineScenario scenario) {
         var beforeThrow = await AdvanceUntilBeforeThrowAsync(scenario);
         return await scenario.Engine.AdvanceAsync(

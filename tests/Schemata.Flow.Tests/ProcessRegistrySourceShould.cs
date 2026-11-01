@@ -17,6 +17,25 @@ namespace Schemata.Flow.Tests;
 public class ProcessRegistrySourceShould
 {
     [Fact]
+    public async Task Reject_Conditions_Sharing_Name_With_Different_Source_Types() {
+        var registry = Registry();
+
+        await Assert.ThrowsAsync<InvalidArgumentException>(async () => await registry.RegisterAsync<ConflictingConditionProcess>());
+    }
+
+    [Fact]
+    public async Task Merge_Conditions_Sharing_Name_And_Source_Type() {
+        var registry = Registry();
+
+        await registry.RegisterAsync<ConsistentConditionProcess>();
+
+        var registration = registry.GetRegistration(nameof(ConsistentConditionProcess));
+        var descriptor = Assert.Single(registration!.SourceTypes).Value;
+        Assert.Equal("source", descriptor.BindingName);
+        Assert.Equal(typeof(Order), descriptor.SourceType);
+    }
+
+    [Fact]
     public async Task Reject_Duplicate_Explicit_Source_Declarations() {
         var registry = Registry();
 
@@ -73,14 +92,14 @@ public class ProcessRegistrySourceShould
     }
 
     private static ProcessRegistry Registry(Mock<ILogger<ProcessRegistry>>? logger = null) {
-        var runtime = new Mock<IFlowRuntime>();
+        var runtime = new Mock<Schemata.Flow.Skeleton.Runtime.IFlowRuntime>();
         runtime.SetupGet(r => r.Capabilities).Returns(FlowRuntimeCapabilities.All);
 
         var services = new Mock<IServiceProvider>();
         services.Setup(s => s.GetService(typeof(IEnumerable<IFlowEngineValidator>)))
                 .Returns(Array.Empty<IFlowEngineValidator>());
         services.As<IKeyedServiceProvider>()
-                .Setup(s => s.GetKeyedService(typeof(IFlowRuntime), It.IsAny<object?>()))
+                .Setup(s => s.GetKeyedService(typeof(Schemata.Flow.Skeleton.Runtime.IFlowRuntime), It.IsAny<object?>()))
                 .Returns(runtime.Object);
 
         if (logger is not null) {
@@ -88,6 +107,38 @@ public class ProcessRegistrySourceShould
         }
 
         return new(services.Object);
+    }
+
+    public sealed class ConflictingConditionProcess : ProcessDefinition
+    {
+        public ConflictingConditionProcess() {
+            this.Start().Go(Review);
+            this.During(Review).Decide(
+                this.When<Order>("source", _ => true).Go(Approved),
+                this.When<Invoice>("source", _ => false).Go(Rejected));
+            this.During(Approved).End();
+            this.During(Rejected).End();
+        }
+
+        public UserTask Review { get; } = null!;
+        public UserTask Approved { get; } = null!;
+        public UserTask Rejected { get; } = null!;
+    }
+
+    public sealed class ConsistentConditionProcess : ProcessDefinition
+    {
+        public ConsistentConditionProcess() {
+            this.Start().Go(Review);
+            this.During(Review).Decide(
+                this.When<Order>("source", _ => true).Go(Approved),
+                this.When<Order>("source", _ => false).Go(Rejected));
+            this.During(Approved).End();
+            this.During(Rejected).End();
+        }
+
+        public UserTask Review { get; } = null!;
+        public UserTask Approved { get; } = null!;
+        public UserTask Rejected { get; } = null!;
     }
 
     public sealed class DuplicateBindingProcess : ProcessDefinition
