@@ -1,3 +1,6 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Schemata.Tenancy.Skeleton.Entities;
 
 namespace Schemata.Tenancy.Skeleton;
@@ -8,10 +11,8 @@ namespace Schemata.Tenancy.Skeleton;
 /// <typeparam name="TTenant">The tenant entity type.</typeparam>
 /// <remarks>
 ///     <para>
-///         Each tenant gets its own DI container built from the root service collection.
-///         Tenant-specific and dynamic overrides registered through
-///         <see cref="SchemataTenancyOptions" /> are applied on container build.
-///         Service providers are cached per tenant via <see cref="ITenantProviderCache" />.
+///         Tenant-specific and dynamic registrations form each versioned container.
+///         Host registrations retain host construction and ownership.
 ///     </para>
 ///     <para>
     ///         The returned <see cref="ITenantProviderLease" /> pins the cached provider while in use;
@@ -21,6 +22,5 @@ namespace Schemata.Tenancy.Skeleton;
 public interface ITenantServiceProviderFactory<TTenant>
     where TTenant : SchemataTenant
 {
-    /// <summary>Acquires a lease over the per-tenant service provider for the tenant in the given accessor.</summary>
-    ITenantProviderLease CreateServiceProvider(ITenantContextAccessor<TTenant> accessor);
+    ValueTask<ITenantProviderLease> CreateServiceProviderAsync(Guid identifier, CancellationToken ct = default);
 }

@@ -13,10 +13,9 @@ namespace Schemata.Tenancy.Skeleton.Entities;
 [Table("SchemataTenantHosts")]
 [CanonicalName("tenants/{tenant}/hosts/{host}")]
 [PrimaryKey(nameof(Uid))]
-public class SchemataTenantHost : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
+public class SchemataTenantHost : IIdentifier, ICanonicalName, IChild, IConcurrency, ITimestamp
 {
-    /// <summary>The parent tenant's <see cref="ICanonicalName.Name" />.</summary>
-    public virtual string? Tenant { get; set; }
+    public virtual string? Parent { get; set; }
 
     /// <summary>
     ///     Stored normalized (trimmed, lower-case invariant) for case-insensitive matching.

@@ -1,14 +1,15 @@
+using System.Runtime.ExceptionServices;
 using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Tenancy.Skeleton;
 
 namespace Schemata.Tenancy.Foundation.Services;
 
 /// <summary>
-///     <see cref="IServiceScope" /> that delegates Scoped/Transient resolution to a host
-///     <see cref="IServiceScope" /> while keeping tenant override singletons visible on top.
+///     Pairs tenant and host dependency scopes; explicit tenant registrations resolve first.
 /// </summary>
 internal sealed class CompositeScope :
     IServiceScope,
@@ -21,12 +22,25 @@ internal sealed class CompositeScope :
 {
     private readonly TenantCompositeServiceProvider _composite;
     private readonly IServiceScope                  _hostScope;
+    private readonly IServiceScope _tenantScope;
+    private readonly ITenantProviderLease?          _lease;
     private          int                            _disposed;
 
     /// <summary>Initializes a composite scope over tenant overrides and a host scope.</summary>
-    public CompositeScope(TenantCompositeServiceProvider composite, IServiceScope hostScope) {
+    /// <param name="composite">The composed provider that owns the tenant overrides.</param>
+    /// <param name="hostScope">The host scope backing the composite with host services.</param>
+    /// <param name="lease">
+    ///     The scope's own lease over the cached provider entry, acquired by
+    ///     <see cref="TenantCompositeServiceProvider.CreateScope" />; released exactly once on
+    ///     disposal, after the tenant and host scopes, even when their cleanup throws. Null
+    ///     when the provider was composed without a provider cache.
+    /// </param>
+    public CompositeScope(TenantCompositeServiceProvider composite, IServiceScope hostScope, ITenantProviderLease? lease) {
         _composite = composite;
         _hostScope = hostScope;
+        _lease = lease;
+        _tenantScope = composite.Overrides.CreateScope();
+        _tenantScope.ServiceProvider.GetRequiredService<TenantResolutionContext>().Services = this;
     }
 
     #region IServiceProvider Members
@@ -37,10 +51,10 @@ internal sealed class CompositeScope :
         }
 
         if (serviceType.IsGenericType && serviceType.GetGenericTypeDefinition() == typeof(IEnumerable<>)) {
-            return TenantCompositeServiceProvider.ComposeEnumerable(serviceType, _hostScope.ServiceProvider, _composite.Overrides);
+            return TenantCompositeServiceProvider.ComposeEnumerable(serviceType, _hostScope.ServiceProvider, _tenantScope.ServiceProvider);
         }
 
-        return _composite.Overrides.GetService(serviceType) ?? _hostScope.ServiceProvider.GetService(serviceType);
+        return _tenantScope.ServiceProvider.GetService(serviceType) ?? _hostScope.ServiceProvider.GetService(serviceType);
     }
 
     #endregion
@@ -54,7 +68,7 @@ internal sealed class CompositeScope :
     #region IKeyedServiceProvider Members
 
     public object? GetKeyedService(Type serviceType, object? serviceKey) {
-        var overrides = (IKeyedServiceProvider)_composite.Overrides;
+        var overrides = (IKeyedServiceProvider)_tenantScope.ServiceProvider;
         if (TenantCompositeServiceProvider.IsEnumerableService(serviceType, out _)) {
             var items = overrides.GetKeyedService(serviceType, serviceKey);
             if (items is System.Collections.ICollection { Count: > 0 }) {
@@ -103,17 +117,28 @@ internal sealed class CompositeScope :
 
     public void Dispose() {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-        _hostScope.Dispose();
+        Exception? failure = null;
+        try { _tenantScope.Dispose(); } catch (Exception error) { failure = error; }
+        try { _hostScope.Dispose(); } catch (Exception error) { failure = failure is null ? error : new AggregateException(failure, error); }
+        try { _lease?.Dispose(); } catch (Exception error) { failure = failure is null ? error : new AggregateException(failure, error); }
+        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
     public async ValueTask DisposeAsync() {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-
-        if (_hostScope is IAsyncDisposable disposable) {
-            await disposable.DisposeAsync();
-        } else {
-            _hostScope.Dispose();
-        }
+        Exception? failure = null;
+        try {
+            if (_tenantScope is IAsyncDisposable tenant) await tenant.DisposeAsync();
+            else _tenantScope.Dispose();
+        } catch (Exception error) { failure = error; }
+        try {
+            if (_hostScope is IAsyncDisposable host) await host.DisposeAsync();
+            else _hostScope.Dispose();
+        } catch (Exception error) { failure = failure is null ? error : new AggregateException(failure, error); }
+        try {
+            if (_lease is not null) await _lease.DisposeAsync();
+        } catch (Exception error) { failure = failure is null ? error : new AggregateException(failure, error); }
+        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
     #endregion

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Authors>Chino Chang</Authors>
+    <Description>Schemata Application Framework - Tenant Actor Execution</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Schemata.Actor.Foundation\Schemata.Actor.Foundation.csproj" />
+    <ProjectReference Include="..\Schemata.Tenancy.Messaging\Schemata.Tenancy.Messaging.csproj" />
+  </ItemGroup>
+</Project>

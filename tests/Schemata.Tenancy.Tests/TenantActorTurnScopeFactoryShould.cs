@@ -3,141 +3,125 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Messaging.Skeleton;
-using Schemata.Tenancy.Foundation.Messaging;
 using Schemata.Tenancy.Foundation.Services;
+using Schemata.Tenancy.Foundation;
+using Schemata.Tenancy.Messaging;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
+using Schemata.Tenancy.Skeleton.Tenancy;
 using Xunit;
 
 namespace Schemata.Tenancy.Tests;
 
-public class TenantActorTurnScopeFactoryShould
+[Trait("Layer", "Integration")]
+public class TenantMessageExecutionScopeFactoryShould
 {
-    private const string TenantIdKey = "tenancy.tenant-id";
-
     [Fact]
-    public async Task CreateAsync_ResolvesTenantIdentity_InTheBootstrapScope_BeforeBuildingTheTurnScope() {
-        var tenant = new SchemataTenant { Uid = Guid.NewGuid() };
-        var disposalLog = new List<string>();
-        var (root, providerFactory) = BuildRoot(tenant, disposalLog, tenantOnlyProvider: new ServiceCollection().BuildServiceProvider());
-
-        var factory = new TenantActorTurnScopeFactory<SchemataTenant>(root.GetRequiredService<IServiceScopeFactory>());
-        var context = new MessageContext(new Dictionary<string, string?> { [TenantIdKey] = tenant.Uid.ToString("D") });
-
-        await using var scope = await factory.CreateAsync(context);
-
-        // ITenantServiceProviderFactory.CreateServiceProvider(accessor) only runs once the tenant
-        // is already resolved on the bootstrap scope's own accessor (phase 1 before phase 2).
-        Assert.Same(tenant, providerFactory.ObservedTenant);
-    }
-
-    [Fact]
-    public async Task CreateAsync_BuildsTheTurnScope_FromTheTenantIsolatedProvider() {
-        var tenant = new SchemataTenant { Uid = Guid.NewGuid() };
-        var disposalLog = new List<string>();
-        var tenantOnlyProvider = new ServiceCollection().AddScoped<TenantOnlyMarker>().BuildServiceProvider();
-        var (root, _) = BuildRoot(tenant, disposalLog, tenantOnlyProvider);
-
-        var factory = new TenantActorTurnScopeFactory<SchemataTenant>(root.GetRequiredService<IServiceScopeFactory>());
-        var context = new MessageContext(new Dictionary<string, string?> { [TenantIdKey] = tenant.Uid.ToString("D") });
-
-        await using var scope = await factory.CreateAsync(context);
-
-        // Only registered in the tenant-isolated provider, never in the host root: resolving it
-        // proves the turn scope descends from the tenant provider, not a scope off the root.
-        Assert.NotNull(scope.ServiceProvider.GetService<TenantOnlyMarker>());
-    }
-
-    [Fact]
-    public async Task DisposeAsync_ReleasesTheFinalScope_BeforeTheBootstrapScope() {
-        var tenant = new SchemataTenant { Uid = Guid.NewGuid() };
-        var disposalLog = new List<string>();
-        var (root, _) = BuildRoot(tenant, disposalLog, tenantOnlyProvider: new ServiceCollection().BuildServiceProvider());
-
-        var factory = new TenantActorTurnScopeFactory<SchemataTenant>(root.GetRequiredService<IServiceScopeFactory>());
-        var context = new MessageContext(new Dictionary<string, string?> { [TenantIdKey] = tenant.Uid.ToString("D") });
-
-        var scope = await factory.CreateAsync(context);
-        await scope.DisposeAsync();
-
-        Assert.Equal(["final-lease", "bootstrap-probe"], disposalLog);
-    }
-
-    /// <summary>
-    ///     Builds a root <see cref="IServiceProvider" /> wired the same way
-    ///     <c>SchemataTenancyFeature</c> wires it, plus a <see cref="StubTenantServiceProviderFactory" />
-    ///     that records the tenant the bootstrap scope resolved before phase 2 runs. The registered
-    ///     <see cref="ITenantResolver" /> depends on <see cref="BootstrapProbe" />, so resolving
-    ///     <c>SchemataTenantContextAccessor&lt;SchemataTenant&gt;</c> — which phase 1's tenant-only
-    ///     restore does, via <see cref="ITenantContextInitializer{TTenant}" /> — constructs it inside
-    ///     the bootstrap scope (and thus disposes it with that scope), letting its disposal be told
-    ///     apart from the final scope's own.
-    /// </summary>
-    private static (IServiceProvider Root, StubTenantServiceProviderFactory ProviderFactory) BuildRoot(
-        SchemataTenant tenant, List<string> disposalLog, IServiceProvider tenantOnlyProvider
-    ) {
+    public async Task Final_Scope_Uses_Explicit_Tenant_Constructor_Dependencies_And_Restores_Identity() {
+        var tenant = new SchemataTenant { Uid = Guid.NewGuid(), Timestamp = Guid.NewGuid(), DisplayName = "tenant" };
         var manager = new Mock<ITenantManager<SchemataTenant>>();
         manager.Setup(m => m.FindByTenantId(tenant.Uid, It.IsAny<CancellationToken>())).ReturnsAsync(tenant);
-
-        var providerFactory = new StubTenantServiceProviderFactory(tenantOnlyProvider, disposalLog);
-
         var services = new ServiceCollection();
+        var disposed = new List<Guid?>();
+        services.AddSingleton(disposed);
         services.AddSingleton(manager.Object);
-        services.AddSingleton(disposalLog);
-        services.AddScoped<BootstrapProbe>();
-        services.AddScoped<ITenantResolver, NoOpTenantResolver>();
-        services.AddScoped<SchemataTenantContextAccessor<SchemataTenant>>(sp =>
-            new(sp, sp.GetRequiredService<ITenantResolver>(), sp.GetRequiredService<ITenantManager<SchemataTenant>>()));
-        services.AddTransient<ITenantContextAccessor<SchemataTenant>>(sp => sp.GetRequiredService<SchemataTenantContextAccessor<SchemataTenant>>());
-        services.AddTransient<ITenantContextInitializer<SchemataTenant>>(sp => sp.GetRequiredService<SchemataTenantContextAccessor<SchemataTenant>>());
-        services.AddScoped<TenantMessageContextPropagator<SchemataTenant>>();
-        services.AddTransient<IMessageContextPropagator>(sp => sp.GetRequiredService<TenantMessageContextPropagator<SchemataTenant>>());
-        services.AddScoped<ITenantServiceScopeFactory<SchemataTenant>>(sp =>
-            new SchemataTenantServiceScopeFactory<SchemataTenant>(sp, sp.GetRequiredService<ITenantContextAccessor<SchemataTenant>>(), providerFactory));
-
-        return (services.BuildServiceProvider(), providerFactory);
-    }
-
-    private sealed class TenantOnlyMarker;
-
-    /// <summary>Disposed when the bootstrap scope is disposed — reached via <see cref="NoOpTenantResolver" />'s dependency on it.</summary>
-    private sealed class BootstrapProbe(List<string> disposalLog) : IDisposable
-    {
-        public void Dispose() => disposalLog.Add("bootstrap-probe");
-    }
-
-    /// <summary>
-    ///     A resolver that never actually resolves anything (phase 1 always calls
-    ///     <c>ITenantContextInitializer&lt;TTenant&gt;.InitializeAsync(TTenant, ct)</c> directly, never
-    ///     the parameterless overload that would use this). Its only purpose is depending on
-    ///     <see cref="BootstrapProbe" />, so constructing <c>SchemataTenantContextAccessor&lt;TTenant&gt;</c>
-    ///     — an ordinary, real part of phase 1 — forces <see cref="BootstrapProbe" /> into the bootstrap scope.
-    /// </summary>
-    private sealed class NoOpTenantResolver : ITenantResolver
-    {
-        public NoOpTenantResolver(BootstrapProbe probe) { }
-
-        public Task<Guid?> ResolveAsync(CancellationToken ct) => Task.FromResult<Guid?>(null);
-    }
-
-    private sealed class StubTenantServiceProviderFactory(IServiceProvider tenantProvider, List<string> disposalLog)
-        : ITenantServiceProviderFactory<SchemataTenant>
-    {
-        public SchemataTenant? ObservedTenant { get; private set; }
-
-        public ITenantProviderLease CreateServiceProvider(ITenantContextAccessor<SchemataTenant> accessor) {
-            ObservedTenant = accessor.Tenant;
-
-            return new StubLease(tenantProvider, disposalLog);
+        services.AddSingleton<ITenantProviderCache, MemoryCacheTenantProviderCache>();
+        services.AddSingleton<ITenantServiceProviderFactory<SchemataTenant>, SchemataTenantServiceProviderFactory<SchemataTenant>>();
+        services.AddSingleton<ITenantServiceScopeFactory<SchemataTenant>, SchemataTenantServiceScopeFactory<SchemataTenant>>();
+        services.AddSingleton<IMessageContextPropagator, TenantMessageContextPropagator>();
+        services.AddSingleton<IMessageExecutionScopeFactory, TenantMessageExecutionScopeFactory<SchemataTenant>>();
+        services.AddOptions<SchemataTenancyOptions>().Configure(options => options.TenantOverrides[tenant.Uid.ToString()] = [registrations => {
+            registrations.AddScoped<Consumer>();
+            registrations.AddScoped<IMessageContextPropagator, SelectedPropagator>();
+        }]);
+        using var root = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+        var factory = new TenantMessageExecutionScopeFactory<SchemataTenant>(root.GetRequiredService<IServiceScopeFactory>());
+        var context = new MessageContext(new Dictionary<string, string?> { [TenancyConstants.Messaging.TenantIdKey] = tenant.Uid.ToString("D") });
+        using (TenantContext.Enter(new(tenant.Uid))) {
+            var captured = await MessageContexts.CaptureAsync(root);
+            Assert.Equal("tenant", captured.Items["test.selected"]);
+            Assert.Equal(tenant.Uid.ToString("D"), captured.Items[TenancyConstants.Messaging.TenantIdKey]);
+            Assert.Equal(tenant.Uid, Assert.Single(disposed));
+            Assert.Equal(new TenantIdentity(tenant.Uid), TenantContext.Current);
+        }
+        var first = await factory.CreateAsync(context);
+        await Task.Yield();
+        Assert.Equal(TenantIdentity.Host, TenantContext.Current);
+        Consumer consumer;
+        using (first.Enter()) {
+            await using var owned = first;
+            await first.RestoreAsync(context);
+            consumer = first.Services.GetRequiredService<Consumer>();
+            Assert.Equal("tenant", consumer.Name);
+            Assert.Equal(new TenantIdentity(tenant.Uid), TenantContext.Current);
+            Assert.Same(consumer, first.Services.GetRequiredService<Consumer>());
+        }
+        Assert.True(consumer.Disposed);
+        Assert.Equal(TenantIdentity.Host, TenantContext.Current);
+        var second = await factory.CreateAsync(context);
+        using (second.Enter()) {
+            await using var owned = second;
+            await second.RestoreAsync(context);
+            Assert.NotSame(consumer, second.Services.GetRequiredService<Consumer>());
         }
     }
 
-    private sealed class StubLease(IServiceProvider provider, List<string> disposalLog) : ITenantProviderLease
-    {
-        public IServiceProvider Provider => provider;
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Failed_Bootstrap_Disposal_Releases_The_Unreturned_Final_Scope(bool finalCleanupFails) {
+        var bootstrapFailure = new InvalidOperationException("bootstrap cleanup");
+        var finalFailure = new ApplicationException("final cleanup");
+        var selected = new Mock<ITenantServiceScopeFactory<SchemataTenant>>();
+        var final = new Mock<IServiceScope>();
+        var finalAsync = final.As<IAsyncDisposable>();
+        finalAsync.Setup(value => value.DisposeAsync()).Returns(finalCleanupFails
+            ? ValueTask.FromException(finalFailure) : ValueTask.CompletedTask);
+        selected.Setup(value => value.CreateAsync(TenantIdentity.Host, default)).Returns(new ValueTask<AsyncServiceScope>(new AsyncServiceScope(final.Object)));
+        using var root = new ServiceCollection().AddSingleton(selected.Object).BuildServiceProvider();
+        var bootstrap = new Mock<IServiceScope>();
+        bootstrap.SetupGet(value => value.ServiceProvider).Returns(root);
+        bootstrap.As<IAsyncDisposable>().Setup(value => value.DisposeAsync()).Returns(ValueTask.FromException(bootstrapFailure));
+        var scopes = new Mock<IServiceScopeFactory>();
+        scopes.Setup(value => value.CreateScope()).Returns(bootstrap.Object);
+        var factory = new TenantMessageExecutionScopeFactory<SchemataTenant>(scopes.Object);
+        if (finalCleanupFails) {
+            var error = await Assert.ThrowsAsync<AggregateException>(() => factory.CreateAsync(null).AsTask());
+            Assert.Equal(new Exception[] { bootstrapFailure, finalFailure }, error.Flatten().InnerExceptions);
+        } else {
+            Assert.Same(bootstrapFailure, await Assert.ThrowsAsync<InvalidOperationException>(() => factory.CreateAsync(null).AsTask()));
+        }
+        finalAsync.Verify(value => value.DisposeAsync(), Times.Once);
+        Assert.Equal(TenantIdentity.Host, TenantContext.Current);
+    }
 
-        public void Dispose() => disposalLog.Add("final-lease");
+    public sealed class Consumer(SchemataTenant tenant) : IDisposable
+    {
+        public string? Name => tenant.DisplayName;
+        public bool Disposed { get; private set; }
+        public void Dispose() => Disposed = true;
+    }
+
+    public sealed class SelectedPropagator(Consumer consumer, SchemataTenant tenant, List<Guid?> disposed) : IMessageContextPropagator, IAsyncDisposable
+    {
+        private bool _restored;
+        public void Capture(IDictionary<string, string?> items, IServiceProvider source) {
+            Assert.True(_restored);
+            Assert.Equal(tenant.Uid, TenantContext.Current.Uid);
+            items["test.selected"] = consumer.Name;
+        }
+        public ValueTask RestoreAsync(IReadOnlyDictionary<string, string?> items, IServiceProvider target, CancellationToken ct = default) {
+            Assert.Equal(tenant.Uid, TenantContext.Current.Uid);
+            _restored = true;
+            return ValueTask.CompletedTask;
+        }
+        public async ValueTask DisposeAsync() {
+            await Task.Yield();
+            Assert.Equal(tenant.Uid, TenantContext.Current.Uid);
+            disposed.Add(TenantContext.Current.Uid);
+        }
     }
 }

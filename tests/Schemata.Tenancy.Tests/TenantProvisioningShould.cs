@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Moq;
+using Schemata.Abstractions.Entities;
 using Schemata.Entity.Repository;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
@@ -14,107 +15,117 @@ namespace Schemata.Tenancy.Tests;
 
 public class TenantProvisioningShould
 {
+    [Trait("Layer", "Component")]
     [Fact]
-    public async Task Create_Adds_And_Commits_Tenant() {
-        var tenant  = Tenant("acme");
-        var tenants = new Mock<IRepository<SchemataTenant>>();
-        var added = false;
-        tenants.Setup(value => value.AddAsync(tenant, It.IsAny<CancellationToken>()))
-               .Callback(() => added = true)
-               .Returns(Task.CompletedTask);
-        tenants.Setup(value => value.CommitAsync(It.IsAny<CancellationToken>()))
-               .Callback(() => Assert.True(added))
-               .Returns(Task.CompletedTask);
-        using var provider = CreateProvider(tenants);
+    public async Task Create_Stages_Tenant_Through_Mutation_Owner() {
+        var tenant         = Tenant("acme");
+        var tenantMutation = Mutation<SchemataTenant>();
+        var added          = false;
+        tenantMutation.Setup(value => value.CreateAsync(tenant, null, It.IsAny<CancellationToken>()))
+                      .Callback(() => added = true)
+                      .ReturnsAsync(MutationResult.Applied);
+        using var provider = CreateProvider(tenantMutation: tenantMutation);
 
         await Manager(provider).CreateAsync(tenant, CancellationToken.None);
 
-        tenants.Verify(value => value.AddAsync(tenant, It.IsAny<CancellationToken>()), Times.Once);
-        tenants.Verify(value => value.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        Assert.True(added);
     }
 
     [Fact]
     public async Task Update_Commits_Tenant_Then_Evicts_Cache() {
-        var tenant  = Tenant("acme");
-        var tenants = new Mock<IRepository<SchemataTenant>>();
-        var cache   = new Mock<ITenantProviderCache>();
-        var committed = false;
-        tenants.Setup(value => value.UpdateAsync(tenant, It.IsAny<CancellationToken>()))
-               .Returns(Task.CompletedTask);
-        tenants.Setup(value => value.CommitAsync(It.IsAny<CancellationToken>()))
-               .Callback(() => committed = true)
-               .Returns(Task.CompletedTask);
-        cache.Setup(value => value.Remove(tenant.Uid.ToString()))
+        var tenant         = Tenant("acme");
+        var tenants        = new Mock<IRepository<SchemataTenant>>();
+        var cache          = new Mock<ITenantProviderCache>();
+        var tenantMutation = Mutation<SchemataTenant>();
+        var committed      = false;
+        var unit           = CommittingUnit(() => committed = true);
+        tenants.Setup(value => value.Begin()).Returns(unit.Object);
+        cache.Setup(value => value.RemoveAsync(tenant.Uid.ToString()))
              .Callback(() => Assert.True(committed));
-        using var provider = CreateProvider(tenants, cache: cache);
+        using var provider = CreateProvider(tenants, cache: cache, tenantMutation: tenantMutation);
 
         await Manager(provider).UpdateAsync(tenant, CancellationToken.None);
 
-        tenants.Verify(value => value.UpdateAsync(tenant, It.IsAny<CancellationToken>()), Times.Once);
-        cache.Verify(value => value.Remove(tenant.Uid.ToString()), Times.Once);
+        unit.Verify(value => value.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        cache.Verify(value => value.RemoveAsync(tenant.Uid.ToString()), Times.Once);
     }
 
     [Fact]
     public async Task Delete_Removes_Hosts_And_Tenant_Atomically_Then_Evicts_Cache() {
-        var tenant        = Tenant("acme");
-        var host          = new SchemataTenantHost { Tenant = tenant.Name, Host = "acme.test" };
-        var tenants       = new Mock<IRepository<SchemataTenant>>();
-        var hosts         = new Mock<IRepository<SchemataTenantHost>>();
-        var cache         = new Mock<ITenantProviderCache>();
-        var unit          = new Mock<IUnitOfWork>();
-        var committed     = false;
-        var hostRemoved   = false;
-        var tenantRemoved = false;
+        var tenant         = Tenant("acme");
+        var host           = new SchemataTenantHost { Parent = tenant.CanonicalName, Host = "acme.test" };
+        var tenants        = new Mock<IRepository<SchemataTenant>>();
+        var hosts          = new Mock<IRepository<SchemataTenantHost>>();
+        var cache          = new Mock<ITenantProviderCache>();
+        var tenantMutation = Mutation<SchemataTenant>();
+        var hostMutation   = Mutation<SchemataTenantHost>();
+        var committed      = false;
+        var hostRemoved    = false;
+        var tenantRemoved  = false;
+        var unit = CommittingUnit(() => {
+            Assert.True(hostRemoved);
+            Assert.True(tenantRemoved);
+            committed = true;
+        });
         tenants.Setup(value => value.Begin()).Returns(unit.Object);
-        tenants.Setup(value => value.RemoveAsync(tenant, It.IsAny<CancellationToken>()))
-               .Callback(() => tenantRemoved = true)
-               .Returns(Task.CompletedTask);
         hosts.Setup(value => value.ListAsync(
                         It.IsAny<Func<IQueryable<SchemataTenantHost>, IQueryable<SchemataTenantHost>>>(),
-                        It.IsAny<CancellationToken>()))
+                        It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
              .Returns(ToAsync([host]));
-        hosts.Setup(value => value.RemoveRangeAsync(
-                      It.IsAny<IEnumerable<SchemataTenantHost>>(), It.IsAny<CancellationToken>()))
-             .Callback(() => hostRemoved = true)
-             .Returns(Task.CompletedTask);
-        unit.Setup(value => value.CommitAsync(It.IsAny<CancellationToken>()))
-            .Callback(() => {
-                Assert.True(hostRemoved);
-                Assert.True(tenantRemoved);
-                committed = true;
-            })
-            .Returns(Task.CompletedTask);
-        unit.Setup(value => value.DisposeAsync()).Returns(ValueTask.CompletedTask);
-        cache.Setup(value => value.Remove(tenant.Uid.ToString()))
+        hostMutation.Setup(value => value.DeleteAsync(host, unit.Object, It.IsAny<Operations>(), It.IsAny<CancellationToken>()))
+                    .Callback(() => hostRemoved = true)
+                    .ReturnsAsync(MutationResult.Applied);
+        tenantMutation.Setup(value => value.DeleteAsync(tenant, unit.Object, It.IsAny<Operations>(), It.IsAny<CancellationToken>()))
+                      .Callback(() => tenantRemoved = true)
+                      .ReturnsAsync(MutationResult.Applied);
+        cache.Setup(value => value.RemoveAsync(tenant.Uid.ToString()))
              .Callback(() => Assert.True(committed));
-        using var provider = CreateProvider(tenants, hosts, cache);
+        using var provider = CreateProvider(tenants, hosts, cache, tenantMutation, hostMutation);
 
         await Manager(provider).DeleteAsync(tenant, CancellationToken.None);
 
         hosts.Verify(value => value.Join(unit.Object), Times.Once);
-        hosts.Verify(value => value.RemoveRangeAsync(
-                         It.Is<IEnumerable<SchemataTenantHost>>(rows => rows.Single() == host),
-                         It.IsAny<CancellationToken>()), Times.Once);
-        tenants.Verify(value => value.RemoveAsync(tenant, It.IsAny<CancellationToken>()), Times.Once);
         unit.Verify(value => value.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
-        cache.Verify(value => value.Remove(tenant.Uid.ToString()), Times.Once);
+        cache.Verify(value => value.RemoveAsync(tenant.Uid.ToString()), Times.Once);
     }
 
+    [Trait("Layer", "Integration")]
     [Fact]
     public async Task SetDisplayName_Assigns_Value_In_Place() {
         var tenant = Tenant("acme");
-        using var provider = CreateProvider();
+        var tenants = new Mock<IRepository<SchemataTenant>>();
+        var cache = new Mock<ITenantProviderCache>();
+        var mutation = Mutation<SchemataTenant>();
+        var committed = false;
+        var unit = CommittingUnit(() => committed = true);
+        tenants.Setup(value => value.Begin()).Returns(unit.Object);
+        mutation.Setup(value => value.UpdateAsync(tenant, unit.Object, Operations.Update, It.IsAny<CancellationToken>()))
+                .Callback(() => Assert.Equal("Acme Europe", tenant.DisplayName))
+                .ReturnsAsync(MutationResult.Applied);
+        cache.Setup(value => value.RemoveAsync(tenant.Uid.ToString())).Callback(() => Assert.True(committed));
+        using var provider = CreateProvider(tenants, cache: cache, tenantMutation: mutation);
 
         await Manager(provider).SetDisplayNameAsync(tenant, "Acme Europe", CancellationToken.None);
 
         Assert.Equal("Acme Europe", tenant.DisplayName);
+        mutation.Verify(value => value.UpdateAsync(tenant, unit.Object, Operations.Update, It.IsAny<CancellationToken>()), Times.Once);
+        unit.Verify(value => value.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        cache.Verify(value => value.RemoveAsync(tenant.Uid.ToString()), Times.Once);
     }
 
+    [Trait("Layer", "Integration")]
     [Fact]
     public async Task SetDisplayNames_Assigns_Nonempty_Map_And_Collapses_Empty_Map() {
         var tenant = Tenant("acme");
         var names = new Dictionary<string, string?> { ["en"] = "Acme", ["fr"] = null };
-        using var provider = CreateProvider();
+        var tenants = new Mock<IRepository<SchemataTenant>>();
+        var cache = new Mock<ITenantProviderCache>();
+        var mutation = Mutation<SchemataTenant>();
+        var commits = 0;
+        var unit = CommittingUnit(() => commits++);
+        tenants.Setup(value => value.Begin()).Returns(unit.Object);
+        cache.Setup(value => value.RemoveAsync(tenant.Uid.ToString())).Callback(() => Assert.Equal(1, commits));
+        using var provider = CreateProvider(tenants, cache: cache, tenantMutation: mutation);
         var manager = Manager(provider);
 
         await manager.SetDisplayNamesAsync(tenant, names, CancellationToken.None);
@@ -124,74 +135,152 @@ public class TenantProvisioningShould
         Assert.True(assigned.ContainsKey("fr"));
         Assert.Null(assigned["fr"]);
 
+        mutation.Verify(value => value.UpdateAsync(tenant, unit.Object, Operations.Update, It.IsAny<CancellationToken>()), Times.Once);
+        unit.Verify(value => value.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        cache.Verify(value => value.RemoveAsync(tenant.Uid.ToString()), Times.Once);
+        mutation.Invocations.Clear();
+        unit.Invocations.Clear();
+        cache.Invocations.Clear();
+        unit = CommittingUnit(() => commits++);
+        tenants.Setup(value => value.Begin()).Returns(unit.Object);
+        mutation.Setup(value => value.UpdateAsync(tenant, unit.Object, Operations.Update, It.IsAny<CancellationToken>()))
+                .Callback(() => Assert.Null(tenant.DisplayNames))
+                .ReturnsAsync(MutationResult.Applied);
+        cache.Setup(value => value.RemoveAsync(tenant.Uid.ToString())).Callback(() => Assert.Equal(2, commits));
         await manager.SetDisplayNamesAsync(tenant, [], CancellationToken.None);
 
         Assert.Null(tenant.DisplayNames);
+        mutation.Verify(value => value.UpdateAsync(tenant, unit.Object, Operations.Update, It.IsAny<CancellationToken>()), Times.Once);
+        unit.Verify(value => value.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        cache.Verify(value => value.RemoveAsync(tenant.Uid.ToString()), Times.Once);
+    }
+
+    [Trait("Layer", "Integration")]
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Display_Setter_NoWrite_Does_Not_Evict(bool localized) {
+        var tenant = Tenant("acme");
+        var tenants = new Mock<IRepository<SchemataTenant>>();
+        var cache = new Mock<ITenantProviderCache>();
+        var mutation = Mutation<SchemataTenant>();
+        var unit = CommittingUnit();
+        tenants.Setup(value => value.Begin()).Returns(unit.Object);
+        mutation.Setup(value => value.UpdateAsync(tenant, unit.Object, Operations.Update, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(MutationResult.NoWrite);
+        using var provider = CreateProvider(tenants, cache: cache, tenantMutation: mutation);
+        var manager = Manager(provider);
+
+        if (localized) {
+            await manager.SetDisplayNamesAsync(tenant, [], CancellationToken.None);
+            Assert.Null(tenant.DisplayNames);
+        } else {
+            await manager.SetDisplayNameAsync(tenant, "Acme Europe", CancellationToken.None);
+            Assert.Equal("Acme Europe", tenant.DisplayName);
+        }
+
+        mutation.Verify(value => value.UpdateAsync(tenant, unit.Object, Operations.Update, It.IsAny<CancellationToken>()), Times.Once);
+        unit.Verify(value => value.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        unit.Verify(value => value.AddCommitSink(It.IsAny<int>(), It.IsAny<Func<CancellationToken, Task>>()), Times.Never);
+        cache.Verify(value => value.RemoveAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Trait("Layer", "Integration")]
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Display_Setter_Failed_Commit_Propagates_Without_Eviction(bool localized) {
+        var tenant = Tenant("acme");
+        var tenants = new Mock<IRepository<SchemataTenant>>();
+        var cache = new Mock<ITenantProviderCache>();
+        var mutation = Mutation<SchemataTenant>();
+        var unit = CommittingUnit();
+        var failure = new InvalidOperationException("Commit failed");
+        tenants.Setup(value => value.Begin()).Returns(unit.Object);
+        unit.Setup(value => value.CommitAsync(It.IsAny<CancellationToken>())).ThrowsAsync(failure);
+        using var provider = CreateProvider(tenants, cache: cache, tenantMutation: mutation);
+        var manager = Manager(provider);
+
+        var thrown = await Assert.ThrowsAsync<InvalidOperationException>(async () => {
+            if (localized) {
+                await manager.SetDisplayNamesAsync(tenant, [], CancellationToken.None);
+            } else {
+                await manager.SetDisplayNameAsync(tenant, "Acme Europe", CancellationToken.None);
+            }
+        });
+
+        Assert.Same(failure, thrown);
+        mutation.Verify(value => value.UpdateAsync(tenant, unit.Object, Operations.Update, It.IsAny<CancellationToken>()), Times.Once);
+        unit.Verify(value => value.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        cache.Verify(value => value.RemoveAsync(It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
     public async Task SetHosts_Replaces_Existing_Rows_With_Normalized_Hosts() {
-        var tenant  = Tenant("acme");
-        var oldHost = new SchemataTenantHost { Tenant = tenant.Name, Host = "old.test" };
-        var added   = new List<SchemataTenantHost>();
-        var removed = false;
-        var hosts   = new Mock<IRepository<SchemataTenantHost>>();
+        var tenant         = Tenant("acme");
+        var oldHost        = new SchemataTenantHost { Parent = tenant.CanonicalName, Host = "old.test" };
+        var added          = new List<SchemataTenantHost>();
+        var removed        = false;
+        var hosts          = new Mock<IRepository<SchemataTenantHost>>();
+        var tenants        = new Mock<IRepository<SchemataTenant>>();
+        var tenantMutation = Mutation<SchemataTenant>();
+        var hostMutation   = Mutation<SchemataTenantHost>();
+        var unit = CommittingUnit(() => {
+            Assert.True(removed);
+            Assert.Equal(2, added.Count);
+        });
+        tenants.Setup(value => value.Begin()).Returns(unit.Object);
         hosts.Setup(value => value.ListAsync(
                         It.IsAny<Func<IQueryable<SchemataTenantHost>, IQueryable<SchemataTenantHost>>>(),
-                        It.IsAny<CancellationToken>()))
+                        It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
              .Returns(ToAsync([oldHost]));
-        hosts.Setup(value => value.RemoveRangeAsync(
-                      It.IsAny<IEnumerable<SchemataTenantHost>>(), It.IsAny<CancellationToken>()))
-             .Callback(() => removed = true)
-             .Returns(Task.CompletedTask);
-        hosts.Setup(value => value.AddAsync(It.IsAny<SchemataTenantHost>(), It.IsAny<CancellationToken>()))
-             .Callback((SchemataTenantHost row, CancellationToken _) => added.Add(row))
-             .Returns(Task.CompletedTask);
-        hosts.Setup(value => value.CommitAsync(It.IsAny<CancellationToken>()))
-             .Callback(() => {
-                Assert.True(removed);
-                Assert.Equal(2, added.Count);
-            })
-             .Returns(Task.CompletedTask);
-        using var provider = CreateProvider(hosts: hosts);
+        hostMutation.Setup(value => value.DeleteAsync(oldHost, unit.Object, It.IsAny<Operations>(), It.IsAny<CancellationToken>()))
+                    .Callback(() => removed = true)
+                    .ReturnsAsync(MutationResult.Applied);
+        hostMutation.Setup(value => value.CreateAsync(It.IsAny<SchemataTenantHost>(), unit.Object, It.IsAny<CancellationToken>()))
+                    .Callback((SchemataTenantHost row, IUnitOfWork? _, CancellationToken _) => added.Add(row))
+                    .ReturnsAsync(MutationResult.Applied);
+        using var provider = CreateProvider(tenants, hosts, tenantMutation: tenantMutation, hostMutation: hostMutation);
 
         await Manager(provider).SetHostsAsync(
             tenant,
             [" One.TEST ", "", "two.test"],
             CancellationToken.None);
 
-        hosts.Verify(value => value.RemoveRangeAsync(
-                         It.Is<IEnumerable<SchemataTenantHost>>(rows => rows.Single() == oldHost),
-                         It.IsAny<CancellationToken>()), Times.Once);
+        Assert.True(removed);
         Assert.Equal(["one.test", "two.test"], added.Select(row => row.Host));
-        Assert.All(added, row => Assert.Equal(tenant.Name, row.Tenant));
-        hosts.Verify(value => value.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        Assert.All(added, row => Assert.Equal(tenant.CanonicalName, row.Parent));
+        hosts.Verify(value => value.Join(unit.Object), Times.Once);
+        unit.Verify(value => value.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task SetHosts_Empty_Removes_Existing_Rows_Without_Adding_Replacements() {
-        var tenant  = Tenant("acme");
-        var oldHost = new SchemataTenantHost { Tenant = tenant.Name, Host = "old.test" };
-        var hosts   = new Mock<IRepository<SchemataTenantHost>>(MockBehavior.Strict);
+        var tenant       = Tenant("acme");
+        var oldHost      = new SchemataTenantHost { Parent = tenant.CanonicalName, Host = "old.test" };
+        var hosts        = new Mock<IRepository<SchemataTenantHost>>(MockBehavior.Strict);
+        var tenants      = new Mock<IRepository<SchemataTenant>>();
+        var hostMutation = Mutation<SchemataTenantHost>();
+        var unit         = CommittingUnit();
+        var removed      = false;
+        hostMutation.Setup(value => value.DeleteAsync(oldHost, unit.Object, It.IsAny<Operations>(), It.IsAny<CancellationToken>()))
+                    .Callback(() => removed = true)
+                    .ReturnsAsync(MutationResult.Applied);
+        tenants.Setup(value => value.Begin()).Returns(unit.Object);
+        hosts.Setup(value => value.Join(unit.Object));
         hosts.Setup(value => value.ListAsync(
                         It.IsAny<Func<IQueryable<SchemataTenantHost>, IQueryable<SchemataTenantHost>>>(),
-                        It.IsAny<CancellationToken>()))
+                        It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
              .Returns(ToAsync([oldHost]));
-        hosts.Setup(value => value.RemoveRangeAsync(
-                      It.IsAny<IEnumerable<SchemataTenantHost>>(), It.IsAny<CancellationToken>()))
-             .Returns(Task.CompletedTask);
-        hosts.Setup(value => value.CommitAsync(It.IsAny<CancellationToken>()))
-             .Returns(Task.CompletedTask);
-        using var provider = CreateProvider(hosts: hosts);
+        using var provider = CreateProvider(tenants, hosts, hostMutation: hostMutation);
 
         await Manager(provider).SetHostsAsync(tenant, [], CancellationToken.None);
 
-        hosts.Verify(value => value.RemoveRangeAsync(
-                         It.Is<IEnumerable<SchemataTenantHost>>(rows => rows.Single() == oldHost),
-                         It.IsAny<CancellationToken>()), Times.Once);
-        hosts.Verify(value => value.AddAsync(
-                         It.IsAny<SchemataTenantHost>(), It.IsAny<CancellationToken>()), Times.Never);
-        hosts.Verify(value => value.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        Assert.True(removed);
+        hostMutation.Verify(
+            value => value.CreateAsync(It.IsAny<SchemataTenantHost>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        unit.Verify(value => value.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -201,8 +290,8 @@ public class TenantProvisioningShould
         var tenants  = new Mock<IRepository<SchemataTenant>>();
         tenants.Setup(value => value.SingleOrDefaultAsync(
                           It.IsAny<Func<IQueryable<SchemataTenant>, IQueryable<SchemataTenant>>>(),
-                          It.IsAny<CancellationToken>()))
-               .Returns((Func<IQueryable<SchemataTenant>, IQueryable<SchemataTenant>> query, CancellationToken _) =>
+                          It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+               .Returns((Func<IQueryable<SchemataTenant>, IQueryable<SchemataTenant>> query, CancellationToken _, QueryOptions _) =>
                    ValueTask.FromResult<SchemataTenant?>(query(new[] { expected, other }.AsQueryable()).SingleOrDefault()));
         using var provider = CreateProvider(tenants);
 
@@ -217,16 +306,16 @@ public class TenantProvisioningShould
         var hosts = new Mock<IRepository<SchemataTenantHost>>();
         hosts.Setup(value => value.SingleOrDefaultAsync(
                         It.IsAny<Func<IQueryable<SchemataTenantHost>, IQueryable<SchemataTenantHost>>>(),
-                        It.IsAny<CancellationToken>()))
-             .Returns((Func<IQueryable<SchemataTenantHost>, IQueryable<SchemataTenantHost>> query, CancellationToken _) =>
+                        It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+             .Returns((Func<IQueryable<SchemataTenantHost>, IQueryable<SchemataTenantHost>> query, CancellationToken _, QueryOptions _) =>
                  ValueTask.FromResult<SchemataTenantHost?>(query(new[] {
-                     new SchemataTenantHost { Tenant = expected.Name, Host = "acme.test" },
+                     new SchemataTenantHost { Parent = expected.CanonicalName, Host = "acme.test" },
                  }.AsQueryable()).SingleOrDefault()));
         var tenants = new Mock<IRepository<SchemataTenant>>();
         tenants.Setup(value => value.SingleOrDefaultAsync(
                           It.IsAny<Func<IQueryable<SchemataTenant>, IQueryable<SchemataTenant>>>(),
-                          It.IsAny<CancellationToken>()))
-               .Returns((Func<IQueryable<SchemataTenant>, IQueryable<SchemataTenant>> query, CancellationToken _) =>
+                          It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+               .Returns((Func<IQueryable<SchemataTenant>, IQueryable<SchemataTenant>> query, CancellationToken _, QueryOptions _) =>
                    ValueTask.FromResult<SchemataTenant?>(query(new[] { expected }.AsQueryable()).SingleOrDefault()));
         using var provider = CreateProvider(tenants, hosts);
 
@@ -246,26 +335,26 @@ public class TenantProvisioningShould
         Assert.Null(result);
         hosts.Verify(value => value.SingleOrDefaultAsync(
                          It.IsAny<Func<IQueryable<SchemataTenantHost>, IQueryable<SchemataTenantHost>>>(),
-                         It.IsAny<CancellationToken>()), Times.Never);
+                         It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()), Times.Never);
         tenants.Verify(value => value.SingleOrDefaultAsync(
                            It.IsAny<Func<IQueryable<SchemataTenant>, IQueryable<SchemataTenant>>>(),
-                           It.IsAny<CancellationToken>()), Times.Never);
+                           It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()), Times.Never);
     }
 
     [Fact]
     public async Task GetHosts_Returns_Associated_Nonblank_Hosts_In_Order() {
         var tenant = Tenant("acme");
         var rows = new[] {
-            new SchemataTenantHost { Tenant = tenant.Name, Host = "one.test" },
-            new SchemataTenantHost { Tenant = tenant.Name, Host = " " },
-            new SchemataTenantHost { Tenant = "other", Host = "other.test" },
-            new SchemataTenantHost { Tenant = tenant.Name, Host = "two.test" },
+            new SchemataTenantHost { Parent = tenant.CanonicalName, Host = "one.test" },
+            new SchemataTenantHost { Parent = tenant.CanonicalName, Host = " " },
+            new SchemataTenantHost { Parent = "other", Host = "other.test" },
+            new SchemataTenantHost { Parent = tenant.CanonicalName, Host = "two.test" },
         };
         var hosts = new Mock<IRepository<SchemataTenantHost>>();
         hosts.Setup(value => value.ListAsync(
                         It.IsAny<Func<IQueryable<SchemataTenantHost>, IQueryable<SchemataTenantHost>>>(),
-                        It.IsAny<CancellationToken>()))
-             .Returns((Func<IQueryable<SchemataTenantHost>, IQueryable<SchemataTenantHost>> query, CancellationToken _) =>
+                        It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+             .Returns((Func<IQueryable<SchemataTenantHost>, IQueryable<SchemataTenantHost>> query, CancellationToken _, QueryOptions _) =>
                  ToAsync(query(rows.AsQueryable()).ToArray()));
         using var provider = CreateProvider(hosts: hosts);
 
@@ -275,7 +364,7 @@ public class TenantProvisioningShould
     }
 
     private static SchemataTenant Tenant(string name) {
-        return new() { Uid = Guid.NewGuid(), Name = name };
+        return new() { Uid = Guid.NewGuid(), Name = name, CanonicalName = "tenants/" + name };
     }
 
     private static async IAsyncEnumerable<T> ToAsync<T>(IEnumerable<T> rows) {

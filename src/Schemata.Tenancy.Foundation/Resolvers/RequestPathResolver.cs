@@ -2,8 +2,8 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
-using Schemata.Abstractions.Exceptions;
 using Schemata.Tenancy.Skeleton;
+using Schemata.Tenancy.Skeleton.Tenancy;
 
 namespace Schemata.Tenancy.Foundation.Resolvers;
 

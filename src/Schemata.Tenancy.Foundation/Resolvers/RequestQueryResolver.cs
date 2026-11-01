@@ -1,10 +1,9 @@
 using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
-using Schemata.Abstractions.Exceptions;
 using Schemata.Tenancy.Skeleton;
+using Schemata.Tenancy.Skeleton.Tenancy;
 
 namespace Schemata.Tenancy.Foundation.Resolvers;
 
@@ -29,7 +28,8 @@ public class RequestQueryResolver : ITenantResolver
             return Task.FromResult<Guid?>(null);
         }
 
-        return Task.FromResult<Guid?>(TenantId.Parse(values.FirstOrDefault()));
+        if (values.Count != 1) throw new TenantResolveException();
+        return Task.FromResult<Guid?>(TenantId.Parse(values[0]));
     }
 
     #endregion

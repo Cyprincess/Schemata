@@ -1,5 +1,5 @@
 using System;
-using Schemata.Abstractions.Exceptions;
+using Schemata.Tenancy.Skeleton.Tenancy;
 
 namespace Schemata.Tenancy.Foundation.Resolvers;
 
@@ -16,7 +16,7 @@ internal static class TenantId
     /// <param name="value">The raw identifier extracted from the request.</param>
     /// <returns>The parsed tenant identifier.</returns>
     public static Guid Parse(string? value) {
-        if (!string.IsNullOrWhiteSpace(value) && Guid.TryParse(value, null, out var key)) {
+        if (!string.IsNullOrWhiteSpace(value) && Guid.TryParse(value, null, out var key) && key != Guid.Empty) {
             return key;
         }
 
