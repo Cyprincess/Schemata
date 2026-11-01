@@ -25,7 +25,7 @@ public sealed class ResourceNameDescriptor
     private readonly Segment?  _leafSegment;
     private readonly Segment[] _parentSegments;
     private readonly Segment[] _segments;
-    private readonly Type      _type = null!;
+    private readonly Type      _type;
     private readonly string?   _plural;
     private readonly string?   _singular;
 
@@ -43,6 +43,8 @@ public sealed class ResourceNameDescriptor
             CollectionPath  = "";
             _segments       = [];
             _parentSegments = [];
+            _singular       = type.Name;
+            _plural         = type.Name.Pluralize();
             return;
         }
 
@@ -55,7 +57,7 @@ public sealed class ResourceNameDescriptor
         _segments = new Segment[parts.Length];
         for (var i = 0; i < parts.Length; i++) {
             var p = parts[i];
-            if (p.Length > 2 && p[0] == '{' && p[^1] == '}') {
+            if (IsPlaceholder(p)) {
                 var placeholder = p.Substring(1, p.Length - 2);
                 var property = identifies && i == parts.Length - 1
                     ? nameof(ICanonicalName.Name)
@@ -109,17 +111,20 @@ public sealed class ResourceNameDescriptor
 
     /// <summary>
     ///     PascalCase singular form, taken from the pattern's leaf placeholder, e.g. <c>"Book"</c>.
-    ///     Available when <see cref="IsAddressable" /> holds; the pattern is the sole source of
-    ///     resource identity.
+    ///     Without a <see cref="CanonicalNameAttribute" /> the CLR type name serves as the
+    ///     singular/plural label pair; it grants no addressability —
+    ///     <see cref="IsAddressable" /> still requires a pattern.
     /// </summary>
-    /// <exception cref="InvalidOperationException">The type declares no addressable pattern.</exception>
+    /// <exception cref="InvalidOperationException">The type declares a non-addressable pattern.</exception>
     public string Singular => _singular ?? throw NotAddressable();
 
     /// <summary>
     ///     PascalCase plural form, taken from the pattern's collection segment as authored, so
-    ///     <c>people/{person}</c> yields <c>"People"</c>.
+    ///     <c>people/{person}</c> yields <c>"People"</c>; when the pattern is a bare placeholder
+    ///     the singular pluralizes, and without a <see cref="CanonicalNameAttribute" /> the
+    ///     pluralized CLR type name is the label.
     /// </summary>
-    /// <exception cref="InvalidOperationException">The type declares no addressable pattern.</exception>
+    /// <exception cref="InvalidOperationException">The type declares a non-addressable pattern.</exception>
     public string Plural => _plural ?? throw NotAddressable();
 
     /// <summary>
@@ -172,6 +177,31 @@ public sealed class ResourceNameDescriptor
     public static ResourceNameDescriptor ForType<T>() { return ForType(typeof(T)); }
 
     /// <summary>
+    ///     Reports whether a pattern segment is a <c>{placeholder}</c>.
+    /// </summary>
+    /// <param name="segment">A single segment of a canonical pattern.</param>
+    /// <returns><see langword="true" /> for a placeholder segment.</returns>
+    public static bool IsPlaceholder(string segment) {
+        return segment.Length > 2 && segment[0] == '{' && segment[^1] == '}';
+    }
+
+    /// <summary>
+    ///     Normalizes a canonical pattern for identity comparison. Every placeholder segment becomes
+    ///     <c>{}</c>, so patterns that spell the same wildcard differently compare equal; literal
+    ///     segments keep their spelling.
+    /// </summary>
+    /// <param name="pattern">The canonical pattern to normalize.</param>
+    /// <returns>The pattern with placeholder names removed.</returns>
+    public static string NormalizePattern(string pattern) {
+        var segments = pattern.Split('/');
+        for (var i = 0; i < segments.Length; i++) {
+            if (IsPlaceholder(segments[i])) segments[i] = "{}";
+        }
+
+        return string.Join('/', segments);
+    }
+
+    /// <summary>
     ///     Resolves placeholder values from an entity instance against the pattern.
     ///     e.g., <c>"publishers/{publisher}/books/{book}"</c> + entity => <c>"publishers/acme/books/les-miserables"</c>.
     /// </summary>
@@ -184,6 +214,15 @@ public sealed class ResourceNameDescriptor
         if (_segments.Length == 0) {
             throw new InvalidOperationException(SchemataResources.GetResourceString(SchemataResources.PATTERN_REQUIRED));
         }
+        if (entity is IChild child && _parentSegments is [{ IsPlaceholder: false }, { IsPlaceholder: true }]
+            && !AppDomainTypeCache.GetProperties(entity.GetType()).ContainsKey(_parentSegments[1].Property!)) {
+            var parent = ParseParent(child.Parent);
+            var name = ((ICanonicalName)entity).Name;
+            if (parent is null || parent.Values.Any(value => value == "-") || string.IsNullOrWhiteSpace(name)) {
+                throw new ValidationException([new() { Field = "parent", Description = "A concrete parent and resource name are required." }]);
+            }
+            return $"{child.Parent}/{Collection}/{name}";
+        }
 
         var type       = entity.GetType();
         var properties = AppDomainTypeCache.GetProperties(type);
@@ -195,15 +234,19 @@ public sealed class ResourceNameDescriptor
                 continue;
             }
 
-            if (!properties.TryGetValue(seg.Property!, out var property)) {
-                throw new MissingFieldException(type.Name, seg.Property!);
+            if (seg.Property is not { } propertyName) {
+                throw new MissingFieldException(type.Name, seg.Raw);
+            }
+
+            if (!properties.TryGetValue(propertyName, out var property)) {
+                throw new MissingFieldException(type.Name, propertyName);
             }
 
             var value = property.GetValue(entity)?.ToString();
             if (string.IsNullOrWhiteSpace(value)) {
                 throw new ValidationException([new() {
-                    Field       = seg.Property!.Underscore(),
-                    Description = string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), seg.Property!.Humanize(LetterCasing.Title)),
+                    Field       = propertyName.Underscore(),
+                    Description = string.Format(SchemataResources.GetResourceString(SchemataResources.NOT_EMPTY), propertyName.Humanize(LetterCasing.Title)),
                     Reason      = SchemataResources.NOT_EMPTY,
                 }]);
             }
@@ -219,6 +262,9 @@ public sealed class ResourceNameDescriptor
         var values = new Dictionary<string, string>();
         for (var i = 0; i < pattern.Length; i++) {
             if (pattern[i].IsPlaceholder) {
+                // An identity segment must address something; empty input falls back to the
+                // callers' invalid-name / invalid-parent rejection instead of matching a row.
+                if (string.IsNullOrWhiteSpace(input[i])) return null;
                 values[pattern[i].Placeholder!] = input[i];
             } else if (!string.Equals(pattern[i].Raw, input[i], StringComparison.OrdinalIgnoreCase)) {
                 return null;
@@ -240,7 +286,7 @@ public sealed class ResourceNameDescriptor
             return null;
         }
 
-        return MatchSegments(_parentSegments, parent!.Split('/'));
+        return MatchSegments(_parentSegments, parent.Split('/'));
     }
 
     /// <summary>
@@ -263,6 +309,25 @@ public sealed class ResourceNameDescriptor
         all.Remove(leaf.Placeholder!);
 
         return (all, leafName);
+    }
+
+    /// <summary>
+    ///     Returns the parent canonical name of a child resource, or <see langword="null" /> for a
+    ///     root resource or a malformed value.
+    /// </summary>
+    /// <param name="canonicalName">The full canonical resource name.</param>
+    /// <returns>The parent path without the collection and leaf segments.</returns>
+    public string? ParentOf(string? canonicalName) {
+        if (string.IsNullOrWhiteSpace(canonicalName)) {
+            return null;
+        }
+
+        var segments = canonicalName.Split('/');
+        if (segments.Length < 4 || segments.Length % 2 != 0) {
+            return null;
+        }
+
+        return string.Join('/', segments[..^2]);
     }
 
     /// <summary>
@@ -351,6 +416,13 @@ public sealed class ResourceNameDescriptor
     public Expression<Func<T, bool>>? BuildParentPredicate<T>(Dictionary<string, string> parentValues) {
         var parameter  = Expression.Parameter(typeof(T), "e");
         var properties = AppDomainTypeCache.GetProperties(typeof(T));
+        if (typeof(IChild).IsAssignableFrom(typeof(T)) && _parentSegments is [{ IsPlaceholder: false }, { IsPlaceholder: true }]
+            && !properties.ContainsKey(_parentSegments[1].Property!)) {
+            if (!parentValues.TryGetValue(_parentSegments[1].Placeholder!, out var value) || value == "-") return null;
+            var parent = $"{_parentSegments[0].Raw}/{value}";
+            var member = Expression.Property(parameter, nameof(IChild.Parent));
+            return Expression.Lambda<Func<T, bool>>(Expression.Equal(member, Expression.Constant(parent)), parameter);
+        }
 
         Expression? body = null;
 

@@ -13,19 +13,10 @@ namespace Schemata.Abstractions.Exceptions;
 /// </remarks>
 public class NoContentException : SchemataException
 {
-    /// <summary>
-    ///     Initializes a new <see cref="NoContentException" />.
-    /// </summary>
-    /// <param name="code">HTTP response status code.</param>
-    /// <param name="status">Canonical error code from <c>google.rpc.Code</c>.</param>
-    /// <param name="message">Developer-oriented diagnostic message.</param>
-    public NoContentException(
-        int     code    = 204,
-        string? status  = ErrorCodes.Ok,
-        string? message = null
-    ) : base(code, status, message) { }
+    /// <summary>Initializes the fixed HTTP 204 / <c>OK</c> control-flow result.</summary>
+    public NoContentException() : base(204, ErrorCodes.Ok) { }
 
-    public override object? CreateErrorResponse(string? requestId = null, string? domain = null, string? locale = null) {
+    public override object? CreateErrorResponse(string? requestId = null, string? locale = null) {
         return null;
     }
 }

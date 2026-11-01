@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Schemata is a modular .NET application framework for building extensible business applications with AIP-aligned resource primitives and documented compliance gaps. It ships as 77 `Schemata.*` NuGet packages built from `src/`, targeting `net8.0;net10.0` (source generators target `netstandard2.0`). Consumers bootstrap with `WebApplicationBuilder.UseSchemata(...)`; capabilities compose through a three-phase feature lifecycle. The public API is extension methods in the `Microsoft.AspNetCore.Builder` / `Microsoft.Extensions.DependencyInjection` namespaces; there is no `Program.cs` in this repo.
+Schemata is a modular .NET application framework for building extensible business applications with AIP-aligned resource primitives and documented compliance gaps. It ships as 88 `Schemata.*` NuGet packages built from `src/`, targeting `net8.0;net10.0` (source generators target `netstandard2.0`). Consumers bootstrap with `WebApplicationBuilder.UseSchemata(...)`; capabilities compose through a three-phase feature lifecycle. The public API is extension methods in the `Microsoft.AspNetCore.Builder` / `Microsoft.Extensions.DependencyInjection` namespaces; there is no `Program.cs` in this repo.
 
 ## Architecture & Data Flow
 
@@ -15,11 +15,11 @@ Schemata is a modular .NET application framework for building extensible busines
 
 **Bootstrap:** `UseSchemata` (`src/Schemata.Core/Extensions/WebApplicationBuilderExtensions.cs`) → `AddSchemata` (`ServiceCollectionExtensions.cs`) builds `SchemataBuilder` and registers `SchemataStartup` as the single `IStartupFilter`, which drives `UseSchemata` middleware → `UseEndpoints` → `CleanSchemata`.
 
-**Request dispatch:** `InProcessRequestDispatcher` (`src/Schemata.Messaging.Skeleton/Internal/InProcessRequestDispatcher.cs`) answers `IRequestDispatcher`/`ICommandDispatcher`/`IQueryDispatcher` from one implementation. For a command/query it composes registered `IRequestPipelineAdvisor<TRequest,TResponse>` wraps in ascending `Order` around one lazily resolved handler. Before segments run in ascending order; after segments unwind in reverse. A plain `IRequest<T>` runs no wrap chain.
+**Request dispatch:** `InProcessRequestDispatcher` (`src/Schemata.Messaging.Skeleton/Runtime/InProcessRequestDispatcher.cs`) answers `IRequestDispatcher`/`ICommandDispatcher`/`IQueryDispatcher` from one implementation. For a command/query it composes registered `IRequestPipelineAdvisor<TRequest,TResponse>` wraps in ascending `Order` around one lazily resolved handler. Before segments run in ascending order; after segments unwind in reverse. A plain `IRequest<T>` runs no wrap chain.
 
 **Security boundary:** `SecurityOrders` fixes dispatcher-wrap order: Authentication, Authorization, Sanitize, Validation, Idempotency, ResponseFamily. `WithAuthentication<TBuilder>(string?)` and `WithAuthorization<TBuilder>()` are the two shared `IResourceBuilder` extensions in Security.Foundation. Each domain supplies a `ResourceSecurityRegistration`; registration determines whether that domain's closed advisor types run. Authentication and coarse permission matching run in wraps; instance access and entitlement filtering stay in domain handler stages. `IAccessProvider` customizes instance policy, while `IPermissionResolver` and `IPermissionMatcher` customize coarse policy.
 
-**Advisor pipeline (handler stages):** `Advisor.For<TAdvisor>()` (`src/Schemata.Advice/Advisor.cs`) returns a token; source-generated `RunAsync` extensions (`generators/Schemata.Advice.Generator/`) dispatch to `AdviceRunner<...>`, which resolves `IAdvisor<...>` from the ambient `AdviceContext`, sorts by `Order`, and short-circuits on the first non-`Continue`. `AdviceContext` (`src/Schemata.Abstractions/Advisors/AdviceContext.cs`) carries pipeline coordination and configuration markers. Business payloads remain in request/response envelopes or local variables.
+**Advisor pipeline (handler stages):** `Advisor.For<TAdvisor>()` (`src/Schemata.Advice/Advisor.cs`) returns a token; source-generated `RunAsync` extensions (`generators/Schemata.Advice.Generator/`) dispatch to `AdviceRunner<...>`, which resolves `IAdvisor<...>` from the passed `AdviceContext`, sorts by `Order`, and short-circuits on the first non-`Continue`. `AdviceContext` (`src/Schemata.Abstractions/Advisors/AdviceContext.cs`) carries the scoped service provider for the advisor pipeline. Business payloads remain in request/response envelopes or local variables.
 
 **Package taxonomy:** `Schemata.<Domain>.<Layer>` — `Skeleton` (contracts), `Foundation` (implementation + `Use{Domain}` registration), `Http`/`Grpc` (transport), bridges (`Event`/`Actor`/`Scheduling`), and provider adapters (`Entity.EntityFrameworkCore`, `Entity.LinqToDB`, `Caching.Redis`, `Mapping.AutoMapper`, `Mapping.Mapster`, `Validation.FluentValidation`, `Messaging.RabbitMq`, `Expressions.Cel`, `Expressions.Aip`). Kernel packages (`Core`, `Common`, `Abstractions`, `Advice`, `Modular`) and `Resource.*`/`Entity.*`/`Transport.*` carry no `Skeleton`.
 
@@ -27,17 +27,17 @@ Schemata is a modular .NET application framework for building extensible busines
 
 | Path | Purpose |
 |---|---|
-| `src/` | 77 packages, `<Domain>.<Layer>` naming |
+| `src/` | 88 packages, `<Domain>.<Layer>` naming |
 | `src/Schemata.Core/` | Bootstrap, feature engine, `SchemataBuilder`, startup filter, built-in features, resource building kernel (`Building/`: `SchemataResourceBuilder`, `ResourceRegistry`, wiring) |
 | `src/Schemata.Abstractions/` | Contracts: `IAdvisor`, `AdviceContext`, `SchemataConstants`, exceptions, entity traits |
-| `src/Schemata.Advice/` | `Advisor.For`, `AdvicePipeline<T>`, `AdviceRunner` overloads |
+| `src/Schemata.Advice/` | `Advisor.For`, `AdvicePipeline<T>` (generated `AdviceRunner` dispatchers) |
 | `src/Schemata.Messaging.Skeleton/` | `IRequest`/`ICommand`/`IQuery`, `IRequestHandler`, `IRequestPipelineAdvisor`, dispatcher |
 | `src/Schemata.Common/` | `ResourceNameDescriptor`, wire-name rules, error factories |
 | `src/Schemata.Resource.Foundation/` | AIP CRUD pipeline: handlers, advisors, default handlers, pipeline wiring |
 | `src/Schemata.Entity.Repository/` | Repository base + persistence advisors (soft-delete, canonical name, timestamps) |
 | `generators/` | `Schemata.Advice.Generator` (advisor `RunAsync` codegen), `Schemata.Modeling.Generator` (`.skm` DSL) |
 | `targets/` | MSBuild meta-packages (`Application`/`Business`/`Module` families) selecting features via `Use*` flags |
-| `tests/` | 52 xUnit projects (`*.Tests`, `*.Integration.Tests`, `*.Conformance.Tests`) |
+| `tests/` | 63 xUnit projects (`*.Tests`, `*.Integration.Tests`, `*.Conformance.Tests`) |
 | `docs/` | DocFX site: `guides/`, `cookbook/`, `documents/`, `modeling/` |
 | `eng/` | Arcade build scripts and signing assets (`eng/common/` is upstream-generated) |
 | `specs/` | Git submodules: `specs/cel`, `specs/bpmn` (required by tests) |
@@ -98,6 +98,7 @@ Patterns to follow:
 - Errors follow AIP-193: exceptions derive from `SchemataException` (`src/Schemata.Abstractions/Exceptions/`); factories in `src/Schemata.Common/Errors/SchemataResourceErrors.cs`; reason constants in `SchemataConstants.ErrorReasons`.
 - Canonical names use `[CanonicalName("collection/{placeholder}")]` + `ResourceNameDescriptor` (`src/Schemata.Common/`). Addressable patterns end in `{placeholder}` after a collection literal.
 - JSON wire format is snake_case with kebab-case enums (`AddSchemataJsonSerializer`).
+- Nullable: never use null-forgiving forced access (`value!.Member`, `value![i]`) in `src/`. Narrow with pattern matching and early return — `if (value is null) { throw ...; }`, `if (value is not { X: true } v) { throw ...; }`, `if (value is not T t) { throw ...; }`, `if (value?.X != true) { throw ...; }` — and prefer `switch` expressions over nested conditionals. `null!`/`default!` are reserved for runtime-satisfied contracts (EF materialization, persisted/wire DTO deserialization, parser-built ASTs, definite-assignment sentinels) and must say why at the declaration. Tests are exempt.
 - AIP claims are requirement-level: read the exact `https://google.aip.dev/<number>` page and classify each rule as `Enforced`, `Supported by extension point`, `Application responsibility`, `Partial`, `Not implemented`, or `Not applicable`.
 - Judge resource contracts after the full path: wire binding, `SchemataJsonTraits` / `SchemataProtoModelConfigurator`, advisors, mapping, repository work, result envelope, and final HTTP JSON or gRPC protobuf. A CLR mismatch alone is not a gap; a matching field name alone is not compliance.
 - Keep entity, request, detail, and summary roles explicit. Use standard methods before custom methods; use a custom method for a named state transition or side effect instead of disguising it as Update.
@@ -114,7 +115,7 @@ Avoid these AIP errors:
 - `src/Schemata.Core/Extensions/WebApplicationBuilderExtensions.cs` — `UseSchemata` bootstrap entry.
 - `src/Schemata.Core/SchemataStartup.cs` — the only `IStartupFilter`; drives the pipeline.
 - `src/Schemata.Core/SchemataBuilder.cs` — `AddFeature<T>` / `Configure` / `Invoke`; sorts features.
-- `src/Schemata.Messaging.Skeleton/Internal/InProcessRequestDispatcher.cs` — unified command/query/request dispatch.
+- `src/Schemata.Messaging.Skeleton/Runtime/InProcessRequestDispatcher.cs` — unified command/query/request dispatch.
 - `generators/Schemata.Advice.Generator/AdvicePipelineGenerator.cs` — emits `RunAsync` per advisor interface.
 - `Directory.Build.props` — root switchboard, gated on project location (`src`/`tests`/`generators`/`targets`).
 - `global.json`, `Directory.Packages.props`, `eng/Versions.props`, `Schemata.slnx` — SDK, package versions, product version, solution.

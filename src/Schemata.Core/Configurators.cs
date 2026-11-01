@@ -25,15 +25,15 @@ public sealed class Configurators
     public void Set<T>(Action<T> action) {
         var key = typeof(T);
 
-        if (!TryGet<T>(out var configure)) {
-            _configurators[key] = action;
+        if (_configurators.TryGetValue(key, out var existing) && existing is Action<T> configure) {
+            _configurators[key] = (T options) => {
+                configure.Invoke(options);
+                action(options);
+            };
             return;
         }
 
-        _configurators[key] = (T options) => {
-            configure!.Invoke(options);
-            action(options);
-        };
+        _configurators[key] = action;
     }
 
     /// <summary>
@@ -45,15 +45,15 @@ public sealed class Configurators
     public void Set<T1, T2>(Action<T1, T2> action) {
         var key = typeof((T1, T2));
 
-        if (!TryGet<T1, T2>(out var configure)) {
-            _configurators[key] = action;
+        if (_configurators.TryGetValue(key, out var existing) && existing is Action<T1, T2> configure) {
+            _configurators[key] = (T1 a1, T2 a2) => {
+                configure.Invoke(a1, a2);
+                action(a1, a2);
+            };
             return;
         }
 
-        _configurators[key] = (T1 a1, T2 a2) => {
-            configure!.Invoke(a1, a2);
-            action(a1, a2);
-        };
+        _configurators[key] = action;
     }
 
     /// <summary>
@@ -177,18 +177,28 @@ public sealed class Configurators
     }
 
     /// <summary>
-    ///     Wraps every outstanding configurator as a
+    ///     Wraps every outstanding options configurator as a
     ///     <see cref="ConfigureNamedOptions{TOptions}" /> singleton registered in the
     ///     service collection, then clears the registry.
     /// </summary>
     /// <param name="services">The service collection to register into.</param>
     /// <returns>The given service collection for chaining.</returns>
+    /// <exception cref="InvalidOperationException">
+    ///     A two-parameter delegate is still registered: those are consumed by their owning
+    ///     feature via <see cref="Pop{T1,T2}" /> and have no options equivalent.
+    /// </exception>
     internal IServiceCollection Invoke(IServiceCollection services) {
         services.AddOptions();
 
         var ic = typeof(IConfigureOptions<>);
         var tc = typeof(ConfigureNamedOptions<>);
         foreach (var (type, configure) in _configurators) {
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(ValueTuple<,>)) {
+                var arguments = type.GetGenericArguments();
+                throw new InvalidOperationException(
+                    $"The two-parameter configurator for ({arguments[0]}, {arguments[1]}) was never consumed by its owning feature.");
+            }
+
             var icg = ic.MakeGenericType(type);
             var tcg = tc.MakeGenericType(type);
 

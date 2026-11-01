@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -16,23 +15,31 @@ namespace Schemata.Core.Json;
 ///     <see cref="JsonPolymorphismOptions" /> on base types with discriminator
 ///     property <c>"@type"</c>. Unknown discriminators fail serialization.
 /// </summary>
+/// <remarks>
+///     The scan runs through <see cref="AppDomainTypeCache.GetAllTypes" /> when the singleton is
+///     created, so assemblies loaded after the cache was first touched are included. Types loaded
+///     only after this resolver is created are not observed; they must be present when the serializer
+///     options are configured.
+/// </remarks>
 public class PolymorphicTypeResolver : DefaultJsonTypeInfoResolver
 {
     private const string TypeDiscriminator = "@type";
 
-    private readonly Dictionary<RuntimeTypeHandle, List<JsonDerivedType>?> _types = [];
+    private readonly Dictionary<RuntimeTypeHandle, List<JsonDerivedType>> _types = [];
 
     private PolymorphicTypeResolver() {
-        var types = AppDomainTypeCache.Types.Values.Where(t => t.HasCustomAttribute<PolymorphicAttribute>(false));
-        foreach (var type in types) {
-            var attribute = type.GetCustomAttribute<PolymorphicAttribute>();
-            var handle    = attribute!.BaseType.TypeHandle;
-            if (!_types.TryGetValue(handle, out var value)) {
-                value          = [];
-                _types[handle] = value;
+        foreach (var type in AppDomainTypeCache.GetAllTypes()) {
+            if (type.GetCustomAttribute<PolymorphicAttribute>() is not { } attribute) {
+                continue;
             }
 
-            value!.Add(attribute.Name is not null ? new(type, attribute.Name) : new(type));
+            var handle = attribute.BaseType.TypeHandle;
+            if (!_types.TryGetValue(handle, out var types)) {
+                types          = [];
+                _types[handle] = types;
+            }
+
+            types.Add(attribute.Name is not null ? new(type, attribute.Name) : new(type));
         }
     }
 
@@ -54,7 +61,7 @@ public class PolymorphicTypeResolver : DefaultJsonTypeInfoResolver
             IgnoreUnrecognizedTypeDiscriminators = true,
             UnknownDerivedTypeHandling           = JsonUnknownDerivedTypeHandling.FailSerialization,
         };
-        foreach (var child in children!) {
+        foreach (var child in children) {
             info.PolymorphismOptions.DerivedTypes.Add(child);
         }
 

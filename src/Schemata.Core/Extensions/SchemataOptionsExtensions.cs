@@ -60,7 +60,9 @@ public static class SchemataOptionsExtensions
     /// <param name="schemata">The options container.</param>
     /// <param name="type">The concrete feature type.</param>
     public static void AddFeature(this SchemataOptions schemata, Type type) {
-        var feature = Utilities.CreateInstance<ISimpleFeature>(type, schemata.CreateLogger(type))!;
+        var feature = Utilities.CreateInstance<ISimpleFeature>(type, schemata.CreateLogger(type))
+                      ?? throw new InvalidOperationException(
+                          $"Feature type {type.FullName} has no public constructor.");
         schemata.AddFeature(type, feature);
     }
 
@@ -75,7 +77,14 @@ public static class SchemataOptionsExtensions
     /// <param name="type">The feature's concrete type.</param>
     /// <param name="feature">The feature instance.</param>
     public static void AddFeature(this SchemataOptions schemata, Type type, ISimpleFeature feature) {
-        var features = schemata.GetFeatures() ?? [];
+        // Publish the dictionary before traversing dependencies: the recursive registrations
+        // below must add to the same map instead of publishing their own.
+        var features = schemata.GetFeatures();
+        if (features is null) {
+            features = [];
+            schemata.SetFeatures(features);
+        }
+
         if (features.ContainsKey(type.TypeHandle)) {
             return;
         }
@@ -115,14 +124,14 @@ public static class SchemataOptionsExtensions
             }
 
             if (attribute is InformationAttribute info && schemata.HasFeature<SchemataLoggingFeature>()) {
-#pragma warning disable CA2254
-                schemata.Logger.Log(info.Level, info.Message, info.Parameters);
-#pragma warning restore CA2254
+                var state = (Message: info.Message, Args: info.Parameters);
+                schemata.Logger.Log(
+                    info.Level, default, state, null,
+                    (s, _) => s.Args is { Length: > 0 } ? string.Format(s.Message, s.Args) : s.Message);
             }
         }
 
         features[type.TypeHandle] = feature;
-        schemata.SetFeatures(features);
     }
 
     /// <summary>

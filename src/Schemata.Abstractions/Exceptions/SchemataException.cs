@@ -32,7 +32,8 @@ public class SchemataException : Exception
     /// <param name="message">
     ///     Developer-oriented diagnostic message for logs and API clients.
     /// </param>
-    public SchemataException(int code, string? status = null, string? message = null) : base(message) {
+    /// <param name="innerException">Internal diagnostic cause; excluded from the error response envelope.</param>
+    public SchemataException(int code, string? status = null, string? message = null, Exception? innerException = null) : base(message, innerException) {
         Code   = code;
         Status = status;
     }
@@ -47,6 +48,17 @@ public class SchemataException : Exception
     ///     enum values.
     /// </summary>
     public string? Status { get; }
+    /// <summary>
+    ///     Logical service domain that namespaces this exception's
+    ///     <see cref="ErrorInfoDetail.Reason" /> codes, per
+    ///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>. Exception
+    ///     families override this with their own constant namespace; response conversion
+    ///     assigns it to every <see cref="ErrorInfoDetail" /> that does not carry one.
+    /// </summary>
+    public virtual string? Domain => ErrorDomains.Schemata;
+
+    protected virtual string? MessageResourceKey => null;
+
 
     /// <summary>
     ///     Typed detail entries providing additional structured information about the error.
@@ -84,14 +96,13 @@ public class SchemataException : Exception
     ///     for protocol-specific error serialization.
     /// </remarks>
     /// <param name="requestId">Optional request identifier included in <see cref="RequestInfoDetail" />.</param>
-    /// <param name="domain">Optional ErrorInfo domain.</param>
     /// <param name="locale">
     ///     Optional <seealso href="https://www.rfc-editor.org/rfc/bcp/bcp47.html">BCP-47</seealso>
     ///     language tag parsed from the transport's <c>Accept-Language</c> header. When
     ///     supplied and resolvable, a <see cref="LocalizedMessageDetail" /> is appended via
     ///     <see cref="EnsureLocalizedMessage" />.
     /// </param>
-    public virtual object? CreateErrorResponse(string? requestId = null, string? domain = null, string? locale = null) {
+    public virtual object? CreateErrorResponse(string? requestId = null, string? locale = null) {
         var status  = Status ?? ErrorCodes.Internal;
         var details = new List<IErrorDetail>();
 
@@ -99,9 +110,10 @@ public class SchemataException : Exception
             details.AddRange(Details);
         }
 
-        EnsureErrorInfo(details, status, domain);
+        EnsureErrorInfo(details, status, Domain);
         EnsureRequestInfo(details, requestId);
-        EnsureLocalizedMessage(details, locale, status);
+        EnsureLocalizedMessage(details, locale, status, MessageResourceKey);
+        EnsureLocalizedFieldViolations(details, locale);
 
         return new ErrorResponse {
             Error = new() {
@@ -120,11 +132,19 @@ public class SchemataException : Exception
     /// <param name="reason">Canonical reason code assigned to the inserted detail.</param>
     /// <param name="domain">Logical service domain assigned to the inserted detail.</param>
     protected static void EnsureErrorInfo(List<IErrorDetail> details, string reason, string? domain) {
-        if (details.Any(d => d is ErrorInfoDetail)) {
-            return;
+        var hasErrorInfo = false;
+        foreach (var detail in details) {
+            if (detail is not ErrorInfoDetail info) {
+                continue;
+            }
+
+            info.Domain ??= domain;
+            hasErrorInfo = true;
         }
 
-        details.Insert(0, new ErrorInfoDetail { Reason = reason, Domain = domain, });
+        if (!hasErrorInfo) {
+            details.Insert(0, new ErrorInfoDetail { Reason = reason, Domain = domain });
+        }
     }
 
     /// <summary>
@@ -158,10 +178,9 @@ public class SchemataException : Exception
     ///         <see cref="LocalizedMessageDetail" /> for the user-facing text.
     ///     </para>
     ///     <para>
-    ///         The lookup tries the <see cref="ErrorInfoDetail.Reason" /> resx key first,
-    ///         then falls back to the <c>Status</c> resx key. This keeps a localized
-    ///         template available even when a specific Reason has no dedicated resx
-    ///         entry. When the template carries named placeholders (e.g.
+    ///         The lookup uses the exception's message resource key when present, otherwise
+    ///         <see cref="ErrorInfoDetail.Reason" />, then falls back to <c>Status</c>.
+    ///         When the template carries named placeholders (e.g.
     ///         <c>{resource}</c>) the helper substitutes them from
     ///         <see cref="ErrorInfoDetail.Metadata" /> by key, which makes the wire
     ///         contract independent of dictionary enumeration order. Templates that
@@ -176,7 +195,8 @@ public class SchemataException : Exception
     /// <param name="details">Mutable detail list for the response.</param>
     /// <param name="locale">BCP-47 language tag parsed from <c>Accept-Language</c>.</param>
     /// <param name="status">Top-level <c>google.rpc.Code</c> name used as the resx fallback key when Reason has no dedicated entry.</param>
-    protected static void EnsureLocalizedMessage(List<IErrorDetail> details, string? locale, string? status) {
+    /// <param name="resourceKey">Optional domain-owned message template when the reason has a separate identifier.</param>
+    protected static void EnsureLocalizedMessage(List<IErrorDetail> details, string? locale, string? status, string? resourceKey = null) {
         if (string.IsNullOrWhiteSpace(locale)) {
             return;
         }
@@ -195,7 +215,7 @@ public class SchemataException : Exception
             return;
         }
 
-        var template = TryGetResource(reason, culture) ?? TryGetResource(status, culture);
+        var template = TryGetResource(resourceKey ?? reason, culture) ?? TryGetResource(status, culture);
         var message  = LocalizedMessageFormatter.Format(template, errorInfo?.Metadata, culture);
         if (string.IsNullOrEmpty(message)) {
             return;
@@ -205,6 +225,45 @@ public class SchemataException : Exception
             Locale  = locale,
             Message = message,
         });
+    }
+
+
+    /// <summary>
+    ///     Fills <see cref="ErrorFieldViolation.LocalizedMessage" /> for every violation whose
+    ///     <see cref="ErrorFieldViolation.Reason" /> resolves a resx template in the caller's
+    ///     culture, mirroring <see cref="EnsureLocalizedMessage" /> at the field level.
+    /// </summary>
+    /// <param name="details">Mutable detail list for the response.</param>
+    /// <param name="locale">BCP-47 language tag parsed from <c>Accept-Language</c>.</param>
+    protected static void EnsureLocalizedFieldViolations(List<IErrorDetail> details, string? locale) {
+        if (string.IsNullOrWhiteSpace(locale)) {
+            return;
+        }
+
+        CultureInfo culture;
+        try {
+            culture = CultureInfo.GetCultureInfo(locale);
+        } catch (CultureNotFoundException) {
+            return;
+        }
+
+        foreach (var violation in details.OfType<BadRequestDetail>()
+                                        .SelectMany(d => d.FieldViolations ?? [])
+                                        .Where(v => v.LocalizedMessage is null)) {
+            var template = TryGetResource(violation.Reason, culture);
+            if (LocalizedMessageFormatter.HasPlaceholders(template)) {
+                continue;
+            }
+
+            var message = LocalizedMessageFormatter.Format(template, null, culture);
+            if (string.IsNullOrEmpty(message)) {
+                continue;
+            }
+            violation.LocalizedMessage = new() {
+                Locale  = locale,
+                Message = message,
+            };
+        }
     }
 
     private static string? TryGetResource(string? key, CultureInfo culture) {

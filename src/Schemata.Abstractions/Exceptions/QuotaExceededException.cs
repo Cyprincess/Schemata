@@ -11,31 +11,30 @@ namespace Schemata.Abstractions.Exceptions;
 /// <remarks>
 ///     Maps to <c>google.rpc.Code.RESOURCE_EXHAUSTED</c> (HTTP 429), per
 ///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
-///     Attaches <see cref="ErrorReasons.QuotaExceeded" /> on
-///     <see cref="ErrorInfoDetail" />; specific quota violations are surfaced through
-///     <see cref="QuotaViolation" /> entries supplied to the violations overload.
+///     The default <see cref="ErrorInfoDetail.Reason" /> is
+///     <see cref="SchemataResources.RESOURCE_EXHAUSTED" />; specific quota violations are surfaced
+///     through <see cref="QuotaViolation" /> entries supplied to the violations overload.
 /// </remarks>
 public class QuotaExceededException : SchemataException
 {
     /// <summary>
-    ///     Initializes a new <see cref="QuotaExceededException" />.
+    ///     Initializes a new <see cref="QuotaExceededException" /> from a resx key. The
+    ///     en-US-invariant message is rendered from <see cref="SchemataResources" /> with
+    ///     the named arguments in <paramref name="args" />; <paramref name="resourceKey" />
+    ///     also becomes the <see cref="ErrorInfoDetail.Reason" /> so the locale-aware
+    ///     response path can rehydrate the localized message from the same template.
     /// </summary>
-    /// <param name="code">HTTP response status code.</param>
-    /// <param name="status">Canonical error code from <c>google.rpc.Code</c>.</param>
-    /// <param name="message">Developer-oriented diagnostic message.</param>
-    /// <param name="reason">
-    ///     Domain-specific reason attached to <see cref="ErrorInfoDetail.Reason" />.
-    ///     Defaults to <see cref="ErrorReasons.QuotaExceeded" />.
+    /// <param name="resourceKey">
+    ///     The <see cref="SchemataResources" /> data name. Defaults to
+    ///     <see cref="SchemataResources.RESOURCE_EXHAUSTED" />.
     /// </param>
+    /// <param name="args">Optional named arguments substituted into the template.</param>
     public QuotaExceededException(
-        int     code    = 429,
-        string? status  = ErrorCodes.ResourceExhausted,
-        string? message = null,
-        string? reason  = ErrorReasons.QuotaExceeded
-    ) : base(code, status, message ?? SchemataResources.GetResourceString(SchemataResources.RESOURCE_EXHAUSTED)) {
-        if (reason is { Length: > 0 }) {
-            Details = [new ErrorInfoDetail { Reason = reason }];
-        }
+        string resourceKey = SchemataResources.RESOURCE_EXHAUSTED,
+        IReadOnlyDictionary<string, string?>? args = null
+    ) : base(429, ErrorCodes.ResourceExhausted, LocalizedMessageFormatter.FormatInvariant(resourceKey, args)) {
+        Details = [new ErrorInfoDetail { Reason = resourceKey }];
+        AttachMetadata(args);
     }
 
     /// <summary>
@@ -44,20 +43,16 @@ public class QuotaExceededException : SchemataException
     ///     <see cref="QuotaFailureDetail" />.
     /// </summary>
     /// <param name="violations">The quotas that were exceeded.</param>
-    /// <param name="code">HTTP response status code.</param>
-    /// <param name="status">Canonical error code from <c>google.rpc.Code</c>.</param>
-    /// <param name="message">Developer-oriented diagnostic message.</param>
-    /// <param name="reason">
-    ///     Domain-specific reason attached to <see cref="ErrorInfoDetail.Reason" />.
-    ///     Defaults to <see cref="ErrorReasons.QuotaExceeded" />.
+    /// <param name="resourceKey">
+    ///     The <see cref="SchemataResources" /> data name. Defaults to
+    ///     <see cref="SchemataResources.RESOURCE_EXHAUSTED" />.
     /// </param>
+    /// <param name="args">Optional named arguments substituted into the template.</param>
     public QuotaExceededException(
         IEnumerable<QuotaViolation> violations,
-        int                         code    = 429,
-        string?                     status  = ErrorCodes.ResourceExhausted,
-        string?                     message = null,
-        string?                     reason  = ErrorReasons.QuotaExceeded
-    ) : this(code, status, message, reason) {
+        string resourceKey = SchemataResources.RESOURCE_EXHAUSTED,
+        IReadOnlyDictionary<string, string?>? args = null
+    ) : this(resourceKey, args) {
         Details ??= [];
         Details.Add(new QuotaFailureDetail { Violations = violations.ToList() });
     }

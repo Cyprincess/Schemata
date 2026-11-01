@@ -36,7 +36,7 @@ public class ResourceNameDescriptorShould
         var predicate = descriptor.BuildParentPredicate<Book>(values);
 
         Assert.NotNull(predicate);
-        var compiled = predicate!.Compile();
+        var compiled = predicate.Compile();
         Assert.True(compiled(new() { Publisher  = "acme" }));
         Assert.False(compiled(new() { Publisher = "other" }));
     }

@@ -9,7 +9,8 @@ namespace Schemata.Abstractions.Resource;
 public class UpdateResultBase<TDetail>
 {
     /// <summary>
-    ///     The updated resource detail, or <see langword="null" /> for async operations.
+    ///     The updated resource detail, or <see langword="null" /> when the mutation was handled
+    ///     without a write and no change was persisted.
     /// </summary>
     public virtual TDetail? Detail { get; set; }
 }

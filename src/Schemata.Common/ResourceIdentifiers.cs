@@ -33,6 +33,17 @@ public static class ResourceIdentifiers
         }
 
         var (parents, leaf) = parsed.Value;
+
+        // AIP-159: a '-' parent segment reads across collections, so it needs the same opt-in
+        // admission ApplyParent enforces, and it must run before any predicate narrows the query.
+        if (!descriptor.SupportsReadAcross && parents.Values.Any(value => value == "-")) {
+            throw new ValidationException([new() {
+                Field       = nameof(name),
+                Description = LocalizedMessageFormatter.FormatInvariant(SchemataResources.CROSS_PARENT_UNSUPPORTED, new Dictionary<string, string?> { ["parent"] = name }),
+                Reason      = SchemataResources.CROSS_PARENT_UNSUPPORTED,
+            }]);
+        }
+
         container.ApplyWhere(entity => entity.Name == leaf);
         container.ApplyWhere(descriptor.BuildParentPredicate<TEntity>(parents));
     }

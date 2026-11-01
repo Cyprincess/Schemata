@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Schemata.Abstractions.Errors;
 using static Schemata.Abstractions.SchemataConstants;
@@ -10,33 +11,12 @@ namespace Schemata.Abstractions.Exceptions;
 /// <remarks>
 ///     Maps to <c>google.rpc.Code.ALREADY_EXISTS</c> (HTTP 409), per
 ///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
-///     Attaches <see cref="ErrorReasons.ResourceAlreadyExists" /> on
-///     <see cref="ErrorInfoDetail" /> so clients can branch on the domain reason
-///     independently of the top-level status.
+///     The default <see cref="ErrorInfoDetail.Reason" /> is
+///     <see cref="SchemataResources.ALREADY_EXISTS" /> so clients can branch on the
+///     domain reason independently of the top-level status.
 /// </remarks>
 public class AlreadyExistsException : SchemataException
 {
-    /// <summary>
-    ///     Initializes a new <see cref="AlreadyExistsException" />.
-    /// </summary>
-    /// <param name="code">HTTP response status code.</param>
-    /// <param name="status">Canonical error code from <c>google.rpc.Code</c>.</param>
-    /// <param name="message">Developer-oriented diagnostic message.</param>
-    /// <param name="reason">
-    ///     Domain-specific reason attached to <see cref="ErrorInfoDetail.Reason" />.
-    ///     Defaults to <see cref="ErrorReasons.ResourceAlreadyExists" />.
-    /// </param>
-    public AlreadyExistsException(
-        int     code    = 409,
-        string? status  = ErrorCodes.AlreadyExists,
-        string? message = null,
-        string? reason  = ErrorReasons.ResourceAlreadyExists
-    ) : base(code, status, message ?? SchemataResources.GetResourceString(SchemataResources.ALREADY_EXISTS)) {
-        if (reason is { Length: > 0 }) {
-            Details = [new ErrorInfoDetail { Reason = reason }];
-        }
-    }
-
     /// <summary>
     ///     Initializes a new <see cref="AlreadyExistsException" /> from a resx key. The
     ///     en-US-invariant message is rendered from <see cref="SchemataResources" /> with
@@ -44,10 +24,18 @@ public class AlreadyExistsException : SchemataException
     ///     also becomes the <see cref="ErrorInfoDetail.Reason" /> so the locale-aware
     ///     response path can rehydrate the localized message from the same template.
     /// </summary>
-    /// <param name="resourceKey">The <see cref="SchemataResources" /> data name.</param>
+    /// <param name="resourceKey">
+    ///     The <see cref="SchemataResources" /> data name. Defaults to
+    ///     <see cref="SchemataResources.ALREADY_EXISTS" />.
+    /// </param>
     /// <param name="args">Optional named arguments substituted into the template.</param>
-    public AlreadyExistsException(string resourceKey, IReadOnlyDictionary<string, string?>? args = null)
-        : this(message: LocalizedMessageFormatter.FormatInvariant(resourceKey, args), reason: resourceKey) {
+    /// <param name="innerException">Internal provider diagnostic cause.</param>
+    public AlreadyExistsException(
+        string resourceKey = SchemataResources.ALREADY_EXISTS,
+        IReadOnlyDictionary<string, string?>? args = null,
+        Exception? innerException = null
+    ) : base(409, ErrorCodes.AlreadyExists, LocalizedMessageFormatter.FormatInvariant(resourceKey, args), innerException) {
+        Details = [new ErrorInfoDetail { Reason = resourceKey }];
         AttachMetadata(args);
     }
 }

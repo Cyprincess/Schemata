@@ -9,7 +9,8 @@ namespace Schemata.Abstractions.Resource;
 public class CreateResultBase<TDetail>
 {
     /// <summary>
-    ///     The created resource detail, or <see langword="null" /> for fire-and-forget operations.
+    ///     The created resource detail, or <see langword="null" /> when the mutation was handled
+    ///     without a write and no row was created.
     /// </summary>
     public virtual TDetail? Detail { get; set; }
 }

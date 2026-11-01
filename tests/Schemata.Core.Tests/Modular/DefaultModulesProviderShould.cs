@@ -23,6 +23,7 @@ public class DefaultModulesProviderShould
 
     private static ConcurrentBag<ModuleDescriptor> GetModules(DefaultModulesProvider provider) {
         var field = typeof(DefaultModulesProvider).GetField("_modules", BindingFlags.Instance | BindingFlags.NonPublic);
-        return Assert.IsType<ConcurrentBag<ModuleDescriptor>>(field!.GetValue(provider));
+        Assert.NotNull(field);
+        return Assert.IsType<ConcurrentBag<ModuleDescriptor>>(field.GetValue(provider));
     }
 }
