@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Schemata.Expressions.Skeleton;
 using Xunit;
 
 namespace Schemata.Expressions.Aip.Tests.Compilation;
@@ -72,12 +73,76 @@ public class AipDynamicEvaluationShould
     public void Reject_Function_In_Dynamic_Evaluation() {
         var tree = _compiler.Parse("regex(o.name, 'a')");
 
-        Assert.ThrowsAny<Exception>(() => _compiler.Compile<IReadOnlyDictionary<string, object?>, bool>(tree));
+        Assert.Throws<ExpressionException>(() => _compiler.Compile<IReadOnlyDictionary<string, object?>, bool>(tree));
+    }
+
+    [Fact]
+    public void Evaluate_Undotted_Field_Reads_Row_Value() {
+        var predicate = Predicate("age > 18");
+
+        Assert.True(predicate(Flat(("age", 20))));
+        Assert.False(predicate(Flat(("age", 18))));
+    }
+
+    [Fact]
+    public void Evaluate_Undotted_Field_On_Either_Side_Reads_Row_Value() {
+        var predicate = Predicate("18 < age");
+
+        Assert.True(predicate(Flat(("age", 20))));
+        Assert.False(predicate(Flat(("age", 18))));
+    }
+
+    [Fact]
+    public void Evaluate_Quoted_Operand_Stays_A_String_Literal() {
+        var predicate = Predicate("name = 'age'");
+
+        Assert.True(predicate(Flat(("name", "age"), ("age", 20))));
+        Assert.False(predicate(Flat(("name", "Alice"))));
+    }
+
+    [Fact]
+    public void Evaluate_Adjacent_Longs_Beyond_Double_Precision_Stay_Distinct() {
+        var equal = Predicate("v = 9007199254740992");
+        Assert.True(equal(Flat(("v", 9007199254740992L))));
+        Assert.False(equal(Flat(("v", 9007199254740993L))));
+
+        var above = Predicate("v > 9007199254740992");
+        Assert.True(above(Flat(("v", 9007199254740993L))));
+        Assert.False(above(Flat(("v", 9007199254740992L))));
+
+        var below = Predicate("v < 9007199254740993");
+        Assert.True(below(Flat(("v", 9007199254740992L))));
+        Assert.False(below(Flat(("v", 9007199254740993L))));
+    }
+
+    [Fact]
+    public void Evaluate_Signed_Unsigned_Boundaries_Order_Correctly() {
+        var row = Flat(("a", long.MinValue), ("b", ulong.MaxValue));
+
+        Assert.True(Predicate("a < b")(row));
+        Assert.True(Predicate("b > a")(row));
+    }
+
+    [Fact]
+    public void Evaluate_Decimal_Precision_Is_Retained() {
+        var predicate = Predicate("m = 0.1");
+
+        Assert.True(predicate(Flat(("m", 0.1m))));
+        Assert.False(predicate(Flat(("m", 0.1000000000000000000000000001m))));
     }
 
     private Func<IReadOnlyDictionary<string, object?>, bool> Predicate(string source) {
         var tree = _compiler.Parse(source);
         return _compiler.Compile<IReadOnlyDictionary<string, object?>, bool>(tree).Compile();
+    }
+
+    private static IReadOnlyDictionary<string, object?> Flat(params (string Key, object? Value)[] fields) {
+        var row = new Dictionary<string, object?>();
+        foreach (var (key, value) in fields) {
+            row[key] = value;
+        }
+
+        return row;
     }
 
     private static IReadOnlyDictionary<string, object?> Row(string alias, params (string Key, object? Value)[] fields) {

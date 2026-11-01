@@ -8,7 +8,8 @@ namespace Schemata.Expressions.Cel.Expressions;
 public abstract class CelNode : IExpressionTree
 {
     /// <summary>
-    ///     Gets or sets the original expression source used as a compile-cache key.
+    ///     Gets or sets the original expression source. Compiler caching keys on the tree's
+    ///     structural fingerprint instead, since this annotation is mutable.
     /// </summary>
     public string Source { get; set; } = string.Empty;
 

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Exceptions;
+using Schemata.Insight.Skeleton;
 using Schemata.Insight.Skeleton.Queries;
 using Schemata.Security.Skeleton;
 
@@ -19,7 +20,7 @@ namespace Schemata.Insight.Foundation.Security;
 /// </summary>
 public static class InsightSecurityGate
 {
-    private const string Operation = "Insight";
+    private const string Operation = InsightConstants.Operations.Insight;
 
     /// <summary>
     ///     Checks source-level access (throwing on denial) and returns the row-level entitlement
@@ -42,7 +43,7 @@ public static class InsightSecurityGate
         var context = new AccessContext<QueryInsightRequest> { Operation = Operation, Request = request };
 
         var access = services.GetService<IAccessProvider<TEntity, QueryInsightRequest>>();
-        if (access is not null && !await access.HasAccessAsync(null, context, principal, ct)) {
+        if (access is not null && await access.HasAccessAsync(null, context, principal, ct) != AccessDecision.Allowed) {
             throw new PermissionDeniedException(
                 SchemataResources.INSIGHT_ACCESS_DENIED,
                 new Dictionary<string, string?> { ["name"] = typeof(TEntity).Name });

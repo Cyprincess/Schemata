@@ -1,6 +1,10 @@
+using System;
 using System.Security.Claims;
 using System.Text.Json.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
 using Schemata.Messaging.Skeleton;
+using Schemata.Report.Skeleton.Enums;
 using Schemata.Report.Skeleton.Models;
 
 namespace Schemata.Report.Foundation.Commands;
@@ -16,4 +20,13 @@ public sealed record RunReportRequest(ReportRequest Request, ClaimsPrincipal? Pr
 
     [JsonIgnore]
     public string? ReportKey => Request?.Name;
+
+    [JsonIgnore]
+    public ReportRunKind Kind { get; init; } = ReportRunKind.ImmediatePersisted;
+
+    [JsonIgnore]
+    public string? Operation { get; init; }
+
+    [JsonIgnore]
+    public Func<CancellationToken, ValueTask<bool>>? IsCancelled { get; init; }
 }

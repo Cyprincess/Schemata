@@ -1,6 +1,5 @@
 using System.Threading;
 using System.Threading.Tasks;
-using Schemata.Abstractions.Advisors;
 using Schemata.Advice;
 using Schemata.Insight.Foundation.Execution;
 using Schemata.Insight.Foundation.Planning;
@@ -9,6 +8,7 @@ using Schemata.Insight.Skeleton.Queries;
 using Schemata.Insight.Skeleton.Models;
 using Schemata.Insight.Skeleton.Plan;
 using Schemata.Messaging.Skeleton;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Insight.Foundation.Handlers;
 
@@ -19,16 +19,13 @@ internal sealed class DefaultQueryInsightHandler(
 {
     public async Task<QueryInsightResponse> HandleAsync(
         QueryInsightRequest request,
-        CancellationToken  ct = default
+        AdviceContext       context,
+        CancellationToken   ct = default
     ) {
-        var ctx = AdviceContext.Require();
+        var rewrite = new InsightPlanContext(request, await planner.BuildAsync(request, ct));
+        await Advisor.For<IInsightPlanAdvisor>().RunAsync(context, rewrite, ct);
 
-        var plan = await planner.BuildAsync(request, ct);
-        ctx.Set(plan);
-        await Advisor.For<IInsightPlanAdvisor>().RunAsync(ctx, request, ct);
-        plan = ctx.Get<PlanNode>()!;
-
-        var response = await executor.ExecuteAsync(plan, request, request.Principal, ct);
+        var response = await executor.ExecuteAsync(rewrite.Plan, request, request.Principal, context, ct);
 
         return response;
     }

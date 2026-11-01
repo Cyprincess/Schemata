@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Transport.Grpc;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Features;
@@ -35,8 +37,9 @@ public sealed class SchemataReportGrpcFeature<TReport, TSnapshot, TChunk> : Feat
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IGrpcRuntimeModelContributor, ReportGrpcModelContributor>());
         var resources = new SchemataResourceBuilder(schemata, services) {
-            AuthenticationScheme = schemata.Get<string>(Foundation.SchemataReportBuilder<TReport, TSnapshot, TChunk>.AuthenticationSchemeKey),
+            AuthenticationScheme = schemata.Get<string>(SchemataReportBuilder<TReport, TSnapshot, TChunk>.AuthenticationSchemeKey),
         };
         resources.Use<TReport, TReport, TReport, TReport>(
             [GrpcResourceAttribute.Name],

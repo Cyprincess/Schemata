@@ -41,6 +41,41 @@ public class AipPushdownPlannerShould
     }
 
     [Fact]
+    public void Keep_Residual_When_MultipleConjuncts_And_Logical_Disabled() {
+        var plan = _planner.Plan(_compiler.Parse("age > 18 AND score > 10"),
+                                 new() { Logical = false });
+
+        Assert.False(plan.HasPushed);
+        Assert.True(plan.HasResidual);
+    }
+
+    [Fact]
+    public void Keep_Residual_When_SpaceConjuncts_And_Logical_Disabled() {
+        var plan = _planner.Plan(_compiler.Parse("age > 18 score > 10"),
+                                 new() { Logical = false });
+
+        Assert.False(plan.HasPushed);
+        Assert.True(plan.HasResidual);
+    }
+
+    [Fact]
+    public void Keep_Residual_When_ParenthesizedConjuncts_And_Logical_Disabled() {
+        var plan = _planner.Plan(_compiler.Parse("(age > 18 score > 10)"),
+                                 new() { Logical = false });
+
+        Assert.False(plan.HasPushed);
+        Assert.True(plan.HasResidual);
+    }
+
+    [Fact]
+    public void Push_SingleConjunct_When_Logical_Disabled() {
+        var plan = _planner.Plan(_compiler.Parse("age > 18"), new() { Logical = false });
+
+        Assert.True(plan.HasPushed);
+        Assert.False(plan.HasResidual);
+    }
+
+    [Fact]
     public void Push_Disjunction_When_Logical_Enabled() {
         var plan = Plan("status = 'a' OR status = 'b'");
 
@@ -79,8 +114,10 @@ public class AipPushdownPlannerShould
         Assert.True(plan.HasPushed);
         Assert.True(plan.HasResidual);
 
-        var pushed   = _compiler.Compile<Row, bool>(plan.Pushed!).Compile();
-        var residual = _compiler.Compile<Row, bool>(plan.Residual!).Compile();
+        Assert.NotNull(plan.Pushed);
+        Assert.NotNull(plan.Residual);
+        var pushed   = _compiler.Compile<Row, bool>(plan.Pushed).Compile();
+        var residual = _compiler.Compile<Row, bool>(plan.Residual).Compile();
 
         Assert.True(pushed(new() { Age        = 1 }));
         Assert.False(pushed(new() { Age       = 2 }));
@@ -91,8 +128,13 @@ public class AipPushdownPlannerShould
     [Fact]
     public void Pushed_And_Residual_Together_Equal_Original() {
         var plan     = Plan("age = 1 AND profile.locale = 'en'");
-        var pushed   = _compiler.Compile<Row, bool>(plan.Pushed!).Compile();
-        var residual = _compiler.Compile<Row, bool>(plan.Residual!).Compile();
+        Assert.True(plan.HasPushed);
+        Assert.True(plan.HasResidual);
+
+        Assert.NotNull(plan.Pushed);
+        Assert.NotNull(plan.Residual);
+        var pushed   = _compiler.Compile<Row, bool>(plan.Pushed).Compile();
+        var residual = _compiler.Compile<Row, bool>(plan.Residual).Compile();
         var original = _compiler.Compile<Row, bool>(_compiler.Parse("age = 1 AND profile.locale = 'en'")).Compile();
 
         Row[] rows = [

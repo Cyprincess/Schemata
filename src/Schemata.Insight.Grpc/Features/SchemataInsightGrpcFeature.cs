@@ -10,6 +10,7 @@ using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Insight.Foundation.Features;
 using Schemata.Insight.Foundation;
+using Schemata.Transport.Grpc;
 using Schemata.Transport.Grpc.Features;
 
 namespace Schemata.Insight.Grpc.Features;
@@ -37,6 +38,7 @@ public sealed class SchemataInsightGrpcFeature : FeatureBase
     ) {
         services.TryAddScoped<InsightGrpcService>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceMethodProvider<InsightGrpcService>, InsightServiceMethodProvider>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IGrpcServiceDescriptorContributor, InsightGrpcServiceDescriptorContributor>());
     }
 
     public override void ConfigureEndpoints(

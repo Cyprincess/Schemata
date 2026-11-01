@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using Schemata.Entity.Repository;
 using Schemata.Insight.Foundation;
@@ -13,8 +14,9 @@ using Schemata.Insight.Foundation.Planning;
 using Schemata.Insight.Skeleton.Catalog;
 using Schemata.Insight.Skeleton.Drivers;
 using Schemata.Insight.Skeleton.Plan;
+using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Runtime;
 using Schemata.Report.Foundation;
-using Schemata.Report.Foundation.Runtime;
 using Schemata.Report.Skeleton;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -51,6 +53,7 @@ internal static class ReportTestHost
     ) {
         state ??= new();
         var services = new ServiceCollection();
+        services.AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>();
         services.Configure<SchemataReportOptions>(options => {
             options.ChunkSize     = chunkSize;
             options.MaxInlineRows = maxInlineRows;
@@ -61,17 +64,16 @@ internal static class ReportTestHost
         services.AddKeyedSingleton(TestDriverName, driver.Object);
         services.AddSingleton<LocalPipelineExecutor>();
         services.AddSingleton<PlanExecutor>();
-        services.AddScoped<ReportExecutionContext>();
         services.AddSingleton<IReportDefinitionStore>(CreateDefinitionStore(report).Object);
         services.AddSingleton(state);
+        services.TryAddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>));
         if (registerRepositories) {
             services.AddScoped<IRepository<SchemataReportSnapshot>>(_ => state.CreateSnapshotRepository());
             services.AddScoped<IRepository<SchemataReportSnapshotChunk>>(_ => state.CreateChunkRepository());
         }
         services.AddSingleton<ReportRetentionEnforcer<SchemataReportSnapshot, SchemataReportSnapshotChunk>>();
         services.AddSingleton<ReportSnapshotWriter<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>();
-        services.AddSingleton<IReportSnapshotStore, DefaultReportSnapshotStore<SchemataReportSnapshot, SchemataReportSnapshotChunk>>();
-        services.AddSchemataReport<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>();
+        services.AddSchemataReport<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new());
         configure?.Invoke(services);
 
         return services.BuildServiceProvider();
@@ -96,8 +98,8 @@ internal static class ReportTestHost
         return driver;
     }
 
-    internal static Mock<IScheduler> CreateScheduler(Action<JobContext, SchemataJobExecution> onTrigger) {
-        var scheduler = new Mock<IScheduler>(MockBehavior.Strict);
+    internal static Mock<IScheduler<SchemataJob, SchemataJobExecution>> CreateScheduler(Action<JobContext, SchemataJobExecution> onTrigger) {
+        var scheduler = new Mock<IScheduler<SchemataJob, SchemataJobExecution>>(MockBehavior.Strict);
         scheduler.Setup(value => value.TriggerAsync<ReportGenerationJob<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>>(
                      It.IsAny<JobContext>(),
                      It.IsAny<CancellationToken>()))
@@ -113,6 +115,11 @@ internal static class ReportTestHost
                      return Task.FromResult(execution);
                  });
         return scheduler;
+    }
+
+    internal static void RegisterScheduler(IServiceCollection services, Mock<IScheduler<SchemataJob, SchemataJobExecution>> scheduler) {
+        services.AddSingleton(scheduler.Object);
+        services.AddSingleton<IScheduler>(scheduler.Object);
     }
 
     internal static ReportRequest InlineRequest(bool persist = false) {
@@ -147,7 +154,7 @@ internal static class ReportTestHost
                  report is not null && string.Equals(report.Name, name, StringComparison.Ordinal)
                      ? ((SchemataReport Report, QueryInsightRequest Query)?)(
                          report,
-                         new QueryInsightRequest { Sources = [new("r", "rows")] })
+                         new() { Sources = [new("r", "rows")] })
                      : null));
         store.Setup(value => value.ListPeriodicAsync(It.IsAny<CancellationToken>()))
              .Returns((CancellationToken _) => ReportTestRows.ToAsync(

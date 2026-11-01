@@ -25,7 +25,7 @@ public sealed class ReportAuthorizationRegistrationShould
     [Fact]
     public void Activation_Registers_Only_Its_Security_Stage() {
         var services = new ServiceCollection();
-        var builder  = new Foundation.SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services);
+        var builder  = new SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services);
 
         builder.WithAuthorization();
 
@@ -40,7 +40,7 @@ public sealed class ReportAuthorizationRegistrationShould
     [Fact]
     public void Combined_Activation_Registers_Both_Security_Stages() {
         var services = new ServiceCollection();
-        var builder  = new Foundation.SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services);
+        var builder  = new SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services);
 
         builder.WithAuthentication().WithAuthorization();
 
@@ -55,7 +55,7 @@ public sealed class ReportAuthorizationRegistrationShould
     [Fact]
     public void Authorization_Resolves_Run_Closure_To_Report_Operation_And_Entity() {
         var services = new ServiceCollection();
-        new Foundation.SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services).WithAuthorization();
+        new SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services).WithAuthorization();
         var envelope = typeof(ResourceMethodRequest<SchemataReport, RunReportRequest, ReportResult>);
         var service  = typeof(IRequestPipelineAdvisor<,>).MakeGenericType(envelope, typeof(ReportResult));
 
@@ -65,7 +65,7 @@ public sealed class ReportAuthorizationRegistrationShould
                                                    && descriptor.ImplementationType == typeof(AuthenticationPipelineAdvisor<ResourceMethodRequest<SchemataReport, RunReportRequest, ReportResult>, ReportResult>));
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
-        var resolve = scope.ServiceProvider.GetRequiredService<Func<ResourceMethodRequest<SchemataReport, RunReportRequest, ReportResult>, (string Operation, Type? Entity)>>();
+        var resolve = scope.ServiceProvider.GetRequiredService<Func<ResourceMethodRequest<SchemataReport, RunReportRequest, ReportResult>, ResourceTarget>>();
 
         var actual = resolve(new(ReportOperations.Run, "reports/daily", new(new() { Name = "daily" }, null), null));
 
@@ -76,7 +76,7 @@ public sealed class ReportAuthorizationRegistrationShould
     [Fact]
     public void Authorization_Resolves_Generate_Closure_To_Report_Operation_And_Entity() {
         var services = new ServiceCollection();
-        new Foundation.SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services).WithAuthorization();
+        new SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services).WithAuthorization();
         var envelope = typeof(ResourceMethodRequest<SchemataReport, GenerateReportRequest, Operation>);
         var service  = typeof(IRequestPipelineAdvisor<,>).MakeGenericType(envelope, typeof(Operation));
 
@@ -86,7 +86,7 @@ public sealed class ReportAuthorizationRegistrationShould
                                                    && descriptor.ImplementationType == typeof(AuthenticationPipelineAdvisor<ResourceMethodRequest<SchemataReport, GenerateReportRequest, Operation>, Operation>));
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
-        var resolve = scope.ServiceProvider.GetRequiredService<Func<ResourceMethodRequest<SchemataReport, GenerateReportRequest, Operation>, (string Operation, Type? Entity)>>();
+        var resolve = scope.ServiceProvider.GetRequiredService<Func<ResourceMethodRequest<SchemataReport, GenerateReportRequest, Operation>, ResourceTarget>>();
 
         var actual = resolve(new(ReportOperations.Generate, "reports/daily", new() { Name = "daily" }, null));
 
@@ -97,7 +97,7 @@ public sealed class ReportAuthorizationRegistrationShould
     [Fact]
     public void Authorization_Resolves_Read_Closure_To_Read_Operation_And_Snapshot_Entity() {
         var services = new ServiceCollection();
-        new Foundation.SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services).WithAuthorization();
+        new SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(new(), services).WithAuthorization();
         var service = typeof(IRequestPipelineAdvisor<,>).MakeGenericType(typeof(ReadSnapshotRequest), typeof(ReadSnapshotResponse));
 
         Assert.Contains(services, descriptor => descriptor.ServiceType == service
@@ -106,7 +106,7 @@ public sealed class ReportAuthorizationRegistrationShould
                                                    && descriptor.ImplementationType == typeof(AuthenticationPipelineAdvisor<ReadSnapshotRequest, ReadSnapshotResponse>));
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
-        var resolve = scope.ServiceProvider.GetRequiredService<Func<ReadSnapshotRequest, (string Operation, Type? Entity)>>();
+        var resolve = scope.ServiceProvider.GetRequiredService<Func<ReadSnapshotRequest, ResourceTarget>>();
 
         var actual = resolve(new() { Name = "reports/daily/snapshots/latest" });
 
@@ -115,13 +115,14 @@ public sealed class ReportAuthorizationRegistrationShould
     }
     [Fact]
     public async Task Anonymous_Run_Bypasses_Authentication_And_Authorization() {
+        using var provider = new ServiceCollection().BuildServiceProvider();
         var resolver = new Mock<IPermissionResolver>(MockBehavior.Strict);
         var matcher  = new Mock<IPermissionMatcher>(MockBehavior.Strict);
         var request  = new ResourceMethodRequest<SchemataReport, RunReportRequest, ReportResult>(ReportOperations.Run, "reports/daily", new(new() { Name = "daily" }, null), null);
         var authentication = new AuthenticationPipelineAdvisor<ResourceMethodRequest<SchemataReport, RunReportRequest, ReportResult>, ReportResult>(
-            value => (value.Verb, typeof(AnonymousReport)));
+            value => ResourceTarget.Instance(value.Verb, typeof(AnonymousReport), value.Name));
         var authorization = new AuthorizationPipelineAdvisor<ResourceMethodRequest<SchemataReport, RunReportRequest, ReportResult>, ReportResult>(
-            value => (value.Verb, typeof(AnonymousReport)), resolver.Object, matcher.Object);
+            value => ResourceTarget.Instance(value.Verb, typeof(AnonymousReport), value.Name), resolver.Object, matcher.Object, provider);
         var calls = 0;
 
         var result = await authentication.AdviseAsync(new(new ServiceCollection().BuildServiceProvider()), request,

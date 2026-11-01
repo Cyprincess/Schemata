@@ -13,4 +13,6 @@ public sealed record FieldDescriptor(
     FieldType                       Type,
     string?                         SourceAlias,
     bool                            IsList,
-    ImmutableArray<FieldDescriptor> Children);
+    ImmutableArray<FieldDescriptor> Children) {
+    public FieldDescriptor? Element { get; init; }
+}

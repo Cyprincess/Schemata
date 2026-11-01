@@ -1,10 +1,12 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Moq;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Entities;
+using Schemata.Common;
 using Schemata.Entity.Repository;
 
 namespace Schemata.Report.Tests.Fixtures;
@@ -23,13 +25,11 @@ internal static class ReportRepositoryMocks
         var removed = new List<TEntity>();
         var updated = new List<TEntity>();
         var services = new Mock<IServiceProvider>(MockBehavior.Strict);
-        var disposable = new Mock<IDisposable>(MockBehavior.Strict);
         var repository = new Mock<IRepository<TEntity>>(MockBehavior.Strict);
         IUnitOfWork? unit = null;
         var committed = false;
 
         services.Setup(value => value.GetService(It.IsAny<Type>())).Returns((object?)null);
-        disposable.Setup(value => value.Dispose());
         repository.SetupGet(value => value.AdviceContext).Returns(new AdviceContext(services.Object));
         repository.Setup(value => value.Begin()).Returns(() => {
             unit = transactions.Create(Commit);
@@ -52,44 +52,41 @@ internal static class ReportRepositoryMocks
                   });
         repository.Setup(value => value.ListAsync<TEntity>(
                       It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
-                      It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>>? predicate, CancellationToken _) =>
+                      It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>>? predicate, CancellationToken _, QueryOptions _) =>
                       ReportTestRows.ToAsync<TEntity>(predicate is null ? records : predicate(records.AsQueryable())));
         repository.Setup(value => value.FirstOrDefaultAsync<TEntity>(
                       It.IsAny<Func<IQueryable<TEntity>, IQueryable<TEntity>>>(),
-                      It.IsAny<CancellationToken>()))
-                  .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>>? predicate, CancellationToken _) =>
+                      It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<TEntity>, IQueryable<TEntity>>? predicate, CancellationToken _, QueryOptions _) =>
                       ValueTask.FromResult<TEntity?>(
                           (predicate is null ? records.AsQueryable() : predicate(records.AsQueryable())).FirstOrDefault()));
-        repository.Setup(value => value.AddAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
-                  .Callback<TEntity, CancellationToken>((entity, _) => {
+        repository.Setup(value => value.AddAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
+                  .Callback<TEntity, CancellationToken, MutationOptions>((entity, _, _) => {
                       EnsureOpen();
+                      if (entity is ICanonicalName resource) {
+                          resource.Name ??= $"consumer-{Guid.NewGuid():n}";
+                          resource.CanonicalName = ResourceNameDescriptor.ForType<TEntity>().Resolve(entity);
+                      }
                       pending.Add(entity);
                   })
-                  .Returns(Task.CompletedTask);
-        repository.Setup(value => value.UpdateAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>()))
-                  .Callback<TEntity, CancellationToken>((entity, _) => {
+                  .ReturnsAsync(MutationResult.Applied);
+        repository.Setup(value => value.UpdateAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
+                  .Callback<TEntity, CancellationToken, MutationOptions>((entity, _, _) => {
                       EnsureOpen();
                       updated.Add(entity);
                   })
-                  .Returns(Task.CompletedTask);
-        repository.Setup(value => value.RemoveRangeAsync(It.IsAny<IEnumerable<TEntity>>(), It.IsAny<CancellationToken>()))
-                  .Callback<IEnumerable<TEntity>, CancellationToken>((entities, _) => {
+                  .ReturnsAsync(MutationResult.Applied);
+        repository.Setup(value => value.RemoveAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
+                  .Callback<TEntity, CancellationToken, MutationOptions>((entity, _, _) => {
                       EnsureOpen();
                       if (unit is null) {
-                          foreach (var entity in entities) {
-                              records.Remove(entity);
-                          }
+                          records.Remove(entity);
                       } else {
-                          removed.AddRange(entities);
+                          removed.Add(entity);
                       }
                   })
-                  .Returns(Task.CompletedTask);
-        repository.Setup(value => value.SuppressAddValidation()).Returns(disposable.Object);
-        repository.Setup(value => value.SuppressUpdateValidation()).Returns(disposable.Object);
-        repository.Setup(value => value.SuppressQuerySoftDelete()).Returns(disposable.Object);
-        repository.Setup(value => value.SuppressSoftDelete()).Returns(disposable.Object);
-        repository.Setup(value => value.SuppressTimestamp()).Returns(disposable.Object);
+                  .ReturnsAsync(MutationResult.Applied);
         repository.Setup(value => value.Dispose());
         repository.Setup(value => value.DisposeAsync()).Returns(ValueTask.CompletedTask);
         return repository.Object;

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Core;
 using Schemata.Core.Features;
+using Schemata.Insight.Skeleton.Entities;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Insight.Foundation.Features;
@@ -25,4 +26,18 @@ public sealed class SchemataInsightFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) => services.AddSchemataInsight();
+}
+
+/// <summary>
+///     Records the host-selected source entity for the Insight subsystem. The query pipeline is
+///     entity-agnostic; the database catalog is closed on this type by
+///     <see cref="SchemataInsightBuilder.UseDatabaseCatalog" />, and transports bind to this closed
+///     feature through <c>DependsOn</c>.
+/// </summary>
+/// <typeparam name="TInsightSource">The persisted source entity type.</typeparam>
+[DependsOn<SchemataInsightFeature>]
+public sealed class SchemataInsightFeature<TInsightSource> : FeatureBase
+    where TInsightSource : SchemataInsightSource, new()
+{
+    public override int Priority => SchemataInsightFeature.DefaultPriority;
 }

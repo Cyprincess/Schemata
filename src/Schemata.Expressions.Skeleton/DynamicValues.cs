@@ -65,7 +65,8 @@ public static class DynamicValues
 
     /// <summary>
     ///     Compares two values for equality. A missing operand is never equal; two nulls are equal;
-    ///     numeric operands compare by value across numeric types.
+    ///     numeric operands compare exactly across numeric types, except that a pair involving a
+    ///     float or double compares in binary64.
     /// </summary>
     public static bool Equal(object? left, object? right) {
         if (IsMissing(left) || IsMissing(right)) {
@@ -76,8 +77,8 @@ public static class DynamicValues
             return left is null && right is null;
         }
 
-        if (TryAsDouble(left, out var l) && TryAsDouble(right, out var r)) {
-            return l.Equals(r);
+        if (TryCompareNumbers(left, right, out var comparison)) {
+            return comparison == 0;
         }
 
         if (left is string ls && right is string rs) {
@@ -169,8 +170,8 @@ public static class DynamicValues
             return null;
         }
 
-        if (TryAsDouble(left, out var l) && TryAsDouble(right, out var r)) {
-            return l.CompareTo(r);
+        if (TryCompareNumbers(left, right, out var comparison)) {
+            return comparison;
         }
 
         if (left is string ls && right is string rs) {
@@ -207,6 +208,73 @@ public static class DynamicValues
             case decimal m: result = (double)m; return true;
             default:        result = 0;   return false;
         }
+    }
+
+    private enum NumberKind
+    {
+        None,
+        Integral,
+        Decimal,
+        Floating,
+    }
+
+    // Numeric comparisons keep exact identity where the CLR can express it: integral pairs compare
+    // as integers across the signed/unsigned boundary, integral/decimal pairs compare through
+    // decimal, and a pair involving a float or double compares in binary64 — the defined mixed-float
+    // rule, chosen deliberately instead of an accidental precision loss.
+    private static bool TryCompareNumbers(object? left, object? right, out int comparison) {
+        comparison = 0;
+        var leftKind  = NumberKindOf(left);
+        var rightKind = NumberKindOf(right);
+        if (leftKind == NumberKind.None || rightKind == NumberKind.None) {
+            return false;
+        }
+
+        if (leftKind == NumberKind.Floating || rightKind == NumberKind.Floating) {
+            comparison = Convert.ToDouble(left).CompareTo(Convert.ToDouble(right));
+            return true;
+        }
+
+        if (leftKind == NumberKind.Integral && rightKind == NumberKind.Integral) {
+            comparison = CompareIntegral(left!, right!);
+            return true;
+        }
+
+        comparison = Convert.ToDecimal(left).CompareTo(Convert.ToDecimal(right));
+        return true;
+    }
+
+    private static int CompareIntegral(object left, object right) {
+        var leftSigned  = IsSigned(left);
+        var rightSigned = IsSigned(right);
+        if (leftSigned == rightSigned) {
+            return leftSigned
+                ? Convert.ToInt64(left).CompareTo(Convert.ToInt64(right))
+                : Convert.ToUInt64(left).CompareTo(Convert.ToUInt64(right));
+        }
+
+        // Mixed signedness: a negative signed value orders below every unsigned value; otherwise
+        // both values are non-negative and compare exactly in unsigned space.
+        if (leftSigned) {
+            var signed = Convert.ToInt64(left);
+            return signed < 0 ? -1 : ((ulong)signed).CompareTo(Convert.ToUInt64(right));
+        }
+
+        var rightValue = Convert.ToInt64(right);
+        return rightValue < 0 ? 1 : Convert.ToUInt64(left).CompareTo((ulong)rightValue);
+    }
+
+    private static NumberKind NumberKindOf(object? value) {
+        return value switch {
+            byte or sbyte or short or ushort or int or uint or long or ulong => NumberKind.Integral,
+            decimal                                                          => NumberKind.Decimal,
+            float or double                                                  => NumberKind.Floating,
+            var _                                                            => NumberKind.None,
+        };
+    }
+
+    private static bool IsSigned(object value) {
+        return value is sbyte or short or int or long;
     }
 
     private sealed class MissingSentinel

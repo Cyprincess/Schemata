@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 
@@ -66,6 +67,7 @@ public static class ExpressionCache
 
     private sealed class LruCache<TKey, TValue>
         where TKey : notnull
+        where TValue : class
     {
         private readonly int                                     _capacity;
         private readonly object                                  _gate = new();
@@ -128,7 +130,7 @@ public static class ExpressionCache
         /// <summary>
         ///     Attempts to get a cached value and promotes the entry when found.
         /// </summary>
-        public bool TryGet(TKey key, out TValue value) {
+        public bool TryGet(TKey key, [NotNullWhen(true)] out TValue? value) {
             lock (_gate) {
                 if (_map.TryGetValue(key, out var node)) {
                     _list.Remove(node);
@@ -137,7 +139,7 @@ public static class ExpressionCache
                     return true;
                 }
 
-                value = default!;
+                value = default;
                 return false;
             }
         }

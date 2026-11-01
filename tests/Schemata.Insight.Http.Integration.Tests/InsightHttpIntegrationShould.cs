@@ -117,6 +117,7 @@ public class InsightHttpIntegrationShould : IClassFixture<WebAppFactory>
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Trait("Layer", "Integration")]
     [Fact]
     public async Task Query_NestedChildList_ProjectsFilteredOrderedToppedComputedChildren() {
         var client = _factory.CreateClient();
@@ -154,11 +155,12 @@ public class InsightHttpIntegrationShould : IClassFixture<WebAppFactory>
         var orders = row.GetProperty("recent_paid_orders");
         Assert.Equal(2, orders.GetArrayLength());
         Assert.Equal(3, orders[0].GetProperty("number").GetInt32());
-        Assert.Equal(220d, orders[0].GetProperty("total").GetDouble(), 6);
+        Assert.Equal(220d, Assert.IsType<double>(Schemata.Common.ScalarPayloadConverter.ReadValue(orders[0].GetProperty("total"))), 6);
         Assert.Equal(1, orders[1].GetProperty("number").GetInt32());
-        Assert.Equal(110d, orders[1].GetProperty("total").GetDouble(), 6);
+        Assert.Equal(110d, Assert.IsType<double>(Schemata.Common.ScalarPayloadConverter.ReadValue(orders[1].GetProperty("total"))), 6);
     }
 
+    [Trait("Layer", "Integration")]
     [Fact]
     public async Task Query_TwoSourceJoin_ProjectsBothSidesFiltered() {
         var client = _factory.CreateClient();
@@ -190,10 +192,11 @@ public class InsightHttpIntegrationShould : IClassFixture<WebAppFactory>
 
         Assert.Equal(2, rows.GetArrayLength());
         foreach (var row in rows.EnumerateArray()) {
-            Assert.False(string.IsNullOrEmpty(row.GetProperty("full_name").GetString()));
-            Assert.True(row.GetProperty("amount").GetInt32() > 0);
+            Assert.False(string.IsNullOrEmpty(Assert.IsType<string>(Schemata.Common.ScalarPayloadConverter.ReadValue(row.GetProperty("full_name")))));
+            Assert.True(Assert.IsType<long>(Schemata.Common.ScalarPayloadConverter.ReadValue(row.GetProperty("amount"))) > 0);
         }
-        Assert.Contains(rows.EnumerateArray(), r => r.GetProperty("full_name").GetString() == "Bob" && r.GetProperty("amount").GetInt32() == 200);
+        Assert.Contains(rows.EnumerateArray(), r => Equals("Bob", Schemata.Common.ScalarPayloadConverter.ReadValue(r.GetProperty("full_name")))
+            && Equals(200L, Schemata.Common.ScalarPayloadConverter.ReadValue(r.GetProperty("amount"))));
     }
 
     [Fact]

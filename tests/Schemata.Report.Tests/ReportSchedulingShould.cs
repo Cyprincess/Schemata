@@ -1,3 +1,4 @@
+﻿using Schemata.Abstractions.Entities;
 using Schemata.Report.Tests.Fixtures;
 using System;
 using System.Collections.Generic;
@@ -7,8 +8,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
-using Schemata.Abstractions.Advisors;
-using Schemata.Core;
 using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Report.Foundation;
@@ -27,6 +26,7 @@ using Schemata.Report.Foundation.Jobs;
 using Schemata.Report.Skeleton.Entities;
 using Schemata.Report.Skeleton.Enums;
 
+using Schemata.Abstractions.Advisors;
 namespace Schemata.Report.Tests;
 
 public class ReportSchedulingShould
@@ -34,7 +34,7 @@ public class ReportSchedulingShould
     [Fact]
     public async Task Initializer_Arms_Periodic_Reports() {
         var scheduler = CreateScheduler();
-        var initializer = new ReportSchedulingInitializer(
+        var initializer = new ReportSchedulingInitializer<SchemataJob, SchemataJobExecution>(
             CreateDefinitionStore(PeriodicReport("daily", "0 0 * * *")).Object,
             scheduler.Object);
 
@@ -49,16 +49,17 @@ public class ReportSchedulingShould
         var records = new List<SchemataReport> { PeriodicReport("database", "0 * * * *") };
         var persistence = new ReportPersistenceState();
         var services = new ServiceCollection();
-        var reports = new Foundation.SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
-            new SchemataOptions(),
+        var reports = new SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
+            new(),
             services);
         reports.Define("dsl", definition => definition.Periodic(cron: "0 0 * * *"));
         services.AddScoped<IRepository<SchemataReport>>(_ => persistence.CreateRepository(records));
         AddDefinitionSource<ConfigurationReportDefinitionStore>(services);
         AddDefinitionSource<DatabaseReportDefinitionStore<SchemataReport>>(services);
+        services.AddSingleton(new ReportRegistration(typeof(SchemataReport), typeof(SchemataReportSnapshot), typeof(SchemataReportSnapshotChunk)));
         services.AddSingleton<IReportDefinitionStore, CompositeReportDefinitionStore>();
         using var provider = services.BuildServiceProvider();
-        var initializer = new ReportSchedulingInitializer(
+        var initializer = new ReportSchedulingInitializer<SchemataJob, SchemataJobExecution>(
             provider.GetRequiredService<IReportDefinitionStore>(),
             scheduler.Object);
 
@@ -69,9 +70,40 @@ public class ReportSchedulingShould
     }
 
     [Fact]
+    public async Task Initializer_Skips_Db_Periodic_Row_Shadowed_By_Config_Definition() {
+        var scheduler = CreateScheduler();
+        var records = new List<SchemataReport> { PeriodicReport("shadow", "0 0 * * *") };
+        var persistence = new ReportPersistenceState();
+        var services = new ServiceCollection();
+        var reports = new SchemataReportBuilder<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
+            new(),
+            services);
+        reports.Define("shadow", definition => { });
+        services.AddScoped<IRepository<SchemataReport>>(_ => persistence.CreateRepository(records));
+        AddDefinitionSource<ConfigurationReportDefinitionStore>(services);
+        AddDefinitionSource<DatabaseReportDefinitionStore<SchemataReport>>(services);
+        services.AddSingleton(new ReportRegistration(typeof(SchemataReport), typeof(SchemataReportSnapshot), typeof(SchemataReportSnapshotChunk)));
+        services.AddSingleton<IReportDefinitionStore, CompositeReportDefinitionStore>();
+        using var provider = services.BuildServiceProvider();
+        var initializer = new ReportSchedulingInitializer<SchemataJob, SchemataJobExecution>(
+            provider.GetRequiredService<IReportDefinitionStore>(),
+            scheduler.Object);
+
+        await initializer.StartAsync(CancellationToken.None);
+
+        VerifySchedule(scheduler, "shadow", "0 0 * * *", Times.Never());
+        scheduler.Verify(
+            value => value.ScheduleAsync(
+                It.IsAny<SchemataJob>(),
+                It.IsAny<IReadOnlyDictionary<string, string?>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
     public async Task Non_Periodic_Reports_Not_Armed() {
         var scheduler = CreateScheduler();
-        var initializer = new ReportSchedulingInitializer(
+        var initializer = new ReportSchedulingInitializer<SchemataJob, SchemataJobExecution>(
             CreateDefinitionStore(new SchemataReport { Name = "manual", Periodic = false }).Object,
             scheduler.Object);
 
@@ -88,38 +120,79 @@ public class ReportSchedulingShould
     [Fact]
     public async Task Definition_Change_Reschedules() {
         var scheduler = CreateScheduler();
-        scheduler.Setup(value => value.UnscheduleAsync("jobs/report-daily", It.IsAny<CancellationToken>()))
+        scheduler.Setup(value => value.UnscheduleAsync("jobs/consumer-weekly", It.IsAny<CancellationToken>()))
                  .Returns(Task.CompletedTask);
-        var advisor = new AdviceReportScheduleSync<SchemataReport>(scheduler.Object);
-        var changes = new CommitChanges<SchemataReport> {
-            Updated = [PeriodicReport("daily", "0 6 * * *")],
-        };
+        var advisor = new AdviceReportScheduleSync<SchemataReport, SchemataJob, SchemataJobExecution>(scheduler.Object, StoredJob());
 
-        var result = await advisor.AdviseAsync(
-            new(EmptyServices()),
-            Mock.Of<IRepository<SchemataReport>>(),
-            changes,
-            CancellationToken.None);
+        var callback = advisor.Prepare(PeriodicReport("daily", "0 6 * * *"), Operations.Update);
 
-        Assert.Equal(AdviseResult.Continue, result);
-        scheduler.Verify(value => value.UnscheduleAsync("jobs/report-daily", It.IsAny<CancellationToken>()), Times.Once);
+        Assert.NotNull(callback);
+        await callback(CancellationToken.None);
+
+        scheduler.Verify(value => value.UnscheduleAsync("jobs/consumer-weekly", It.IsAny<CancellationToken>()), Times.Once);
         VerifySchedule(scheduler, "daily", "0 6 * * *", Times.Once());
     }
 
     [Fact]
     public async Task Definition_Removal_Unschedules() {
         var scheduler = CreateScheduler();
-        scheduler.Setup(value => value.UnscheduleAsync("jobs/report-daily", It.IsAny<CancellationToken>()))
+        scheduler.Setup(value => value.UnscheduleAsync("jobs/consumer-weekly", It.IsAny<CancellationToken>()))
                  .Returns(Task.CompletedTask);
-        var advisor = new AdviceReportScheduleSync<SchemataReport>(scheduler.Object);
+        var advisor = new AdviceReportScheduleSync<SchemataReport, SchemataJob, SchemataJobExecution>(scheduler.Object, StoredJob());
 
-        await advisor.AdviseAsync(
-            new(EmptyServices()),
-            Mock.Of<IRepository<SchemataReport>>(),
-            new() { Removed = [PeriodicReport("daily", "0 0 * * *")] },
-            CancellationToken.None);
+        var callback = advisor.Prepare(PeriodicReport("daily", "0 0 * * *"), Operations.Delete);
 
-        scheduler.Verify(value => value.UnscheduleAsync("jobs/report-daily", It.IsAny<CancellationToken>()), Times.Once);
+        Assert.NotNull(callback);
+        await callback(CancellationToken.None);
+
+        scheduler.Verify(value => value.UnscheduleAsync("jobs/consumer-weekly", It.IsAny<CancellationToken>()), Times.Once);
+        scheduler.Verify(
+            value => value.ScheduleAsync(
+                It.IsAny<SchemataJob>(),
+                It.IsAny<IReadOnlyDictionary<string, string?>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task Creation_Arms_Active_Periodic_Report() {
+        var scheduler = CreateScheduler();
+        var advisor = new AdviceReportScheduleSync<SchemataReport, SchemataJob, SchemataJobExecution>(scheduler.Object, StoredJob());
+
+        var callback = advisor.Prepare(PeriodicReport("daily", "0 6 * * *"), Operations.Create);
+
+        Assert.NotNull(callback);
+        await callback(CancellationToken.None);
+
+        VerifySchedule(scheduler, "daily", "0 6 * * *", Times.Once());
+        scheduler.Verify(value => value.UnscheduleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public void Creation_Of_Non_Periodic_Report_Prepares_No_Callback() {
+        var advisor = new AdviceReportScheduleSync<SchemataReport, SchemataJob, SchemataJobExecution>(CreateScheduler().Object, StoredJob());
+
+        var callback = advisor.Prepare(new SchemataReport { Name = "manual", Periodic = false }, Operations.Create);
+
+        Assert.Null(callback);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task Update_To_Non_Periodic_Disarms_Without_Rearm() {
+        var scheduler = CreateScheduler();
+        scheduler.Setup(value => value.UnscheduleAsync("jobs/consumer-weekly", It.IsAny<CancellationToken>()))
+                 .Returns(Task.CompletedTask);
+        var advisor = new AdviceReportScheduleSync<SchemataReport, SchemataJob, SchemataJobExecution>(scheduler.Object, StoredJob());
+
+        var callback = advisor.Prepare(new SchemataReport { Name = "daily", Periodic = false }, Operations.Update);
+
+        Assert.NotNull(callback);
+        await callback(CancellationToken.None);
+
+        scheduler.Verify(value => value.UnscheduleAsync("jobs/consumer-weekly", It.IsAny<CancellationToken>()), Times.Once);
         scheduler.Verify(
             value => value.ScheduleAsync(
                 It.IsAny<SchemataJob>(),
@@ -135,7 +208,7 @@ public class ReportSchedulingShould
                           It.Is<RunReportRequest>(request =>
                               request.Request.Name == "daily"
                            && request.Request.Persist
-                           && request.Principal == null),
+                           && request.Principal == null),It.IsAny<AdviceContext>(), 
                           It.IsAny<CancellationToken>()))
                .ReturnsAsync(new ReportResult());
         using var provider = ReportTestHost.Create(
@@ -147,10 +220,11 @@ public class ReportSchedulingShould
                 services.AddSingleton(handler.Object);
             });
         var job = new ReportGenerationJob<SchemataReport, SchemataReportSnapshot, SchemataReportSnapshotChunk>(
-            provider.GetRequiredService<IServiceScopeFactory>(),
-            provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<SchemataReportOptions>>());
+            provider.GetRequiredService<Schemata.Messaging.Skeleton.IMessageExecutionScopeFactory>(),
+            provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<SchemataReportOptions>>(),
+            new(typeof(SchemataReport), typeof(SchemataReportSnapshot), typeof(SchemataReportSnapshotChunk)));
 
-        await job.ExecuteAsync(new JobContext {
+        await job.ExecuteAsync(new() {
             Variables = new Dictionary<string, string?> { ["report"] = "daily" },
         }, CancellationToken.None);
 
@@ -160,7 +234,7 @@ public class ReportSchedulingShould
     [Fact]
     public async Task Missing_CronExpression_Throws_Clear_Error() {
         var scheduler = CreateScheduler();
-        var initializer = new ReportSchedulingInitializer(
+        var initializer = new ReportSchedulingInitializer<SchemataJob, SchemataJobExecution>(
             CreateDefinitionStore(new SchemataReport {
                 Name         = "daily",
                 Periodic     = true,
@@ -173,8 +247,70 @@ public class ReportSchedulingShould
         Assert.Equal("Periodic report 'daily' requires a cron expression.", exception.Message);
     }
 
-    private static Mock<IScheduler> CreateScheduler() {
-        var scheduler = new Mock<IScheduler>();
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task Prepared_Update_Preserves_Configuration_Before_Later_Entity_Mutation() {
+        var scheduler = CreateScheduler();
+        var advisor = new AdviceReportScheduleSync<SchemataReport, SchemataJob, SchemataJobExecution>(scheduler.Object, StoredJob());
+        var report = PeriodicReport("daily", "0 6 * * *");
+        report.CanonicalName = "reports/daily";
+
+        var callback = advisor.Prepare(report, Operations.Update);
+        report.CronExpression = "0 12 * * *";
+        report.CanonicalName = "reports/later";
+        report.Name = "later";
+
+        Assert.NotNull(callback);
+        await callback(CancellationToken.None);
+
+        scheduler.Verify(value => value.ScheduleAsync(
+            It.Is<SchemataJob>(job => job.Key == "report:reports/daily" && job.CronExpression == "0 6 * * *"),
+            It.Is<IReadOnlyDictionary<string, string?>>(variables => variables["report"] == "reports/daily"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Fact]
+    public async Task Initializer_Does_Not_Arm_Soft_Deleted_Periodic_Definitions() {
+        var scheduler = CreateScheduler();
+        var initializer = new ReportSchedulingInitializer<SchemataJob, SchemataJobExecution>(
+            CreateDefinitionStore(new DeletedReport {
+                Name = "deleted", Periodic = true, ScheduleKind = ReportScheduleKind.Cron,
+                CronExpression = "0 0 * * *", DeleteTime = DateTime.UtcNow,
+            }).Object,
+            scheduler.Object);
+
+        await initializer.StartAsync(CancellationToken.None);
+
+        scheduler.Verify(value => value.ScheduleAsync(It.IsAny<SchemataJob>(),
+            It.IsAny<IReadOnlyDictionary<string, string?>>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Trait("Layer", "Unit")]
+    [Theory]
+    [InlineData(Operations.Create)]
+    [InlineData(Operations.Undelete)]
+    public void Inactive_Periodic_Definition_Prepares_No_Arm_Callback(Operations operation) {
+        var advisor = new AdviceReportScheduleSync<DeletedReport, SchemataJob, SchemataJobExecution>(CreateScheduler().Object, StoredJob());
+
+        var callback = advisor.Prepare(new DeletedReport {
+            Name = "daily", CanonicalName = "reports/daily", Periodic = true,
+            ScheduleKind = ReportScheduleKind.Cron, CronExpression = "0 0 * * *",
+            DeleteTime = DateTime.UtcNow,
+        }, operation);
+
+        Assert.Null(callback);
+    }
+
+    private sealed class DeletedReport : SchemataReport, ISoftDelete
+    {
+        public DateTime? DeleteTime { get; set; }
+
+        public DateTime? PurgeTime { get; set; }
+    }
+
+    private static Mock<IScheduler<SchemataJob, SchemataJobExecution>> CreateScheduler() {
+        var scheduler = new Mock<IScheduler<SchemataJob, SchemataJobExecution>>();
         scheduler.Setup(value => value.ScheduleAsync(
                      It.IsAny<SchemataJob>(),
                      It.IsAny<IReadOnlyDictionary<string, string?>>(),
@@ -183,11 +319,7 @@ public class ReportSchedulingShould
         return scheduler;
     }
 
-    private static IServiceProvider EmptyServices() {
-        var services = new Mock<IServiceProvider>(MockBehavior.Strict);
-        services.Setup(value => value.GetService(It.IsAny<Type>())).Returns((object?)null);
-        return services.Object;
-    }
+
 
     private static SchemataReport PeriodicReport(string name, string expression) {
         return new() {
@@ -205,11 +337,11 @@ public class ReportSchedulingShould
         services.AddSingleton(source, typeof(TSource));
     }
 
-    private static void VerifySchedule(Mock<IScheduler> scheduler, string name, string expression, Times times) {
+    private static void VerifySchedule(Mock<IScheduler<SchemataJob, SchemataJobExecution>> scheduler, string name, string expression, Times times) {
         scheduler.Verify(
             value => value.ScheduleAsync(
-                It.Is<SchemataJob>(job => job.Name == $"report-{name}"
-                                          && job.CanonicalName == $"jobs/report-{name}"
+                It.Is<SchemataJob>(job => job.Key == $"report:{name}"
+                                          && job.Name == null && job.CanonicalName == null
                                           && job.JobKey == ReportJobKeyResolver.Key
                                           && job.ScheduleType == ScheduleType.Cron
                                           && job.CronExpression == expression),
@@ -217,6 +349,13 @@ public class ReportSchedulingShould
                                                                     && variables["report"] == name),
                 It.IsAny<CancellationToken>()),
             times);
+    }
+
+    private static IRepository<SchemataJob> StoredJob() {
+        var rows = new List<SchemataJob> {
+            new() { Key = "report:daily", Name = "consumer-weekly", CanonicalName = "jobs/consumer-weekly" },
+        };
+        return new ReportPersistenceState().CreateRepository(rows);
     }
 
     private static Mock<IReportDefinitionStore> CreateDefinitionStore(params SchemataReport[] reports) {

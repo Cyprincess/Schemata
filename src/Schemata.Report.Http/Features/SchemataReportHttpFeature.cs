@@ -7,6 +7,7 @@ using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Report.Foundation;
 using Schemata.Report.Foundation.Features;
+using Schemata.Report.Http.Linking;
 using Schemata.Core.Building;
 using Schemata.Resource.Http.Features;
 using Schemata.Report.Skeleton.Entities;
@@ -51,5 +52,7 @@ public sealed class SchemataReportHttpFeature<TReport, TSnapshot, TChunk> : Feat
                 resource.Operations = ReportResourceRegistration<TReport, TSnapshot, TChunk>.SnapshotOperations;
                 resource.Methods    = ReportResourceRegistration<TReport, TSnapshot, TChunk>.SnapshotMethods;
             });
+
+        services.AddSchemataLinkContributor<ReportLinkContributor>();
     }
 }

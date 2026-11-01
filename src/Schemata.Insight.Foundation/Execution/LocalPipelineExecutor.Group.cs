@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,16 +9,20 @@ namespace Schemata.Insight.Foundation.Execution;
 
 public sealed partial class LocalPipelineExecutor
 {
-    private static async IAsyncEnumerable<IReadOnlyDictionary<string, object?>> Group(
+    private async IAsyncEnumerable<IReadOnlyDictionary<string, object?>> Group(
         IAsyncEnumerable<IReadOnlyDictionary<string, object?>> rows,
         GroupNode                                             group,
-        [EnumeratorCancellation] CancellationToken             ct
+        [EnumeratorCancellation] CancellationToken ct,
+        string? groupedAlias
     ) {
-        var buckets = new Dictionary<string, List<IReadOnlyDictionary<string, object?>>>(StringComparer.Ordinal);
-        var order   = new List<string>();
+        var buffer = await Buffer(rows, MaxScan(), ct);
+        var buckets = new Dictionary<GroupKey, List<IReadOnlyDictionary<string, object?>>>();
+        var order   = new List<GroupKey>();
 
-        await foreach (var row in rows.WithCancellation(ct)) {
-            var key = string.Join('\u001f', ImmutableArrayExtensions.Select<string, string>(group.Keys, k => Resolve(row, k)?.ToString() ?? "\u0000"));
+        foreach (var row in buffer) {
+            var values = group.Keys.IsEmpty ? Array.Empty<object?>() : new object?[group.Keys.Length];
+            for (var index = 0; index < values.Length; index++) values[index] = Resolve(row, group.Keys[index]);
+            var key = new GroupKey(values);
             if (!buckets.TryGetValue(key, out var bucket)) {
                 bucket       = [];
                 buckets[key] = bucket;
@@ -41,7 +44,29 @@ public sealed partial class LocalPipelineExecutor
                 result[aggregation.Alias] = Aggregate(bucket, aggregation);
             }
 
-            yield return result;
+            yield return groupedAlias is null ? result : new GroupedRow(result, groupedAlias);
+        }
+    }
+
+    private sealed class GroupedRow(IReadOnlyDictionary<string, object?> values, string alias)
+        : IReadOnlyDictionary<string, object?>, Schemata.Expressions.Skeleton.IQualifiedExpressionContext
+    {
+        internal string Alias => alias;
+        public object? this[string key] => values[key];
+        public IEnumerable<string> Keys => values.Keys;
+        public IEnumerable<object?> Values => values.Values;
+        public int Count => values.Count;
+        public bool ContainsKey(string key) => values.ContainsKey(key);
+        public bool TryGetValue(string key, out object? value) => values.TryGetValue(key, out value);
+        public IEnumerator<KeyValuePair<string, object?>> GetEnumerator() => values.GetEnumerator();
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+        public bool TryGetQualifiedMember(string qualifier, string member, out object? value) {
+            if (qualifier == alias) {
+                value = values.TryGetValue(member, out var field) ? field : Schemata.Expressions.Skeleton.DynamicValues.Missing;
+                return true;
+            }
+            value = null;
+            return false;
         }
     }
 }

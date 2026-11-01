@@ -5,11 +5,14 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions.Resource;
 using Schemata.Actor.Foundation;
 using Schemata.Actor.Foundation.Features;
+using Schemata.Actor.Foundation.Handlers;
+using Schemata.Actor.Skeleton;
 using Schemata.Actor.Foundation.Runtime;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Messaging.Skeleton;
 using Schemata.Report.Actor.Handlers;
+using Schemata.Report.Foundation;
 using Schemata.Report.Foundation.Commands;
 using Schemata.Report.Foundation.Features;
 using Schemata.Report.Skeleton;
@@ -22,7 +25,7 @@ namespace Schemata.Report.Actor.Features;
 ///     Installs the Report.Actor bridge: replaces the unkeyed default handler of both report
 ///     generation commands with <see cref="ActorSerializingHandler{TRequest,TResult}" /> and
 ///     registers the shared <see cref="RequestDispatchingActor" /> under the <c>"report"</c> route
-///     keyed by report name, so every entry point that resolves the unkeyed handler — facade,
+///     keyed by resolved canonical identity or configuration name, so every entry point — facade,
 ///     dispatcher, scheduled job, HTTP/gRPC <c>:generate</c> — serializes concurrent generations of
 ///     the same report.
 /// </summary>
@@ -50,14 +53,28 @@ public sealed class SchemataReportActorFeature<TReport, TSnapshot, TChunk> : Fea
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        services.Replace(ServiceDescriptor.Scoped<
-            IRequestHandler<RunReportRequest, ReportResult>,
-            ActorSerializingHandler<RunReportRequest, ReportResult>>());
-        services.Replace(ServiceDescriptor.Scoped<
-            IRequestHandler<GenerateReportRequest, Operation>,
-            ActorSerializingHandler<GenerateReportRequest, Operation>>());
+        var registration = schemata.Get<ReportRegistration>("Schemata.Report.Selection");
+        if (registration?.Report != typeof(TReport)
+         || registration.Snapshot != typeof(TSnapshot)
+         || registration.Chunk != typeof(TChunk)) {
+            return;
+        }
+
+        Register<RunReportRequest, ReportResult>(services);
+        Register<GenerateReportRequest, Operation>(services);
 
         new SchemataActorBuilder(schemata, services).Register<RequestDispatchingActor>(
             "report", ReportConstants.Handlers.Default);
+    }
+
+    private static void Register<TRequest, TResult>(IServiceCollection services)
+        where TRequest : class, IRequest<TResult>, IReportScoped {
+        services.TryAddScoped<IActorRouting<TRequest>, ReportActorRouting<TRequest>>();
+        services.Replace(ServiceDescriptor.Scoped<IRequestHandler<TRequest, TResult>>(provider =>
+            new ActorSerializingHandler<TRequest, TResult>(
+                provider.GetRequiredService<IActorSystem>(),
+                provider,
+                provider.GetRequiredService<IActorRouting<TRequest>>(),
+                ReportConstants.Handlers.Default)));
     }
 }

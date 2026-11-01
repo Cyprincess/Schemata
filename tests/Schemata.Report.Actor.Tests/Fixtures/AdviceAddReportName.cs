@@ -21,6 +21,7 @@ internal sealed class AdviceAddReportName : IRepositoryAddAdvisor<SchemataReport
         AdviceContext               ctx,
         IRepository<SchemataReport> repository,
         SchemataReport              entity,
+        MutationOptions      options,
         CancellationToken           ct
     ) {
         if (string.IsNullOrWhiteSpace(entity.Name)) {

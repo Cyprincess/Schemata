@@ -15,39 +15,22 @@ internal sealed class ReportPersistenceState
 
     internal List<SchemataReportSnapshotChunk> Chunks { get; } = [];
 
-    internal int ChunkRepositoryInstances { get; private set; }
-
     internal int CancelAfterChunks { get; set; }
 
     internal SchemataJobExecution? Execution { get; set; }
 
-    internal int ExecutionRepositoryInstances { get; private set; }
-
-    internal int ExecutionCommitCount { get; private set; }
-
     internal Queue<DateTime> SuccessfulCaptureTimes { get; } = [];
-
-    internal List<SnapshotState> SnapshotStateSequence { get; } = [];
 
     internal List<ReportChunkMetadata> ChunkAddSequence { get; } = [];
 
     internal IRepository<SchemataReportSnapshot> CreateSnapshotRepository() {
-        return ReportRepositoryMocks.Create(Snapshots, _transactions,
-                                            onAdd:    CaptureSnapshotAdd,
-                                            onUpdate: CaptureSnapshotUpdate);
+        return ReportRepositoryMocks.Create(Snapshots, _transactions, onUpdate: SetSuccessfulCaptureTime);
     }
 
     internal IRepository<SchemataReportSnapshotChunk> CreateChunkRepository() {
-        ChunkRepositoryInstances++;
         return ReportRepositoryMocks.Create(Chunks, _transactions,
                                             onCommit: CancelAfterChunkCommit,
                                             onAdd:    CaptureChunkAdd);
-    }
-
-    internal IRepository<SchemataJobExecution> CreateExecutionRepository() {
-        ExecutionRepositoryInstances++;
-        var rows = Execution is null ? [] : new List<SchemataJobExecution> { Execution };
-        return ReportRepositoryMocks.Create(rows, _transactions, () => ExecutionCommitCount++);
     }
 
     internal IRepository<TEntity> CreateRepository<TEntity>(List<TEntity> records)
@@ -67,17 +50,9 @@ internal sealed class ReportPersistenceState
         }
     }
 
-    private void CaptureSnapshotAdd(SchemataReportSnapshot snapshot) {
-        SnapshotStateSequence.Add(snapshot.State);
-    }
-
-    private void CaptureSnapshotUpdate(SchemataReportSnapshot snapshot) {
-        SnapshotStateSequence.Add(snapshot.State);
-        SetSuccessfulCaptureTime(snapshot);
-    }
 
     private void CaptureChunkAdd(SchemataReportSnapshotChunk chunk) {
-        ChunkAddSequence.Add(new ReportChunkMetadata(
+        ChunkAddSequence.Add(new(
                                  chunk.Name ?? string.Empty,
                                  chunk.Index,
                                  chunk.CanonicalName ?? string.Empty,

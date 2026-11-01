@@ -25,6 +25,12 @@ public sealed class AipPushdownPlanner : IExpressionPushdownPlanner
             throw new ArgumentException("Tree must be an AIP filter.", nameof(tree));
         }
 
+        // Top-level flattening splits a filter into conjuncts, so a multi-conjunct filter only
+        // ever pushes as compound AND; admission for that composition is the Logical capability.
+        if (!capabilities.Logical && IsCompound(filter)) {
+            return new(null, filter);
+        }
+
         var pushed   = new List<Factor>();
         var residual = new List<Factor>();
         foreach (var factor in filter.Sequences.SelectMany(sequence => sequence.Factors)) {
@@ -44,18 +50,30 @@ public sealed class AipPushdownPlanner : IExpressionPushdownPlanner
 
     #endregion
 
+    private static bool IsCompound(Filter node) {
+        return node.Sequences.Count > 1 || node.Sequences.Any(sequence => sequence.Factors.Count > 1);
+    }
+
     // Rebuilds a sub-filter from a subset of the original conjuncts. The suffix keeps the pushed and
-    // residual parts on distinct compile-cache keys, since the cache is keyed by Filter.Source.
+    // residual Source annotations distinct; compile-cache identity is the structural fingerprint.
     private static Filter Rebuild(Filter original, List<Factor> factors, string suffix) {
         var position = factors[0].Position;
         return new(position, new(position, factors), null) { Source = original.Source + suffix };
     }
 
     private static bool IsPushable(Filter node, ExpressionCapabilities caps) {
+        if (node.Sequences.Count > 1 && !caps.Logical) {
+            return false;
+        }
+
         return node.Sequences.All(sequence => IsPushable(sequence, caps));
     }
 
     private static bool IsPushable(Sequence node, ExpressionCapabilities caps) {
+        if (node.Factors.Count > 1 && !caps.Logical) {
+            return false;
+        }
+
         return node.Factors.All(factor => IsPushable(factor, caps));
     }
 

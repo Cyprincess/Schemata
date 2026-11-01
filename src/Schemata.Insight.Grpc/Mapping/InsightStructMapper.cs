@@ -1,6 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Linq;
+using Schemata.Transport.Grpc;
+using Schemata.Transport.Grpc.Wire;
 using Schemata.Insight.Grpc.Wire;
 using Schemata.Insight.Skeleton.Models;
 using Schemata.Insight.Skeleton.Queries;
@@ -9,7 +9,7 @@ namespace Schemata.Insight.Grpc.Mapping;
 
 /// <summary>
 ///     Maps between the gRPC edge messages and the protobuf-free core wire types: the request graph
-///     in, and the dynamic dictionary rows out as <see cref="InsightStruct" /> trees.
+///     in, and the dynamic dictionary rows out through the shared transport encoding.
 /// </summary>
 public static class InsightStructMapper
 {
@@ -49,7 +49,7 @@ public static class InsightStructMapper
         };
 
         foreach (var row in response.Rows) {
-            message.Rows.Add(ToStruct(row));
+            message.Rows.Add(DynamicValueMapper.ToStruct(InsightValueModel.EncodeRow(row, response.Schema), InsightValueModel.Unsupported));
         }
 
         foreach (var field in response.Schema) {
@@ -61,34 +61,6 @@ public static class InsightStructMapper
         }
 
         return message;
-    }
-
-    /// <summary>Maps a dictionary row to a dynamic struct.</summary>
-    public static InsightStruct ToStruct(IReadOnlyDictionary<string, object?> row) {
-        var result = new InsightStruct();
-        foreach (var (key, value) in row) {
-            result.Fields[key] = ToValue(value);
-        }
-
-        return result;
-    }
-
-    private static InsightValue ToValue(object? value) {
-        return value switch {
-            null        => new() { NullValue   = true },
-            string text => new() { StringValue = text },
-            bool flag   => new() { BoolValue   = flag },
-            byte or sbyte or short or ushort or int or uint or long
-                                                                  => new() { IntValue = Convert.ToInt64(value) },
-            ulong unsigned                              => new() { IntValue    = unchecked((long)unsigned) },
-            float or double or decimal                  => new() { NumberValue = Convert.ToDouble(value) },
-            IReadOnlyDictionary<string, object?> nested => new() { StructValue = ToStruct(nested) },
-            IEnumerable<IReadOnlyDictionary<string, object?>> list => new() {
-                ListValue = list.Select(item => new InsightValue { StructValue = ToStruct(item) }).ToList(),
-            },
-            IEnumerable<object?> items => new() { ListValue   = items.Select(ToValue).ToList() },
-            var other                  => new() { StringValue = other.ToString() },
-        };
     }
 
     private static InsightExpression ToExpression(InsightExpressionMessage message) {
@@ -146,12 +118,14 @@ public static class InsightStructMapper
         return spec;
     }
 
-    private static FieldDescriptorMessage ToFieldDescriptor(FieldDescriptor field) {
-        var message = new FieldDescriptorMessage {
+
+    private static DynamicFieldDescriptor<FieldType> ToFieldDescriptor(FieldDescriptor field) {
+        var message = new DynamicFieldDescriptor<FieldType> {
             Name        = field.Name,
             Type        = field.Type,
             SourceAlias = field.SourceAlias,
             IsList      = field.IsList,
+            Element     = field.Element is null ? null : ToFieldDescriptor(field.Element),
         };
 
         foreach (var child in field.Children) {

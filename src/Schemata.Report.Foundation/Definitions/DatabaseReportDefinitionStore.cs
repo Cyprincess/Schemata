@@ -33,7 +33,7 @@ public sealed class DatabaseReportDefinitionStore<TReport> : IReportDefinitionSo
         await using var scope = _scopes.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IRepository<TReport>>();
         var report = await repository.FirstOrDefaultAsync(
-                         query => query.Where(candidate => candidate.Name == name), ct);
+                         query => query.Where(candidate => candidate.CanonicalName == name || candidate.Name == name), ct);
         if (report is null) {
             return null;
         }

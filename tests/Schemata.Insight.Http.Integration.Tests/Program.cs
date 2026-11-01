@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -26,11 +27,22 @@ builder.UseSchemata(schema => {
             i.WithAuthentication("InsightTest");
         }
 
-        i.AddRepositorySource("students", "students")
-         .AddRepositorySource("customers", "customers")
-         .AddRepositorySource("buyers", "buyers")
-         .AddRepositorySource("purchases", "purchases")
+        i.AddRepositorySource<Student, StudentQuery>("students", s => new StudentQuery { FullName = s.FullName, Age = s.Age })
+         .AddRepositorySource<Customer, CustomerQuery>("customers", c => new CustomerQuery { FullName = c.FullName,
+             Orders = c.Orders.Select(o => new OrderQuery { Number = o.Number, Status = o.Status, Amount = o.Amount, Placed = o.Placed }).ToList() })
+         .AddRepositorySource<Buyer, BuyerQuery>("buyers", b => new BuyerQuery { Id = b.Id, FullName = b.FullName })
+         .AddRepositorySource<Purchase, PurchaseQuery>("purchases", p => new PurchaseQuery { BuyerId = p.BuyerId, Amount = p.Amount, Status = p.Status })
          .AddSourceDriver<RepositoryDriver>(RepositoryDriver.DriverName);
+        i.AddRepositorySource<Customer, ProtectedQuery>("protected", c => new ProtectedQuery {
+            Label = c.FullName,
+            Years = c.Orders.Count,
+            Secret = c.Orders.Count,
+            String = c.FullName,
+            Children = c.Orders.OrderBy(o => o.Number).Select(o => new ProtectedChild {
+                Number = o.Number, Secret = o.Status,
+                Detail = new ProtectedDetail { Label = o.Status, Secret = o.Status },
+            }).ToList(),
+        });
     });
     insight.UseAip().UseCel().UseOrdering();
     insight.UseDatabaseCatalog();
@@ -83,7 +95,7 @@ using (var scope = app.Services.CreateScope()) {
         Uid    = Guid.NewGuid(),
         Name   = "live_buyers",
         Driver = "repository",
-        Params = """{"resource":"buyers"}""",
+        Params = """{"binding":"buyers"}""",
     });
 
     context.SaveChanges();

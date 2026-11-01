@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Schemata.Advice\Schemata.Advice.csproj" />
+    <ProjectReference Include="..\Schemata.Common\Schemata.Common.csproj" />
     <ProjectReference Include="..\Schemata.Expressions.Skeleton\Schemata.Expressions.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Messaging.Skeleton\Schemata.Messaging.Skeleton.csproj" />
   </ItemGroup>

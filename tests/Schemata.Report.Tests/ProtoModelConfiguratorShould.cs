@@ -41,14 +41,6 @@ public class ProtoModelConfiguratorShould
         using var ready = new CountdownEvent(2);
         using var start = new ManualResetEventSlim();
 
-        Task Configure() {
-            return Task.Run(() => {
-                ready.Signal();
-                start.Wait();
-                SchemataProtoModelConfigurator.ConfigureType(model, typeof(QueryInsightRequest));
-            });
-        }
-
         var first  = Configure();
         var second = Configure();
         ready.Wait();
@@ -57,5 +49,14 @@ public class ProtoModelConfiguratorShould
 
         Assert.True(model.IsDefined(typeof(QueryInsightRequest)));
         Assert.True(model.IsDefined(typeof(SelectionSpec)));
+        return;
+
+        Task Configure() {
+            return Task.Run(() => {
+                ready.Signal();
+                start.Wait();
+                SchemataProtoModelConfigurator.ConfigureType(model, typeof(QueryInsightRequest));
+            });
+        }
     }
 }

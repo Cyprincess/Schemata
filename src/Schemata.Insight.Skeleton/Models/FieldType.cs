@@ -11,5 +11,13 @@ public enum FieldType
     Timestamp,
     Duration,
     Bytes,
+    UInt64,
+    Decimal,
+    Guid,
+    DateTimeOffset,
+    Enum,
+    Char,
+    Map,
+    Dynamic,
     Object = 100,
 }

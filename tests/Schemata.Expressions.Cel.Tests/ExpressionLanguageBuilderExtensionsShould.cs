@@ -24,4 +24,24 @@ public class ExpressionLanguageBuilderExtensionsShould
         var provider = services.BuildServiceProvider();
         Assert.NotNull(provider.GetKeyedService<IExpressionCompiler>(CelLanguage.Name));
     }
+
+    [Fact]
+    public void Keeps_Global_Defaults_When_Enabled_Without_Configure() {
+        var services = new ServiceCollection();
+        services.AddCelExpressions(o => {
+            o.Filtering           = FilteringMode.Residual;
+            o.MaxResidualScanRows = 5_000;
+        });
+        var languages = new ExpressionLanguageProfile();
+        var builder = new Mock<IExpressionLanguageBuilder>(MockBehavior.Strict);
+        builder.SetupGet(value => value.Services).Returns(services);
+        builder.SetupGet(value => value.Languages).Returns(languages);
+
+        builder.Object.UseCel();
+
+        var descriptor = services.BuildServiceProvider().GetKeyedService<ExpressionLanguageDescriptor>(CelLanguage.Name);
+        Assert.NotNull(descriptor);
+        Assert.Equal(FilteringMode.Residual, descriptor.Filtering);
+        Assert.Equal(5_000, descriptor.MaxResidualScanRows);
+    }
 }

@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Report.Foundation.Dsl;
 using Schemata.Report.Skeleton;
 using Schemata.Report.Skeleton.Entities;
@@ -39,6 +40,42 @@ public sealed partial class SchemataReportBuilder<TReport, TSnapshot, TChunk>
             _definitionNames.Remove(name);
             throw;
         }
+    }
+
+    /// <summary>
+    ///     Selects a custom <see cref="IReportService" /> implementation for this capability. The
+    ///     framework-owned facade stays the registered <see cref="IReportService" /> — it enforces
+    ///     the single-triple guard before constructing the selected implementation.
+    ///     Applications replacing the public interface directly own its full execution contract.
+    /// </summary>
+    /// <typeparam name="TService">The custom implementation type.</typeparam>
+    /// <returns>This builder for chaining.</returns>
+    public SchemataReportBuilder<TReport, TSnapshot, TChunk> UseService<TService>()
+        where TService : class, IReportService {
+        Services.TryAddScoped<TService>();
+        Services.AddKeyedScoped<IReportService>(ReportConstants.Services.Selected, (sp, _) => {
+            sp.GetRequiredService<ReportRegistration>().EnsureSingleTriple<TReport>();
+            return sp.GetRequiredService<TService>();
+        });
+        return this;
+    }
+
+    /// <summary>
+    ///     Selects a custom <see cref="IReportSnapshotStore" /> implementation for this capability.
+    ///     The framework-owned facade stays the registered <see cref="IReportSnapshotStore" /> — it
+    ///     enforces the single-triple guard before any snapshot I/O, then delegates to the selected
+    ///     implementation. Applications replacing the public interface directly own its full contract.
+    /// </summary>
+    /// <typeparam name="TStore">The custom implementation type.</typeparam>
+    /// <returns>This builder for chaining.</returns>
+    public SchemataReportBuilder<TReport, TSnapshot, TChunk> UseSnapshotStore<TStore>()
+        where TStore : class, IReportSnapshotStore {
+        Services.TryAddScoped<TStore>();
+        Services.AddKeyedScoped<IReportSnapshotStore>(ReportConstants.Services.Selected, (sp, _) => {
+            sp.GetRequiredService<ReportRegistration>().EnsureSingleTriple<TSnapshot>();
+            return sp.GetRequiredService<TStore>();
+        });
+        return this;
     }
 
 }
