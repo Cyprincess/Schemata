@@ -71,12 +71,12 @@ public class DefaultPushServiceShould
         services.AddSingleton<IRequestPipelineAdvisor<SendPushRequest, ImmutableArray<TransportResult>>>(new OrderedAdvisor(order: 1, log));
         services.AddSingleton<IRequestPipelineAdvisor<SendPushRequest, ImmutableArray<TransportResult>>>(new OrderedAdvisor(order: 2, log));
         services.AddSingleton<IPushTransport>(new FakeTransport("t1", (_, _) =>
-            new ValueTask<TransportResult>(TransportResult.Sent("t1"))));
+            new(TransportResult.Sent("t1"))));
 
         using var sp = BuildServices(services);
         var sut = sp.GetRequiredService<IPushService>();
 
-        await foreach (var _ in sut.SendAsync(new PushContext("msg", new TopicTarget("topic")), default)) { }
+        await foreach (var _ in sut.SendAsync(new("msg", new TopicTarget("topic")), default)) { }
 
         Assert.Equal([1, 2, 3], log);
     }
@@ -90,14 +90,14 @@ public class DefaultPushServiceShould
         services.AddSingleton<IRequestPipelineAdvisor<SendPushRequest, ImmutableArray<TransportResult>>>(new OrderedAdvisor(order: 1, advisorCalls));
         services.AddSingleton<IPushTransport>(new FakeTransport("t1", (_, _) => {
             invoked = true;
-            return new ValueTask<TransportResult>(TransportResult.Sent("t1"));
+            return new(TransportResult.Sent("t1"));
         }));
 
         using var sp = BuildServices(services);
         var sut = sp.GetRequiredService<IPushService>();
 
         var results = new List<TransportResult>();
-        await foreach (var r in sut.SendAsync(new PushContext("msg", new TopicTarget("topic")), default)) {
+        await foreach (var r in sut.SendAsync(new("msg", new TopicTarget("topic")), default)) {
             results.Add(r);
         }
 
@@ -113,14 +113,14 @@ public class DefaultPushServiceShould
         var fast   = new TaskCompletionSource<TransportResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         var services = new ServiceCollection();
         services.AddSingleton<IPushTransport>(new FakeTransport(
-            "slow", (_, _) => new ValueTask<TransportResult>(slow.Task)));
+            "slow", (_, _) => new(slow.Task)));
         services.AddSingleton<IPushTransport>(new FakeTransport(
-            "middle", (_, _) => new ValueTask<TransportResult>(middle.Task)));
+            "middle", (_, _) => new(middle.Task)));
         services.AddSingleton<IPushTransport>(new FakeTransport(
-            "fast", (_, _) => new ValueTask<TransportResult>(fast.Task)));
+            "fast", (_, _) => new(fast.Task)));
         using var sp = BuildServices(services);
         await using var enumerator = sp.GetRequiredService<IPushService>()
-                                       .SendAsync(new PushContext("msg", new TopicTarget("topic")))
+                                       .SendAsync(new("msg", new TopicTarget("topic")))
                                        .GetAsyncEnumerator();
 
         var first = enumerator.MoveNextAsync().AsTask();
@@ -147,17 +147,17 @@ public class DefaultPushServiceShould
     public async Task Isolate_Throwing_Transport_While_Siblings_Still_Yield() {
         var services = new ServiceCollection();
         services.AddSingleton<IPushTransport>(new FakeTransport("good", (_, _) =>
-            new ValueTask<TransportResult>(TransportResult.Sent("good", "addr-1"))));
+            new(TransportResult.Sent("good", "addr-1"))));
         services.AddSingleton<IPushTransport>(new FakeTransport("throws", (_, _) =>
             throw new InvalidOperationException("transport error")));
         services.AddSingleton<IPushTransport>(new FakeTransport("also-good", (_, _) =>
-            new ValueTask<TransportResult>(TransportResult.Sent("also-good", "addr-2"))));
+            new(TransportResult.Sent("also-good", "addr-2"))));
 
         using var sp = BuildServices(services);
         var sut = sp.GetRequiredService<IPushService>();
 
         var results = new List<TransportResult>();
-        await foreach (var r in sut.SendAsync(new PushContext("msg", new TopicTarget("topic")), default)) {
+        await foreach (var r in sut.SendAsync(new("msg", new TopicTarget("topic")), default)) {
             results.Add(r);
         }
 
@@ -188,13 +188,13 @@ public class DefaultPushServiceShould
             var captured = index;
             services.AddSingleton<IPushTransport>(new FakeTransport($"t{captured}", (_, _) => {
                 Interlocked.Increment(ref started);
-                return new ValueTask<TransportResult>(completions[captured].Task);
+                return new(completions[captured].Task);
             }));
         }
 
         using var sp = BuildServices(services);
         await using var enumerator = sp.GetRequiredService<IPushService>()
-                                       .SendAsync(new PushContext("msg", new TopicTarget("topic")))
+                                       .SendAsync(new("msg", new TopicTarget("topic")))
                                        .GetAsyncEnumerator();
         var first = enumerator.MoveNextAsync().AsTask();
 

@@ -6,15 +6,21 @@ using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Push.Foundation.Commands;
 using Schemata.Push.Skeleton.Entities;
+using Schemata.Abstractions.Advisors;
 
 namespace Schemata.Push.Foundation.Handlers;
 
 /// <summary>Removes a push subscription matching its complete address identity.</summary>
-public sealed class RemovePushSubscriptionHandler(IRepository<SchemataPushSubscription> subscriptions)
+/// <typeparam name="TPushSubscription">The persisted subscription entity type.</typeparam>
+public sealed class RemovePushSubscriptionHandler<TPushSubscription>(
+    IRepository<TPushSubscription>       subscriptions,
+    IResourceMutation<TPushSubscription> mutation)
     : IRequestHandler<RemovePushSubscriptionRequest, Unit>
+    where TPushSubscription : SchemataPushSubscription
 {
     public async Task<Unit> HandleAsync(
         RemovePushSubscriptionRequest request,
+        AdviceContext                 context,
         CancellationToken             ct = default
     ) {
         var subscription = await subscriptions.FirstOrDefaultAsync(
@@ -26,8 +32,7 @@ public sealed class RemovePushSubscriptionHandler(IRepository<SchemataPushSubscr
             return Unit.Value;
         }
 
-        await subscriptions.RemoveAsync(subscription, ct);
-        await subscriptions.CommitAsync(ct);
+        await mutation.DeleteAsync(subscription, null, ct: ct);
         return Unit.Value;
     }
 }

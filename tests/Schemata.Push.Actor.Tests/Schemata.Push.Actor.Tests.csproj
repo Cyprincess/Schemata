@@ -19,6 +19,7 @@
     <ProjectReference Include="..\..\src\Schemata.Entity.EntityFrameworkCore\Schemata.Entity.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Entity.Repository\Schemata.Entity.Repository.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Messaging.Skeleton\Schemata.Messaging.Skeleton.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Push.Actor\Schemata.Push.Actor.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Push.Foundation\Schemata.Push.Foundation.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Push.Skeleton\Schemata.Push.Skeleton.csproj" />
