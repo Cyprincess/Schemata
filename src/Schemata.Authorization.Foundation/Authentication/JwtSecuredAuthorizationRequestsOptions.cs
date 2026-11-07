@@ -9,6 +9,12 @@ public sealed class JwtSecuredAuthorizationRequestsOptions
     /// <summary>JWS algorithms accepted on signed authorization request objects.</summary>
     public HashSet<string> SigningAlgorithms { get; } = new(StringComparer.Ordinal);
 
+    /// <summary>JWE key-management algorithms accepted on encrypted authorization request objects.</summary>
+    public HashSet<string> EncryptionAlgorithms { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>JWE content-encryption algorithms accepted on encrypted authorization request objects.</summary>
+    public HashSet<string> ContentEncryptionAlgorithms { get; } = new(StringComparer.Ordinal);
+
     /// <summary>Requires every authorization request to carry a signed request object.</summary>
     public bool RequireForAllClients { get; set; }
 }

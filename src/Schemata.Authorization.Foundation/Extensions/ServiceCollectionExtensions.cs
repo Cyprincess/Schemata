@@ -128,6 +128,8 @@ public static class ServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryBase>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryClientAuthentication<TApp>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryAcrValues>());
+        services.TryAddScoped<ClientEncryptionKeyResolver<TSecurity>>();
+        services.TryAddScoped<IIdTokenResponseProtector, IdTokenResponseProtector<TSecurity>>();
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IClientAuthentication<TApp>, ClientSecretBasicAuthentication<TApp, TSecurity>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IClientAuthentication<TApp>, ClientSecretPostAuthentication<TApp, TSecurity>>());
@@ -212,6 +214,7 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<IOpLogoutService, DefaultOpLogoutService<TToken>>();
 
         services.TryAddScoped<IApplicationManager<TApp>, SchemataApplicationManager<TApp, TAuth>>();
+        services.TryAddScoped<IApplicationSecurityMetadataStore, ApplicationSecurityMetadataStore<TSecurity>>();
         services.TryAddScoped<IScopeManager<TScope>, SchemataScopeManager<TScope>>();
         services.TryAddScoped<IResourceMutation<TApp>, ApplicationResourceMutation<TApp, TAuth, TSubjectMapping, TSecurity, TToken>>();
         services.TryAddScoped<IResourceMutation<TToken>, TokenResourceMutation<TApp, TToken>>();

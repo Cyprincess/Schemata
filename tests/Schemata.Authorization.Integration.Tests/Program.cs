@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -34,7 +35,10 @@ var builder = WebApplication.CreateBuilder(options);
 var useUserInfo = builder.Environment.EnvironmentName is not ("NoUserInfo" or "NoFlows");
 var useFlows    = builder.Environment.EnvironmentName is not ("NoFlows" or "EndSessionOnly");
 var useDeviceFlow = builder.Environment.EnvironmentName == "DeviceFlow";
-var issuer        = builder.Environment.EnvironmentName == "IssuerPath" ? "https://localhost/issuer1" : "https://localhost";
+var issuer = builder.Environment.EnvironmentName == "IssuerPath" ? "https://localhost/issuer1"
+    : builder.Environment.EnvironmentName == "BrowserProfile"
+        ? builder.Configuration["BrowserProfile:Issuer"] ?? "https://localhost"
+        : "https://localhost";
 using var connection = new SqliteConnection("Data Source=:memory:");
 connection.Open();
 
@@ -72,7 +76,7 @@ builder.UseSchemata(schema => {
     schema.Services.AddSingleton<IInitialAccessTokenValidator>(new Schemata.Authorization.Integration.Tests.TestInitialAccessTokenValidator());
     var authorization = schema.UseAuthorization(o => {
         o.Issuer         = issuer;
-        o.InteractionUri = "https://localhost/interact";
+        o.InteractionUri = builder.Environment.EnvironmentName == "BrowserProfile" ? issuer + "/interact" : "https://localhost/interact";
         if (useDeviceFlow) {
             o.DeviceVerificationUri = "https://localhost/device";
         }
@@ -126,7 +130,7 @@ builder.UseSchemata(schema => {
         authorization = authorization.UseUserInfo();
     }
 
-    if (builder.Environment.EnvironmentName is "EndSessionOnly" or "Logout") {
+    if (builder.Environment.EnvironmentName is "EndSessionOnly" or "Logout" or "BrowserProfile") {
         authorization = authorization.UseEndSession();
     }
 
@@ -134,10 +138,7 @@ builder.UseSchemata(schema => {
         authorization.UseSessionManagement();
     }
 
-    authorization.MapHttp();
-    if (builder.Environment.EnvironmentName == "Grpc") authorization.MapGrpc();
-
-    if (builder.Environment.EnvironmentName == "Dpop") {
+    if (builder.Environment.EnvironmentName is "Dpop" or "BrowserProfile") {
         authorization.UseDemonstratingProofOfPossession(o => o.RequireForAllClients());
     }
 
@@ -145,8 +146,12 @@ builder.UseSchemata(schema => {
         authorization.UsePairwiseSubjects();
     }
 
-    if (builder.Environment.EnvironmentName == "Jar") {
+    if (builder.Environment.EnvironmentName is "Jar" or "ExternalJar") {
         authorization.UseJwtSecuredAuthorizationRequests();
+    }
+
+    if (builder.Environment.EnvironmentName == "ExternalJar") {
+        authorization.UseExternalRequestObjects();
     }
 
     if (builder.Environment.EnvironmentName == "Rar") {
@@ -154,15 +159,18 @@ builder.UseSchemata(schema => {
         schema.Services.AddSingleton<IAuthorizationDetailTypeDescriptor, Schemata.Authorization.Integration.Tests.PaymentInitiationDescriptor>();
     }
 
-    if (builder.Environment.EnvironmentName is "Authenticated" or "Authorized" or "AuthenticatedNoSession" or "DeviceFlow") {
-        authorization.WithAuthentication("ManagementTest");
-    }
-
-    if (builder.Environment.EnvironmentName == "Authorized") {
-        authorization.WithAuthorization();
-    }
-
     schema.UseAuthentication((AuthenticationBuilder _) => { });
+    if (builder.Environment.EnvironmentName == "BrowserProfile") {
+        schema.UseCors(cors => cors.AddDefaultPolicy(policy => policy
+            .WithOrigins("https://127.0.0.1:4173")
+            .WithMethods("GET", "POST", "OPTIONS")
+            .WithHeaders("Authorization", "Content-Type", "DPoP")
+            .WithExposedHeaders("DPoP-Nonce")));
+        schema.Services.AddAuthentication(options => {
+            options.DefaultAuthenticateScheme = WebAppFactory.InteractionScheme;
+            options.DefaultChallengeScheme = WebAppFactory.InteractionScheme;
+        }).AddScheme<AuthenticationSchemeOptions, WebAppFactory.InteractionHandler>(WebAppFactory.InteractionScheme, null);
+    }
     if (builder.Environment.EnvironmentName == "Logout") {
         schema.Services.AddAuthentication(o => {
             o.DefaultAuthenticateScheme = Microsoft.AspNetCore.Identity.IdentityConstants.ApplicationScheme;
@@ -172,6 +180,14 @@ builder.UseSchemata(schema => {
     }
     schema.Services.AddScoped<IAuthenticationContextProvider, TestAuthenticationContextProvider>();
 });
+
+if (builder.Environment.EnvironmentName == "BrowserProfile") {
+    builder.Services.PostConfigure<Microsoft.AspNetCore.Authentication.AuthenticationOptions>(options => {
+        options.DefaultAuthenticateScheme = WebAppFactory.InteractionScheme;
+        options.DefaultChallengeScheme = WebAppFactory.InteractionScheme;
+        options.DefaultScheme = WebAppFactory.InteractionScheme;
+    });
+}
 
 var app = builder.Build();
 
@@ -289,13 +305,33 @@ Permissions = ["e:/Connect/Introspect"],
         Name         = "browser-client",
         ClientId     = "browser-client",
         ApplicationType = ApplicationTypes.Native,
-        RedirectUris = new List<string> { "https://localhost/callback" },
+        RedirectUris = new List<string> { "https://localhost/callback", "https://127.0.0.1:4173/callback" },
+        PostLogoutRedirectUris = ["https://127.0.0.1:4173/logged-out"],
         TokenEndpointAuthMethod = ClientAuthMethods.None,
 Permissions  = new List<string> { "e:/Connect/Authorize", "e:/Connect/Token" },
-        GrantTypes   = ["authorization_code"],
+        GrantTypes   = ["authorization_code", "refresh_token"],
         ResponseTypes = ["code"],
+        Scope = "openid offline_access",
     };
     await applications.CreateAsync(browserApp);
+
+    var encryptionJwk = builder.Configuration["BrowserProfile:ClientEncryptionJwk"];
+    if (builder.Environment.EnvironmentName == "BrowserProfile" && encryptionJwk is not null) {
+        var encryptedApp = new SchemataApplication {
+            Name = "encrypted-rp-client", ClientId = "encrypted-rp-client",
+            ApplicationType = ApplicationTypes.Native, TokenEndpointAuthMethod = ClientAuthMethods.None,
+            RedirectUris = ["https://localhost/callback"],
+            Permissions = ["e:/Connect/Authorize", "e:/Connect/Token"],
+            GrantTypes = ["authorization_code", "refresh_token"], ResponseTypes = ["code"],
+            Scope = "openid offline_access", IdTokenEncryptedResponseAlg = EncryptionAlgorithms.RsaOaep,
+        };
+        await applications.CreateAsync(encryptedApp);
+        await securities.CreateAsync(new() {
+            Parent = SecurityParents.Application(encryptedApp), Key = "encrypted-rp-client",
+            Kind = SecurityConstants.Kinds.Jwks, Usage = SecurityConstants.Usages.Authentication,
+            Status = SecurityConstants.Statuses.Valid, Value = $"{{\"keys\":[{encryptionJwk}]}}",
+        });
+    }
 
     var deviceApp = new SchemataApplication {
         Name        = "device-client",

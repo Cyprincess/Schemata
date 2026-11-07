@@ -59,14 +59,13 @@ public static class ResponseModeService
     }
 
     /// <summary>
-    ///     Resolves the effective response mode for a request that already passed the configured
-    ///     allow-list. An explicit mode must be allowed. An omitted mode uses the inferred mode
-    ///     when allowed; otherwise it selects a legal allowed mode for the response type.
+    ///     Resolves the effective response mode for a request that already passed redirect validation.
+    ///     An explicit mode must be allowed. An omitted mode uses the response-type default only when allowed.
     /// </summary>
     /// <param name="responseMode">Explicit response_mode value, or null to infer.</param>
     /// <param name="responseType">The response_type value used for inference.</param>
     /// <param name="allowedModes">The server's allowed response modes.</param>
-    /// <returns>The effective mode, or null when no allowed mode can carry the response.</returns>
+    /// <returns>The explicit allowed mode or allowed response-type default; otherwise null.</returns>
     public static string? ResolveAllowedMode(
         string?                   responseMode,
         string?                   responseType,
@@ -77,26 +76,7 @@ public static class ResponseModeService
         }
 
         var inferred = ResolveMode(null, responseType);
-        if (allowedModes.Count == 0 || allowedModes.Contains(inferred)) {
-            return inferred;
-        }
-
-        var carriesToken = responseType?.Contains(ResponseTypes.Token) == true
-                        || responseType?.Contains(ResponseTypes.IdToken) == true;
-
-        if (carriesToken && allowedModes.Contains(ResponseModes.Fragment)) {
-            return ResponseModes.Fragment;
-        }
-
-        if (allowedModes.Contains(ResponseModes.FormPost)) {
-            return ResponseModes.FormPost;
-        }
-
-        if (!carriesToken && allowedModes.Contains(ResponseModes.Query)) {
-            return ResponseModes.Query;
-        }
-
-        return null;
+        return allowedModes.Count == 0 || allowedModes.Contains(inferred) ? inferred : null;
     }
 
     /// <summary>

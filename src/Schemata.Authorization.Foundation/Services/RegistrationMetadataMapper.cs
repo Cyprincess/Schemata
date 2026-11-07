@@ -14,10 +14,8 @@ using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Models;
+using Schemata.Authorization.Skeleton.Services;
 using Schemata.Authorization.Foundation.Managers;
-using Schemata.Security.Skeleton;
-using Schemata.Security.Skeleton.Entities;
-using Schemata.Security.Skeleton.Services;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
 namespace Schemata.Authorization.Foundation.Services;
@@ -65,12 +63,19 @@ public static class RegistrationMetadataMapper
     )
         where TApp : SchemataApplication
     {
+        ValidateAbsoluteHttpsMetadata(request);
+        ValidateRequestUris(request);
         var redirectFlow = UsesRedirectFlow(request);
 
         ValidateApplicationType(request);
         ValidateAuthMethod(request, options);
         ValidateJwksPairing(request);
         ValidateDefaultMaxAge(request);
+        ValidateIdTokenEncryption(request);
+        if (string.IsNullOrWhiteSpace(request.RequestObjectEncryptionAlg)
+            && !string.IsNullOrWhiteSpace(request.RequestObjectEncryptionEnc)) {
+            throw OAuthError(OAuthErrors.InvalidClientMetadata, SchemataResources.INVALID_CLIENT_METADATA);
+        }
         if (redirectFlow) {
             // Interactive profiles keep the redirect obligations; a pure OAuth registration
             // (e.g. client_credentials) carries none and never fetches a sector document.
@@ -89,7 +94,16 @@ public static class RegistrationMetadataMapper
         application.ResponseTypes              = responseTypes;
         application.Scope                      = NormalizeScope(request.Scope);
         application.IdTokenSignedResponseAlg   = request.IdTokenSignedResponseAlg ?? SigningAlgorithms.RsaSha256;
+        application.IdTokenEncryptedResponseAlg = request.IdTokenEncryptedResponseAlg;
+        application.IdTokenEncryptedResponseEnc = string.IsNullOrWhiteSpace(request.IdTokenEncryptedResponseAlg)
+            ? null : request.IdTokenEncryptedResponseEnc ?? ContentEncryptionAlgorithms.Aes128CbcHmacSha256;
+        application.RequestObjectSigningAlg = request.RequestObjectSigningAlg;
+        application.RequestObjectEncryptionAlg = request.RequestObjectEncryptionAlg;
+        application.RequestObjectEncryptionEnc = string.IsNullOrWhiteSpace(request.RequestObjectEncryptionAlg)
+            ? null : request.RequestObjectEncryptionEnc ?? ContentEncryptionAlgorithms.Aes128CbcHmacSha256;
+        application.RequireSignedRequestObject = request.RequireSignedRequestObject;
         application.RedirectUris               = request.RedirectUris;
+        application.RequestUris                = request.RequestUris;
         application.PostLogoutRedirectUris     = request.PostLogoutRedirectUris;
         application.ClientName                 = request.ClientName;
         application.Contacts                   = request.Contacts;
@@ -142,31 +156,11 @@ public static class RegistrationMetadataMapper
 
     /// <summary>Maps a stored application back onto the wire response shape, echoing the
     /// client's newest <c>jwks</c> / <c>jwks_uri</c> security rows.</summary>
-    public static async Task<RegistrationResponse> ToResponse<TSecurity>(
-        SchemataApplication         application,
-        ISecurityStore<TSecurity>   securities,
-        CancellationToken           ct = default
-    ) where TSecurity : SchemataSecurity, new() {
-        var parent = SecurityParents.Application(application);
-
-        JsonElement? jwks = null;
-        await foreach (var row in securities.ListByParentAsync(parent, SecurityConstants.Kinds.Jwks, null, SecurityConstants.Statuses.Valid, ct)) {
-            if (string.IsNullOrWhiteSpace(row.Value)) {
-                throw new InvalidOperationException("The active registration JWKS row has no key document.");
-            }
-
-            using var document = JsonDocument.Parse(row.Value);
-            ValidatePublicJwks(document.RootElement);
-            jwks = document.RootElement.Clone();
-            break;
-        }
-
-        string? jwksUri = null;
-        await foreach (var row in securities.ListByParentAsync(parent, SecurityConstants.Kinds.JwksUri, null, SecurityConstants.Statuses.Valid, ct)) {
-            jwksUri = row.Value;
-            break;
-        }
-
+    public static async Task<RegistrationResponse> ToResponse(
+        SchemataApplication application,
+        IApplicationSecurityMetadataStore security,
+        CancellationToken ct = default
+    ) {
         Dictionary<string, JsonElement>? localized = null;
         if (application.DisplayNames is { } names) {
             foreach (var (language, value) in names) (localized ??= new())["client_name#" + language] = JsonSerializer.SerializeToElement(value);
@@ -180,12 +174,13 @@ public static class RegistrationMetadataMapper
             }
         }
 
-        return new() {
+        var response = new RegistrationResponse {
             ClientId                                = application.ClientId,
             ClientIdIssuedAt                         = application.CreateTime is { } created
                 ? new DateTimeOffset(DateTime.SpecifyKind(created, DateTimeKind.Utc)).ToUnixTimeSeconds() : null,
             LocalizedMetadata                       = localized,
             RedirectUris                            = application.RedirectUris?.ToList(),
+            RequestUris                             = application.RequestUris?.ToList(),
             PostLogoutRedirectUris                  = application.PostLogoutRedirectUris?.ToList(),
             ClientName                              = application.ClientName,
             Contacts                                = application.Contacts?.ToList(),
@@ -193,8 +188,6 @@ public static class RegistrationMetadataMapper
             LogoUri                                 = application.LogoUri,
             PolicyUri                               = application.PolicyUri,
             TosUri                                  = application.TosUri,
-            Jwks                                    = jwks,
-            JwksUri                                 = jwksUri,
             TokenEndpointAuthMethod                 = application.TokenEndpointAuthMethod,
             TokenEndpointAuthSigningAlg             = application.TokenEndpointAuthSigningAlg,
             UserinfoSignedResponseAlg               = application.UserinfoSignedResponseAlg,
@@ -215,10 +208,61 @@ public static class RegistrationMetadataMapper
             SoftwareVersion                         = application.SoftwareVersion,
             SoftwareStatement                       = application.SoftwareStatement,
             IdTokenSignedResponseAlg                = application.IdTokenSignedResponseAlg,
+            IdTokenEncryptedResponseAlg             = application.IdTokenEncryptedResponseAlg,
+            IdTokenEncryptedResponseEnc             = application.IdTokenEncryptedResponseEnc,
+            RequestObjectSigningAlg = application.RequestObjectSigningAlg,
+            RequestObjectEncryptionAlg = application.RequestObjectEncryptionAlg,
+            RequestObjectEncryptionEnc = application.RequestObjectEncryptionEnc,
+            RequireSignedRequestObject = application.RequireSignedRequestObject,
             GrantTypes                              = application.GrantTypes?.ToList(),
             ResponseTypes                           = application.ResponseTypes?.ToList(),
             Scope                                   = application.Scope,
         };
+        await security.ProjectAsync(application, response, ct);
+        return response;
+    }
+
+    private static void ValidateIdTokenEncryption(RegisterRequest request) {
+        if (string.IsNullOrWhiteSpace(request.IdTokenEncryptedResponseAlg)
+            && !string.IsNullOrWhiteSpace(request.IdTokenEncryptedResponseEnc)) {
+            throw OAuthError(OAuthErrors.InvalidClientMetadata, SchemataResources.INVALID_CLIENT_METADATA);
+        }
+    }
+
+    private static void ValidateRequestUris(RegisterRequest request) {
+        foreach (var value in request.RequestUris ?? []) {
+            if (!Uri.TryCreate(value, UriKind.Absolute, out var parsed)
+                || parsed.Scheme != Uri.UriSchemeHttps
+                || string.IsNullOrEmpty(parsed.Host)) {
+                throw OAuthError(OAuthErrors.InvalidClientMetadata, SchemataResources.REGISTRATION_METADATA_URI_INVALID,
+                    new Dictionary<string, string?> { ["name"] = "request_uris", ["value"] = value });
+            }
+
+            try {
+                ExternalRequestObjectResolver.ReadCommitment(parsed);
+            } catch (FormatException) {
+                throw OAuthError(OAuthErrors.InvalidClientMetadata, SchemataResources.REGISTRATION_METADATA_URI_INVALID,
+                    new Dictionary<string, string?> { ["name"] = "request_uris", ["value"] = value });
+            }
+        }
+    }
+
+    private static void ValidateAbsoluteHttpsMetadata(RegisterRequest request) {
+        foreach (var (value, name) in new (string? Value, string Name)[] {
+                     (request.JwksUri, "jwks_uri"),
+                     (request.InitiateLoginUri, "initiate_login_uri"),
+                 }) {
+            if (value is null) {
+                continue;
+            }
+
+            if (!Uri.TryCreate(value, UriKind.Absolute, out var parsed)
+                || parsed.Scheme != Uri.UriSchemeHttps
+                || string.IsNullOrEmpty(parsed.Host)) {
+                throw OAuthError(OAuthErrors.InvalidClientMetadata, SchemataResources.REGISTRATION_METADATA_URI_INVALID,
+                    new Dictionary<string, string?> { ["name"] = name, ["value"] = value });
+            }
+        }
     }
 
     private static void ValidateApplicationType(RegisterRequest request) {
@@ -361,6 +405,8 @@ public static class RegistrationMetadataMapper
         return !string.IsNullOrWhiteSpace(request.SubjectType)
             || !string.IsNullOrWhiteSpace(request.SectorIdentifierUri)
             || !string.IsNullOrWhiteSpace(request.IdTokenSignedResponseAlg)
+            || !string.IsNullOrWhiteSpace(request.IdTokenEncryptedResponseAlg)
+            || !string.IsNullOrWhiteSpace(request.IdTokenEncryptedResponseEnc)
             || !string.IsNullOrWhiteSpace(request.UserinfoSignedResponseAlg)
             || !string.IsNullOrWhiteSpace(request.UserinfoEncryptedResponseAlg)
             || !string.IsNullOrWhiteSpace(request.UserinfoEncryptedResponseEnc)
@@ -441,7 +487,7 @@ public static class RegistrationMetadataMapper
         if (request.Jwks is { ValueKind: JsonValueKind.Object } jwks) ValidatePublicJwks(jwks);
     }
 
-    private static void ValidatePublicJwks(JsonElement jwks) {
+    internal static void ValidatePublicJwks(JsonElement jwks) {
         if (jwks.ValueKind != JsonValueKind.Object || !jwks.TryGetProperty("keys", out var keys) || keys.ValueKind != JsonValueKind.Array) {
             throw OAuthError(OAuthErrors.InvalidClientMetadata, SchemataResources.INVALID_CLIENT_METADATA);
         }

@@ -10,25 +10,21 @@ namespace Schemata.Authorization.Skeleton.Contexts;
 public static class AuthorizationCallbackExtensions
 {
     /// <summary>
-    ///     Decorates an authorization failure with the validated callback facts when the response
-    ///     mode has been resolved and the failure did not already resolve its own delivery. Before
-    ///     that point (or with an invalid redirect) the failure stays a bare JSON error — never a
-    ///     guessed callback.
+    ///     Decorates an authorization failure with missing callback facts after client and redirect
+    ///     validation. Existing redirect and state values are preserved, and the validated context
+    ///     supplies a missing response mode.
     /// </summary>
     public static OAuthException WithCallback<TApp>(this OAuthException exception, AuthorizeContext<TApp> authz)
         where TApp : Entities.SchemataApplication
     {
-        if (authz.ResponseMode is null || exception.RedirectUri is not null) {
+        if (authz.ResponseMode is not { } mode
+         || authz.Request is not { RedirectUri: { } redirectUri } request) {
             return exception;
         }
 
-        if (authz.Request is null) {
-            return exception;
-        }
-
-        exception.RedirectUri   = authz.Request.RedirectUri;
-        exception.State       ??= authz.Request.State;
-        exception.ResponseMode ??= authz.ResponseMode;
+        exception.RedirectUri ??= redirectUri;
+        exception.State       ??= request.State;
+        exception.ResponseMode ??= mode;
         return exception;
     }
 }

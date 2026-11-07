@@ -41,12 +41,14 @@ public sealed class PrivateKeyJwtAuthentication<TApp, TSecurity, TToken>(
     IOptions<SchemataSecurityOptions>      security,
     ISecurityStore<TSecurity>              securities,
     ClientAssertionValidator<TToken>       assertions,
-    ClientAssertionChannel                 channel
+    ClientAssertionChannel                 channel,
+    TimeProvider?                          time = null
 ) : IClientAuthentication<TApp>
     where TApp : SchemataApplication
     where TSecurity : SchemataSecurity, new()
     where TToken : SchemataToken, new()
 {
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
     #region IClientAuthentication<TApp> Members
 
     public string Method => ClientAuthMethods.PrivateKeyJwt;
@@ -73,7 +75,7 @@ public sealed class PrivateKeyJwtAuthentication<TApp, TSecurity, TToken>(
         var clientId = channel.ResolveClientId(form, assertion);
         var app      = await channel.FindApplicationAsync(apps, clientId, ct);
 
-        var keys = await ClientKeyResolver<TApp, TSecurity>.ResolveAsync(app, assertion, securities, http, cache, security, ct);
+        var keys = await ClientKeyResolver<TApp, TSecurity>.ResolveAsync(app, assertion, securities, http, cache, security, _time, ct);
 
         var token = await assertions.ValidateAsync(
             assertion,

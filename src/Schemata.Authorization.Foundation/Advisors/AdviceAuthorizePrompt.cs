@@ -66,7 +66,8 @@ public static class AdviceAuthorizePrompt
 public sealed class AdviceAuthorizePrompt<TApp>(
     IAuthenticationContextProvider? contexts = null,
     TimeProvider?                   time     = null,
-    IOptions<SchemataAuthorizationOptions>? options = null
+    IOptions<SchemataAuthorizationOptions>? options = null,
+    IResourceAuthenticationRequirementProvider? requirements = null
 ) : IAuthorizeAdvisor<TApp>
     where TApp : SchemataApplication
 {
@@ -164,7 +165,7 @@ public sealed class AdviceAuthorizePrompt<TApp>(
          && authz.Principal?.Identity?.IsAuthenticated == true
          && context?.AuthTime is null) {
             if (none) {
-                throw new OAuthException(OAuthErrors.LoginRequired, SchemataResources.USER_AUTHENTICATION_REQUIRED);
+                throw await SilentError(authz, context, age, ct);
             }
 
             authz.RequireReauthentication = true;
@@ -182,12 +183,34 @@ public sealed class AdviceAuthorizePrompt<TApp>(
         }
 
         if (none) {
-            throw new OAuthException(OAuthErrors.LoginRequired, SchemataResources.USER_AUTHENTICATION_REQUIRED);
+            throw await SilentError(authz, context, age, ct);
         }
 
         authz.RequireReauthentication = true;
 
         return AdviseResult.Continue;
+    }
+
+    private async Task<OAuthException> SilentError(
+        AuthorizeContext<TApp> authz,
+        AuthenticationContext? authentication,
+        long? maxAge,
+        CancellationToken ct
+    ) {
+        if (requirements is not null && authz.Request is { } request) {
+            var acrValues = request.AcrValues?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [];
+            var resource = request.Resource?.FirstOrDefault()
+                        ?? options?.Value.DefaultResource
+                        ?? options?.Value.Issuer;
+            var requirement = await AdviceAuthorizeClaims.Evaluate(
+                requirements, authz.Principal, request.ClientId, resource, acrValues, maxAge, ct);
+            if (requirement is not null
+             && !requirement.IsSatisfiedBy(authentication?.Acr, authentication?.AuthTime, _time.GetUtcNow())) {
+                return new(OAuthErrors.UnmetAuthenticationRequirements, SchemataResources.USER_AUTHENTICATION_REQUIRED);
+            }
+        }
+
+        return new(OAuthErrors.LoginRequired, SchemataResources.USER_AUTHENTICATION_REQUIRED);
     }
 
     #endregion

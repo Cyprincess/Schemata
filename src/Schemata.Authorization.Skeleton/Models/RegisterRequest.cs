@@ -88,6 +88,12 @@ public class RegisterRequest
     /// <summary><c>id_token_signed_response_alg</c>.</summary>
     public string? IdTokenSignedResponseAlg { get; set; }
 
+    /// <summary><c>id_token_encrypted_response_alg</c>. JWE key management algorithm using the client's public key.</summary>
+    public string? IdTokenEncryptedResponseAlg { get; set; }
+
+    /// <summary><c>id_token_encrypted_response_enc</c>. JWE content encryption algorithm.</summary>
+    public string? IdTokenEncryptedResponseEnc { get; set; }
+
     /// <summary><c>userinfo_signed_response_alg</c>. JWS algorithm signing the UserInfo response.</summary>
     public string? UserinfoSignedResponseAlg { get; set; }
 
@@ -152,6 +158,15 @@ public class RegisterRequest
     ///     registered for request objects; <see langword="null" /> leaves the choice open.
     /// </summary>
     public string? RequestObjectSigningAlg { get; set; }
+
+    /// <summary><c>request_object_encryption_alg</c>.</summary>
+    public string? RequestObjectEncryptionAlg { get; set; }
+
+    /// <summary><c>request_object_encryption_enc</c>.</summary>
+    public string? RequestObjectEncryptionEnc { get; set; }
+
+    /// <summary>Exact external request URIs registered by the client.</summary>
+    public List<string>? RequestUris { get; set; }
 
     /// <summary>
     ///     <c>require_signed_request_object</c>, per

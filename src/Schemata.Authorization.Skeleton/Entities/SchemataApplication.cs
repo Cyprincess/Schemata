@@ -290,6 +290,12 @@ public class SchemataApplication : IIdentifier, ICanonicalName, IDescriptive, IC
     /// </summary>
     public virtual ICollection<string>? AuthorizationDetailsTypes { get; set; }
 
+    /// <summary><c>id_token_encrypted_response_alg</c> — JWE key management algorithm for the client's public key.</summary>
+    public virtual string? IdTokenEncryptedResponseAlg { get; set; }
+
+    /// <summary><c>id_token_encrypted_response_enc</c> — JWE content encryption algorithm; defaults to A128CBC-HS256.</summary>
+    public virtual string? IdTokenEncryptedResponseEnc { get; set; }
+
     /// <summary>
     ///     <c>userinfo_signed_response_alg</c> — JWS algorithm the UserInfo response is signed
     ///     with, per
@@ -318,10 +324,17 @@ public class SchemataApplication : IIdentifier, ICanonicalName, IDescriptive, IC
     /// </summary>
     public virtual bool? RequirePushedAuthorizationRequests { get; set; }
 
-    /// <summary>
-    ///     <c>request_object_signing_alg</c>, per RFC 9101 §4.
-    /// </summary>
+    /// <summary><c>request_object_signing_alg</c>, per RFC 9101 §4.</summary>
     public virtual string? RequestObjectSigningAlg { get; set; }
+
+    /// <summary><c>request_object_encryption_alg</c> for nested request objects.</summary>
+    public virtual string? RequestObjectEncryptionAlg { get; set; }
+
+    /// <summary><c>request_object_encryption_enc</c> for nested request objects.</summary>
+    public virtual string? RequestObjectEncryptionEnc { get; set; }
+
+    /// <summary>Exact external <c>request_uri</c> values registered for this client.</summary>
+    public virtual ICollection<string>? RequestUris { get; set; }
 
     /// <summary>
     ///     <c>require_signed_request_object</c>, per

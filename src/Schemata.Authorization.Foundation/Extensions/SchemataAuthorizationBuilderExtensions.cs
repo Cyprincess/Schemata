@@ -118,6 +118,23 @@ public static class SchemataAuthorizationBuilderExtensions
     }
 
     /// <summary>
+    ///     Enables the RFC 6749 §4.3 resource owner password credentials grant for historical compatibility.
+    ///     This grant is not RFC 9700 Best Current Practice compliant and requires an
+    ///     <see cref="Schemata.Authorization.Skeleton.Services.IResourceOwnerPasswordValidator" />.
+    /// </summary>
+    /// <returns>The builder for chaining.</returns>
+    /// <seealso cref="ResourceOwnerPasswordFlowFeature{TApp}" />
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseResourceOwnerPasswordFlow<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder
+    )
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddResourceOwnerPasswordFlow();
+    }
+
+    /// <summary>
     ///     Enables the OAuth 2.0 Refresh Token flow,
     ///     per
     ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-6">
@@ -210,6 +227,18 @@ public static class SchemataAuthorizationBuilderExtensions
         where TScope : SchemataScope
         where TSubjectMapping : SchemataSubjectMapping, new() {
         return builder.AddJwtSecuredAuthorizationRequests(configure);
+    }
+
+    /// <summary>Enables bounded retrieval of exact client-registered HTTPS request URIs.</summary>
+    public static SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> UseExternalRequestObjects<TApp, TAuth, TScope, TSubjectMapping>(
+        this SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> builder,
+        Action<ExternalRequestObjectOptions>? configure = null
+    )
+        where TApp : SchemataApplication, new()
+        where TAuth : SchemataAuthorization, new()
+        where TScope : SchemataScope
+        where TSubjectMapping : SchemataSubjectMapping, new() {
+        return builder.AddExternalRequestObjects(configure);
     }
 
     /// <summary>

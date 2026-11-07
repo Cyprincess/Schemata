@@ -1,0 +1,103 @@
+{
+  "generated_at": "2026-11-05T00:16:29.763Z",
+  "host": {
+    "command": "dotnet artifacts\\bin\\Schemata.Authorization.Integration.Tests\\Release\\net10.0\\Schemata.Authorization.Integration.Tests.dll",
+    "environment": "BrowserProfile",
+    "issuer": "https://localhost:7043",
+    "target_framework": "net10.0"
+  },
+  "rp": {
+    "package": "openid-client",
+    "version": "6.8.1",
+    "node": "v26.13.0"
+  },
+  "transport": {
+    "tls": "Node trusted the exported ASP.NET Core development certificate through NODE_EXTRA_CA_CERTS"
+  },
+  "requests": [
+    {
+      "operation": "discovery",
+      "path": "/.well-known/openid-configuration"
+    },
+    {
+      "operation": "authorize",
+      "path": "/connect/authorize",
+      "response_type": "code",
+      "scope": "openid offline_access",
+      "pkce": "S256"
+    },
+    {
+      "operation": "token",
+      "path": "/connect/token",
+      "grant_types": [
+        "authorization_code",
+        "refresh_token"
+      ],
+      "client_authentication": "none",
+      "dpop": true
+    }
+  ],
+  "results": [
+    {
+      "scenario": "browser-client: discovery and code+PKCE",
+      "outcome": "passed",
+      "issuer": "https://localhost:7043",
+      "state_validated": true,
+      "nonce_validated": true,
+      "token_type": "dpop",
+      "encrypted_id_token_processed": false,
+      "subject": "users/u-1"
+    },
+    {
+      "scenario": "browser-client: refresh",
+      "outcome": "passed",
+      "new_access_token_issued": true,
+      "token_type": "dpop"
+    },
+    {
+      "scenario": "browser-client: replayed state",
+      "outcome": "rejected_before_token_request",
+      "error": "OAUTH_INVALID_RESPONSE"
+    },
+    {
+      "scenario": "browser-client: replayed state and code",
+      "outcome": "rejected",
+      "error": "invalid_grant"
+    },
+    {
+      "scenario": "concurrent authorization-code redemption",
+      "outcome": "one_success_one_rejection",
+      "successful_credential_sets": 1,
+      "rejected_redemptions": 1,
+      "rejection": "OAUTH_RESPONSE_IS_NOT_CONFORM",
+      "http_status": null
+    },
+    {
+      "scenario": "encrypted-rp-client: discovery and code+PKCE",
+      "outcome": "passed",
+      "issuer": "https://localhost:7043",
+      "state_validated": true,
+      "nonce_validated": true,
+      "token_type": "dpop",
+      "encrypted_id_token_processed": true,
+      "subject": "users/u-1"
+    },
+    {
+      "scenario": "encrypted-rp-client: refresh",
+      "outcome": "passed",
+      "new_access_token_issued": true,
+      "token_type": "dpop"
+    },
+    {
+      "scenario": "encrypted-rp-client: replayed state",
+      "outcome": "rejected_before_token_request",
+      "error": "OAUTH_INVALID_RESPONSE"
+    },
+    {
+      "scenario": "encrypted-rp-client: replayed state and code",
+      "outcome": "rejected",
+      "error": "invalid_grant"
+    }
+  ],
+  "sanitization": "Client secrets, authorization codes, PKCE verifiers, tokens, private keys, cookies, and DPoP proofs are omitted."
+}

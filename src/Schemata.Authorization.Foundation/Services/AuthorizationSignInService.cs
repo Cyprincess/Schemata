@@ -42,7 +42,8 @@ public sealed class AuthorizationSignInService<TApp, TSecurity, TToken>(
     ITokenStore<TToken>             tokens,
     IServiceProvider                       services,
     TimeProvider?                          time = null,
-    IOpSessionService?                     sessions = null
+    IOpSessionService?                     sessions = null,
+    IIdTokenResponseProtector?             idTokenProtection = null
 ) : IAuthorizationSignInService
     where TApp : SchemataApplication
     where TSecurity : SchemataSecurity, new()
@@ -75,6 +76,17 @@ public sealed class AuthorizationSignInService<TApp, TSecurity, TToken>(
             throw new InvalidOperationException(
                 "Authorization sign-in service requires a principal with a ClaimsIdentity.");
         }
+
+        var subject = principal.FindFirstValue(IdentityClaims.Subject);
+        var subjectKind = carriedGrant?.SubjectKind
+                       ?? AuthorizationGrantContexts.KindOf(subject, items.GetValueOrDefault(Properties.GrantType));
+        if (subjectKind == GrantSubjectKinds.EndUser
+         && !string.IsNullOrWhiteSpace(subject)
+         && services.GetService<ISubjectProvider>() is { } subjects
+         && !await subjects.ValidateAsync(subject, ct)) {
+            throw new OAuthException(OAuthErrors.InvalidGrant, SchemataResources.INVALID_GRANT);
+        }
+
         principal = new ClaimsPrincipal(principal.Identities.Select(value => value.Clone()));
         var identity = (ClaimsIdentity)principal.Identity!;
 
@@ -104,8 +116,6 @@ public sealed class AuthorizationSignInService<TApp, TSecurity, TToken>(
             throw new OAuthException(OAuthErrors.InvalidClient, SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
         var app = application?.CanonicalName;
-
-        var subject = principal.FindFirstValue(IdentityClaims.Subject);
 
         if (callback && sessions is not null) {
             sid = await sessions.IssueAsync(principal, subject, ct) ?? sid;
@@ -232,7 +242,7 @@ public sealed class AuthorizationSignInService<TApp, TSecurity, TToken>(
         // ID token's signature. It applies only when this operation actually issues an ID token;
         // OAuth-only grants and non-user grants sign everything with the primary selection.
         var issuesIdToken = grant.Profile == GrantProfiles.OpenIdConnect
-                         && SchemataAuthenticationHandler<TApp, TSecurity, TToken>.IsUserGrant(items);
+                         && grant.SubjectKind == GrantSubjectKinds.EndUser;
         await using var signing = await issuer.BeginSigningAsync(
             issuesIdToken ? application?.IdTokenSignedResponseAlg ?? SigningAlgorithms.RsaSha256 : null, ct);
         var successors = new List<TToken>();
@@ -297,8 +307,11 @@ public sealed class AuthorizationSignInService<TApp, TSecurity, TToken>(
             }
 
             var idExpiresAt = Min(issuedAt + config.Value.IdTokenLifetime, grant.ExpiresAt);
-            response.IdToken = SchemataAuthenticationHandler<TApp, TSecurity, TToken>.CreateIdToken(
+            var signedIdToken = SchemataAuthenticationHandler<TApp, TSecurity, TToken>.CreateIdToken(
                 issuer, signing, items, idClaims, issuedAt, idExpiresAt, response.AccessToken, null);
+            response.IdToken = application is not null && idTokenProtection is not null
+                ? await idTokenProtection.ProtectAsync(application, signedIdToken, ct)
+                : signedIdToken;
         }
 
         if (items.TryGetValue(Properties.IssuedTokenType, out var issuedType)
@@ -418,7 +431,7 @@ public sealed class AuthorizationSignInService<TApp, TSecurity, TToken>(
         // serves every token of a combined response.
         var issuesIdToken = responseTypes.Contains(ResponseTypes.IdToken)
                          && grant.Profile == GrantProfiles.OpenIdConnect
-                         && SchemataAuthenticationHandler<TApp, TSecurity, TToken>.IsUserGrant(items);
+                         && grant.SubjectKind == GrantSubjectKinds.EndUser;
         var idTokenAlgorithm = issuesIdToken ? application?.IdTokenSignedResponseAlg : null;
 
         // A code-only callback mints no JWT; the signing selection resolves on the first
@@ -446,9 +459,12 @@ public sealed class AuthorizationSignInService<TApp, TSecurity, TToken>(
             if (issuesIdToken) {
                 var idExpiresAt = Min(issuedAt + config.Value.IdTokenLifetime, grant.ExpiresAt);
                 signing ??= await issuer.BeginSigningAsync(idTokenAlgorithm, ct);
-                parameters[Parameters.IdToken] = SchemataAuthenticationHandler<TApp, TSecurity, TToken>.CreateIdToken(
+                var signedIdToken = SchemataAuthenticationHandler<TApp, TSecurity, TToken>.CreateIdToken(
                     issuer, signing, items, WithSession(id, sid), issuedAt, idExpiresAt, at,
                     parameters.GetValueOrDefault(Parameters.Code));
+                parameters[Parameters.IdToken] = application is not null && idTokenProtection is not null
+                    ? await idTokenProtection.ProtectAsync(application, signedIdToken, ct)
+                    : signedIdToken;
             }
 
             if (grant.Profile == GrantProfiles.OpenIdConnect

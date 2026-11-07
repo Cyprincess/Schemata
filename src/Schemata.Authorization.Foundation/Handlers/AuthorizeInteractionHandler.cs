@@ -49,6 +49,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
     private readonly IOpSessionService? _sessions;
     private readonly ITokenStore<TToken>                    _tokens;
     private readonly IEnumerable<IAuthorizeAdvisor<TApp>>?  _advisors;
+    private readonly IResourceAuthenticationRequirementProvider? _requirements;
 
     /// <summary>
     ///     Initializes the handler with the required managers and configuration.
@@ -66,6 +67,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
     ///     The installed authorize-advisor stage; the claims-parameter approval rule runs only
     ///     when its advisor is part of the stage.
     /// </param>
+    /// <param name="requirements">Optional resource authentication policy rechecked against the approving event.</param>
     public AuthorizeInteractionHandler(
         IApplicationManager<TApp>              apps,
         IAuthorizationManager<TAuth>           auths,
@@ -76,7 +78,8 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
         TimeProvider?                          time     = null,
         IOpSessionService? sessions = null,
         IAuthenticationContextProvider?        contexts = null,
-        IEnumerable<IAuthorizeAdvisor<TApp>>?   advisors = null
+        IEnumerable<IAuthorizeAdvisor<TApp>>?   advisors = null,
+        IResourceAuthenticationRequirementProvider? requirements = null
     ) {
         _apps     = apps;
         _auths    = auths;
@@ -88,6 +91,7 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
         _options  = options;
         _time     = time ?? TimeProvider.System;
         _advisors = advisors;
+        _requirements = requirements;
     }
 
     #region IInteractionHandler Members
@@ -254,14 +258,20 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
             throw new OAuthException(OAuthErrors.LoginRequired, SchemataResources.USER_AUTHENTICATION_REQUIRED);
         }
 
+        int? age = null;
         if (!string.IsNullOrWhiteSpace(authorize.MaxAge)) {
-            if (!int.TryParse(authorize.MaxAge, NumberStyles.None, CultureInfo.InvariantCulture, out var age) || age < 0) {
+            if (!int.TryParse(authorize.MaxAge, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed) || parsed < 0) {
                 throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED, new Dictionary<string, string?> { ["value"] = Parameters.MaxAge });
             }
+            age = parsed;
+        }
 
+        await EnforceResourceRequirement(authorize, principal, authentication, ct);
+
+        if (age is { } maximum) {
             var fresh = authentication?.AuthTime is { } epoch
                      && (authorize.AuthenticationRequiredAfter is not { } boundary || epoch >= boundary)
-                     && _time.GetUtcNow().ToUnixTimeSeconds() - epoch <= age;
+                     && _time.GetUtcNow().ToUnixTimeSeconds() - epoch <= maximum;
             if (!fresh) {
                 throw new OAuthException(OAuthErrors.LoginRequired, SchemataResources.USER_AUTHENTICATION_REQUIRED);
             }
@@ -324,6 +334,37 @@ public sealed class AuthorizeInteractionHandler<TApp, TAuth, TScope, TToken> : I
         properties[Properties.AuthorizationDetails] = details;
 
         return AuthorizationResult.SignIn(response, properties);
+    }
+
+    private async Task EnforceResourceRequirement(
+        AuthorizeRequest authorize,
+        ClaimsPrincipal principal,
+        AuthenticationContext? authentication,
+        CancellationToken ct
+    ) {
+        if (_requirements is null) {
+            return;
+        }
+
+        long? maxAge = null;
+        if (!string.IsNullOrWhiteSpace(authorize.MaxAge)
+         && long.TryParse(authorize.MaxAge, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed)) {
+            maxAge = parsed;
+        }
+        var acrValues = authorize.AcrValues?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [];
+        var resource = authorize.Resource?.FirstOrDefault()
+                    ?? _options.Value.DefaultResource
+                    ?? _options.Value.Issuer;
+        var requirement = await AdviceAuthorizeClaims.Evaluate(
+            _requirements, principal, authorize.ClientId, resource, acrValues, maxAge, ct);
+        if (requirement is null
+         || requirement.IsSatisfiedBy(authentication?.Acr, authentication?.AuthTime, _time.GetUtcNow())) {
+            return;
+        }
+
+        throw new OAuthException(
+            OAuthErrors.UnmetAuthenticationRequirements,
+            SchemataResources.USER_AUTHENTICATION_REQUIRED);
     }
 
     /// <summary>

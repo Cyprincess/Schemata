@@ -39,7 +39,8 @@ public sealed class RequestObjectReader<TApp, TSecurity>(
     ICacheProvider                         cache,
     ISecurityStore<TSecurity>              securities,
     ClientAssertionChannel                 channel,
-    TimeProvider?                          time = null
+    TimeProvider?                          time = null,
+    RequestObjectDecrypter<TSecurity>?     decrypter = null
 ) where TApp : SchemataApplication
   where TSecurity : SchemataSecurity, new()
 {
@@ -48,8 +49,8 @@ public sealed class RequestObjectReader<TApp, TSecurity>(
 
     /// <summary>
     ///     Verifies the signed request JWT and folds its claims into <paramref name="target" />,
-    ///     replacing any query parameters that the object overrides. JWE (encrypted) request
-    ///     objects are rejected with <c>invalid_request_object</c>.
+    ///     replacing any query parameters that the object overrides. Nested objects are decrypted
+    ///     before the same signed-object validation runs.
     /// </summary>
     /// <exception cref="OAuthException">
     ///     <c>invalid_request_object</c> on signature, claim, or JWE failures; <c>invalid_request</c>
@@ -62,7 +63,12 @@ public sealed class RequestObjectReader<TApp, TSecurity>(
         bool              enforceOidcOuterParameters,
         CancellationToken ct
     ) {
-        if (assertion.Count(character => character == '.') != 2) {
+        var segments = assertion.Count(character => character == '.');
+        if (segments == 4 && decrypter is not null) {
+            assertion = await decrypter.DecryptAsync(assertion, application, ct);
+            segments = 2;
+        }
+        if (segments != 2) {
             throw InvalidRequestObject();
         }
         JsonWebToken jwt;
@@ -101,7 +107,7 @@ public sealed class RequestObjectReader<TApp, TSecurity>(
 
             try {
                 var keys = await ClientKeyResolver<TApp, TSecurity>.ResolveAsync(
-                               application, assertion, securities, http, cache, security, ct);
+                               application, assertion, securities, http, cache, security, _time, ct);
                 await channel.VerifySignatureAsync(
                     assertion,
                     new() {

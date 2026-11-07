@@ -51,6 +51,7 @@ public static class ClientKeyResolver<TApp, TSecurity>
         IHttpClientFactory                http,
         ICacheProvider                    cache,
         IOptions<SchemataSecurityOptions> security,
+        TimeProvider                      time,
         CancellationToken                 ct
     ) {
         var client    = http.CreateClient(SecurityKeyMaterialExtensions.HttpClientName);
@@ -62,7 +63,8 @@ public static class ClientKeyResolver<TApp, TSecurity>
                            SecurityConstants.Usages.Authentication,
                            null,
                            ct)) {
-            if (row.Status is not (SecurityConstants.Statuses.Valid or SecurityConstants.Statuses.Retired)) {
+            if (row.Status != SecurityConstants.Statuses.Valid
+                && !SecurityKeyLifecycle.IsRetained(row, time.GetUtcNow(), security.Value.RetiredKeyRetention)) {
                 continue;
             }
 

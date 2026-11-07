@@ -29,14 +29,12 @@ public sealed class JwtSecuredAuthorizationRequestsFeature<TApp, TSecurity> : IA
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
         services.AddOptions<JwtSecuredAuthorizationRequestsOptions>();
+        services.TryAddScoped<RequestObjectDecrypter<TSecurity>>();
         services.TryAddScoped<RequestObjectReader<TApp, TSecurity>>();
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryRequestObject>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryRequestObject<TSecurity>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeRequestAdvisor<TApp>, AdviceAuthorizeRequestObject<TApp, TSecurity>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<
             IRegistrationRequestAdvisor<TApp>,
-            AdviceRegistrationJwtSecuredAuthorizationRequests<TApp>>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<
-            IRegistrationResponseAdvisor<TApp>,
             AdviceRegistrationJwtSecuredAuthorizationRequests<TApp>>());
     }
 }

@@ -1,4 +1,3 @@
-using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Authorization.Foundation.Advisors;
@@ -19,11 +18,6 @@ public sealed class HybridFlowFeature : IAuthorizationFlowFeature
     public int Order => AuthorizationCodeFlowFeature.DefaultOrder + 20;
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
-        if (!schemata.HasFeature(typeof(AuthorizationCodeFlowFeature<,,,,>))) {
-            throw new InvalidOperationException(
-                "The hybrid flow requires an authorize endpoint; call UseAuthorizationCodeFlow() before UseHybridFlow().");
-        }
-
         services.Configure<SchemataAuthorizationOptions>(options => {
             options.AllowedResponseTypes.Add(ResponseTypes.Code + " " + ResponseTypes.IdToken);
             options.AllowedResponseTypes.Add(ResponseTypes.Code + " " + ResponseTypes.Token);

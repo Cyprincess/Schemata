@@ -61,6 +61,7 @@ public sealed class UserInfoFeature<TApp, TSecurity> : IAuthorizationFlowFeature
                 });
 
         services.TryAddScoped<UserInfoEndpoint, UserInfoHandler>();
+        services.TryAddScoped<ClientEncryptionKeyResolver<TSecurity>>();
         services.TryAddScoped<IUserInfoResponseProtector, UserInfoResponseProtector<TApp, TSecurity>>();
         services.TryAddScoped<
             IRequestHandler<UserInfoEndpointQuery, AuthorizationResult>,

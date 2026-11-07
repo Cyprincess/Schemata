@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
@@ -58,6 +60,28 @@ public static class AdviceAuthorizeClaims
                 ?? request.Userinfo?.GetValueOrDefault(IdentityClaims.Subject);
         return spec?.Value;
     }
+
+    internal static Task<ResourceAuthenticationRequirement?> Evaluate(
+        IResourceAuthenticationRequirementProvider requirements,
+        ClaimsPrincipal? principal,
+        string? clientId,
+        string? resource,
+        IReadOnlyList<string> requestedAcr,
+        long? maxAge,
+        CancellationToken ct
+    ) {
+        var policyPrincipal = principal is null
+            ? new ClaimsPrincipal(new ClaimsIdentity())
+            : new ClaimsPrincipal(principal.Identities.Select(identity => identity.Clone()));
+        if (!string.IsNullOrWhiteSpace(clientId)
+         && policyPrincipal.Identity is ClaimsIdentity identity
+         && policyPrincipal.FindFirst(Claims.ClientId) is null) {
+            identity.AddClaim(new(Claims.ClientId, clientId));
+        }
+
+        return requirements.EvaluateAsync(
+            new(policyPrincipal, resource, requestedAcr, maxAge), ct);
+    }
 }
 
 /// <summary>
@@ -90,10 +114,13 @@ public static class AdviceAuthorizeClaims
 /// </remarks>
 public sealed class AdviceAuthorizeClaims<TApp>(
     IAuthenticationContextProvider? contexts = null,
-    IOptions<SchemataAuthorizationOptions>? options = null
+    IOptions<SchemataAuthorizationOptions>? options = null,
+    IResourceAuthenticationRequirementProvider? requirements = null,
+    TimeProvider? time = null
 ) : IAuthorizeAdvisor<TApp>
     where TApp : SchemataApplication
 {
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
     #region IAuthorizeAdvisor<TApp> Members
 
     public int Order => AdviceAuthorizeClaims.DefaultOrder;
@@ -105,6 +132,10 @@ public sealed class AdviceAuthorizeClaims<TApp>(
     ) {
         if (authz.Request is null) {
             return AdviseResult.Continue;
+        }
+
+        if (authz.Stage != AuthorizationRequestStage.Pushed) {
+            await ApplyResourceRequirement(authz, ct);
         }
 
         ClaimsRequest? request;
@@ -173,6 +204,65 @@ public sealed class AdviceAuthorizeClaims<TApp>(
     }
 
     #endregion
+
+    private async Task ApplyResourceRequirement(AuthorizeContext<TApp> authz, CancellationToken ct) {
+        if (requirements is null || authz.Request is not { } request) {
+            return;
+        }
+
+        long? requestedAge = null;
+        if (!string.IsNullOrWhiteSpace(request.MaxAge)) {
+            if (!long.TryParse(request.MaxAge, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed)) {
+                throw Redirect(authz, OAuthErrors.InvalidRequest, SchemataResources.NOT_SUPPORTED);
+            }
+            requestedAge = parsed;
+        }
+
+        var requestedAcr = request.AcrValues?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [];
+        var resource = request.Resource?.FirstOrDefault()
+                    ?? options?.Value.DefaultResource
+                    ?? options?.Value.Issuer;
+        var requirement = await AdviceAuthorizeClaims.Evaluate(
+            requirements, authz.Principal, request.ClientId, resource, requestedAcr, requestedAge, ct);
+        if (requirement is null) {
+            return;
+        }
+
+        var authentication = await AuthenticationContextExtensions.ResolveAsync(
+            authz.Principal,
+            request.Authentication,
+            request.OpSessionId,
+            options?.Value.SessionIdClaimType ?? Claims.SessionId,
+            contexts,
+            ct);
+        request.Authentication = authentication;
+        if (requirement.IsSatisfiedBy(authentication?.Acr, authentication?.AuthTime, _time.GetUtcNow())) {
+            return;
+        }
+
+        if (IsSilent(authz)) {
+            throw Redirect(authz, OAuthErrors.UnmetAuthenticationRequirements, SchemataResources.USER_AUTHENTICATION_REQUIRED);
+        }
+
+        var acrValues = requestedAcr.ToList();
+        acrValues.AddRange(requirement.AcrValues.Where(value => !acrValues.Contains(value, StringComparer.Ordinal)));
+        if (acrValues.Count > 0) {
+            request.AcrValues = string.Join(' ', acrValues);
+            request.AcrValueTokens = new(acrValues, StringComparer.Ordinal);
+        }
+
+        if (requirement.MaxAge is { } maxAge) {
+            var seconds = (long)maxAge.TotalSeconds;
+            if (seconds < 0 || maxAge.TotalSeconds != seconds) {
+                throw new InvalidOperationException("Resource max_age must be a non-negative whole number of seconds.");
+            }
+            if (requestedAge is not { } currentAge || seconds < currentAge) {
+                request.MaxAge = seconds.ToString(CultureInfo.InvariantCulture);
+            }
+        }
+
+        authz.RequireReauthentication = true;
+    }
 
     private static OAuthException Redirect(AuthorizeContext<TApp> authz, string error, string resourceKey) {
         return new(error, resourceKey) {

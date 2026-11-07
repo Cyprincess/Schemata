@@ -16,7 +16,7 @@ namespace Schemata.Authorization.Foundation.Advisors;
 
 internal sealed class AdviceRegistrationJwtSecuredAuthorizationRequests<TApp>(
     IOptions<JwtSecuredAuthorizationRequestsOptions> options
-) : IRegistrationRequestAdvisor<TApp>, IRegistrationResponseAdvisor<TApp>
+) : IRegistrationRequestAdvisor<TApp>
     where TApp : SchemataApplication
 {
     public int Order => SchemataConstants.Orders.Extension;
@@ -35,19 +35,25 @@ internal sealed class AdviceRegistrationJwtSecuredAuthorizationRequests<TApp>(
                 new Dictionary<string, string?> { ["value"] = request.RequestObjectSigningAlg });
         }
 
-        application.RequestObjectSigningAlg   = request.RequestObjectSigningAlg;
-        application.RequireSignedRequestObject = request.RequireSignedRequestObject;
+        if (!string.IsNullOrWhiteSpace(request.RequestObjectEncryptionEnc)
+            && string.IsNullOrWhiteSpace(request.RequestObjectEncryptionAlg)) {
+            throw InvalidEncryptionMetadata();
+        }
+
+        var encryptionEnc = request.RequestObjectEncryptionEnc;
+        if (!string.IsNullOrWhiteSpace(request.RequestObjectEncryptionAlg)) {
+            encryptionEnc ??= ContentEncryptionAlgorithms.Aes128CbcHmacSha256;
+            if (!options.Value.EncryptionAlgorithms.Contains(request.RequestObjectEncryptionAlg)
+                || !options.Value.ContentEncryptionAlgorithms.Contains(encryptionEnc)) {
+                throw InvalidEncryptionMetadata();
+            }
+        }
+
         return Task.FromResult(AdviseResult.Continue);
     }
 
-    public Task<AdviseResult> AdviseAsync(
-        AdviceContext         ctx,
-        TApp                  application,
-        RegistrationResponse response,
-        CancellationToken     ct = default
-    ) {
-        response.RequestObjectSigningAlg   = application.RequestObjectSigningAlg;
-        response.RequireSignedRequestObject = application.RequireSignedRequestObject;
-        return Task.FromResult(AdviseResult.Continue);
+
+    private static OAuthException InvalidEncryptionMetadata() {
+        return new(OAuthErrors.InvalidClientMetadata, SchemataResources.INVALID_CLIENT_METADATA);
     }
 }

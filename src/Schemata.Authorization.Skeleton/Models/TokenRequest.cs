@@ -43,6 +43,16 @@ public class TokenRequest
     public string? ClientSecret { get; set; }
 
     /// <summary>
+    ///     Resource owner username for the historical password grant, per RFC 6749 §4.3.2.
+    /// </summary>
+    public string? Username { get; set; }
+
+    /// <summary>
+    ///     Resource owner password for the historical password grant, per RFC 6749 §4.3.2.
+    /// </summary>
+    public string? Password { get; set; }
+
+    /// <summary>
     ///     Authorization code received from the authorization endpoint.
     ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1.3">
     ///         RFC 6749: The OAuth 2.0 Authorization

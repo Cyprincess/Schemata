@@ -79,7 +79,7 @@ public class AuthorizeCallbackFinalizationShould
     }
 
     [Fact]
-    public async Task Code_OmittedMode_UsesFormPostWhenOnlyFormPostIsAllowed() {
+    public async Task Code_OmittedMode_RejectsWhenDefaultQueryIsNotAllowed() {
         var app = App(ResponseTypes.Code);
         var manager = new Mock<IApplicationManager<SchemataApplication>>();
         manager.Setup(m => m.FindByClientIdAsync(app.ClientId, It.IsAny<CancellationToken>())).ReturnsAsync(app);
@@ -102,12 +102,14 @@ public class AuthorizeCallbackFinalizationShould
             },
         };
         var advisor = new AdviceAuthorizeClientAndRedirect<SchemataApplication>(manager.Object, options);
-        var ctx     = new AdviceContext(new ServiceCollection().BuildServiceProvider());
 
-        var result = await advisor.AdviseAsync(ctx, authz, CancellationToken.None);
+        var ex = await RejectsAsync(advisor, authz);
 
-        Assert.Equal(AdviseResult.Continue, result);
-        Assert.Equal(ResponseModes.FormPost, authz.ResponseMode);
+        Assert.Equal(OAuthErrors.InvalidRequest, ex.Status);
+        Assert.Null(ex.RedirectUri);
+        Assert.Null(ex.ResponseMode);
+        Assert.True(ex.OmitErrorParameters);
+        Assert.Null(authz.ResponseMode);
     }
 
     [Fact]
@@ -179,7 +181,7 @@ public class AuthorizeCallbackFinalizationShould
     }
 
     [Fact]
-    public void WithCallback_Leaves_Already_Resolved_Delivery_Untouched() {
+    public void WithCallback_Completes_An_Existing_Redirect_With_The_Validated_Mode() {
         var authz = new AuthorizeContext<SchemataApplication> {
             ResponseMode = ResponseModes.Fragment,
             Request      = new() { RedirectUri = "https://localhost/callback", State = "the-state" },
@@ -194,7 +196,7 @@ public class AuthorizeCallbackFinalizationShould
         Assert.Same(ex, result);
         Assert.Equal("https://elsewhere.example/cb", result.RedirectUri);
         Assert.Equal("other", result.State);
-        Assert.Null(result.ResponseMode);
+        Assert.Equal(ResponseModes.Fragment, result.ResponseMode);
     }
 
     [Fact]

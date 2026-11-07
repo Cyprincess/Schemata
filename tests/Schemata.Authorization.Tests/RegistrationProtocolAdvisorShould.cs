@@ -29,7 +29,7 @@ public class RegistrationProtocolAdvisorShould
     }
 
     [Fact]
-    public async Task Validate_And_Project_Jwt_Secured_Request_Metadata_Only_Through_Its_Advisor() {
+    public async Task Shared_Mapper_Preserves_Validated_Jar_Metadata() {
         var options = new JwtSecuredAuthorizationRequestsOptions();
         options.SigningAlgorithms.Add(SigningAlgorithms.RsaSha256);
         var advisor = new AdviceRegistrationJwtSecuredAuthorizationRequests<SchemataApplication>(Options.Create(options));
@@ -37,11 +37,18 @@ public class RegistrationProtocolAdvisorShould
         var response = new RegistrationResponse();
         var ctx = new AdviceContext(new ServiceCollection().BuildServiceProvider());
 
-        await advisor.AdviseAsync(ctx, new() {
+        var request = new RegisterRequest {
+            GrantTypes = [GrantTypes.ClientCredentials],
+            TokenEndpointAuthMethod = ClientAuthMethods.ClientSecretBasic,
             RequestObjectSigningAlg = SigningAlgorithms.RsaSha256,
             RequireSignedRequestObject = true,
-        }, application);
-        await advisor.AdviseAsync(ctx, application, response);
+        };
+        await advisor.AdviseAsync(ctx, request, application);
+        await Schemata.Authorization.Foundation.Services.RegistrationMetadataMapper.ApplyAsync(application, request,
+            Options.Create(new SchemataAuthorizationOptions()),
+            new Moq.Mock<System.Net.Http.IHttpClientFactory>().Object);
+        response = await Schemata.Authorization.Foundation.Services.RegistrationMetadataMapper.ToResponse(application,
+            new Moq.Mock<Schemata.Authorization.Skeleton.Services.IApplicationSecurityMetadataStore>().Object);
 
         Assert.Equal(SigningAlgorithms.RsaSha256, application.RequestObjectSigningAlg);
         Assert.True(application.RequireSignedRequestObject);

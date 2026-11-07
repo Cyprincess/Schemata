@@ -741,6 +741,16 @@ public static class AuthorizationConstants
         public const string Implicit = "implicit";
 
         /// <summary>
+        ///     Resource owner password credentials grant, per
+        ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.3">
+        ///         RFC 6749: The OAuth 2.0 Authorization
+        ///         Framework §4.3: Resource Owner Password Credentials Grant
+        ///     </seealso>
+        ///     .
+        /// </summary>
+        public const string Password = "password";
+
+        /// <summary>
         ///     Client credentials grant, per
         ///     <seealso href="https://www.rfc-editor.org/rfc/rfc6749.html#section-4.4">
         ///         RFC 6749: The OAuth 2.0 Authorization
@@ -1134,6 +1144,12 @@ public static class AuthorizationConstants
         ///     .
         /// </summary>
         public const string InvalidToken = "invalid_token";
+
+        /// <summary>The token's authentication event does not meet resource policy, per RFC 9470 §3.</summary>
+        public const string InsufficientUserAuthentication = "insufficient_user_authentication";
+
+        /// <summary>The authorization server cannot meet the requested authentication requirements.</summary>
+        public const string UnmetAuthenticationRequirements = "unmet_authentication_requirements";
 
         /// <summary>
         ///     The DPoP proof is invalid, per

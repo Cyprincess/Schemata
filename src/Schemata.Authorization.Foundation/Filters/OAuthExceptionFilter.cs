@@ -30,7 +30,7 @@ public sealed class OAuthExceptionFilter(IOptions<SchemataAuthorizationOptions> 
             }
         }
 
-        if (oauth.RedirectUri is null) {
+        if (oauth is not { RedirectUri: { } redirectUri, ResponseMode: { } responseMode }) {
             // RFC 6749 §5.2: an invalid_client error answered with HTTP 401 MUST carry a WWW-Authenticate
             // challenge naming the scheme the client used; Basic is the scheme this server accepts on the
             // Authorization header.
@@ -69,10 +69,10 @@ public sealed class OAuthExceptionFilter(IOptions<SchemataAuthorizationOptions> 
             parameters[Parameters.SessionState] = sessionState;
         }
 
-        context.Result = ResponseModeService.CreateCallback(oauth.RedirectUri,
+        context.Result = ResponseModeService.CreateCallback(redirectUri,
                                                             parameters.Where(p => p.Value is not null)
                                                                       .ToDictionary(p => p.Key, p => p.Value),
-                                                            oauth.ResponseMode ?? ResponseModes.Query);
+                                                            responseMode);
 
         context.ExceptionHandled = true;
     }

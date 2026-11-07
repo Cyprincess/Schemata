@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Authorization.Foundation.Commands;
+using Schemata.Authorization.Foundation.Advisors;
+using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Foundation.Handlers;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Handlers;
@@ -28,6 +30,7 @@ public sealed class TokenFeature : IAuthorizationFlowFeature
 
     public void ConfigureServices(IServiceCollection services, SchemataOptions schemata, Configurators configurators) {
 
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IDiscoveryAdvisor, AdviceDiscoveryIdTokenEncryption>());
         services.TryAddScoped<TokenEndpoint, TokenHandler>();
         services.TryAddScoped<
             IRequestHandler<TokenEndpointRequest, AuthorizationResult>,

@@ -36,6 +36,12 @@ public class ApplicationRequest : ICanonicalName, IDescriptive, IFreshness
     /// <summary><c>id_token_signed_response_alg</c>.</summary>
     public string? IdTokenSignedResponseAlg { get; set; }
 
+    /// <summary><c>id_token_encrypted_response_alg</c>.</summary>
+    public string? IdTokenEncryptedResponseAlg { get; set; }
+
+    /// <summary><c>id_token_encrypted_response_enc</c>.</summary>
+    public string? IdTokenEncryptedResponseEnc { get; set; }
+
     /// <summary><c>userinfo_signed_response_alg</c>.</summary>
     public string? UserinfoSignedResponseAlg { get; set; }
 
@@ -89,6 +95,15 @@ public class ApplicationRequest : ICanonicalName, IDescriptive, IFreshness
 
     /// <summary><c>request_object_signing_alg</c>; the JWS algorithm registered for request objects (RFC 9101 §4).</summary>
     public string? RequestObjectSigningAlg { get; set; }
+
+    /// <summary><c>request_object_encryption_alg</c>.</summary>
+    public string? RequestObjectEncryptionAlg { get; set; }
+
+    /// <summary><c>request_object_encryption_enc</c>.</summary>
+    public string? RequestObjectEncryptionEnc { get; set; }
+
+    /// <summary>Exact external request URIs registered by the client.</summary>
+    public ICollection<string>? RequestUris { get; set; }
 
     /// <summary><c>require_signed_request_object</c>; requires the server to reject unsigned request objects for this client (RFC 9101 §10.5).</summary>
     public bool? RequireSignedRequestObject { get; set; }

@@ -4,43 +4,54 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
+using Schemata.Authorization.Foundation.Services;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
+using Schemata.Security.Skeleton.Entities;
 
 namespace Schemata.Authorization.Foundation.Advisors;
 
-/// <summary>
-///     Advertises JAR support in the discovery document: the <c>request</c> parameter flag, the
-///     allow-list of JWS signing algorithms, and the <c>require_signed_request_object</c> flag,
-///     per
-///     <seealso href="https://www.rfc-editor.org/rfc/rfc9101.html#section-10.5">
-///         RFC 9101: JWT-Secured Authorization Request (JAR) §10.5: Choice of Algorithms
-///     </seealso>
-///     .
-/// </summary>
-public sealed class AdviceDiscoveryRequestObject(IOptions<JwtSecuredAuthorizationRequestsOptions> options) : IDiscoveryAdvisor
+/// <summary>Advertises the configured signed and encrypted JAR capabilities.</summary>
+public sealed class AdviceDiscoveryRequestObject<TSecurity>(
+    RequestObjectDecrypter<TSecurity> decrypter,
+    IOptions<JwtSecuredAuthorizationRequestsOptions> options,
+    IExternalRequestObjectResolver? external = null
+) : IDiscoveryAdvisor
+    where TSecurity : SchemataSecurity, new()
 {
     public int Order => AdviceDiscoveryTokenExchange.DefaultOrder + 20_000_000;
 
-    public Task<AdviseResult> AdviseAsync(
-        AdviceContext     ctx,
-        DiscoveryContext  discovery,
+    public async Task<AdviseResult> AdviseAsync(
+        AdviceContext ctx,
+        DiscoveryContext discovery,
         CancellationToken ct = default
     ) {
         discovery.Document ??= new();
         discovery.Document.RequestParameterSupported = true;
 
-        var algs = options.Value.SigningAlgorithms;
-        if (algs.Count == 0 && !options.Value.RequireForAllClients) {
-            return Task.FromResult(AdviseResult.Continue);
+        var signing = options.Value.SigningAlgorithms;
+        if (signing.Count > 0) {
+            discovery.Document.RequestObjectSigningAlgValuesSupported = signing.OrderBy(value => value).ToList();
+        }
+        if (signing.Count > 0 || options.Value.RequireForAllClients) {
+            discovery.Document.RequireSignedRequestObject = options.Value.RequireForAllClients;
         }
 
-        if (algs.Count > 0) {
-            discovery.Document.RequestObjectSigningAlgValuesSupported = algs.OrderBy(a => a).ToList();
+        if (options.Value.ContentEncryptionAlgorithms.Count > 0) {
+            var encryption = await decrypter.GetSupportedAlgorithmsAsync(ct);
+            if (encryption.Count > 0) {
+                discovery.Document.RequestObjectEncryptionAlgValuesSupported = encryption.ToList();
+                discovery.Document.RequestObjectEncryptionEncValuesSupported = options.Value.ContentEncryptionAlgorithms
+                    .OrderBy(value => value)
+                    .ToList();
+            }
         }
 
-        discovery.Document.RequireSignedRequestObject = options.Value.RequireForAllClients;
+        if (external is not null) {
+            discovery.Document.RequestUriParameterSupported = true;
+            discovery.Document.RequireRequestUriRegistration = true;
+        }
 
-        return Task.FromResult(AdviseResult.Continue);
+        return AdviseResult.Continue;
     }
 }

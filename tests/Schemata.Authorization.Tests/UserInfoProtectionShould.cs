@@ -98,7 +98,8 @@ public class UserInfoProtectionShould
         var http = new Mock<IHttpClientFactory>();
         http.Setup(h => h.CreateClient(It.IsAny<string>())).Returns(new HttpClient());
         var options = Options.Create(new SchemataAuthorizationOptions { Issuer = Issuer });
-        return new(apps.Object, TestSecurityKeys.CreateTokenService(options.Value, store, seed: false), store,
-            http.Object, Mock.Of<ICacheProvider>(), Options.Create(new SchemataSecurityOptions()), options);
+        var resolver = new ClientEncryptionKeyResolver<SchemataSecurity>(
+            store, http.Object, Mock.Of<ICacheProvider>(), Options.Create(new SchemataSecurityOptions()));
+        return new(apps.Object, TestSecurityKeys.CreateTokenService(options.Value, store, seed: false), resolver, options);
     }
 }

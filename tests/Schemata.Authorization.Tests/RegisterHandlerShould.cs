@@ -9,6 +9,7 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Schemata.Authorization.Foundation.Services;
 using Schemata.Caching.Skeleton;
+using Schemata.Entity.Repository;
 using Schemata.Security.Foundation;
 using System.Threading;
 using System.Threading.Tasks;
@@ -53,7 +54,8 @@ public class RegisterHandlerShould : IDisposable
         Action<SchemataAuthorizationOptions>? configure = null,
         HttpMessageHandler?                   handler   = null,
         ISoftwareStatementValidator?          softwareStatements = null,
-        TimeProvider?                         time               = null
+        TimeProvider?                         time               = null,
+        Mock<ISecretVerifier>?                verifier           = null
     ) {
         var options = new SchemataAuthorizationOptions {
             Issuer = "https://as.example",
@@ -64,9 +66,10 @@ public class RegisterHandlerShould : IDisposable
 
         var apps = new Mock<IApplicationManager<SchemataApplication>>();
         apps.SetupTypedMetadata();
+        apps.Setup(m => m.BeginProvisioning()).Returns(() => new Mock<IUnitOfWork>().Object);
 
-        apps.Setup(m => m.CreateAsync(It.IsAny<SchemataApplication>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((SchemataApplication a, CancellationToken _) => {
+        apps.Setup(m => m.CreateAsync(It.IsAny<SchemataApplication>(), It.IsAny<IUnitOfWork>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((SchemataApplication a, IUnitOfWork _, CancellationToken _) => {
                 a.Name = "registered-resource";
                 a.CanonicalName = "applications/registered-resource";
                 _registered.Add(a);
@@ -74,7 +77,7 @@ public class RegisterHandlerShould : IDisposable
             });
         apps.Setup(m => m.FindByClientIdAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string? id, CancellationToken _) => _registered.FirstOrDefault(a => a.ClientId == id));
-        apps.Setup(m => m.UpdateAsync(It.IsAny<SchemataApplication>(), It.IsAny<CancellationToken>()))
+        apps.Setup(m => m.UpdateAsync(It.IsAny<SchemataApplication>(), It.IsAny<IUnitOfWork>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         apps.Setup(m => m.DeleteAsync(It.IsAny<SchemataApplication>(), It.IsAny<CancellationToken>()))
             .Returns((SchemataApplication a, CancellationToken _) => {
@@ -103,7 +106,7 @@ public class RegisterHandlerShould : IDisposable
                                       It.IsAny<Func<Schemata.Entity.Repository.IUnitOfWork, CancellationToken, Task>?>()))
             .Returns(Task.CompletedTask);
 
-        var verifier = new Mock<ISecretVerifier>();
+        verifier ??= new Mock<ISecretVerifier>();
         verifier
             .Setup(v => v.HashAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string presented, string? _, CancellationToken _) => $"hashed:{presented}");
@@ -149,7 +152,7 @@ public class RegisterHandlerShould : IDisposable
 
         var registerHandler = new RegisterHandler<SchemataApplication, SchemataSecurity, SchemataToken>(
             apps.Object, tokens.Object, TestSecurityKeys.CreateTokenService(options),
-            Options.Create(options), http.Object, securities.Object, verifier.Object,
+            Options.Create(options), http.Object, securities.Object, new TestSecurityStore(_rows), verifier.Object,
             softwareStatements: softwareStatements,
             initialAccess: initialAccess.Object,
             time: time);
@@ -219,7 +222,7 @@ public class RegisterHandlerShould : IDisposable
 
         Assert.Equal(OAuthErrors.InvalidClientMetadata, error.Status);
         Assert.Equal(original, client!.TokenEndpointAuthMethod);
-        apps.Verify(a => a.UpdateAsync(It.IsAny<SchemataApplication>(), It.IsAny<CancellationToken>()), Times.Never);
+        apps.Verify(a => a.UpdateAsync(It.IsAny<SchemataApplication>(), It.IsAny<IUnitOfWork>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Theory]
@@ -282,6 +285,30 @@ public class RegisterHandlerShould : IDisposable
         Assert.Equal(SecurityConstants.Statuses.Valid, row.Status);
         Assert.Equal($"hashed:{response.ClientSecret}", row.Value);
     }
+
+    [Fact]
+    public async Task Verify_The_Stored_Password_Row_During_Replacement() {
+        var verifier = new Mock<ISecretVerifier>();
+        verifier.Setup(v => v.VerifyAsync(It.IsAny<SchemataSecurity>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+        var (handler, _, _, _, _, _) = Create(verifier: verifier);
+        var created = await handler.HandleAsync(new() {
+            RedirectUris = ["https://rp.example/cb"],
+        }, null, advice, CancellationToken.None);
+        var row = Assert.Single(_rows, value => value.Kind == SecurityConstants.Kinds.Password);
+        var secret = created.ClientSecret ?? string.Empty;
+        Assert.NotEmpty(secret);
+
+        var replaced = await handler.ReplaceAsync(created.ClientId, new() {
+            ClientId = created.ClientId,
+            ClientSecret = secret,
+            RedirectUris = ["https://rp.example/cb"],
+        }, created.RegistrationAccessToken, advice, CancellationToken.None);
+
+        Assert.NotNull(replaced);
+        verifier.Verify(v => v.VerifyAsync(row, secret, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     [Fact]
     public async Task Source_The_Client_Jwks_From_A_Jwks_Security_Row() {
         var (handler, _, _, _, _, _) = Create();
@@ -584,7 +611,7 @@ public class RegisterHandlerShould : IDisposable
         var denyAll = new RegisterHandler<SchemataApplication, SchemataSecurity, SchemataToken>(
             apps.Object, tokens.Object, TestSecurityKeys.CreateTokenService(options),
             Options.Create(options), new Mock<IHttpClientFactory>().Object,
-            new Mock<ISecurityStore<SchemataSecurity>>().Object, new Mock<ISecretVerifier>().Object);
+            new Mock<ISecurityStore<SchemataSecurity>>().Object, new TestSecurityStore(), new Mock<ISecretVerifier>().Object);
 
         var ex = await Assert.ThrowsAsync<OAuthException>(
             () => denyAll.HandleAsync(new() { RedirectUris = ["https://rp.example/cb"] }, bearerToken,advice,  CancellationToken.None));
@@ -741,7 +768,6 @@ public class RegisterHandlerShould : IDisposable
         services.AddSingleton<IRegistrationRequestAdvisor<SchemataApplication>>(par);
         services.AddSingleton<IRegistrationRequestAdvisor<SchemataApplication>>(jar);
         services.AddSingleton<IRegistrationResponseAdvisor<SchemataApplication>>(par);
-        services.AddSingleton<IRegistrationResponseAdvisor<SchemataApplication>>(jar);
         using var sp      = services.BuildServiceProvider();
         var advice = new AdviceContext(sp);
         var created = await handler.HandleAsync(new() {
@@ -989,34 +1015,12 @@ public class RegisterHandlerShould : IDisposable
     }
 
     [Fact]
-    public async Task Replace_Key_Material_Only_After_The_Listing_Streams_Close() {
-        var (handler, _, _, _, _, securities) = Create();
+    public async Task Replace_Key_Material_Revokes_Previous_Rows_And_Publishes_Current_Metadata() {
+        var (handler, _, _, _, _, _) = Create();
         var created = await handler.HandleAsync(new() {
             RedirectUris = ["https://rp.example/cb"],
             Jwks         = JsonDocument.Parse("""{"keys":[{"kty":"RSA","kid":"rp-1","use":"sig","n":"x","e":"AQAB"}]}""").RootElement.Clone(),
         }, null, advice, CancellationToken.None);
-
-        // Both kind listings share the repository context with the updates: no row may be
-        // mutated while either stream is open.
-        var jwks    = new ListingSpy(_rows, "applications/registered-resource", kind: SecurityConstants.Kinds.Jwks);
-        var jwksUri = new ListingSpy(_rows, "applications/registered-resource", kind: SecurityConstants.Kinds.JwksUri);
-        securities.Setup(s => s.ListByParentAsync(
-                       "applications/registered-resource", SecurityConstants.Kinds.Jwks, null, null,
-                       It.IsAny<CancellationToken>()))
-                  .Returns(jwks);
-        securities.Setup(s => s.ListByParentAsync(
-                       "applications/registered-resource", SecurityConstants.Kinds.JwksUri, null, null,
-                       It.IsAny<CancellationToken>()))
-                  .Returns(jwksUri);
-        var updatedWhileOpen = false;
-        securities.Setup(s => s.UpdateAsync(It.IsAny<SchemataSecurity>(), It.IsAny<CancellationToken>(),
-                                             It.IsAny<Func<Schemata.Entity.Repository.IUnitOfWork, CancellationToken, Task>?>()))
-                  .Callback((SchemataSecurity _, CancellationToken _, Func<Schemata.Entity.Repository.IUnitOfWork, CancellationToken, Task>? _) => {
-                      if (jwks.Open || jwksUri.Open) {
-                          updatedWhileOpen = true;
-                      }
-                  })
-                  .Returns(Task.CompletedTask);
 
         var replaced = await handler.ReplaceAsync(created.ClientId, new() {
             ClientId     = created.ClientId,
@@ -1025,7 +1029,7 @@ public class RegisterHandlerShould : IDisposable
         }, created.RegistrationAccessToken,advice,  CancellationToken.None);
 
         Assert.NotNull(replaced);
-        Assert.False(updatedWhileOpen);
+        Assert.Equal("rp-2", replaced.Jwks!.Value.GetProperty("keys")[0].GetProperty("kid").GetString());
 
         var keyRows = _rows.Where(row => row.Kind == SecurityConstants.Kinds.Jwks).ToList();
         Assert.Equal(2, keyRows.Count);
@@ -1061,6 +1065,30 @@ public class RegisterHandlerShould : IDisposable
         Assert.NotEqual(first.ClientSecret, second.ClientSecret);
     }
 
+    [Theory]
+    [InlineData("/relative", "jwks_uri")]
+    [InlineData("http://rp.example/jwks", "jwks_uri")]
+    [InlineData("not a uri", "initiate_login_uri")]
+    [InlineData("http://rp.example/login", "initiate_login_uri")]
+    public async Task Invalid_Https_Metadata_Is_Rejected_Before_Persistence(string value, string field) {
+        var (handler, _, _, _, _, _) = Create();
+        var request = new RegisterRequest {
+            RedirectUris = ["https://rp.example/cb"],
+        };
+        if (field == "jwks_uri") {
+            request.JwksUri = value;
+        } else {
+            request.InitiateLoginUri = value;
+        }
+
+        var error = await Assert.ThrowsAsync<OAuthException>(
+            () => handler.HandleAsync(request, null, advice, CancellationToken.None));
+
+        Assert.Equal(OAuthErrors.InvalidClientMetadata, error.Status);
+        Assert.Empty(_registered);
+        Assert.Empty(_rows);
+    }
+
     private const string Statement = "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJzb2Z0d2FyZSJ9.c2ln";
 
     private sealed class CountingRequestAdvisor : IRegistrationRequestAdvisor<SchemataApplication>
@@ -1079,30 +1107,4 @@ public class RegisterHandlerShould : IDisposable
             return Task.FromResult(AdviseResult.Continue);
         }
     }
-
-    private sealed class ListingSpy(
-        List<SchemataSecurity> rows,
-        string?                parent,
-        string?                kind   = null,
-        string?                status = null
-    ) : IAsyncEnumerable<SchemataSecurity>
-    {
-        public bool Open { get; private set; }
-
-        public async IAsyncEnumerator<SchemataSecurity> GetAsyncEnumerator(
-            CancellationToken ct = default
-        ) {
-            Open = true;
-            try {
-                foreach (var row in rows.Where(row => row.Parent == parent
-                                                   && (kind is null || row.Kind == kind)
-                                                   && (status is null || row.Status == status))) {
-                    yield return row;
-                }
-            } finally {
-                Open = false;
-            }
-        }
-    }
-
 }

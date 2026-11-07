@@ -37,6 +37,25 @@ public class PrivateKeyJwtShould
 
     private readonly List<SchemataSecurity> _rows = new();
 
+    [Theory]
+    [InlineData(-1, false)]
+    [InlineData(0, false)]
+    [InlineData(1, false)]
+    [InlineData(-1, true)]
+    public async Task Enforce_Retired_Client_Assertion_Key_Boundary(long ticks, bool revoked) {
+        var key = RsaKey("retired");
+        var app = CreateApp();
+        var row = JwksRow(Jwks(Jwk(key)));
+        row.Status = revoked ? SecurityConstants.Statuses.Revoked : SecurityConstants.Statuses.Retired;
+        row.RetirementTime = Now.UtcDateTime.AddHours(-1).AddTicks(-ticks);
+        _rows.Add(row);
+        var subject = CreateSubject(app);
+        var assertion = Mint(key, SigningAlgorithms.RsaSha256);
+
+        if (ticks < 0 && !revoked) Assert.Same(app, await subject.AuthenticateAsync(null, Form(assertion), null, default));
+        else await Assert.ThrowsAsync<OAuthException>(() => subject.AuthenticateAsync(null, Form(assertion), null, default));
+    }
+
     [Fact]
     public async Task Authenticate_An_Rsa_Assertion_Against_The_Registered_Jwks() {
         var key = RsaKey("rsa-1");
@@ -332,10 +351,10 @@ manager.Setup(m => m.HasGrantTypeAsync(It.IsAny<SchemataApplication?>(), It.IsAn
             Options.Create(options),
             http.Object,
             cache.Object,
-            Options.Create(new SchemataSecurityOptions()),
+            Options.Create(new SchemataSecurityOptions { RetiredKeyRetention = TimeSpan.FromHours(1) }),
             securities.Object,
             assertions ?? Validator(),
-            new());
+            new(), new FakeTimeProvider(Now));
     }
 
     private static async IAsyncEnumerable<SchemataSecurity> Enumerate(IEnumerable<SchemataSecurity> rows) {

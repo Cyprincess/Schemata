@@ -75,6 +75,26 @@ public class RequestObjectReaderShould
         -----END PRIVATE KEY-----
         """;
 
+    [Theory]
+    [InlineData(-1, false)]
+    [InlineData(0, false)]
+    [InlineData(1, false)]
+    [InlineData(-1, true)]
+    public async Task Enforce_Retired_Jar_Key_Expiry(long ticks, bool revoked) {
+        var reader = Reader(retired: Now.UtcDateTime.AddHours(-1).AddTicks(-ticks), revoked: revoked);
+        var target = Query();
+        var claims = BaseClaims();
+        claims[Parameters.State] = "verified";
+        if (ticks < 0 && !revoked) {
+            await reader.ReadAsync(Mint(claims), Application(), target, true, CancellationToken.None);
+            Assert.Equal("verified", target.State);
+        } else {
+            var error = await Assert.ThrowsAsync<OAuthException>(() => reader.ReadAsync(Mint(claims), Application(), target, true, CancellationToken.None));
+            Assert.Equal(OAuthErrors.InvalidRequestObject, error.Status);
+            Assert.NotEqual("verified", target.State);
+        }
+    }
+
     [Fact]
     public async Task Accept_A_Valid_Signed_Object_And_Ignore_Duplicate_Query_Parameters() {
         var target = new AuthorizeRequest {
@@ -483,7 +503,8 @@ apps.SetupTypedMetadata();
     }
 
     private static RequestObjectReader<SchemataApplication, SchemataSecurity> Reader(
-        JwtSecuredAuthorizationRequestsOptions? options = null, TimeProvider? time = null
+        JwtSecuredAuthorizationRequestsOptions? options = null, TimeProvider? time = null,
+        DateTime? retired = null, bool revoked = false
     ) {
         var row = new SchemataSecurity {
             Uid       = Guid.Parse("33333333-3333-3333-3333-333333333333"),
@@ -491,7 +512,8 @@ apps.SetupTypedMetadata();
             Name      = KeyId,
             Kind      = SecurityConstants.Kinds.Jwks,
             Usage     = SecurityConstants.Usages.Authentication,
-            Status    = SecurityConstants.Statuses.Valid,
+            Status    = revoked ? SecurityConstants.Statuses.Revoked : retired is not null ? SecurityConstants.Statuses.Retired : SecurityConstants.Statuses.Valid,
+            RetirementTime = retired,
             Value     = Jwks(),
         };
         var securities = new Mock<ISecurityStore<SchemataSecurity>>();
@@ -510,7 +532,7 @@ apps.SetupTypedMetadata();
         return new(
             Microsoft.Extensions.Options.Options.Create(options ?? Options()),
             Microsoft.Extensions.Options.Options.Create(new SchemataAuthorizationOptions { Issuer = Issuer }),
-            Microsoft.Extensions.Options.Options.Create(new SchemataSecurityOptions()),
+            Microsoft.Extensions.Options.Options.Create(new SchemataSecurityOptions { RetiredKeyRetention = TimeSpan.FromHours(1) }),
             http.Object,
             cache.Object,
             securities.Object,

@@ -76,6 +76,20 @@ public class OAuthExceptionFilterShould
     }
 
     [Fact]
+    public void Redirect_Without_A_Validated_Mode_Does_Not_Fall_Back_To_Query() {
+        var filter = CreateFilter("https://auth.example.com");
+        var exception = OAuthException.FromDescription(OAuthErrors.AccessDenied, "denied");
+        exception.RedirectUri = "https://client.example.com/callback";
+        var ctx = CreateContext(exception);
+
+        filter.OnException(ctx);
+
+        var json = Assert.IsType<JsonResult>(ctx.Result);
+        Assert.Equal(exception.Code, json.StatusCode);
+        Assert.True(ctx.ExceptionHandled);
+    }
+
+    [Fact]
     public void KeepsJsonResponse_WhenNoRedirectUri() {
         var filter    = CreateFilter("https://auth.example.com");
         var exception = OAuthException.FromDescription(OAuthErrors.InvalidClient, "bad client");

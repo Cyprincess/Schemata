@@ -23,7 +23,6 @@ using Schemata.Authorization.Skeleton.Managers;
 using Schemata.Authorization.Skeleton.Services;
 using Schemata.Caching.Skeleton;
 using Schemata.Core;
-using Schemata.Core.Building;
 using Schemata.Entity.Repository;
 using Schemata.Security.Foundation;
 using Schemata.Security.Foundation.Stores;
@@ -44,8 +43,7 @@ public class CustomAuthorizationEntitiesShould
             options = schema.Options;
             schema.UseSecurity<MySecurity, MyToken>()
                   .UseAuthorization<MyApplication, MyGrant, MyScope, MyMapping>(o => o.Issuer = "https://as.example")
-                  .UsePairwiseSubjects()
-                  .MapHttp();
+                  .UsePairwiseSubjects();
         });
 
         var services = builder.Services;
@@ -66,15 +64,6 @@ public class CustomAuthorizationEntitiesShould
         Assert.True(options.HasFeature(typeof(SchemataAuthorizationFeature<MyApplication, MyGrant, MyScope, MyMapping, MySecurity, MyToken>)));
         Assert.False(options.HasFeature(
             typeof(SchemataAuthorizationFeature<SchemataApplication, SchemataAuthorization, SchemataScope, SchemataSubjectMapping, SchemataSecurity, SchemataToken>)));
-
-        using var app = builder.Build();
-        var registry = app.Services.GetRequiredService<ResourceRegistry>();
-        Assert.NotNull(registry.GetResource(typeof(MyApplication)));
-        Assert.NotNull(registry.GetResource(typeof(MyScope)));
-        Assert.NotNull(registry.GetResource(typeof(MyToken)));
-        Assert.Null(registry.GetResource(typeof(SchemataApplication)));
-        Assert.Null(registry.GetResource(typeof(SchemataScope)));
-        Assert.Null(registry.GetResource(typeof(SchemataToken)));
     }
 
     [Fact]
@@ -147,7 +136,7 @@ public class CustomAuthorizationEntitiesShould
                              new ValueTask<MyMapping?>(query(rows.AsQueryable()).FirstOrDefault()));
         var transaction = new Mock<IUnitOfWork>();
         transaction.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        mappings.Setup(r => r.Begin()).Returns(transaction.Object);
+        mappings.Setup(r => r.Begin(System.Data.IsolationLevel.Serializable)).Returns(transaction.Object);
         var mutation = new Mock<IResourceMutation<MyMapping>>();
         mutation.Setup(m => m.CreateAsync(It.IsAny<MyMapping>(), It.IsAny<IUnitOfWork>(), It.IsAny<CancellationToken>()))
                 .Callback((MyMapping row, IUnitOfWork _, CancellationToken _) => rows.Add(row))

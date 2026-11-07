@@ -109,6 +109,7 @@ public class ResponseModeServiceShould
     [InlineData("token", ResponseModes.Fragment)]
     [InlineData("id_token", ResponseModes.Fragment)]
     [InlineData("code token", ResponseModes.Fragment)]
+    [InlineData("none", ResponseModes.Query)]
     public void ResolveMode_DefaultsBasedOnResponseType(string responseType, string expected) {
         Assert.Equal(expected, ResponseModeService.ResolveMode(null, responseType));
     }
@@ -119,18 +120,43 @@ public class ResponseModeServiceShould
         Assert.Equal(ResponseModes.Fragment, ResponseModeService.ResolveMode("", "token"));
     }
 
-    [Fact]
-    public void ResolveAllowedMode_OmittedCodeMode_UsesFormPostWhenOnlyFormPostIsAllowed() {
-        var allowed = new HashSet<string> { ResponseModes.FormPost };
+    [Theory]
+    [InlineData("code", ResponseModes.Query)]
+    [InlineData("token", ResponseModes.Fragment)]
+    [InlineData("id_token", ResponseModes.Fragment)]
+    [InlineData("code id_token", ResponseModes.Fragment)]
+    [InlineData("code token", ResponseModes.Fragment)]
+    [InlineData("code id_token token", ResponseModes.Fragment)]
+    [InlineData("none", ResponseModes.Query)]
+    public void ResolveAllowedMode_OmittedMode_UsesTheResponseTypeDefault(string responseType, string expected) {
+        var allowed = new HashSet<string> { ResponseModes.Query, ResponseModes.Fragment, ResponseModes.FormPost };
 
-        Assert.Equal(ResponseModes.FormPost, ResponseModeService.ResolveAllowedMode(null, "code", allowed));
+        Assert.Equal(expected, ResponseModeService.ResolveAllowedMode(null, responseType, allowed));
     }
 
-    [Fact]
-    public void ResolveAllowedMode_OmittedTokenMode_UsesFragmentWhenFragmentIsAllowed() {
-        var allowed = new HashSet<string> { ResponseModes.FormPost, ResponseModes.Fragment };
+    [Theory]
+    [InlineData("code", ResponseModes.FormPost)]
+    [InlineData("none", ResponseModes.FormPost)]
+    [InlineData("token", ResponseModes.Query)]
+    [InlineData("code id_token", ResponseModes.Query)]
+    public void ResolveAllowedMode_OmittedMode_RejectsADisallowedDefault(
+        string responseType,
+        string soleAllowedMode
+    ) {
+        var allowed = new HashSet<string> { soleAllowedMode };
 
-        Assert.Equal(ResponseModes.Fragment, ResponseModeService.ResolveAllowedMode(null, "token", allowed));
+        Assert.Null(ResponseModeService.ResolveAllowedMode(null, responseType, allowed));
+    }
+
+    [Theory]
+    [InlineData("code", ResponseModes.FormPost)]
+    [InlineData("token", ResponseModes.FormPost)]
+    [InlineData("code id_token", ResponseModes.Fragment)]
+    [InlineData("none", ResponseModes.Query)]
+    public void ResolveAllowedMode_ExplicitAllowedMode_IsPreserved(string responseType, string mode) {
+        var allowed = new HashSet<string> { ResponseModes.Query, ResponseModes.Fragment, ResponseModes.FormPost };
+
+        Assert.Equal(mode, ResponseModeService.ResolveAllowedMode(mode, responseType, allowed));
     }
 
     [Fact]

@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Authorization.Foundation.Features;
+using Schemata.Authorization.Identity.Services;
 using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Authorization.Skeleton.Services;
 using Schemata.Security.Skeleton.Entities;
 using Schemata.Core;
 using Schemata.Core.Features;
@@ -30,5 +33,8 @@ public sealed class SchemataAuthorizationIdentityFeature<TUser> : FeatureBase wh
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) => services.AddSchemataIdentitySubjectProvider<TUser>();
+    ) {
+        services.AddSchemataIdentitySubjectProvider<TUser>();
+        services.TryAddScoped<IResourceOwnerPasswordValidator, IdentityResourceOwnerPasswordValidator<TUser>>();
+    }
 }

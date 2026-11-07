@@ -1,9 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Net.Http;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Features;
+using Schemata.Authorization.Foundation.Services;
+using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Core;
 using Schemata.Core.Building;
@@ -20,9 +25,6 @@ public static class SchemataAuthorizationBuilder
 {
     /// <summary>Options key carrying the authentication scheme selected for authorization resources.</summary>
     public const string AuthenticationSchemeKey = "Authorization:AuthenticationScheme";
-
-    /// <summary>Options key carrying the host entity set exposed to transport resource features.</summary>
-    public const string ResourceRegistrationKey = "Authorization:ResourceRegistration";
 }
 
 /// <summary>
@@ -104,6 +106,8 @@ public abstract class SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubject
 
     internal abstract SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> AddDeviceFlow();
 
+    internal abstract SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> AddResourceOwnerPasswordFlow();
+
     internal abstract SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> AddJwtBearerGrant();
 
     internal abstract SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> AddPushedAuthorizationRequests(
@@ -118,6 +122,10 @@ public abstract class SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubject
 
     internal abstract SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> AddJwtSecuredAuthorizationRequests(
         Action<JwtSecuredAuthorizationRequestsOptions>? configure
+    );
+
+    internal abstract SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> AddExternalRequestObjects(
+        Action<ExternalRequestObjectOptions>? configure
     );
 
     internal abstract SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> AddUserInfo();
@@ -210,6 +218,13 @@ internal sealed class SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubject
         return this;
     }
 
+    internal override SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> AddResourceOwnerPasswordFlow() {
+        AddFlowFeature<TokenFeature>();
+        AddFlowFeature<ResourceOwnerPasswordFlowFeature<TApp>>();
+
+        return this;
+    }
+
     internal override SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> AddPushedAuthorizationRequests(
         Action<PushedAuthorizationRequestsOptions>? configure
     ) {
@@ -252,6 +267,24 @@ internal sealed class SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubject
 
         AddFlowFeature<JwtSecuredAuthorizationRequestsFeature<TApp, TSecurity>>();
 
+        return this;
+    }
+
+    internal override SchemataAuthorizationBuilder<TApp, TAuth, TScope, TSubjectMapping> AddExternalRequestObjects(
+        Action<ExternalRequestObjectOptions>? configure
+    ) {
+        Services.AddOptions<ExternalRequestObjectOptions>()
+                .Validate(options => options.Timeout > TimeSpan.Zero, "External request object timeout must be positive.")
+                .Validate(options => options.MaximumBodyBytes > 0, "External request object body limit must be positive.")
+                .Validate(options => options.CacheLifetime > TimeSpan.Zero, "External request object cache lifetime must be positive.");
+        if (configure is not null) {
+            Services.Configure(configure);
+        }
+
+        Services.TryAddScoped<IExternalRequestObjectResolver, ExternalRequestObjectResolver>();
+        Services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizeRequestAdvisor<TApp>, AdviceAuthorizeRequestUri<TApp, TToken>>());
+        Services.AddHttpClient(ExternalRequestObjectResolver.HttpClientName)
+                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         return this;
     }
 

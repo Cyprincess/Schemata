@@ -38,7 +38,8 @@ public sealed class AdviceAuthorizeRequestUri<TApp, TToken>(
     ITokenStore<TToken>                    tokens,
     IOptions<PushedAuthorizationRequestsOptions> options,
     IOptions<JsonSerializerOptions>        json,
-    TimeProvider?                          time = null
+    TimeProvider?                          time = null,
+    IExternalRequestObjectResolver?        external = null
 ) : IAuthorizeRequestAdvisor<TApp>
     where TApp : SchemataApplication
     where TToken : SchemataToken, new()
@@ -75,8 +76,24 @@ public sealed class AdviceAuthorizeRequestUri<TApp, TToken>(
         }
 
         if (!raw.StartsWith(RequestUriPrefixes.Par, StringComparison.Ordinal)) {
-            // Spec §4.6: by-reference request_uri from a remote server is not implemented.
-            throw new OAuthException(OAuthErrors.RequestUriNotSupported, SchemataResources.REQUEST_URI_NOT_SUPPORTED);
+            if (external is null) {
+                throw new OAuthException(OAuthErrors.RequestUriNotSupported, SchemataResources.REQUEST_URI_NOT_SUPPORTED);
+            }
+            if (string.IsNullOrWhiteSpace(request?.ClientId)) {
+                throw new OAuthException(OAuthErrors.InvalidRequest, SchemataResources.NOT_EMPTY, new Dictionary<string, string?> { ["value"] = Parameters.ClientId });
+            }
+
+            var externalApplication = await apps.FindByClientIdAsync(request.ClientId, ct);
+            if (externalApplication is null
+                || !Uri.TryCreate(raw, UriKind.Absolute, out var externalUri)) {
+                throw new OAuthException(OAuthErrors.InvalidRequestUri, SchemataResources.INVALID_REQUEST_URI);
+            }
+
+            var assertion = await external.ResolveAsync(externalApplication, externalUri, ct);
+            request.Request = assertion;
+            authz.Application = externalApplication;
+            authz.ResolvedRequestUri = raw;
+            return AdviseResult.Continue;
         }
 
         if (string.IsNullOrWhiteSpace(request?.ClientId)) {

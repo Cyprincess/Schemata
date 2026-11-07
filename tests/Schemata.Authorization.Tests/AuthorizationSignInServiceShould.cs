@@ -19,6 +19,7 @@ using Schemata.Abstractions.Advisors;
 using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Services;
+using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Security.Skeleton;
@@ -63,6 +64,114 @@ public class AuthorizationSignInServiceShould
         Assert.Null(http.Response.ContentType);
         Assert.Empty(http.Response.Headers);
         Assert.Equal(0, http.Response.Body.Length);
+    }
+
+    [Theory]
+    [InlineData(GrantTypes.AuthorizationCode, false)]
+    [InlineData(GrantTypes.RefreshToken, false)]
+    [InlineData(GrantTypes.TokenExchange, false)]
+    [InlineData(GrantTypes.RefreshToken, true)]
+    public async Task Inactive_Subject_Fails_Grant_Before_Key_Or_Credential_Creation(string grantType, bool rotation) {
+        var subjects = new Mock<ISubjectProvider>(MockBehavior.Strict);
+        subjects.Setup(provider => provider.ValidateAsync("users/inactive", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(false);
+        var claims = new Mock<IClaimsAdvisor>(MockBehavior.Strict);
+        var sessions = new Mock<IOpSessionService>(MockBehavior.Strict);
+        using var provider = new ServiceCollection()
+                            .AddSingleton(subjects.Object)
+                            .AddSingleton(claims.Object)
+                            .BuildServiceProvider();
+        var keys = new TestSecurityStore();
+        var (service, tokens) = Create(provider, store: keys, sessions: sessions.Object);
+        var grant = AuthorizationGrantContexts.Create(
+            "users/inactive", $"{Scopes.OpenId} {Scopes.DeviceSso} {Scopes.OfflineAccess}", "sid-1",
+            GrantTypes.AuthorizationCode, null, GrantProfiles.OpenIdConnect);
+        grant.Family = "family";
+        grant.FamilyEstablished = true;
+        var properties = new Dictionary<string, string?> {
+            [Properties.GrantType] = grantType,
+            [Properties.Scope] = grant.Scope,
+            [Properties.SessionId] = "sid-1",
+            [Properties.GrantContext] = AuthorizationGrantContexts.Serialize(grant),
+        };
+        if (rotation) {
+            properties[Properties.RefreshPredecessor] = JsonSerializer.Serialize(new SchemataToken {
+                Family = "family", ReferenceId = "predecessor",
+            }, Schemata.Common.SchemataJson.Default);
+        }
+        var principal = new ClaimsPrincipal(new ClaimsIdentity([
+            new(IdentityClaims.Subject, "users/inactive"),
+        ], "grant"));
+
+        var error = await Assert.ThrowsAsync<OAuthException>(() => service.IssueAsync(
+            principal, properties, AuthorizationSignInResponseKind.Token));
+
+        Assert.Equal(OAuthErrors.InvalidGrant, error.Status);
+        Assert.Equal(0, keys.ListByParentCalls);
+        tokens.Verify(store => store.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(),
+            It.IsAny<Func<Schemata.Entity.Repository.IUnitOfWork, CancellationToken, Task>?>()), Times.Never);
+        tokens.Verify(store => store.PublishFamilyAsync(It.IsAny<string>(), It.IsAny<IReadOnlyCollection<SchemataToken>>(),
+            It.IsAny<bool>(), It.IsAny<CancellationToken>(),
+            It.IsAny<Func<Schemata.Entity.Repository.IUnitOfWork, CancellationToken, Task>?>()), Times.Never);
+        tokens.Verify(store => store.RotateFamilyAsync(It.IsAny<SchemataToken>(), It.IsAny<IReadOnlyCollection<SchemataToken>>(),
+            It.IsAny<CancellationToken>(), It.IsAny<Func<Schemata.Entity.Repository.IUnitOfWork, CancellationToken, Task>?>()),
+            Times.Never);
+        claims.VerifyNoOtherCalls();
+        sessions.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Inactive_Subject_Fails_Code_Creation_Before_Session_Establishment() {
+        var subjects = new Mock<ISubjectProvider>(MockBehavior.Strict);
+        subjects.Setup(provider => provider.ValidateAsync("users/inactive", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(false);
+        var sessions = new Mock<IOpSessionService>(MockBehavior.Strict);
+        var claims = new Mock<IClaimsAdvisor>(MockBehavior.Strict);
+        using var provider = new ServiceCollection()
+                            .AddSingleton(subjects.Object)
+                            .AddSingleton(claims.Object)
+                            .BuildServiceProvider();
+        var keys = new TestSecurityStore();
+        var (service, tokens) = Create(provider, store: keys, sessions: sessions.Object);
+        var principal = new ClaimsPrincipal(new ClaimsIdentity([
+            new(IdentityClaims.Subject, "users/inactive"),
+        ], "authorize"));
+
+        var error = await Assert.ThrowsAsync<OAuthException>(() => service.IssueAsync(principal,
+            new Dictionary<string, string?> {
+                [Properties.GrantType] = GrantTypes.AuthorizationCode,
+                [Properties.ResponseType] = ResponseTypes.Code,
+                [Properties.RedirectUri] = "https://client.example/callback",
+                [Properties.Scope] = Scopes.OpenId,
+            }, AuthorizationSignInResponseKind.Callback));
+
+        Assert.Equal(OAuthErrors.InvalidGrant, error.Status);
+        Assert.Equal(0, keys.ListByParentCalls);
+        sessions.VerifyNoOtherCalls();
+        claims.VerifyNoOtherCalls();
+        tokens.Verify(store => store.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(),
+            It.IsAny<Func<Schemata.Entity.Repository.IUnitOfWork, CancellationToken, Task>?>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Client_Only_Grant_Skips_Subject_Admission() {
+        var subjects = new Mock<ISubjectProvider>(MockBehavior.Strict);
+        using var provider = new ServiceCollection().AddSingleton(subjects.Object).BuildServiceProvider();
+        var (service, tokens) = Create(provider);
+        tokens.Setup(store => store.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(),
+                It.IsAny<Func<Schemata.Entity.Repository.IUnitOfWork, CancellationToken, Task>?>()))
+              .ReturnsAsync((SchemataToken token, CancellationToken _, Func<Schemata.Entity.Repository.IUnitOfWork, CancellationToken, Task>? _) => token);
+        var principal = new ClaimsPrincipal(new ClaimsIdentity([
+            new(IdentityClaims.Subject, "users/client-only"),
+        ], "grant"));
+
+        var result = await service.IssueAsync(principal, new Dictionary<string, string?> {
+            [Properties.GrantType] = GrantTypes.ClientCredentials,
+            [Properties.Scope] = "api",
+        }, AuthorizationSignInResponseKind.Token);
+
+        Assert.NotNull(result.Token?.AccessToken);
+        subjects.VerifyNoOtherCalls();
     }
 
     [Fact]
@@ -260,6 +369,56 @@ public class AuthorizationSignInServiceShould
 
         Assert.Equal("client-1", id.Audiences.Single());
         Assert.DoesNotContain("https://issuer.example", id.Audiences);
+    }
+
+    [Fact]
+    public async Task Issue_An_Id_Token_For_A_Refresh_Continuation() {
+        using var provider = Provider(out _);
+        var (service, tokens) = Create(provider);
+        tokens.Setup(value => value.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(),
+                                               It.IsAny<Func<Schemata.Entity.Repository.IUnitOfWork, CancellationToken, Task>?>()))
+              .ReturnsAsync((SchemataToken? token, CancellationToken _, Func<Schemata.Entity.Repository.IUnitOfWork, CancellationToken, Task>? _) => token!);
+        var grant = AuthorizationGrantContexts.Create(
+            "user-1", Scopes.OpenId, "sid-1", GrantTypes.AuthorizationCode, null, GrantProfiles.OpenIdConnect);
+        var principal = new ClaimsPrincipal(new ClaimsIdentity([
+            new(IdentityClaims.Subject, "user-1"),
+            new(Claims.ClientId, "client-1"),
+        ], "grant"));
+
+        var result = await service.IssueAsync(principal, new Dictionary<string, string?> {
+            [Properties.GrantType] = GrantTypes.RefreshToken,
+            [Properties.Scope] = Scopes.OpenId,
+            [Properties.GrantContext] = AuthorizationGrantContexts.Serialize(grant),
+        }, AuthorizationSignInResponseKind.Token);
+
+        Assert.NotNull(result.Token);
+        Assert.NotNull(result.Token.IdToken);
+    }
+
+    [Fact]
+    public async Task Application_Subject_Kind_Suppresses_Id_Token_For_A_Refresh_Source() {
+        var subjects = new Mock<ISubjectProvider>(MockBehavior.Strict);
+        using var provider = new ServiceCollection().AddSingleton(subjects.Object).BuildServiceProvider();
+        var (service, tokens) = Create(provider);
+        tokens.Setup(value => value.CreateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(),
+                                               It.IsAny<Func<Schemata.Entity.Repository.IUnitOfWork, CancellationToken, Task>?>()))
+              .ReturnsAsync((SchemataToken? token, CancellationToken _, Func<Schemata.Entity.Repository.IUnitOfWork, CancellationToken, Task>? _) => token!);
+        var grant = AuthorizationGrantContexts.Create(
+            "user-1", Scopes.OpenId, "sid-1", GrantTypes.AuthorizationCode, null, GrantProfiles.OpenIdConnect);
+        grant.SubjectKind = GrantSubjectKinds.Application;
+        var principal = new ClaimsPrincipal(new ClaimsIdentity([
+            new(IdentityClaims.Subject, "user-1"),
+            new(Claims.ClientId, "client-1"),
+        ], "grant"));
+
+        var result = await service.IssueAsync(principal, new Dictionary<string, string?> {
+            [Properties.GrantType] = GrantTypes.RefreshToken,
+            [Properties.Scope] = Scopes.OpenId,
+            [Properties.GrantContext] = AuthorizationGrantContexts.Serialize(grant),
+        }, AuthorizationSignInResponseKind.Token);
+
+        Assert.NotNull(result.Token?.AccessToken);
+        Assert.Null(result.Token.IdToken);
     }
 
     [Fact]

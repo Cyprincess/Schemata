@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
@@ -53,6 +54,8 @@ public class SchemataAuthenticationHandler<TApp, TSecurity, TToken>(
     ITokenStore<TToken>                                   tokens,
     IOptions<DPopOptions>                                 dpop,
     IOptions<SchemataAuthorizationOptions>                config,
+    IResourceAuthenticationRequirementProvider?           requirements = null,
+    TimeProvider?                                         time = null,
     DPopProofValidator<TToken>?                           proofs = null,
     [FromKeyedServices(SecurityConstants.TokenTypes.Nonce)] ITokenStore<TToken>? nonces = null
 ) : AuthenticationHandler<SchemataAuthenticationHandlerOptions>(options, logger, encoder)
@@ -60,15 +63,6 @@ public class SchemataAuthenticationHandler<TApp, TSecurity, TToken>(
     where TSecurity : SchemataSecurity, new()
     where TToken : SchemataToken, new()
 {
-    /// <summary>
-    ///     Returns <c>true</c> when the grant type indicates a user-present flow
-    ///     that can receive an ID token.
-    /// </summary>
-    public static bool IsUserGrant(IDictionary<string, string?> items) {
-        items.TryGetValue(Properties.GrantType, out var grant);
-        return grant is GrantTypes.AuthorizationCode or GrantTypes.Implicit or GrantTypes.RefreshToken or GrantTypes.TokenExchange;
-    }
-
     /// <summary>
     ///     Determines whether a refresh token should be issued.
     ///     Returns <c>true</c> for the <c>refresh_token</c> grant (rotation),
@@ -226,8 +220,10 @@ public class SchemataAuthenticationHandler<TApp, TSecurity, TToken>(
 
     private const string ChallengeErrorItem       = "Schemata.Authorization.DpopChallengeError";
     private const string ChallengeNonceItem       = "Schemata.Authorization.DpopChallengeNonce";
+    private const string ChallengeRequirementItem = "Schemata.Authorization.ChallengeRequirement";
     private const string BearerChallengeErrorItem = "Schemata.Authorization.BearerChallengeError";
     private const string NonceProvider            = "dpop-rs";
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync() {
         var ct = Context.RequestAborted;
@@ -289,7 +285,8 @@ public class SchemataAuthenticationHandler<TApp, TSecurity, TToken>(
         // self-addressed tokens), never the canonical application reference of the client
         // that requested it. Tokens audience-restricted to external resources are invalid
         // here and rejected with invalid_token.
-        if (!AcceptsAudience(principal)) {
+        var resource = AcceptedResource(principal);
+        if (resource is null) {
             return StageInvalidToken(flavor);
         }
 
@@ -301,7 +298,7 @@ public class SchemataAuthenticationHandler<TApp, TSecurity, TToken>(
                 return AuthenticateResult.NoResult();
             }
 
-            return AuthenticateResult.Success(new(principal, Scheme.Name));
+            return await CompleteAuthentication(principal, flavor, resource);
         }
 
         // Unreachable without the DPoP scheme; the guard keeps the DPoP branch honest when the
@@ -352,7 +349,36 @@ public class SchemataAuthenticationHandler<TApp, TSecurity, TToken>(
 
         // Tokens issued without cnf stay presentable via the DPoP scheme during the BCP
         // transition; the proof is still enforced, only cnf-bound tokens are compared.
-        return AuthenticateResult.Success(new(principal, Scheme.Name));
+        return await CompleteAuthentication(principal, flavor, resource);
+    }
+
+    private async Task<AuthenticateResult> CompleteAuthentication(
+        ClaimsPrincipal principal,
+        string flavor,
+        string resource
+    ) {
+        if (requirements is null) {
+            return AuthenticateResult.Success(new(principal, Scheme.Name));
+        }
+
+        var requirement = await requirements.EvaluateAsync(
+            new(principal, resource, [], null), Context.RequestAborted);
+        if (requirement is null) {
+            return AuthenticateResult.Success(new(principal, Scheme.Name));
+        }
+
+        var rawAuthTime = principal.FindFirstValue(Claims.AuthTime);
+        long? authTime = long.TryParse(rawAuthTime, NumberStyles.Integer, CultureInfo.InvariantCulture, out var epoch)
+            ? epoch
+            : null;
+        if (requirement.IsSatisfiedBy(principal.FindFirstValue(Claims.Acr), authTime, _time.GetUtcNow())) {
+            return AuthenticateResult.Success(new(principal, Scheme.Name));
+        }
+
+        Context.Items[ChallengeRequirementItem] = requirement;
+        return flavor == Schemes.Dpop
+            ? StageDpopChallenge(OAuthErrors.InsufficientUserAuthentication)
+            : StageBearerChallenge(OAuthErrors.InsufficientUserAuthentication);
     }
     /// <summary>
     ///     Copies the raw DPoP field values into the shape the canonical
@@ -395,12 +421,22 @@ public class SchemataAuthenticationHandler<TApp, TSecurity, TToken>(
     ///     non-blank default resource and issuer.
     /// </summary>
     internal bool AcceptsAudience(ClaimsPrincipal principal) {
+        return AcceptedResource(principal) is not null;
+    }
+
+    private string? AcceptedResource(ClaimsPrincipal principal) {
         var options = config.Value;
         var accepted = options.ResourceAudiences is { Count: > 0 } cached
             ? cached
             : DefaultResourceAudiences(options);
 
-        return principal.FindAll(Claims.Audience).Any(a => accepted.Contains(a.Value));
+        foreach (var audience in principal.FindAll(Claims.Audience)) {
+            if (accepted.Contains(audience.Value)) {
+                return audience.Value;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>The audiences this server mints for itself: the non-blank default resource
@@ -453,11 +489,12 @@ public class SchemataAuthenticationHandler<TApp, TSecurity, TToken>(
         // error rides the challenge corresponding to the mechanism that failed. Instances
         // share the request item store, so each flavor consumes only its own staged state.
         var isDpop = Scheme.Name.Equals(Schemes.Dpop, StringComparison.Ordinal);
+        var requirement = Context.Items[ChallengeRequirementItem] as ResourceAuthenticationRequirement;
 
         if (!isDpop && Context.Items[BearerChallengeErrorItem] is string bearerError) {
-            WriteChallenge(BuildBearerChallenge(bearerError));
+            WriteChallenge(BuildBearerChallenge(bearerError, requirement: requirement));
         } else if (isDpop && Context.Items[ChallengeErrorItem] is string error) {
-            WriteChallenge(BuildChallenge(error, dpop.Value.SigningAlgorithms));
+            WriteChallenge(BuildChallenge(error, dpop.Value.SigningAlgorithms, requirement));
 
             if (Context.Items[ChallengeNonceItem] is string nonce) {
                 Response.Headers[Headers.DpopNonce] = nonce;
@@ -486,11 +523,14 @@ public class SchemataAuthenticationHandler<TApp, TSecurity, TToken>(
     }
 
     /// <summary>
-    ///     Shapes a DPoP WWW-Authenticate value per RFC 9449 §7.1: the scheme name, an
-    ///     error parameter when a presented token failed authentication, and the
-    ///     space-delimited <c>algs</c> list of acceptable proof algorithms.
+    ///     Shapes a DPoP WWW-Authenticate value per RFC 9449 §7.1 and appends
+    ///     RFC 9470 authentication requirements when the resource policy is unmet.
     /// </summary>
-    internal static string BuildChallenge(string? error, IEnumerable<string> algorithms) {
+    internal static string BuildChallenge(
+        string? error,
+        IEnumerable<string> algorithms,
+        ResourceAuthenticationRequirement? requirement = null
+    ) {
         var builder = new StringBuilder(Schemes.Dpop);
         var first   = true;
 
@@ -502,24 +542,66 @@ public class SchemataAuthenticationHandler<TApp, TSecurity, TToken>(
         var algs = string.Join(' ', algorithms.OrderBy(a => a, StringComparer.Ordinal));
         if (algs.Length > 0) {
             builder.Append(first ? " algs=\"" : ", algs=\"").Append(algs).Append('"');
+            first = false;
         }
 
+        AppendRequirement(builder, requirement, ref first);
         return builder.ToString();
     }
 
     /// <summary>
-    ///     Shapes the Bearer challenge per RFC 6750 §3: an <c>error</c> parameter with a
-    ///     description for a presented-but-rejected credential (§3.1), and a <c>realm</c>
-    ///     auth-param without any error code when no credential was presented.
+    ///     Shapes the Bearer challenge per RFC 6750 §3 and appends RFC 9470
+    ///     <c>acr_values</c> and <c>max_age</c> for an unmet resource requirement.
     /// </summary>
-    internal static string BuildBearerChallenge(string? error, string? realm = null) {
+    internal static string BuildBearerChallenge(
+        string? error,
+        string? realm = null,
+        ResourceAuthenticationRequirement? requirement = null
+    ) {
         if (string.IsNullOrWhiteSpace(error)) {
-            var escaped = (realm ?? string.Empty)
-                          .Replace("\\", "\\\\", StringComparison.Ordinal)
-                          .Replace("\"", "\\\"", StringComparison.Ordinal);
-            return $"{Schemes.Bearer} realm=\"{escaped}\"";
+            return $"{Schemes.Bearer} realm=\"{Escape(realm ?? string.Empty)}\"";
         }
 
-        return $"{Schemes.Bearer} error=\"{error}\", error_description=\"{SchemataResources.GetResourceString(SchemataResources.INVALID_TOKEN)}\"";
+        var resourceKey = error == OAuthErrors.InsufficientUserAuthentication
+            ? SchemataResources.USER_AUTHENTICATION_REQUIRED
+            : SchemataResources.INVALID_TOKEN;
+        var builder = new StringBuilder(Schemes.Bearer)
+            .Append(" error=\"").Append(error)
+            .Append("\", error_description=\"").Append(SchemataResources.GetResourceString(resourceKey)).Append('"');
+        var first = false;
+        AppendRequirement(builder, requirement, ref first);
+        return builder.ToString();
+    }
+
+    private static void AppendRequirement(
+        StringBuilder builder,
+        ResourceAuthenticationRequirement? requirement,
+        ref bool first
+    ) {
+        if (requirement is null) {
+            return;
+        }
+
+        if (requirement.AcrValues.Count > 0) {
+            builder.Append(first ? " acr_values=\"" : ", acr_values=\"")
+                   .Append(Escape(string.Join(' ', requirement.AcrValues))).Append('"');
+            first = false;
+        }
+
+        if (requirement.MaxAge is { } maxAge) {
+            var seconds = (long)maxAge.TotalSeconds;
+            if (seconds < 0 || maxAge.TotalSeconds != seconds) {
+                throw new InvalidOperationException("Resource max_age must be a non-negative whole number of seconds.");
+            }
+
+            builder.Append(first ? " max_age=\"" : ", max_age=\"")
+                   .Append(seconds.ToString(CultureInfo.InvariantCulture)).Append('"');
+            first = false;
+        }
+    }
+
+    private static string Escape(string value) {
+        return value.Replace("\\", "\\\\", StringComparison.Ordinal)
+                    .Replace("\"", "\\\"", StringComparison.Ordinal);
     }
 }

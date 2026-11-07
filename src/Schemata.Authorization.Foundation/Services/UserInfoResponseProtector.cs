@@ -51,10 +51,7 @@ namespace Schemata.Authorization.Foundation.Services;
 public sealed class UserInfoResponseProtector<TApp, TSecurity>(
     IApplicationManager<TApp>              apps,
     TokenService<TSecurity>                issuer,
-    ISecurityStore<TSecurity>              securities,
-    IHttpClientFactory                     http,
-    ICacheProvider                         cache,
-    IOptions<SchemataSecurityOptions>      securityOptions,
+    ClientEncryptionKeyResolver<TSecurity> encryption,
     IOptions<SchemataAuthorizationOptions> options,
     TimeProvider?                          time = null
 ) : IUserInfoResponseProtector
@@ -85,7 +82,8 @@ public sealed class UserInfoResponseProtector<TApp, TSecurity>(
         }
 
         var signing   = !string.IsNullOrWhiteSpace(app.UserinfoSignedResponseAlg);
-        var encrypted = !string.IsNullOrWhiteSpace(app.UserinfoEncryptedResponseAlg);
+        var encryptionAlgorithm = app.UserinfoEncryptedResponseAlg ?? string.Empty;
+        var encrypted = !string.IsNullOrWhiteSpace(encryptionAlgorithm);
 
         if (!signing && !encrypted) {
             return null;
@@ -112,7 +110,7 @@ public sealed class UserInfoResponseProtector<TApp, TSecurity>(
 
             if (encrypted) {
                 // Core 1.0 §5.3.2: signed then encrypted — a Nested JWT.
-                descriptor.EncryptingCredentials = await ResolveEncryptingCredentialsAsync(app, ct);
+                descriptor.EncryptingCredentials = await encryption.ResolveAsync(app, encryptionAlgorithm, app.UserinfoEncryptedResponseEnc, ct);
             }
 
             response = Handler.CreateToken(descriptor);
@@ -123,7 +121,7 @@ public sealed class UserInfoResponseProtector<TApp, TSecurity>(
                 Claims = payload,
                 IssuedAt = now,
                 Expires = now + ResponseLifetime,
-                EncryptingCredentials = await ResolveEncryptingCredentialsAsync(app, ct),
+                EncryptingCredentials = await encryption.ResolveAsync(app, encryptionAlgorithm, app.UserinfoEncryptedResponseEnc, ct),
             };
             response = Handler.CreateToken(descriptor);
         }
@@ -132,64 +130,4 @@ public sealed class UserInfoResponseProtector<TApp, TSecurity>(
     }
 
     #endregion
-
-
-    private async Task<EncryptingCredentials> ResolveEncryptingCredentialsAsync(TApp app, CancellationToken ct) {
-        var parent = SecurityParents.Application(app);
-
-        TSecurity? row = null;
-        await foreach (var candidate in securities.ListByParentAsync(parent, SecurityConstants.Kinds.Jwks, null, SecurityConstants.Statuses.Valid, ct)) {
-            row = candidate;
-            break;
-        }
-
-        if (row is null) {
-            await foreach (var candidate in securities.ListByParentAsync(parent, SecurityConstants.Kinds.JwksUri, null, SecurityConstants.Statuses.Valid, ct)) {
-                row = candidate;
-                break;
-            }
-        }
-
-        if (row is null) {
-            throw new InvalidOperationException(
-                "A client registering userinfo_encrypted_response_alg must register jwks or jwks_uri key material.");
-        }
-
-        var material = await row.ToKeyMaterialAsync(
-            http.CreateClient(SecurityKeyMaterialExtensions.HttpClientName),
-            cache,
-            securityOptions.Value.KeyCacheLifetime,
-            ct);
-
-        var alg = SecurityKeyAdapter.ToEncryptionAlgorithm(app.UserinfoEncryptedResponseAlg!);
-        SecurityKey? key = null;
-        Exception? keyFailure = null;
-        if (material is not null) {
-            foreach (var candidate in SecurityKeyAdapter.ToJsonWebKeySet([material]).Keys) {
-                if (!string.IsNullOrEmpty(candidate.Use) && candidate.Use != "enc"
-                 || !string.IsNullOrEmpty(candidate.Alg) && candidate.Alg != alg
-                 || candidate.KeyOps.Count > 0 && !candidate.KeyOps.Contains("encrypt") && !candidate.KeyOps.Contains("wrapKey")) {
-                    continue;
-                }
-                if (!candidate.CryptoProviderFactory.IsSupportedAlgorithm(alg, candidate)) continue;
-                try {
-                    var provider = candidate.CryptoProviderFactory.CreateKeyWrapProvider(candidate, alg);
-                    candidate.CryptoProviderFactory.ReleaseKeyWrapProvider(provider);
-                    key = candidate;
-                    break;
-                } catch (Exception error) when (error is ArgumentException or CryptographicException or NotSupportedException) {
-                    keyFailure = error;
-                }
-            }
-        }
-        if (key is null) {
-            throw new InvalidOperationException("The client's registered key set has no eligible encryption key.", keyFailure);
-        }
-
-        var enc = string.IsNullOrWhiteSpace(app.UserinfoEncryptedResponseEnc)
-            ? SecurityAlgorithms.Aes128CbcHmacSha256
-            : app.UserinfoEncryptedResponseEnc!;
-
-        return new(key, alg, enc);
-    }
 }

@@ -1,9 +1,9 @@
-using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Authorization.Foundation.Advisors;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Features;
+using Schemata.Authorization.Skeleton.Advisors;
 using Schemata.Authorization.Skeleton.Contexts;
 using Schemata.Authorization.Skeleton.Models;
 using Schemata.Abstractions.Advisors;
@@ -17,36 +17,44 @@ namespace Schemata.Authorization.Tests;
 public class ImplicitAndHybridFlowShould
 {
     [Fact]
-    public void Reject_An_Implicit_Flow_Without_The_Authorization_Code_Endpoint() {
-        var options = new SchemataOptions();
+    public void Enable_Implicit_Response_Metadata_Without_A_Root_Registry() {
         var services = new ServiceCollection();
 
-        var error = Assert.Throws<InvalidOperationException>(() =>
-            new ImplicitFlowFeature().ConfigureServices(services, options, new Configurators()));
+        new ImplicitFlowFeature().ConfigureServices(services, new SchemataOptions(), new Configurators());
 
-        Assert.Contains("UseAuthorizationCodeFlow", error.Message, StringComparison.Ordinal);
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<SchemataAuthorizationOptions>>().Value;
+        Assert.Contains(ResponseTypes.Token, options.AllowedResponseTypes);
+        Assert.Contains(ResponseTypes.IdToken, options.AllowedResponseTypes);
+        Assert.Contains("id_token token", options.AllowedResponseTypes);
+        Assert.Contains(ResponseModes.Fragment, options.AllowedResponseModes);
+        Assert.Contains(provider.GetServices<IDiscoveryAdvisor>(), advisor => advisor is AdviceDiscoveryImplicitGrant);
     }
 
     [Fact]
-    public void Reject_A_Hybrid_Flow_Without_The_Authorization_Code_Endpoint() {
-        var options = new SchemataOptions();
+    public void Enable_Hybrid_Response_Metadata_Without_A_Root_Registry() {
         var services = new ServiceCollection();
 
-        var error = Assert.Throws<InvalidOperationException>(() =>
-            new HybridFlowFeature().ConfigureServices(services, options, new Configurators()));
+        new HybridFlowFeature().ConfigureServices(services, new SchemataOptions(), new Configurators());
 
-        Assert.Contains("UseAuthorizationCodeFlow", error.Message, StringComparison.Ordinal);
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<SchemataAuthorizationOptions>>().Value;
+        Assert.Contains("code id_token", options.AllowedResponseTypes);
+        Assert.Contains("code token", options.AllowedResponseTypes);
+        Assert.Contains("code id_token token", options.AllowedResponseTypes);
+        Assert.Contains(ResponseModes.Fragment, options.AllowedResponseModes);
+        Assert.Contains(provider.GetServices<IDiscoveryAdvisor>(), advisor => advisor is AdviceDiscoveryImplicitGrant);
     }
 
     [Fact]
-    public void Reject_A_None_Flow_Without_The_Authorization_Code_Endpoint() {
-        var options = new SchemataOptions();
+    public void Enable_None_Response_Metadata_Without_A_Root_Registry() {
         var services = new ServiceCollection();
 
-        var error = Assert.Throws<InvalidOperationException>(() =>
-            new NoneFlowFeature().ConfigureServices(services, options, new Configurators()));
+        new NoneFlowFeature().ConfigureServices(services, new SchemataOptions(), new Configurators());
 
-        Assert.Contains("UseAuthorizationCodeFlow", error.Message, StringComparison.Ordinal);
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<SchemataAuthorizationOptions>>().Value;
+        Assert.Contains(ResponseTypes.None, options.AllowedResponseTypes);
     }
 
     [Fact]

@@ -110,6 +110,12 @@ public sealed class DiscoveryDocument
     /// <summary>JWS signing algorithms supported for <c>id_token</c>s.</summary>
     public List<string>? IdTokenSigningAlgValuesSupported { get; set; }
 
+    /// <summary>JWE key management algorithms supported for encrypted <c>id_token</c>s.</summary>
+    public List<string>? IdTokenEncryptionAlgValuesSupported { get; set; }
+
+    /// <summary>JWE content encryption algorithms supported for encrypted <c>id_token</c>s.</summary>
+    public List<string>? IdTokenEncryptionEncValuesSupported { get; set; }
+
     /// <summary>Claim names the server can supply in <c>id_token</c>s or UserInfo.</summary>
     public List<string>? ClaimsSupported { get; set; }
 
@@ -209,6 +215,12 @@ public sealed class DiscoveryDocument
     ///     .
     /// </summary>
     public List<string>? RequestObjectSigningAlgValuesSupported { get; set; }
+
+    /// <summary>JWE key-management algorithms accepted for encrypted request objects.</summary>
+    public List<string>? RequestObjectEncryptionAlgValuesSupported { get; set; }
+
+    /// <summary>JWE content-encryption algorithms accepted for encrypted request objects.</summary>
+    public List<string>? RequestObjectEncryptionEncValuesSupported { get; set; }
 
     /// <summary>
     ///     Whether the authorization server requires authorization requests to be signed request
