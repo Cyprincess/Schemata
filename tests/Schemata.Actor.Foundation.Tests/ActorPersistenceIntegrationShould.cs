@@ -1,7 +1,11 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using LinqToDB;
+using LinqToDB.Data;
+using LinqToDB.Mapping;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -12,10 +16,12 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions.Exceptions;
 using Microsoft.Extensions.Hosting;
 using Schemata.Actor.Foundation.Tests.Fixtures;
+using Schemata.Actor.Foundation.Runtime;
 using Schemata.Actor.Skeleton;
 using Schemata.Actor.Skeleton.Entities;
 using Schemata.Core;
 using Schemata.Entity.EntityFrameworkCore;
+using Schemata.Entity.LinqToDB;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Xunit;
@@ -63,25 +69,25 @@ public sealed class ActorPersistenceIntegrationShould
         var actor = await system.GetAsync(id);
 
         // Tell: fire-and-forget, observed indirectly through the later Ask reads.
-        await actor.TellAsync(new Increment());
+        await actor.TellAsync(root, new Increment());
 
         // Ask: request/response, twice more.
-        await actor.AskAsync<Increment, int>(new());
-        var afterThree = await actor.AskAsync<Increment, int>(new());
+        await actor.AskAsync<Increment, int>(root, new());
+        var afterThree = await actor.AskAsync<Increment, int>(root, new());
 
         var otherId = new ActorId("counter/integration", "child");
         var other = await system.GetAsync(otherId);
-        Assert.Equal(1, await other.AskAsync<Increment, int>(new()));
+        Assert.Equal(1, await other.AskAsync<Increment, int>(root, new()));
         await system.StopAsync(otherId);
         var otherRespawned = await system.GetAsync(otherId);
-        Assert.Equal(1, await otherRespawned.AskAsync<GetCount, int>(new()));
+        Assert.Equal(1, await otherRespawned.AskAsync<GetCount, int>(root, new()));
         Assert.Equal(3, afterThree);
 
         await system.StopAsync(id);
 
         // Persistence: a freshly (re)spawned instance loads the state a real repository wrote.
         var respawned = await system.GetAsync(id);
-        var loaded     = await respawned.AskAsync<GetCount, int>(new());
+        var loaded     = await respawned.AskAsync<GetCount, int>(root, new());
         Assert.Equal(3, loaded);
 
         await using var verifyScope = root.CreateAsyncScope();
@@ -115,8 +121,8 @@ public sealed class ActorPersistenceIntegrationShould
             await scope.ServiceProvider.GetRequiredService<TestDbContext>().Database.EnsureCreatedAsync();
         }
         var actor = await host.Services.GetRequiredService<IActorSystem>().GetAsync(new("counter", "shutdown"));
-        await actor.TellAsync(new Increment());
-        await actor.TellAsync(new Increment());
+        await actor.TellAsync(host.Services, new Increment());
+        await actor.TellAsync(host.Services, new Increment());
         await host.StopAsync().WaitAsync(TimeSpan.FromSeconds(10));
         await using var verify = host.Services.CreateAsyncScope();
         var row = await verify.ServiceProvider.GetRequiredService<TestDbContext>().Set<SchemataActor>().SingleAsync();
@@ -145,7 +151,7 @@ public sealed class ActorPersistenceIntegrationShould
 
         var system = root.GetRequiredService<IActorSystem>();
         var actor = await system.GetAsync(new("counter", "unnamed"));
-        await Assert.ThrowsAsync<ValidationException>(() => actor.AskAsync<Increment, int>(new()).AsTask());
+        await Assert.ThrowsAsync<ValidationException>(() => actor.AskAsync<Increment, int>(root, new()).AsTask());
 
         await using var verifyScope = root.CreateAsyncScope();
         var database = verifyScope.ServiceProvider.GetRequiredService<TestDbContext>();
@@ -180,11 +186,11 @@ public sealed class ActorPersistenceIntegrationShould
         var system = root.GetRequiredService<IActorSystem>();
         var id     = new ActorId("counter", "custom");
         var actor  = await system.GetAsync(id);
-        await actor.AskAsync<Increment, int>(new());
+        await actor.AskAsync<Increment, int>(root, new());
         await system.StopAsync(id);
 
         var respawned = await system.GetAsync(id);
-        Assert.Equal(1, await respawned.AskAsync<GetCount, int>(new()));
+        Assert.Equal(1, await respawned.AskAsync<GetCount, int>(root, new()));
 
         await using var verify = root.CreateAsyncScope();
         var row = await verify.ServiceProvider.GetRequiredService<SessionDbContext>().Set<SessionActor>().SingleAsync();
@@ -193,6 +199,93 @@ public sealed class ActorPersistenceIntegrationShould
         Assert.StartsWith("session-", row.Name, StringComparison.Ordinal);
         Assert.Equal(1, BitConverter.ToInt32(row.State!, 0));
         await ((IActorSystemLifetime)system).ShutdownAsync(CancellationToken.None);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConcurrentSaves_ForANewIdentity_LeaveOneDurableRow(bool linq) {
+        await using var host = await RaceHost.CreateAsync(linq);
+        var id = new ActorId("counter", "same-key");
+
+        var attempts = await Task.WhenAll(SaveAsync(host, id, 1), SaveAsync(host, id, 2));
+
+        Assert.All(attempts, AssertAllowedConflict);
+        Assert.Equal(1, await host.CountAsync(id));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConcurrentSaves_ForAnExistingIdentity_LeaveOneDurableRow(bool linq) {
+        await using var host = await RaceHost.CreateAsync(linq);
+        var id = new ActorId("counter", "same-key");
+        Assert.Null(await SaveAsync(host, id, 0));
+
+        var attempts = await Task.WhenAll(SaveAsync(host, id, 1), SaveAsync(host, id, 2));
+
+        Assert.All(attempts, AssertAllowedConflict);
+        Assert.Equal(1, await host.CountAsync(id));
+    }
+
+    private static async Task<Exception?> SaveAsync(RaceHost host, ActorId id, int state) {
+        await using var scope = host.Services.CreateAsyncScope();
+        var       store = scope.ServiceProvider.GetRequiredService<ActorStateStore<SchemataActor>>();
+        try {
+            await store.SaveAsync(id, BitConverter.GetBytes(state), CancellationToken.None);
+            return null;
+        } catch (Exception exception) {
+            return exception;
+        }
+    }
+
+    private static void AssertAllowedConflict(Exception? error) {
+        Assert.True(error is null or AlreadyExistsException or AbortedException, error?.ToString());
+    }
+
+    private sealed class RaceConnection(DataOptions options) : DataConnection(options);
+
+    private sealed class RaceHost(ServiceProvider services, string path) : IAsyncDisposable
+    {
+        public ServiceProvider Services => services;
+
+        public static async Task<RaceHost> CreateAsync(bool linq) {
+            var path = Path.Combine(Path.GetTempPath(), $"schemata-actor-race-{Guid.NewGuid():N}.db");
+            var services = new ServiceCollection();
+            if (linq) {
+                var schema = new MappingSchema();
+                schema.AddMetadataReader(new SystemComponentModelDataAnnotationsSchemaAttributeReader());
+                var options = new DataOptions().UseSQLite($"Data Source={path};Pooling=False").UseMappingSchema(schema);
+                services.AddSingleton<Func<RaceConnection>>(_ => () => new(options));
+                services.AddRepository<SchemataActor, LinqToDbRepository<RaceConnection, SchemataActor>>();
+                using var db = new RaceConnection(options);
+                db.CreateTable<SchemataActor>();
+            } else {
+                services.AddDbContextFactory<TestDbContext>(options => options.UseSqlite($"Data Source={path};Pooling=False")
+                    .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
+                services.AddRepository<SchemataActor, EfCoreRepository<TestDbContext, SchemataActor>>();
+            }
+            services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataActor>, ActorNameAdvisor>());
+            services.AddScoped<ActorStateStore<SchemataActor>>();
+            var root = services.BuildServiceProvider();
+            if (!linq) {
+                await using var db = await root.GetRequiredService<IDbContextFactory<TestDbContext>>().CreateDbContextAsync();
+                await db.Database.EnsureCreatedAsync();
+            }
+            return new(root, path);
+        }
+
+        public async Task<int> CountAsync(ActorId id) {
+            await using var scope = Services.CreateAsyncScope();
+            var repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataActor>>();
+            return await repository.CountAsync(query => query.Where(row => row.ActorType == id.Type && row.ActorKey == id.Key));
+        }
+
+        public async ValueTask DisposeAsync() {
+            await services.DisposeAsync();
+            SqliteConnection.ClearAllPools();
+            File.Delete(path);
+        }
     }
 
     private sealed class SessionDbContext(DbContextOptions<SessionDbContext> options) : DbContext(options)

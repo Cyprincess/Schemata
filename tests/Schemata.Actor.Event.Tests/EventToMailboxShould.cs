@@ -63,7 +63,7 @@ public class EventToMailboxShould
         IMessage? received = null;
         var deadline = DateTime.UtcNow.AddSeconds(5);
         while (received is null && DateTime.UtcNow < deadline) {
-            received = await actor.AskAsync<GetReceived, IMessage?>(new());
+            received = await actor.AskAsync<GetReceived, IMessage?>(root, new());
             if (received is null) {
                 await Task.Delay(TimeSpan.FromMilliseconds(50));
             }
@@ -113,7 +113,7 @@ public class EventToMailboxShould
         IMessage? received = null;
         var deadline = DateTime.UtcNow.AddSeconds(5);
         while (received is null && DateTime.UtcNow < deadline) {
-            received = await actor.AskAsync<GetReceived, IMessage?>(new());
+            received = await actor.AskAsync<GetReceived, IMessage?>(root, new());
             if (received is null) {
                 await Task.Delay(TimeSpan.FromMilliseconds(50));
             }

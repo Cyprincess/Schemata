@@ -1,35 +1,19 @@
 using System;
-using System.Threading;
 using Schemata.Actor.Skeleton;
 
 namespace Schemata.Actor.Foundation.Runtime;
 
-internal sealed class ActorTurnIdentity : IDisposable
+internal sealed class ActorTurnIdentity
 {
-    private static readonly AsyncLocal<ActorTurnIdentity?> Ambient = new();
-    private readonly ActorTurnIdentity? _previous;
-    private readonly ActorId _actor;
-    private readonly IActorSystem _system;
-    private int _active = 1;
+    private ActorId? _actor;
+    private IActorSystem? _system;
 
-    internal ActorTurnIdentity(ActorId actor, IActorSystem system) {
+    internal void Bind(ActorId actor, IActorSystem system) {
+        if (_actor is not null) throw new InvalidOperationException("The actor turn identity is already bound.");
         _actor = actor;
         _system = system;
-        _previous = Ambient.Value;
-        Ambient.Value = this;
     }
 
-    internal static bool IsCurrent(ActorId target, IActorSystem system) => Ambient.Value is { } turn
-        && Volatile.Read(ref turn._active) != 0 && turn._actor == target && ReferenceEquals(turn._system, system);
-
-    internal static void RejectSelfAsk(ActorId target, IActorSystem system) {
-        if (IsCurrent(target, system)) {
-            throw new InvalidOperationException($"Actor '{target}' cannot await an Ask to itself from its own callback.");
-        }
-    }
-
-    public void Dispose() {
-        Volatile.Write(ref _active, 0);
-        Ambient.Value = _previous;
-    }
+    internal bool IsCurrent(ActorId target, IActorSystem system) =>
+        _actor == target && ReferenceEquals(_system, system);
 }

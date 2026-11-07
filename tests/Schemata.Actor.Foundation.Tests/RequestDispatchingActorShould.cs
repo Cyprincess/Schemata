@@ -24,7 +24,7 @@ public class RequestDispatchingActorShould
         registry.Register("ledger", new(typeof(RequestDispatchingActor), ["selected"]));
         try {
             var actor = await system.GetAsync(new("ledger", "base"));
-            var response = await actor.AskAsync<Credit, int>(new BonusCredit(7, 90), timeout: TimeSpan.FromSeconds(30));
+            var response = await actor.AskAsync<Credit, int>(root, new BonusCredit(7, 90), timeout: TimeSpan.FromSeconds(30));
 
             Assert.Equal(7, response);
             Assert.Equal(7, ledger.Balance);
@@ -44,8 +44,8 @@ public class RequestDispatchingActorShould
         registry.Register("ledger", new(typeof(RequestDispatchingActor), ["selected"]));
         try {
             var actor = await system.GetAsync(new("ledger", "multiple"));
-            var numeric = await actor.AskAsync<Adjustment, int>(new(4), timeout: TimeSpan.FromSeconds(30));
-            var receipt = await actor.AskAsync<Adjustment, string>(new(3), timeout: TimeSpan.FromSeconds(30));
+            var numeric = await actor.AskAsync<Adjustment, int>(root, new(4), timeout: TimeSpan.FromSeconds(30));
+            var receipt = await actor.AskAsync<Adjustment, string>(root, new(3), timeout: TimeSpan.FromSeconds(30));
 
             Assert.Equal(4, numeric);
             Assert.Equal("balance=7", receipt);
@@ -66,8 +66,8 @@ public class RequestDispatchingActorShould
         registry.Register("ledger", new(typeof(RequestDispatchingActor), ["selected"]));
         try {
             var actor = await system.GetAsync(new("ledger", "tell"));
-            await actor.TellAsync<IRequest<int>>(new Adjustment(6));
-            var balance = await actor.AskAsync<ReadBalance, int>(new(), timeout: TimeSpan.FromSeconds(30));
+            await actor.TellAsync<IRequest<int>>(root, new Adjustment(6));
+            var balance = await actor.AskAsync<ReadBalance, int>(root, new(), timeout: TimeSpan.FromSeconds(30));
 
             Assert.Equal(6, balance);
             Assert.Equal(6, ledger.Balance);
@@ -86,7 +86,7 @@ public class RequestDispatchingActorShould
         registry.Register("ledger", new(typeof(RequestDispatchingActor), ["selected"]));
         try {
             var actor = await system.GetAsync(new("ledger", "exact"));
-            var balance = await actor.AskAsync<Credit, int>(new(5), timeout: TimeSpan.FromSeconds(30));
+            var balance = await actor.AskAsync<Credit, int>(root, new(5), timeout: TimeSpan.FromSeconds(30));
 
             Assert.Equal(5, balance);
             Assert.Equal(5, ledger.Balance);
@@ -107,11 +107,31 @@ public class RequestDispatchingActorShould
         registry.Register("ledger", new(typeof(RequestDispatchingActor), ["selected"]));
         try {
             var actor = await system.GetAsync(new("ledger", "ambiguous"));
-            await actor.TellAsync(new Adjustment(8));
-            var balance = await actor.AskAsync<ReadBalance, int>(new(), timeout: TimeSpan.FromSeconds(30));
+            await actor.TellAsync(root, new Adjustment(8));
+            var balance = await actor.AskAsync<ReadBalance, int>(root, new(), timeout: TimeSpan.FromSeconds(30));
 
             Assert.Equal(0, balance);
             Assert.Equal(0, ledger.Balance);
+        } finally {
+            await system.ShutdownAsync(default);
+            if (root is IAsyncDisposable disposable) await disposable.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Ask_AfterInferredDispatch_ReusesOnlyMatchingMetadata() {
+        var ledger = new Ledger();
+        var (system, registry, root) = ActorSystemFactory.Create(services => {
+            services.AddKeyedScoped<IRequestHandler<Credit, int>>("selected", (_, _) => new CreditHandler(ledger, 1));
+        });
+        registry.Register("ledger", new(typeof(RequestDispatchingActor), ["selected"]));
+        try {
+            var actor = await system.GetAsync(new("ledger", "inferred"));
+            await actor.TellAsync(root, new Credit(4));
+            var balance = await actor.AskAsync<Credit, int>(root, new(3), timeout: TimeSpan.FromSeconds(30));
+
+            Assert.Equal(7, balance);
+            Assert.Equal(7, ledger.Balance);
         } finally {
             await system.ShutdownAsync(default);
             if (root is IAsyncDisposable disposable) await disposable.DisposeAsync();

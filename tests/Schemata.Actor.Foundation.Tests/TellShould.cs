@@ -10,22 +10,22 @@ public class TellShould
 {
     [Fact]
     public async Task Tell_DeliversTheMessageToTheActor() {
-        var (system, _, _) = ActorSystemFactory.Create();
+        var (system, _, root) = ActorSystemFactory.Create();
         var actor           = await system.SpawnAsync(new("recorder", "a"), new(typeof(TellRecordingActor)));
 
-        await actor.TellAsync(new RecordTell("hello"));
+        await actor.TellAsync(root, new RecordTell("hello"));
 
-        var received = await actor.AskAsync<GetReceived, IReadOnlyList<string>>(new());
+        var received = await actor.AskAsync<GetReceived, IReadOnlyList<string>>(root, new());
         Assert.Equal(["hello"], received);
     }
 
     [Fact]
     public async Task Tell_ReturnsWithoutWaitingForTheHandlerToFinish() {
-        var (system, _, _) = ActorSystemFactory.Create();
+        var (system, _, root) = ActorSystemFactory.Create();
         var gate           = new ManualGate();
         var actor          = await system.SpawnAsync(new("gated", "a"), new(typeof(GatedActor), [gate]));
 
-        await actor.TellAsync(new GateAndWait());
+        await actor.TellAsync(root, new GateAndWait());
 
         // The handler reaches the gate only by actually executing the turn, so this handshake
         // proves TellAsync already returned while the handler is still in flight.
@@ -39,14 +39,14 @@ public class TellShould
 
     [Fact]
     public async Task Tell_LeavesNoPendingReplyTableResidue_SoASubsequentAskStillResolves() {
-        var (system, _, _) = ActorSystemFactory.Create();
+        var (system, _, root) = ActorSystemFactory.Create();
         var actor           = await system.SpawnAsync(new("recorder", "b"), new(typeof(TellRecordingActor)));
 
         for (var i = 0; i < 50; i++) {
-            await actor.TellAsync(new RecordTell($"m{i}"));
+            await actor.TellAsync(root, new RecordTell($"m{i}"));
         }
 
-        var received = await actor.AskAsync<GetReceived, IReadOnlyList<string>>(new());
+        var received = await actor.AskAsync<GetReceived, IReadOnlyList<string>>(root, new());
         Assert.Equal(50, received.Count);
     }
 }

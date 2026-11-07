@@ -4,11 +4,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Actor.Foundation.Runtime;
 using Schemata.Actor.Foundation.Tests.Fixtures;
 using Schemata.Actor.Skeleton;
 using Schemata.Actor.Skeleton.Entities;
+using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Runtime;
 using Xunit;
 
 namespace Schemata.Actor.Foundation.Tests;
@@ -30,7 +33,7 @@ public class ActorShutdownShould
             ctx.Stopping.Register(() => { entered.SetResult(); release.Task.GetAwaiter().GetResult(); throw callback; });
         }).Returns(ValueTask.CompletedTask);
         actor.Setup(a => a.OnStoppedAsync(It.IsAny<IActorContext>())).Throws(stopped);
-        var reference = await SpawnActivation(system, new("cleanup", "one"), new(typeof(ForwardActor), [actor.Object]));
+        var reference = await SpawnActivation(root, system, new("cleanup", "one"), new(typeof(ForwardActor), [actor.Object]));
         var first = reference.StopAsync();
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         var second = reference.StopAsync();
@@ -54,14 +57,14 @@ public class ActorShutdownShould
         await host.StartAsync();
         var system = (InProcessActorSystem<SchemataActor>)host.Services.GetRequiredService<IActorSystem>();
         var gate = new ManualGate();
-        var actor = await SpawnActivation(system, new("deadline", "one"), new(typeof(GatedActor), [gate]));
-        var executing = actor.AskAsync<GateAndWait, string>(new()).AsTask();
+        var actor = await SpawnActivation(host.Services, system, new("deadline", "one"), new(typeof(GatedActor), [gate]));
+        var executing = actor.AskAsync<GateAndWait, string>(host.Services, new()).AsTask();
         await gate.Started.WaitAsync(TimeSpan.FromSeconds(30));
-        var queued = actor.AskAsync<Increment, int>(new()).AsTask();
+        var queued = actor.AskAsync<Increment, int>(host.Services, new()).AsTask();
         using var budget = new CancellationTokenSource();
         var stopping = host.StopAsync(budget.Token);
         await Assert.ThrowsAsync<InvalidOperationException>(() => system.GetAsync(actor.Id));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => actor.TellAsync(new Increment()).AsTask());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => actor.TellAsync(host.Services, new Increment()).AsTask());
         budget.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => stopping.WaitAsync(TimeSpan.FromSeconds(30)));
         await Assert.ThrowsAsync<InvalidOperationException>(() => executing.WaitAsync(TimeSpan.FromSeconds(30)));
@@ -79,13 +82,13 @@ public class ActorShutdownShould
         var system = host.Services.GetRequiredService<IActorSystem>();
         var gate = new ManualGate();
         var actor = await system.SpawnAsync(new("drain", "one"), new(typeof(GatedActor), [gate]));
-        var executing = actor.AskAsync<GateAndWait, string>(new()).AsTask();
+        var executing = actor.AskAsync<GateAndWait, string>(host.Services, new()).AsTask();
         await gate.Started.WaitAsync(TimeSpan.FromSeconds(30));
-        var queued = actor.AskAsync<Increment, int>(new()).AsTask();
+        var queued = actor.AskAsync<Increment, int>(host.Services, new()).AsTask();
         host.Services.GetRequiredService<IHostApplicationLifetime>().StopApplication();
         await Assert.ThrowsAsync<InvalidOperationException>(() => system.GetAsync(actor.Id));
         await Assert.ThrowsAsync<InvalidOperationException>(() => system.SpawnAsync(new("new", "one"), new(typeof(IdentityActor))));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => actor.AskAsync<Increment, int>(new()).AsTask());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => actor.AskAsync<Increment, int>(host.Services, new()).AsTask());
         gate.Release();
         Assert.Equal("released", await executing.WaitAsync(TimeSpan.FromSeconds(30)));
         Assert.Equal(1, await queued.WaitAsync(TimeSpan.FromSeconds(30)));
@@ -127,9 +130,9 @@ public class ActorShutdownShould
             throw start;
         });
         mock.Setup(a => a.OnStoppedAsync(It.IsAny<IActorContext>())).Throws(stop);
-        var actor = await SpawnActivation(system, new("startfail", "one"), new(typeof(ForwardActor), [mock.Object]));
+        var actor = await SpawnActivation(root, system, new("startfail", "one"), new(typeof(ForwardActor), [mock.Object]));
         await started.Task.WaitAsync(TimeSpan.FromSeconds(30));
-        var queued = actor.AskAsync<Increment, int>(new()).AsTask();
+        var queued = actor.AskAsync<Increment, int>(root, new()).AsTask();
         var stopping = actor.StopAsync();
         release.SetResult();
         await Assert.ThrowsAsync<InvalidOperationException>(() => queued);
@@ -140,6 +143,69 @@ public class ActorShutdownShould
     }
 
     private static TaskCompletionSource Signal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    [Fact]
+    public async Task Disposed_Root_Disposes_Synchronous_Actor_Exactly_Once() {
+        var (system, _, root) = ActorSystemFactory.Create();
+        var services = (ServiceProvider)root;
+        var actor = new Mock<IActor>();
+        actor.Setup(a => a.OnStartedAsync(It.IsAny<IActorContext>())).Returns(ValueTask.CompletedTask);
+        var disposed = actor.As<IDisposable>();
+        var reference = await SpawnActivation(root, system, new("disposed", "sync"), new(typeof(ForwardActor), [actor.Object]));
+        services.Dispose();
+        await reference.StopAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        disposed.Verify(a => a.Dispose(), Times.Once);
+    }
+
+    [Fact]
+    public async Task Disposed_Root_Disposes_Asynchronous_Actor_Once_And_Retains_Failure() {
+        var (system, _, root) = ActorSystemFactory.Create();
+        var services = (ServiceProvider)root;
+        var disposalFailure = new InvalidOperationException("actor disposal");
+        var actor = new Mock<IActor>();
+        actor.Setup(a => a.OnStartedAsync(It.IsAny<IActorContext>())).Returns(ValueTask.CompletedTask);
+        var disposed = actor.As<IAsyncDisposable>();
+        disposed.Setup(a => a.DisposeAsync()).Throws(disposalFailure);
+        var reference = await SpawnActivation(root, system, new("disposed", "async"), new(typeof(AsyncForwardActor), [actor.Object]));
+        services.Dispose();
+        var observed = await Assert.ThrowsAsync<InvalidOperationException>(() => reference.StopAsync().WaitAsync(TimeSpan.FromSeconds(30)));
+        Assert.Same(disposalFailure, observed);
+        disposed.Verify(a => a.DisposeAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task Disposed_Root_Before_Startup_Scope_Disposes_Synchronous_Actor_Once() {
+        var release = Signal();
+        var (system, root) = CreateGatedSystem(release.Task);
+        var services = (ServiceProvider)root;
+        var actor = new Mock<IActor>();
+        actor.Setup(a => a.OnStartedAsync(It.IsAny<IActorContext>())).Returns(ValueTask.CompletedTask);
+        var disposed = actor.As<IDisposable>();
+        var reference = await SpawnActivation(root, system, new("disposed-gated", "sync"), new(typeof(ForwardActor), [actor.Object]));
+        services.Dispose();
+        release.SetResult();
+        await reference.StopAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        actor.Verify(a => a.OnStartedAsync(It.IsAny<IActorContext>()), Times.Never);
+        disposed.Verify(a => a.Dispose(), Times.Once);
+    }
+
+    [Fact]
+    public async Task Disposed_Root_Before_Startup_Scope_Retains_Only_The_Actor_Disposal_Failure() {
+        var release = Signal();
+        var (system, root) = CreateGatedSystem(release.Task);
+        var services = (ServiceProvider)root;
+        var disposalFailure = new InvalidOperationException("actor disposal");
+        var actor = new Mock<IActor>();
+        actor.Setup(a => a.OnStartedAsync(It.IsAny<IActorContext>())).Returns(ValueTask.CompletedTask);
+        var disposed = actor.As<IAsyncDisposable>();
+        disposed.Setup(a => a.DisposeAsync()).Throws(disposalFailure);
+        var reference = await SpawnActivation(root, system, new("disposed-gated", "async"), new(typeof(AsyncForwardActor), [actor.Object]));
+        services.Dispose();
+        release.SetResult();
+        var observed = await Assert.ThrowsAsync<InvalidOperationException>(() => reference.StopAsync().WaitAsync(TimeSpan.FromSeconds(30)));
+        Assert.Same(disposalFailure, observed);
+        disposed.Verify(a => a.DisposeAsync(), Times.Once);
+    }
 
     [Fact]
     public async Task Deadline_While_Constructing_Still_Retires_The_Late_Activation() {
@@ -156,7 +222,7 @@ public class ActorShutdownShould
         gate.Release();
         var actor = await spawning.WaitAsync(TimeSpan.FromSeconds(30));
         await system.ShutdownAsync(default).WaitAsync(TimeSpan.FromSeconds(30));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => actor.AskAsync<WhoAmI, Guid>(new()).AsTask());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => actor.AskAsync<WhoAmI, Guid>(root, new()).AsTask());
     }
 
     [Fact]
@@ -173,7 +239,7 @@ public class ActorShutdownShould
             ready.SetResult();
         }).Returns(ValueTask.CompletedTask);
         blocked.Setup(a => a.OnStoppedAsync(It.IsAny<IActorContext>())).Returns(ValueTask.CompletedTask);
-        var first = await SpawnActivation(system, new("blocked", "one"), new(typeof(ForwardActor), [blocked.Object]));
+        var first = await SpawnActivation(root, system, new("blocked", "one"), new(typeof(ForwardActor), [blocked.Object]));
         await ready.Task.WaitAsync(TimeSpan.FromSeconds(30));
         var other = new Mock<IActor>();
         other.Setup(a => a.OnStartedAsync(It.IsAny<IActorContext>())).Returns(ValueTask.CompletedTask);
@@ -204,8 +270,8 @@ public class ActorShutdownShould
             .Callback<IActorContext, Envelope>((ctx, _) => ctx.Services.GetRequiredService<IAsyncDisposable>()).Throws(receive);
         actor.Setup(a => a.OnFailedAsync(It.IsAny<IActorContext>(), receive)).Throws(supervision);
         actor.Setup(a => a.OnStoppedAsync(It.IsAny<IActorContext>())).Returns(ValueTask.CompletedTask);
-        var reference = await SpawnActivation(system, new("cleanup", "turn"), new(typeof(ForwardActor), [actor.Object]));
-        Assert.Same(receive, await Assert.ThrowsAsync<InvalidOperationException>(() => reference.AskAsync<Increment, int>(new()).AsTask()));
+        var reference = await SpawnActivation(root, system, new("cleanup", "turn"), new(typeof(ForwardActor), [actor.Object]));
+        Assert.Same(receive, await Assert.ThrowsAsync<InvalidOperationException>(() => reference.AskAsync<Increment, int>(root, new()).AsTask()));
         var failure = await Assert.ThrowsAsync<AggregateException>(() => reference.Completion.WaitAsync(TimeSpan.FromSeconds(30)));
         Assert.All(new[] { receive, supervision, cleanup }, error => Assert.Contains(error, failure.Flatten().InnerExceptions));
         actor.Verify(a => a.OnStoppedAsync(It.IsAny<IActorContext>()), Times.Once);
@@ -230,9 +296,9 @@ public class ActorShutdownShould
             await finish.Task;
             await ctx.ReplyAsync(1);
         });
-        var reference = await SpawnActivation(system, new("cancel", "item"), new(typeof(ForwardActor), [actor.Object]));
+        var reference = await SpawnActivation(root, system, new("cancel", "item"), new(typeof(ForwardActor), [actor.Object]));
         using var cancellation = new CancellationTokenSource();
-        var asking = reference.AskAsync<Increment, int>(new(), ct: cancellation.Token).AsTask();
+        var asking = reference.AskAsync<Increment, int>(root, new(), ct: cancellation.Token).AsTask();
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => asking.WaitAsync(TimeSpan.FromSeconds(30)));
@@ -246,9 +312,26 @@ public class ActorShutdownShould
         actor.Verify(a => a.OnStoppedAsync(It.IsAny<IActorContext>()), Times.Once);
     }
 
-    private static async Task<ActorInstance<SchemataActor>> SpawnActivation(InProcessActorSystem<SchemataActor> system, ActorId id, Props props) {
+    private static async Task<ActorInstance<SchemataActor>> SpawnActivation(IServiceProvider services, InProcessActorSystem<SchemataActor> system, ActorId id, Props props) {
         await system.SpawnAsync(id, props);
-        return await system.ResolveForSendAsync(id, props, default);
+        return await system.ResolveForSendAsync(services, id, props, default);
+    }
+
+    private static (InProcessActorSystem<SchemataActor> System, IServiceProvider Root) CreateGatedSystem(Task release) {
+        var services = new ServiceCollection();
+        services.AddSingleton<Schemata.Messaging.Skeleton.IMessageExecutionScopeFactory, MessageExecutionScopeFactory>();
+        services.AddSingleton<Schemata.Messaging.Skeleton.IMessageExecutionScopeRunner, MessageExecutionScopeRunner>();
+        services.AddScoped<ActorTurnIdentity>();
+        var root = services.BuildServiceProvider();
+        var inner = new MessageExecutionScopeFactory(root.GetRequiredService<IServiceScopeFactory>());
+        var factory = new Mock<IMessageExecutionScopeFactory>();
+        factory.Setup(f => f.CreateAsync(It.IsAny<MessageContext?>(), It.IsAny<CancellationToken>()))
+            .Returns(async (MessageContext? context, CancellationToken ct) => {
+                await release.WaitAsync(ct);
+                return await inner.CreateAsync(context, ct);
+            });
+        var system = new InProcessActorSystem<SchemataActor>(root, new ActorRegistry(), factory.Object, Options.Create(new SchemataActorOptions()));
+        return (system, root);
     }
 
     public sealed class ForwardActor(IActor inner) : IActor, IDisposable
@@ -258,5 +341,14 @@ public class ActorShutdownShould
         public ValueTask OnStoppedAsync(IActorContext ctx) => inner.OnStoppedAsync(ctx);
         public ValueTask<bool> OnFailedAsync(IActorContext ctx, Exception error) => inner.OnFailedAsync(ctx, error);
         public void Dispose() { if (inner is IDisposable disposable) disposable.Dispose(); }
+    }
+
+    public sealed class AsyncForwardActor(IActor inner) : IActor, IAsyncDisposable
+    {
+        public ValueTask OnStartedAsync(IActorContext ctx) => inner.OnStartedAsync(ctx);
+        public ValueTask OnReceiveAsync(IActorContext ctx, Envelope envelope) => inner.OnReceiveAsync(ctx, envelope);
+        public ValueTask OnStoppedAsync(IActorContext ctx) => inner.OnStoppedAsync(ctx);
+        public ValueTask<bool> OnFailedAsync(IActorContext ctx, Exception error) => inner.OnFailedAsync(ctx, error);
+        public ValueTask DisposeAsync() => ((IAsyncDisposable)inner).DisposeAsync();
     }
 }

@@ -28,8 +28,8 @@ public class TurnScopedAdviceContextShould
         try {
             var actor = await system.GetAsync(new("probe", "context"));
 
-            var first  = await actor.AskAsync<ProbeMarker, MarkerProbe>(new(), timeout: TimeSpan.FromSeconds(30));
-            var second = await actor.AskAsync<ProbeMarker, MarkerProbe>(new(), timeout: TimeSpan.FromSeconds(30));
+            var first  = await actor.AskAsync<ProbeMarker, MarkerProbe>(root, new(), timeout: TimeSpan.FromSeconds(30));
+            var second = await actor.AskAsync<ProbeMarker, MarkerProbe>(root, new(), timeout: TimeSpan.FromSeconds(30));
 
             Assert.True(first.SameScope);
             Assert.True(second.SameScope);
@@ -37,6 +37,50 @@ public class TurnScopedAdviceContextShould
         } finally {
             await system.ShutdownAsync(default);
             if (root is IAsyncDisposable disposable) await disposable.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task RequestDispatchingActor_ResolvesAFreshHandlerAndLedgerFromEachTurnScope() {
+        var (system, registry, root) = ActorSystemFactory.Create(services => {
+            services.AddScoped<ScopeLedger>();
+            services.AddKeyedScoped<IRequestHandler<ScopeProbe, ScopeReceipt>>("selected",
+                (provider, _) => new ScopeProbeHandler(provider.GetRequiredService<ScopeLedger>()));
+        });
+        registry.Register("probe", new(typeof(RequestDispatchingActor), ["selected"]));
+        try {
+            var actor = await system.GetAsync(new("probe", "handler"));
+
+            var first  = await actor.AskAsync<ScopeProbe, ScopeReceipt>(root, new(), timeout: TimeSpan.FromSeconds(30));
+            var second = await actor.AskAsync<ScopeProbe, ScopeReceipt>(root, new(), timeout: TimeSpan.FromSeconds(30));
+
+            Assert.Equal(1, first.Balance);
+            Assert.Equal(1, second.Balance);
+            Assert.NotEqual(first.LedgerId, second.LedgerId);
+            Assert.NotEqual(first.HandlerId, second.HandlerId);
+        } finally {
+            await system.ShutdownAsync(default);
+            if (root is IAsyncDisposable disposable) await disposable.DisposeAsync();
+        }
+    }
+
+    private sealed record ScopeProbe : IRequest<ScopeReceipt>;
+
+    private sealed record ScopeReceipt(Guid LedgerId, Guid HandlerId, int Balance);
+
+    private sealed class ScopeLedger
+    {
+        public Guid Id { get; } = Guid.NewGuid();
+        public int Balance { get; set; }
+    }
+
+    private sealed class ScopeProbeHandler(ScopeLedger ledger) : IRequestHandler<ScopeProbe, ScopeReceipt>
+    {
+        private readonly Guid _id = Guid.NewGuid();
+
+        public Task<ScopeReceipt> HandleAsync(ScopeProbe request, AdviceContext context, CancellationToken ct = default) {
+            ledger.Balance++;
+            return Task.FromResult(new ScopeReceipt(ledger.Id, _id, ledger.Balance));
         }
     }
 

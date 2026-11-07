@@ -39,7 +39,7 @@ public class ActorEntityChoiceShould
         Assert.IsType<InProcessActorSystem<SessionActor>>(system);
 
         var actor = await system.GetAsync(new("recorder", "entity-choice"));
-        Assert.Null(await actor.AskAsync<GetReceived, IMessage?>(new()));
+        Assert.Null(await actor.AskAsync<GetReceived, IMessage?>(root, new()));
         await ((IActorSystemLifetime)system).ShutdownAsync(CancellationToken.None);
     }
 

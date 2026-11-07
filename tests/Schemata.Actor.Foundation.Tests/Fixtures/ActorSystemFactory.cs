@@ -13,6 +13,9 @@ public static class ActorSystemFactory
     public static (InProcessActorSystem<SchemataActor> System, ActorRegistry Registry, IServiceProvider Root) Create(Action<IServiceCollection>? configureServices = null) {
         var services = new ServiceCollection();
         configureServices?.Invoke(services);
+        services.AddSingleton<Schemata.Messaging.Skeleton.IMessageExecutionScopeFactory, MessageExecutionScopeFactory>();
+        services.AddSingleton<Schemata.Messaging.Skeleton.IMessageExecutionScopeRunner, MessageExecutionScopeRunner>();
+        services.AddScoped<ActorTurnIdentity>();
         var root = services.BuildServiceProvider();
 
         var registry         = new ActorRegistry();

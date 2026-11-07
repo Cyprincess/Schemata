@@ -20,7 +20,7 @@ public class ActorActivationShould
 
     [Fact]
     public async Task Graceful_Stop_Before_Start_Completes_Initialization_And_Drains_Accepted_Work() {
-        var (system, _, _) = ActorSystemFactory.Create();
+        var (system, _, root) = ActorSystemFactory.Create();
         var recorder       = new LifecycleRecorder();
         var startReleased  = ReleaseSource();
         var actor          = await system.SpawnAsync(
@@ -29,7 +29,7 @@ public class ActorActivationShould
 
         // AskAsync writes synchronously into the bounded channel: by the time this call returns
         // the item is accepted work.
-        var accepted = actor.AskAsync<AskEcho, string>(new()).AsTask();
+        var accepted = actor.AskAsync<AskEcho, string>(root, new()).AsTask();
 
         // The graceful stop signal runs synchronously through the state transition and the
         // writer completion before StopAsync first suspends.
@@ -46,14 +46,14 @@ public class ActorActivationShould
 
     [Fact]
     public async Task Startup_Failure_After_Graceful_Intent_Faults_Queued_Work_Without_Receives() {
-        var (system, _, _) = ActorSystemFactory.Create();
+        var (system, _, root) = ActorSystemFactory.Create();
         var recorder       = new LifecycleRecorder();
         var startReleased  = ReleaseSource();
         var actor          = await system.SpawnAsync(
             new("failing-start", "a"),
             new(typeof(FailingStartActor), [recorder, startReleased]));
 
-        var accepted = actor.AskAsync<AskEcho, string>(new()).AsTask();
+        var accepted = actor.AskAsync<AskEcho, string>(root, new()).AsTask();
         var stopping = system.StopAsync(new("failing-start", "a"));
 
         startReleased.SetResult(true);
@@ -68,7 +68,7 @@ public class ActorActivationShould
 
     [Fact]
     public async Task Retained_Reference_Delivers_After_Explicit_Retirement() {
-        var (system, _, _) = ActorSystemFactory.Create();
+        var (system, _, root) = ActorSystemFactory.Create();
         var recorder       = new LifecycleRecorder();
         var startReleased  = ReleaseSource();
         startReleased.SetResult(true);
@@ -78,21 +78,21 @@ public class ActorActivationShould
 
         await system.StopAsync(new("retiring", "a"));
 
-        await actor.TellAsync(new AskEcho());
-        Assert.Equal("received", await actor.AskAsync<AskEcho, string>(new()));
+        await actor.TellAsync(root, new AskEcho());
+        Assert.Equal("received", await actor.AskAsync<AskEcho, string>(root, new()));
         await system.StopAsync(actor.Id);
     }
 
     [Fact]
     public async Task Startup_Failure_Without_Graceful_Intent_Faults_Queued_Work() {
-        var (system, _, _) = ActorSystemFactory.Create();
+        var (system, _, root) = ActorSystemFactory.Create();
         var recorder       = new LifecycleRecorder();
         var startReleased  = ReleaseSource();
         var actor          = await system.SpawnAsync(
             new("failing-start-2", "a"),
             new(typeof(FailingStartActor), [recorder, startReleased]));
 
-        var accepted = actor.AskAsync<AskEcho, string>(new()).AsTask();
+        var accepted = actor.AskAsync<AskEcho, string>(root, new()).AsTask();
 
         startReleased.SetResult(true);
 

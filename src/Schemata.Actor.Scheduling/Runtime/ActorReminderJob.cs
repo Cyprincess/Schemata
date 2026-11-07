@@ -49,7 +49,7 @@ public sealed class ActorReminderJob(IActorSystem actors, IServiceProvider servi
             : await MessageContexts.CaptureAsync(services, ct);
 
         var actor = await actors.GetAsync(target);
-        await actor.TellAsync(payload, messageContext, ct);
+        await actor.TellAsync(services, payload, messageContext, ct);
     }
 
     #endregion

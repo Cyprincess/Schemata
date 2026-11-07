@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -26,14 +27,14 @@ public class PersistenceShould
         var id          = new ActorId("counter", "a");
 
         var actor = await system.GetAsync(id);
-        await actor.AskAsync<Increment, int>(new());
-        await actor.AskAsync<Increment, int>(new());
-        await actor.AskAsync<Increment, int>(new());
+        await actor.AskAsync<Increment, int>(root, new());
+        await actor.AskAsync<Increment, int>(root, new());
+        await actor.AskAsync<Increment, int>(root, new());
 
         await system.StopAsync(id);
 
         var respawned = await system.GetAsync(id);
-        var loaded     = await respawned.AskAsync<GetCount, int>(new());
+        var loaded     = await respawned.AskAsync<GetCount, int>(root, new());
 
         Assert.Equal(3, loaded);
         var row = Assert.Single(rows);
@@ -51,14 +52,14 @@ public class PersistenceShould
         var id          = new ActorId("counter", "a");
 
         var actor = await system.GetAsync(id);
-        await actor.AskAsync<Increment, int>(new());
-        await actor.AskAsync<Increment, int>(new());
-        await actor.AskAsync<Increment, int>(new());
+        await actor.AskAsync<Increment, int>(root, new());
+        await actor.AskAsync<Increment, int>(root, new());
+        await actor.AskAsync<Increment, int>(root, new());
 
         await system.StopAsync(id);
 
         var respawned = await system.GetAsync(id);
-        var loaded     = await respawned.AskAsync<GetCount, int>(new());
+        var loaded     = await respawned.AskAsync<GetCount, int>(root, new());
 
         Assert.Equal(0, loaded);
         Assert.Empty(rows); // Opt-in never enabled: the repository is never touched.
@@ -86,11 +87,11 @@ public class PersistenceShould
         var id     = new ActorId("counter", "a");
 
         var actor = await system.GetAsync(id);
-        await actor.AskAsync<Increment, int>(new());
+        await actor.AskAsync<Increment, int>(root, new());
         await system.StopAsync(id);
 
         var respawned = await system.GetAsync(id);
-        Assert.Equal(1, await respawned.AskAsync<GetCount, int>(new()));
+        Assert.Equal(1, await respawned.AskAsync<GetCount, int>(root, new()));
 
         Assert.Empty(hostRows);
         var row = Assert.Single(configuredRows);
@@ -106,7 +107,7 @@ public class PersistenceShould
         var actor = await system.GetAsync(id);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => actor.AskAsync<Increment, int>(new()).AsTask());
+            () => actor.AskAsync<Increment, int>(root, new()).AsTask());
 
     }
 
@@ -134,6 +135,10 @@ public class PersistenceShould
 
     private static Mock<IRepository<SchemataActor>> CreateRepository(List<SchemataActor> rows) {
         var repository = new Mock<IRepository<SchemataActor>>(MockBehavior.Strict);
+        var transaction = new Mock<IUnitOfWork>(MockBehavior.Strict);
+        transaction.Setup(unit => unit.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        transaction.Setup(unit => unit.DisposeAsync()).Returns(ValueTask.CompletedTask);
+        repository.Setup(r => r.Begin(IsolationLevel.Serializable)).Returns(transaction.Object);
         repository.Setup(r => r.FirstOrDefaultAsync<SchemataActor>(
                       It.IsAny<Func<IQueryable<SchemataActor>, IQueryable<SchemataActor>>>(),
                       It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))

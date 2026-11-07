@@ -108,7 +108,7 @@ internal sealed class ActorInstance<TActor> : IActorRef
 
     public ActorId Id { get; }
 
-    public async ValueTask TellAsync<T>(T message, MessageContext? context = null, CancellationToken ct = default)
+    public async ValueTask TellAsync<T>(IServiceProvider services, T message, MessageContext? context = null, CancellationToken ct = default)
         where T : IMessage {
         _system.ThrowIfStopping();
         context = BindContext(context);
@@ -128,10 +128,10 @@ internal sealed class ActorInstance<TActor> : IActorRef
     }
 
     public async ValueTask<TResponse> AskAsync<TRequest, TResponse>(
-        TRequest request, MessageContext? context = null,
+        IServiceProvider services, TRequest request, MessageContext? context = null,
         TimeSpan? timeout = null, CancellationToken ct = default
     ) where TRequest : IRequest<TResponse> {
-        ActorTurnIdentity.RejectSelfAsk(Id, _system);
+        _system.RejectSelfAsk(services, Id);
         _system.ThrowIfStopping();
         context = BindContext(context);
         var correlationId = Guid.NewGuid();
@@ -312,10 +312,13 @@ internal sealed class ActorInstance<TActor> : IActorRef
         try {
             if (State is StateStarting or StateGracefulStopping) {
                 try {
-                    await StartActorAsync(_actor);
-                    Volatile.Write(ref _initialized, true);
-                    lock (_lifecycle) _lastActivity = _clock.GetTimestamp();
-                    Transition(StateStarting, StateRunning);
+                    if (await StartActorAsync(_actor)) {
+                        Volatile.Write(ref _initialized, true);
+                        lock (_lifecycle) _lastActivity = _clock.GetTimestamp();
+                        Transition(StateStarting, StateRunning);
+                    } else {
+                        RequestStop();
+                    }
                 } catch (Exception error) {
                     (failures ??= []).Add(error);
                     RequestStop();
@@ -407,29 +410,18 @@ internal sealed class ActorInstance<TActor> : IActorRef
 
         var persistent = _actor as IPersistentActor;
 
-        IDisposable identity;
-        try { identity = scope.Enter(); }
-        catch (Exception error) {
-            try { await scope.DisposeAsync(); }
-            catch (Exception cleanup) { error = new AggregateException(error, cleanup); }
-            FaultPendingReply(envelope.CorrelationId, error);
-            return;
-        }
         try {
             await scope.RestoreAsync(envelope.Context, stopping);
         } catch (Exception error) {
             try { await scope.DisposeAsync(); }
-            catch (Exception cleanup) { error = new AggregateException(error, cleanup); }
-            try { identity.Dispose(); }
             catch (Exception cleanup) { error = new AggregateException(error, cleanup); }
             FaultPendingReply(envelope.CorrelationId, error);
             return;
         }
         Exception? failure = null;
         try {
-            using var turn = new ActorTurnIdentity(Id, _system);
-
             var context = new ActorTurnContext<TActor>(Id, scope.Services, stopping, envelope.Sender, this, envelope.CorrelationId);
+            context.Services.GetRequiredService<ActorTurnIdentity>().Bind(Id, _system);
 
             try {
                 // Resolved from the turn's own scope, and only for an actor that opted in, so a
@@ -480,8 +472,6 @@ internal sealed class ActorInstance<TActor> : IActorRef
             failure = error;
         }
         try { await scope.DisposeAsync(); }
-        catch (Exception cleanup) { failure = failure is null ? cleanup : new AggregateException(failure, cleanup); }
-        try { identity.Dispose(); }
         catch (Exception cleanup) { failure = failure is null ? cleanup : new AggregateException(failure, cleanup); }
         if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
     }
@@ -547,46 +537,48 @@ internal sealed class ActorInstance<TActor> : IActorRef
 
     private async ValueTask DisposeActorAsync(IActor actor) {
         if (actor is not IAsyncDisposable && actor is not IDisposable) return;
-        var scope = await _turnScopeFactory.CreateAsync(_activationContext, CancellationToken.None);
-        IDisposable? lease = null;
+        MessageExecutionScope scope;
+        try {
+            scope = await _turnScopeFactory.CreateAsync(_activationContext, CancellationToken.None);
+        } catch (ObjectDisposedException) {
+            if (actor is IAsyncDisposable asyncDisposable) await asyncDisposable.DisposeAsync();
+            else ((IDisposable)actor).Dispose();
+            return;
+        }
         Exception? failure = null;
         try {
-            lease = scope.Enter();
             await scope.RestoreAsync(_activationContext);
             if (actor is IAsyncDisposable asyncDisposable) await asyncDisposable.DisposeAsync();
             else ((IDisposable)actor).Dispose();
         } catch (Exception error) { failure = error; }
         try { await scope.DisposeAsync(); }
         catch (Exception cleanup) { failure = failure is null ? cleanup : new AggregateException(failure, cleanup); }
-        try { lease?.Dispose(); }
-        catch (Exception cleanup) { failure = failure is null ? cleanup : new AggregateException(failure, cleanup); }
         if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
-    private async Task StartActorAsync(IActor actor) {
+    private async Task<bool> StartActorAsync(IActor actor) {
         var message = _activationContext;
-        var scope = await _turnScopeFactory.CreateAsync(message, _stoppingCts.Token);
-        IDisposable identity;
-        try { identity = scope.Enter(); }
-        catch (Exception error) {
-            try { await scope.DisposeAsync(); }
-            catch (Exception cleanup) { throw new AggregateException(error, cleanup); }
-            throw;
+        MessageExecutionScope scope;
+        try {
+            scope = await _turnScopeFactory.CreateAsync(message, _stoppingCts.Token);
+        } catch (ObjectDisposedException) {
+            // The owning service provider was disposed before this activation's startup turn
+            // could begin (container disposal order is not part of the actor system contract).
+            return false;
         }
         Exception? failure = null;
         try {
             await scope.RestoreAsync(message, _stoppingCts.Token);
-            using var turn = new ActorTurnIdentity(Id, _system);
             var context = new ActorTurnContext<TActor>(Id, scope.Services, _stoppingCts.Token, sender: null, this, correlationId: Guid.Empty);
+            context.Services.GetRequiredService<ActorTurnIdentity>().Bind(Id, _system);
             await actor.OnStartedAsync(context);
         } catch (Exception error) {
             failure = error;
         }
         try { await scope.DisposeAsync(); }
         catch (Exception cleanup) { failure = failure is null ? cleanup : new AggregateException(failure, cleanup); }
-        try { identity.Dispose(); }
-        catch (Exception cleanup) { failure = failure is null ? cleanup : new AggregateException(failure, cleanup); }
         if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
+        return true;
     }
 
     /// <summary>
@@ -643,25 +635,16 @@ internal sealed class ActorInstance<TActor> : IActorRef
             // a disposal race from shutdown.
             return;
         }
-        IDisposable identity;
-        try { identity = scope.Enter(); }
-        catch (Exception error) {
-            try { await scope.DisposeAsync(); }
-            catch (Exception cleanup) { throw new AggregateException(error, cleanup); }
-            throw;
-        }
         Exception? failure = null;
         try {
             await scope.RestoreAsync(message, CancellationToken.None);
-            using var turn = new ActorTurnIdentity(Id, _system);
             var context = new ActorTurnContext<TActor>(Id, scope.Services, CancellationToken.None, sender: null, this, correlationId: Guid.Empty);
+            context.Services.GetRequiredService<ActorTurnIdentity>().Bind(Id, _system);
             await _actor.OnStoppedAsync(context);
         } catch (Exception error) {
             failure = error;
         }
         try { await scope.DisposeAsync(); }
-        catch (Exception cleanup) { failure = failure is null ? cleanup : new AggregateException(failure, cleanup); }
-        try { identity.Dispose(); }
         catch (Exception cleanup) { failure = failure is null ? cleanup : new AggregateException(failure, cleanup); }
         if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
     }

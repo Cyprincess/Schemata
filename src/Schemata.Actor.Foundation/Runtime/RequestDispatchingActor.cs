@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,6 +22,8 @@ namespace Schemata.Actor.Foundation.Runtime;
 /// </param>
 public sealed class RequestDispatchingActor(object handlerKey) : IActor
 {
+    private static readonly ConcurrentDictionary<Type, (Type ResponseType, MethodInfo Dispatch)> DispatchCache = new();
+
     private static readonly MethodInfo DispatchMethod =
         typeof(RequestDispatchingActor).GetMethod(nameof(DispatchAsync), BindingFlags.NonPublic | BindingFlags.Static)!;
 
@@ -34,8 +37,17 @@ public sealed class RequestDispatchingActor(object handlerKey) : IActor
         if (!requestType.IsInstanceOfType(envelope.Payload)) {
             throw new InvalidOperationException($"The envelope payload is not assignable to '{requestType}'.");
         }
-        var responseType = envelope.ResponseType ?? ResolveResponseType(requestType);
-        var dispatch     = DispatchMethod.MakeGenericMethod(requestType, responseType);
+        MethodInfo dispatch;
+        if (envelope.ResponseType is { } responseType) {
+            dispatch = DispatchCache.TryGetValue(requestType, out var cached) && cached.ResponseType == responseType
+                ? cached.Dispatch
+                : DispatchMethod.MakeGenericMethod(requestType, responseType);
+        } else {
+            dispatch = DispatchCache.GetOrAdd(requestType, static type => {
+                var inferred = ResolveResponseType(type);
+                return (inferred, DispatchMethod.MakeGenericMethod(type, inferred));
+            }).Dispatch;
+        }
 
         // An uncaught exception here is left to the shared turn dispatcher: it faults this turn's
         // Ask with the original exception either way, and restarting this stateless actor (its

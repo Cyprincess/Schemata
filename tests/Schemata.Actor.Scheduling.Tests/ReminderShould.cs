@@ -65,7 +65,7 @@ public sealed class ReminderShould
             // bounds how long a slow CI runner may take to materialize and dispatch the row.
             var deadline = DateTime.UtcNow.AddSeconds(30);
             while (received is null && DateTime.UtcNow < deadline) {
-                received = await actor.AskAsync<GetReceived, ReminderPayload?>(new());
+                received = await actor.AskAsync<GetReceived, ReminderPayload?>(root, new());
                 if (received is null) {
                     await Task.Delay(TimeSpan.FromMilliseconds(50));
                 }

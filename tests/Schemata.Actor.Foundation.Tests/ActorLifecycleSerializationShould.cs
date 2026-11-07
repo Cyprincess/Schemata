@@ -13,7 +13,7 @@ public class ActorLifecycleSerializationShould
     public async Task NeverRunTwoLifecycleCallbacksConcurrently_AndAlwaysEndWithExactlyOneOnStopped() {
         var recorder = new LifecycleRecorder();
         var gate      = new ManualGate();
-        var (system, _, _) = ActorSystemFactory.Create();
+        var (system, _, root) = ActorSystemFactory.Create();
         var id              = new ActorId("lifecycle", "a");
         var actor           = await system.SpawnAsync(id, new(typeof(LifecycleRecordingActor), [recorder, gate]));
 
@@ -22,7 +22,7 @@ public class ActorLifecycleSerializationShould
         // called OnStoppedAsync directly from the caller's task while this turn was still
         // executing; the fix makes StopAsync only signal intent and waits for the mailbox loop's
         // own task to notify OnStoppedAsync once the turn has actually finished.
-        var executing = actor.AskAsync<GateAndWait, string>(new()).AsTask();
+        var executing = actor.AskAsync<GateAndWait, string>(root, new()).AsTask();
         await gate.Started.WaitAsync(TimeSpan.FromSeconds(30));
 
         var stopping = system.StopAsync(id);
@@ -42,12 +42,12 @@ public class ActorLifecycleSerializationShould
     public async Task SuppressRestart_WhenAStopHasAlreadyBegunBeforeTheFailingTurnThrows() {
         var gate               = new ManualGate();
         var constructionCount  = new SharedCounter();
-        var (system, _, _)     = ActorSystemFactory.Create();
+        var (system, _, root)     = ActorSystemFactory.Create();
         var id                  = new ActorId("stop-during-fail", "a");
         var actor               = await system.SpawnAsync(id, new(typeof(StopDuringFailureActor), [gate, constructionCount]));
 
         // The failing turn begins and blocks before it ever throws.
-        var failing = actor.AskAsync<Fail, string>(new("boom")).AsTask();
+        var failing = actor.AskAsync<Fail, string>(root, new("boom")).AsTask();
         await gate.Started.WaitAsync(TimeSpan.FromSeconds(30));
 
         // A stop is requested while that turn is still in flight, before it throws.

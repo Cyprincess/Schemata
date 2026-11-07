@@ -81,7 +81,7 @@ public sealed class InProcessActorSystem<TActor> : IActorSystem, IActorSystemLif
 
     private async ValueTask<MessageContext> CaptureAsync() {
         if (_capture is not null) return await _capture();
-        return await MessageContexts.CaptureAsync(_services, scopes: _turnScopeFactory);
+        return await MessageContexts.CaptureAsync(_services);
     }
 
     /// <summary>
@@ -183,13 +183,19 @@ public sealed class InProcessActorSystem<TActor> : IActorSystem, IActorSystemLif
         return Resolve(id, lazy);
     }
 
-    internal async ValueTask<ActorInstance<TActor>> ResolveForSendAsync(ActorId id, Props props, CancellationToken ct, MessageContext? context = null) {
+    internal void RejectSelfAsk(IServiceProvider services, ActorId target) {
+        if (services.GetRequiredService<ActorTurnIdentity>().IsCurrent(target, this)) {
+            throw new InvalidOperationException($"Actor '{target}' cannot await an Ask to itself from its own callback.");
+        }
+    }
+
+    internal async ValueTask<ActorInstance<TActor>> ResolveForSendAsync(IServiceProvider services, ActorId id, Props props, CancellationToken ct, MessageContext? context = null) {
         context ??= await CaptureAsync();
         while (true) {
             ct.ThrowIfCancellationRequested();
             var activation = GetOrCreate(id, props, context);
             if (activation.Accepting) return activation;
-            if (ActorTurnIdentity.IsCurrent(id, this)) throw new InvalidOperationException($"Actor '{id}' cannot send to itself while retiring.");
+            if (services.GetRequiredService<ActorTurnIdentity>().IsCurrent(id, this)) throw new InvalidOperationException($"Actor '{id}' cannot send to itself while retiring.");
             await activation.Completion.WaitAsync(ct);
         }
     }

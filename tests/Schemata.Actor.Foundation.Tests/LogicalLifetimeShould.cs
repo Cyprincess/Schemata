@@ -22,21 +22,22 @@ public sealed class LogicalLifetimeShould
         long now = 0;
         clock.Setup(value => value.GetTimestamp()).Returns(() => now);
         clock.SetupGet(value => value.TimestampFrequency).Returns(1);
-        using var root = new ServiceCollection().BuildServiceProvider();
+        using var root = new ServiceCollection().AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
+            .AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>().AddScoped<ActorTurnIdentity>().BuildServiceProvider();
         var registry = new ActorRegistry();
         var state = new State();
         var props = new Props(typeof(ProbeActor), [state]);
         var system = new InProcessActorSystem<SchemataActor>(root, registry, new MessageExecutionScopeFactory(root.GetRequiredService<IServiceScopeFactory>()), Options.Create(new SchemataActorOptions()), clock.Object);
         var reference = await system.SpawnAsync(new("probe", "idle"), props);
-        var first = await reference.AskAsync<Identity, Guid>(new());
-        var activation = await system.ResolveForSendAsync(reference.Id, props, default);
-        var blocked = reference.AskAsync<Block, Guid>(new()).AsTask();
+        var first = await reference.AskAsync<Identity, Guid>(root, new());
+        var activation = await system.ResolveForSendAsync(root, reference.Id, props, default);
+        var blocked = reference.AskAsync<Block, Guid>(root, new()).AsTask();
         await state.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         now = 1000;
         Assert.False(activation.TryRetireIdle(TimeSpan.FromMinutes(15)));
         state.Release.SetResult();
         Assert.Equal(first, await blocked);
-        await reference.AskAsync<Identity, Guid>(new());
+        await reference.AskAsync<Identity, Guid>(root, new());
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         while (true) {
             now += 1000;
@@ -45,7 +46,7 @@ public sealed class LogicalLifetimeShould
             await Task.Yield();
         }
         await activation.Completion;
-        Assert.NotEqual(first, await reference.AskAsync<Identity, Guid>(new()));
+        Assert.NotEqual(first, await reference.AskAsync<Identity, Guid>(root, new()));
         await system.StopAsync(reference.Id);
     }
 
@@ -58,14 +59,15 @@ public sealed class LogicalLifetimeShould
                 callbacks.Add((callback, state));
                 return Mock.Of<ITimer>();
             });
-        using var root = new ServiceCollection().BuildServiceProvider();
+        using var root = new ServiceCollection().AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
+            .AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>().AddScoped<ActorTurnIdentity>().BuildServiceProvider();
         var state = new State();
         var props = new Props(typeof(ProbeActor), [state]);
         var system = new InProcessActorSystem<SchemataActor>(root, new ActorRegistry(), new MessageExecutionScopeFactory(root.GetRequiredService<IServiceScopeFactory>()), Options.Create(new SchemataActorOptions()), clock.Object);
         var reference = await system.SpawnAsync(new("probe", "timers"), props);
-        await reference.AskAsync<Identity, Guid>(new());
-        var activation = await system.ResolveForSendAsync(reference.Id, props, default);
-        var blocked = reference.AskAsync<Block, Guid>(new()).AsTask();
+        await reference.AskAsync<Identity, Guid>(root, new());
+        var activation = await system.ResolveForSendAsync(root, reference.Id, props, default);
+        var blocked = reference.AskAsync<Block, Guid>(root, new()).AsTask();
         await state.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         var old = 0;
         var current = 0;
@@ -75,14 +77,14 @@ public sealed class LogicalLifetimeShould
         callbacks[1].Callback(callbacks[1].State);
         state.Release.SetResult();
         await blocked;
-        await reference.AskAsync<Identity, Guid>(new());
+        await reference.AskAsync<Identity, Guid>(root, new());
         Assert.Equal(0, old);
         Assert.Equal(1, current);
         activation.RegisterTimer("cancel", _ => { current++; return ValueTask.CompletedTask; }, TimeSpan.Zero, null);
         activation.CancelTimer("cancel");
         activation.CancelTimer("cancel");
         callbacks[2].Callback(callbacks[2].State);
-        await reference.AskAsync<Identity, Guid>(new());
+        await reference.AskAsync<Identity, Guid>(root, new());
         Assert.Equal(1, current);
         await system.StopAsync(reference.Id);
         callbacks[1].Callback(callbacks[1].State);

@@ -17,13 +17,14 @@ public interface IActorRef
 
     /// <summary>Enqueues <paramref name="message" /> for one-way, fire-and-forget delivery.</summary>
     /// <typeparam name="T">The message type.</typeparam>
+    /// <param name="services">The caller's current invocation provider.</param>
     /// <param name="message">The message instance.</param>
     /// <param name="context">
     ///     The sender-captured ambient state to restore in the target turn's scope, or
     ///     <see langword="null" /> when there is none to propagate.
     /// </param>
     /// <param name="ct">A cancellation token that only covers the enqueue operation itself.</param>
-    ValueTask TellAsync<T>(T message, MessageContext? context = null, CancellationToken ct = default)
+    ValueTask TellAsync<T>(IServiceProvider services, T message, MessageContext? context = null, CancellationToken ct = default)
         where T : IMessage;
 
     /// <summary>
@@ -32,6 +33,7 @@ public interface IActorRef
     /// </summary>
     /// <typeparam name="TRequest">The request type.</typeparam>
     /// <typeparam name="TResponse">The response type produced by the actor's reply.</typeparam>
+    /// <param name="services">The caller's current invocation provider.</param>
     /// <param name="request">The request instance.</param>
     /// <param name="context">
     ///     The sender-captured ambient state to restore in the target turn's scope, or
@@ -44,7 +46,7 @@ public interface IActorRef
     /// <param name="ct">A cancellation token that aborts the wait for a reply.</param>
     /// <returns>The response the actor supplied through its reply.</returns>
     ValueTask<TResponse> AskAsync<TRequest, TResponse>(
-        TRequest request, MessageContext? context = null,
+        IServiceProvider services, TRequest request, MessageContext? context = null,
         TimeSpan? timeout = null, CancellationToken ct = default)
         where TRequest : IRequest<TResponse>;
 }

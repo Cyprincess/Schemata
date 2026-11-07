@@ -40,6 +40,8 @@ public static class ServiceCollectionExtensions
 
         services.TryAddSingleton<IActorSystemFactory, InProcessActorSystemFactory<TActor>>();
         services.TryAddSingleton<IActorSystem>(sp => sp.GetRequiredService<IActorSystemFactory>().Create(sp));
+        services.TryAddSingleton<IActorSystemLifetime>(sp => sp.GetRequiredService<IActorSystem>() as IActorSystemLifetime
+            ?? throw new System.InvalidOperationException("The actor system does not expose its lifetime."));
         services.AddHostedService<ActorHostedService>();
 
         services.TryAddSingleton<IActorRegistry>(sp => {
@@ -53,6 +55,8 @@ public static class ServiceCollectionExtensions
         });
 
         services.TryAddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>();
+        services.TryAddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>();
+        services.TryAddScoped<ActorTurnIdentity>();
 
         return services;
     }

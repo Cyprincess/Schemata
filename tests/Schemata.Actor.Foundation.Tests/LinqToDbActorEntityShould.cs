@@ -81,11 +81,11 @@ public sealed class LinqToDbActorEntityShould : IAsyncLifetime
         var system = _root!.GetRequiredService<IActorSystem>();
         var id     = new ActorId("counter", "linqto-db");
         var actor  = await system.GetAsync(id);
-        await actor.AskAsync<Increment, int>(new());
+        await actor.AskAsync<Increment, int>(_root!, new());
         await system.StopAsync(id);
 
         var respawned = await system.GetAsync(id);
-        Assert.Equal(1, await respawned.AskAsync<GetCount, int>(new()));
+        Assert.Equal(1, await respawned.AskAsync<GetCount, int>(_root!, new()));
 
         await using var verify = _root!.CreateAsyncScope();
         var repository = verify.ServiceProvider.GetRequiredService<IRepository<SessionActor>>();

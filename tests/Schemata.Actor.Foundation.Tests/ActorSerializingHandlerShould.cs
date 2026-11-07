@@ -44,7 +44,7 @@ public class ActorSerializingHandlerShould
                .ReturnsAsync(actorId);
         var actor = new Mock<IActorRef>(MockBehavior.Strict);
         actor.Setup(value => value.AskAsync<TestRequest, string>(
-                         request, It.IsAny<MessageContext?>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
+                         It.IsAny<IServiceProvider>(), request, It.IsAny<MessageContext?>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
              .ReturnsAsync("actor");
         var actors = new Mock<IActorSystem>(MockBehavior.Strict);
         actors.Setup(value => value.GetAsync(actorId)).ReturnsAsync(actor.Object);

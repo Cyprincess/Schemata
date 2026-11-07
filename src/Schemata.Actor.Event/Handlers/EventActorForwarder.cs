@@ -37,7 +37,7 @@ public sealed class EventActorForwarder<TEvent>(
             }
 
             var actor = await actors.GetAsync(target);
-            await actor.TellAsync(@event, context, ct);
+            await actor.TellAsync(services, @event, context, ct);
         }
     }
 

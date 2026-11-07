@@ -25,7 +25,6 @@ public class MessageExecutionScopeFactoryShould
         await Assert.ThrowsAsync<InvalidOperationException>(async () => {
             var message = new MessageContext(new Dictionary<string, string?>());
             var scope = await factory.CreateAsync(message);
-            using var identity = scope.Enter();
             await using var owned = scope;
             await scope.RestoreAsync(message);
         });
@@ -45,10 +44,10 @@ public class MessageExecutionScopeFactoryShould
         var (system, _, root) = ActorSystemFactory.Create(services => services.AddScoped(_ => propagator.Object));
         using var owned = (ServiceProvider)root;
         var actor = await system.SpawnAsync(new("restore", "same"), new(typeof(IdentityActor)));
-        var before = await actor.AskAsync<WhoAmI, Guid>(new());
+        var before = await actor.AskAsync<WhoAmI, Guid>(root, new());
         var context = new MessageContext(new Dictionary<string, string?> { ["invalid"] = "yes" });
-        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => actor.AskAsync<WhoAmI, Guid>(new(), context).AsTask()));
-        Assert.Equal(before, await actor.AskAsync<WhoAmI, Guid>(new()));
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => actor.AskAsync<WhoAmI, Guid>(root, new(), context).AsTask()));
+        Assert.Equal(before, await actor.AskAsync<WhoAmI, Guid>(root, new()));
         await system.StopAsync(actor.Id);
     }
 
