@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using Schemata.Abstractions.Resource;
 
 namespace Schemata.Push.Skeleton;
 
@@ -23,6 +24,10 @@ public class PushContext
 
     /// <summary>The dispatch target.</summary>
     public PushTarget Target { get; }
+
+    /// <summary>Caller-supplied canonical resource name carried into scheduled execution metadata.</summary>
+    [ResourceReference]
+    public string? Subject { get; init; }
 
     /// <summary>Cross-transport delivery options.</summary>
     public PushOptions Options { get; init; } = PushOptions.Default;

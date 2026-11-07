@@ -1,3 +1,4 @@
+using Grpc.AspNetCore.Server.Model;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
@@ -7,6 +8,8 @@ using Schemata.Flow.Grpc.Services;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Core.Building;
 using Schemata.Transport.Grpc;
+using Schemata.Flow.Grpc.Linking;
+using Schemata.Transport.Grpc.Linking;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -54,6 +57,9 @@ public static class ServiceCollectionExtensions
             resource => resource.Operations = FlowResourceRegistration<TProcess, TToken>.TransitionOperations);
 
         services.TryAddScoped<ProcessDefinitionService>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IGrpcLinkTargetResolver, FlowGrpcLinkTargetResolver>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceMethodProvider<ProcessDefinitionService>, FlowServiceMethodProvider>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IGrpcServiceDescriptorContributor, FlowGrpcServiceDescriptorContributor>());
 
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTypeContributor, FlowProtoTypeContributor<TProcess, TToken, TTransition>>());
 

@@ -6,6 +6,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Grpc.Core;
+using ProtoBuf;
+using ProtoBuf.Meta;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
@@ -14,12 +16,20 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository.Advisors;
+using Schemata.Abstractions.Resource;
+using Schemata.Common;
+using Schemata.Report.Foundation.Commands;
+using Schemata.Report.Foundation.Queries;
+using Schemata.Report.Grpc;
 using ProtoBuf.Grpc.Client;
 using ProtoBuf.Grpc.Configuration;
 using Schemata.Report.Integration.Tests.Fixtures;
 using Schemata.Report.Skeleton.Entities;
 using Schemata.Scheduling.Skeleton.Entities;
 using Schemata.Resource.Grpc;
+using Schemata.Resource.Grpc.Runtime;
+using Schemata.Transport.Grpc;
+using Schemata.Transport.Grpc.Proto;
 using Xunit;
 using Schemata.Abstractions.Exceptions;
 
@@ -153,6 +163,42 @@ public sealed class ReportConflictTransportShould
         });
 
         Assert.Equal(StatusCode.FailedPrecondition, error.StatusCode);
+    }
+
+    [Trait("Layer", "Integration")]
+    [Fact]
+    public async Task Grpc_Custom_Methods_Reject_Conflict_Before_Persistence() {
+        using var factory = ConflictHost();
+
+        var generate = await Assert.ThrowsAsync<RpcException>(() =>
+            Call<SchemataReport, GenerateReportRequest, Operation>(factory,
+                "generate", new() { Name = "daily", Sync = true }));
+        Assert.Equal(StatusCode.FailedPrecondition, generate.StatusCode);
+
+        var read = await Assert.ThrowsAsync<RpcException>(() =>
+            Call<SchemataReportSnapshot, ReadSnapshotRequest, ReadSnapshotGrpcResponse>(factory,
+                "read", new() { CanonicalName = "reports/daily/snapshots/current" }));
+        Assert.Equal(StatusCode.FailedPrecondition, read.StatusCode);
+    }
+
+    private static async Task<TResponse> Call<TEntity, TRequest, TResponse>(WebAppFactory factory, string verb, TRequest request)
+        where TEntity : class
+        where TRequest : class
+        where TResponse : class {
+        var model = RuntimeTypeModel.Create();
+        model.DefaultCompatibilityLevel = CompatibilityLevel.Level300;
+        SchemataProtoModelConfigurator.ConfigureType(model, typeof(TRequest));
+        SchemataProtoModelConfigurator.ConfigureType(model, typeof(TResponse));
+        var descriptor = ResourceNameDescriptor.ForType<TEntity>();
+        var method = new Method<TRequest, TResponse>(
+            MethodType.Unary,
+            GrpcResourceNaming.ServiceFullName(typeof(TEntity)),
+            GrpcResourceNaming.CustomMethodName(descriptor, verb),
+            GrpcMarshallers.Create<TRequest>(model),
+            GrpcMarshallers.Create<TResponse>(model));
+        using var channel = factory.CreateGrpcChannel();
+        using var call = channel.CreateCallInvoker().AsyncUnaryCall(method, null, new(), request);
+        return await call.ResponseAsync;
     }
 
 }

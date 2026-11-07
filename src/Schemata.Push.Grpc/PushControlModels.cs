@@ -4,6 +4,8 @@ using ProtoBuf;
 using ProtoBuf.WellKnownTypes;
 using Schemata.Push.Skeleton.Models;
 using Schemata.Push.Skeleton;
+using System.Linq;
+using Schemata.Core.Linking;
 
 namespace Schemata.Push.Grpc;
 
@@ -59,20 +61,24 @@ public sealed class CreatePushSubscriptionCommand
 
 /// <summary>Wire request listing the calling owner's subscriptions.</summary>
 [ProtoContract]
-public sealed class ListPushSubscriptionsQuery
+public sealed class ListPushSubscriptionsQuery : ILinkRequest
 {
     /// <summary>The optional transport provider to filter on.</summary>
     [ProtoMember(1)]
     public string? Provider { get; set; }
+
+    string? ILinkRequest.GetInput(string name) => name == "provider" ? Provider : null;
 }
 
 /// <summary>Wire response listing subscriptions without credentials.</summary>
 [ProtoContract]
-public sealed class ListPushSubscriptionsResult
+public sealed class ListPushSubscriptionsResult : IPushLinkResult
 {
     /// <summary>The calling owner's subscriptions.</summary>
     [ProtoMember(1)]
     public List<PushSubscriptionView> Subscriptions { get; set; } = [];
+
+    IEnumerable<string> IPushLinkResult.GetLinkProviders() => Subscriptions.Select(subscription => subscription.Provider);
 }
 
 /// <summary>Wire request deleting one subscription by its addressing identity.</summary>

@@ -15,6 +15,14 @@ using Schemata.Resource.Http.Integration.Tests.Fixtures;
 using Schemata.Abstractions.Linking;
 using Schemata.Transport.Http.Linking;
 using Xunit;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.Options;
+using Schemata.Resource.Foundation.Linking;
+using Schemata.Resource.Foundation.Models;
+using Schemata.Common;
+using Microsoft.AspNetCore.Http;
+using Schemata.Core.Linking;
+
 
 namespace Schemata.Resource.Http.Integration.Tests;
 
@@ -24,6 +32,58 @@ public class LinkHeaderShould : IClassFixture<WebAppFactory>
     private readonly WebAppFactory _factory;
 
     public LinkHeaderShould(WebAppFactory factory) { _factory = factory; }
+
+    [Fact]
+    public void Resource_Adapters_Resolve_Standard_Semantics_From_The_Final_Request_Provider() {
+        var registry = new ResourceRegistry();
+        registry.Add(new Schemata.Abstractions.Resource.ResourceAttribute<Student>(), []);
+        var accessor = new HttpContextAccessor();
+        var http = new Schemata.Resource.Http.Linking.ResourceLinkContributor(accessor);
+        var grpc = new Schemata.Transport.Grpc.Linking.ResourceLinkContributor(accessor);
+        var protection = new EphemeralDataProtectionProvider();
+        var protector = protection.CreateProtector(PageToken.ProtectionPurpose);
+        var token = new PageToken { PageSize = 1, Skip = 1 }.ToString(protector);
+        var context = new LinkContext(new ResourceCollectionTarget(typeof(Student)),
+            new ListResultBase<Student, Student> { NextPageToken = token, TotalSize = 3 },
+            registry.GetResource(typeof(Student)));
+        Assert.Empty(http.GetLinks(context));
+        Assert.Empty(grpc.GetLinks(context));
+        var policy = new ResourceLinkPolicy(protection, Options.Create(new SchemataResourceOptions()));
+        using var services = new ServiceCollection().AddSingleton(registry)
+            .AddSingleton<IResourceLinkPolicy>(policy).AddTransient<ResourceLinkSemantics>().BuildServiceProvider();
+        accessor.HttpContext = new DefaultHttpContext { RequestServices = services };
+        try {
+            Assert.Equal(new[] { "self", "next", "last" }, http.GetLinks(context).Select(link => link.Relation));
+            var last = grpc.GetLinks(context).Single(link => link.Relation == "last").Target.Parameters!["page_token"];
+            Assert.Equal(2, PageToken.FromString(last, protector)?.Skip);
+        } finally {
+            accessor.HttpContext = null;
+        }
+    }
+
+    [Fact]
+    public void Paging_Adapter_Preserves_Protected_Continuation_Fields() {
+        var protection = new EphemeralDataProtectionProvider();
+        var protector = protection.CreateProtector(PageToken.ProtectionPurpose);
+        var original = new PageToken {
+            Filter = "full_name=one", Language = "aip", Parent = "schools/one", OrderBy = "name desc",
+            Caller = new ProtectedContinuationCaller(true, "test", "users/one", null),
+            ShowDeleted = true, PageSize = 7, Skip = 14,
+        };
+        var policy = new ResourceLinkPolicy(protection, Options.Create(new SchemataResourceOptions()));
+        var basis = policy.ReadPage(original.ToString(protector));
+        Assert.NotNull(basis);
+        var first = PageToken.FromString(policy.WritePage(basis, 0), protector);
+        Assert.NotNull(first);
+        Assert.Equal(0, first.Skip);
+        Assert.Equal(7, first.PageSize);
+        Assert.Equal(original.Filter, first.Filter);
+        Assert.Equal(original.Language, first.Language);
+        Assert.Equal(original.Parent, first.Parent);
+        Assert.Equal(original.OrderBy, first.OrderBy);
+        Assert.Equal(original.ShowDeleted, first.ShowDeleted);
+        Assert.Equal(original.Caller, first.Caller);
+    }
 
     [Fact]
     public async Task List_Emits_Self_Next_And_Second_Page_Navigation() {
@@ -60,8 +120,10 @@ public class LinkHeaderShould : IClassFixture<WebAppFactory>
         var second = Links(secondResponse);
 
         var firstLink = Assert.Single(second, link => link.Rel == "first");
-        Assert.DoesNotContain("page_token=", firstLink.Target);
-        Assert.Contains("page_size=1", firstLink.Target);
+        Assert.Contains("page_token=", firstLink.Target);
+        var replayed = await client.GetAsync(firstLink.Target);
+        Assert.Equal(HttpStatusCode.OK, replayed.StatusCode);
+        Assert.Single((await replayed.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("students").EnumerateArray());
 
         var previous = Assert.Single(second, link => link.Rel == "prev");
         Assert.Contains("page_token=", previous.Target);

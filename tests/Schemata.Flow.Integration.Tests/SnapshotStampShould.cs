@@ -39,7 +39,7 @@ public abstract class SnapshotStampShould
         Assert.Equal("Completed", finished.Process.State);
 
         var row    = await ReadProcessRowAsync(process.CanonicalName!);
-        var tokens = await ReadTokenRowsAsync(process.Name!);
+        var tokens = await ReadTokenRowsAsync(process.CanonicalName!);
 
         // The update rotated the stamp, so the exposed value must be the rotated one.
         Assert.NotEqual(mid.Timestamp, row.Timestamp);

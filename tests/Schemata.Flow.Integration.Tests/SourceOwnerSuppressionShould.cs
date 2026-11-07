@@ -29,7 +29,7 @@ public sealed class SourceOwnerSuppressionShould : IClassFixture<OwnedSourceFixt
     public async Task SourceOwner_Timer_Continuation_Writes_Back_Without_Ambient_Owner() {
         var order   = await CreateOrderAsync(OwnerA);
         var process = await StartAsync(nameof(OwnedTimerProcess), order);
-        var token   = await WaitingTokenAsync(process.Name!);
+        var token   = await WaitingTokenAsync(process.CanonicalName!);
 
         AmbientOwner.Current.Value = null;
         await RunTimerAsync(process.CanonicalName!, token.CanonicalName);
@@ -75,7 +75,7 @@ public sealed class SourceOwnerSuppressionShould : IClassFixture<OwnedSourceFixt
     public async Task SourceOwner_SoftDeleted_Source_Is_Still_Written_Back() {
         var order   = await CreateOrderAsync(OwnerA, deleted: true);
         var process = await StartAsync(nameof(OwnedTimerProcess), order);
-        var token   = await WaitingTokenAsync(process.Name!);
+        var token   = await WaitingTokenAsync(process.CanonicalName!);
 
         AmbientOwner.Current.Value = null;
         await RunTimerAsync(process.CanonicalName!, token.CanonicalName);
@@ -89,7 +89,7 @@ public sealed class SourceOwnerSuppressionShould : IClassFixture<OwnedSourceFixt
     public async Task SourceOwner_Filter_Applies_Again_After_The_Flow_Scope() {
         var order   = await CreateOrderAsync(OwnerA);
         var process = await StartAsync(nameof(OwnedTimerProcess), order);
-        var token   = await WaitingTokenAsync(process.Name!);
+        var token   = await WaitingTokenAsync(process.CanonicalName!);
 
         AmbientOwner.Current.Value = null;
         await RunTimerAsync(process.CanonicalName!, token.CanonicalName);

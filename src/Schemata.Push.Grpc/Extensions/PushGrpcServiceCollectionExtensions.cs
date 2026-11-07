@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Push.Grpc;
 using Schemata.Transport.Grpc;
 using Grpc.AspNetCore.Server.Model;
+using Schemata.Transport.Grpc.Linking;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -22,6 +23,7 @@ public static class PushGrpcServiceCollectionExtensions
 
         services.TryAddScoped<PushControlGrpcService>();
         services.TryAddSingleton<PushGrpcModel>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IGrpcLinkTargetResolver, PushLinkTargetResolver>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceMethodProvider<PushControlGrpcService>, PushControlMethodProvider>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IGrpcServiceDescriptorContributor, PushGrpcServiceDescriptorContributor>());
 

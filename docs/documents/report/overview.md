@@ -141,6 +141,15 @@ resolves advisors by `Order` and stops at the first result other than `AdviseRes
 | `IReportSnapshotAdvisor` | After materialization and before a persisted snapshot finalizes. |
 | `IReportDefinitionProvider` | Produces a program-backed `QueryInsightRequest` for a keyed definition. |
 
+## Semantic links
+
+`Schemata.Report.Foundation/Linking/ReportLinkContributor.cs` supplies schedule associations for
+active periodic definitions and the snapshot `:read` rows relation. Core supplies standard
+resource, parent, and child-collection relations. Snapshot parents use
+`ResourceNameDescriptor.ParentOf`, retaining the complete canonical parent.
+HTTP and gRPC project only registered targets, including the registered instance `read` method;
+chunks and unregistered definition operations have no invented endpoints.
+
 ## See also
 
 - [Definitions](definitions.md) — configuration, DSL, and database definition resolution

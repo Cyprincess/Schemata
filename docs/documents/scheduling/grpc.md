@@ -83,6 +83,12 @@ Custom-method request bodies are the same types as the HTTP transport:
 `IRequestPrincipal`; the resource method pipeline binds the gRPC call's `HttpContext.User` before
 dispatch.
 
+### Related resource metadata
+
+Scheduling.Foundation supplies the same domain relations to the gRPC link projector. Each projected target contains the full RPC path. For the default execution resource, a job's `executions` relation targets `/Schemata.Scheduling.Skeleton.Entities.OperationService/ListOperations` with a `filter` attribute equal to `job="jobs/example"`. An execution's `job` relation targets `/Schemata.Scheduling.Skeleton.Entities.JobService/GetJob` with `name="jobs/example"`. The resource package, or its CLR namespace when no package is declared, qualifies the service name; host-selected job and execution entity types determine the registered RPCs.
+
+The `subject` relation carries the referenced resource's full Get RPC and its canonical `name` input. It is emitted only for an explicitly supplied Subject resolving to a registered addressable resource with an enabled gRPC Get operation. Null Subject emits no subject relation. Report jobs use the report canonical name, Flow timer jobs use the process canonical name, and scheduled Push sends use `PushContext.Subject`. Arguments, output, variables, message context, targets, and tenant strings never infer Subject. Core supplies standard relations; unregistered or unavailable RPCs produce no projected link. Sources: `src/Schemata.Scheduling.Foundation/Linking/SchedulingLinkContributor.cs`, `src/Schemata.Resource.Grpc/Runtime/ResourceGrpcLinkTargetResolver.cs`, and `src/Schemata.Transport.Grpc/Linking/GrpcLinkProjector.cs`.
+
 ## Error mapping
 
 `ExceptionMappingInterceptor` (registered by `SchemataTransportGrpcFeature`) wraps every unary

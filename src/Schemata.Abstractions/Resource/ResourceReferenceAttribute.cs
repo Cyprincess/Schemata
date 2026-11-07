@@ -16,10 +16,9 @@ namespace Schemata.Abstractions.Resource;
 ///         cascades or referential-integrity guarantees from this marker.
 ///     </para>
 ///     <para>
-///         This is distinct from identity-composing parents (mode A), which the framework
-///         identifies structurally via <c>[CanonicalName]</c> templates and a
-///         <c>ResourceNameDescriptor</c>. Identity parents store the bare leaf id of the
-///         parent segment; cross-resource references store the complete canonical name.
+///         An unannotated identity-composing parent stores its leaf id. A typed reference whose
+///         target pattern matches the complete parent pattern stores that parent's canonical name;
+///         resource-name composition and route predicates preserve that canonical value.
 ///     </para>
 /// </remarks>
 [AttributeUsage(AttributeTargets.Property)]

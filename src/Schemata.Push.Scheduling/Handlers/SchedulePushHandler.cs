@@ -30,6 +30,7 @@ internal sealed class SchedulePushHandler(IScheduler scheduler) : IRequestHandle
         var jobContext = new JobContext {
             ExecutionUid = uid,
             Method       = SendMethod,
+            Subject      = request.Context.Subject,
             ArgsJson     = argsJson,
             StartTime    = request.At?.UtcDateTime,
         };

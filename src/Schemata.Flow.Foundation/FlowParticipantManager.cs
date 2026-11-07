@@ -42,7 +42,7 @@ public sealed class FlowParticipantManager<TProcess, TToken, TParticipant>(
             ?? throw new NotFoundException(SchemataResources.FLOW_PROCESS_NOT_FOUND, new Dictionary<string, string?> { ["name"] = processName });
         string? activity = null;
         if (kind == ProcessParticipationKind.Eligibility && tokenName is not null) {
-            var token = await tokens.FirstOrDefaultAsync(q => q.Where(t => t.CanonicalName == tokenName && t.Process == process.Name), ct);
+            var token = await tokens.FirstOrDefaultAsync(q => q.Where(t => t.CanonicalName == tokenName && t.Process == process.CanonicalName), ct);
             if (token is null || !TokenStates.Live.Contains(token.State!)) throw new FailedPreconditionException(SchemataResources.FLOW_TOKEN_ASSIGNMENT_INELIGIBLE,
                 new Dictionary<string, string?> { ["token"] = tokenName });
             activity = token.WaitingAtName ?? token.StateName;

@@ -294,7 +294,7 @@ public class FlowEventCatchHandlerShould
         var (definition, host, _) = BoundarySetup(new Signal { Name = "shutdown" });
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
         var sibling = new SchemataProcessToken {
-            Process       = "p1",
+            Process       = "processes/p1",
             CanonicalName = "processes/p1/tokens/t2",
             StateName     = host.Name,
             State         = "Active",
@@ -384,7 +384,7 @@ public class FlowEventCatchHandlerShould
         });
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
         var sibling = new SchemataProcessToken {
-            Process       = "p1",
+            Process       = "processes/p1",
             CanonicalName = "processes/p1/tokens/t2",
             StateName     = "catch-sig",
             WaitingAtName = "catch-sig",
@@ -437,7 +437,7 @@ public class FlowEventCatchHandlerShould
         var definition = GatewaySignalDefinition();
         var process = new SchemataProcess { CanonicalName = "processes/p1" };
         var sibling = new SchemataProcessToken {
-            Process       = "p1",
+            Process       = "processes/p1",
             CanonicalName = "processes/p1/tokens/t2",
             StateName     = "gw",
             WaitingAtName = "gw",

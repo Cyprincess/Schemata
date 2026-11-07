@@ -1,11 +1,12 @@
 using System.Collections.Generic;
 using ProtoBuf;
+using Schemata.Core.Linking;
 
 namespace Schemata.Insight.Grpc.Wire;
 
 /// <summary>The federated read query request at the gRPC edge.</summary>
 [ProtoContract]
-public sealed class QueryInsightGrpcRequest
+public sealed class QueryInsightGrpcRequest : ILinkRequest
 {
     [ProtoMember(1)] public List<SourceBindingMessage> Sources { get; set; } = new();
 
@@ -22,4 +23,6 @@ public sealed class QueryInsightGrpcRequest
     [ProtoMember(7)] public string? PageToken { get; set; }
 
     [ProtoMember(8)] public string? Language { get; set; }
+
+    string? ILinkRequest.GetInput(string name) => name == "page_token" ? PageToken : null;
 }

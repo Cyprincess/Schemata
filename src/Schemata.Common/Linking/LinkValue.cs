@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Globalization;
 using Schemata.Abstractions.Linking;
 
 namespace Schemata.Common.Linking;
@@ -11,6 +12,7 @@ namespace Schemata.Common.Linking;
 /// </summary>
 public static class LinkValue
 {
+    private static readonly UTF8Encoding Utf8 = new(false, true);
     /// <summary>
     ///     Serializes links into one comma-separated link-value list.
     /// </summary>
@@ -59,7 +61,7 @@ public static class LinkValue
         AppendOptionalParameter(builder, "hreflang", link.Hreflang);
         AppendOptionalParameter(builder, "media", link.Media);
         AppendOptionalParameter(builder, "title", link.Title);
-        AppendOptionalParameter(builder, "title*", link.TitleStar);
+        if (link.TitleStar is { } titleStar) AppendExtValue(builder, titleStar);
         AppendOptionalParameter(builder, "type", link.Type);
 
         if (link.Extensions is not null) {
@@ -77,13 +79,66 @@ public static class LinkValue
         return builder.ToString();
     }
 
+    public static bool IsRepresentable(WebLink link) {
+        if (NormalizeTarget(link.Target) is null || !IsParameterValue(link.Rel)
+         || !IsParameterValue(link.Anchor) || !IsParameterValue(link.Hreflang)
+         || !IsParameterValue(link.Media) || !IsParameterValue(link.Title)
+         || !IsParameterValue(link.Type) || link.TitleStar is { } titleStar && !IsExtValue(titleStar)) return false;
+        if (link.Extensions is null) return true;
+        foreach (var extension in link.Extensions) {
+            if (IsReservedParameter(extension.Key) || !IsToken(extension.Key) || !IsParameterValue(extension.Value)) return false;
+        }
+        return true;
+    }
+
     /// <summary>
     ///     Reports whether <paramref name="name" /> is a serialization-defined link parameter.
     /// </summary>
     /// <param name="name">The parameter name.</param>
     /// <returns><see langword="true" /> when the parameter is reserved.</returns>
     public static bool IsReservedParameter(string name) =>
-        name.ToLowerInvariant() is "rel" or "anchor" or "hreflang" or "media" or "title" or "title*" or "type";
+        name.ToLowerInvariant() is "rel" or "rev" or "anchor" or "hreflang" or "media" or "title" or "title*" or "type";
+
+    public static bool IsExtValue(string value) {
+        var first = value.IndexOf('\'');
+        if (first < 0 || !value.AsSpan(0, first).Equals("UTF-8".AsSpan(), StringComparison.OrdinalIgnoreCase)) return false;
+        var second = value.IndexOf('\'', first + 1);
+        if (second < 0) return false;
+        var language = value.AsSpan(first + 1, second - first - 1);
+        var segment = 0;
+        for (var index = 0; index < language.Length; index++) {
+            var current = language[index];
+            if (current == '-') {
+                if (segment == 0 || segment > 8) return false;
+                segment = 0;
+            } else {
+                if (!IsAsciiLetter(current) && !(current is >= '0' and <= '9' && index > 0)) return false;
+                segment++;
+            }
+        }
+        if (language.Length > 0 && (segment == 0 || segment > 8)) return false;
+        var bytes = new byte[value.Length - second - 1];
+        var count = 0;
+        for (var index = second + 1; index < value.Length; index++) {
+            var current = value[index];
+            if (current == '%') {
+                if (index + 2 >= value.Length || !IsHexDigit(value[index + 1]) || !IsHexDigit(value[index + 2])) return false;
+                bytes[count++] = byte.Parse(value.AsSpan(index + 1, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+                index += 2;
+            } else {
+                if (!(current is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9'
+                    or '!' or '#' or '$' or '&' or '+' or '-' or '.' or '^' or '_' or '`' or '|' or '~')) return false;
+                bytes[count++] = (byte)current;
+            }
+        }
+        try {
+            var decoded = Utf8.GetString(bytes.AsSpan(0, count));
+            foreach (var current in decoded) if (char.IsControl(current)) return false;
+            return true;
+        } catch (DecoderFallbackException) {
+            return false;
+        }
+    }
 
     /// <summary>
     ///     Reports whether <paramref name="target" /> starts with a URI scheme.
@@ -163,34 +218,23 @@ public static class LinkValue
         return true;
     }
 
-    private static string ValidateTarget(string target) {
-        if (string.IsNullOrEmpty(target)) {
-            throw new ArgumentException("A link target is required.", nameof(target));
+    private static string ValidateTarget(string target) => NormalizeTarget(target)
+        ?? throw new ArgumentException("The link target is not a representable URI-Reference.", nameof(target));
+
+    private static string? NormalizeTarget(string target) {
+        if (string.IsNullOrEmpty(target)) return null;
+        if (!HasScheme(target)) return IsUriReference(target, false) ? target : null;
+        if (!IsUriReference(target, true)) return null;
+        if (IsDrivePath(target)) return target;
+        return Uri.TryCreate(target, UriKind.Absolute, out var absolute) ? NormalizeAbsolute(absolute) : null;
+    }
+
+    private static bool IsParameterValue(string? value) {
+        if (value is null) return true;
+        foreach (var current in value) {
+            if (current != '\t' && (current < 0x20 || current == 0x7f)) return false;
         }
-
-        if (HasScheme(target)) {
-            if (!IsUriReference(target, true)) {
-                throw new ArgumentException("The link target is not a URI-Reference.", nameof(target));
-            }
-
-            if (IsDrivePath(target)) {
-                return target;
-            }
-
-            if (!Uri.TryCreate(target, UriKind.Absolute, out var absolute)) {
-                throw new ArgumentException("The link target is not an absolute URI.", nameof(target));
-            }
-
-            return NormalizeAbsolute(absolute)
-                ?? throw new ArgumentException($"The host of the link target '{target}' cannot be mapped to an IDN.",
-                    nameof(target));
-        }
-
-        if (!IsUriReference(target, false)) {
-            throw new ArgumentException("The link target is not a URI-Reference.", nameof(target));
-        }
-
-        return target;
+        return true;
     }
 
     private static bool IsHexDigit(char current) => current is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F';
@@ -206,6 +250,11 @@ public static class LinkValue
             or ':' or '/' or '?' or '#' or '[' or ']' or '@'
             or '!' or '$' or '&' or '\'' or '(' or ')' or '*' or '+' or ',' or ';' or '=';
 
+    private static void AppendExtValue(StringBuilder builder, string value) {
+        if (!IsExtValue(value)) throw new ArgumentException("The title* parameter must be a UTF-8 ext-value.", nameof(value));
+        builder.Append("; title*=").Append(value);
+    }
+
     private static void AppendOptionalParameter(StringBuilder builder, string name, string? value) {
         if (value is not null) {
             AppendParameter(builder, name, value);
@@ -216,6 +265,7 @@ public static class LinkValue
         if (!IsToken(name)) {
             throw new ArgumentException($"The link parameter name '{name}' is not an HTTP token.", nameof(name));
         }
+        if (!IsParameterValue(value)) throw new ArgumentException($"The link parameter '{name}' contains a control character.", nameof(value));
 
         builder.Append("; ").Append(name).Append("=\"");
 
@@ -231,12 +281,6 @@ public static class LinkValue
 
                     break;
                 default:
-                    if (current < 0x20 || current == 0x7f) {
-                        throw new ArgumentException(
-                            $"The link parameter '{name}' contains the control character U+{(int)current:X4}.",
-                            nameof(value));
-                    }
-
                     builder.Append(current);
 
                     break;

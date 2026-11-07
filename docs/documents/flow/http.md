@@ -114,11 +114,11 @@ The `Get` and `List` operations come from the resource registration, not a hand-
 ### Definitions endpoint
 
 `ProcessDefinitionsController` is the only hand-written controller. Mounted at
-`~/v1/processes:definitions`, its single `GET` dispatches a
-`ListProcessDefinitionsQuery` through `IQueryDispatcher` and returns the result unchanged. The
-internal `DefaultListProcessDefinitionsHandler` reads the registry and projects the rows. Each row carries
-`CanonicalName`, the four `IDescriptive` label fields, `messages` (declared message names with
-their labels), and the definition graph:
+`~/v1/processes:definitions`, its single `GET` binds optional `definitionName` and
+`definitionVersion` query fields to `ListProcessDefinitionsQuery`. The Foundation handler
+filters registration names and versions using ordinal comparisons; omitting both returns all
+registrations. Each row carries `CanonicalName`, the four `IDescriptive` label fields,
+`messages` (declared message names with their labels), and the definition graph:
 
 - `elements` — `name`, shape `kind`, `scope` (enclosing sub-process, absent at the top level),
   event `position`, `trigger` and `trigger_kind` (the event definition's name and shape),
@@ -128,6 +128,15 @@ their labels), and the definition graph:
 
 Together the fields carry enough structure to rebuild the BPMN diagram from one list call.
 The gRPC path exposes the same rows.
+
+Process responses expose a `related` definitions link with the process's `definitionName` and
+`definitionVersion` query inputs. Following it replays the same filtered list. Token and
+transition `process` fields contain the full canonical owner name, and association links target
+that name directly. Token spawner and transition token links also use canonical names.
+`Flow.Foundation/Linking/FlowLinkContributor.cs` owns these relations; HTTP projects them only
+when the destination operation is registered. Standard child, self, and pagination links remain
+owned by the Resource link semantics. Definition GET, catch, and parent/child process-operation
+links are not emitted.
 
 ### Which messages a token accepts
 

@@ -47,7 +47,7 @@ public sealed class TenantExecutionShould
         var hostPlans = root.GetRequiredService<InsightPlanBuilder>();
         var hostService = root.GetRequiredService<IInsightService>();
         var tenancy = root.GetRequiredService<IOptions<SchemataTenancyOptions>>();
-        using var cache = new MemoryCacheTenantProviderCache(tenancy);
+        await using var cache = new MemoryCacheTenantProviderCache(tenancy);
         var scopes = new SchemataTenantServiceScopeFactory<SchemataTenant>(
             root, new SchemataTenantServiceProviderFactory<SchemataTenant>(root, cache, tenancy));
         await using var scope = await scopes.CreateAsync(new(Guid.NewGuid()));

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,7 +28,7 @@ internal sealed class DefaultTerminateProcessHandler<TProcess, TToken, TTransiti
         ProcessSnapshot? snapshot = null;
 
         await support.ExecuteWithNotificationAsync(process, async (scope, current) => {
-            var tokens = await FlowHandlerSupport<TProcess, TToken, TTransition, TCompensation, TParticipant, TSource>.LoadTokensAsync(scope, process.Name!, current);
+            var tokens = await FlowHandlerSupport<TProcess, TToken, TTransition, TCompensation, TParticipant, TSource>.LoadTokensAsync(scope, process.CanonicalName ?? throw new InvalidOperationException("Process canonical name is required."), current);
             if (support.Access is { } access && request.Principal is not null) {
                 await access.RequireEligibilityAsync(FlowOperations.Terminate, process, [], request.Principal, scope.UnitOfWork, current);
             }

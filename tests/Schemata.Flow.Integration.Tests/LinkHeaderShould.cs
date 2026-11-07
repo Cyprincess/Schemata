@@ -47,7 +47,7 @@ public class LinkHeaderShould : IClassFixture<WebAppFactory>, IClassFixture<Grpc
         Assert.Single(processLinks, link => link.Rel == "canonical");
         Assert.Contains(processLinks, link => link.Rel == "related" && link.Title == "Tokens" && link.Target.EndsWith($"/v1/processes/{process}/tokens"));
         Assert.Contains(processLinks, link => link.Rel == "related" && link.Title == "Transitions" && link.Target.EndsWith($"/v1/processes/{process}/transitions"));
-        Assert.Contains(processLinks, link => link.Rel == "related" && link.Target.EndsWith("/v1/processes:definitions"));
+        Assert.Contains(processLinks, link => link.Rel == "related" && link.Target.Contains("/v1/processes:definitions?definitionName=link-definition&definitionVersion=one", StringComparison.Ordinal));
         Assert.DoesNotContain(processLinks, link => link.Target.Contains("catch", StringComparison.OrdinalIgnoreCase));
 
         var tokenResponse = await _http.CreateClient().GetAsync($"/v1/processes/{process}/tokens/{token}");
@@ -55,11 +55,14 @@ public class LinkHeaderShould : IClassFixture<WebAppFactory>, IClassFixture<Grpc
         var tokenLinks = Links(tokenResponse);
         var parent     = Assert.Single(tokenLinks, link => link.Rel == "up");
         Assert.EndsWith($"/v1/processes/{process}", parent.Target);
+        Assert.EndsWith($"/v1/processes/{process}", Assert.Single(tokenLinks, link => link.Title == "process").Target);
+        Assert.EndsWith($"/v1/processes/{process}/tokens/{token}", Assert.Single(tokenLinks, link => link.Title == "spawner").Target);
 
         var transitionResponse = await _http.CreateClient().GetAsync($"/v1/processes/{process}/transitions/{transition}");
         Assert.Equal(HttpStatusCode.OK, transitionResponse.StatusCode);
         var transitionLinks = Links(transitionResponse);
         Assert.EndsWith($"/v1/processes/{process}", Assert.Single(transitionLinks, link => link.Rel == "up").Target);
+        Assert.EndsWith($"/v1/processes/{process}", Assert.Single(transitionLinks, link => link.Title == "process").Target);
         Assert.EndsWith($"/v1/processes/{process}/tokens/{token}",
                         Assert.Single(transitionLinks, link => link.Rel == "related" && link.Title == "token").Target);
     }
@@ -109,8 +112,39 @@ public class LinkHeaderShould : IClassFixture<WebAppFactory>, IClassFixture<Grpc
 
         var headers = await call.ResponseHeadersAsync;
         Assert.DoesNotContain(headers, entry => string.Equals(entry.Key, LinkHeader.Name, StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(call.GetTrailers(),
-                              entry => string.Equals(entry.Key, LinkHeader.Name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Grpc_Token_And_Transition_Links_Replay_Canonical_Associations() {
+        var (process, token, transition) = await SeedAsync(_grpc.Services);
+        var model = RuntimeTypeModel.Create();
+        model.DefaultCompatibilityLevel = CompatibilityLevel.Level300;
+        SchemataProtoModelConfigurator.ConfigureType(model, typeof(GetRequest));
+        SchemataProtoModelConfigurator.ConfigureType(model, typeof(SchemataProcess));
+        SchemataProtoModelConfigurator.ConfigureType(model, typeof(SchemataProcessToken));
+        SchemataProtoModelConfigurator.ConfigureType(model, typeof(SchemataProcessTransition));
+        using var channel = _grpc.CreateGrpcChannel();
+        async Task<(TEntity Entity, IReadOnlyList<WebLink> Links)> Get<TEntity>(string name) where TEntity : class, ICanonicalName {
+            var descriptor = ResourceNameDescriptor.ForType<TEntity>();
+            var method = new Method<GetRequest, TEntity>(MethodType.Unary, GrpcResourceNaming.ServiceFullName(typeof(TEntity)),
+                GrpcResourceNaming.MethodName(descriptor, Operations.Get), GrpcMarshallers.Create<GetRequest>(model), GrpcMarshallers.Create<TEntity>(model));
+            using var call = channel.CreateCallInvoker().AsyncUnaryCall(method, null, new(), new() { CanonicalName = name });
+            var entity = await call.ResponseAsync;
+            return (entity, LinkHeader.Parse(string.Join(", ", call.GetTrailers().Where(entry => entry.Key == "link").Select(entry => entry.Value))));
+        }
+        var tokenResult = await Get<SchemataProcessToken>($"processes/{process}/tokens/{token}");
+        Assert.Equal($"processes/{process}", tokenResult.Entity.Process);
+        var owner = Assert.Single(tokenResult.Links, link => link.Title == "process");
+        Assert.Equal("/" + GrpcResourceNaming.ServiceFullName(typeof(SchemataProcess)) + "/GetProcess", owner.Target);
+        Assert.Equal($"processes/{process}", owner.Extensions!["name"]);
+        Assert.Equal(owner.Extensions["name"], (await Get<SchemataProcess>(owner.Extensions["name"])).Entity.CanonicalName);
+        var spawner = Assert.Single(tokenResult.Links, link => link.Title == "spawner");
+        Assert.Equal(tokenResult.Entity.CanonicalName, (await Get<SchemataProcessToken>(spawner.Extensions!["name"])).Entity.CanonicalName);
+        var transitionResult = await Get<SchemataProcessTransition>($"processes/{process}/transitions/{transition}");
+        Assert.Equal($"processes/{process}", transitionResult.Entity.Process);
+        var associated = Assert.Single(transitionResult.Links, link => link.Title == "token");
+        Assert.Equal(tokenResult.Entity.CanonicalName, (await Get<SchemataProcessToken>(associated.Extensions!["name"])).Entity.CanonicalName);
+        Assert.Equal($"processes/{process}", Assert.Single(transitionResult.Links, link => link.Title == "process").Extensions!["name"]);
     }
 
     private static async Task<(string Process, string Token, string Transition)> SeedAsync(IServiceProvider services) {
@@ -127,11 +161,11 @@ public class LinkHeaderShould : IClassFixture<WebAppFactory>, IClassFixture<Grpc
         });
         database.ProcessTokens.Add(new SchemataProcessToken {
             Uid = Guid.NewGuid(), Name = token, CanonicalName = $"processes/{process}/tokens/{token}",
-            Process = process, ScopeName = string.Empty, StateName = "task", WaitingAtName = "catch",
+            Process = $"processes/{process}", Spawner = $"processes/{process}/tokens/{token}", ScopeName = string.Empty, StateName = "task", WaitingAtName = "catch",
         });
         database.ProcessTransitions.Add(new SchemataProcessTransition {
             Uid = Guid.NewGuid(), Name = transition, CanonicalName = $"processes/{process}/transitions/{transition}",
-            Process = process, Token = $"processes/{process}/tokens/{token}", Event = "advance", Kind = TransitionKind.Move,
+            Process = $"processes/{process}", Token = $"processes/{process}/tokens/{token}", Event = "advance", Kind = TransitionKind.Move,
         });
         await database.SaveChangesAsync();
 

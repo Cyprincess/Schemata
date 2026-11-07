@@ -1,10 +1,10 @@
 using System.Linq;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+using Schemata.Core.Linking;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
 using Schemata.Core.Building;
-using Schemata.Scheduling.Http.Linking;
+using Schemata.Scheduling.Foundation.Linking;
 using Schemata.Scheduling.Skeleton.Entities;
 using Schemata.Transport.Http.Linking;
 using Xunit;
@@ -20,7 +20,9 @@ public class PackageLinkShould
         var job      = new PackagedJob { Name = "job", CanonicalName = "jobs/job" };
         var context  = Context(job, registry.GetResource(typeof(PackagedJob))!);
 
-        var link = Assert.Single(new SchedulingLinkContributor(registry).GetLinks(context));
+        var semantic = Assert.Single(new SchedulingLinkContributor<PackagedJob, PackagedExecution>(registry).GetLinks(context));
+        var link = new HttpLinkProjector([registry], []).Project(semantic, context, new DefaultHttpContext().Request);
+        Assert.NotNull(link);
 
         Assert.Equal("related", link.Rel);
         Assert.StartsWith("/v1/sched/operations?filter=", link.Target);
@@ -32,7 +34,9 @@ public class PackageLinkShould
         var operation = new Operation { Metadata = new() { Job = "jobs/job" } };
         var context   = Context(operation, registry.GetResource(typeof(PackagedExecution))!);
 
-        var link = Assert.Single(new SchedulingLinkContributor(registry).GetLinks(context));
+        var semantic = Assert.Single(new SchedulingLinkContributor<PackagedJob, PackagedExecution>(registry).GetLinks(context));
+        var link = new HttpLinkProjector([registry], []).Project(semantic, context, new DefaultHttpContext().Request);
+        Assert.NotNull(link);
 
         Assert.Equal("/v1/sched/jobs/job", link.Target);
     }
@@ -46,7 +50,7 @@ public class PackageLinkShould
     }
 
     private static LinkContext Context(object value, ResourceRegistration resource) {
-        return new(new DefaultHttpContext(), new JsonResult(value), resource);
+        return new(new ResourceInstanceTarget(resource.Entity, "operations/execution"), value, resource);
     }
 
     [CanonicalName("jobs/{job}")]

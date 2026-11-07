@@ -53,7 +53,7 @@ public sealed class ParticipantAccessShould : IClassFixture<ParticipantWebAppFac
             var runner = services.GetRequiredService<FlowRunner>();
             hidden = await runner.StartAsync("participants", null, admin, default);
             allowed = await runner.StartAsync("participants", null, admin, default);
-            token = (await services.GetRequiredService<IRepository<SchemataProcessToken>>().FirstOrDefaultAsync(q => q.Where(t => t.Process == allowed.Name)))!.CanonicalName!;
+            token = (await services.GetRequiredService<IRepository<SchemataProcessToken>>().FirstOrDefaultAsync(q => q.Where(t => t.Process == allowed.CanonicalName)))!.CanonicalName!;
             await services.GetRequiredService<FlowParticipantManager>().GrantAsync(allowed.CanonicalName!, subject, ProcessParticipationKind.Participation, admin);
         }
         using var client = Client(subject);
@@ -132,7 +132,7 @@ public sealed class ParticipantAccessShould : IClassFixture<ParticipantWebAppFac
             var services = scope.ServiceProvider;
             await services.GetRequiredService<IProcessRegistry>().RegisterAsync<ProcessVersionShould.Original>(configure: c => c.Name = "grpc-participant");
             process = await services.GetRequiredService<FlowRunner>().StartAsync("grpc-participant", null, admin, default);
-            token = (await services.GetRequiredService<IRepository<SchemataProcessToken>>().FirstOrDefaultAsync(q => q.Where(t => t.Process == process.Name)))!.CanonicalName!;
+            token = (await services.GetRequiredService<IRepository<SchemataProcessToken>>().FirstOrDefaultAsync(q => q.Where(t => t.Process == process.CanonicalName)))!.CanonicalName!;
         }
         using var client = Client(actor);
         client.DefaultRequestHeaders.Add("X-Permissions", "schemata-process.complete");

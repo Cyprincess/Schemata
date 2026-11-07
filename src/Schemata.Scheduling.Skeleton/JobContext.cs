@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Schemata.Abstractions.Resource;
 using Schemata.Scheduling.Skeleton.Entities;
 
 namespace Schemata.Scheduling.Skeleton;
@@ -13,6 +14,9 @@ public class JobContext
     ///     <see cref="IScheduler.TriggerAsync{TJob}" /> with no persistent scheduler entry.
     /// </summary>
     public string? Job { get; set; }
+
+    [ResourceReference]
+    public string? Subject { get; set; }
 
     /// <summary>Caller-supplied string variables, mirrored to/from <see cref="Entities.SchemataJob.Variables" />.</summary>
     public IReadOnlyDictionary<string, string?> Variables { get; set; } = new Dictionary<string, string?>();

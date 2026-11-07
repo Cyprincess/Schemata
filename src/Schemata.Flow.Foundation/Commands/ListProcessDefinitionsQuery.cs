@@ -4,5 +4,4 @@ using Schemata.Messaging.Skeleton;
 
 namespace Schemata.Flow.Foundation.Commands;
 
-/// <summary>Requests the projection of every registered Flow process definition.</summary>
-public sealed record ListProcessDefinitionsQuery : IQuery<IReadOnlyList<ProcessDefinitionInfo>>;
+public sealed record ListProcessDefinitionsQuery(string? DefinitionName = null, string? DefinitionVersion = null) : IQuery<IReadOnlyList<ProcessDefinitionInfo>>;

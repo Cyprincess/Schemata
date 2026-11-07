@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
@@ -28,7 +29,7 @@ internal sealed class DefaultCompleteActivityHandler<TProcess, TToken, TTransiti
         ProcessSnapshot? snapshot = null;
 
         await support.ExecuteWithNotificationAsync(process, async (scope, current) => {
-            var tokens  = await FlowHandlerSupport<TProcess, TToken, TTransition, TCompensation, TParticipant, TSource>.LoadTokensAsync(scope, process.Name!, current);
+            var tokens  = await FlowHandlerSupport<TProcess, TToken, TTransition, TCompensation, TParticipant, TSource>.LoadTokensAsync(scope, process.CanonicalName ?? throw new InvalidOperationException("Process canonical name is required."), current);
             if (support.Access is { } access && request.Principal is not null) {
                 var targets = tokens.Where(token => TokenStates.Live.Contains(token.State!)
                     && (request.Token == null || token.CanonicalName == request.Token)).ToArray();

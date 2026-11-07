@@ -8,12 +8,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Linking;
 using Schemata.Common.Linking;
 using Schemata.Core.Building;
+using Schemata.Core.Linking;
 
 namespace Schemata.Transport.Grpc.Linking;
 
 /// <summary>
-///     Collects every <see cref="IGrpcLinkContributor" /> link for a unary response and writes one
-///     RFC 8288 link-value list into the <c>link</c> response trailer.
+///     Collects keyed semantic contributors and writes Schemata's gRPC link projection to trailers.
 /// </summary>
 public sealed class GrpcLinkMetadataInterceptor : Interceptor
 {
@@ -31,30 +31,21 @@ public sealed class GrpcLinkMetadataInterceptor : Interceptor
 
         var http     = context.GetHttpContext();
         var resource = http.GetEndpoint()?.Metadata.GetMetadata<ResourceRegistration>();
-        var state    = new GrpcLinkContext(context, response, resource);
+        var projector = http.RequestServices.GetRequiredService<GrpcLinkProjector>();
+        var state = projector.CreateContext(context.Method, request, response, resource);
 
         var links = new List<WebLink>();
-        foreach (var contributor in http.RequestServices.GetServices<IGrpcLinkContributor>()) {
-            var contributed = contributor.GetLinks(state);
-            if (contributed is null) {
-                continue;
+        foreach (var contributor in http.RequestServices.GetKeyedServices<ILinkContributor>(LinkTransports.Grpc)) {
+            foreach (var link in contributor.GetLinks(state)) {
+                if (projector.Project(link, state) is { } projected) links.Add(projected);
             }
-
-            links.AddRange(contributed);
         }
 
         if (links.Count == 0) {
             return response;
         }
 
-        string value;
-        try {
-            value = LinkValue.Serialize(links);
-        } catch (ArgumentException) {
-            // Links are ancillary response metadata; an invalid contributed target must not turn
-            // an otherwise successful response into a failed call.
-            return response;
-        }
+        var value = LinkValue.Serialize(links);
 
         if (value.Length > 0) {
             context.ResponseTrailers.Add(TrailerName, value);

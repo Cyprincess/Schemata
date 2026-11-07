@@ -69,7 +69,7 @@ public class DslNamedBindingShould
         return new() {
             Name          = canonical[(canonical.LastIndexOf('/') + 1)..],
             CanonicalName = canonical,
-            Process       = "p1",
+            Process       = "processes/p1",
             ScopeName     = string.Empty,
             StateName     = stateName,
             WaitingAtName = waitingAtName,

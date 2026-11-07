@@ -45,6 +45,11 @@ public static class FlowConstants
 
     #endregion
 
+    public static class LinkOperations
+    {
+        public const string Definitions = "flow.definitions";
+    }
+
     #region Nested type: Effects
 
     /// <summary>Well-known names for external-effect intent recording.</summary>

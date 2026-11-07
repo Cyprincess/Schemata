@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Schemata.Insight.Http.Linking;
+using Schemata.Core.Linking;
 using Schemata.Insight.Skeleton.Models;
 using Schemata.Insight.Skeleton.Queries;
 using Schemata.Messaging.Skeleton;
@@ -34,13 +34,16 @@ public sealed class InsightController : ControllerBase
     [HttpPost("~/v1/insight:query")]
     public async Task<IActionResult> QueryAsync([FromBody] QueryInsightRequest request) {
         request.Principal = HttpContext.User;
-        InsightQueryState.SetPageToken(HttpContext, request.PageToken);
         var dispatcher = _services.GetRequiredService<IRequestDispatcher>();
         var response = await dispatcher.SendAsync<QueryInsightRequest, QueryInsightResponse>(request, HttpContext.RequestAborted);
         for (var i = 0; i < response.Rows.Count; i++)
             response.Rows[i] = InsightValueModel.EncodeRow(response.Rows[i], response.Schema);
 
-        return new JsonResult(response, _json);
+        return new QueryResult(response, _json, request.PageToken);
     }
 
+    private sealed class QueryResult(object value, JsonSerializerOptions json, string? token) : JsonResult(value, json), ILinkRequest
+    {
+        string? ILinkRequest.GetInput(string name) => name == "page_token" ? token : null;
+    }
 }

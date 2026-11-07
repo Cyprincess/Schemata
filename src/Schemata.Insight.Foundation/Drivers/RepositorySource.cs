@@ -110,7 +110,7 @@ internal sealed class RepositorySource<TEntity, TPublic>(Expression<Func<TEntity
             }
 
             var planner = provider.GetRequiredKeyedService<IExpressionPushdownPlanner>(resolved.Language);
-            var plan    = planner.Plan(filter.Predicate.Tree, ExpressionCapabilities.Relational);
+            var plan    = planner.Plan(filter.Predicate.Tree, ExpressionCapabilities.Relational, typeof(TPublic));
 
             if (plan.Pushed is not null) {
                 pushedExpressions.Add(compiler.Compile<TPublic, bool>(plan.Pushed, compile));

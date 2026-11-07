@@ -78,7 +78,7 @@ public static class EventBasedGatewayHandler<TProcess, TToken, TTransition>
     ) {
         var parked = previousState ?? eb.Name;
         var arrivalTransition = BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-            process.Name!,
+            process,
             token.CanonicalName,
             previousState,
             parked,

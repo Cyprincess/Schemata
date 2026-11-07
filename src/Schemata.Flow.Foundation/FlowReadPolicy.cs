@@ -45,11 +45,8 @@ public sealed class FlowReadPolicy<TEntity, TRequest, TProcess, TToken, TPartici
         var row = Expression.Parameter(typeof(TEntity), "row");
         if (global) expression = Expression.Constant(true);
         else {
-            var values = typeof(TEntity) == typeof(TProcess)
-                ? names
-                : names.Select(ProcessLeafName).ToArray();
             var property = typeof(TEntity) == typeof(TProcess) ? nameof(ICanonicalName.CanonicalName) : nameof(SchemataProcessToken.Process);
-            expression = Expression.Call(typeof(Enumerable), nameof(Enumerable.Contains), [typeof(string)], Expression.Constant(values), Expression.Property(row, property));
+            expression = Expression.Call(typeof(Enumerable), nameof(Enumerable.Contains), [typeof(string)], Expression.Constant(names), Expression.Property(row, property));
         }
         return Expression.Lambda<Func<TEntity, bool>>(expression, row);
     }
@@ -64,8 +61,5 @@ public sealed class FlowReadPolicy<TEntity, TRequest, TProcess, TToken, TPartici
         return parts.Length >= depth ? string.Join('/', parts.Take(depth)) : canonical;
     }
 
-    private static string ProcessLeafName(string canonical) {
-        return ResourceNameDescriptor.ForType<TProcess>().ParseCanonicalName(canonical)?.LeafName ?? canonical;
-    }
 
 }

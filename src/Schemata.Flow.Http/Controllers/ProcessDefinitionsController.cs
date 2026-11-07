@@ -22,9 +22,9 @@ public sealed class ProcessDefinitionsController(
 {
     /// <summary>Lists registered Flow process definitions.</summary>
     [HttpGet]
-    public async Task<IActionResult> ListProcessDefinitions() {
+    public async Task<IActionResult> ListProcessDefinitions([FromQuery] string? definitionName = null, [FromQuery] string? definitionVersion = null) {
         var results = await dispatcher.SendAsync<ListProcessDefinitionsQuery, IReadOnlyList<ProcessDefinitionInfo>>(
-            new(), HttpContext.RequestAborted);
+            new(definitionName, definitionVersion), HttpContext.RequestAborted);
         return new JsonResult(new ListResultBase<ProcessDefinitionInfo, ProcessDefinitionInfo> { Entities = results.ToList() }, json.Value);
     }
 }

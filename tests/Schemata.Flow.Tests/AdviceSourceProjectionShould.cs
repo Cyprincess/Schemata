@@ -332,7 +332,7 @@ public class AdviceSourceProjectionShould
         return new() {
             Name          = canonicalName[(canonicalName.LastIndexOf('/') + 1)..],
             CanonicalName = canonicalName,
-            Process       = "p1",
+            Process       = "processes/p1",
             ScopeName     = string.Empty,
             StateName     = stateName,
             State         = state,

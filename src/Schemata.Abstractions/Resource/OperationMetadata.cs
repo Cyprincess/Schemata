@@ -14,6 +14,9 @@ public sealed class OperationMetadata
     /// <summary>Canonical name of the originating job.</summary>
     public string? Job { get; set; }
 
+    [ResourceReference]
+    public string? Subject { get; set; }
+
     /// <summary>Wall-clock start time.</summary>
     public DateTime StartTime { get; set; }
 

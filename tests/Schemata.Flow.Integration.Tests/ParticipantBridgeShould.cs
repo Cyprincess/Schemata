@@ -60,14 +60,14 @@ public sealed class ParticipantBridgeShould
                 var dispatch = new EventDispatchContext();
                 dispatch.SetSubscriptions([new() { Target = first.CanonicalName!, EventType = "broadcast-signal" }]);
                 await new FlowEventHandler(scope.ServiceProvider, dispatch).HandleAsync(new ApprovalPayload { Approved = true }, default);
-                var row = await scope.ServiceProvider.GetRequiredService<IRepository<TenantProcessToken>>().FirstOrDefaultAsync(q => q.Where(t => t.Process == first.Name));
+                var row = await scope.ServiceProvider.GetRequiredService<IRepository<TenantProcessToken>>().FirstOrDefaultAsync(q => q.Where(t => t.Process == first.CanonicalName));
                 Assert.Null(row!.WaitingAtName);
                 var principal = Principal("signal", "administer");
                 var results = await runner.ThrowSignalAsync("broadcast-signal", (string?)null, null, principal, default);
                 Assert.DoesNotContain(results, result => result.ProcessCanonicalName == second.CanonicalName);
             }
             await using (var scope = await fixture.EnterTenantAsync(foreign)) {
-                var row = await scope.ServiceProvider.GetRequiredService<IRepository<TenantProcessToken>>().FirstOrDefaultAsync(q => q.Where(t => t.Process == second.Name));
+                var row = await scope.ServiceProvider.GetRequiredService<IRepository<TenantProcessToken>>().FirstOrDefaultAsync(q => q.Where(t => t.Process == second.CanonicalName));
                 Assert.Equal("signal-catch", row!.WaitingAtName);
             }
             async Task<TenantProcess> Start(Guid id) {

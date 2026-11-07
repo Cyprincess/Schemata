@@ -4,7 +4,7 @@ using System.Collections.Immutable;
 namespace Schemata.Insight.Skeleton.Models;
 
 /// <summary>A federated read query result: nested rows, a schema tree, and pagination metadata.</summary>
-public sealed class QueryInsightResponse
+public sealed class QueryInsightResponse : IInsightLinkResult
 {
     /// <summary>The result rows; each is a nested string-keyed map.</summary>
     public IList<IReadOnlyDictionary<string, object?>> Rows { get; set; } = [];

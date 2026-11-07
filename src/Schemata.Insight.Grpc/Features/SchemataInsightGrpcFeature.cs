@@ -12,6 +12,7 @@ using Schemata.Insight.Foundation.Features;
 using Schemata.Insight.Foundation;
 using Schemata.Transport.Grpc;
 using Schemata.Transport.Grpc.Features;
+using Schemata.Transport.Grpc.Linking;
 
 namespace Schemata.Insight.Grpc.Features;
 
@@ -37,6 +38,7 @@ public sealed class SchemataInsightGrpcFeature : FeatureBase
         IWebHostEnvironment environment
     ) {
         services.TryAddScoped<InsightGrpcService>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IGrpcLinkTargetResolver, InsightLinkTargetResolver>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceMethodProvider<InsightGrpcService>, InsightServiceMethodProvider>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IGrpcServiceDescriptorContributor, InsightGrpcServiceDescriptorContributor>());
     }

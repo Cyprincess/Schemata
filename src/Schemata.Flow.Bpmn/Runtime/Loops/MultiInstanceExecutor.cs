@@ -112,7 +112,7 @@ public sealed class MultiInstanceExecutor<TProcess, TToken, TTransition>
 
         var transitions = new List<SchemataProcessTransition> {
             BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-                process.Name!,
+                process,
                 instance.CanonicalName,
                 activity.Name,
                 activity.Name,
@@ -130,7 +130,7 @@ public sealed class MultiInstanceExecutor<TProcess, TToken, TTransition>
                     sibling.WaitingAtName         = null;
                     sibling.CurrentCallActivation = null;
                     transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-                        process.Name!,
+                        process,
                         sibling.CanonicalName,
                         activity.Name,
                         activity.Name,
@@ -181,7 +181,7 @@ public sealed class MultiInstanceExecutor<TProcess, TToken, TTransition>
         var transitions = new List<SchemataProcessTransition>();
         if (includeArrival) {
             transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-                process.Name!,
+                process,
                 token.CanonicalName,
                 previousState,
                 activity.Name,
@@ -204,7 +204,7 @@ public sealed class MultiInstanceExecutor<TProcess, TToken, TTransition>
             WriteAggregate(token, total, 1, completed);
 
             var transition = BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-                process.Name!,
+                process,
                 token.CanonicalName,
                 activity.Name,
                 activity.Name,
@@ -247,7 +247,7 @@ public sealed class MultiInstanceExecutor<TProcess, TToken, TTransition>
             var skipTransitions = new List<SchemataProcessTransition>();
             if (includeArrival) {
                 skipTransitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-                    process.Name!,
+                    process,
                     parent.CanonicalName,
                     previousState,
                     activity.Name,
@@ -265,7 +265,7 @@ public sealed class MultiInstanceExecutor<TProcess, TToken, TTransition>
         var transitions = new List<SchemataProcessTransition>();
         if (includeArrival) {
             transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-                process.Name!,
+                process,
                 parent.CanonicalName,
                 previousState,
                 activity.Name,
@@ -274,7 +274,7 @@ public sealed class MultiInstanceExecutor<TProcess, TToken, TTransition>
         }
 
         transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-            process.Name!,
+            process,
             parent.CanonicalName,
             previousState,
             activity.Name,
@@ -288,7 +288,7 @@ public sealed class MultiInstanceExecutor<TProcess, TToken, TTransition>
             await context.CreateTokenAsync(child, ct);
             working.Add(child);
             transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-                process.Name!,
+                process,
                 child.CanonicalName,
                 activity.Name,
                 activity.Name,
@@ -350,7 +350,7 @@ public sealed class MultiInstanceExecutor<TProcess, TToken, TTransition>
         BpmnEngine<TProcess, TToken, TTransition>.ApplyResolvedToToken(token, resolved);
 
         return BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-            process.Name!,
+            process,
             token.CanonicalName,
             previousState ?? activity.Name,
             resolved.StateName,

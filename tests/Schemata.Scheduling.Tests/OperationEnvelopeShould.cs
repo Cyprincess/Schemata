@@ -10,11 +10,13 @@ namespace Schemata.Scheduling.Tests;
 public class OperationEnvelopeShould
 {
     [Fact]
+    [Trait("Layer", "Unit")]
     public void MapSucceededExecution_ToDoneOperationWithResponse() {
         var execution = new SchemataJobExecution {
             Name          = "abc",
             CanonicalName = "operations/abc",
             Job           = "jobs/report",
+            Subject       = "reports/daily",
             Method        = "run",
             State         = ExecutionState.Succeeded,
             StartTime     = DateTime.UtcNow.AddSeconds(-5),
@@ -31,6 +33,7 @@ public class OperationEnvelopeShould
         Assert.Equal("{\"ok\":true}", operation.Response?.Output);
         Assert.Equal("run", operation.Metadata?.Method);
         Assert.Equal("jobs/report", operation.Metadata?.Job);
+        Assert.Equal("reports/daily", operation.Metadata?.Subject);
         Assert.Equal(execution.StartTime, operation.Metadata?.StartTime);
         Assert.Equal(execution.EndTime, operation.Metadata?.EndTime);
     }
@@ -98,6 +101,21 @@ public class OperationEnvelopeShould
         var operation = OperationMapper.FromExecution(new() { Uid = Guid.NewGuid() });
         Assert.Null(operation.Name);
         Assert.Null(operation.CanonicalName);
+    }
+
+    [Theory]
+    [Trait("Layer", "Unit")]
+    [InlineData("reports/daily")]
+    [InlineData("tenants/acme/reports/daily")]
+    public void Missing_Subject_Is_Not_Inferred_From_Execution_Payload(string value) {
+        var execution = new SchemataJobExecution {
+            Job = "jobs/report", ArgsJson = value, Output = value,
+            Variables = new() { ["subject"] = value, ["tenant"] = value },
+            MessageContext = new() { ["subject"] = value, ["tenant"] = value },
+        };
+        var operation = OperationMapper.FromExecution(execution);
+        Assert.Null(operation.Metadata?.Subject);
+        Assert.Equal("jobs/report", operation.Metadata?.Job);
     }
 
 }

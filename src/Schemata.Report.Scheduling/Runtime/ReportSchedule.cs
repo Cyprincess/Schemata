@@ -65,6 +65,7 @@ internal static class ReportSchedule<TJob, TExecution>
         var job = new TJob {
             Key           = projection.SlotKey,
             JobKey        = ReportJobKeyResolver.Key,
+            Subject       = projection.CanonicalName,
             State         = JobState.Active,
         };
         ScheduleDefinitionMapper.ApplyToJob(CreateDefinition(projection, name), job);

@@ -13,7 +13,7 @@ namespace Schemata.Flow.Skeleton.Entities;
 [PrimaryKey(nameof(Uid))]
 public class SchemataProcessTransition : IIdentifier, ICanonicalName, IConcurrency, ITransition, ITimestamp
 {
-    /// <summary>The parent process's <see cref="ICanonicalName.Name" />.</summary>
+    [ResourceReference(typeof(SchemataProcess))]
     public virtual string? Process { get; set; }
 
     /// <summary>

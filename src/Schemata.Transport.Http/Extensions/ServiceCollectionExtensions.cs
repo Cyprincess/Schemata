@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Schemata.Transport.Http;
 using Schemata.Transport.Http.Linking;
+using Schemata.Core.Linking;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -35,23 +36,11 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddSchemataLinkHeaderShaping(this IServiceCollection services) {
+        services.TryAddScoped<HttpLinkProjector>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<Microsoft.AspNetCore.Mvc.MvcOptions>,
                                                                 LinkHeaderMvcOptionsSetup>());
 
         return services;
     }
 
-    /// <summary>
-    ///     Registers an <see cref="ILinkContributor" /> so the shared HTTP response shaping collects
-    ///     every contributor and serializes the links once.
-    /// </summary>
-    /// <typeparam name="TContributor">The contributor implementation.</typeparam>
-    /// <param name="services">The service collection.</param>
-    /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddSchemataLinkContributor<TContributor>(this IServiceCollection services)
-        where TContributor : class, ILinkContributor {
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<ILinkContributor, TContributor>());
-
-        return services;
-    }
 }

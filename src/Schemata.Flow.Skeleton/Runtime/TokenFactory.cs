@@ -25,9 +25,12 @@ public static class TokenFactory<TProcess, TToken>
     public static TToken NewRootToken(TProcess process, TargetState resolved) {
         ArgumentNullException.ThrowIfNull(process);
         ArgumentNullException.ThrowIfNull(resolved);
+        if (process.CanonicalName is not { Length: > 0 } canonical) {
+            throw new InvalidOperationException("Process canonical name is required before creating a token.");
+        }
 
         return new() {
-            Process       = process.Name!,
+            Process       = canonical,
             Spawner       = null,
             ScopeName     = string.Empty,
             StateName     = resolved.StateName,
@@ -45,9 +48,12 @@ public static class TokenFactory<TProcess, TToken>
         ArgumentNullException.ThrowIfNull(process);
         ArgumentNullException.ThrowIfNull(resolved);
         ArgumentNullException.ThrowIfNull(spawner);
+        if (process.CanonicalName is not { Length: > 0 } canonical) {
+            throw new InvalidOperationException("Process canonical name is required before creating a token.");
+        }
 
         return new() {
-            Process       = process.Name!,
+            Process       = canonical,
             Spawner       = spawner.CanonicalName,
             ScopeName     = spawner.ScopeName,
             StateName     = resolved.StateName,

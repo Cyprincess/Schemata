@@ -28,6 +28,7 @@
     <ProjectReference Include="..\..\src\Schemata.Scheduling.Grpc\Schemata.Scheduling.Grpc.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Scheduling.Skeleton\Schemata.Scheduling.Skeleton.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Transport.Grpc\Schemata.Transport.Grpc.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Transport.Http\Schemata.Transport.Http.csproj" />
   </ItemGroup>
 
 </Project>

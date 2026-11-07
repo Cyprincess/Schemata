@@ -74,6 +74,7 @@ public static class LinkHeaderParser
         index = end + 1;
 
         var parameters = ParseParameters(value, ref index);
+        if (parameters is null) return null;
         var relations = SplitRelations(FirstParameter(parameters, "rel"));
 
         if (relations.Count == 0 || !TryResolve(context, target, out var resolvedTarget)) {
@@ -103,7 +104,7 @@ public static class LinkHeaderParser
         return links;
     }
 
-    private static List<KeyValuePair<string, string>> ParseParameters(string value, ref int index) {
+    private static List<KeyValuePair<string, string>>? ParseParameters(string value, ref int index) {
         var parameters = new List<KeyValuePair<string, string>>();
 
         while (index < value.Length) {
@@ -131,11 +132,13 @@ public static class LinkHeaderParser
             if (index < value.Length && value[index] == '=') {
                 index++;
                 SkipOws(value, ref index);
+                if (name.Equals("title*", StringComparison.OrdinalIgnoreCase) && index < value.Length && value[index] == '"') return null;
 
                 parameterValue = index < value.Length && value[index] == '"'
                     ? ParseQuotedString(value, ref index)
                     : ParseTokenValue(value, ref index);
             }
+            if (name.Equals("title*", StringComparison.OrdinalIgnoreCase) && !LinkValue.IsExtValue(parameterValue)) return null;
 
             if (name.Length > 0) {
                 parameters.Add(new(name.ToLowerInvariant(), parameterValue));

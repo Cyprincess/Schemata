@@ -141,7 +141,7 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
         Assert.Contains("second-message", exception.Message);
         Assert.Contains(nameof(FlowCatchKind.Message), exception.Message);
 
-        var token = await ReadTokenAsync(started.Name!);
+        var token = await ReadTokenAsync(started.CanonicalName!);
         Assert.Equal("first-gateway", token.WaitingAtName);
     }
 
@@ -158,7 +158,7 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
         var process = await RegisterAsync(definition, engine);
         var started = await StartAsync(process);
 
-        var token = await ReadTokenAsync(started.Name!);
+        var token = await ReadTokenAsync(started.CanonicalName!);
         Assert.Equal(waitingAt, token.WaitingAtName);
     }
 
@@ -170,7 +170,7 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
         var process = await RegisterAsync(typeof(MixedGatewayBridgeProcess), engine);
         var started = await StartAsync(process);
 
-        var token = await ReadTokenAsync(started.Name!);
+        var token = await ReadTokenAsync(started.CanonicalName!);
         Assert.Equal("gateway", token.WaitingAtName);
     }
 
@@ -182,7 +182,7 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
         var process = await RegisterAsync(typeof(BoundaryTimerBridgeProcess), engine);
         var started = await StartAsync(process);
 
-        var token = await ReadTokenAsync(started.Name!);
+        var token = await ReadTokenAsync(started.CanonicalName!);
         Assert.Equal("Active", token.State);
         Assert.Equal("host", token.StateName);
         Assert.Null(token.WaitingAtName);
@@ -198,7 +198,7 @@ public sealed class BridgeFailClosedShould : IClassFixture<EfCoreFlowFixture>
 
         await CorrelateAsync(started, "first-message");
 
-        var token = await ReadTokenAsync(started.Name!);
+        var token = await ReadTokenAsync(started.CanonicalName!);
         Assert.True(token.WaitingAtName is "second-gateway" or "second-message");
     }
 

@@ -48,7 +48,7 @@ public class BpmnEngine_CallActivityShould
 
         var snapshot = await harness.StartParentAsync();
 
-        var transition = Assert.Single(harness.Transitions, t => t.Process == snapshot.Process.Name
+        var transition = Assert.Single(harness.Transitions, t => t.Process == snapshot.Process.CanonicalName
                                                        && t.Kind == TransitionKind.Spawn);
         var child = Assert.Single(harness.Processes, p => p.DefinitionName == "called");
         var waiter = Assert.Single(snapshot.Tokens, token => token.State == "Waiting");
@@ -97,7 +97,7 @@ public class BpmnEngine_CallActivityShould
 
         var child = Assert.Single(harness.Processes, p => p.DefinitionName == "called");
         Assert.StartsWith("processes/", child.CanonicalName, StringComparison.Ordinal);
-        Assert.Single(harness.Transitions, t => t.Process == snapshot.Process.Name && t.Kind == TransitionKind.Spawn);
+        Assert.Single(harness.Transitions, t => t.Process == snapshot.Process.CanonicalName && t.Kind == TransitionKind.Spawn);
         var parent = Assert.Single(snapshot.Tokens, token => token.State == "Waiting");
         Assert.Equal("call", parent.WaitingAtName);
     }
@@ -411,7 +411,7 @@ public class BpmnEngine_CallActivityShould
 
         public async Task CompleteChildAsync() {
             var child = Processes.Single(p => p.DefinitionName == "called" && !TokenStates.IsTerminal(p.State));
-            var childTokens = Tokens.Where(t => t.Process == child.Name).ToList();
+            var childTokens = Tokens.Where(t => t.Process == child.CanonicalName).ToList();
             var completed = await Engine.AdvanceAsync(CalledDefinition, child, childTokens, Context(), childTokens[0].CanonicalName, CancellationToken.None);
             Upsert(Processes, completed.Process, p => p.CanonicalName);
             foreach (var token in completed.Tokens) {
@@ -435,7 +435,7 @@ public class BpmnEngine_CallActivityShould
         public void FailChild() {
             var child = Processes.Single(p => p.DefinitionName == "called");
             child.State     = "Failed";
-            foreach (var token in Tokens.Where(t => t.Process == child.Name)) {
+            foreach (var token in Tokens.Where(t => t.Process == child.CanonicalName)) {
                 token.State       = "Failed";
                 token.WaitingAtName = null;
             }

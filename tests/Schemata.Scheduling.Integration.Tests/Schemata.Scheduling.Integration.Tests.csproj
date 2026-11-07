@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Grpc.Net.Client" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
 
@@ -24,6 +25,7 @@
     <ProjectReference Include="..\..\src\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Scheduling.Foundation\Schemata.Scheduling.Foundation.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Scheduling.Http\Schemata.Scheduling.Http.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Scheduling.Grpc\Schemata.Scheduling.Grpc.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Scheduling.Skeleton\Schemata.Scheduling.Skeleton.csproj" />
   </ItemGroup>
 

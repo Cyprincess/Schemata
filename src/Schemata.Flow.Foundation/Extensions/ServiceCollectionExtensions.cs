@@ -5,6 +5,7 @@ using Schemata.Flow.Foundation;
 using Schemata.Flow.Foundation.Advisors;
 using Schemata.Flow.Foundation.Commands;
 using Schemata.Flow.Foundation.Handlers;
+using Schemata.Flow.Foundation.Linking;
 using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Observers;
@@ -57,6 +58,7 @@ public static class ServiceCollectionExtensions
         where TParticipant : SchemataProcessParticipant, new()
         where TSource : SchemataProcessSource, new() {
         services.AddInProcessRequestDispatcher();
+        services.AddSchemataLinkContributor<FlowLinkContributor<TProcess, TToken, TTransition>>();
 
         services.TryAddSingleton<IProcessRegistry>(sp => {
             var registry = ActivatorUtilities.CreateInstance<ProcessRegistry>(sp);

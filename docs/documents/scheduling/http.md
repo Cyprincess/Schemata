@@ -69,6 +69,12 @@ caller polls `/v1/operations/{name}` or calls `:wait` for terminal state.
 the resource's plural (`jobs`, `operations`). Property names then go through snake_case via the
 configured `PropertyNamingPolicy`.
 
+### Related resource links
+
+Scheduling.Foundation supplies domain relations to the shared HTTP link projector. A job response includes an `executions` link to `/v1/operations?filter=job%3D%22jobs%2Fexample%22` for `jobs/example`. The filter selects executions belonging to that canonical job. An operation includes a `job` link when its metadata has an originating job. Registered resource packages determine the actual target prefixes.
+
+An explicit canonical Subject appears on jobs and in `Operation.Metadata.Subject`. A `subject` link is projected only when the referenced resource and its Get operation are addressable through HTTP. Omitted Subject remains null and emits no subject link; arguments, output, variables, message context, Push targets, and tenant strings are not inspected for associations. Report and Flow producers set their canonical resource names; Push callers supply `PushContext.Subject`. Core supplies standard relations independently. Sources: `src/Schemata.Scheduling.Foundation/Linking/SchedulingLinkContributor.cs`, `src/Schemata.Scheduling.Skeleton/OperationMapper.cs`, and `src/Schemata.Transport.Http/Linking/HttpLinkProjector.cs`.
+
 `RunJobRequest` and `WaitOperationRequest` live in `Schemata.Scheduling.Skeleton`;
 `CancelOperationRequest` lives in `Schemata.Scheduling.Foundation`:
 

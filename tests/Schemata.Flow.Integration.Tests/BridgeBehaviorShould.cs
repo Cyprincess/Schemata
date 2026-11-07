@@ -33,7 +33,7 @@ public sealed class BridgeBehaviorShould : IClassFixture<EfCoreFlowFixture>
         var order   = await CreateOrderAsync();
         var process = await StartAsync(order);
         await CompleteAsync(process);
-        var token   = await ReadTokenAsync(process.Name!);
+        var token   = await ReadTokenAsync(process.CanonicalName!);
         Assert.Equal("Await_Review", token.WaitingAtName);
 
         using (var scope = _fixture.CreateScope()) {
@@ -58,7 +58,7 @@ public sealed class BridgeBehaviorShould : IClassFixture<EfCoreFlowFixture>
             await handler.HandleAsync(new ApprovalPayload { Approved = true }, CancellationToken.None);
         }
 
-        var advanced = await ReadTokenAsync(process.Name!);
+        var advanced = await ReadTokenAsync(process.CanonicalName!);
         Assert.Equal("Approved", advanced.StateName);
         Assert.Null(advanced.WaitingAtName);
     }

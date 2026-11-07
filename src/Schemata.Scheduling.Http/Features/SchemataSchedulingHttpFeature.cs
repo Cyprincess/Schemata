@@ -8,7 +8,6 @@ using Schemata.Core.Building;
 using Schemata.Resource.Http.Features;
 using Schemata.Scheduling.Foundation;
 using Schemata.Scheduling.Foundation.Features;
-using Schemata.Scheduling.Http.Linking;
 using Schemata.Scheduling.Skeleton.Entities;
 
 namespace Schemata.Scheduling.Http.Features;
@@ -48,7 +47,5 @@ public sealed class SchemataSchedulingHttpFeature<TJob, TExecution> : FeatureBas
                 resource.Operations = SchedulingResourceRegistration<TJob, TExecution>.ExecutionOperations;
                 resource.Methods    = SchedulingResourceRegistration<TJob, TExecution>.ExecutionMethods;
             });
-
-        services.AddSchemataLinkContributor<SchedulingLinkContributor>();
     }
 }

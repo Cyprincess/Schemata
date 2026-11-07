@@ -12,6 +12,16 @@ using Schemata.Report.Integration.Tests.Fixtures;
 using Schemata.Abstractions.Linking;
 using Schemata.Transport.Http.Linking;
 using Xunit;
+using Grpc.Core;
+using ProtoBuf;
+using ProtoBuf.Meta;
+using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Resource;
+using Schemata.Common;
+using Schemata.Report.Skeleton.Entities;
+using Schemata.Resource.Grpc.Runtime;
+using Schemata.Transport.Grpc;
+using Schemata.Transport.Grpc.Proto;
 
 namespace Schemata.Report.Integration.Tests;
 
@@ -73,7 +83,7 @@ public class LinkHeaderShould : IClassFixture<WebAppFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var links      = Links(response);
-        var definition = Assert.Single(links, link => link.Rel == "up" && link.Title == "report");
+        var definition = Assert.Single(links, link => link.Rel == "up");
         Assert.EndsWith($"/v1/reports/{report}", Target(definition));
 
         var rows = Assert.Single(links, link => link.Rel == "related" && link.Title == "rows");
@@ -82,6 +92,25 @@ public class LinkHeaderShould : IClassFixture<WebAppFactory>
         var read = await client.GetAsync(rows.Target);
         Assert.Equal(HttpStatusCode.OK, read.StatusCode);
         Assert.Equal(3, (await read.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("rows").GetArrayLength());
+
+        using var channel = _factory.CreateGrpcChannel();
+        var model = RuntimeTypeModel.Create();
+        model.DefaultCompatibilityLevel = CompatibilityLevel.Level300;
+        SchemataProtoModelConfigurator.ConfigureType(model, typeof(GetRequest));
+        SchemataProtoModelConfigurator.ConfigureType(model, typeof(SchemataReportSnapshot));
+        var descriptor = ResourceNameDescriptor.ForType<SchemataReportSnapshot>();
+        var service = GrpcResourceNaming.ServiceFullName(typeof(SchemataReportSnapshot));
+        var method = new Method<GetRequest, SchemataReportSnapshot>(MethodType.Unary, service,
+            GrpcResourceNaming.MethodName(descriptor, Operations.Get), GrpcMarshallers.Create<GetRequest>(model),
+            GrpcMarshallers.Create<SchemataReportSnapshot>(model));
+        using var call = channel.CreateCallInvoker().AsyncUnaryCall(method, null, new(), new GetRequest { CanonicalName = snapshot });
+        Assert.Equal(snapshot, (await call.ResponseAsync).CanonicalName);
+        var rpcLinks = LinkHeader.Parse(call.GetTrailers().Single(entry => entry.Key == "link").Value);
+        Assert.Equal(links.Select(link => link.Rel).OrderBy(value => value), rpcLinks.Select(link => link.Rel).OrderBy(value => value));
+        var rpcRows = Assert.Single(rpcLinks, link => link.Title == "rows");
+        Assert.Equal($"/{service}/{GrpcResourceNaming.CustomMethodName(descriptor, "read")}", rpcRows.Target);
+        Assert.Equal(snapshot, rpcRows.Extensions!["name"]);
+        Assert.Equal($"reports/{report}", Assert.Single(rpcLinks, link => link.Rel == "up").Extensions!["name"]);
     }
 
     private static async Task<string> CreateAsync(HttpClient client, bool periodic) {

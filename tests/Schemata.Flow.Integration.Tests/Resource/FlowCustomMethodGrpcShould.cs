@@ -107,8 +107,8 @@ public class FlowCustomMethodGrpcShould : IClassFixture<GrpcWebAppFactory>
         model.DefaultCompatibilityLevel = CompatibilityLevel.Level300;
         object[] rows = [
             new SchemataProcess { Name = "process", CanonicalName = "processes/process", DefinitionName = "wire", DefinitionVersion = "one" },
-            new SchemataProcessToken { Name = "token", CanonicalName = "processes/process/tokens/token", Process = "process", ScopeName = string.Empty, StateName = "task" },
-            new SchemataProcessTransition { Name = "transition", CanonicalName = "processes/process/transitions/transition", Process = "process", Event = "advance" },
+            new SchemataProcessToken { Name = "token", CanonicalName = "processes/process/tokens/token", Process = "processes/process", ScopeName = string.Empty, StateName = "task" },
+            new SchemataProcessTransition { Name = "transition", CanonicalName = "processes/process/transitions/transition", Process = "processes/process", Event = "advance" },
             new SchemataProcessParticipant { Process = "processes/process", Subject = "users/actor" },
             new SchemataProcessSource { Process = "processes/process", Name = "source", SourceType = "Order", Source = "orders/order" },
             new SchemataProcessCompensation { Name = "compensation", Process = "processes/process", ScopeOwnerCanonicalName = "processes/process/tokens/token", ActivityName = "undo", BoundaryName = "boundary" },

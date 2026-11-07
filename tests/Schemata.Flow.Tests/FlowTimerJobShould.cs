@@ -11,6 +11,10 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Common;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Foundation.Commands;
+using Schemata.Flow.Scheduling.Handlers;
+using Schemata.Flow.Skeleton.Observers;
+using Schemata.Scheduling.Foundation.Commands;
+using Schemata.Scheduling.Foundation.Runtime;
 using Schemata.Flow.Scheduling.Runtime;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
@@ -25,6 +29,34 @@ namespace Schemata.Flow.Tests;
 
 public class FlowTimerJobShould
 {
+    [Fact]
+    [Trait("Layer", "Unit")]
+    public async SystemTask Timer_Job_Carries_Process_Canonical_Subject() {
+        ScheduleJobRequest<SchemataJob>? scheduled = null;
+        var dispatcher = new Mock<IRequestDispatcher>();
+        dispatcher.Setup(value => value.SendAsync<ScheduleJobRequest<SchemataJob>, Unit>(
+                It.IsAny<ScheduleJobRequest<SchemataJob>>(), It.IsAny<CancellationToken>()))
+            .Callback<ScheduleJobRequest<SchemataJob>, CancellationToken>((request, _) => scheduled = request)
+            .ReturnsAsync(Unit.Value);
+        using var services = new ServiceCollection().AddSingleton(dispatcher.Object)
+            .AddSingleton(Mock.Of<IScheduler<SchemataJob, SchemataJobExecution>>())
+            .AddSingleton<IScheduledJobRegistry, DefaultScheduledJobRegistry>().BuildServiceProvider();
+        var definition = new ProcessDefinition();
+        definition.Elements.Add(new FlowEvent {
+            Name = "timer", Position = EventPosition.IntermediateCatch,
+            Definition = new TimerDefinition { TimerType = TimerType.Duration, TimeExpression = "PT1H", Name = "t" },
+        });
+        var context = new FlowTransitionContext {
+            Definition = definition,
+            Snapshot = new() { Process = new() { CanonicalName = "processes/owner" }, Tokens = [], Transitions = [] },
+            Token = new() { CanonicalName = "processes/owner/tokens/one", ScopeName = string.Empty,
+                StateName = "timer", WaitingAtName = "timer", Status = "Waiting" },
+        };
+        await new FlowTimerCatchHandler<SchemataJob, SchemataJobExecution>(services).ArmAsync(context);
+        Assert.NotNull(scheduled);
+        Assert.Equal("processes/owner", scheduled.Job.Subject);
+    }
+
     [Fact]
     public async SystemTask MissingProcessName_Throws() {
         var job = new FlowTimerJob<SchemataJob>(new ServiceCollection().BuildServiceProvider());

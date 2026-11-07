@@ -105,7 +105,7 @@ public sealed class CallActivityExecutor<TProcess, TToken, TTransition>
 
         var childSnapshot = await childEngine.StartAsync(registration.Definition, childProcess, childContext, ct);
         var spawn = NewTransition(
-            parentProcess.Name!,
+            parentProcess,
             waiter.CanonicalName,
             callActivity.Name,
             childProcess.CanonicalName,
@@ -143,7 +143,7 @@ public sealed class CallActivityExecutor<TProcess, TToken, TTransition>
 
         var transitions = _services.GetRequiredService<IRepository<TTransition>>();
         var spawn = await transitions.FirstOrDefaultAsync(
-            q => q.Where(t => t.Process == parentProcess.Name
+            q => q.Where(t => t.Process == parentProcess.CanonicalName
                            && t.Token == parentToken.CanonicalName
                            && t.Kind == TransitionKind.Spawn
                            && t.Activation == activation), ct);
@@ -159,7 +159,7 @@ public sealed class CallActivityExecutor<TProcess, TToken, TTransition>
 
         var tokens = _services.GetRequiredService<IRepository<TToken>>();
         var childTokens = new List<SchemataProcessToken>();
-        await foreach (var token in tokens.ListAsync<TToken>(q => q.Where(t => t.Process == child.Name), ct)) {
+        await foreach (var token in tokens.ListAsync<TToken>(q => q.Where(t => t.Process == child.CanonicalName), ct)) {
             childTokens.Add(token);
         }
 
@@ -180,11 +180,11 @@ public sealed class CallActivityExecutor<TProcess, TToken, TTransition>
 
 
     private static SchemataProcessTransition NewTransition(
-        string         processName,
+        SchemataProcess process,
         string?        tokenCanonical,
         string?        previous,
         string?        posterior,
         TransitionKind kind,
         string         eventName
-    ) => TransitionFactory<TTransition>.New(processName, tokenCanonical, previous, posterior, kind, eventName);
+    ) => TransitionFactory<TTransition>.New(process, tokenCanonical, previous, posterior, kind, eventName);
 }

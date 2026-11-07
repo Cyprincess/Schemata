@@ -46,7 +46,7 @@ public sealed class StateMachineEngine<TProcess, TToken, TTransition> : IFlowRun
             Tokens      = [token],
             Transitions = [
                 TransitionFactory<TTransition>.New(
-                process.Name!,
+                process,
                 token.CanonicalName,
                 null,
                 resolved.StateName,
@@ -220,7 +220,7 @@ public sealed class StateMachineEngine<TProcess, TToken, TTransition> : IFlowRun
             Tokens      = [token],
             Transitions = [
                 TransitionFactory<TTransition>.New(
-                process.Name!,
+                process,
                 token.CanonicalName,
                 previousState,
                 resolved.StateName,

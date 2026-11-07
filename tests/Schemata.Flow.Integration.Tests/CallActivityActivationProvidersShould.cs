@@ -64,9 +64,9 @@ public sealed class CallActivityActivationProvidersShould
             }
 
             var second = Assert.Single(await ReadRowsAsync<SchemataProcess>(fixture), row => row.DefinitionName == "waiting-child" && !TokenStates.IsTerminal(row.State));
-            var waiter = Assert.Single(await ReadRowsAsync<SchemataProcessToken>(fixture), row => row.Process == parent.Name && row.WaitingAtName == "call");
+            var waiter = Assert.Single(await ReadRowsAsync<SchemataProcessToken>(fixture), row => row.Process == parent.CanonicalName && row.WaitingAtName == "call");
             var spawns = (await ReadRowsAsync<SchemataProcessTransition>(fixture))
-                         .Where(row => row.Process == parent.Name && row.Kind == TransitionKind.Spawn && row.Note == "call")
+                         .Where(row => row.Process == parent.CanonicalName && row.Kind == TransitionKind.Spawn && row.Note == "call")
                          .ToList();
             var firstSpawn = Assert.Single(spawns, row => row.Posterior == first.CanonicalName);
             var secondSpawn = Assert.Single(spawns, row => row.Posterior == second.CanonicalName);

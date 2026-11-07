@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -30,7 +31,7 @@ internal sealed class DefaultCancelTokenHandler<TProcess, TToken, TTransition, T
         ProcessSnapshot? snapshot = null;
 
         await support.ExecuteWithNotificationAsync(process, async (scope, current) => {
-            var tokens  = await FlowHandlerSupport<TProcess, TToken, TTransition, TCompensation, TParticipant, TSource>.LoadTokensAsync(scope, process.Name!, current);
+            var tokens  = await FlowHandlerSupport<TProcess, TToken, TTransition, TCompensation, TParticipant, TSource>.LoadTokensAsync(scope, process.CanonicalName ?? throw new InvalidOperationException("Process canonical name is required."), current);
             var context = await support.CreateExecutionContextAsync(scope, process, request.Principal, advice, current);
             var target  = tokens.FirstOrDefault(token => token.CanonicalName == request.TokenCanonicalName);
             if (target is null) {

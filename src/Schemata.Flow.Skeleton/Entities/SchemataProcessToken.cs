@@ -18,8 +18,8 @@ namespace Schemata.Flow.Skeleton.Entities;
 public class SchemataProcessToken : IIdentifier, ICanonicalName, IConcurrency, IStateful, ITimestamp, ISoftDelete,
                                     IAnnotatable
 {
-    /// <summary>Bare leaf id of the owning process (AIP structural parent, mode A).</summary>
-    public virtual string Process { get; set; } = null!; // EF Core materializes this required column.
+    [ResourceReference(typeof(SchemataProcess))]
+    public virtual string? Process { get; set; }
 
     /// <summary>
     ///     Full canonical name of the token that spawned this token (mode B cross-resource FK).

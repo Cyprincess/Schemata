@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Core;
 using Schemata.Core.Features;
+using Schemata.Scheduling.Foundation.Linking;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 
@@ -43,5 +44,8 @@ public sealed class SchemataSchedulingFeature<TJob, TExecution> : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) => services.AddSchemataScheduling<TJob, TExecution>();
+    ) {
+        services.AddSchemataScheduling<TJob, TExecution>();
+        services.AddSchemataLinkContributor<SchedulingLinkContributor<TJob, TExecution>>();
+    }
 }

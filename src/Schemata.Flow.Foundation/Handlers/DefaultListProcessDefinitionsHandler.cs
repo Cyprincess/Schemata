@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -20,11 +21,13 @@ internal sealed class DefaultListProcessDefinitionsHandler(IProcessRegistry regi
         AdviceContext               context,
         CancellationToken           ct = default
     ) {
-        return Task.FromResult<IReadOnlyList<ProcessDefinitionInfo>>(ListProcessDefinitions());
+        return Task.FromResult<IReadOnlyList<ProcessDefinitionInfo>>(ListProcessDefinitions(request));
     }
 
-    private List<ProcessDefinitionInfo> ListProcessDefinitions() {
+    private List<ProcessDefinitionInfo> ListProcessDefinitions(ListProcessDefinitionsQuery request) {
         return registry.GetRegisteredProcesses()
+                       .Where(registration => (request.DefinitionName is null || string.Equals(registration.Name, request.DefinitionName, StringComparison.Ordinal))
+                           && (request.DefinitionVersion is null || string.Equals(registration.Version, request.DefinitionVersion, StringComparison.Ordinal)))
                        .Select(registration => {
                            var definition = registration.Definition;
                            var info = new ProcessDefinitionInfo {

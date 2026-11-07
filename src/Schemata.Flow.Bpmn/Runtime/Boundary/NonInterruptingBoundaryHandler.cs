@@ -34,7 +34,7 @@ public sealed class NonInterruptingBoundaryHandler<TProcess, TToken, TTransition
         ArgumentNullException.ThrowIfNull(trigger);
 
         return ValueTask.FromResult<SchemataProcessTransition>(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-            process.Name!,
+            process,
             spawned.CanonicalName,
             boundary.Name,
             resolved.StateName,

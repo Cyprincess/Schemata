@@ -7,7 +7,7 @@ namespace Schemata.Insight.Grpc.Wire;
 
 /// <summary>The federated read query result at the gRPC edge.</summary>
 [ProtoContract]
-public sealed class QueryInsightGrpcResponse
+public sealed class QueryInsightGrpcResponse : IInsightLinkResult
 {
     [ProtoMember(1)] public List<DynamicStruct> Rows { get; set; } = new();
 

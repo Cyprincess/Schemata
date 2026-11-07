@@ -55,7 +55,7 @@ public sealed class TransactionExecutor<TProcess, TToken, TTransition>
         var parent = BpmnEngine<TProcess, TToken, TTransition>.NewRootToken(process, new(transaction.Name, transaction.Name, false));
         await execution.CreateTokenAsync(parent, ct);
         var parentTransition = BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-            process.Name!,
+            process,
             parent.CanonicalName,
             null,
             transaction.Name,
@@ -104,7 +104,7 @@ public sealed class TransactionExecutor<TProcess, TToken, TTransition>
         ArgumentNullException.ThrowIfNull(transaction);
 
         var arrivalTransition = BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-            process.Name!,
+            process,
             token.CanonicalName,
             previousState,
             transaction.Name,
@@ -222,7 +222,7 @@ public sealed class TransactionExecutor<TProcess, TToken, TTransition>
         trigger.State       = "Completed";
 
         transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-            process.Name!,
+            process,
             trigger.CanonicalName,
             previous.Name,
             cancelEnd.Name,
@@ -243,7 +243,7 @@ public sealed class TransactionExecutor<TProcess, TToken, TTransition>
             token.CurrentCallActivation = null;
 
             transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-                process.Name!,
+                process,
                 token.CanonicalName,
                 previous,
                 cancelEnd.Name,
@@ -282,7 +282,7 @@ public sealed class TransactionExecutor<TProcess, TToken, TTransition>
         BpmnEngine<TProcess, TToken, TTransition>.ApplyResolvedToToken(parent, resolved);
 
         transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-            process.Name!,
+            process,
             parent.CanonicalName,
             transaction.Name,
             resolved.StateName,
@@ -324,7 +324,7 @@ public sealed class TransactionExecutor<TProcess, TToken, TTransition>
         BpmnEngine<TProcess, TToken, TTransition>.ApplyResolvedToToken(child, resolved);
 
         transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-            process.Name!,
+            process,
             child.CanonicalName,
             boundary.Name,
             resolved.StateName,

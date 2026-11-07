@@ -103,8 +103,8 @@ public sealed class ActorPerInstanceSerializationShould
 
     private static async Task RunActorScenarioAsync(EntryPoint entry) {
         await using var harness = await ActorConcurrencyHarness.BuildAsync(withActor: true);
-        var (canonicalName, processName) = await StartProcessAsync(harness.Root);
-        var baselineTransitions = await CountTransitionsAsync(harness.Root, processName);
+        var (canonicalName, _) = await StartProcessAsync(harness.Root);
+        var baselineTransitions = await CountTransitionsAsync(harness.Root, canonicalName);
 
         var outcome = await RunConcurrentCompletionsAsync(harness.Root, canonicalName, entry);
 
@@ -122,7 +122,7 @@ public sealed class ActorPerInstanceSerializationShould
         var transitions = verifyScope.ServiceProvider.GetRequiredService<IRepository<SchemataProcessTransition>>();
         var rows = new List<SchemataProcessTransition>();
         await foreach (var row in transitions.ListAsync<SchemataProcessTransition>(
-                           q => q.Where(t => t.Process == processName), CancellationToken.None)) {
+                           q => q.Where(t => t.Process == canonicalName), CancellationToken.None)) {
             rows.Add(row);
         }
 

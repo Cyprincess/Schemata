@@ -4,6 +4,7 @@ using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Linking;
 using Schemata.Transport.Http.Linking;
+using Schemata.Core.Linking;
 using Xunit;
 
 namespace Schemata.Transport.Http.Tests;
@@ -281,24 +282,50 @@ public class LinkHeaderShould
 
         services.AddSchemataLinkContributor<FirstContributor>();
         services.AddSchemataLinkContributor<SecondContributor>();
+        services.AddSchemataLinkContributor<FirstContributor>();
 
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
 
-        var contributors = scope.ServiceProvider.GetServices<ILinkContributor>()
+        var contributors = scope.ServiceProvider.GetKeyedServices<ILinkContributor>(LinkTransports.Http)
                                 .Select(contributor => contributor.GetType())
                                 .ToArray();
 
         Assert.Equal(new[] { typeof(FirstContributor), typeof(SecondContributor) }, contributors);
+        Assert.Equal(contributors, scope.ServiceProvider.GetKeyedServices<ILinkContributor>(LinkTransports.Grpc)
+            .Select(contributor => contributor.GetType()).ToArray());
     }
+
+    [Theory]
+    [InlineData("UTF-8''%c2%a3%20rates")]
+    [InlineData("UTF-8'en'%C2%A3%20rates")]
+    public void Round_Trip_Unquoted_Ext_Values(string value) {
+        var serialized = LinkHeader.Serialize([new WebLink("/jobs/1", "related", TitleStar: value)]);
+        Assert.Equal("</jobs/1>; rel=\"related\"; title*=" + value, serialized);
+        Assert.Equal(value, Assert.Single(LinkHeader.Parse(serialized)).TitleStar);
+    }
+
+    [Fact]
+    public void Reject_Quoted_Ext_Values() =>
+        Assert.Empty(LinkHeader.Parse("</jobs/1>; rel=related; title*=\"UTF-8'en'%C2%A3\""));
+
+    [Theory]
+    [InlineData("ISO-8859-1''%A3")]
+    [InlineData("UTF-8'en..US'value")]
+    [InlineData("UTF-8''%x0")]
+    [InlineData("UTF-8''%")]
+    [InlineData("UTF-8''£")]
+    [InlineData("UTF-8''%0A")]
+    public void Reject_Invalid_Ext_Values(string value) =>
+        Assert.Empty(LinkHeader.Parse("</jobs/1>; rel=related; title*=" + value));
 
     private sealed class FirstContributor : ILinkContributor
     {
-        public IEnumerable<WebLink> GetLinks(LinkContext _) => [];
+        public IEnumerable<SemanticLink> GetLinks(LinkContext _) => [];
     }
 
     private sealed class SecondContributor : ILinkContributor
     {
-        public IEnumerable<WebLink> GetLinks(LinkContext _) => [];
+        public IEnumerable<SemanticLink> GetLinks(LinkContext _) => [];
     }
 }

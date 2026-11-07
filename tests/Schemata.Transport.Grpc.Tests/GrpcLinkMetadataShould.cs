@@ -23,6 +23,11 @@ using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Transport.Grpc.Linking;
 using Schemata.Transport.Http.Linking;
 using Xunit;
+using System.Threading;
+using Grpc.Core.Testing;
+using Microsoft.AspNetCore.Http;
+using Moq;
+using Schemata.Core.Linking;
 
 namespace Schemata.Transport.Grpc.Tests;
 
@@ -30,6 +35,38 @@ namespace Schemata.Transport.Grpc.Tests;
 [Trait("Layer", "Integration")]
 public sealed class GrpcLinkMetadataShould
 {
+    [Theory]
+    [InlineData("title")]
+    [InlineData("input")]
+    public async Task Invalid_Ancillary_Metadata_Omits_Only_That_Link_And_Returns_Completed_Response(string invalid) {
+        var valid = new DomainOperationTarget("valid");
+        var bad = new DomainOperationTarget("bad");
+        var contributor = new Mock<ILinkContributor>();
+        contributor.Setup(value => value.GetLinks(It.IsAny<LinkContext>())).Returns(new[] {
+            new SemanticLink("related", bad, invalid == "title" ? "consumer\nlabel" : null),
+            new SemanticLink("self", valid),
+        });
+        var resolver = new Mock<IGrpcLinkTargetResolver>();
+        resolver.Setup(value => value.Resolve(valid)).Returns(new GrpcLinkTarget("/service/Read", new Dictionary<string, string?> { ["name"] = "items/one" }));
+        resolver.Setup(value => value.Resolve(bad)).Returns(new GrpcLinkTarget("/service/Read", new Dictionary<string, string?> {
+            ["filter"] = invalid == "input" ? "value=one\n" : "value=one",
+        }));
+        using var services = new ServiceCollection().AddSingleton(resolver.Object)
+            .AddSingleton<GrpcLinkProjector>().AddKeyedSingleton<ILinkContributor>(LinkTransports.Grpc, contributor.Object)
+            .BuildServiceProvider();
+        var context = TestServerCallContext.Create("/service/Read", "host", DateTime.MaxValue, new(),
+            CancellationToken.None, "peer", null, null, _ => Task.CompletedTask, () => new(), _ => { });
+        context.UserState["__HttpContext"] = new DefaultHttpContext { RequestServices = services };
+        var completed = new object();
+        var result = await new GrpcLinkMetadataInterceptor().UnaryServerHandler<object, object>(new(), context,
+            (_, _) => Task.FromResult(completed));
+        Assert.Same(completed, result);
+        Assert.Equal(StatusCode.OK, context.Status.StatusCode);
+        var link = Assert.Single(LinkHeader.Parse(Trailer(context.ResponseTrailers)));
+        Assert.Equal("self", link.Rel);
+        Assert.Equal("items/one", link.Extensions!["name"]);
+    }
+
     [Fact]
     public async Task PaginatedResponse_CarriesNextLinkMetadata() {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions {
@@ -81,9 +118,10 @@ public sealed class GrpcLinkMetadataShould
             var token     = Assert.Single(firstPage["next_page_token"]).ToString();
             Assert.False(string.IsNullOrEmpty(token));
 
-            var link = Assert.Single(LinkHeader.Parse(Trailer(first.GetTrailers())));
-            Assert.Equal("next", link.Rel);
-            Assert.Equal(token, Assert.Single(link.Extensions!).Value);
+            var links = LinkHeader.Parse(Trailer(first.GetTrailers()));
+            Assert.Contains(links, candidate => candidate.Rel == "self");
+            var link = Assert.Single(links, candidate => candidate.Rel == "next");
+            Assert.Equal(token, link.Extensions!["page_token"]);
             Assert.Equal($"/{service.FullName}/{list.Name}", link.Target);
 
             using var second = invoker.AsyncUnaryCall(rpc, null, new CallOptions(),

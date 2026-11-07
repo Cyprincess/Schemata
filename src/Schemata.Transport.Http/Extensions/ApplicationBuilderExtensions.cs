@@ -56,7 +56,7 @@ public static class ApplicationBuilderExtensions
                 context.Response.StatusCode  = ex.Code;
                 context.Response.ContentType = MediaTypeNames.Application.Json;
                 if (ex.Details?.OfType<RetryInfoDetail>().FirstOrDefault()?.RetryDelay is { } retry) {
-                    context.Response.Headers.RetryAfter = Math.Max(0, Math.Ceiling(retry.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
+                    context.Response.Headers.RetryAfter = Math.Clamp(Math.Ceiling(retry.TotalSeconds), 0, int.MaxValue).ToString(CultureInfo.InvariantCulture);
                 }
 
                 var locale   = AcceptLanguageParser.Parse(context.Request.Headers.AcceptLanguage)?.Name;

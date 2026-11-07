@@ -245,6 +245,15 @@ from `InsightGrpcMethods.Model` and the bound method definitions. Shared transpo
 adds the exception interceptor once across repeated domain installations. Existing proto-first
 services retain their generated `BindServiceMethod` descriptor discovery.
 
+## Shared query links
+
+`Schemata.Insight.Foundation/Linking/InsightLinkContributor.cs` supplies query navigation for both
+`IInsightLinkResult` response shapes. HTTP uses `/v1/insight:query`; gRPC uses
+`/schemata.insight.v1.InsightService/Query`. Continuations travel as `page_token` target attributes
+and remain in the response body. Explicit `ILinkRequest` adapters supply the incoming continuation
+without request-static state. Query target adapters register with their transport; unregistered
+operations produce no links.
+
 ## gRPC errors
 
 The shared `ExceptionMappingInterceptor` consumes the domain exception and writes

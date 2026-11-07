@@ -39,6 +39,6 @@ public sealed class CancelTokenHandler<TToken>(
         }
 
         return await dispatcher.SendAsync<CancelProcessTokenRequest, ProcessSnapshot>(
-            new($"processes/{token.Process}", name, request.Principal), ct);
+            new(token.Process ?? throw new InvalidOperationException("Token process reference is required."), name, request.Principal), ct);
     }
 }

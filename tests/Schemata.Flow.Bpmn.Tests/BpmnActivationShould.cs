@@ -195,7 +195,7 @@ public class BpmnActivationShould
 
     private static SchemataProcess Process() => new() { Name = "p1", CanonicalName = "processes/p1", DefinitionName = "test" };
     private static SchemataProcessToken Token(string name, string state, string? waiting, string status, string scope = "", string? spawner = null) => new() {
-        Name = name, CanonicalName = $"processes/p1/tokens/{name}", Process = "p1", ScopeName = scope,
+        Name = name, CanonicalName = $"processes/p1/tokens/{name}", Process = "processes/p1", ScopeName = scope,
         StateName = state, WaitingAtName = waiting, State = status, Spawner = spawner,
     };
 }

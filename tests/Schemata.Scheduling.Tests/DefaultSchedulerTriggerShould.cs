@@ -133,6 +133,31 @@ public class DefaultSchedulerTriggerShould
         Assert.Equal("acme", execution.MessageContext["tenant"]);
     }
 
+    [Theory]
+    [Trait("Layer", "Integration")]
+    [InlineData(null, null)]
+    [InlineData("reports/stored", null)]
+    [InlineData("reports/stored", "reports/explicit")]
+    [InlineData(null, "reports/explicit")]
+    public async Task Trigger_Preserves_Explicit_Subject_Or_Stored_Fallback(string? stored, string? supplied) {
+        var harness = CreateHarness(new() {
+            Name = "sample", CanonicalName = "jobs/sample", Subject = stored,
+            ArgsJson = "reports/decoy", Variables = new() { ["subject"] = "reports/decoy" },
+            MessageContext = new() { ["tenant"] = "tenants/decoy" },
+        });
+        await harness.Scheduler.StartAsync(CancellationToken.None);
+        try {
+            var execution = await harness.Scheduler.TriggerAsync<SampleJob>(new() {
+                Job = "jobs/sample", Subject = supplied, ArgsJson = "reports/other",
+                Variables = new Dictionary<string, string?> { ["subject"] = "reports/other" },
+            }, CancellationToken.None);
+            Assert.Equal(supplied ?? stored, Assert.Single(harness.Persisted).Subject);
+            Assert.Equal(supplied ?? stored, OperationMapper.FromExecution(execution).Metadata?.Subject);
+        } finally {
+            await harness.Scheduler.StopAsync(CancellationToken.None);
+        }
+    }
+
     private static async Task<Harness> StartedHarness() {
         var harness = CreateHarness();
         await harness.Scheduler.StartAsync(CancellationToken.None);

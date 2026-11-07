@@ -107,6 +107,6 @@ public sealed class FlowPersistenceScope<TProcess, TToken, TTransition, TCompens
     internal async Task CreateTokenAsync(TToken token, CancellationToken ct) {
         await Mutation<TToken>().CreateAsync(token, UnitOfWork, ct);
         CreatedTokens.Add(token);
-        if (token.CanonicalName is { } name && _loadedTokens.TryGetValue(token.Process, out var index)) index[name] = token;
+        if (token is { CanonicalName: { } name, Process: { } process } && _loadedTokens.TryGetValue(process, out var index)) index[name] = token;
     }
 }

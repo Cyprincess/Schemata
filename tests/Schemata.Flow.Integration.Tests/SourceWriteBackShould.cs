@@ -78,7 +78,7 @@ public abstract class SourceWriteBackShould
         var process = await StartAsync<FailingSavePreparationProcess>(order);
         var source     = await ReadOrderAsync(order.Uid);
         var processRow = await ReadProcessRowAsync(process.CanonicalName!);
-        var tokenRows  = await ReadTokenRowsAsync(process.Name!);
+        var tokenRows  = await ReadTokenRowsAsync(process.CanonicalName!);
         Assert.Single(tokenRows);
         var bindings   = await ReadBindingsAsync(process.CanonicalName!);
         var stamps     = bindings.ConvertAll(binding => binding.SourceTimestamp);
@@ -91,7 +91,7 @@ public abstract class SourceWriteBackShould
         var processAfter = await ReadProcessRowAsync(process.CanonicalName!);
         Assert.Equal(processRow.State, processAfter.State);
         Assert.Equal(processRow.Timestamp, processAfter.Timestamp);
-        var tokensAfter = await ReadTokenRowsAsync(process.Name!);
+        var tokensAfter = await ReadTokenRowsAsync(process.CanonicalName!);
         Assert.Equal(tokenRows.ConvertAll(token => (token.State, token.Timestamp)),
                      tokensAfter.ConvertAll(token => (token.State, token.Timestamp)));
         var after = await ReadBindingsAsync(process.CanonicalName!);

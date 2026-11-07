@@ -47,8 +47,8 @@ public sealed class ConsumerNameShould
             Assert.All(tokens, token => {
                 Assert.StartsWith("consumer-", token.Name);
                 Assert.NotEqual(token.Uid.ToString("n"), token.Name);
-                Assert.Equal($"processes/{token.Process}/tokens/{token.Name}", token.CanonicalName);
-                Assert.Contains(processes, owner => owner.Name == token.Process);
+                Assert.Equal($"{token.Process}/tokens/{token.Name}", token.CanonicalName);
+                Assert.Contains(processes, owner => owner.CanonicalName == token.Process);
                 if (token.Spawner is { } spawner) {
                     Assert.Contains(tokens, ancestor => ancestor.CanonicalName == spawner && ancestor.Process == token.Process);
                 }
@@ -56,9 +56,12 @@ public sealed class ConsumerNameShould
             Assert.All(transitions, transition => {
                 Assert.StartsWith("consumer-", transition.Name);
                 Assert.Contains(tokens, token => token.CanonicalName == transition.Token);
+                var owner = Assert.Single(processes, process => process.CanonicalName == transition.Process);
+                Assert.NotEqual(owner.Name, transition.Process);
+                Assert.Equal($"{owner.CanonicalName}/transitions/{transition.Name}", transition.CanonicalName);
             });
 
-            var parent = Assert.Single(tokens, token => token.Process == process.Name && token.State == "Waiting");
+            var parent = Assert.Single(tokens, token => token.Process == process.CanonicalName && token.State == "Waiting");
             SchemataProcess workProcess;
             SchemataProcessToken work;
             if (callActivity) {
@@ -69,7 +72,7 @@ public sealed class ConsumerNameShould
                 Assert.Null(consumed.Spawner);
                 Assert.Equal(string.Empty, parent.ScopeName);
                 workProcess = Assert.Single(processes, row => row.DefinitionName == nameof(CalledProcess));
-                work = Assert.Single(tokens, token => token.Process == workProcess.Name);
+                work = Assert.Single(tokens, token => token.Process == workProcess.CanonicalName);
                 var spawn = Assert.Single(transitions, transition => transition.Kind == TransitionKind.Spawn);
                 Assert.Equal(parent.CanonicalName, spawn.Token);
                 Assert.Equal(workProcess.CanonicalName, spawn.Posterior);
@@ -89,11 +92,11 @@ public sealed class ConsumerNameShould
             var resumed = await Rows<SchemataProcessToken>(fixture);
             Assert.Equal("after", Assert.Single(resumed, token => token.CanonicalName == parent.CanonicalName).StateName);
             Assert.Equal("Completed", Assert.Single(resumed, token => token.CanonicalName == work.CanonicalName).State);
-            Assert.Single(resumed, token => TokenStates.Live.Contains(token.State!) && token.Process == process.Name && token.CanonicalName == parent.CanonicalName);
+            Assert.Single(resumed, token => TokenStates.Live.Contains(token.State!) && token.Process == process.CanonicalName && token.CanonicalName == parent.CanonicalName);
             Assert.Equal(tokens.Select(token => token.CanonicalName).OrderBy(name => name), resumed.Select(token => token.CanonicalName).OrderBy(name => name));
             Assert.All(resumed, token => {
                 Assert.StartsWith("consumer-", token.Name);
-                Assert.Equal($"processes/{token.Process}/tokens/{token.Name}", token.CanonicalName);
+                Assert.Equal($"{token.Process}/tokens/{token.Name}", token.CanonicalName);
             });
             if (callActivity) {
                 Assert.Equal("Completed", Assert.Single(resumed, token => token.CanonicalName == parent.Spawner).State);
@@ -101,6 +104,42 @@ public sealed class ConsumerNameShould
         } finally {
             await lifetime.DisposeAsync();
         }
+    }
+
+    [Theory]
+    [InlineData(false, FlowConstants.Engines.StateMachine)]
+    [InlineData(true, FlowConstants.Engines.StateMachine)]
+    [InlineData(false, FlowConstants.Engines.Bpmn)]
+    [InlineData(true, FlowConstants.Engines.Bpmn)]
+    public async Task Cancel_Reloaded_Token_Uses_Canonical_Owner_And_Isolates_Other_Process(bool linq, string engine) {
+        IFlowIntegrationFixture fixture = linq ? new LinqToDbFlowFixture() : new EfCoreFlowFixture();
+        var lifetime = (IAsyncLifetime)fixture;
+        await lifetime.InitializeAsync();
+        try {
+            SchemataProcess first;
+            SchemataProcess second;
+            using (var start = fixture.CreateScope()) {
+                await start.ServiceProvider.GetRequiredService<IProcessRegistry>().RegisterAsync<ProcessVersionShould.Original>(engine);
+                var runner = start.ServiceProvider.GetRequiredService<FlowRunner>();
+                first = await runner.StartAsync(nameof(ProcessVersionShould.Original));
+                second = await runner.StartAsync(nameof(ProcessVersionShould.Original));
+            }
+            var tokens = await Rows<SchemataProcessToken>(fixture);
+            var target = Assert.Single(tokens, row => row.Process == first.CanonicalName);
+            Assert.NotEqual(first.Name, target.Process);
+            Assert.Single(tokens, row => row.Process == second.CanonicalName);
+            using (var cancel = fixture.CreateScope()) {
+                var result = await cancel.ServiceProvider.GetRequiredService<FlowRunner>().CancelTokenAsync(target, null, default);
+                Assert.Equal(first.CanonicalName, result.Process.CanonicalName);
+            }
+            var reloaded = await Rows<SchemataProcessToken>(fixture);
+            Assert.Equal("Cancelled", Assert.Single(reloaded, row => row.Process == first.CanonicalName).State);
+            Assert.Equal("Active", Assert.Single(reloaded, row => row.Process == second.CanonicalName).State);
+            var transitions = await Rows<SchemataProcessTransition>(fixture);
+            Assert.Contains(transitions, row => row.Process == first.CanonicalName && row.Kind == TransitionKind.Cancel && row.Token == target.CanonicalName);
+            Assert.DoesNotContain(transitions, row => row.Process == second.CanonicalName && row.Kind == TransitionKind.Cancel);
+            Assert.All(transitions, row => Assert.Contains(row.Process, new[] { first.CanonicalName, second.CanonicalName }));
+        } finally { await lifetime.DisposeAsync(); }
     }
 
     [Theory]

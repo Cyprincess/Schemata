@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Insight.Skeleton.Entities;
+using Schemata.Insight.Foundation.Linking;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Insight.Foundation.Features;
@@ -25,7 +26,10 @@ public sealed class SchemataInsightFeature : FeatureBase
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) => services.AddSchemataInsight();
+    ) {
+        services.AddSchemataInsight();
+        services.AddSchemataLinkContributor<InsightLinkContributor>();
+    }
 }
 
 /// <summary>

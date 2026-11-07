@@ -30,7 +30,7 @@ public sealed class FlowTimerBridgeShould : IClassFixture<TimerBridgeFixture>
     public async Task Fire_Each_Parallel_Timer_On_Its_Own_Token_Without_Ambiguity() {
         var process = await StartAsync(nameof(ParallelTimerProcess));
 
-        var waiting = await ReadTokensAsync(process.Name!);
+        var waiting = await ReadTokensAsync(process.CanonicalName!);
         Assert.Equal(2, waiting.Count);
         Assert.All(waiting, token => Assert.Equal("Waiting", token.State));
         Assert.Equal(["timer-a", "timer-b"], waiting.Select(t => t.WaitingAtName).OrderBy(n => n));
@@ -56,7 +56,7 @@ public sealed class FlowTimerBridgeShould : IClassFixture<TimerBridgeFixture>
 
         await FireAsync(first);
 
-        var afterFirst = await ReadTokensAsync(process.Name!);
+        var afterFirst = await ReadTokensAsync(process.CanonicalName!);
         var fired      = afterFirst.Single(t => t.CanonicalName == firstToken);
         var untouched  = afterFirst.Single(t => t.CanonicalName == otherToken);
         Assert.Null(fired.WaitingAtName);
@@ -65,7 +65,7 @@ public sealed class FlowTimerBridgeShould : IClassFixture<TimerBridgeFixture>
 
         await FireAsync(jobs[1]);
 
-        var afterBoth = await ReadTokensAsync(process.Name!);
+        var afterBoth = await ReadTokensAsync(process.CanonicalName!);
         Assert.DoesNotContain(afterBoth, token => token.State == "Waiting");
         Assert.Equal(["task-a", "task-b"], afterBoth.Select(t => t.StateName).OrderBy(n => n));
     }
@@ -103,7 +103,7 @@ public sealed class FlowTimerBridgeShould : IClassFixture<TimerBridgeFixture>
         var definition = await RegisterAsync(typeof(ReentrantGatewayTimerProcess));
         var process    = await StartAsync(definition);
 
-        var token = await ReadTokenAsync(process.Name!);
+        var token = await ReadTokenAsync(process.CanonicalName!);
         Assert.Equal("gateway", token.WaitingAtName);
         var job = Assert.Single(await ReadJobsAsync(process.CanonicalName!));
         Assert.Equal(JobState.Active, job.State);
@@ -116,7 +116,7 @@ public sealed class FlowTimerBridgeShould : IClassFixture<TimerBridgeFixture>
 
         // Leaving through the message branch cancelled the pending timer branch; re-entering
         // armed a fresh generation under the same job identity.
-        var reentered = await ReadTokenAsync(process.Name!);
+        var reentered = await ReadTokenAsync(process.CanonicalName!);
         Assert.Equal("gateway", reentered.WaitingAtName);
         var rearmed = Assert.Single(await ReadJobsAsync(process.CanonicalName!));
         Assert.Equal(JobState.Active, rearmed.State);
@@ -129,11 +129,11 @@ public sealed class FlowTimerBridgeShould : IClassFixture<TimerBridgeFixture>
         Assert.Equal(rearmed.ScheduleVersion, current.ScheduleVersion);
 
         await AssertStaleFiringAsync(rearmed, firstVersion);
-        Assert.Equal("gateway", (await ReadTokenAsync(process.Name!)).WaitingAtName);
+        Assert.Equal("gateway", (await ReadTokenAsync(process.CanonicalName!)).WaitingAtName);
 
         await FireExecutionAsync(rearmed, current);
 
-        var completed = await ReadTokenAsync(process.Name!);
+        var completed = await ReadTokenAsync(process.CanonicalName!);
         Assert.Null(completed.WaitingAtName);
         Assert.Equal("end", completed.StateName);
     }
@@ -162,7 +162,7 @@ public sealed class FlowTimerBridgeShould : IClassFixture<TimerBridgeFixture>
         var definition = await RegisterAsync(typeof(TerminateEndTimerProcess));
         var process    = await StartAsync(definition);
 
-        var tokens = await ReadTokensAsync(process.Name!);
+        var tokens = await ReadTokensAsync(process.CanonicalName!);
         var worker = Assert.Single(tokens, token => token.StateName == "work");
         Assert.Single(tokens, token => token.WaitingAtName == "timer-catch");
         var job = Assert.Single(await ReadJobsAsync(process.CanonicalName!));

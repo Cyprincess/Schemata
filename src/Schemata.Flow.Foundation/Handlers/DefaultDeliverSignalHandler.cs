@@ -53,7 +53,7 @@ internal sealed class DefaultDeliverSignalHandler<TProcess, TToken, TTransition,
                 var payload = FlowPayload.Deserialize(
                     request.Payload,
                     registration.SignalPayloadTypes.GetValueOrDefault(request.SignalName));
-                var tokens  = await FlowHandlerSupport<TProcess, TToken, TTransition, TCompensation, TParticipant, TSource>.LoadTokensAsync(scope, process.Name!, current);
+                var tokens  = await FlowHandlerSupport<TProcess, TToken, TTransition, TCompensation, TParticipant, TSource>.LoadTokensAsync(scope, process.CanonicalName ?? throw new InvalidOperationException("Process canonical name is required."), current);
                 var context = await support.CreateExecutionContextAsync(scope, process, request.Principal, advice, current);
                 var targets = await engine.FindTriggerTargetsAsync(
                     registration.Definition, process, tokens, context, signal, current);

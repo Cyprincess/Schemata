@@ -10,6 +10,8 @@ using Schemata.Insight.Foundation;
 using Schemata.Insight.Http.Linking;
 using Schemata.Insight.Skeleton.Entities;
 using Schemata.Transport.Http.Features;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Transport.Http.Linking;
 
 namespace Schemata.Insight.Http.Features;
 
@@ -42,7 +44,7 @@ public sealed class SchemataInsightHttpFeature<TInsightSource> : FeatureBase
         IWebHostEnvironment environment
     ) {
         services.AddSchemataApplicationPart<InsightController>();
-        services.AddSchemataLinkContributor<InsightLinkContributor>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<ILinkRouteProvider, InsightLinkRouteProvider>());
 
         var scheme = schemata.Get<string>(SchemataInsightBuilder.AuthenticationSchemeKey);
         if (!string.IsNullOrWhiteSpace(scheme)) {

@@ -269,9 +269,9 @@ public sealed class FlowTaskContext
         var spawner = Token.Spawner;
         while (!string.IsNullOrEmpty(spawner)) {
             var parent = _execution.FindTokenAsync is { } findToken
-                ? await findToken(Process.Name!, spawner, ct)
+                ? await findToken(process, spawner, ct)
                 : await FindLegacyTokenAsync(spawner, ct);
-            if (parent is null || parent.Process != Process.Name) {
+            if (parent is null || parent.Process != process) {
                 break;
             }
 
@@ -298,7 +298,7 @@ public sealed class FlowTaskContext
         return tokens is null
             ? null
             : await tokens.SingleOrDefaultAsync(
-                query => query.Where(token => token.Process == Process.Name && token.CanonicalName == canonicalName), ct);
+                query => query.Where(token => token.Process == Process.CanonicalName && token.CanonicalName == canonicalName), ct);
     }
 
     private ValueTask<SchemataProcessSource?> FindPersistedSourceAsync(

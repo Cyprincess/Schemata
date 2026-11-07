@@ -71,6 +71,15 @@ Implement a closed request-pipeline advisor for request-wide Push gates, rate li
 
 `UseScheduling()` on `SchemataPushBuilder` activates the Push Scheduling bridge. It serializes a context, triggers a Scheduling job, and returns a durable operation envelope. Immediate sends still dispatch through the Push request pipeline.
 
+## Subscription links
+
+`Schemata.Push.Foundation/Linking/PushLinkContributor.cs` consumes `IPushLinkResult` on both list
+response shapes. It emits the list self relation and provider-filtered alternatives from provider
+names only. HTTP projects the registered subscription list route with a provider query parameter;
+gRPC projects `/schemata.push.v1.PushControl/List` with a `provider` input attribute.
+Provider credentials never enter link inputs. A filtered list offers an all-providers alternative.
+Send, delete, and unregistered provider operations have no generated links.
+
 ## See also
 
 - [Dispatch](dispatch.md)

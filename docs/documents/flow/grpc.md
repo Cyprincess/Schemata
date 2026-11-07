@@ -127,21 +127,40 @@ the no-source `StartAsync` overload.
 `ProcessDefinitionService` implements `IProcessDefinitionService`, the only hand-written service:
 
 ```csharp
+using System.Threading.Tasks;
+using ProtoBuf.Grpc;
+using ProtoBuf.Grpc.Configuration;
+using Schemata.Abstractions.Resource;
+using Schemata.Flow.Grpc.Wire;
+using Schemata.Flow.Skeleton.Models;
+
+[Service("schemata.flow.v1.ProcessDefinitionService")]
 public interface IProcessDefinitionService
 {
     [Operation]
     ValueTask<ListResultBase<ProcessDefinitionInfo, ProcessDefinitionInfo>> ListProcessDefinitionsAsync(
-        ListRequest request, CallContext context = default);
+        ListProcessDefinitionsRequest request, CallContext context = default);
 }
 ```
 
-The method carries `[Operation]` from `ProtoBuf.Grpc.Configuration`. The implementation dispatches a
-`ListProcessDefinitionsQuery` through `IQueryDispatcher` and passes the results through unchanged;
-the internal `DefaultListProcessDefinitionsHandler` reads the registry, and each entry has
-`CanonicalName = "definitions/{name}"`, plus the `IDescriptive` label fields from the source
-`ProcessDefinition`, and the same `messages` / `elements` / `flows`
-definition graph documented for the HTTP endpoint. `messages` carries the message definitions the
-process declares.
+`ListProcessDefinitionsRequest` has optional protobuf fields `definition_name` (1) and
+`definition_version` (2), and implements `ILinkRequest`. The service dispatches the same
+`ListProcessDefinitionsQuery` used by HTTP. Its Foundation handler applies ordinal name/version
+filters; omitting both fields returns all registered versions. Each entry has a canonical name
+`definitions/{name}/versions/{version}`, labels, and the same definition graph as HTTP.
+
+`FlowServiceMethodProvider` publishes this RPC explicitly with `FlowGrpcMethods` marshallers.
+`FlowGrpcServiceDescriptorContributor` contributes its reflection schema from the same method
+definition and protobuf model.
+
+Process responses project a `related` definitions link to the full
+`/schemata.flow.v1.ProcessDefinitionService/ListProcessDefinitions` RPC with `definition_name`
+and `definition_version` input attributes. Replaying those attributes returns the same filtered
+rows as HTTP navigation. `FlowGrpcLinkTargetResolver` obtains the method from registered endpoint
+metadata, so an unpublished RPC has no link. Token/transition `process` references and links use
+the full canonical process name; spawner/token associations use their canonical token names.
+Definition GET, catch, and parent/child process-operation links are not emitted. These trailers
+are Schemata's gRPC link projection, rather than an HTTP linking standard for gRPC.
 
 ## Request and response wire format
 

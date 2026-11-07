@@ -204,7 +204,7 @@ public abstract class FlowEffectRecoveryShould
         using var scope      = fixture.CreateScope();
         var       repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataProcessToken>>();
         var       token = await repository.FirstOrDefaultAsync(
-            query => query.Where(row => row.Process == process.Name && row.State == "Active"));
+            query => query.Where(row => row.Process == process.CanonicalName && row.State == "Active"));
         Assert.NotNull(token);
         return token;
     }

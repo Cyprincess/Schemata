@@ -95,7 +95,7 @@ public class CallActivityChildRuntimeShould : IAsyncLifetime
             var snapshot = await scope.ServiceProvider.GetRequiredService<FlowRunner>().CompleteAsync(current, null, null, CancellationToken.None);
             Assert.Equal("call", Assert.Single(snapshot.Tokens, token => token.State == "Waiting").WaitingAtName);
         }
-        var spawns = (await ReadRowsAsync<SchemataProcessTransition>()).Where(row => row.Process == parent.Name && row.Kind == TransitionKind.Spawn && row.Note == "call").ToList();
+        var spawns = (await ReadRowsAsync<SchemataProcessTransition>()).Where(row => row.Process == parent.CanonicalName && row.Kind == TransitionKind.Spawn && row.Note == "call").ToList();
         Assert.Equal(2, spawns.Select(row => row.Token).Distinct().Count());
         Assert.Contains(spawns, row => row.Posterior == first.CanonicalName);
         Assert.Contains(spawns, row => row.Posterior == second.CanonicalName);
@@ -128,14 +128,14 @@ public class CallActivityChildRuntimeShould : IAsyncLifetime
             parent = await runner.StartAsync("compensating-parent", null, CancellationToken.None);
             await runner.CompleteAsync(parent, null, null, CancellationToken.None);
         }
-        var tokens = (await ReadRowsAsync<SchemataProcessToken>()).Where(row => row.Process == parent.Name).ToList();
+        var tokens = (await ReadRowsAsync<SchemataProcessToken>()).Where(row => row.Process == parent.CanonicalName).ToList();
         var thrower = Assert.Single(tokens, row => row.StateName == (atEnd ? "throw-end" : "after"));
         var waiter = Assert.Single(tokens, row => row.WaitingAtName == "undo-call" && row.State == "Waiting");
         var carrier = Assert.Single(tokens, row => row.CanonicalName == waiter.Spawner);
         Assert.NotEqual(thrower.CanonicalName, carrier.CanonicalName);
         Assert.Equal(thrower.CanonicalName, carrier.Spawner);
         Assert.Equal("Completed", carrier.State);
-        var spawn = Assert.Single(await ReadRowsAsync<SchemataProcessTransition>(), row => row.Process == parent.Name && row.Kind == TransitionKind.Spawn && row.Note == "undo-call");
+        var spawn = Assert.Single(await ReadRowsAsync<SchemataProcessTransition>(), row => row.Process == parent.CanonicalName && row.Kind == TransitionKind.Spawn && row.Note == "undo-call");
         Assert.Equal(waiter.CanonicalName, spawn.Token);
         var child = Assert.Single(await ReadRowsAsync<SchemataProcess>(), row => row.CanonicalName == spawn.Posterior);
         using (var scope = _fixture.CreateScope()) {
@@ -145,13 +145,13 @@ public class CallActivityChildRuntimeShould : IAsyncLifetime
             var current = (await scope.ServiceProvider.GetRequiredService<IRepository<SchemataProcess>>().FirstOrDefaultAsync(query => query.Where(row => row.CanonicalName == parent.CanonicalName)))!;
             await scope.ServiceProvider.GetRequiredService<FlowRunner>().CompleteAsync(current, waiter.CanonicalName, null, CancellationToken.None);
         }
-        tokens = (await ReadRowsAsync<SchemataProcessToken>()).Where(row => row.Process == parent.Name).ToList();
+        tokens = (await ReadRowsAsync<SchemataProcessToken>()).Where(row => row.Process == parent.CanonicalName).ToList();
         Assert.Equal("Completed", tokens.Single(row => row.CanonicalName == waiter.CanonicalName).State);
         var retained = tokens.Single(row => row.CanonicalName == thrower.CanonicalName);
         Assert.Equal(atEnd ? "throw-end" : "after", retained.StateName);
         Assert.Equal(atEnd ? "Completed" : "Active", retained.State);
-        Assert.Single(await ReadRowsAsync<SchemataProcessTransition>(), row => row.Process == parent.Name && row.Token == waiter.CanonicalName && row.Event == "ExitCallActivity");
-        Assert.Single(await ReadRowsAsync<SchemataProcessTransition>(), row => row.Process == parent.Name && row.Kind == TransitionKind.Spawn && row.Note == "undo-call");
+        Assert.Single(await ReadRowsAsync<SchemataProcessTransition>(), row => row.Process == parent.CanonicalName && row.Token == waiter.CanonicalName && row.Event == "ExitCallActivity");
+        Assert.Single(await ReadRowsAsync<SchemataProcessTransition>(), row => row.Process == parent.CanonicalName && row.Kind == TransitionKind.Spawn && row.Note == "undo-call");
     }
 
     private async Task<List<TEntity>> ReadRowsAsync<TEntity>() where TEntity : class {

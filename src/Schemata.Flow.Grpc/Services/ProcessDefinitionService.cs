@@ -5,6 +5,7 @@ using ProtoBuf.Grpc;
 using Schemata.Abstractions.Resource;
 using Schemata.Flow.Foundation.Commands;
 using Schemata.Flow.Skeleton.Models;
+using Schemata.Flow.Grpc.Wire;
 using Schemata.Messaging.Skeleton;
 
 namespace Schemata.Flow.Grpc.Services;
@@ -15,11 +16,11 @@ public sealed class ProcessDefinitionService(IQueryDispatcher dispatcher) : IPro
     #region IProcessDefinitionService Members
 
     public async ValueTask<ListResultBase<ProcessDefinitionInfo, ProcessDefinitionInfo>> ListProcessDefinitionsAsync(
-        ListRequest request,
+        ListProcessDefinitionsRequest request,
         CallContext context = default
     ) {
         var results = await dispatcher.SendAsync<ListProcessDefinitionsQuery, IReadOnlyList<ProcessDefinitionInfo>>(
-            new(), context.CancellationToken);
+            new(request.DefinitionName, request.DefinitionVersion), context.CancellationToken);
         return new() { Entities = results.ToList() };
     }
 

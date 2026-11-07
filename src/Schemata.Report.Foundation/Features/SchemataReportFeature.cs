@@ -6,6 +6,7 @@ using Schemata.Core.Features;
 using Schemata.Insight.Foundation.Features;
 using static Schemata.Abstractions.SchemataConstants;
 using Schemata.Report.Skeleton.Entities;
+using Schemata.Report.Foundation.Linking;
 
 namespace Schemata.Report.Foundation.Features;
 
@@ -27,5 +28,8 @@ public sealed class SchemataReportFeature<TReport, TSnapshot, TChunk> : FeatureB
         Configurators       configurators,
         IConfiguration      configuration,
         IWebHostEnvironment environment
-    ) => services.AddSchemataReport<TReport, TSnapshot, TChunk>(schemata);
+    ) {
+        services.AddSchemataReport<TReport, TSnapshot, TChunk>(schemata);
+        services.AddSchemataLinkContributor<ReportLinkContributor>();
+    }
 }

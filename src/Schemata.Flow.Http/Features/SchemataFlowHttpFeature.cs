@@ -8,6 +8,8 @@ using Schemata.Flow.Foundation.Features;
 using Schemata.Flow.Http.Linking;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Resource.Http.Features;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Transport.Http.Linking;
 
 namespace Schemata.Flow.Http.Features;
 
@@ -36,6 +38,6 @@ public sealed class SchemataFlowHttpFeature<TProcess, TToken, TTransition> : Fea
     ) {
         services.AddSchemataApplicationPart<SchemataFlowHttpFeature<TProcess, TToken, TTransition>>();
         services.AddSchemataFlowHttpResources<TProcess, TToken, TTransition>(schemata);
-        services.AddSchemataLinkContributor<FlowLinkContributor>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<ILinkRouteProvider, FlowLinkRouteProvider>());
     }
 }

@@ -2,6 +2,12 @@ using System.Collections.Generic;
 
 namespace Schemata.Abstractions.Resource;
 
+public interface IEntitiesResult
+{
+    string? NextPageToken { get; }
+    int? TotalSize { get; }
+}
+
 /// <summary>
 ///     Marks an operation result whose <c>Entities</c> property carries resources of
 ///     <typeparamref name="TItem" /> for the resource identified by <typeparamref name="TEntity" />.
@@ -11,7 +17,7 @@ namespace Schemata.Abstractions.Resource;
 /// </summary>
 /// <typeparam name="TEntity">The entity type carrying the resource identity.</typeparam>
 /// <typeparam name="TItem">The resource DTO type carried by the result.</typeparam>
-public interface IEntitiesResult<TEntity, TItem>
+public interface IEntitiesResult<TEntity, TItem> : IEntitiesResult
 {
     /// <summary>
     ///     Resource items carried by the result.

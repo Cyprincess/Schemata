@@ -10,6 +10,19 @@ public static class SchemataConstants
     /// </summary>
     public const string Schemata = "9049a32e-c96b-4e0e-ae34-c370c574f00d";
 
+    public static class LinkRelations
+    {
+        public const string Self = "self";
+        public const string Canonical = "canonical";
+        public const string Related = "related";
+        public const string Up = "up";
+        public const string Next = "next";
+        public const string Prev = "prev";
+        public const string First = "first";
+        public const string Last = "last";
+        public const string Alternate = "alternate";
+    }
+
     #region Nested type: ErrorCodes
 
     /// <summary>
@@ -173,20 +186,6 @@ public static class SchemataConstants
 
         /// <summary>Subject claim.</summary>
         public const string Subject           = "sub";
-    }
-
-    #endregion
-
-    #region Nested type: ProvisioningClaims
-
-    /// <summary>
-    ///     Storage-only claim names that mark provisioned Identity rows. These claims never describe
-    ///     an authenticated principal and are excluded from cookies and tokens.
-    /// </summary>
-    public static class ProvisioningClaims
-    {
-        /// <summary>The SCIM Group ownership marker on a role.</summary>
-        public const string ScimGroup = "urn:schemata:identity:scim:group";
     }
 
     #endregion

@@ -38,7 +38,7 @@ public class MultiStateMessageShould
         var token = new SchemataProcessToken {
             Name          = "t1",
             CanonicalName = "processes/p1/tokens/t1",
-            Process       = "p1",
+            Process       = "processes/p1",
             ScopeName     = string.Empty,
             StateName     = "irrelevant-state",
             State         = "Active",
@@ -129,7 +129,7 @@ public class MultiStateMessageShould
         return new() {
             Name          = canonical[(canonical.LastIndexOf('/') + 1)..],
             CanonicalName = canonical,
-            Process       = "p1",
+            Process       = "processes/p1",
             ScopeName     = string.Empty,
             StateName     = stateName,
             WaitingAtName = waitingAtName,

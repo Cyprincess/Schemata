@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Linking;
 using Schemata.Core.Building;
+using Schemata.Core.Linking;
 
 namespace Schemata.Transport.Http.Linking;
 
@@ -26,16 +27,16 @@ public sealed class LinkHeaderResultFilter : IAlwaysRunResultFilter
         }
 
         var resource = context.HttpContext.GetEndpoint()?.Metadata.GetMetadata<ResourceRegistration>();
-        var state = new LinkContext(context.HttpContext, context.Result, resource);
+        var projector = context.HttpContext.RequestServices.GetRequiredService<HttpLinkProjector>();
+        var result = context.Result switch { JsonResult json => json.Value, ObjectResult obj => obj.Value, _ => null };
+        var state = projector.CreateContext(context.HttpContext.Request, result, resource);
+        if (context.Result is ILinkRequest input) state = state with { Request = input };
 
         var links = new List<WebLink>();
-        foreach (var contributor in context.HttpContext.RequestServices.GetServices<ILinkContributor>()) {
-            var contributed = contributor.GetLinks(state);
-            if (contributed is null) {
-                continue;
+        foreach (var contributor in context.HttpContext.RequestServices.GetKeyedServices<ILinkContributor>(LinkTransports.Http)) {
+            foreach (var link in contributor.GetLinks(state)) {
+                if (projector.Project(link, state, context.HttpContext.Request) is { } projected) links.Add(projected);
             }
-
-            links.AddRange(contributed);
         }
 
         if (links.Count == 0) {
@@ -54,15 +55,7 @@ public sealed class LinkHeaderResultFilter : IAlwaysRunResultFilter
 
     #endregion
 
-    private static string Serialize(List<WebLink> links) {
-        try {
-            return LinkHeader.Serialize(links);
-        } catch (ArgumentException) {
-            // Links are ancillary response metadata; an invalid contributed target must not turn
-            // an otherwise successful response into a server error.
-            return string.Empty;
-        }
-    }
+    private static string Serialize(List<WebLink> links) => LinkHeader.Serialize(links);
 
     private static bool IsSuccess(IActionResult result) => result switch {
         ChallengeResult or ForbidResult         => false,

@@ -212,7 +212,7 @@ public sealed class BoundTaskPersistenceShould
             Assert.Equal(persisted.Source.Timestamp, Assert.Single(persisted.Bindings).SourceTimestamp);
             var child = Assert.Single(await Rows<SchemataProcess>(fixture), row => row.DefinitionName == nameof(SourceCallChildProcess));
             Assert.Equal("Completed", child.State);
-            var childToken = Assert.Single(await Rows<SchemataProcessToken>(fixture), row => row.Process == child.Name);
+            var childToken = Assert.Single(await Rows<SchemataProcessToken>(fixture), row => row.Process == child.CanonicalName);
             Assert.Equal("Completed", childToken.State);
             Assert.Equal("child-end", childToken.StateName);
             Assert.Equal("42", childToken.Annotations["score"]);
@@ -249,11 +249,11 @@ public sealed class BoundTaskPersistenceShould
             var persisted = Assert.Single(await Rows<Order>(fixture), row => row.Uid == order.Uid);
             Assert.Equal("42", persisted.TaskValue);
             Assert.Equal("high", persisted.State);
-            var token = Assert.Single(await Rows<SchemataProcessToken>(fixture), row => row.Process == process.Name && row.State == "Active");
+            var token = Assert.Single(await Rows<SchemataProcessToken>(fixture), row => row.Process == process.CanonicalName && row.State == "Active");
             Assert.Equal("approved", token.StateName);
             Assert.Equal("42", token.Annotations["score"]);
             Assert.Equal("high", token.Annotations["risk"]);
-            Assert.Contains(await Rows<SchemataProcessTransition>(fixture), row => row.Process == process.Name && row.Posterior == "approved");
+            Assert.Contains(await Rows<SchemataProcessTransition>(fixture), row => row.Process == process.CanonicalName && row.Posterior == "approved");
             var bindings = (await Rows<SchemataProcessSource>(fixture)).Where(row => row.Process == process.CanonicalName).ToList();
             Assert.Contains(bindings, row => row.Name == "computed" && row.Token == token.CanonicalName);
             Assert.All(bindings, row => Assert.Equal(persisted.Timestamp, row.SourceTimestamp));
@@ -364,7 +364,7 @@ public sealed class BoundTaskPersistenceShould
             var runner = scope.ServiceProvider.GetRequiredService<FlowRunner>();
             var process = await runner.StartAsync(boundary ? nameof(BoundaryChildProcess) : nameof(RootForkProcess));
             if (boundary) {
-                var parent = Assert.Single(await Rows<SchemataProcessToken>(fixture), row => row.Process == process.Name);
+                var parent = Assert.Single(await Rows<SchemataProcessToken>(fixture), row => row.Process == process.CanonicalName);
                 using (var write = fixture.CreateScope()) {
                     var repository = write.ServiceProvider.GetRequiredService<IRepository<SchemataProcessToken>>();
                     var loaded = (await repository.FindAsync([parent.Uid]))!;
@@ -382,7 +382,7 @@ public sealed class BoundTaskPersistenceShould
                     .HandleAsync(new(process.CanonicalName!, "spawn", null, parent.CanonicalName, null), new AdviceContext(trigger.ServiceProvider), CancellationToken.None);
                 Assert.Equal(SignalDeliveryStatus.Delivered, delivery.Status);
             }
-            var tokens = (await Rows<SchemataProcessToken>(fixture)).Where(row => row.Process == process.Name).ToList();
+            var tokens = (await Rows<SchemataProcessToken>(fixture)).Where(row => row.Process == process.CanonicalName).ToList();
             var child = Assert.Single(tokens, row => row.StateName == "approved" && row.State == "Active");
             Assert.Equal("42", child.Annotations["score"]);
             Assert.Equal(child.CanonicalName, child.Annotations["output_owner"]);
@@ -393,7 +393,7 @@ public sealed class BoundTaskPersistenceShould
                 Assert.Equal("42", Assert.Single(await Rows<Order>(fixture), row => row.Uid == source!.Uid).TaskValue);
                 Assert.DoesNotContain(await Rows<SchemataProcessSource>(fixture), row => row.Process == process.CanonicalName && row.Token == child.CanonicalName);
             }
-            Assert.Contains(await Rows<SchemataProcessTransition>(fixture), row => row.Process == process.Name && row.Token == child.CanonicalName && row.Posterior == "approved");
+            Assert.Contains(await Rows<SchemataProcessTransition>(fixture), row => row.Process == process.CanonicalName && row.Token == child.CanonicalName && row.Posterior == "approved");
         } finally { await lifetime.DisposeAsync(); }
     }
 
@@ -410,7 +410,7 @@ public sealed class BoundTaskPersistenceShould
             using var scope = fixture.CreateScope();
             await scope.ServiceProvider.GetRequiredService<IProcessRegistry>().RegisterAsync<FailingBoundaryChildProcess>(FlowConstants.Engines.Bpmn);
             var process = await scope.ServiceProvider.GetRequiredService<FlowRunner>().StartAsync(nameof(FailingBoundaryChildProcess));
-            var parent = Assert.Single(await Rows<SchemataProcessToken>(fixture), row => row.Process == process.Name);
+            var parent = Assert.Single(await Rows<SchemataProcessToken>(fixture), row => row.Process == process.CanonicalName);
             using (var bind = fixture.CreateScope()) {
                 var repository = bind.ServiceProvider.GetRequiredService<IRepository<SchemataProcessSource>>();
                 await repository.AddAsync(new() { Process = process.CanonicalName!, Token = parent.CanonicalName, Name = "order", Source = source.CanonicalName!, SourceType = typeof(Order).FullName!, SourceTimestamp = source.Timestamp });
@@ -508,9 +508,9 @@ public sealed class BoundTaskPersistenceShould
     private static async Task<Persisted> CaptureAsync(IFlowIntegrationFixture fixture, SchemataProcess process, Guid order) => new(
         Assert.Single(await Rows<Order>(fixture), row => row.Uid == order),
         Assert.Single(await Rows<SchemataProcess>(fixture), row => row.Uid == process.Uid),
-        (await Rows<SchemataProcessToken>(fixture)).Where(row => row.Process == process.Name).OrderBy(row => row.Name).ToList(),
+        (await Rows<SchemataProcessToken>(fixture)).Where(row => row.Process == process.CanonicalName).OrderBy(row => row.Name).ToList(),
         (await Rows<SchemataProcessSource>(fixture)).Where(row => row.Process == process.CanonicalName).OrderBy(row => row.Name).ToList(),
-        (await Rows<SchemataProcessTransition>(fixture)).Where(row => row.Process == process.Name).OrderBy(row => row.Name).ToList());
+        (await Rows<SchemataProcessTransition>(fixture)).Where(row => row.Process == process.CanonicalName).OrderBy(row => row.Name).ToList());
 
     private sealed record Persisted(Order Source, SchemataProcess Process, List<SchemataProcessToken> Tokens, List<SchemataProcessSource> Bindings, List<SchemataProcessTransition> Transitions);
     public interface IRiskService { string Classify(long score); }

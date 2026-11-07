@@ -137,7 +137,7 @@ internal sealed class FlowHandlerSupport<TProcess, TToken, TTransition, TCompens
         ProcessSnapshot? snapshot = null;
 
         await ExecuteWithNotificationAsync(process, async (scope, current) => {
-            var tokens    = await LoadTokensAsync(scope, process.Name!, current);
+            var tokens    = await LoadTokensAsync(scope, process.CanonicalName ?? throw new InvalidOperationException("Process canonical name is required."), current);
             var context   = await CreateExecutionContextAsync(scope, process, principal, advice, current);
             var tokenName = resolveTarget
                 ? await ResolveTargetAsync(
@@ -399,8 +399,11 @@ internal sealed class FlowHandlerSupport<TProcess, TToken, TTransition, TCompens
         string               @event,
         ClaimsPrincipal?     principal
     ) {
+        if (process.CanonicalName is not { Length: > 0 } canonical) {
+            throw new InvalidOperationException("Process canonical name is required before creating a transition.");
+        }
         return new() {
-            Process   = process.Name,
+            Process   = canonical,
             Token     = token.CanonicalName,
             Kind      = TransitionKind.Cancel,
             Previous  = previous,

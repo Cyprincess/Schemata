@@ -22,6 +22,7 @@ public static class OperationMapper
             Metadata = new() {
                 Method    = execution.Method,
                 Job       = execution.Job,
+                Subject   = execution.Subject,
                 StartTime = execution.StartTime,
                 EndTime   = execution.EndTime,
             },

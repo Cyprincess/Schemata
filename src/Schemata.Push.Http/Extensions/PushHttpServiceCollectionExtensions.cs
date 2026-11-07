@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Builder;
 using Schemata.Push.Http.Controllers;
 using Schemata.Push.Http.Linking;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Transport.Http.Linking;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -19,7 +21,7 @@ public static class PushHttpServiceCollectionExtensions
         services.AddSchemataApplicationPart<PushController>();
         services.AddSchemataJsonSerializer(_ => { });
         services.AddSchemataJsonTraits();
-        services.AddSchemataLinkContributor<PushLinkContributor>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<ILinkRouteProvider, PushLinkRouteProvider>());
 
         return services;
     }

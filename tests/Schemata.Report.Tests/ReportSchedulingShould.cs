@@ -31,6 +31,26 @@ namespace Schemata.Report.Tests;
 
 public class ReportSchedulingShould
 {
+    [Theory]
+    [Trait("Layer", "Unit")]
+    [InlineData(null)]
+    [InlineData("reports/canonical-daily")]
+    public async Task Scheduled_Job_Uses_Report_Canonical_Subject(string? canonical) {
+        var scheduler = CreateScheduler();
+        var report = PeriodicReport("daily", "0 0 * * *");
+        report.CanonicalName = canonical;
+        SchemataJob? scheduled = null;
+        scheduler.Setup(value => value.ScheduleAsync(It.IsAny<SchemataJob>(),
+                It.IsAny<IReadOnlyDictionary<string, string?>>(), It.IsAny<CancellationToken>()))
+            .Callback<SchemataJob, IReadOnlyDictionary<string, string?>, CancellationToken>((job, _, _) => scheduled = job)
+            .Returns(Task.CompletedTask);
+        var initializer = new ReportSchedulingInitializer<SchemataJob, SchemataJobExecution>(
+            CreateDefinitionStore(report).Object, scheduler.Object);
+        await initializer.StartAsync(CancellationToken.None);
+        Assert.NotNull(scheduled);
+        Assert.Equal(report.CanonicalName, scheduled.Subject);
+    }
+
     [Fact]
     public async Task Initializer_Arms_Periodic_Reports() {
         var scheduler = CreateScheduler();

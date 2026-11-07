@@ -152,7 +152,7 @@ public sealed class FlowRunner<TProcess, TToken>(IServiceProvider services) : IF
         var tokenCanonicalName = RequireCanonicalName(token.CanonicalName, nameof(token));
         var dispatcher = services.GetRequiredService<IRequestDispatcher>();
         return new(dispatcher.SendAsync<ResourceMethodRequest<TToken, CancelTokenRequest, ProcessSnapshot>, ProcessSnapshot>(
-            new(FlowOperations.Cancel, tokenCanonicalName, new($"processes/{token.Process}", tokenCanonicalName, principal), principal), ct));
+            new(FlowOperations.Cancel, tokenCanonicalName, new(RequireCanonicalName(token.Process, nameof(token)), tokenCanonicalName, principal), principal), ct));
     }
 
     #endregion

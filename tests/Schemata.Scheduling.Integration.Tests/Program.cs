@@ -21,7 +21,7 @@ connection.Open();
 
 builder.UseSchemata(schema => {
     schema.UseMapster();
-    schema.UseScheduling().MapHttp();
+    schema.UseScheduling().MapHttp().MapGrpc();
 
     var resource = schema.UseResource();
     resource.UseAip().UseOrdering();

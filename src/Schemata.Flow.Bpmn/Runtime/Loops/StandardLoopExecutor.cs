@@ -55,7 +55,7 @@ public sealed class StandardLoopExecutor<TProcess, TToken, TTransition>
 
         if (includeArrival) {
             transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-                process.Name!,
+                process,
                 token.CanonicalName,
                 previousState,
                 activity.Name,
@@ -80,7 +80,7 @@ public sealed class StandardLoopExecutor<TProcess, TToken, TTransition>
                 token.State         = "Active";
 
                 transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-                    process.Name!,
+                    process,
                     token.CanonicalName,
                     activity.Name,
                     activity.Name,
@@ -110,7 +110,7 @@ public sealed class StandardLoopExecutor<TProcess, TToken, TTransition>
             token.WaitingAtName = null;
 
             var fail = BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-                process.Name!,
+                process,
                 token.CanonicalName,
                 activity.Name,
                 activity.Name,
@@ -157,7 +157,7 @@ public sealed class StandardLoopExecutor<TProcess, TToken, TTransition>
 
         BpmnEngine<TProcess, TToken, TTransition>.ApplyResolvedToToken(token, resolved);
         transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-            process.Name!,
+            process,
             token.CanonicalName,
             previousState,
             resolved.StateName,

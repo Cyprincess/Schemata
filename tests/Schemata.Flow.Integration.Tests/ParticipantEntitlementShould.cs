@@ -45,6 +45,12 @@ public sealed class ParticipantEntitlementShould
                 var processes = seedScope.ServiceProvider.GetRequiredService<IRepository<TenantProcess>>();
                 var rows = seedScope.ServiceProvider.GetRequiredService<IRepository<TenantProcessParticipant>>();
                 await using var seed = processes.Begin();
+                var tokens = seedScope.ServiceProvider.GetRequiredService<IRepository<TenantProcessToken>>();
+                var transitions = seedScope.ServiceProvider.GetRequiredService<IRepository<TenantProcessTransition>>();
+                tokens.Join(seed);
+                transitions.Join(seed);
+                await tokens.AddAsync(new() { Name = "token", Process = "processes/" + name, ScopeName = string.Empty, StateName = "task", State = "Active" });
+                await transitions.AddAsync(new() { Name = "transition", Process = "processes/" + name, Event = "Start" });
                 rows.Join(seed);
                 await processes.AddAsync(new() { Name = name, DefinitionName = "test", DefinitionVersion = "1" });
                 if (name != "hidden") {
@@ -64,6 +70,16 @@ public sealed class ParticipantEntitlementShould
             Assert.Equal(1, await query.CountAsync(q => q.Where(expression!)));
             var page = await query.ListAsync(q => q.Where(expression!).OrderBy(p => p.Name).Take(1)).ToListAsync();
             Assert.Equal("allowed", Assert.Single(page).Name);
+            var tokenRead = new FlowReadPolicy<TenantProcessToken, ListRequest, TenantProcess, TenantProcessToken, TenantProcessParticipant>(policy);
+            var tokenExpression = await tokenRead.GenerateEntitlementExpressionAsync(new() { Operation = nameof(Operations.List) }, principal);
+            var visibleTokens = await services.GetRequiredService<IRepository<TenantProcessToken>>()
+                .ListAsync(q => q.Where(tokenExpression!)).ToListAsync();
+            Assert.Equal("processes/allowed", Assert.Single(visibleTokens).Process);
+            var transitionRead = new FlowReadPolicy<TenantProcessTransition, ListRequest, TenantProcess, TenantProcessToken, TenantProcessParticipant>(policy);
+            var transitionExpression = await transitionRead.GenerateEntitlementExpressionAsync(new() { Operation = nameof(Operations.List) }, principal);
+            var visibleTransitions = await services.GetRequiredService<IRepository<TenantProcessTransition>>()
+                .ListAsync(q => q.Where(transitionExpression!)).ToListAsync();
+            Assert.Equal("processes/allowed", Assert.Single(visibleTransitions).Process);
             principal.AddIdentity(new ClaimsIdentity([new Claim("permission", "tenant-process.list")], "test"));
             expression = await read.GenerateEntitlementExpressionAsync(new() { Operation = nameof(Operations.List) }, principal);
             Assert.Equal(4, await query.CountAsync(q => q.Where(expression!)));

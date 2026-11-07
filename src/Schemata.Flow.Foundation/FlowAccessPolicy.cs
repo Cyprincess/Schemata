@@ -82,6 +82,9 @@ public sealed class FlowAccessPolicy<TProcess, TToken, TParticipant>(
         IUnitOfWork              unitOfWork,
         CancellationToken        ct
     ) {
+        if (process.CanonicalName is not { Length: > 0 } canonical) {
+            throw new InvalidOperationException("Process canonical name is required for eligibility.");
+        }
         var entity = operation == FlowOperations.Cancel ? typeof(TToken) : typeof(TProcess);
         RequirePermission(operation, entity, process.CanonicalName, principal);
         if (HasPermission(Administration, typeof(TProcess), principal)) return;
@@ -91,7 +94,7 @@ public sealed class FlowAccessPolicy<TProcess, TToken, TParticipant>(
         var now = clock.GetUtcNow().UtcDateTime;
         var participants = services.GetRequiredService<IRepository<TParticipant>>();
         participants.Join(unitOfWork);
-        var rows = await participants.ListAsync(query => query.Where(row => row.Process == process.CanonicalName
+        var rows = await participants.ListAsync(query => query.Where(row => row.Process == canonical
             && identities.Contains(row.Subject)
             && row.Kind == ProcessParticipationKind.Eligibility && row.RevokedAt == null
             && (row.ExpiresAt == null || row.ExpiresAt > now)), ct).ToListAsync(ct);
@@ -101,7 +104,7 @@ public sealed class FlowAccessPolicy<TProcess, TToken, TParticipant>(
         }
         if (targets.Count == 0) Deny();
         foreach (var token in targets) {
-            if (token.Process != process.Name || !TokenStates.Live.Contains(token.State!)) Deny();
+            if (token.Process != canonical || !TokenStates.Live.Contains(token.State!)) Deny();
             if (!rows.Any(row => row.Token == token.CanonicalName
                 && row.Activity == (token.WaitingAtName ?? token.StateName))) Deny();
         }

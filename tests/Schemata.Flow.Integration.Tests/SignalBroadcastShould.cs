@@ -53,9 +53,9 @@ public class SignalBroadcastShould : IAsyncLifetime
             Assert.NotNull(results[1].Error);
 
             // The siblings' transitions are committed, and the failed one rolled back to its catch.
-            Assert.Null(await ReadWaitingAtAsync(ordered[0].Name!));
-            Assert.Equal("signal-catch", await ReadWaitingAtAsync(ordered[1].Name!));
-            Assert.Null(await ReadWaitingAtAsync(ordered[2].Name!));
+            Assert.Null(await ReadWaitingAtAsync(ordered[0].CanonicalName!));
+            Assert.Equal("signal-catch", await ReadWaitingAtAsync(ordered[1].CanonicalName!));
+            Assert.Null(await ReadWaitingAtAsync(ordered[2].CanonicalName!));
         } finally {
             fixture.FailingProcesses.Remove(failing);
             fixture.FlowOptions.SignalBroadcastConcurrency = concurrency;
@@ -81,7 +81,7 @@ public class SignalBroadcastShould : IAsyncLifetime
             process = await runner.StartAsync(definition, null, CancellationToken.None);
         }
 
-        Assert.Null(await ReadWaitingAtAsync(process.Name!));
+        Assert.Null(await ReadWaitingAtAsync(process.CanonicalName!));
 
         IReadOnlyList<SignalDeliveryResult> results;
         using (var scope = fixture.CreateScope()) {
@@ -148,7 +148,7 @@ public class SignalBroadcastShould : IAsyncLifetime
             var tokens = scope.ServiceProvider.GetRequiredService<IRepository<SchemataProcessToken>>();
             var routed = new List<SchemataProcessToken>();
             await foreach (var token in tokens.ListAsync<SchemataProcessToken>(
-                               q => q.Where(t => t.Process == process.Name && t.StateName == "after-a"))) {
+                               q => q.Where(t => t.Process == process.CanonicalName && t.StateName == "after-a"))) {
                 routed.Add(token);
             }
 

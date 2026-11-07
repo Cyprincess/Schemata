@@ -1,3 +1,4 @@
+using System;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 
@@ -9,15 +10,18 @@ public static class TransitionFactory<TTransition>
     where TTransition : SchemataProcessTransition, new()
 {
     public static TTransition New(
-        string         processName,
+        SchemataProcess process,
         string?        tokenCanonical,
         string?        previous,
         string?        posterior,
         TransitionKind kind,
         string         eventName
     ) {
+        if (process.CanonicalName is not { Length: > 0 } canonical) {
+            throw new InvalidOperationException("Process canonical name is required before creating a transition.");
+        }
         return new() {
-            Process   = processName,
+            Process   = canonical,
             Token     = tokenCanonical,
             Kind      = kind,
             Previous  = previous,

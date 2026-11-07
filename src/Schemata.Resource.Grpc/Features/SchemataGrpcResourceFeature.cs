@@ -13,6 +13,8 @@ using Schemata.Core.Building;
 using Schemata.Resource.Foundation.Features;
 using Schemata.Transport.Grpc;
 using Schemata.Transport.Grpc.Features;
+using Schemata.Resource.Grpc.Runtime;
+using Schemata.Transport.Grpc.Linking;
 
 namespace Schemata.Resource.Grpc.Features;
 
@@ -43,6 +45,7 @@ public sealed class SchemataGrpcResourceFeature : FeatureBase
         IWebHostEnvironment environment
     ) {
         services.TryAddScoped(typeof(ResourceService<,,,>));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IGrpcLinkTargetResolver, ResourceGrpcLinkTargetResolver>());
 
         services.TryAddSingleton(sp => {
             var registry   = sp.GetRequiredService<ResourceRegistry>();
