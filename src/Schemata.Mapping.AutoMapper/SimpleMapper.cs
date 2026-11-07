@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using AutoMapper;
 using Schemata.Mapping.Foundation;
@@ -20,12 +19,6 @@ public sealed class SimpleMapper : ISimpleMapper
     public SimpleMapper(MapperConfiguration config) { _mapper = new Mapper(config); }
 
     #region ISimpleMapper Members
-
-    public T? Map<T>(object source) { return _mapper.Map<T>(source); }
-
-    public T? Map<T>(object source, Type sourceType, Type destinationType) {
-        return (T?)_mapper.Map(source, sourceType, destinationType);
-    }
 
     public TDestination? Map<TSource, TDestination>(TSource source) {
         return _mapper.Map<TSource, TDestination>(source);

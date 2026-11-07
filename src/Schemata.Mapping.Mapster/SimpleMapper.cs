@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using Mapster;
 using MapsterMapper;
@@ -21,12 +20,6 @@ public sealed class SimpleMapper : ISimpleMapper
     public SimpleMapper(TypeAdapterConfig config) { _mapper = new(config); }
 
     #region ISimpleMapper Members
-
-    public T? Map<T>(object source) { return _mapper.Map<T>(source); }
-
-    public T? Map<T>(object source, Type sourceType, Type destinationType) {
-        return (T?)_mapper.Map(source, sourceType, destinationType);
-    }
 
     public TDestination? Map<TSource, TDestination>(TSource source) {
         return _mapper.Map<TSource, TDestination>(source);

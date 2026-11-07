@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 
 namespace Schemata.Mapping.Skeleton;
@@ -12,24 +11,6 @@ namespace Schemata.Mapping.Skeleton;
 /// </remarks>
 public interface ISimpleMapper
 {
-    /// <summary>
-    ///     Maps the source object to a new instance of <typeparamref name="T" />.
-    /// </summary>
-    /// <typeparam name="T">The destination type.</typeparam>
-    /// <param name="source">The source object.</param>
-    /// <returns>The mapped object, or <see langword="null" /> if mapping fails.</returns>
-    T? Map<T>(object source);
-
-    /// <summary>
-    ///     Maps the source object to a new instance of <typeparamref name="T" /> using explicit source and destination types.
-    /// </summary>
-    /// <typeparam name="T">The cast type for the result.</typeparam>
-    /// <param name="source">The source object.</param>
-    /// <param name="sourceType">The runtime source type.</param>
-    /// <param name="destinationType">The runtime destination type.</param>
-    /// <returns>The mapped object, or <see langword="null" /> if mapping fails.</returns>
-    T? Map<T>(object source, Type sourceType, Type destinationType);
-
     /// <summary>
     ///     Maps the source to a new instance of <typeparamref name="TDestination" />.
     /// </summary>

@@ -12,31 +12,6 @@ namespace Schemata.Mapping.Skeleton;
 public static class MapperExtensions
 {
     /// <summary>
-    ///     Maps each element in the source collection to type <typeparamref name="T" />, skipping null results.
-    /// </summary>
-    /// <typeparam name="T">The destination type.</typeparam>
-    /// <param name="mapper">Mapper applied to each element.</param>
-    /// <param name="source">The source collection.</param>
-    /// <param name="ct">A cancellation token.</param>
-    /// <returns>An enumerable of mapped objects.</returns>
-    public static IEnumerable<T> Each<T>(
-        this ISimpleMapper  mapper,
-        IEnumerable<object> source,
-        CancellationToken   ct = default
-    ) {
-        foreach (var item in source) {
-            ct.ThrowIfCancellationRequested();
-
-            var result = mapper.Map<T>(item);
-            if (result is null) {
-                continue;
-            }
-
-            yield return result;
-        }
-    }
-
-    /// <summary>
     ///     Maps each element in the strongly-typed source collection to <typeparamref name="TDestination" />, skipping null
     ///     results.
     /// </summary>
@@ -55,30 +30,6 @@ public static class MapperExtensions
             ct.ThrowIfCancellationRequested();
 
             var result = mapper.Map<TSource, TDestination>(item);
-            if (result is null) {
-                continue;
-            }
-
-            yield return result;
-        }
-    }
-
-    /// <summary>
-    ///     Asynchronously maps each element in the source to type <typeparamref name="T" />, skipping null results.
-    /// </summary>
-    /// <typeparam name="T">The destination type.</typeparam>
-    /// <param name="mapper">Mapper applied to each element.</param>
-    /// <param name="source">The async source collection.</param>
-    /// <param name="ct">A cancellation token.</param>
-    /// <returns>An async enumerable of mapped objects.</returns>
-    public static async IAsyncEnumerable<T> EachAsync<T>(
-        this ISimpleMapper                         mapper,
-        IAsyncEnumerable<object>                   source,
-        [EnumeratorCancellation] CancellationToken ct = default
-    ) {
-        await foreach (var item in source.WithCancellation(ct)) {
-            ct.ThrowIfCancellationRequested();
-            var result = mapper.Map<T>(item);
             if (result is null) {
                 continue;
             }

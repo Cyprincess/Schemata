@@ -9,7 +9,8 @@ internal sealed class ListRequestBindingMetadataProvider : IBindingMetadataProvi
 {
     public void CreateBindingMetadata(BindingMetadataProviderContext context) {
         if (context.Key.MetadataKind != ModelMetadataKind.Property
-         || context.Key.ContainerType != typeof(ListRequest)) {
+         || context.Key.ContainerType is not { } container
+         || !typeof(ListRequest).IsAssignableFrom(container)) {
             return;
         }
 

@@ -36,7 +36,12 @@ shared application discriminator preserve continuations across host restarts and
 codec adds no token-size or decompressed-size policy.
 
 Implementation: `src/Schemata.Resource.Foundation/Models/PageToken.cs` and
-`src/Schemata.Resource.Foundation/ResourceOperationHandler.List.cs`.
+`src/Schemata.Resource.Foundation/ResourceOperationHandler.List.cs`. Encoding and decoding use the
+synchronous `PageToken.ToString(IDataProtector)` and `PageToken.FromString(string?, IDataProtector)` APIs.
+
+HTTP query metadata binds `ListRequest` and derived request containers with snake_case names.
+`AddSchemataHttpResources()` is idempotent: repeated calls retain the first controller feature providers,
+MVC conventions, binding metadata provider, and application-part registrations.
 
 ## Get
 

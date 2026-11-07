@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Mapping.AutoMapper.Integration.Tests.Fixtures;
@@ -44,8 +47,8 @@ public class AutoMapperShould
             Sex   = Sex.Female,
         };
 
-        var maleResult   = mapper.Map<Destination>(male);
-        var femaleResult = mapper.Map<Destination>(female);
+        var maleResult   = mapper.Map<Source, Destination>(male);
+        var femaleResult = mapper.Map<Source, Destination>(female);
 
         Assert.NotNull(maleResult);
         Assert.Equal("Mr. John", maleResult.DisplayName);
@@ -67,9 +70,41 @@ public class AutoMapperShould
             Sex   = Sex.Male,
         };
 
-        var result = mapper.Map<Destination>(source);
+        var result = mapper.Map<Source, Destination>(source);
 
         Assert.NotNull(result);
         Assert.Equal(0, result.Grade);
+    }
+
+    [Fact]
+    public void Each_TypedSource_MapsEveryElement() {
+        var mapper = CreateMapper();
+        var source = new[] {
+            new Source { Name = "John", Sex = Sex.Male },
+            new Source { Name = "Jane", Sex = Sex.Female },
+        };
+
+        var result = mapper.Each<Source, Destination>(source).ToArray();
+
+        Assert.Equal(new[] { "Mr. John", "Ms. Jane" }, result.Select(item => item.DisplayName));
+    }
+
+    [Fact]
+    public async Task EachAsync_TypedSource_MapsEveryElement() {
+        var mapper = CreateMapper();
+        var result = new List<Destination>();
+
+        await foreach (var item in mapper.EachAsync<Source, Destination>(AsyncSource(
+                           new Source { Name = "John", Sex = Sex.Male },
+                           new Source { Name = "Jane", Sex = Sex.Female }))) {
+            result.Add(item);
+        }
+
+        Assert.Equal(new[] { "Mr. John", "Ms. Jane" }, result.Select(item => item.DisplayName));
+    }
+
+    private static async IAsyncEnumerable<Source> AsyncSource(params Source[] source) {
+        await Task.Yield();
+        foreach (var item in source) yield return item;
     }
 }

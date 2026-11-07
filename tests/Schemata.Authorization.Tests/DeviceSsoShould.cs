@@ -507,12 +507,15 @@ public class DeviceSsoShould
             new(IdentityClaims.Subject, "user-1"),
             new(Claims.ClientId, app.ClientId!),
         ], "grant"));
+        var grant = AuthorizationGrantContexts.Create(
+            "user-1", Scopes.OpenId, "sid-1", GrantTypes.AuthorizationCode, null, GrantProfiles.OpenIdConnect);
 
         var issued = await service.IssueAsync(principal, new Dictionary<string, string?> {
             [Properties.GrantType] = GrantTypes.TokenExchange,
             [Properties.Scope] = Scopes.OpenId,
             [Properties.SessionId] = "sid-1",
             [Properties.GrantProfile] = GrantProfiles.OpenIdConnect,
+            [Properties.GrantContext] = AuthorizationGrantContexts.Serialize(grant),
         }, AuthorizationSignInResponseKind.Token);
 
         Assert.NotNull(issued.Token?.IdToken);

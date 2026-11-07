@@ -39,6 +39,7 @@ public class TokenEndpointShould : IClassFixture<WebAppFactory>
         Assert.Equal("Bearer", root.GetProperty("token_type").GetString());
         Assert.True(root.TryGetProperty("expires_in", out var expiresIn));
         Assert.True(expiresIn.GetInt32() > 0);
+        Assert.False(root.TryGetProperty("id_token", out _));
 
         using var scope = _factory.Services.CreateScope();
         var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AuthorizationDbContext>>();

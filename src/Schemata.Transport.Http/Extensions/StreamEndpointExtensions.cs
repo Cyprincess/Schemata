@@ -19,22 +19,28 @@ public static class StreamEndpointExtensions
 {
     public static RouteHandlerBuilder MapSchemataStream<TRequest, TItem>(this IEndpointRouteBuilder endpoints, string pattern)
         where TRequest : class, IStreamRequest<TItem> {
+        Lazy<JsonSerializerOptions>? json = null;
         return endpoints.MapPost(pattern, (TRequest request, HttpContext context) => {
             var dispatcher = context.RequestServices.GetService<IStreamDispatcher>();
             if (dispatcher is null) {
                 context.Response.StatusCode = StatusCodes.Status501NotImplemented;
                 return Results.Empty;
             }
-            var json = new JsonSerializerOptions(context.RequestServices.GetService<IOptions<JsonSerializerOptions>>()?.Value ?? SchemataJson.Default) {
-                WriteIndented = false,
-            };
+            var options = LazyInitializer.EnsureInitialized(
+                ref json,
+                () => new Lazy<JsonSerializerOptions>(
+                    () => new JsonSerializerOptions(
+                        context.RequestServices.GetService<IOptions<JsonSerializerOptions>>()?.Value ?? SchemataJson.Default) {
+                        WriteIndented = false,
+                    },
+                    LazyThreadSafetyMode.ExecutionAndPublication));
             System.Collections.Generic.IAsyncEnumerable<TItem> sequence;
             try { sequence = dispatcher.Stream<TRequest, TItem>(request, context.User, context.RequestAborted); }
             catch (System.NotSupportedException) {
                 context.Response.StatusCode = StatusCodes.Status501NotImplemented;
                 return Results.Empty;
             }
-            return new NdjsonStreamResult<TItem>(sequence, json);
+            return new NdjsonStreamResult<TItem>(sequence, options.Value);
         });
     }
 

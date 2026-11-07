@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text.Json;
-using System.Threading.Tasks;
 using Humanizer;
 using Microsoft.AspNetCore.DataProtection;
 using Schemata.Abstractions;
@@ -74,8 +73,8 @@ public class PageToken : IPagination
     /// </summary>
     /// <param name="protector">The <see cref="IDataProtector" /> sealing the token.</param>
     /// <returns>The encoded page token.</returns>
-    public Task<string> ToStringAsync(IDataProtector protector) =>
-        Task.FromResult(ProtectedContinuation.Encode(protector, this));
+    public string ToString(IDataProtector protector) =>
+        ProtectedContinuation.Encode(protector, this);
 
     /// <summary>
     ///     Decodes a page token from its protected representation.
@@ -85,9 +84,9 @@ public class PageToken : IPagination
     /// <param name="protector">The <see cref="IDataProtector" /> that sealed the token.</param>
     /// <returns>The decoded token, or <see langword="null" /> for empty input.</returns>
     /// <exception cref="ValidationException">The token cannot be decoded.</exception>
-    public static Task<PageToken?> FromStringAsync(string? token, IDataProtector protector) {
+    public static PageToken? FromString(string? token, IDataProtector protector) {
         if (string.IsNullOrWhiteSpace(token)) {
-            return Task.FromResult<PageToken?>(null);
+            return null;
         }
 
         try {
@@ -96,7 +95,7 @@ public class PageToken : IPagination
                 throw new JsonException("Page token offset cannot be negative.");
             }
 
-            return Task.FromResult<PageToken?>(parsed);
+            return parsed;
         } catch (Exception ex) when (ex is FormatException
                                         or CryptographicException
                                         or JsonException

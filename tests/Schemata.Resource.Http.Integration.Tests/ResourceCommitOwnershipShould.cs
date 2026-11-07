@@ -108,12 +108,6 @@ public class ResourceCommitOwnershipShould : IClassFixture<WebAppFactory>
 
     private sealed class FaultingMapper(ISimpleMapper inner, MapperFault fault) : ISimpleMapper
     {
-        public T? Map<T>(object source) { return inner.Map<T>(source); }
-
-        public T? Map<T>(object source, Type sourceType, Type destinationType) {
-            return inner.Map<T>(source, sourceType, destinationType);
-        }
-
         public TDestination? Map<TSource, TDestination>(TSource source) {
             if (fault.FailDetail && typeof(TSource) == typeof(Trash) && typeof(TDestination) == typeof(Trash)) {
                 throw new InvalidOperationException("detail mapping failed");

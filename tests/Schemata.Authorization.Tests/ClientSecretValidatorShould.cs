@@ -64,7 +64,8 @@ public class ClientSecretValidatorShould
 
     [Fact]
     public async Task Query_The_Newest_Valid_Authentication_Password_Row() {
-        var securities = StoreWith(PasswordRow("my-client"));
+        var row        = PasswordRow("my-client");
+        var securities = StoreWith(row);
         var verifier   = new Mock<ISecretVerifier>();
         verifier.Setup(v => v.VerifyAsync(It.IsAny<SchemataSecurity>(), "my-secret", It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
@@ -81,6 +82,7 @@ public class ClientSecretValidatorShould
                 SecurityConstants.Statuses.Valid,
                 It.IsAny<CancellationToken>()),
             Times.Once);
+        verifier.Verify(v => v.VerifyAsync(row, "my-secret", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

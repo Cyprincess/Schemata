@@ -13,10 +13,9 @@ public static class SecurityServiceCollectionExtensions
     /// <summary>
     ///     Registers the repository and cache token stores over <typeparamref name="TToken" />: the
     ///     stores as scoped services, the plain <see cref="ITokenStore{TToken}" /> slot
-    ///     (TryAdd-guarded) forwarding to the repository store, the <see cref="KeyedService.AnyKey" />
-    ///     slot forwarding to the repository store, and the nonce/jti/rate-slot keyed slots
+    ///     (TryAdd-guarded) forwarding to the repository store, and the nonce/jti/rate-slot keyed slots
     ///     forwarding to the cache store. Keyed factories resolve the scoped concrete instance so
-    ///     one instance serves every key per scope.
+    ///     the registered cache keys share one instance per scope. Unknown keys have no registration.
     /// </summary>
     /// <remarks>
     ///     Idempotent: the plain slot is TryAdd-guarded and the keyed descriptors overwrite to
@@ -33,8 +32,6 @@ public static class SecurityServiceCollectionExtensions
 
         services.TryAddScoped<ITokenStore<TToken>>(sp => sp.GetRequiredService<RepositoryTokenStore<TToken>>());
 
-        services.AddKeyedScoped<ITokenStore<TToken>>(
-            KeyedService.AnyKey, (sp, _) => sp.GetRequiredService<RepositoryTokenStore<TToken>>());
         services.AddKeyedScoped<ITokenStore<TToken>>(
             SecurityConstants.TokenTypes.Nonce, (sp, _) => sp.GetRequiredService<CacheTokenStore<TToken>>());
         services.AddKeyedScoped<ITokenStore<TToken>>(

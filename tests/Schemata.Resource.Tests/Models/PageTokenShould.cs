@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.DataProtection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Errors;
@@ -16,15 +15,15 @@ namespace Schemata.Resource.Tests.Models;
 public class PageTokenShould
 {
     [Fact]
-    public async Task Preserve_Query_And_Continuation_Fields() {
+    public void Preserve_Query_And_Continuation_Fields() {
         var original = new PageToken {
             Parent = "organizations/acme", Filter = "age > 18", Language = "aip",
             OrderBy = "name DESC", PageSize = 25, Skip = 50, ShowDeleted = false,
             Caller = new ProtectedContinuationCaller(true, "test", "alice", null),
         };
         var protector = new EphemeralDataProtectionProvider().CreateProtector(PageToken.ProtectionPurpose);
-        var encoded = await original.ToStringAsync(protector);
-        var decoded = await PageToken.FromStringAsync(encoded, protector);
+        var encoded = original.ToString(protector);
+        var decoded = PageToken.FromString(encoded, protector);
         Assert.NotNull(decoded);
         Assert.Equal(original.Parent, decoded.Parent);
         Assert.Equal(original.Filter, decoded.Filter);
@@ -44,7 +43,7 @@ public class PageTokenShould
     [InlineData("negative")]
     [InlineData("unprotected")]
     [InlineData("format")]
-    public async Task Reject_Invalid_Continuations_With_Field_Violations(string change) {
+    public void Reject_Invalid_Continuations_With_Field_Violations(string change) {
         var provider = new EphemeralDataProtectionProvider();
         var protector = provider.CreateProtector(PageToken.ProtectionPurpose);
         var encoded = ProtectedContinuation.Encode(protector, new PageToken { Skip = change == "negative" ? -1 : 25 });
@@ -54,24 +53,24 @@ public class PageTokenShould
         if (change == "truncate") encoded = encoded[..^8];
         if (change == "unprotected") encoded = Convert.ToBase64String(new byte[8]);
         if (change == "format") encoded = "%%%not-a-token%%%";
-        var error = await Assert.ThrowsAsync<ValidationException>(async () => await PageToken.FromStringAsync(encoded, protector));
+        var error = Assert.Throws<ValidationException>(() => PageToken.FromString(encoded, protector));
         var field = Assert.Single(error.Details!.OfType<BadRequestDetail>()).FieldViolations;
         Assert.Equal(SchemataResources.INVALID_PAGE_TOKEN, Assert.Single(field!).Reason);
         Assert.Equal("page_token", Assert.Single(field!).Field);
     }
 
     [Fact]
-    public async Task Preserve_Null_Parameters_And_Empty_Continuation() {
+    public void Preserve_Null_Parameters_And_Empty_Continuation() {
         var protector = new EphemeralDataProtectionProvider().CreateProtector(PageToken.ProtectionPurpose);
-        var encoded = await new PageToken().ToStringAsync(protector);
-        var decoded = await PageToken.FromStringAsync(encoded, protector);
+        var encoded = new PageToken().ToString(protector);
+        var decoded = PageToken.FromString(encoded, protector);
         Assert.NotNull(decoded);
         Assert.Null(decoded.Parent);
         Assert.Null(decoded.Filter);
         Assert.Null(decoded.Language);
         Assert.Null(decoded.OrderBy);
         Assert.Null(decoded.ShowDeleted);
-        Assert.Null(await PageToken.FromStringAsync(null, protector));
-        Assert.Null(await PageToken.FromStringAsync("   ", protector));
+        Assert.Null(PageToken.FromString(null, protector));
+        Assert.Null(PageToken.FromString("   ", protector));
     }
 }
