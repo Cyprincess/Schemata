@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading;
@@ -19,7 +20,7 @@ namespace Schemata.Identity.Skeleton.Stores;
 /// <typeparam name="TRole">The role entity type.</typeparam>
 /// <typeparam name="TRoleClaim">The role claim entity type.</typeparam>
 /// <typeparam name="TUserRole">The user-role link entity type.</typeparam>
-public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<TRole>
+public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<TRole>, IRoleProvisioningStore<TRole>
     where TRole : SchemataRole
     where TRoleClaim : SchemataRoleClaim, new()
     where TUserRole : SchemataUserRole, new()
@@ -57,29 +58,66 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<T
 
     #region IRoleClaimStore<TRole> Members
 
+    public IUnitOfWork BeginProvisioning() {
+        ThrowIfDisposed();
+        var roles = _services.GetRequiredService<IRepository<TRole>>();
+        return roles.Begin(IsolationLevel.Serializable);
+    }
+
     public virtual async Task<IdentityResult> CreateAsync(TRole role, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (role is null) {
-            throw new ArgumentNullException(nameof(role));
+        ArgumentNullException.ThrowIfNull(role);
+        await using var transaction = BeginProvisioning();
+        var result = await CreateAsync(role, transaction, ct);
+        if (result.Succeeded) {
+            await transaction.CommitAsync(ct);
         }
 
-        await _mutation.CreateAsync(role, null, ct);
+        return result;
+    }
 
+    public virtual async Task<IdentityResult> CreateAsync(
+        TRole role,
+        IUnitOfWork transaction,
+        CancellationToken ct
+    ) {
+        ct.ThrowIfCancellationRequested();
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(role);
+        ArgumentNullException.ThrowIfNull(transaction);
+        await _mutation.CreateAsync(role, transaction, ct);
         return IdentityResult.Success;
     }
 
     public virtual async Task<IdentityResult> UpdateAsync(TRole role, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (role is null) {
-            throw new ArgumentNullException(nameof(role));
+        ArgumentNullException.ThrowIfNull(role);
+        await using var transaction = BeginProvisioning();
+        var result = await UpdateAsync(role, transaction, ct);
+        if (result.Succeeded) {
+            try {
+                await transaction.CommitAsync(ct);
+            } catch (AbortedException) {
+                return IdentityResult.Failed(ErrorDescriber.ConcurrencyFailure());
+            }
         }
 
-        // Providers signal optimistic concurrency at different boundaries: LinqToDB throws at the
-        // mutation, EF at commit. Translate both, let every other failure propagate.
+        return result;
+    }
+
+    public virtual async Task<IdentityResult> UpdateAsync(
+        TRole role,
+        IUnitOfWork transaction,
+        CancellationToken ct
+    ) {
+        ct.ThrowIfCancellationRequested();
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(role);
+        ArgumentNullException.ThrowIfNull(transaction);
         try {
-            await _mutation.UpdateAsync(role, null, Operations.Update, ct);
+            await _mutation.UpdateAsync(role, transaction, Operations.Update, ct);
         } catch (AbortedException) {
             return IdentityResult.Failed(ErrorDescriber.ConcurrencyFailure());
         }
@@ -90,14 +128,31 @@ public class SchemataRoleStore<TRole, TRoleClaim, TUserRole> : IRoleClaimStore<T
     public virtual async Task<IdentityResult> DeleteAsync(TRole role, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (role is null) {
-            throw new ArgumentNullException(nameof(role));
+        ArgumentNullException.ThrowIfNull(role);
+        await using var transaction = BeginProvisioning();
+        var result = await DeleteAsync(role, transaction, ct);
+        if (result.Succeeded) {
+            try {
+                await transaction.CommitAsync(ct);
+            } catch (AbortedException) {
+                return IdentityResult.Failed(ErrorDescriber.ConcurrencyFailure());
+            }
         }
 
-        // The owner removes the role and every dependent row (user links, claims) in one unit of
-        // work so a failure cannot delete the role while leaving orphaned child rows behind.
+        return result;
+    }
+
+    public virtual async Task<IdentityResult> DeleteAsync(
+        TRole role,
+        IUnitOfWork transaction,
+        CancellationToken ct
+    ) {
+        ct.ThrowIfCancellationRequested();
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(role);
+        ArgumentNullException.ThrowIfNull(transaction);
         try {
-            await _mutation.DeleteAsync(role, null, Operations.Delete, ct);
+            await _mutation.DeleteAsync(role, transaction, Operations.Delete, ct);
         } catch (AbortedException) {
             return IdentityResult.Failed(ErrorDescriber.ConcurrencyFailure());
         }

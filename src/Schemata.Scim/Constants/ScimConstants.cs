@@ -17,6 +17,12 @@ public static class ScimConstants
     /// <summary>The Error message schema URI.</summary>
     public const string ErrorSchema = "urn:ietf:params:scim:api:messages:2.0:Error";
 
+    /// <summary>The SearchRequest message schema URI.</summary>
+    public const string SearchRequestSchema = "urn:ietf:params:scim:api:messages:2.0:SearchRequest";
+
+    /// <summary>The PatchOp message schema URI.</summary>
+    public const string PatchOpSchema = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
+
     /// <summary>The ServiceProviderConfig schema URI.</summary>
     public const string ServiceProviderConfigSchema = "urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig";
 

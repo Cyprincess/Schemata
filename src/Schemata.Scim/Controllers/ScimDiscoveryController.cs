@@ -26,6 +26,8 @@ public sealed class ScimDiscoveryController(
         var config = new ServiceProviderConfig {
             DocumentationUri      = settings.DocumentationUri,
             AuthenticationSchemes = [.. settings.AuthenticationSchemes],
+            Patch                 = new() { Supported = true },
+            Filter                = new() { Supported = true, MaxResults = settings.MaxPageSize },
             Meta                  = Meta("ServiceProviderConfig", "ServiceProviderConfig"),
         };
 
@@ -58,6 +60,16 @@ public sealed class ScimDiscoveryController(
         return Scim(resourceType with {
             Meta = Meta("ResourceType", "ResourceTypes", ScimSchemaRegistry.ResourceTypeId(resourceType)),
         });
+    }
+
+    /// <summary>Rejects modification of read-only discovery resources.</summary>
+    [AcceptVerbs("POST", "PUT", "PATCH", "DELETE", Route = "ServiceProviderConfig")]
+    [AcceptVerbs("POST", "PUT", "PATCH", "DELETE", Route = "ResourceTypes")]
+    [AcceptVerbs("POST", "PUT", "PATCH", "DELETE", Route = "ResourceTypes/{id}")]
+    [AcceptVerbs("POST", "PUT", "PATCH", "DELETE", Route = "Schemas")]
+    [AcceptVerbs("POST", "PUT", "PATCH", "DELETE", Route = "Schemas/{id}")]
+    public IActionResult RejectDiscoveryWrite() {
+        return Error(StatusCodes.Status405MethodNotAllowed, detail: "The HTTP method is not supported for this SCIM endpoint.");
     }
 
     /// <summary>Returns the installed schemas.</summary>

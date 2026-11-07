@@ -35,7 +35,9 @@ public class UserManagerSubjectShould
                        It.IsAny<Func<IQueryable<SchemataUser>, IQueryable<SchemataUser>>?>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
                   .Returns((Func<IQueryable<SchemataUser>, IQueryable<SchemataUser>> query, CancellationToken _, QueryOptions _) =>
                       ValueTask.FromResult(query(rows).SingleOrDefault()));
-        using var services = new ServiceCollection().AddSingleton(repository.Object).BuildServiceProvider();
+        using var services = new ServiceCollection().AddSingleton(repository.Object)
+                                                    .AddSingleton<ILookupNormalizer>(new UpperInvariantLookupNormalizer())
+                                                    .BuildServiceProvider();
         using var store = new SchemataUserStore<SchemataUser, SchemataRole, SchemataUserClaim, SchemataUserRole, SchemataUserLogin, SchemataUserToken, SchemataRoleClaim>(Mock.Of<IRepository<SchemataUserClaim>>(),
             Mock.Of<IRepository<SchemataUserRole>>(), Mock.Of<IRepository<SchemataUserLogin>>(),
             Mock.Of<IRepository<SchemataUserToken>>(), Mock.Of<IResourceMutation<SchemataUser>>(), services);

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Schemata.Identity.Skeleton.Entities;
+using Schemata.Scim.Entities;
 
 namespace Schemata.Identity.Scim.Integration.Tests;
 
@@ -12,4 +13,5 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<SchemataUserLogin> UserLogins { get; set; } = null!;
     public DbSet<SchemataUserToken> UserTokens { get; set; } = null!;
     public DbSet<SchemataRoleClaim> RoleClaims { get; set; } = null!;
+    public DbSet<ScimProvisioningBinding> ProvisioningBindings { get; set; } = null!;
 }

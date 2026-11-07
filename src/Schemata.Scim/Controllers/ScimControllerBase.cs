@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Schemata.Scim.Models;
 
 namespace Schemata.Scim.Controllers;
@@ -36,7 +38,7 @@ public abstract class ScimControllerBase : ControllerBase
     /// <param name="id">The resource id, or <see langword="null" /> for the collection itself.</param>
     /// <returns>The metadata.</returns>
     protected ScimMeta Meta(string resourceType, string collection, string? id = null) {
-        return ScimResults.Meta(HttpContext.Request, resourceType, collection, id);
+        return ScimResults.Meta(HttpContext.Request, resourceType, collection, id, BasePath);
     }
 
     /// <summary>Builds the absolute location of a discovery resource for this request.</summary>
@@ -44,6 +46,8 @@ public abstract class ScimControllerBase : ControllerBase
     /// <param name="id">The resource id, or <see langword="null" /> for the collection itself.</param>
     /// <returns>The absolute location.</returns>
     protected string Location(string collection, string? id = null) {
-        return ScimResults.Location(HttpContext.Request, collection, id);
+        return ScimResults.Location(HttpContext.Request, collection, id, BasePath);
     }
+
+    private string BasePath => HttpContext.RequestServices.GetRequiredService<IOptions<ScimServiceProviderOptions>>().Value.BasePath;
 }

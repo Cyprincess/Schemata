@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Threading.Tasks;
@@ -20,7 +21,11 @@ internal sealed class TestAuthenticationHandler(
             return Task.FromResult(AuthenticateResult.NoResult());
         }
 
-        var principal = new ClaimsPrincipal(new ClaimsIdentity([new(ClaimTypes.Name, "provisioner")], SchemeName));
+        var domain = Request.Headers["X-Test-Domain"].FirstOrDefault() ?? "domain-a";
+        var principal = new ClaimsPrincipal(new ClaimsIdentity([
+            new(ClaimTypes.Name, "provisioner"),
+            new("scim_domain", domain),
+        ], SchemeName));
 
         return Task.FromResult(AuthenticateResult.Success(new(principal, SchemeName)));
     }

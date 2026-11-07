@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
@@ -36,12 +35,6 @@ public class SchemataUserClaimsPrincipalFactory<TUser, TRole> : UserClaimsPrinci
 
     protected override async Task<ClaimsIdentity> GenerateClaimsAsync(TUser user) {
         var identity = await base.GenerateClaimsAsync(user);
-
-        // Provisioning markers describe row ownership, not the caller's authority; keeping them would
-        // put internal SCIM state in every cookie and token issued to a member of a managed group.
-        foreach (var claim in identity.FindAll(ProvisioningClaims.ScimGroup).ToList()) {
-            identity.RemoveClaim(claim);
-        }
 
         // The base factory issues IdentityClaims.Subject from user.Id.ToString() via
         // IdentityOptions.ClaimsIdentity.UserIdClaimType. Overwrite that value with the

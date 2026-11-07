@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Authorization.Foundation.Authentication;
 using Schemata.Authorization.Foundation.Queries;
@@ -419,6 +420,99 @@ public class RegisterReplaceFlowShould(WebAppFactory factory) : IClassFixture<We
         Assert.Equal("Trusted RP", replaced.GetProperty("client_name").GetString());
         Assert.Equal(clientId, replaced.GetProperty("client_id").GetString());
         Assert.Equal(TrustingValidator.Statement, replaced.GetProperty("software_statement").GetString());
+    }
+
+    [Theory]
+    [InlineData("/relative", "jwks_uri")]
+    [InlineData("http://rp.example/jwks", "jwks_uri")]
+    [InlineData("not a uri", "initiate_login_uri")]
+    [InlineData("http://rp.example/login", "initiate_login_uri")]
+    public async Task Invalid_Https_Create_Metadata_Writes_Nothing(string value, string field) {
+        using var host = factory.WithEnvironment("Testing");
+        using var client = host.CreateClient();
+        var before = await CountRowsAsync(host);
+        var body = new Dictionary<string, object?> {
+            ["redirect_uris"] = new[] { "https://rp.example/cb" },
+            [field] = value,
+        };
+
+        var (status, payload) = await PostRawAsync(client, body);
+
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.Equal(OAuthErrors.InvalidClientMetadata,
+            JsonDocument.Parse(payload).RootElement.GetProperty("error").GetString());
+        Assert.Equal(before, await CountRowsAsync(host));
+    }
+
+    [Theory]
+    [InlineData("/relative", "jwks_uri")]
+    [InlineData("http://rp.example/jwks", "jwks_uri")]
+    [InlineData("not a uri", "initiate_login_uri")]
+    [InlineData("http://rp.example/login", "initiate_login_uri")]
+    public async Task Invalid_Https_Replace_Metadata_Preserves_The_Registration(string value, string field) {
+        using var host = factory.WithEnvironment("Testing");
+        using var client = host.CreateClient();
+        var (clientId, rat, _) = await RegisterAsync(client, new() {
+            ["redirect_uris"] = new[] { "https://rp.example/cb" },
+            ["client_name"] = "Before",
+            ["jwks_uri"] = "https://rp.example/original-jwks",
+        });
+        var before = await ReadApplicationAsync(host, clientId);
+        var beforeRows = await CountRowsAsync(host);
+
+        var (status, payload, _) = await ReplaceAsync(client, clientId, new() {
+            ["client_id"] = clientId,
+            ["redirect_uris"] = new[] { "https://rp.example/cb" },
+            [field] = value,
+        }, rat);
+
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.Equal(OAuthErrors.InvalidClientMetadata,
+            JsonDocument.Parse(payload).RootElement.GetProperty("error").GetString());
+        Assert.Equal(before, await ReadApplicationAsync(host, clientId));
+        Assert.Equal(beforeRows, await CountRowsAsync(host));
+    }
+
+    [Fact]
+    public async Task Valid_Https_Key_And_Login_Uris_Survive_Create_And_Replace() {
+        using var host = factory.WithEnvironment("Testing");
+        using var client = host.CreateClient();
+        var (clientId, rat, created) = await RegisterAsync(client, new() {
+            ["redirect_uris"] = new[] { "https://rp.example/cb" },
+            ["jwks_uri"] = "https://rp.example/jwks",
+            ["initiate_login_uri"] = "https://rp.example/login",
+        });
+        Assert.Equal("https://rp.example/jwks", created.GetProperty("jwks_uri").GetString());
+        Assert.Equal("https://rp.example/login", created.GetProperty("initiate_login_uri").GetString());
+
+        var (status, payload, _) = await ReplaceAsync(client, clientId, new() {
+            ["client_id"] = clientId,
+            ["redirect_uris"] = new[] { "https://rp.example/cb" },
+            ["jwks_uri"] = "https://rp.example/replaced-jwks",
+            ["initiate_login_uri"] = "https://rp.example/replaced-login",
+        }, rat);
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        var replaced = JsonDocument.Parse(payload).RootElement;
+        Assert.Equal("https://rp.example/replaced-jwks", replaced.GetProperty("jwks_uri").GetString());
+        Assert.Equal("https://rp.example/replaced-login", replaced.GetProperty("initiate_login_uri").GetString());
+    }
+
+    private static async Task<(int Applications, int Securities)> CountRowsAsync(WebAppFactory host) {
+        using var scope = host.Services.CreateScope();
+        await using var context = await scope.ServiceProvider.GetRequiredService<IDbContextFactory<AuthorizationDbContext>>().CreateDbContextAsync();
+        return (await context.Applications.CountAsync(), await context.Securities.CountAsync());
+    }
+
+    private static async Task<string?> ReadApplicationAsync(WebAppFactory host, string clientId) {
+        using var scope = host.Services.CreateScope();
+        await using var context = await scope.ServiceProvider.GetRequiredService<IDbContextFactory<AuthorizationDbContext>>().CreateDbContextAsync();
+        var application = await context.Applications.SingleAsync(app => app.ClientId == clientId);
+        var keyUri = await context.Securities.Where(row => row.Parent == application.CanonicalName
+                                                        && row.Kind == "jwks_uri" && row.Status == "valid")
+                                  .Select(row => row.Value)
+                                  .SingleOrDefaultAsync();
+        return $"{application.ClientName}|{keyUri}|{application.InitiateLoginUri}";
     }
 
     private static async Task<(string ClientId, string Rat, JsonElement Created)> RegisterAsync(

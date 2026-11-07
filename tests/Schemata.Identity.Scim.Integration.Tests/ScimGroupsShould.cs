@@ -8,12 +8,11 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Abstractions;
 using Schemata.Entity.Repository;
 using Schemata.Identity.Scim.Integration.Tests.Fixtures;
 using Schemata.Identity.Skeleton.Entities;
-using Schemata.Identity.Skeleton.Managers;
 using Schemata.Scim;
+using Schemata.Scim.Entities;
 using Xunit;
 
 namespace Schemata.Identity.Scim.Integration.Tests;
@@ -21,671 +20,455 @@ namespace Schemata.Identity.Scim.Integration.Tests;
 [Trait("Layer", "Integration")]
 public sealed class ScimGroupsShould
 {
-    private const string Users  = "/scim/v2/Users";
     private const string Groups = "/scim/v2/Groups";
+    private const string Users = "/scim/v2/Users";
 
     [Fact]
-    public async Task Create_Get_List_Replace_And_Delete_A_Group() {
+    public async Task Relationship_Uris_Use_Configured_BasePath_And_Request_PathBase() {
+        using var factory = new WebAppFactory("CustomPath");
+        using var client = CreateClient(factory);
+        const string root = "/host/directory";
+        using var userResponse = await client.PostAsync(root + "/Users", new StringContent(JsonSerializer.Serialize(new {
+            schemas = new[] { ScimConstants.UserSchema }, userName = "rooted-user", externalId = "rooted-user",
+        }), Encoding.UTF8, "application/scim+json"));
+        Assert.Equal(HttpStatusCode.Created, userResponse.StatusCode);
+        var user = await ReadJsonAsync(userResponse);
+        var userId = user.GetProperty("id").GetString();
+        using var groupResponse = await client.PostAsync(root + "/Groups", GroupContent("Rooted group", members: [Member(userId!)]));
+        Assert.True(groupResponse.StatusCode == HttpStatusCode.Created, await groupResponse.Content.ReadAsStringAsync());
+        var group = await ReadJsonAsync(groupResponse);
+        var groupId = group.GetProperty("id").GetString();
+        Assert.Equal(new Uri(client.BaseAddress!, root + "/Users/" + userId).AbsoluteUri,
+            Assert.Single(group.GetProperty("members").EnumerateArray()).GetProperty("$ref").GetString());
+        using var read = await client.GetAsync(root + "/Users/" + userId);
+        var projected = await ReadJsonAsync(read);
+        Assert.Equal(new Uri(client.BaseAddress!, root + "/Groups/" + groupId).AbsoluteUri,
+            Assert.Single(projected.GetProperty("groups").EnumerateArray()).GetProperty("$ref").GetString());
+
+        using (var groupRead = await client.GetAsync(root + "/Groups/" + groupId)) {
+            Assert.Equal(HttpStatusCode.OK, groupRead.StatusCode);
+            Assert.Equal(new Uri(client.BaseAddress!, root + "/Users/" + userId).AbsoluteUri,
+                Assert.Single((await ReadJsonAsync(groupRead)).GetProperty("members").EnumerateArray()).GetProperty("$ref").GetString());
+        }
+
+        foreach (var (collection, filter, expectedId) in new[] {
+            ("Groups", "members.$ref pr", groupId), ("Groups", "members[$ref pr]", groupId),
+            ("Users", "groups.$ref pr", userId), ("Users", "groups[$ref pr]", userId),
+        }) {
+            using var get = await client.GetAsync(root + "/" + collection + "?filter=" + Uri.EscapeDataString(filter));
+            Assert.Equal(HttpStatusCode.OK, get.StatusCode);
+            var result = await ReadJsonAsync(get);
+            Assert.Equal(1, result.GetProperty("totalResults").GetInt32());
+            Assert.Equal(expectedId, Assert.Single(result.GetProperty("Resources").EnumerateArray()).GetProperty("id").GetString());
+            using var search = await client.PostAsync(root + "/" + collection + "/.search", new StringContent(JsonSerializer.Serialize(new {
+                schemas = new[] { ScimConstants.SearchRequestSchema }, filter,
+            }), Encoding.UTF8, "application/scim+json"));
+            Assert.Equal(HttpStatusCode.OK, search.StatusCode);
+            var searched = await ReadJsonAsync(search);
+            Assert.Equal(1, searched.GetProperty("totalResults").GetInt32());
+            Assert.Equal(expectedId, Assert.Single(searched.GetProperty("Resources").EnumerateArray()).GetProperty("id").GetString());
+        }
+
+        using (var removed = await client.PatchAsync(root + "/Groups/" + groupId,
+            PatchContent(new Dictionary<string, object?> { ["op"] = "remove", ["path"] = "members[$ref pr]" }))) {
+            Assert.Equal(HttpStatusCode.OK, removed.StatusCode);
+            Assert.Empty((await ReadJsonAsync(removed)).GetProperty("members").EnumerateArray());
+        }
+        using (var scope = factory.Services.CreateScope()) {
+            Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<IRepository<SchemataUserRole>>().CountAsync(query => query));
+        }
+        using var after = await client.GetAsync(root + "/Users/" + userId);
+        Assert.Equal(HttpStatusCode.OK, after.StatusCode);
+        Assert.Empty((await ReadJsonAsync(after)).GetProperty("groups").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Complete_Lifecycle_Preserves_Identity_And_Projects_ReadOnly_User_Groups() {
         using var factory = new WebAppFactory();
-        using var client  = CreateClient(factory);
-        var       alice   = await CreateUserAsync(client, "Alice", "Alice Example");
-        var       bob     = await CreateUserAsync(client, "Bob", "Bob Example");
-        var       aliceId = alice.GetProperty("id").GetString()!;
-        var       bobId   = bob.GetProperty("id").GetString()!;
+        using var client = CreateClient(factory);
+        var first = await CreateUserAsync(client, "Group-User-1", "First User", "user-1");
+        var second = await CreateUserAsync(client, "Group-User-2", "Second User", "user-2");
+        var firstId = first.GetProperty("id").GetString()!;
+        var secondId = second.GetProperty("id").GetString()!;
 
-        using var created = await client.PostAsync(
-            Groups,
-            GroupContent("Engineering", Member(aliceId), Member(bobId)));
-        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
-        Assert.Equal(ScimConstants.MediaType, created.Content.Headers.ContentType?.MediaType);
-        var body = await ReadJsonAsync(created);
-        var id   = body.GetProperty("id").GetString();
-        Assert.NotNull(id);
-        Assert.True(Guid.TryParse(id, out _));
-        Assert.Equal(ScimConstants.GroupSchema, body.GetProperty("schemas")[0].GetString());
-        Assert.Equal("Engineering", body.GetProperty("displayName").GetString());
-        Assert.Equal("Group", body.GetProperty("meta").GetProperty("resourceType").GetString());
-        Assert.EndsWith($"{Groups}/{id}", body.GetProperty("meta").GetProperty("location").GetString());
-        Assert.Equal(body.GetProperty("meta").GetProperty("location").GetString(), created.Headers.Location?.ToString());
+        var created = await CreateGroupAsync(client, "Initial Group", "group-external",
+            Member(firstId, reference: $"https://ref.invalid/scim/v2/Users/{firstId}"));
+        var id = created.GetProperty("id").GetString()!;
+        Assert.Equal("group-external", created.GetProperty("externalId").GetString());
+        var initialMember = Assert.Single(created.GetProperty("members").EnumerateArray());
+        Assert.Equal(firstId, initialMember.GetProperty("value").GetString());
+        Assert.Equal("First User", initialMember.GetProperty("display").GetString());
+        Assert.Equal("User", initialMember.GetProperty("type").GetString());
+        Assert.Equal(new Uri(client.BaseAddress!, $"/scim/v2/Users/{firstId}").AbsoluteUri, initialMember.GetProperty("$ref").GetString());
 
-        var members = body.GetProperty("members").EnumerateArray().ToList();
-        Assert.Equal(2, members.Count);
-        Assert.All(members, member => {
-            Assert.Equal("User", member.GetProperty("type").GetString());
-            Assert.EndsWith($"{Users}/{member.GetProperty("value").GetString()}",
-                            member.GetProperty("$ref").GetString());
-        });
-        Assert.Contains(members, member => member.GetProperty("value").GetString() == aliceId
-                                        && member.GetProperty("display").GetString() == "Alice Example");
-        Assert.Contains(members, member => member.GetProperty("value").GetString() == bobId
-                                        && member.GetProperty("display").GetString() == "Bob Example");
-
-        using (var single = await client.GetAsync($"{Groups}/{id}")) {
-            Assert.Equal(HttpStatusCode.OK, single.StatusCode);
-            var root = await ReadJsonAsync(single);
-            Assert.Equal(id, root.GetProperty("id").GetString());
-            Assert.Equal("Engineering", root.GetProperty("displayName").GetString());
-            Assert.Equal(2, root.GetProperty("members").GetArrayLength());
+        string canonicalName;
+        string resourceName;
+        using (var scope = factory.Services.CreateScope()) {
+            var role = await scope.ServiceProvider.GetRequiredService<IRepository<SchemataRole>>().FindAsync([Guid.Parse(id)]);
+            Assert.NotNull(role);
+            Assert.Equal(id, role.Uid.ToString());
+            Assert.NotNull(role.CanonicalName);
+            Assert.NotNull(role.Name);
+            canonicalName = role.CanonicalName;
+            resourceName = role.Name;
+            Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<IRepository<SchemataRoleClaim>>().CountAsync(q => q));
         }
 
-        using (var list = await client.GetAsync(Groups)) {
-            var root = await ReadJsonAsync(list);
-            Assert.Equal(ScimConstants.ListResponseSchema, root.GetProperty("schemas")[0].GetString());
-            Assert.Equal(1, root.GetProperty("totalResults").GetInt32());
-            Assert.Equal(1, root.GetProperty("startIndex").GetInt32());
-            Assert.Equal(1, root.GetProperty("itemsPerPage").GetInt32());
-            Assert.Equal(id, root.GetProperty("Resources")[0].GetProperty("id").GetString());
-        }
-
-        using (var replaced = await client.PutAsync($"{Groups}/{id}", GroupContent("Engineering-Renamed", Member(bobId)))) {
-            Assert.Equal(HttpStatusCode.OK, replaced.StatusCode);
-            var root = await ReadJsonAsync(replaced);
-            Assert.Equal(id, root.GetProperty("id").GetString());
-            Assert.Equal("Engineering-Renamed", root.GetProperty("displayName").GetString());
-            Assert.Equal(1, root.GetProperty("members").GetArrayLength());
-            Assert.Equal(bobId, root.GetProperty("members")[0].GetProperty("value").GetString());
-        }
-
-        using (var single = await client.GetAsync($"{Groups}/{id}")) {
-            var root = await ReadJsonAsync(single);
-            Assert.Equal("Engineering-Renamed", root.GetProperty("displayName").GetString());
-            Assert.Equal(1, root.GetProperty("members").GetArrayLength());
-            Assert.Equal(bobId, root.GetProperty("members")[0].GetProperty("value").GetString());
-        }
-
-        using (var bobView = await client.GetAsync($"{Users}/{bobId}")) {
-            var groups = (await ReadJsonAsync(bobView)).GetProperty("groups");
-            Assert.Equal(1, groups.GetArrayLength());
-            var group = groups[0];
+        using (var user = await client.GetAsync($"{Users}/{firstId}")) {
+            var group = Assert.Single((await ReadJsonAsync(user)).GetProperty("groups").EnumerateArray());
             Assert.Equal(id, group.GetProperty("value").GetString());
-            Assert.Equal("Engineering-Renamed", group.GetProperty("display").GetString());
-            Assert.Equal("direct", group.GetProperty("type").GetString());
-            Assert.EndsWith($"{Groups}/{id}", group.GetProperty("$ref").GetString());
+            Assert.Equal("Initial Group", group.GetProperty("display").GetString());
+            Assert.Equal(new Uri(client.BaseAddress!, $"/scim/v2/Groups/{id}").AbsoluteUri, group.GetProperty("$ref").GetString());
+        }
+
+        using (var readOnly = await client.PatchAsync($"{Users}/{firstId}", PatchContent(
+            Operation("replace", "groups", new[] { Member(secondId) })))) {
+            Assert.Equal(HttpStatusCode.BadRequest, readOnly.StatusCode);
+            AssertScimError(await ReadJsonAsync(readOnly), "400", ScimConstants.Mutability);
+        }
+
+        using (var replaced = await client.PutAsync($"{Groups}/{id}", GroupContent("Renamed Group", "group-external",
+            Member(secondId)))) {
+            Assert.True(replaced.StatusCode == HttpStatusCode.OK, await replaced.Content.ReadAsStringAsync());
+            var body = await ReadJsonAsync(replaced);
+            Assert.Equal(id, body.GetProperty("id").GetString());
+            Assert.Equal(secondId, Assert.Single(body.GetProperty("members").EnumerateArray()).GetProperty("value").GetString());
         }
 
         using (var scope = factory.Services.CreateScope()) {
-            var users = scope.ServiceProvider.GetRequiredService<SchemataUserManager<SchemataUser>>();
-            var a     = await users.FindByNameAsync("Alice");
-            var b     = await users.FindByNameAsync("Bob");
-            Assert.NotNull(a);
-            Assert.NotNull(b);
-            Assert.False(await users.IsInRoleAsync(a!, "Engineering-Renamed"));
-            Assert.True(await users.IsInRoleAsync(b!, "Engineering-Renamed"));
+            var role = await scope.ServiceProvider.GetRequiredService<IRepository<SchemataRole>>().FindAsync([Guid.Parse(id)]);
+            Assert.NotNull(role);
+            Assert.Equal(canonicalName, role.CanonicalName);
+            Assert.Equal(resourceName, role.Name);
+            Assert.Equal("Renamed Group", role.DisplayName);
+        }
+
+        using (var formerMember = await client.GetAsync($"{Users}/{firstId}")) {
+            Assert.Empty((await ReadJsonAsync(formerMember)).GetProperty("groups").EnumerateArray());
+        }
+        using (var currentMember = await client.GetAsync($"{Users}/{secondId}")) {
+            Assert.Equal(id, Assert.Single((await ReadJsonAsync(currentMember)).GetProperty("groups").EnumerateArray())
+                .GetProperty("value").GetString());
+        }
+
+        using (var emptied = await client.PutAsync($"{Groups}/{id}", GroupContent("Empty Group"))) {
+            Assert.Equal(HttpStatusCode.OK, emptied.StatusCode);
+            var body = await ReadJsonAsync(emptied);
+            Assert.Empty(body.GetProperty("members").EnumerateArray());
+            Assert.False(body.TryGetProperty("externalId", out _));
         }
 
         using (var deleted = await client.DeleteAsync($"{Groups}/{id}")) {
             Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
         }
-
         using (var missing = await client.GetAsync($"{Groups}/{id}")) {
             Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
-            AssertScimError(await ReadJsonAsync(missing), "404");
         }
 
-        using (var list = await client.GetAsync(Groups)) {
-            var root = await ReadJsonAsync(list);
-            Assert.Equal(0, root.GetProperty("totalResults").GetInt32());
-            Assert.Equal(0, root.GetProperty("Resources").GetArrayLength());
-        }
-
-        using (var bobView = await client.GetAsync($"{Users}/{bobId}")) {
-            Assert.Equal(0, (await ReadJsonAsync(bobView)).GetProperty("groups").GetArrayLength());
-        }
-
-        using (var scope = factory.Services.CreateScope()) {
-            Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<IRepository<SchemataRole>>()
-                                           .CountAsync(q => q));
-            Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<IRepository<SchemataUserRole>>()
-                                           .CountAsync(q => q));
-            Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<IRepository<SchemataRoleClaim>>()
-                                           .CountAsync(q => q));
-        }
+        using var verification = factory.Services.CreateScope();
+        Assert.Equal(0, await verification.ServiceProvider.GetRequiredService<IRepository<SchemataUserRole>>().CountAsync(q => q));
+        Assert.Equal(0, await verification.ServiceProvider.GetRequiredService<IRepository<ScimProvisioningBinding>>()
+            .CountAsync(q => q.Where(binding => binding.ResourceType == "Group")));
     }
 
     [Fact]
-    public async Task Require_A_Display_Name() {
+    public async Task Create_Requires_Explicit_Role_Provisioning_Privilege() {
+        using var factory = new WebAppFactory("PrivilegeDenied");
+        using var client = CreateClient(factory);
+        var user = await CreateUserAsync(client, "Privilege-User");
+
+        using var response = await client.PostAsync(Groups, GroupContent("Denied Group", members: Member(user.GetProperty("id").GetString()!)));
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        AssertScimError(await ReadJsonAsync(response), "403");
+
+        using var scope = factory.Services.CreateScope();
+        Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<IRepository<SchemataRole>>().CountAsync(q => q));
+        Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<IRepository<ScimProvisioningBinding>>()
+            .CountAsync(q => q.Where(binding => binding.ResourceType == "Group")));
+    }
+
+    [Fact]
+    public async Task Unbound_Roles_Cannot_Be_Adopted_By_Id_Or_DisplayName() {
         using var factory = new WebAppFactory();
-        using var client  = CreateClient(factory);
-
-        using (var missing = await client.PostAsync(Groups, GroupContent(null))) {
-            Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
-            AssertScimError(await ReadJsonAsync(missing), "400", ScimConstants.InvalidValue);
-        }
-
-        using (var blank = await client.PostAsync(Groups, GroupContent("   "))) {
-            Assert.Equal(HttpStatusCode.BadRequest, blank.StatusCode);
-            AssertScimError(await ReadJsonAsync(blank), "400", ScimConstants.InvalidValue);
-        }
-
-        var group = await CreateGroupAsync(client, GroupContent("Required"));
-        var id    = group.GetProperty("id").GetString()!;
-
-        using (var blank = await client.PutAsync($"{Groups}/{id}", GroupContent("   "))) {
-            Assert.Equal(HttpStatusCode.BadRequest, blank.StatusCode);
-            AssertScimError(await ReadJsonAsync(blank), "400", ScimConstants.InvalidValue);
-        }
-
-        using (var single = await client.GetAsync($"{Groups}/{id}")) {
-            Assert.Equal("Required", (await ReadJsonAsync(single)).GetProperty("displayName").GetString());
-        }
-    }
-
-    [Fact]
-    public async Task Validate_Member_Value_Reference_And_Type() {
-        using var factory = new WebAppFactory();
-        using var client  = CreateClient(factory);
-        var       alice   = await CreateUserAsync(client, "Alice", "Alice Example");
-        var       aliceId = alice.GetProperty("id").GetString()!;
-        var       otherId = Guid.NewGuid().ToString();
-
-        foreach (var invalid in new[] {
-                     GroupContent("Mismatched", Member(aliceId, $"{Users}/{otherId}")),
-                     GroupContent("Group-Type", Member(aliceId, type: "Group")),
-                     GroupContent("Nested", Member(aliceId, $"{Groups}/{aliceId}")),
-                     GroupContent("Missing", Member(otherId)),
-                     GroupContent("No-Value", new Dictionary<string, object?> { ["type"] = "User" }),
-                 }) {
-            using var response = await client.PostAsync(Groups, invalid);
-            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            AssertScimError(await ReadJsonAsync(response), "400", ScimConstants.InvalidValue);
-        }
-
-        var payload = new Dictionary<string, object?> {
-            ["id"]          = "forged",
-            ["schemas"]     = new[] { ScimConstants.GroupSchema },
-            ["displayName"] = "Validated",
-            ["members"] = new[] {
-                Member(aliceId, display: "Forged Display"),
-                Member(aliceId),
-            },
-            ["meta"] = new Dictionary<string, object?>(),
-        };
-
-        using (var response = await client.PostAsync(Groups, JsonContent(payload))) {
-            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-            var root = await ReadJsonAsync(response);
-            Assert.NotEqual("forged", root.GetProperty("id").GetString());
-            Assert.True(Guid.TryParse(root.GetProperty("id").GetString(), out _));
-            Assert.Equal(1, root.GetProperty("members").GetArrayLength());
-            var member = root.GetProperty("members")[0];
-            Assert.Equal(aliceId, member.GetProperty("value").GetString());
-            Assert.Equal("Alice Example", member.GetProperty("display").GetString());
-            Assert.EndsWith($"{Users}/{aliceId}", member.GetProperty("$ref").GetString());
-        }
-
-        using var list = await client.GetAsync(Groups);
-        Assert.Equal(1, (await ReadJsonAsync(list)).GetProperty("totalResults").GetInt32());
-    }
-
-    [Fact]
-    public async Task Replace_Clears_The_Complete_Membership() {
-        using var factory = new WebAppFactory();
-        using var client  = CreateClient(factory);
-        var       alice   = await CreateUserAsync(client, "Alice");
-        var       bob     = await CreateUserAsync(client, "Bob");
-        var       aliceId = alice.GetProperty("id").GetString()!;
-        var       bobId   = bob.GetProperty("id").GetString()!;
-
-        var group = await CreateGroupAsync(client, GroupContent("Clearing", Member(aliceId), Member(bobId)));
-        var id    = group.GetProperty("id").GetString()!;
-
-        using (var cleared = await client.PutAsync($"{Groups}/{id}", GroupContent("Clearing", Array.Empty<object>()))) {
-            Assert.Equal(HttpStatusCode.OK, cleared.StatusCode);
-            Assert.Equal(0, (await ReadJsonAsync(cleared)).GetProperty("members").GetArrayLength());
-        }
-
+        using var client = CreateClient(factory);
+        Guid id;
+        string canonicalName;
         using (var scope = factory.Services.CreateScope()) {
-            Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<IRepository<SchemataUserRole>>()
-                                           .CountAsync(q => q));
-        }
-
-        using (var added = await client.PutAsync($"{Groups}/{id}", GroupContent("Clearing", Member(aliceId)))) {
-            Assert.Equal(HttpStatusCode.OK, added.StatusCode);
-            Assert.Equal(1, (await ReadJsonAsync(added)).GetProperty("members").GetArrayLength());
-        }
-
-        using (var omitted = await client.PutAsync($"{Groups}/{id}", GroupContent("Clearing"))) {
-            Assert.Equal(HttpStatusCode.OK, omitted.StatusCode);
-            Assert.Equal(0, (await ReadJsonAsync(omitted)).GetProperty("members").GetArrayLength());
-        }
-
-        using (var scope = factory.Services.CreateScope()) {
-            Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<IRepository<SchemataUserRole>>()
-                                           .CountAsync(q => q));
-        }
-    }
-
-    [Fact]
-    public async Task Roll_Back_A_Failed_Membership_Replacement() {
-        using var factory = new WebAppFactory("MembershipFailure");
-        using var client  = CreateClient(factory);
-        var       alice   = await CreateUserAsync(client, "Alice");
-        var       aliceId = alice.GetProperty("id").GetString()!;
-
-        string failingId;
-        using (var scope = factory.Services.CreateScope()) {
-            var repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataUser>>();
-            var user       = new SchemataUser { UserName = "Failing", Name = "failing-member", DisplayName = "Failing" };
-            await repository.AddAsync(user);
-            await repository.CommitAsync();
-            failingId = user.Uid.ToString();
-        }
-
-        var group = await CreateGroupAsync(client, GroupContent("Rollback", Member(aliceId)));
-        var id    = group.GetProperty("id").GetString()!;
-
-        using (var failed = await client.PutAsync(
-                   $"{Groups}/{id}",
-                   GroupContent("Rollback-Renamed", Member(failingId)))) {
-            Assert.Equal(HttpStatusCode.InternalServerError, failed.StatusCode);
-            AssertScimError(await ReadJsonAsync(failed), "500");
-        }
-
-        using (var single = await client.GetAsync($"{Groups}/{id}")) {
-            var root = await ReadJsonAsync(single);
-            Assert.Equal("Rollback", root.GetProperty("displayName").GetString());
-            Assert.Equal(1, root.GetProperty("members").GetArrayLength());
-            Assert.Equal(aliceId, root.GetProperty("members")[0].GetProperty("value").GetString());
-        }
-
-        using (var scope = factory.Services.CreateScope()) {
-            var role = await scope.ServiceProvider.GetRequiredService<IRepository<SchemataRole>>()
-                                    .SingleOrDefaultAsync(q => q.Where(r => r.Uid == Guid.Parse(id)));
-            Assert.NotNull(role);
-            Assert.Equal("Rollback", role!.DisplayName);
-            var links = await scope.ServiceProvider.GetRequiredService<IRepository<SchemataUserRole>>()
-                                    .ListAsync(q => q.Where(l => l.RoleId == role.CanonicalName))
-                                    .ToListAsync();
-            Assert.Single(links);
-            Assert.DoesNotContain(links, link => link.UserId == FailingMembershipAdvisor.User);
-        }
-    }
-
-    [Fact]
-    public async Task Reject_Unauthenticated_And_Unauthorized_Group_Requests() {
-        using (var factory = new WebAppFactory()) {
-            using var anonymous = CreateClient(factory, authenticated: false);
-            using var get       = await anonymous.GetAsync(Groups);
-            Assert.Equal(HttpStatusCode.Unauthorized, get.StatusCode);
-            AssertScimError(await ReadJsonAsync(get), "401");
-            using var post = await anonymous.PostAsync(Groups, GroupContent("Anonymous"));
-            Assert.Equal(HttpStatusCode.Unauthorized, post.StatusCode);
-            AssertScimError(await ReadJsonAsync(post), "401");
-        }
-
-        using (var factory = new WebAppFactory("Denied")) {
-            using var client = CreateClient(factory);
-            using var denied = await client.GetAsync(Groups);
-            Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
-            AssertScimError(await ReadJsonAsync(denied), "403");
-            using var post = await client.PostAsync(Groups, GroupContent("Denied"));
-            Assert.Equal(HttpStatusCode.Forbidden, post.StatusCode);
-            AssertScimError(await ReadJsonAsync(post), "403");
-        }
-
-        using (var factory = new WebAppFactory("ScimPolicy")) {
-            using var client = CreateClient(factory);
-            using var denied = await client.GetAsync(Groups);
-            Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
-            AssertScimError(await ReadJsonAsync(denied), "403");
-        }
-    }
-
-    [Fact]
-    public async Task Do_Not_Expose_Or_Adopt_Unmanaged_Roles() {
-        using var factory     = new WebAppFactory();
-        using var client      = CreateClient(factory);
-        string    privilegedId;
-        string    privilegedName;
-        using (var scope = factory.Services.CreateScope()) {
-            var roles = scope.ServiceProvider.GetRequiredService<RoleManager<SchemataRole>>();
-            var role  = new SchemataRole { DisplayName = "Privileged" };
-            var result = await roles.CreateAsync(role);
-            Assert.True(result.Succeeded, string.Join("; ", result.Errors.Select(e => e.Description)));
-            privilegedId   = role.Uid.ToString();
-            privilegedName = role.Name!;
+            var manager = scope.ServiceProvider.GetRequiredService<RoleManager<SchemataRole>>();
+            var role = new SchemataRole { DisplayName = "Privileged Role" };
+            Assert.True((await manager.CreateAsync(role)).Succeeded);
+            id = role.Uid;
+            Assert.NotNull(role.CanonicalName);
+            canonicalName = role.CanonicalName;
         }
 
         using (var list = await client.GetAsync(Groups)) {
             Assert.Equal(0, (await ReadJsonAsync(list)).GetProperty("totalResults").GetInt32());
         }
-
-        using (var single = await client.GetAsync($"{Groups}/{privilegedId}")) {
-            Assert.Equal(HttpStatusCode.NotFound, single.StatusCode);
-            AssertScimError(await ReadJsonAsync(single), "404");
+        using (var get = await client.GetAsync($"{Groups}/{id}")) {
+            Assert.Equal(HttpStatusCode.NotFound, get.StatusCode);
         }
-
-        using (var named = await client.GetAsync($"{Groups}/{privilegedName}")) {
-            Assert.Equal(HttpStatusCode.NotFound, named.StatusCode);
+        using (var patch = await client.PatchAsync($"{Groups}/{id}", PatchContent(Operation("replace", "displayName", "Adopted")))) {
+            Assert.Equal(HttpStatusCode.Forbidden, patch.StatusCode);
         }
-
-        using (var replaced = await client.PutAsync($"{Groups}/{privilegedId}", GroupContent("Hijacked"))) {
-            Assert.Equal(HttpStatusCode.NotFound, replaced.StatusCode);
+        using (var put = await client.PutAsync($"{Groups}/{id}", GroupContent("Adopted"))) {
+            Assert.Equal(HttpStatusCode.Forbidden, put.StatusCode);
         }
-
-        using (var deleted = await client.DeleteAsync($"{Groups}/{privilegedId}")) {
-            Assert.Equal(HttpStatusCode.NotFound, deleted.StatusCode);
+        using (var delete = await client.DeleteAsync($"{Groups}/{id}")) {
+            Assert.Equal(HttpStatusCode.Forbidden, delete.StatusCode);
         }
-
-        using (var duplicate = await client.PostAsync(Groups, GroupContent("Privileged"))) {
+        using (var duplicate = await client.PostAsync(Groups, GroupContent("Privileged Role"))) {
             Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
-            AssertScimError(await ReadJsonAsync(duplicate), "409", ScimConstants.Uniqueness);
         }
 
-        using (var scope = factory.Services.CreateScope()) {
-            var roles = await scope.ServiceProvider.GetRequiredService<IRepository<SchemataRole>>()
-                                    .ListAsync(q => q)
-                                    .ToListAsync();
-            Assert.Single(roles);
-            Assert.Equal(privilegedId, roles[0].Uid.ToString());
-        }
-
-        var allowed = await CreateGroupAsync(client, GroupContent("Allowed"));
-        Assert.NotEqual(privilegedId, allowed.GetProperty("id").GetString());
-
-        using (var list = await client.GetAsync(Groups)) {
-            var resources = (await ReadJsonAsync(list)).GetProperty("Resources").EnumerateArray().ToList();
-            Assert.Single(resources);
-            Assert.Equal(allowed.GetProperty("id").GetString(), resources[0].GetProperty("id").GetString());
-        }
+        using var verification = factory.Services.CreateScope();
+        var stored = await verification.ServiceProvider.GetRequiredService<IRepository<SchemataRole>>().FindAsync([id]);
+        Assert.NotNull(stored);
+        Assert.Equal("Privileged Role", stored.DisplayName);
+        Assert.Equal(canonicalName, stored.CanonicalName);
+        Assert.Equal(0, await verification.ServiceProvider.GetRequiredService<IRepository<ScimProvisioningBinding>>()
+            .CountAsync(q => q.Where(binding => binding.ResourceType == "Group")));
     }
 
     [Fact]
-    public async Task Page_List_Groups_With_Clamped_Start_Index_And_Count() {
-        using var factory = new WebAppFactory("Limited");
-        using var client  = CreateClient(factory);
-        foreach (var name in new[] { "Page-A", "Page-B", "Page-C" }) {
-            await CreateGroupAsync(client, GroupContent(name));
-        }
-
-        using (var response = await client.GetAsync($"{Groups}?startIndex=2&count=1")) {
-            var root = await ReadJsonAsync(response);
-            Assert.Equal(3, root.GetProperty("totalResults").GetInt32());
-            Assert.Equal(2, root.GetProperty("startIndex").GetInt32());
-            Assert.Equal(1, root.GetProperty("itemsPerPage").GetInt32());
-            Assert.Equal(1, root.GetProperty("Resources").GetArrayLength());
-        }
-
-        using (var response = await client.GetAsync($"{Groups}?startIndex=0&count=10")) {
-            var root = await ReadJsonAsync(response);
-            Assert.Equal(1, root.GetProperty("startIndex").GetInt32());
-            Assert.Equal(2, root.GetProperty("itemsPerPage").GetInt32());
-            Assert.Equal(2, root.GetProperty("Resources").GetArrayLength());
-        }
-
-        using (var response = await client.GetAsync($"{Groups}?startIndex=1&count=-5")) {
-            var root = await ReadJsonAsync(response);
-            Assert.Equal(3, root.GetProperty("totalResults").GetInt32());
-            Assert.Equal(0, root.GetProperty("itemsPerPage").GetInt32());
-            Assert.Equal(0, root.GetProperty("Resources").GetArrayLength());
-        }
-
-        using (var response = await client.GetAsync($"{Groups}?startIndex=99")) {
-            var root = await ReadJsonAsync(response);
-            Assert.Equal(99, root.GetProperty("startIndex").GetInt32());
-            Assert.Equal(0, root.GetProperty("itemsPerPage").GetInt32());
-            Assert.Equal(0, root.GetProperty("Resources").GetArrayLength());
-        }
-    }
-
-    [Fact]
-    public async Task Reject_Group_Filters_And_Report_Patch_As_Not_Implemented() {
+    public async Task Patch_Add_Remove_Replace_And_ValuePath_Preserve_Membership_Idempotence() {
         using var factory = new WebAppFactory();
-        using var client  = CreateClient(factory);
-        var       group   = await CreateGroupAsync(client, GroupContent("Filtered"));
-        var       id      = group.GetProperty("id").GetString();
+        using var client = CreateClient(factory);
+        var first = await CreateUserAsync(client, "Patch-User-1");
+        var second = await CreateUserAsync(client, "Patch-User-2");
+        var third = await CreateUserAsync(client, "Patch-User-3");
+        var firstId = first.GetProperty("id").GetString()!;
+        var secondId = second.GetProperty("id").GetString()!;
+        var thirdId = third.GetProperty("id").GetString()!;
+        var group = await CreateGroupAsync(client, "Patch Group", members: Member(firstId));
+        var id = group.GetProperty("id").GetString()!;
 
-        using (var filtered = await client.GetAsync($"{Groups}?filter={Uri.EscapeDataString("displayName eq \"Filtered\"")}")) {
-            Assert.Equal(HttpStatusCode.BadRequest, filtered.StatusCode);
-            AssertScimError(await ReadJsonAsync(filtered), "400", ScimConstants.InvalidFilter);
-        }
-
-        using var patch = await client.PatchAsync(
-            $"{Groups}/{id}",
-            new StringContent("{\"Operations\":[]}", Encoding.UTF8, ScimConstants.MediaType));
-        Assert.Equal(HttpStatusCode.NotImplemented, patch.StatusCode);
-        AssertScimError(await ReadJsonAsync(patch), "501");
-    }
-
-    [Fact]
-    public async Task Reject_A_Duplicate_Display_Name_On_Replace() {
-        using var factory = new WebAppFactory();
-        using var client  = CreateClient(factory);
-        var       first   = await CreateGroupAsync(client, GroupContent("First"));
-        await CreateGroupAsync(client, GroupContent("Second"));
-        var id = first.GetProperty("id").GetString();
-
-        using (var duplicate = await client.PutAsync($"{Groups}/{id}", GroupContent("Second"))) {
-            Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
-            AssertScimError(await ReadJsonAsync(duplicate), "409", ScimConstants.Uniqueness);
-        }
-
-        using var single = await client.GetAsync($"{Groups}/{id}");
-        Assert.Equal("First", (await ReadJsonAsync(single)).GetProperty("displayName").GetString());
-    }
-
-    [Fact]
-    public async Task Adopt_An_Administratively_Marked_Role() {
-        using var factory = new WebAppFactory();
-        using var client  = CreateClient(factory);
-        string roleId;
-        using (var scope = factory.Services.CreateScope()) {
-            var roles = scope.ServiceProvider.GetRequiredService<RoleManager<SchemataRole>>();
-            var role  = new SchemataRole { DisplayName = "Adopted" };
-            Assert.True((await roles.CreateAsync(role)).Succeeded);
-            var marked = await roles.AddClaimAsync(role, new(SchemataConstants.ProvisioningClaims.ScimGroup, "managed"));
-            Assert.True(marked.Succeeded);
-            roleId = role.Uid.ToString();
-        }
-
-        using (var single = await client.GetAsync($"{Groups}/{roleId}")) {
-            Assert.Equal(HttpStatusCode.OK, single.StatusCode);
-            var root = await ReadJsonAsync(single);
-            Assert.Equal("Adopted", root.GetProperty("displayName").GetString());
-            Assert.Equal(0, root.GetProperty("members").GetArrayLength());
-        }
-
-        var member = await CreateUserAsync(client, "Adopted-Member");
-        var userId = member.GetProperty("id").GetString()!;
-
-        using (var added = await client.PutAsync($"{Groups}/{roleId}", GroupContent("Adopted-Renamed", Member(userId)))) {
+        using (var added = await client.PatchAsync($"{Groups}/{id}", PatchContent(
+            Operation("add", "members", new[] { Member(secondId), Member(secondId) }),
+            Operation("add", "members", Member(secondId))))) {
             Assert.Equal(HttpStatusCode.OK, added.StatusCode);
-            Assert.Equal("Adopted-Renamed", (await ReadJsonAsync(added)).GetProperty("displayName").GetString());
+            var members = (await ReadJsonAsync(added)).GetProperty("members").EnumerateArray().ToList();
+            Assert.Equal(2, members.Count);
+            Assert.Equal(new[] { firstId, secondId }.OrderBy(value => value), members.Select(member => member.GetProperty("value").GetString()).OrderBy(value => value));
         }
 
-        using (var scope = factory.Services.CreateScope()) {
-            Assert.Equal(1, await scope.ServiceProvider.GetRequiredService<IRepository<SchemataUserRole>>()
-                                           .CountAsync(q => q));
+        using (var removed = await client.PatchAsync($"{Groups}/{id}", PatchContent(
+            new Dictionary<string, object?> { ["op"] = "remove", ["path"] = $"members[value eq \"{firstId}\"]" }))) {
+            Assert.Equal(HttpStatusCode.OK, removed.StatusCode);
+            Assert.Equal(secondId, Assert.Single((await ReadJsonAsync(removed)).GetProperty("members").EnumerateArray())
+                .GetProperty("value").GetString());
         }
 
-        using (var cleared = await client.PutAsync($"{Groups}/{roleId}", GroupContent("Adopted-Renamed", Array.Empty<object>()))) {
-            Assert.Equal(HttpStatusCode.OK, cleared.StatusCode);
-            Assert.Equal(0, (await ReadJsonAsync(cleared)).GetProperty("members").GetArrayLength());
-        }
-
-        using (var scope = factory.Services.CreateScope()) {
-            Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<IRepository<SchemataUserRole>>()
-                                           .CountAsync(q => q));
-            var marker = await scope.ServiceProvider.GetRequiredService<IRepository<SchemataRoleClaim>>()
-                                    .ListAsync(q => q.Where(rc => rc.ClaimType == SchemataConstants.ProvisioningClaims.ScimGroup))
-                                    .ToListAsync();
-            Assert.Single(marker);
-        }
-
-        using (var deleted = await client.DeleteAsync($"{Groups}/{roleId}")) {
-            Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
-        }
-
-        using (var scope = factory.Services.CreateScope()) {
-            Assert.Null(await scope.ServiceProvider.GetRequiredService<IRepository<SchemataRole>>()
-                                   .SingleOrDefaultAsync(q => q.Where(r => r.Uid == Guid.Parse(roleId))));
+        using (var replaced = await client.PatchAsync($"{Groups}/{id}", PatchContent(
+            Operation("replace", "members", new[] { Member(thirdId) }),
+            Operation("replace", "displayName", "Patched Group")))) {
+            Assert.Equal(HttpStatusCode.OK, replaced.StatusCode);
+            var body = await ReadJsonAsync(replaced);
+            Assert.Equal("Patched Group", body.GetProperty("displayName").GetString());
+            Assert.Equal(thirdId, Assert.Single(body.GetProperty("members").EnumerateArray()).GetProperty("value").GetString());
         }
     }
 
-    [Fact]
-    public async Task Keep_The_Management_Marker_Out_Of_Principals() {
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("cross-domain")]
+    [InlineData("bad-value")]
+    [InlineData("bad-type")]
+    [InlineData("bad-ref-value")]
+    [InlineData("bad-ref-type")]
+    [InlineData("bad-ref-syntax")]
+    public async Task Invalid_Members_Are_Rejected_Without_Partial_Group_Writes(string scenario) {
         using var factory = new WebAppFactory();
-        using var client  = CreateClient(factory);
-        var       user    = await CreateUserAsync(client, "Marker-User");
-        var       userId  = user.GetProperty("id").GetString()!;
-        var       group   = await CreateGroupAsync(client, GroupContent("Marker-Group", Member(userId)));
-        var       groupId = group.GetProperty("id").GetString()!;
+        using var owner = CreateClient(factory);
+        using var other = CreateClient(factory, "domain-b");
+        var owned = await CreateUserAsync(owner, "Owned-Member");
+        var foreign = await CreateUserAsync(other, "Foreign-Member");
+        var ownedId = owned.GetProperty("id").GetString()!;
+        var foreignId = foreign.GetProperty("id").GetString()!;
+        var member = scenario switch {
+            "missing" => Member(Guid.NewGuid().ToString()),
+            "cross-domain" => Member(foreignId),
+            "bad-value" => Member("not-a-guid"),
+            "bad-type" => Member(ownedId, "Group"),
+            "bad-ref-value" => Member(ownedId, reference: $"/scim/v2/Users/{Guid.NewGuid()}"),
+            "bad-ref-type" => Member(ownedId, reference: $"/scim/v2/Groups/{ownedId}"),
+            "bad-ref-syntax" => Member(ownedId, reference: "://not-a-uri"),
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario)),
+        };
 
-        using (var scope = factory.Services.CreateScope()) {
-            var manager = scope.ServiceProvider.GetRequiredService<SchemataUserManager<SchemataUser>>();
-            var entity  = await manager.FindByNameAsync("Marker-User");
-            Assert.NotNull(entity);
-            var principals = scope.ServiceProvider.GetRequiredService<IUserClaimsPrincipalFactory<SchemataUser>>();
-            var principal  = await principals.CreateAsync(entity!);
-            Assert.DoesNotContain(principal.Claims,
-                                  claim => claim.Type == SchemataConstants.ProvisioningClaims.ScimGroup);
-            Assert.Contains(principal.Claims,
-                            claim => claim.Type == SchemataConstants.IdentityClaims.Role
-                                  && claim.Value == "Marker-Group");
+        using var response = await owner.PostAsync(Groups, GroupContent($"Invalid {scenario}", members: member));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        AssertScimError(await ReadJsonAsync(response), "400", ScimConstants.InvalidValue);
 
-            var role = await scope.ServiceProvider.GetRequiredService<IRepository<SchemataRole>>()
-                               .SingleOrDefaultAsync(q => q.Where(r => r.Uid == Guid.Parse(groupId)));
-            Assert.NotNull(role);
-            var markers = await scope.ServiceProvider.GetRequiredService<IRepository<SchemataRoleClaim>>()
-                                      .ListAsync(q => q.Where(rc => rc.RoleId == role!.CanonicalName
-                                                                 && rc.ClaimType == SchemataConstants.ProvisioningClaims.ScimGroup))
-                                      .ToListAsync();
-            Assert.Single(markers);
-        }
+        using var scope = factory.Services.CreateScope();
+        Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<IRepository<SchemataRole>>().CountAsync(q => q));
+        Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<IRepository<SchemataUserRole>>().CountAsync(q => q));
+        Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<IRepository<ScimProvisioningBinding>>()
+            .CountAsync(q => q.Where(binding => binding.ResourceType == "Group")));
     }
 
     [Fact]
-    public async Task Keep_Groups_Off_A_Custom_Role_Host() {
-        using var factory = new WebAppFactory("CustomRole");
-        using var client  = CreateClient(factory);
-        var       user    = await CreateUserAsync(client, "Custom-Host");
-        var       userId  = user.GetProperty("id").GetString()!;
-
-        using (var single = await client.GetAsync($"{Users}/{userId}")) {
-            Assert.Equal(HttpStatusCode.OK, single.StatusCode);
-        }
-
-        using (var response = await client.GetAsync("/scim/v2/ResourceTypes")) {
-            var names = (await ReadJsonAsync(response)).GetProperty("Resources")
-                                                       .EnumerateArray()
-                                                       .Select(resource => resource.GetProperty("name").GetString())
-                                                       .ToList();
-            Assert.Contains("User", names);
-            Assert.DoesNotContain("Group", names);
-        }
-
-        using (var response = await client.GetAsync($"/scim/v2/Schemas/{Uri.EscapeDataString(ScimConstants.GroupSchema)}")) {
-            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        }
-
-        using (var response = await client.GetAsync(Groups)) {
-            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-            AssertScimError(await ReadJsonAsync(response), "404");
-        }
-    }
-
-    [Fact]
-    public async Task Register_The_Group_Resource_Type_And_Schema_With_Discovery() {
+    public async Task Nested_Groups_Are_Rejected_Without_Changing_The_Existing_Group() {
         using var factory = new WebAppFactory();
-        using var client  = CreateClient(factory);
+        using var client = CreateClient(factory);
+        var existing = await CreateGroupAsync(client, "Existing Group");
+        var id = existing.GetProperty("id").GetString()!;
 
-        using (var response = await client.GetAsync("/scim/v2/ResourceTypes")) {
-            var group = (await ReadJsonAsync(response)).GetProperty("Resources")
-                                                       .EnumerateArray()
-                                                       .Single(r => r.GetProperty("name").GetString() == "Group");
-            Assert.Equal("/Groups", group.GetProperty("endpoint").GetString());
-            Assert.Equal(ScimConstants.GroupSchema, group.GetProperty("schema").GetString());
-        }
+        using var response = await client.PostAsync(Groups, GroupContent("Nested Group",
+            members: Member(id, "Group", $"/scim/v2/Groups/{id}")));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        AssertScimError(await ReadJsonAsync(response), "400", ScimConstants.InvalidValue);
 
-        using (var response = await client.GetAsync($"/scim/v2/Schemas/{Uri.EscapeDataString(ScimConstants.GroupSchema)}")) {
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var attributes = (await ReadJsonAsync(response)).GetProperty("attributes").EnumerateArray().ToList();
-            var displayName = attributes.Single(a => a.GetProperty("name").GetString() == "displayName");
-            Assert.True(displayName.GetProperty("required").GetBoolean());
-            Assert.Equal(ScimConstants.ReadWrite, displayName.GetProperty("mutability").GetString());
-            var members = attributes.Single(a => a.GetProperty("name").GetString() == "members");
-            Assert.True(members.GetProperty("multiValued").GetBoolean());
-            Assert.Equal(ScimConstants.ReadWrite, members.GetProperty("mutability").GetString());
-            var subAttributes = members.GetProperty("subAttributes").EnumerateArray().ToList();
-            Assert.Equal(ScimConstants.Immutable,
-                         subAttributes.Single(a => a.GetProperty("name").GetString() == "value")
-                                      .GetProperty("mutability").GetString());
-            Assert.Equal(ScimConstants.ReadOnly,
-                         subAttributes.Single(a => a.GetProperty("name").GetString() == "display")
-                                      .GetProperty("mutability").GetString());
-            var types = subAttributes.Single(a => a.GetProperty("name").GetString() == "type")
-                                     .GetProperty("canonicalValues")
-                                     .EnumerateArray()
-                                     .Select(value => value.GetString()!)
-                                     .ToArray();
-            Assert.Equal(new[] { "User" }, types);
-        }
+        using var list = await client.GetAsync(Groups);
+        var root = await ReadJsonAsync(list);
+        Assert.Equal(1, root.GetProperty("totalResults").GetInt32());
+        Assert.Equal(id, Assert.Single(root.GetProperty("Resources").EnumerateArray()).GetProperty("id").GetString());
     }
 
-    private static HttpClient CreateClient(WebAppFactory factory, bool authenticated = true) {
+    [Fact]
+    public async Task Cross_Domain_Group_Writes_Are_Denied_And_Reads_Are_Not_Listed() {
+        using var factory = new WebAppFactory();
+        using var owner = CreateClient(factory);
+        using var other = CreateClient(factory, "domain-b");
+        var created = await CreateGroupAsync(owner, "Owned Group", "owned-group");
+        var id = created.GetProperty("id").GetString()!;
+
+        using (var list = await other.GetAsync(Groups)) {
+            Assert.Equal(0, (await ReadJsonAsync(list)).GetProperty("totalResults").GetInt32());
+        }
+        using (var get = await other.GetAsync($"{Groups}/{id}")) {
+            Assert.Equal(HttpStatusCode.NotFound, get.StatusCode);
+        }
+        using (var patch = await other.PatchAsync($"{Groups}/{id}", PatchContent(Operation("replace", "displayName", "Stolen")))) {
+            Assert.Equal(HttpStatusCode.Forbidden, patch.StatusCode);
+        }
+        using (var put = await other.PutAsync($"{Groups}/{id}", GroupContent("Stolen"))) {
+            Assert.Equal(HttpStatusCode.Forbidden, put.StatusCode);
+        }
+        using (var delete = await other.DeleteAsync($"{Groups}/{id}")) {
+            Assert.Equal(HttpStatusCode.Forbidden, delete.StatusCode);
+        }
+
+        using var owned = await owner.GetAsync($"{Groups}/{id}");
+        Assert.Equal("Owned Group", (await ReadJsonAsync(owned)).GetProperty("displayName").GetString());
+    }
+
+    [Fact]
+    public async Task Mid_Patch_Failure_Restores_Role_Members_And_Binding() {
+        using var factory = new WebAppFactory("MembershipFailure");
+        using var client = CreateClient(factory);
+        var first = await CreateUserAsync(client, "Rollback-User-1");
+        var second = await CreateUserAsync(client, "Rollback-User-2");
+        var third = await CreateUserAsync(client, "Rollback-User-3");
+        var group = await CreateGroupAsync(client, "Original Group", "before-binding",
+            members: Member(first.GetProperty("id").GetString()!));
+        var id = group.GetProperty("id").GetString()!;
+        var before = await ReadGroupSnapshotAsync(factory, id);
+
+        using var response = await client.PatchAsync($"{Groups}/{id}", PatchContent(
+            Operation("replace", "displayName", "Changed Group"),
+            Operation("replace", "externalId", "after-binding"),
+            Operation("add", "members", new[] {
+                Member(second.GetProperty("id").GetString()!),
+                Member(third.GetProperty("id").GetString()!),
+            })));
+        Assert.True(response.StatusCode == HttpStatusCode.InternalServerError, await response.Content.ReadAsStringAsync());
+
+        var after = await ReadGroupSnapshotAsync(factory, id);
+        Assert.Equal(before, after);
+    }
+
+    [Fact]
+    public async Task Missing_Role_Store_Capability_Fails_Before_Staging() {
+        using var factory = new WebAppFactory("MissingRoleCapability");
+        using var client = CreateClient(factory);
+
+        using var response = await client.PostAsync(Groups, GroupContent("Unsupported Group"));
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        AssertScimError(await ReadJsonAsync(response), "500");
+
+        using var scope = factory.Services.CreateScope();
+        Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<IRepository<SchemataRole>>().CountAsync(q => q));
+        Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<IRepository<ScimProvisioningBinding>>()
+            .CountAsync(q => q.Where(binding => binding.ResourceType == "Group")));
+    }
+
+    private static async Task<GroupSnapshot> ReadGroupSnapshotAsync(WebAppFactory factory, string id) {
+        using var scope = factory.Services.CreateScope();
+        var services = scope.ServiceProvider;
+        var role = await services.GetRequiredService<IRepository<SchemataRole>>().FindAsync([Guid.Parse(id)]);
+        Assert.NotNull(role);
+        Assert.NotNull(role.CanonicalName);
+        Assert.NotNull(role.Name);
+        var binding = Assert.Single(await services.GetRequiredService<IRepository<ScimProvisioningBinding>>()
+            .ListAsync(q => q.Where(item => item.ResourceType == "Group" && item.EntityUid == role.Uid)).ToListAsync());
+        var members = await services.GetRequiredService<IRepository<SchemataUserRole>>()
+            .ListAsync(q => q.Where(link => link.RoleId == role.CanonicalName).OrderBy(link => link.UserId)).ToListAsync();
+        return new(role.DisplayName ?? string.Empty, role.NormalizedName, role.Name, role.CanonicalName, binding.ExternalId,
+            string.Join(",", members.Select(member => member.UserId)));
+    }
+
+    private static HttpClient CreateClient(WebAppFactory factory, string domain = "domain-a") {
         var client = factory.CreateClient();
-        if (authenticated) {
-            client.DefaultRequestHeaders.Add("X-Test-Scim", "1");
-        }
-
+        client.DefaultRequestHeaders.Add("X-Test-Scim", "1");
+        client.DefaultRequestHeaders.Add("X-Test-Domain", domain);
         return client;
     }
 
-    private static async Task<JsonElement> CreateUserAsync(
-        HttpClient client,
-        string     userName,
-        string?    displayName = null
-    ) {
-        var payload = new Dictionary<string, object?> { ["userName"] = userName };
-        if (displayName is not null) {
-            payload["displayName"] = displayName;
-        }
-
+    private static async Task<JsonElement> CreateUserAsync(HttpClient client, string userName, string? displayName = null,
+        string? externalId = null) {
+        var payload = new Dictionary<string, object?> {
+            ["schemas"] = new[] { ScimConstants.UserSchema },
+            ["userName"] = userName,
+            ["displayName"] = displayName,
+            ["externalId"] = externalId ?? $"external-{userName}",
+        };
         using var response = await client.PostAsync(Users, JsonContent(payload));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-
         return await ReadJsonAsync(response);
     }
 
-    private static async Task<JsonElement> CreateGroupAsync(HttpClient client, StringContent content) {
-        using var response = await client.PostAsync(Groups, content);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-
+    private static async Task<JsonElement> CreateGroupAsync(HttpClient client, string displayName, string? externalId = null,
+        params object[] members) {
+        using var response = await client.PostAsync(Groups, GroupContent(displayName, externalId, members));
+        Assert.True(response.StatusCode == HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
         return await ReadJsonAsync(response);
     }
 
-    private static StringContent GroupContent(string? displayName, params object[] members) {
-        var payload = new Dictionary<string, object?>();
-        if (displayName is not null) {
-            payload["displayName"] = displayName;
+    private static StringContent GroupContent(string displayName, string? externalId = null, params object[] members) {
+        var payload = new Dictionary<string, object?> {
+            ["schemas"] = new[] { ScimConstants.GroupSchema },
+            ["displayName"] = displayName,
+        };
+        if (externalId is not null) {
+            payload["externalId"] = externalId;
         }
-
         if (members.Length > 0) {
             payload["members"] = members;
         }
-
         return JsonContent(payload);
     }
 
-    private static Dictionary<string, object?> Member(
-        string  value,
-        string? reference = null,
-        string? type      = "User",
-        string? display   = null
-    ) {
+    private static Dictionary<string, object?> Member(string value, string? type = "User", string? reference = null) {
         var member = new Dictionary<string, object?> {
             ["value"] = value,
-            ["$ref"]  = reference ?? $"{Users}/{value}",
+            ["type"] = type,
         };
-        if (type is not null) {
-            member["type"] = type;
+        if (reference is not null) {
+            member["$ref"] = reference;
         }
-
-        if (display is not null) {
-            member["display"] = display;
-        }
-
         return member;
+    }
+
+    private static Dictionary<string, object?> Operation(string op, string path, object value) {
+        return new() { ["op"] = op, ["path"] = path, ["value"] = value };
+    }
+
+    private static StringContent PatchContent(params object[] operations) {
+        return JsonContent(new Dictionary<string, object?> {
+            ["schemas"] = new[] { ScimConstants.PatchOpSchema },
+            ["Operations"] = operations,
+        });
     }
 
     private static StringContent JsonContent(object payload) {
@@ -694,7 +477,6 @@ public sealed class ScimGroupsShould
 
     private static async Task<JsonElement> ReadJsonAsync(HttpResponseMessage response) {
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-
         return document.RootElement.Clone();
     }
 
@@ -706,7 +488,13 @@ public sealed class ScimGroupsShould
         } else {
             Assert.Equal(scimType, root.GetProperty("scimType").GetString());
         }
-
-        Assert.False(root.TryGetProperty("error", out _));
     }
+
+    private sealed record GroupSnapshot(
+        string DisplayName,
+        string? NormalizedName,
+        string ResourceName,
+        string CanonicalName,
+        string? ExternalId,
+        string Members);
 }

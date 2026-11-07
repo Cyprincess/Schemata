@@ -1,54 +1,34 @@
+using System;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ApplicationModels;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Schemata.Scim;
 using Schemata.Scim.Controllers;
 using Schemata.Scim.Filters;
 using Schemata.Scim.Models;
+using Schemata.Scim.Services;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
-/// <summary>
-///     Registers the shared SCIM protocol services and discovery endpoints.
-/// </summary>
+/// <summary>Registers the shared SCIM protocol services and controllers.</summary>
 public static class ScimEndpointExtensions
 {
-    /// <summary>
-    ///     Registers the schema registry, service provider options, model-state and media-type error
-    ///     shapes, and the discovery controller.
-    /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddSchemataScim(this IServiceCollection services) {
-        services.TryAddSingleton<ScimSchemaRegistry>();
+        services.AddHttpContextAccessor();
+        services.TryAddScoped<ScimSchemaRegistry>();
+        services.TryAddScoped<IScimBindingStore, ScimBindingStore>();
         services.AddOptions<ScimServiceProviderOptions>();
+        services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<RouteOptions>, ScimConstraintSetup>());
         services.PostConfigure<ApiBehaviorOptions>(ConfigureInvalidModelState);
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<MvcOptions>, ScimUnsupportedMediaTypeSetup>());
+        services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<MvcOptions>, ScimRouteSetup>());
         services.AddSchemataApplicationPart<ScimDiscoveryController>();
-
-        return services;
-    }
-
-    /// <summary>
-    ///     Registers a resource type and the schemas it references with discovery.
-    /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <param name="resourceType">The resource type.</param>
-    /// <param name="schemas">The schemas referenced by the resource type.</param>
-    /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddSchemataScimResourceType(
-        this IServiceCollection services,
-        ScimResourceType         resourceType,
-        params ScimSchema[]      schemas
-    ) {
-        services.AddSchemataScim();
-        services.AddSingleton(resourceType);
-        foreach (var schema in schemas) {
-            services.AddSingleton(schema);
-        }
+        services.AddSchemataApplicationPart<ScimResourceController>();
 
         return services;
     }
@@ -56,7 +36,8 @@ public static class ScimEndpointExtensions
     private static void ConfigureInvalidModelState(ApiBehaviorOptions options) {
         var fallback = options.InvalidModelStateResponseFactory;
         options.InvalidModelStateResponseFactory = context => {
-            if (!ScimResults.IsScimPath(context.HttpContext.Request.Path)) {
+            var settings = context.HttpContext.RequestServices.GetRequiredService<IOptions<ScimServiceProviderOptions>>().Value;
+            if (!ScimResults.IsScimPath(context.HttpContext.Request.Path, settings.BasePath)) {
                 return fallback(context);
             }
 
@@ -73,5 +54,48 @@ public static class ScimEndpointExtensions
 
             return ScimResults.Error(StatusCodes.Status400BadRequest, ScimConstants.InvalidSyntax, detail);
         };
+    }
+}
+
+internal sealed class ScimConstraintSetup : IConfigureOptions<RouteOptions>
+{
+    public void Configure(RouteOptions options) {
+        options.ConstraintMap.Add("scimResource", typeof(ScimResourceRouteConstraint));
+    }
+}
+
+internal sealed class ScimRouteSetup(IOptions<ScimServiceProviderOptions> settings) : IConfigureOptions<MvcOptions>
+{
+    public void Configure(MvcOptions options) {
+        options.Conventions.Add(new ScimRouteConvention(options: settings.Value));
+    }
+
+    private sealed class ScimRouteConvention(ScimServiceProviderOptions options) : IApplicationModelConvention
+    {
+        public void Apply(ApplicationModel application) {
+            foreach (var controller in application.Controllers) {
+                if (controller.ControllerType != typeof(ScimDiscoveryController)
+                    && controller.ControllerType != typeof(ScimResourceController)) {
+                    continue;
+                }
+
+                foreach (var selector in controller.Selectors) {
+                    Rewrite(selector);
+                }
+
+                foreach (var action in controller.Actions) {
+                    foreach (var selector in action.Selectors) {
+                        Rewrite(selector);
+                    }
+                }
+            }
+        }
+
+        private void Rewrite(SelectorModel selector) {
+            if (selector.AttributeRouteModel?.Template is { } template) {
+                selector.AttributeRouteModel.Template = template.Replace(
+                    "~" + ScimConstants.BasePath, "~" + options.BasePath, StringComparison.Ordinal);
+            }
+        }
     }
 }

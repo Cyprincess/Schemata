@@ -8,6 +8,20 @@ namespace Schemata.Scim;
 /// </summary>
 public sealed class ScimServiceProviderOptions
 {
+    public string BasePath { get; set; } = ScimConstants.BasePath;
+
+    public int DefaultPageSize { get; set; } = 100;
+
+    public int MaxPageSize { get; set; } = 200;
+
+    public long MaxRequestBodySize { get; set; } = 1024 * 1024;
+
+    public int MaxFilterLength { get; set; } = 8 * 1024;
+
+    public int MaxFilterDepth { get; set; } = 32;
+
+    public int MaxPatchOperations { get; set; } = 100;
+
     /// <summary>The provider's human-consumable help documentation URI.</summary>
     public string? DocumentationUri { get; set; }
 

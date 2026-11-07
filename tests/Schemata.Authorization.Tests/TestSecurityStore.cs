@@ -6,6 +6,12 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Text.Json;
+using Schemata.Authorization.Foundation.Services;
+using Schemata.Authorization.Skeleton.Entities;
+using Schemata.Authorization.Skeleton.Models;
+using Schemata.Authorization.Skeleton.Services;
+using Schemata.Security.Skeleton;
 using Schemata.Security.Skeleton.Entities;
 using Schemata.Security.Skeleton.Services;
 
@@ -16,9 +22,13 @@ namespace Schemata.Authorization.Tests;
 ///     unit tests. Rows order by create time descending then key ascending, mirroring the
 ///     store contract the token pipeline relies on for primary-key selection.
 /// </summary>
-public class TestSecurityStore : ISecurityStore<SchemataSecurity>
+public class TestSecurityStore : ISecurityStore<SchemataSecurity>, IApplicationSecurityMetadataStore
 {
-    private readonly List<SchemataSecurity> _rows = [];
+    private readonly List<SchemataSecurity> _rows;
+
+    public TestSecurityStore(List<SchemataSecurity>? rows = null) {
+        _rows = rows ?? [];
+    }
 
     /// <summary>Number of <see cref="ListByParentAsync" /> invocations observed; proves an
     /// operation resolves its signing selection once instead of re-querying per token.</summary>
@@ -74,6 +84,55 @@ public class TestSecurityStore : ISecurityStore<SchemataSecurity>
             _rows.Remove(security);
         }
 
+        return Task.CompletedTask;
+    }
+
+    public async Task ProjectAsync(SchemataApplication application, RegistrationResponse response, CancellationToken ct) {
+        await foreach (var row in ListByParentAsync(application.CanonicalName, SecurityConstants.Kinds.Jwks,
+                           null, SecurityConstants.Statuses.Valid, ct)) {
+            using var document = JsonDocument.Parse(row.Value!);
+            RegistrationMetadataMapper.ValidatePublicJwks(document.RootElement);
+            response.Jwks = document.RootElement.Clone();
+            break;
+        }
+        await foreach (var row in ListByParentAsync(application.CanonicalName, SecurityConstants.Kinds.JwksUri,
+                           null, SecurityConstants.Statuses.Valid, ct)) {
+            response.JwksUri = row.Value;
+            break;
+        }
+    }
+
+    public Task ReplaceAsync(
+        SchemataApplication application,
+        RegisterRequest request,
+        IUnitOfWork transaction,
+        CancellationToken ct
+    ) {
+        var stale = _rows.Where(row => row.Parent == application.CanonicalName
+                                    && row.Kind is SecurityConstants.Kinds.Jwks or SecurityConstants.Kinds.JwksUri).ToList();
+        foreach (var row in stale) {
+            row.Status = SecurityConstants.Statuses.Revoked;
+        }
+        if (request.Jwks is { ValueKind: JsonValueKind.Object } jwks) {
+            _rows.Add(new() {
+                Parent = application.CanonicalName,
+                Key = application.ClientId,
+                Kind = SecurityConstants.Kinds.Jwks,
+                Usage = SecurityConstants.Usages.Authentication,
+                Value = jwks.GetRawText(),
+                Status = SecurityConstants.Statuses.Valid,
+            });
+        }
+        if (!string.IsNullOrWhiteSpace(request.JwksUri)) {
+            _rows.Add(new() {
+                Parent = application.CanonicalName,
+                Key = application.ClientId,
+                Kind = SecurityConstants.Kinds.JwksUri,
+                Usage = SecurityConstants.Usages.Authentication,
+                Value = request.JwksUri,
+                Status = SecurityConstants.Statuses.Valid,
+            });
+        }
         return Task.CompletedTask;
     }
 

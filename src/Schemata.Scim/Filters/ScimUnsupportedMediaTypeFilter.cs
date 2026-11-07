@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Schemata.Scim.Filters;
@@ -19,7 +20,8 @@ internal sealed class ScimUnsupportedMediaTypeFilter : IAlwaysRunResultFilter, I
     public int Order => -10_000;
 
     public void OnResultExecuting(ResultExecutingContext context) {
-        if (!ScimResults.IsScimPath(context.HttpContext.Request.Path)) {
+        var settings = context.HttpContext.RequestServices.GetRequiredService<IOptions<ScimServiceProviderOptions>>().Value;
+        if (!ScimResults.IsScimPath(context.HttpContext.Request.Path, settings.BasePath)) {
             return;
         }
 

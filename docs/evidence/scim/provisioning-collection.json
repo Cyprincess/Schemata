@@ -1,0 +1,354 @@
+{
+  "info": {
+    "_postman_id": "4f0c5377-ece2-45c9-a1ea-e3f1de549b7f",
+    "name": "Schemata SCIM provisioning evidence",
+    "description": "Executes the supported SCIM profile against fresh Identity and Authorization HTTP hosts. This collection is project evidence, not a vendor compatibility suite.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "identityBaseUrl", "value": "http://127.0.0.1:5181/scim/v2" },
+    { "key": "authorizationBaseUrl", "value": "http://127.0.0.1:5182/scim/v2" },
+    { "key": "userId", "value": "" },
+    { "key": "groupId", "value": "" },
+    { "key": "applicationId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Identity discovery",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-Test-Scim", "value": "1" }],
+        "url": "{{identityBaseUrl}}/ServiceProviderConfig"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('discovery advertises only supported capabilities', function () {",
+          "  const body = pm.response.json();",
+          "  pm.expect(body.patch.supported).to.eql(true);",
+          "  pm.expect(body.filter.supported).to.eql(true);",
+          "  pm.expect(body.bulk.supported).to.eql(false);",
+          "  pm.expect(body.sort.supported).to.eql(false);",
+          "  pm.expect(body.etag.supported).to.eql(false);",
+          "});"
+        ] }
+      }]
+    },
+    {
+      "name": "User schema and secret boundary",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-Test-Scim", "value": "1" }],
+        "url": "{{identityBaseUrl}}/Schemas/urn%3Aietf%3Aparams%3Ascim%3Aschemas%3Acore%3A2.0%3AUser"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('schema exposes typed writable attributes without password', function () {",
+          "  const attributes = pm.response.json().attributes;",
+          "  const userName = attributes.find(function (item) { return item.name === 'userName'; });",
+          "  pm.expect(userName.type).to.eql('string');",
+          "  pm.expect(userName.caseExact).to.eql(false);",
+          "  pm.expect(attributes.some(function (item) { return item.name === 'password'; })).to.eql(false);",
+          "});"
+        ] }
+      }]
+    },
+    {
+      "name": "Create User",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-Test-Scim", "value": "1" },
+          { "key": "Content-Type", "value": "application/scim+json" }
+        ],
+        "url": "{{identityBaseUrl}}/Users",
+        "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:User\"],\n  \"userName\": \"Newman.User\",\n  \"displayName\": \"Newman User\",\n  \"externalId\": \"newman-user-external\",\n  \"active\": true\n}" }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('create returns a stable redacted User', function () {",
+          "  pm.expect(pm.response.code).to.eql(201);",
+          "  const body = pm.response.json();",
+          "  pm.expect(body.id).to.be.a('string').and.not.empty;",
+          "  pm.expect(body.userName).to.eql('Newman.User');",
+          "  pm.expect(body.externalId).to.eql('newman-user-external');",
+          "  pm.expect(body).to.not.have.property('passwordHash');",
+          "  pm.expect(body).to.not.have.property('securityStamp');",
+          "  pm.collectionVariables.set('userId', body.id);",
+          "});"
+        ] }
+      }]
+    },
+    {
+      "name": "Read User",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-Test-Scim", "value": "1" }],
+        "url": "{{identityBaseUrl}}/Users/{{userId}}"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('read returns the created User id', function () {",
+          "  pm.expect(pm.response.code).to.eql(200);",
+          "  pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('userId'));",
+          "});"
+        ] }
+      }]
+    },
+    {
+      "name": "Filter and project Users",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-Test-Scim", "value": "1" }],
+        "url": "{{identityBaseUrl}}/Users?filter=userName%20eq%20%22NEWMAN.USER%22&attributes=userName&startIndex=1&count=1"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('normalized equality and projection return one User', function () {",
+          "  const body = pm.response.json();",
+          "  pm.expect(body.totalResults).to.eql(1);",
+          "  pm.expect(body.itemsPerPage).to.eql(1);",
+          "  pm.expect(body.Resources[0].userName).to.eql('Newman.User');",
+          "  pm.expect(body.Resources[0]).to.not.have.property('displayName');",
+          "});"
+        ] }
+      }]
+    },
+    {
+      "name": "Patch User",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "X-Test-Scim", "value": "1" },
+          { "key": "Content-Type", "value": "application/scim+json" }
+        ],
+        "url": "{{identityBaseUrl}}/Users/{{userId}}",
+        "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\n  \"Operations\": [\n    { \"op\": \"replace\", \"path\": \"displayName\", \"value\": \"Newman User Patched\" },\n    { \"op\": \"replace\", \"path\": \"active\", \"value\": false }\n  ]\n}" }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('PATCH preserves id and applies admission state', function () {",
+          "  const body = pm.response.json();",
+          "  pm.expect(body.id).to.eql(pm.collectionVariables.get('userId'));",
+          "  pm.expect(body.displayName).to.eql('Newman User Patched');",
+          "  pm.expect(body.active).to.eql(false);",
+          "});"
+        ] }
+      }]
+    },
+    {
+      "name": "Create Group",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-Test-Scim", "value": "1" },
+          { "key": "Content-Type", "value": "application/scim+json" }
+        ],
+        "url": "{{identityBaseUrl}}/Groups",
+        "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:Group\"],\n  \"displayName\": \"Newman Group\",\n  \"externalId\": \"newman-group-external\",\n  \"members\": [{ \"value\": \"{{userId}}\", \"type\": \"User\" }]\n}" }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('create returns direct User membership', function () {",
+          "  pm.expect(pm.response.code).to.eql(201);",
+          "  const body = pm.response.json();",
+          "  pm.expect(body.members[0].value).to.eql(pm.collectionVariables.get('userId'));",
+          "  pm.expect(body.members[0].type).to.eql('User');",
+          "  pm.collectionVariables.set('groupId', body.id);",
+          "});"
+        ] }
+      }]
+    },
+    {
+      "name": "Read Group",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-Test-Scim", "value": "1" }],
+        "url": "{{identityBaseUrl}}/Groups/{{groupId}}"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('read returns the created Group', function () {",
+          "  pm.expect(pm.response.code).to.eql(200);",
+          "  pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('groupId'));",
+          "});"
+        ] }
+      }]
+    },
+    {
+      "name": "Patch Group member valuePath",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "X-Test-Scim", "value": "1" },
+          { "key": "Content-Type", "value": "application/scim+json" }
+        ],
+        "url": "{{identityBaseUrl}}/Groups/{{groupId}}",
+        "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\n  \"Operations\": [\n    { \"op\": \"remove\", \"path\": \"members[value eq \\\"{{userId}}\\\"]\" },\n    { \"op\": \"replace\", \"path\": \"displayName\", \"value\": \"Newman Group Patched\" }\n  ]\n}" }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('valuePath removes only the selected member', function () {",
+          "  const body = pm.response.json();",
+          "  pm.expect(body.displayName).to.eql('Newman Group Patched');",
+          "  pm.expect(body.members).to.have.length(0);",
+          "});"
+        ] }
+      }]
+    },
+    {
+      "name": "Delete Group",
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "X-Test-Scim", "value": "1" }],
+        "url": "{{identityBaseUrl}}/Groups/{{groupId}}"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Group delete succeeds', function () { pm.expect(pm.response.code).to.eql(204); });"
+        ] }
+      }]
+    },
+    {
+      "name": "Delete User",
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "X-Test-Scim", "value": "1" }],
+        "url": "{{identityBaseUrl}}/Users/{{userId}}"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('User delete succeeds', function () { pm.expect(pm.response.code).to.eql(204); });"
+        ] }
+      }]
+    },
+    {
+      "name": "Authorization discovery",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-Test-Scim", "value": "1" }],
+        "url": "{{authorizationBaseUrl}}/ResourceTypes"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Application handler is discoverable', function () {",
+          "  const body = pm.response.json();",
+          "  pm.expect(body.Resources.some(function (item) { return item.name === 'Application' && item.endpoint === '/Applications'; })).to.eql(true);",
+          "});"
+        ] }
+      }]
+    },
+    {
+      "name": "Create Application",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-Test-Scim", "value": "1" },
+          { "key": "X-Test-Permissions", "value": "allow" },
+          { "key": "Content-Type", "value": "application/scim+json" }
+        ],
+        "url": "{{authorizationBaseUrl}}/Applications",
+        "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"https://github.com/Cyprincess/Schemata/scim/schemas/2.0/Application\"],\n  \"tokenEndpointAuthMethod\": \"none\",\n  \"redirectUris\": [\"https://localhost/callback\"],\n  \"grantTypes\": [\"client_credentials\", \"authorization_code\"],\n  \"responseTypes\": [\"code\"],\n  \"clientName\": \"Newman Application\",\n  \"externalId\": \"newman-application-external\",\n  \"scope\": \"openid api\",\n  \"https://github.com/Cyprincess/Schemata/scim/schemas/2.0/ApplicationAuthorization\": {\n    \"permissions\": [\"e:/Connect/Token\"]\n  }\n}" }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('create returns public registration metadata only', function () {",
+          "  pm.expect(pm.response.code).to.eql(201);",
+          "  const body = pm.response.json();",
+          "  pm.expect(body.id).to.be.a('string').and.not.empty;",
+          "  pm.expect(body.clientId).to.be.a('string').and.not.empty;",
+          "  pm.expect(body).to.not.have.property('clientSecret');",
+          "  pm.expect(body).to.not.have.property('registrationAccessToken');",
+          "  pm.collectionVariables.set('applicationId', body.id);",
+          "});"
+        ] }
+      }]
+    },
+    {
+      "name": "Read Application",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-Test-Scim", "value": "1" }],
+        "url": "{{authorizationBaseUrl}}/Applications/{{applicationId}}"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('read returns the created Application', function () {",
+          "  pm.expect(pm.response.code).to.eql(200);",
+          "  pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('applicationId'));",
+          "});"
+        ] }
+      }]
+    },
+    {
+      "name": "Filter and project Applications",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-Test-Scim", "value": "1" }],
+        "url": "{{authorizationBaseUrl}}/Applications?filter=clientName%20eq%20%22Newman%20Application%22&attributes=clientName,clientId&startIndex=1&count=1"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Application filter and projection return public fields', function () {",
+          "  const body = pm.response.json();",
+          "  pm.expect(body.totalResults).to.eql(1);",
+          "  pm.expect(body.Resources[0].clientName).to.eql('Newman Application');",
+          "  pm.expect(body.Resources[0]).to.not.have.property('grantTypes');",
+          "});"
+        ] }
+      }]
+    },
+    {
+      "name": "Patch Application",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "X-Test-Scim", "value": "1" },
+          { "key": "Content-Type", "value": "application/scim+json" }
+        ],
+        "url": "{{authorizationBaseUrl}}/Applications/{{applicationId}}",
+        "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\n  \"Operations\": [\n    { \"op\": \"replace\", \"path\": \"clientName\", \"value\": \"Newman Application Patched\" },\n    { \"op\": \"replace\", \"path\": \"externalId\", \"value\": \"newman-application-after\" }\n  ]\n}" }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Application PATCH preserves ids and redacts credentials', function () {",
+          "  const body = pm.response.json();",
+          "  pm.expect(body.id).to.eql(pm.collectionVariables.get('applicationId'));",
+          "  pm.expect(body.clientName).to.eql('Newman Application Patched');",
+          "  pm.expect(body.externalId).to.eql('newman-application-after');",
+          "  pm.expect(body).to.not.have.property('clientSecret');",
+          "});"
+        ] }
+      }]
+    },
+    {
+      "name": "Delete Application",
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "X-Test-Scim", "value": "1" }],
+        "url": "{{authorizationBaseUrl}}/Applications/{{applicationId}}"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Application delete succeeds', function () { pm.expect(pm.response.code).to.eql(204); });"
+        ] }
+      }]
+    }
+  ]
+}

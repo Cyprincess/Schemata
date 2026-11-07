@@ -27,6 +27,18 @@ public interface IApplicationManager<TApplication>
     /// <summary>Deletes an application.</summary>
     Task DeleteAsync(TApplication? application, CancellationToken ct = default);
 
+    /// <summary>Begins a serializable application provisioning transaction.</summary>
+    IUnitOfWork BeginProvisioning();
+
+    /// <summary>Stages application creation in the caller-owned transaction.</summary>
+    Task<TApplication?> CreateAsync(TApplication? application, IUnitOfWork transaction, CancellationToken ct);
+
+    /// <summary>Stages application replacement in the caller-owned transaction.</summary>
+    Task UpdateAsync(TApplication? application, IUnitOfWork transaction, CancellationToken ct);
+
+    /// <summary>Stages application deletion and its dependent cleanup in the caller-owned transaction.</summary>
+    Task DeleteAsync(TApplication? application, IUnitOfWork transaction, CancellationToken ct);
+
     /// <summary>Lists applications matching the optional predicate.</summary>
     IAsyncEnumerable<TApplication> ListAsync(
         Func<IQueryable<TApplication>, IQueryable<TApplication>>? predicate,

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -289,6 +290,35 @@ public class SchemataApplicationManager<TApplication, TAuthorization> : IApplica
         }
 
         await _mutation.DeleteAsync(application, null, Operations.Delete, ct);
+    }
+
+    public IUnitOfWork BeginProvisioning() {
+        var applications = _services.GetRequiredService<IRepository<TApplication>>();
+        return applications.Begin(IsolationLevel.Serializable);
+    }
+
+    public async Task<TApplication?> CreateAsync(TApplication? application, IUnitOfWork transaction, CancellationToken ct) {
+        ct.ThrowIfCancellationRequested();
+        if (application is null) {
+            return null;
+        }
+
+        await _mutation.CreateAsync(application, transaction, ct);
+        return application;
+    }
+
+    public async Task UpdateAsync(TApplication? application, IUnitOfWork transaction, CancellationToken ct) {
+        ct.ThrowIfCancellationRequested();
+        if (application is not null) {
+            await _mutation.UpdateAsync(application, transaction, Operations.Update, ct);
+        }
+    }
+
+    public async Task DeleteAsync(TApplication? application, IUnitOfWork transaction, CancellationToken ct) {
+        ct.ThrowIfCancellationRequested();
+        if (application is not null) {
+            await _mutation.DeleteAsync(application, transaction, Operations.Delete, ct);
+        }
     }
 
     public async Task EnlistPublicationAsync(IUnitOfWork transaction, string application, CancellationToken ct = default) {

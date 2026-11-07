@@ -2,7 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
+using System.Security.Claims;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -12,6 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Scim.Models;
+using Schemata.Scim.Services;
 using Xunit;
 
 namespace Schemata.Scim.Tests;
@@ -57,7 +61,7 @@ public sealed class ScimDiscoveryShould
     }
 
     [Fact]
-    public async Task Declare_Unsupported_Optional_Capabilities() {
+    public async Task Declare_Filter_And_Patch_With_Unsupported_Optional_Capabilities() {
         using var host     = await StartHostAsync();
         using var client   = host.GetTestClient();
         using var response = await client.GetAsync("/scim/v2/ServiceProviderConfig");
@@ -68,12 +72,12 @@ public sealed class ScimDiscoveryShould
         Assert.EndsWith("/scim/v2/ServiceProviderConfig", root.GetProperty("meta").GetProperty("location").GetString());
         Assert.False(root.GetProperty("meta").TryGetProperty("version", out _));
 
-        Assert.False(root.GetProperty("patch").GetProperty("supported").GetBoolean());
+        Assert.True(root.GetProperty("patch").GetProperty("supported").GetBoolean());
         Assert.False(root.GetProperty("bulk").GetProperty("supported").GetBoolean());
         Assert.Equal(0, root.GetProperty("bulk").GetProperty("maxOperations").GetInt32());
         Assert.Equal(0, root.GetProperty("bulk").GetProperty("maxPayloadSize").GetInt32());
-        Assert.False(root.GetProperty("filter").GetProperty("supported").GetBoolean());
-        Assert.Equal(0, root.GetProperty("filter").GetProperty("maxResults").GetInt32());
+        Assert.True(root.GetProperty("filter").GetProperty("supported").GetBoolean());
+        Assert.Equal(200, root.GetProperty("filter").GetProperty("maxResults").GetInt32());
         Assert.False(root.GetProperty("changePassword").GetProperty("supported").GetBoolean());
         Assert.False(root.GetProperty("sort").GetProperty("supported").GetBoolean());
         Assert.False(root.GetProperty("etag").GetProperty("supported").GetBoolean());
@@ -275,6 +279,25 @@ public sealed class ScimDiscoveryShould
         Assert.False(root.TryGetProperty("error", out _));
     }
 
+    private sealed class ProbeHandler : IScimResourceHandler
+    {
+        public ScimResourceType ResourceType => ProbeType;
+
+        public IReadOnlyList<ScimSchema> Schemas { get; } = [Probe];
+
+        public Task<ScimResource?> GetAsync(string id, ClaimsPrincipal principal, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<ScimSearchResult> SearchAsync(ScimSearchRequest request, ClaimsPrincipal principal, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<ScimResource> CreateAsync(JsonObject body, ClaimsPrincipal principal, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<ScimResource?> ReplaceAsync(string id, JsonObject body, ClaimsPrincipal principal, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<ScimResource?> PatchAsync(string id, ScimPatchDocument patch, ClaimsPrincipal principal, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<bool> DeleteAsync(string id, ClaimsPrincipal principal, CancellationToken ct) => throw new NotSupportedException();
+    }
+
     private static async Task<IHost> StartHostAsync(
         bool                          registerProbe    = true,
         Action<IServiceCollection>?   configureServices = null,
@@ -286,10 +309,9 @@ public sealed class ScimDiscoveryShould
                                                .ConfigureServices(services => {
                                                     services.AddRouting();
                                                     services.AddControllers();
+                                                    services.AddSchemataScim();
                                                     if (registerProbe) {
-                                                        services.AddSchemataScimResourceType(ProbeType, Probe);
-                                                    } else {
-                                                        services.AddSchemataScim();
+                                                        services.AddSingleton<IScimResourceHandler, ProbeHandler>();
                                                     }
 
                                                     configureServices?.Invoke(services);

@@ -43,6 +43,7 @@ public sealed class RegisterHandler<TApp, TSecurity, TToken>(
     IOptions<SchemataAuthorizationOptions> options,
     IHttpClientFactory                     http,
     ISecurityStore<TSecurity>              securities,
+    IApplicationSecurityMetadataStore      securityMetadata,
     ISecretVerifier                        verifier,
     ISoftwareStatementValidator?           softwareStatements = null,
     IInitialAccessTokenValidator?          initialAccess      = null,
@@ -93,12 +94,15 @@ public sealed class RegisterHandler<TApp, TSecurity, TToken>(
 
         await ValidateResponseAlgorithmsAsync(application, ct);
 
-        var created = await apps.CreateAsync(application, ct);
-        var clientId = created?.ClientId;
-        if (created is null || string.IsNullOrWhiteSpace(clientId)) {
+        await using var transaction = apps.BeginProvisioning();
+        var created = await apps.CreateAsync(application, transaction, ct);
+        if (created is null || string.IsNullOrWhiteSpace(created.ClientId)) {
             throw new OAuthException(OAuthErrors.InvalidClientMetadata,
                 SchemataResources.INVALID_CLIENT_CREDENTIALS);
         }
+        await securityMetadata.ReplaceAsync(created, request, transaction, ct);
+        await transaction.CommitAsync(ct);
+        var clientId = created.ClientId;
         if (RequiresClientSecret(created)) {
             var symmetric = created.TokenEndpointAuthMethod == ClientAuthMethods.ClientSecretJwt;
             var secret = RegistrationMetadataMapper.Base64UrlEncode(RandomNumberGenerator.GetBytes(symmetric ? 64 : 32));
@@ -115,33 +119,11 @@ public sealed class RegisterHandler<TApp, TSecurity, TToken>(
             plainSecret = secret;
         }
 
-        if (request.Jwks is { ValueKind: JsonValueKind.Object } jwks) {
-            await securities.CreateAsync(new() {
-                Parent = SecurityParents.Application(created),
-                Key    = clientId,
-                Kind   = SecurityConstants.Kinds.Jwks,
-                Usage  = SecurityConstants.Usages.Authentication,
-                Value  = jwks.GetRawText(),
-                Status = SecurityConstants.Statuses.Valid,
-            }, ct, (transaction, cancellation) => apps.EnlistPublicationAsync(transaction, created.CanonicalName!, cancellation));
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.JwksUri)) {
-            await securities.CreateAsync(new() {
-                Parent = SecurityParents.Application(created),
-                Key    = clientId,
-                Kind   = SecurityConstants.Kinds.JwksUri,
-                Usage  = SecurityConstants.Usages.Authentication,
-                Value  = request.JwksUri,
-                Status = SecurityConstants.Statuses.Valid,
-            }, ct, (transaction, cancellation) => apps.EnlistPublicationAsync(transaction, created.CanonicalName!, cancellation));
-        }
-
         var reference = issuer.CreateReference();
         await tokens.CreateAsync(CreateRegistrationToken(created, reference), ct,
             (transaction, cancellation) => apps.EnlistPublicationAsync(transaction, created.CanonicalName!, cancellation));
 
-        var response = await RegistrationMetadataMapper.ToResponse(created, securities, ct);
+        var response = await RegistrationMetadataMapper.ToResponse(created, securityMetadata, ct);
         response.ClientId                 = created.ClientId;
         response.ClientSecret             = plainSecret;
         response.ClientSecretExpiresAt    = plainSecret is null ? null : 0; // 0 = does not expire
@@ -173,7 +155,7 @@ public sealed class RegisterHandler<TApp, TSecurity, TToken>(
 
         // RFC 7592 §2.1: the read response is the complete current registration - metadata plus
         // the management URI and a usable registration access token.
-        var response = await RegistrationMetadataMapper.ToResponse(application, securities, ct);
+        var response = await RegistrationMetadataMapper.ToResponse(application, securityMetadata, ct);
         if (await Advisor.For<IRegistrationResponseAdvisor<TApp>>()
                           .RunAsync(context, application, response, ct) != AdviseResult.Continue) {
             return null;
@@ -247,10 +229,12 @@ public sealed class RegisterHandler<TApp, TSecurity, TToken>(
 
         await ValidateResponseAlgorithmsAsync(application, ct);
 
-        await apps.UpdateAsync(application, ct);
-        await ReplaceClientKeyMaterialAsync(application, request, ct);
+        await using var transaction = apps.BeginProvisioning();
+        await apps.UpdateAsync(application, transaction, ct);
+        await securityMetadata.ReplaceAsync(application, request, transaction, ct);
+        await transaction.CommitAsync(ct);
 
-        var response = await RegistrationMetadataMapper.ToResponse(application, securities, ct);
+        var response = await RegistrationMetadataMapper.ToResponse(application, securityMetadata, ct);
         if (await Advisor.For<IRegistrationResponseAdvisor<TApp>>()
                           .RunAsync(context, application, response, ct) != AdviseResult.Continue) {
             return null;
@@ -394,49 +378,6 @@ public sealed class RegisterHandler<TApp, TSecurity, TToken>(
         }
 
         return false;
-    }
-
-    /// <summary>Replaces the client's jwks / jwks_uri rows so they match the replaced metadata.</summary>
-    private async Task ReplaceClientKeyMaterialAsync(TApp application, RegisterRequest request, CancellationToken ct) {
-        var parent = SecurityParents.Application(application);
-
-        // The listing streams and updates share the store's repository context, so both kind
-        // listings are drained before any update.
-        var stale = new List<TSecurity>();
-        await foreach (var row in securities.ListByParentAsync(parent, SecurityConstants.Kinds.Jwks, null, null, ct)) {
-            stale.Add(row);
-        }
-
-        await foreach (var row in securities.ListByParentAsync(parent, SecurityConstants.Kinds.JwksUri, null, null, ct)) {
-            stale.Add(row);
-        }
-
-        foreach (var row in stale) {
-            row.Status = SecurityConstants.Statuses.Revoked;
-            await securities.UpdateAsync(row, ct);
-        }
-
-        if (request.Jwks is { ValueKind: JsonValueKind.Object } jwks) {
-            await securities.CreateAsync(new() {
-                Parent = parent,
-                Key    = application.ClientId,
-                Kind   = SecurityConstants.Kinds.Jwks,
-                Usage  = SecurityConstants.Usages.Authentication,
-                Value  = jwks.GetRawText(),
-                Status = SecurityConstants.Statuses.Valid,
-            }, ct, (transaction, cancellation) => apps.EnlistPublicationAsync(transaction, application.CanonicalName!, cancellation));
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.JwksUri)) {
-            await securities.CreateAsync(new() {
-                Parent = parent,
-                Key    = application.ClientId,
-                Kind   = SecurityConstants.Kinds.JwksUri,
-                Usage  = SecurityConstants.Usages.Authentication,
-                Value  = request.JwksUri,
-                Status = SecurityConstants.Statuses.Valid,
-            }, ct, (transaction, cancellation) => apps.EnlistPublicationAsync(transaction, application.CanonicalName!, cancellation));
-        }
     }
 
     /// <summary>

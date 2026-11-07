@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Schemata.Scim.Services;
 
 namespace Schemata.Scim.Models;
 
@@ -15,9 +16,8 @@ public sealed class ScimSchemaRegistry
     ///     Creates a registry from the discovery schemas plus the supplied resource types and
     ///     schemas.
     /// </summary>
-    /// <param name="schemas">Schemas contributed by SCIM resource adapters.</param>
-    /// <param name="resourceTypes">Resource types contributed by SCIM resource adapters.</param>
-    public ScimSchemaRegistry(IEnumerable<ScimSchema> schemas, IEnumerable<ScimResourceType> resourceTypes) {
+    /// <param name="handlers">Explicitly registered SCIM resource handlers.</param>
+    public ScimSchemaRegistry(IEnumerable<IScimResourceHandler> handlers) {
         _schemaIndex       = new(StringComparer.Ordinal);
         _resourceTypeIndex = new(StringComparer.OrdinalIgnoreCase);
 
@@ -28,11 +28,12 @@ public sealed class ScimSchemaRegistry
             AddSchema(schemaList, schema);
         }
 
-        foreach (var schema in schemas) {
-            AddSchema(schemaList, schema);
-        }
+        foreach (var handler in handlers) {
+            foreach (var schema in handler.Schemas) {
+                AddSchema(schemaList, schema);
+            }
 
-        foreach (var resourceType in resourceTypes) {
+            var resourceType = handler.ResourceType;
             var id = ResourceTypeId(resourceType);
             AddResourceTypeKey(id, resourceType);
             if (!string.Equals(id, resourceType.Name, StringComparison.OrdinalIgnoreCase)) {
@@ -84,6 +85,92 @@ public sealed class ScimSchemaRegistry
         }
 
         schemas.Add(schema);
+    }
+
+    /// <summary>The minimal core User schema used by the shared protocol services.</summary>
+    public static readonly ScimSchema CoreUser = new() {
+        Id          = ScimConstants.UserSchema,
+        Name        = "User",
+        Description = "User Account",
+        Attributes = [
+            .. CommonAttributes(),
+            new() { Name = "userName", Type = ScimConstants.StringType, Required = true, Uniqueness = ScimConstants.UniquenessServer },
+            new() { Name = "displayName", Type = ScimConstants.StringType },
+            new() { Name = "active", Type = ScimConstants.BooleanType },
+            new() {
+                Name = "name", Type = ScimConstants.ComplexType,
+                SubAttributes = [
+                    new() { Name = "formatted", Type = ScimConstants.StringType },
+                    new() { Name = "familyName", Type = ScimConstants.StringType },
+                    new() { Name = "givenName", Type = ScimConstants.StringType },
+                    new() { Name = "middleName", Type = ScimConstants.StringType },
+                    new() { Name = "honorificPrefix", Type = ScimConstants.StringType },
+                    new() { Name = "honorificSuffix", Type = ScimConstants.StringType },
+                ],
+            },
+            new() {
+                Name = "emails", Type = ScimConstants.ComplexType, MultiValued = true,
+                SubAttributes = MultiValueAttributes(),
+            },
+            new() {
+                Name = "groups", Type = ScimConstants.ComplexType, MultiValued = true, Mutability = ScimConstants.ReadOnly,
+                SubAttributes = [
+                    new() { Name = "value", Type = ScimConstants.StringType, Mutability = ScimConstants.ReadOnly },
+                    new() { Name = "display", Type = ScimConstants.StringType, Mutability = ScimConstants.ReadOnly },
+                    new() { Name = "$ref", Type = ScimConstants.ReferenceType, CaseExact = true, Mutability = ScimConstants.ReadOnly, ReferenceTypes = ["Group"] },
+                    new() { Name = "type", Type = ScimConstants.StringType, Mutability = ScimConstants.ReadOnly },
+                ],
+            },
+        ],
+    };
+
+    /// <summary>The core Group schema, including valuePath membership attributes.</summary>
+    public static readonly ScimSchema CoreGroup = new() {
+        Id          = ScimConstants.GroupSchema,
+        Name        = "Group",
+        Description = "Group",
+        Attributes = [
+            .. CommonAttributes(),
+            new() { Name = "displayName", Type = ScimConstants.StringType, Required = true, Uniqueness = ScimConstants.UniquenessServer },
+            new() {
+                Name = "members", Type = ScimConstants.ComplexType, MultiValued = true,
+                SubAttributes = [
+                    new() { Name = "value", Type = ScimConstants.StringType, Mutability = ScimConstants.Immutable },
+                    new() { Name = "$ref", Type = ScimConstants.ReferenceType, CaseExact = true, Mutability = ScimConstants.Immutable, ReferenceTypes = ["User", "Group"] },
+                    new() { Name = "type", Type = ScimConstants.StringType, Mutability = ScimConstants.Immutable, CanonicalValues = ["User", "Group"] },
+                    new() { Name = "display", Type = ScimConstants.StringType, Mutability = ScimConstants.ReadOnly },
+                ],
+            },
+        ],
+    };
+
+    /// <summary>Common attributes whose RFC characteristics apply to every resource schema.</summary>
+    public static ScimAttribute[] CommonAttributes() {
+        return [
+            new() { Name = "schemas", Type = ScimConstants.StringType, MultiValued = true, Required = true, CaseExact = true, Mutability = ScimConstants.ReadOnly, Returned = ScimConstants.Always },
+            new() { Name = "id", Type = ScimConstants.StringType, Required = true, CaseExact = true, Mutability = ScimConstants.ReadOnly, Returned = ScimConstants.Always },
+            new() { Name = "externalId", Type = ScimConstants.StringType, CaseExact = true },
+            new() {
+                Name = "meta", Type = ScimConstants.ComplexType, Mutability = ScimConstants.ReadOnly,
+                SubAttributes = [
+                    new() { Name = "resourceType", Type = ScimConstants.StringType, CaseExact = true, Mutability = ScimConstants.ReadOnly },
+                    new() { Name = "created", Type = ScimConstants.DateTimeType, Mutability = ScimConstants.ReadOnly },
+                    new() { Name = "lastModified", Type = ScimConstants.DateTimeType, Mutability = ScimConstants.ReadOnly },
+                    new() { Name = "location", Type = ScimConstants.ReferenceType, CaseExact = true, Mutability = ScimConstants.ReadOnly, ReferenceTypes = ["uri"] },
+                    new() { Name = "version", Type = ScimConstants.StringType, CaseExact = true, Mutability = ScimConstants.ReadOnly, Returned = ScimConstants.Never },
+                ],
+            },
+        ];
+    }
+
+    private static ScimAttribute[] MultiValueAttributes() {
+        return [
+            new() { Name = "value", Type = ScimConstants.StringType },
+            new() { Name = "display", Type = ScimConstants.StringType },
+            new() { Name = "type", Type = ScimConstants.StringType },
+            new() { Name = "primary", Type = ScimConstants.BooleanType },
+            new() { Name = "$ref", Type = ScimConstants.ReferenceType, CaseExact = true },
+        ];
     }
 
     private static readonly ScimSchema[] DiscoverySchemas = [
