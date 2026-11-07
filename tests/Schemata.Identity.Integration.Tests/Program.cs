@@ -26,8 +26,6 @@ var tenanted = string.Equals(builder.Environment.EnvironmentName, "Tenanted", St
 
 builder.UseSchemata(schema => {
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IRepositoryAddAdvisor<>), typeof(ResourceNameAdvisor<>)));
-    schema.UseMapster().Map<SchemataUser, SchemataUser>();
-    schema.UseMapster().Map<SchemataRole, SchemataRole>();
     schema.Services.AddMemoryCacheProvider();
     schema.Services.AddDbContextFactory<IdentityDbContext>(options => options.UseSqlite(connectionString).ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
     schema.Services.AddRepository<SchemataUser, EfCoreRepository<IdentityDbContext, SchemataUser>>();
@@ -37,10 +35,9 @@ builder.UseSchemata(schema => {
     schema.Services.AddRepository<SchemataUserLogin, EfCoreRepository<IdentityDbContext, SchemataUserLogin>>();
     schema.Services.AddRepository<SchemataUserToken, EfCoreRepository<IdentityDbContext, SchemataUserToken>>();
     schema.Services.AddRepository<SchemataRoleClaim, EfCoreRepository<IdentityDbContext, SchemataRoleClaim>>();
-    var identity = schema.UseIdentity().UseRegistration().UseAccountConfirmation().UsePasswordReset()
-        .UsePasswordChange().UseEmailChange().UsePhoneNumberChange().UseTwoFactorAuthentication().MapHttp();
+    schema.UseIdentity().UseRegistration().UseAccountConfirmation().UsePasswordReset()
+        .UsePasswordChange().UseEmailChange().UsePhoneNumberChange().UseTwoFactorAuthentication();
     schema.UseSecurity();
-    if (builder.Environment.EnvironmentName == "Authenticated") identity.WithAuthentication("ManagementTest");
     schema.UseAuthentication((AuthenticationBuilder _) => { });
     if (tenanted) {
         var tenancy = schema.UseTenancy<TestTenantManager, SchemataTenant, SchemataTenantHost>();

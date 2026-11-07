@@ -4,7 +4,7 @@ using Grpc.Core;
 using Microsoft.AspNetCore.Http;
 using Schemata.Security.Foundation.Signatures;
 
-namespace Schemata.Transport.Grpc.Extensions;
+namespace Schemata.Security.Grpc.Extensions;
 
 /// <summary>
 ///     The gRPC binding for message signatures: adapts gRPC metadata and call context into the

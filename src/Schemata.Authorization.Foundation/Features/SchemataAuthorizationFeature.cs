@@ -65,10 +65,6 @@ public sealed class SchemataAuthorizationFeature<TApp, TAuth, TScope, TSubjectMa
         services.AddSchemataAuthorizationFlows(schemata, configurators);
         services.AddSchemataApplicationPart<SchemataAuthorizationFeature<TApp, TAuth, TScope, TSubjectMapping, TSecurity, TToken>>();
         services.AddSchemataAuthorization<TApp, TAuth, TScope, TSubjectMapping, TSecurity, TToken>();
-
-        IAuthorizationResourceRegistration resources =
-            new AuthorizationResourceRegistration<TApp, TScope, TToken>();
-        schemata.Set(SchemataAuthorizationBuilder.ResourceRegistrationKey, resources);
     }
 
     public override void ConfigureEndpoints(

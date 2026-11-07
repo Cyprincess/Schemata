@@ -1,6 +1,4 @@
 using System;
-using System.Net;
-using System.Net.Http;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -100,9 +98,8 @@ public class IdentityAssociationsShould
         Assert.Empty(await verify.ServiceProvider.GetRequiredService<IdentityDbContext>().RoleClaims.ToListAsync());
     }
     [Fact]
-    public async Task Management_Delete_Cleans_Relationships_Before_Name_Reconstruction() {
+    public async Task Store_Delete_Cleans_Relationships_Before_Name_Reconstruction() {
         using var factory = new WebAppFactory();
-        using var client = factory.CreateClient();
         var user = new SchemataUser { Name = "reuse", UserName = "reuse" };
         using (var scope = factory.Services.CreateScope()) {
             var users = scope.ServiceProvider.GetRequiredService<IUserStore<SchemataUser>>();
@@ -110,12 +107,8 @@ public class IdentityAssociationsShould
             await ((IUserLoginStore<SchemataUser>)users).AddLoginAsync(user, new("provider", "old-key", "Provider"), default);
             await ((IUserClaimStore<SchemataUser>)users).AddClaimsAsync(user, [new Claim("permission", "old")], default);
             await ((IUserAuthenticationTokenStore<SchemataUser>)users).SetTokenAsync(user, "provider", "token", "old", default);
+            Assert.True((await users.DeleteAsync(user, default)).Succeeded);
         }
-        using var current = await client.GetAsync("/v1/users/reuse");
-        Assert.Equal(HttpStatusCode.OK, current.StatusCode);
-        using var deletion = new HttpRequestMessage(HttpMethod.Delete, "/v1/users/reuse");
-        using var deleted = await client.SendAsync(deletion);
-        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
         using var fresh = factory.Services.CreateScope();
         var store = fresh.ServiceProvider.GetRequiredService<IUserStore<SchemataUser>>();
         var replacement = new SchemataUser { Name = "reuse", UserName = "reuse" };
@@ -128,9 +121,8 @@ public class IdentityAssociationsShould
     }
 
     [Fact]
-    public async Task Role_Management_Delete_Cleans_Claims_And_Memberships_Before_Reconstruction() {
+    public async Task Role_Store_Delete_Cleans_Claims_And_Memberships_Before_Reconstruction() {
         using var factory = new WebAppFactory();
-        using var client = factory.CreateClient();
         var role = new SchemataRole { Name = "reused-role", NormalizedName = "REUSED-ROLE", DisplayName = "Reused role" };
         var user = new SchemataUser { Name = "member", UserName = "member" };
         using (var scope = factory.Services.CreateScope()) {
@@ -140,9 +132,8 @@ public class IdentityAssociationsShould
             Assert.True((await users.CreateAsync(user, default)).Succeeded);
             await ((IRoleClaimStore<SchemataRole>)roles).AddClaimAsync(role, new("permission", "old"), default);
             await ((IUserRoleStore<SchemataUser>)users).AddToRoleAsync(user, role.NormalizedName!, default);
+            Assert.True((await roles.DeleteAsync(role, default)).Succeeded);
         }
-        using var deleted = await client.DeleteAsync("/v1/roles/reused-role");
-        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
         using var fresh = factory.Services.CreateScope();
         var store = fresh.ServiceProvider.GetRequiredService<IRoleStore<SchemataRole>>();
         var replacement = new SchemataRole { Name = "reused-role", NormalizedName = "REUSED-ROLE" };

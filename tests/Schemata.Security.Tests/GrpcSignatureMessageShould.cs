@@ -5,10 +5,10 @@ using Grpc.Core;
 using Moq;
 using Schemata.Security.Foundation.Signatures;
 using Schemata.Security.Skeleton.Services;
-using Schemata.Transport.Grpc.Extensions;
+using Schemata.Security.Grpc.Extensions;
 using Xunit;
 
-namespace Schemata.Transport.Grpc.Tests;
+namespace Schemata.Security.Tests;
 
 public class GrpcSignatureMessageShould
 {
