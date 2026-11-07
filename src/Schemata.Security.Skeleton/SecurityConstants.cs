@@ -88,6 +88,9 @@ public static class SecurityConstants
     /// </summary>
     public static class Statuses
     {
+        /// <summary>The material is published for a future switch but cannot sign, encrypt, verify, or decrypt.</summary>
+        public const string Staged = "staged";
+
         /// <summary>The material is active and usable.</summary>
         public const string Valid = "valid";
 

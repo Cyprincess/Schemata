@@ -4,8 +4,10 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Schemata.Core;
 using Schemata.Core.Features;
+using Schemata.Scheduling.Skeleton;
 using Schemata.Security.Foundation.Extensions;
 using Schemata.Security.Foundation.Services;
 using Schemata.Security.Foundation.Stores;
@@ -59,6 +61,17 @@ public class SchemataSecurityFeature<TSecurity, TToken> : FeatureBase, ISecurity
             KeyedService.AnyKey, (sp, _) => sp.GetRequiredService<IPasswordHasher<SchemataSecurity>>());
         services.TryAddScoped<ISecretVerifier, SecretVerifier>();
         services.TryAddScoped<ISecurityStore<TSecurity>, SecurityStore<TSecurity>>();
+        services.TryAddScoped<ISecurityKeyGenerator<TSecurity>, RsaSecurityKeyGenerator<TSecurity>>();
+        services.TryAddScoped<SecurityKeyRotationService<TSecurity>>();
+        services.AddScheduledJob<SecurityKeyRotationJob<TSecurity>>();
+        services.AddOptions<SchemataSchedulingOptions>().Configure<IOptions<SchemataSecurityOptions>>((scheduling, configured) => {
+            var security = configured.Value;
+            if (security.RotationInterval is not { } interval || security.Rotations.Count == 0) {
+                return;
+            }
+
+            scheduling.Jobs.Add(new(typeof(SecurityKeyRotationJob<TSecurity>), new PeriodicSchedule(interval)));
+        });
 
         services.AddTokenStores<TToken>();
         services.AddHttpClient(SecurityKeyMaterialExtensions.HttpClientName)

@@ -24,8 +24,9 @@ namespace Schemata.Authorization.Foundation.Handlers;
 ///     JWKS endpoint per
 ///     <seealso href="https://www.rfc-editor.org/rfc/rfc7517.html">RFC 7517: JSON Web Key (JWK)</seealso>.
 ///     Publishes the public key material of the signing rows stored under the issuer:
-///     valid and retired rows publish, revoked rows never do. Any symmetric row keeps
-///     the whole set private and yields an empty <c>keys</c> array, per RFC 7517 §4.2.
+///     staged, valid, and retained retired rows publish; expired retired and revoked rows do not.
+///     Any symmetric row keeps the whole set private and yields an empty <c>keys</c> array,
+///     per RFC 7517 §4.2.
 /// </summary>
 /// <exception cref="NotSupportedException">A signing row carries no publishable material or
 /// cannot be imported under its declared key algorithm.</exception>
@@ -34,16 +35,19 @@ public sealed class JwksHandler<TSecurity>(
     IHttpClientFactory                     http,
     ICacheProvider                         cache,
     IOptions<SchemataSecurityOptions>      security,
-    IOptions<SchemataAuthorizationOptions> options
+    IOptions<SchemataAuthorizationOptions> options,
+    TimeProvider?                          time = null
 ) where TSecurity : SchemataSecurity, new()
 {
     /// <summary>Returns the JSON Web Key Set for tokens issued by this OP.</summary>
     /// <param name="ct">A cancellation token.</param>
     public async Task<AuthorizationResult> ExecuteAsync(CancellationToken ct = default) {
         var rows = new List<TSecurity>();
+        var now = (time ?? TimeProvider.System).GetUtcNow();
         await foreach (var row in securities.ListByParentAsync(
                            SecurityParents.Issuer(options.Value.Issuer!), null, SecurityConstants.Usages.Signing, null, ct)) {
-            if (row.Status is SecurityConstants.Statuses.Valid or SecurityConstants.Statuses.Retired) {
+            if (row.Status is SecurityConstants.Statuses.Staged or SecurityConstants.Statuses.Valid
+             || SecurityKeyLifecycle.IsRetained(row, now, security.Value.RetiredKeyRetention)) {
                 rows.Add(row);
             }
         }

@@ -60,8 +60,9 @@ public class TokenService<TSecurity>(
     ///     Resolves the signing context for one operation: the newest valid signing row is
     ///     primary, a non-blank <paramref name="algorithm" /> (OIDC Registration §2
     ///     <c>id_token_signed_response_alg</c>) selects the newest valid row serving it, valid
-    ///     and retired rows verify, and the newest valid encryption row (when present)
-    ///     encrypts. Nothing is cached across operations, so rotation stays observable.
+    ///     and retained retired rows verify, and the newest valid encryption row (when present)
+    ///     encrypts. Staged, expired retired, and revoked rows cannot sign, verify, encrypt, or
+    ///     decrypt. Nothing is cached across operations, so rotation stays observable.
     /// </summary>
     /// <param name="algorithm">Negotiated JWS signing algorithm; blank selects the primary row.</param>
     /// <param name="ct">Cancellation token.</param>
@@ -86,8 +87,10 @@ public class TokenService<TSecurity>(
             // With multiple verification keys the kid header is the only way to route a
             // signature to its key, so every key in a set must carry a key id. A single
             // bare key remains valid: RFC 7517 §4.5 makes kid a SHOULD, not a MUST.
+            var now = _time.GetUtcNow();
             var trusted = signingRows
-                .Where(row => row.Status is SecurityConstants.Statuses.Valid or SecurityConstants.Statuses.Retired)
+                .Where(row => row.Status == SecurityConstants.Statuses.Valid
+                           || SecurityKeyLifecycle.IsRetained(row, now, securityOptions.Value.RetiredKeyRetention))
                 .ToList();
             if (trusted.Count > 1 && trusted.Any(row => string.IsNullOrEmpty(row.Kid))) {
                 throw new InvalidOperationException(
@@ -139,7 +142,8 @@ public class TokenService<TSecurity>(
             EncryptingCredentials? encrypting = null;
             var decryption = new List<SecurityKey>();
             foreach (var row in await ListRowsAsync(SecurityConstants.Usages.Encryption, ct)) {
-                if (row.Status is not (SecurityConstants.Statuses.Valid or SecurityConstants.Statuses.Retired)) {
+                if (row.Status != SecurityConstants.Statuses.Valid
+                 && !SecurityKeyLifecycle.IsRetained(row, now, securityOptions.Value.RetiredKeyRetention)) {
                     continue;
                 }
                 if (await ToKeyAsync(row, ct) is not { } key) {

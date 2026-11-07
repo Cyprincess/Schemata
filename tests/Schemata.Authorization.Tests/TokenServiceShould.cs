@@ -205,6 +205,92 @@ public class TokenServiceShould
         Assert.Equal("user-1", (await service.Validate(successor))?.FindFirst("sub")?.Value);
     }
 
+    [Fact]
+    public async Task Trust_Only_Active_And_Retained_Signing_Keys() {
+        var now = DateTimeOffset.UtcNow;
+        var store = new TestSecurityStore();
+        var active = TestSecurityKeys.AddSigningRow(store, Issuer);
+        var retained = TestSecurityKeys.AddSigningRow(store, Issuer);
+        retained.Status = SecurityConstants.Statuses.Retired;
+        retained.RetirementTime = now.AddMinutes(-30).UtcDateTime;
+        var expired = TestSecurityKeys.AddSigningRow(store, Issuer);
+        expired.Status = SecurityConstants.Statuses.Retired;
+        expired.RetirementTime = now.AddHours(-2).UtcDateTime;
+        var revoked = TestSecurityKeys.AddSigningRow(store, Issuer);
+        revoked.Status = SecurityConstants.Statuses.Revoked;
+        var staged = TestSecurityKeys.AddSigningRow(store, Issuer);
+        staged.Status = SecurityConstants.Statuses.Staged;
+        staged.CreateTime = now.AddDays(1).UtcDateTime;
+        var service = new TokenService<SchemataSecurity>(
+            store,
+            new StubHttpClientFactory(),
+            new Mock<ICacheProvider>().Object,
+            Options.Create(new SchemataSecurityOptions { RetiredKeyRetention = TimeSpan.FromHours(1) }),
+            Options.Create(new SchemataAuthorizationOptions { Issuer = Issuer }),
+            new FakeTimeProvider(now));
+
+        await using var signing = await service.BeginSigningAsync();
+        var current = service.CreateToken(signing, signing.Signing, [], now, now.AddMinutes(5));
+
+        Assert.Equal(active.Kid, new JsonWebToken(current).Kid);
+        Assert.NotNull(await service.Validate(SignWithRow(retained)));
+        Assert.Null(await service.Validate(SignWithRow(expired)));
+        Assert.Null(await service.Validate(SignWithRow(revoked)));
+        Assert.Null(await service.Validate(SignWithRow(staged)));
+    }
+
+    [Fact]
+    public async Task Refuse_Staged_Key_As_The_Only_Signing_Key() {
+        var store = new TestSecurityStore();
+        TestSecurityKeys.AddSigningRow(store, Issuer).Status = SecurityConstants.Statuses.Staged;
+        var service = CreateTokenService(store);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await service.BeginSigningAsync());
+    }
+
+    [Fact]
+    public async Task Honor_Retention_And_Revocation_For_Encryption_Keys() {
+        var now = DateTimeOffset.UtcNow;
+        var store = new TestSecurityStore();
+        TestSecurityKeys.AddSigningRow(store, Issuer);
+        var previous = TestSecurityKeys.AddEncryptionRow(store, Issuer);
+        var service = new TokenService<SchemataSecurity>(
+            store,
+            new StubHttpClientFactory(),
+            new Mock<ICacheProvider>().Object,
+            Options.Create(new SchemataSecurityOptions { RetiredKeyRetention = TimeSpan.FromHours(1) }),
+            Options.Create(new SchemataAuthorizationOptions { Issuer = Issuer }),
+            new FakeTimeProvider(now));
+        var original = await IssueAsync(service, now);
+        previous.Status = SecurityConstants.Statuses.Retired;
+        previous.RetirementTime = now.AddHours(-2).UtcDateTime;
+        var staged = TestSecurityKeys.AddEncryptionRow(store, Issuer);
+        staged.Status = SecurityConstants.Statuses.Staged;
+        staged.CreateTime = now.AddDays(1).UtcDateTime;
+        var current = TestSecurityKeys.AddEncryptionRow(store, Issuer);
+
+        var successor = await IssueAsync(service, now);
+
+        Assert.Equal(current.Kid, new JsonWebToken(successor).Kid);
+        Assert.Null(await service.Validate(original));
+        previous.RetirementTime = now.AddMinutes(-30).UtcDateTime;
+        Assert.Equal("users/rotation", (await service.Validate(original))?.FindFirst("sub")?.Value);
+        previous.Status = SecurityConstants.Statuses.Revoked;
+        Assert.Null(await service.Validate(original));
+        Assert.Equal("users/rotation", (await service.Validate(successor))?.FindFirst("sub")?.Value);
+    }
+
+    private static async Task<string> IssueAsync(TokenService<SchemataSecurity> service, DateTimeOffset now) {
+        await using var signing = await service.BeginSigningAsync();
+        return service.CreateToken(
+            signing,
+            signing.Signing,
+            [new("sub", "users/rotation")],
+            now,
+            now.AddMinutes(5),
+            encrypt: true);
+    }
+
     private static TokenService<SchemataSecurity> CreateTokenService(TestSecurityStore store) {
         return new(
             store,

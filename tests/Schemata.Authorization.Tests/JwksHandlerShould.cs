@@ -154,6 +154,48 @@ public class JwksHandlerShould
         });
     }
 
+    [Fact]
+    public async Task Publishes_Staged_And_Retained_Rows_While_Excluding_Expired_Retirement() {
+        var store = new TestSecurityStore();
+        var active = TestSecurityKeys.AddSigningRow(store, Issuer);
+        var staged = TestSecurityKeys.AddSigningRow(store, Issuer);
+        staged.Status = SecurityConstants.Statuses.Staged;
+        var retained = TestSecurityKeys.AddSigningRow(store, Issuer);
+        retained.Status = SecurityConstants.Statuses.Retired;
+        retained.RetirementTime = DateTime.UtcNow;
+        var expired = TestSecurityKeys.AddSigningRow(store, Issuer);
+        expired.Status = SecurityConstants.Statuses.Retired;
+        expired.RetirementTime = DateTime.UtcNow.AddDays(-8);
+        var revoked = TestSecurityKeys.AddSigningRow(store, Issuer);
+        revoked.Status = SecurityConstants.Statuses.Revoked;
+
+        using var json = await GetWireAsync(store);
+        var kids = json.RootElement.GetProperty("keys").EnumerateArray()
+            .Select(key => key.GetProperty("kid").GetString()).ToList();
+
+        Assert.Equal(3, kids.Count);
+        Assert.Contains(active.Kid, kids);
+        Assert.Contains(staged.Kid, kids);
+        Assert.Contains(retained.Kid, kids);
+        Assert.DoesNotContain(expired.Kid, kids);
+        Assert.DoesNotContain(revoked.Kid, kids);
+    }
+
+    [Fact]
+    public async Task Keeps_Jwks_Private_When_Staged_Key_Is_Symmetric() {
+        var store = new TestSecurityStore();
+        TestSecurityKeys.AddSigningRow(store, Issuer);
+        var staged = TestSecurityKeys.AddSigningRow(store, Issuer);
+        staged.Status = SecurityConstants.Statuses.Staged;
+        staged.Kind = SecurityConstants.Kinds.Secret;
+        staged.Algorithm = SecurityConstants.Algorithms.HmacSha256;
+        staged.Value = "staged-shared-secret";
+
+        using var json = await GetWireAsync(store);
+
+        Assert.Equal(0, json.RootElement.GetProperty("keys").GetArrayLength());
+    }
+
     private static JwksHandler<SchemataSecurity> CreateHandler(TestSecurityStore store) {
         return new(
             store,

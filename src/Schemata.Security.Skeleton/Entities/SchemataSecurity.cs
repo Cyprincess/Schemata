@@ -40,8 +40,14 @@ public class SchemataSecurity : IIdentifier, ICanonicalName, IConcurrency, ITime
     /// <summary>Material: password → hash string; secret/private-key → plaintext material; jwk/jwks → JSON; *-uri → URI; public-key → PEM.</summary>
     public virtual string? Value { get; set; }
 
-    /// <summary>Lifecycle: valid / retired (still verifiable) / revoked (never). See <see cref="SecurityConstants.Statuses" />.</summary>
+    /// <summary>Lifecycle: staged / valid / retired (retained for verification) / revoked. See <see cref="SecurityConstants.Statuses" />.</summary>
     public virtual string? Status { get; set; }
+
+    /// <summary>UTC instant when the row became active.</summary>
+    public virtual DateTime? ActivationTime { get; set; }
+
+    /// <summary>UTC instant when the row stopped signing or encrypting and entered its retention window.</summary>
+    public virtual DateTime? RetirementTime { get; set; }
 
     /// <inheritdoc cref="IIdentifier.Uid" />
     public virtual Guid Uid { get; set; }
