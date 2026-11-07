@@ -192,19 +192,19 @@ public static class SchemataBuilderExtensions
     }
 
     /// <summary>
-    ///     Enables <c>Quota</c>, which provides rate limiting with
+    ///     Enables ASP.NET Core rate limiting with
     ///     <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>
     ///     compliant error responses.
-    ///     See <see cref="SchemataQuotaFeature" /> for details.
+    ///     See <see cref="SchemataRateLimitingFeature" /> for details.
     /// </summary>
     /// <param name="builder">The <see cref="SchemataBuilder" />.</param>
     /// <param name="configure">Optional configuration delegate for <see cref="RateLimiterOptions" />.</param>
     /// <returns>The builder for chaining.</returns>
-    public static SchemataBuilder UseQuota(this SchemataBuilder builder, Action<RateLimiterOptions>? configure = null) {
+    public static SchemataBuilder UseRateLimiting(this SchemataBuilder builder, Action<RateLimiterOptions>? configure = null) {
         configure ??= _ => { };
         builder.Configure(configure);
 
-        builder.AddFeature<SchemataQuotaFeature>();
+        builder.AddFeature<SchemataRateLimitingFeature>();
 
         return builder;
     }

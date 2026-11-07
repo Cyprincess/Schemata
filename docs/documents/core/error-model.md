@@ -194,12 +194,17 @@ throw SchemataResourceErrors.PermissionDenied<Book>(
 | `NoContentException`          | 204       | `OK`                  | _(none)_                                                      |
 
 Rate-limit policies can expose `QuotaMetadata.Subject` on their rejected lease to identify the
-actual quota partition. Otherwise Core uses the authenticated `sub`, name identifier, or name,
+actual rate-limit partition. Otherwise Core uses the authenticated `sub`, name identifier, or name,
 then client IP. Installed Tenancy decorates rejection handling and prefixes only fallback violation
 subjects with the current tenant UID, preserving an explicit lease subject. This labels diagnostics;
 application rate-limit policies still own partition selection. Lease
 `MetadataName.RetryAfter` becomes `RetryInfoDetail` and the HTTP transport emits ceiling-seconds
 `Retry-After`. Application `OnRejected` runs first; a started response remains application-owned.
+
+Durable accounting in `Schemata.Quota.Foundation` uses the same exception for capacity rejection.
+Its `QuotaFailureDetail` identifies each rejected metric and policy, and its `RetryInfoDetail` uses
+the earliest non-negative algorithm retry. These reservations use `UseQuotaAccounting()` and persist
+independently of the native `UseRateLimiting()` middleware.
 
 `ValidationException` takes a set of `ErrorFieldViolation` values and wraps them in a
 `BadRequestDetail`. `NoContentException` signals a successful body-less response, used by

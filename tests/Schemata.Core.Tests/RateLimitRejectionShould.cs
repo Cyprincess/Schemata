@@ -17,7 +17,7 @@ using Xunit;
 
 namespace Schemata.Core.Tests;
 
-public class QuotaRejectionShould
+public class RateLimitRejectionShould
 {
     [Theory]
     [InlineData(true)]

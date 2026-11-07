@@ -13,12 +13,11 @@ namespace Schemata.Core.Features;
 ///     <see cref="QuotaExceededException" /> so the exception handler can produce a
 ///     structured <see cref="ErrorResponse" />. See <seealso href="https://google.aip.dev/193">AIP-193: Errors</seealso>.
 /// </summary>
-public sealed class SchemataQuotaFeature : FeatureBase
+public sealed class SchemataRateLimitingFeature : FeatureBase
 {
     /// <summary>
-    ///     Default middleware priority for rate limiting. Rate limiting runs after authentication
-    /// and authorization so the limiter can partition on the authenticated subject (and tenancy
-    /// binding) rather than only the remote IP.
+    ///     Default middleware priority after authentication and authorization, where the limiter
+    ///     can partition on the authenticated subject.
     /// </summary>
     public const int DefaultPriority = SchemataAuthenticationFeature.DefaultPriority + 5_000_000;
 
