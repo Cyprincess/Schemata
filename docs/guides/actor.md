@@ -99,16 +99,17 @@ Resolve `IActorSystem` and address an instance by `ActorId`. `GetAsync` spawns t
 first use; an unregistered `Type` throws rather than silently constructing something:
 
 ```csharp
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Actor.Skeleton;
 
-public sealed class CounterService(IActorSystem actors)
+public sealed class CounterService(IActorSystem actors, IServiceProvider services)
 {
     public async Task<int> IncrementAsync(string counterName, int by, CancellationToken ct = default)
     {
         var counter = await actors.GetAsync(new ActorId("counter", counterName));
-        return await counter.AskAsync<Increment, int>(new Increment(by), ct: ct);
+        return await counter.AskAsync<Increment, int>(services, new Increment(by), ct: ct);
     }
 }
 ```
@@ -117,6 +118,12 @@ Every `Increment` for the same `counterName` runs on the same mailbox, one turn 
 concurrent callers never interleave their reads and writes of `_count`.
 
 ## Ask semantics
+
+Pass the current invocation provider as the first argument. Actor callbacks pass `ctx.Services`;
+other callers pass their current scope, or the root provider when the host permits scoped root
+resolution. A callback that Asks its own actor identity fails deterministically before mailbox
+admission or remote send, while a different actor remains callable. Ordinary message execution
+scopes have an unbound Actor turn identity.
 
 `AskAsync` generates a `CorrelationId`, enqueues the envelope, and awaits a
 `TaskCompletionSource` registered in the actor's own pending-reply table, bounded by the optional
@@ -130,6 +137,26 @@ a derived payload or the payload implements multiple `IRequest<TResponse>` contr
 one-way request dispatch uses the declared `TellAsync<T>` type; a type with multiple response
 contracts must select one explicitly through `TellAsync<IRequest<TResponse>>` and register the
 handler for that interface, or use `AskAsync<TRequest, TResponse>`.
+
+Response inference caches only the finite response-`Type`/`MethodInfo` metadata for each request
+type. Declared-response calls reuse an entry only on a response-type match, leaving other declared
+pairs and the inferred entry independent. The keyed handler and its `AdviceContext` still come
+from the current turn's `ctx.Services` on every call.
+
+The file-based harness in `eng/actor-dispatch.measure.cs` warms 500 calls, measures five batches
+of 5,000 calls, and writes allocation and timing data with `Stopwatch` and
+`GC.GetTotalAllocatedBytes(true)`:
+
+```shell
+dotnet run --file eng/actor-dispatch.measure.cs --configuration Release > artifacts/measurements/actor-dispatch.json
+```
+
+On 2026-11-04, the before/after artifacts on Windows 10.0.26300 X64 with 24 processors and .NET
+10.0.14 recorded mean allocation of 2,751.57 versus 2,527.13 bytes per Ask (8.16% lower), and
+mean batch throughput of 130,582.57 versus 45,232.31 calls/s (65.36% lower). These single runs
+show an allocation reduction and a throughput regression in this environment; they do not
+establish a general performance improvement. The measurements are not timing-sensitive test
+assertions.
 
 The reply commits only after the turn ends: it is recorded once `OnReceiveAsync` returns without
 throwing, so a reply recorded earlier in the same turn is discarded if the turn subsequently
@@ -175,8 +202,10 @@ same convention `Flow.Foundation`/`Scheduling.Foundation` use for their own enti
 persistence without registering that repository surfaces as a DI resolution failure the first
 time a persistent actor's turn runs, not at startup.
 
-The stored lookup identity is the unique `(SchemataActor.ActorType, SchemataActor.ActorKey)` pair,
-independent of resource `Name`. Register a consumer `IRepositoryAddAdvisor<SchemataActor>` through
+The stored lookup identity is the `(SchemataActor.ActorType, SchemataActor.ActorKey)` pair,
+independent of resource `Name`. `ActorStateStore.SaveAsync` begins a serializable transaction
+before that lookup and commits the insert or update once; its ordinary index supports the query.
+Register a consumer `IRepositoryAddAdvisor<SchemataActor>` through
 `TryAddEnumerable` before `AdviceAddCanonicalName.DefaultOrder` (120,000,000) to assign missing
 names. See the
 [persistence reference](../documents/actor/overview.md#persistence-is-opt-in-and-the-actor-never-holds-authoritative-state)
@@ -261,8 +290,10 @@ turn never inherits the sender's context.
 Install `Schemata.Tenancy.Actor` and call `tenancy.UseActor()` after configuring the ordinary
 actor capability. The Tenancy-owned decorator selects an independent in-process runtime for
 each bound tenant while `ActorId` keeps its business `Type` and `Key`. Actor references capture
-generic `MessageContext`; using a reference under another tenant fails before enqueueing.
-The bridge enables tenant message propagation and turn-scope restoration.
+generic `MessageContext`; passing an explicit context for another tenant fails before enqueueing.
+The scoped actor facade resolves `TenantIdentity` from its final provider. Sends and stops use the
+standard scope runner; activation, timer, and shutdown callbacks restore their activation context
+directly through create/restore/work/dispose.
 
 Persisted actor state needs a tenanted row type, because the shipped `SchemataActor` implements no
 `ITenant`. Declare the subtype, close the tenancy actor bridge on it, and register its repository
@@ -292,6 +323,10 @@ Constructors retain activation-lifetime dependencies; per-turn dependencies come
 `IActorContext.Services`. Startup, timer callbacks and shutdown restore the activation's captured
 context through the same execution-scope factory. The hosted lifecycle collects idle activations
 and drains every selected runtime on shutdown.
+
+Actor disposal normally restores the activation context in a fresh turn scope before cleanup. An
+already-disposed root scope factory causes direct owned-actor disposal, async-first, exactly once;
+actor cleanup failures remain observable.
 
 The in-process actor system removes the race between two callers in the same process. A
 multi-instance deployment still relies on the entity's own `IConcurrency` optimistic-concurrency

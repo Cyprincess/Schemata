@@ -1,198 +1,80 @@
-# Advice Generator
+# Advice Source Generator
 
-`Schemata.Advice.Generator` is a Roslyn incremental source generator with two outputs. For every
-interface whose base list contains `IAdvisor`, it emits a `RunAsync` extension on
-`AdvicePipeline<TAdvisor>` that delegates to the matching `AdviceRunner<...>`. In the compilation
-that declares `AdvicePipeline<TAdvisor>` it also emits the `AdviceRunner` classes for arities 1
-through 16. A new advisor interface needs only its declaration.
+`Schemata.Advice.Generator` emits `RunAsync` extensions for advisor interfaces and the
+`AdviceRunner` family used by those extensions. It targets `netstandard2.0` and is included as an
+analyzer for `src/` projects through `Directory.Build.props`.
 
-## Where the code lives
+## Source ownership
 
-| Package                     | Key files                                               |
-| --------------------------- | ------------------------------------------------------- |
-| `Schemata.Advice.Generator` | `AdvicePipelineGenerator.cs`, `AdvisorInterfaceInfo.cs` |
+| Concern | Executable source |
+| --- | --- |
+| Discovery, semantic matching, emission | `generators/Schemata.Advice.Generator/AdvicePipelineGenerator.cs` |
+| Emission metadata | `generators/Schemata.Advice.Generator/AdvisorInterfaceInfo.cs` |
+| Runtime token | `src/Schemata.Advice/AdvicePipeline.cs`, `src/Schemata.Advice/Advisor.cs` |
+| Advisor contracts | `src/Schemata.Abstractions/Advisors/IAdvisor.cs` |
 
-The generator targets `netstandard2.0`, references `Microsoft.CodeAnalysis.CSharp`, and is
-injected as an analyzer into every `src/` project through `Directory.Build.props`.
+## Activation
 
-## Activation guards
+`Initialize` probes for `Schemata.Advice.AdvicePipeline` with metadata arity 1. A compilation
+referencing that type can receive per-interface extensions. `DefinesAdvicePipeline` additionally
+compares the type's declaring assembly with the current compilation through
+`SymbolEqualityComparer.Default`. Only the assembly declaring the pipeline receives the runners.
+A compilation referencing only Abstractions receives neither output family.
 
-Two guards share the `AdvicePipeline\`1` probe:
+`GenerateRunners` emits `AdviceRunner.Arity1.g.cs` through `AdviceRunner.Arity16.g.cs` into
+`Schemata.Advice`. Each runner resolves `GetServices<TAdvisor>()` from the supplied
+`AdviceContext.ServiceProvider`, orders by `Order`, checks cancellation before each invocation,
+and returns the first result other than `Continue`. Completing the collection returns `Continue`.
 
-```csharp
-var hasInfrastructure = context.CompilationProvider.Select(
-    static (compilation, _) =>
-        compilation.GetTypeByMetadataName("Schemata.Advice.AdvicePipeline`1") is not null);
+## Candidate and semantic matching
 
-var definesInfrastructure = context.CompilationProvider.Select(
-    static (compilation, _) => DefinesAdvicePipeline(compilation));
-```
+The syntax filter accepts every interface declaration with a base list. Aliases and inherited
+advisor interfaces therefore reach semantic analysis without requiring the text `IAdvisor`.
+`GetAdvisorInfo` resolves the declared symbol and the non-generic marker
+`Schemata.Abstractions.Advisors.IAdvisor` from the compilation.
 
-`DefinesAdvicePipeline` compares the declaring assembly with the current one:
+`IsAdvisorInterface` accepts a generic interface when its original definition directly inherits
+the resolved marker, comparing symbols through `SymbolEqualityComparer.Default`. Matching a
+similarly named type in another namespace is insufficient.
 
-```csharp
-private static bool DefinesAdvicePipeline(Compilation compilation) {
-    var pipeline = compilation.GetTypeByMetadataName("Schemata.Advice.AdvicePipeline`1");
-    return pipeline is not null
-        && SymbolEqualityComparer.Default.Equals(pipeline.ContainingAssembly, compilation.Assembly);
-}
-```
+Selection takes the first matching entry from `AllInterfaces`, then replaces it with the first
+matching direct base from `Interfaces`, if present. Each loop stops at its first match. An
+interface with several advisor bases therefore has one selected argument list, rather than one
+extension per base.
 
-`hasInfrastructure` gates the per-interface `RunAsync` extensions: any project that references
-`AdvicePipeline\`1` qualifies, because its advisor interfaces need the extension methods.
-`definesInfrastructure` gates the runner family and requires the compilation to declare
-`AdvicePipeline\`1` itself, which only `Schemata.Advice` does. Consumer assemblies therefore never
-receive copies of the public `AdviceRunner` types.
+## Emitted signature
 
-## Runner emission
+The generated extension receives the pipeline token, `AdviceContext`, the selected advisor's
+arguments in declaration order, and an optional `CancellationToken`. It forwards those arguments
+to the corresponding runner. Repository add, update, and remove contracts include
+`MutationOptions` before cancellation; the emitted signature carries that argument too.
 
-For arities 1 through 16 the generator adds one tree named `AdviceRunner.ArityN.g.cs`:
+Containing-type and interface type parameters are forwarded with their constraints. Repeated
+parameter names are disambiguated and C# keywords are escaped. Type references use fully qualified
+names with nullable annotations. Public reachable interfaces produce public extensions; internal
+accessibility caps the extension at internal. An interface hidden behind private/protected
+accessibility produces diagnostic `SKA001` instead of an inaccessible extension.
 
-```csharp
-// <auto-generated/>
-namespace Schemata.Advice;
+## Stable hint identity
 
-public static class AdviceRunner<TAdvisor, T1, /* ... */>
-    where TAdvisor : IAdvisor<T1, /* ... */>
-{
-    public static async Task<AdviseResult> RunAsync(
-        AdviceContext     ctx,
-        T1                a1,
-        /* ... */
-        CancellationToken ct = default
-    ) { /* resolve, order, short-circuit */ }
-}
-```
+`BuildSymbolKeyName` includes the type kind, namespace, containing types and their metadata
+arities, interface name, generic arity, and parameter names. Each segment is UTF-8 encoded with a
+length prefix and hexadecimal bytes. The resulting key supplies both deduplication identity and
+the `.g.cs` hint name. Partial declarations collapse to one output; identical simple names in
+different namespaces or containing types retain distinct keys.
 
-`MaxArity` in `AdvicePipelineGenerator.cs` mirrors the 16 `IAdvisor<T1, ..., TN>` overloads in
-`Schemata.Abstractions`; adding an overload means raising the constant. `AdviceRunnerArityShould`
-invokes arity 1 through 16 through the real generated extensions, and
-`AdviceRunnerGenerationShould` runs the generator over an in-memory compilation both with and
-without a local `AdvicePipeline\`1` declaration.
+## Extension points and limits
 
-A project that references only `Schemata.Abstractions` produces no source, so the generated code
-never references a type the project lacks.
+Define an interface inheriting a supported `IAdvisor<T1, …, TN>` contract to receive an extension
+on the next build. `MaxArity` is 16 and must track the available contract and runner overloads.
+`SchemataSkipGenerators=true` disables the analyzer reference supplied by the repository props.
 
-## Candidate detection
-
-A fast syntactic filter precedes semantic analysis:
-
-```csharp
-private static bool IsAdvisorCandidate(SyntaxNode node) {
-    if (node is not InterfaceDeclarationSyntax iface) return false;
-    if (iface.BaseList is null) return false;
-
-    foreach (var baseType in iface.BaseList.Types) {
-        if (baseType.Type.ToString().Contains("IAdvisor")) return true;
-    }
-
-    return false;
-}
-```
-
-Any interface whose base-list text contains `"IAdvisor"` is a candidate. The check is textual, so
-it runs before the semantic model is consulted.
-
-## Semantic analysis
-
-For each candidate, `GetAdvisorInfo` resolves the symbol and walks `AllInterfaces` then
-`Interfaces` to find the `IAdvisor<...>` generic base. The match is metadata-based: the generator
-resolves `Schemata.Abstractions.Advisors.IAdvisor` through `GetTypeByMetadataName` and accepts any
-generic interface whose `OriginalDefinition.Interfaces` contains that symbol, so `IAdvisor<...>`
-implementations in any namespace are recognized without name heuristics:
-
-1. Extracts the type arguments of the `IAdvisor<T1, ..., TN>` base.
-2. Collects the interface's own type parameters and their constraints.
-3. Builds the `RunAsync` parameter list: `AdviceContext ctx`, one parameter per type argument
-   (`a1`, `a2`, ...), then `CancellationToken ct = default`.
-4. Builds the `AdviceRunner<...>` type-argument list: the advisor interface, then each argument
-   type.
-
-The result is an `AdvisorInterfaceInfo` carrying every string needed to emit the method.
-
-## Code emission
-
-Each `AdvisorInterfaceInfo` contributes to a partial `AdvicePipelineExtensions` class in the
-`Schemata.Advice` namespace:
-
-```csharp
-// <auto-generated/>
-#nullable enable
-
-namespace Schemata.Advice;
-
-public static partial class AdvicePipelineExtensions
-{
-    public static global::System.Threading.Tasks.Task<global::Schemata.Abstractions.Advisors.AdviseResult>
-        RunAsync<TEntity>(
-            this global::Schemata.Advice.AdvicePipeline<
-                global::Schemata.Entity.Repository.Advisors.IRepositoryAddAdvisor<TEntity>> _,
-            global::Schemata.Abstractions.Advisors.AdviceContext ctx,
-            global::Schemata.Entity.Repository.IRepository<TEntity> a1,
-            TEntity a2,
-            global::System.Threading.CancellationToken ct = default)
-        where TEntity : class
-        => global::Schemata.Advice.AdviceRunner<
-               global::Schemata.Entity.Repository.Advisors.IRepositoryAddAdvisor<TEntity>,
-               global::Schemata.Entity.Repository.IRepository<TEntity>,
-               TEntity>
-           .RunAsync(ctx, a1, a2, ct);
-}
-```
-
-All type references use `global::` fully-qualified names.
-
-## Hint name generation
-
-Each file registers via `spc.AddSource(hintName, source)`, with the hint name derived from
-`AdvisorInterfaceInfo.InterfaceMinimalName`:
-
-```csharp
-var hintName = info.InterfaceMinimalName
-    .Replace("global::", "")
-    .Replace("<", "_")
-    .Replace(">", "_")
-    .Replace(", ", "_")
-    .Replace(".", "_");
-spc.AddSource($"{hintName}.g.cs", sb.ToString());
-```
-
-`InterfaceMinimalName` is the simple name plus a `_TypeParam` suffix for generics (e.g.
-`IRepositoryAddAdvisor_TEntity`). Two interfaces with the same simple name in different namespaces
-produce the same hint name; Roslyn treats duplicate hint names as a conflict. Give advisor
-interfaces unique simple names across a compilation.
-
-## Type parameter forwarding
-
-When the advisor interface has its own type parameters (e.g. `IRepositoryAddAdvisor<TEntity>`), the
-generator forwards them — and their constraints — to the emitted `RunAsync` and to the
-`AdviceRunner<...>` type arguments, resolving them by name so the emitted code uses `TEntity` rather
-than a concrete type.
-
-## Extension points
-
-- Define a new advisor interface extending `IAdvisor<T1>` (or any arity up to 16); the generator
-  emits its `RunAsync` on the next build.
-- Set `<SchemataSkipGenerators>true</SchemataSkipGenerators>` to remove the analyzer reference that
-  `Directory.Build.props` injects.
-
-## Design rationale
-
-The incremental generator re-runs only for interfaces that changed. The syntactic pre-filter keeps
-semantic-model queries minimal. The activation guard keeps the generator silent in projects without
-the runtime package.
-
-## Caveats
-
-- Candidate detection is textual (`Contains("IAdvisor")`), so an interface mentioning `IAdvisor`
-  elsewhere in its base-list text is subjected to a harmless semantic pass.
-- The walk takes `AllInterfaces` first, then `Interfaces` (direct bases), and the last direct
-  `IAdvisor` base wins when an interface has several.
-- Hint-name collisions (same simple name in different namespaces) can drop one generated file. Keep
-  advisor simple names unique.
+This reference was traced against the generator implementation. Its generated behavior is tested
+by `tests/Schemata.Advice.Generator.Tests`; those tests were not executed during this documentation
+alignment.
 
 ## See also
 
-- [Advice Overview](overview.md) — `AdvicePipeline`, `Advisor`, short-circuit semantics
-- [Advice Runtime](runtime.md) — the `AdviceRunner` family, arity 1..16
-- [Advice Pipeline](../core/advice-pipeline.md) — `IAdvisor`, `AdviceContext`, `AdviseResult`
+- [Advice Overview](overview.md)
+- [Advice Runtime](runtime.md)
+- [Advice Pipeline](../core/advice-pipeline.md)

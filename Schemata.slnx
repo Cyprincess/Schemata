@@ -20,8 +20,7 @@
     <Project Path="src/Schemata.Advice/Schemata.Advice.csproj" />
     <Project Path="src/Schemata.Authorization.Foundation/Schemata.Authorization.Foundation.csproj" />
     <Project Path="src/Schemata.Authorization.Identity/Schemata.Authorization.Identity.csproj" />
-    <Project Path="src/Schemata.Authorization.Grpc/Schemata.Authorization.Grpc.csproj" />
-    <Project Path="src/Schemata.Authorization.Http/Schemata.Authorization.Http.csproj" />
+    <Project Path="src/Schemata.Authorization.Scim/Schemata.Authorization.Scim.csproj" />
     <Project Path="src/Schemata.Authorization.Skeleton/Schemata.Authorization.Skeleton.csproj" />
     <Project Path="src/Schemata.Caching.Memory/Schemata.Caching.Memory.csproj" />
     <Project Path="src/Schemata.Caching.Redis/Schemata.Caching.Redis.csproj" />
@@ -51,8 +50,6 @@
     <Project Path="src/Schemata.Flow.Skeleton/Schemata.Flow.Skeleton.csproj" />
     <Project Path="src/Schemata.Flow.StateMachine/Schemata.Flow.StateMachine.csproj" />
     <Project Path="src/Schemata.Identity.Foundation/Schemata.Identity.Foundation.csproj" />
-    <Project Path="src/Schemata.Identity.Grpc/Schemata.Identity.Grpc.csproj" />
-    <Project Path="src/Schemata.Identity.Http/Schemata.Identity.Http.csproj" />
     <Project Path="src/Schemata.Identity.Scim/Schemata.Identity.Scim.csproj" />
     <Project Path="src/Schemata.Identity.Skeleton/Schemata.Identity.Skeleton.csproj" />
     <Project Path="src/Schemata.Insight.Foundation/Schemata.Insight.Foundation.csproj" />
@@ -73,6 +70,10 @@
     <Project Path="src/Schemata.Push.Http/Schemata.Push.Http.csproj" />
     <Project Path="src/Schemata.Push.Grpc/Schemata.Push.Grpc.csproj" />
     <Project Path="src/Schemata.Push.WebPush/Schemata.Push.WebPush.csproj" />
+    <Project Path="src/Schemata.Quota.Foundation/Schemata.Quota.Foundation.csproj" />
+    <Project Path="src/Schemata.Quota.Grpc/Schemata.Quota.Grpc.csproj" />
+    <Project Path="src/Schemata.Quota.Http/Schemata.Quota.Http.csproj" />
+    <Project Path="src/Schemata.Quota.Skeleton/Schemata.Quota.Skeleton.csproj" />
     <Project Path="src/Schemata.Report.Actor/Schemata.Report.Actor.csproj" />
     <Project Path="src/Schemata.Report.Foundation/Schemata.Report.Foundation.csproj" />
     <Project Path="src/Schemata.Report.Grpc/Schemata.Report.Grpc.csproj" />
@@ -89,6 +90,7 @@
     <Project Path="src/Schemata.Scheduling.Skeleton/Schemata.Scheduling.Skeleton.csproj" />
     <Project Path="src/Schemata.Scim/Schemata.Scim.csproj" />
     <Project Path="src/Schemata.Security.Foundation/Schemata.Security.Foundation.csproj" />
+    <Project Path="src/Schemata.Security.Grpc/Schemata.Security.Grpc.csproj" />
     <Project Path="src/Schemata.Security.Skeleton/Schemata.Security.Skeleton.csproj" />
     <Project Path="src/Schemata.Tenancy.Foundation/Schemata.Tenancy.Foundation.csproj" />
     <Project Path="src/Schemata.Tenancy.Caching/Schemata.Tenancy.Caching.csproj" />
@@ -120,6 +122,7 @@
     <Project Path="tests/Schemata.Actor.Scheduling.Tests/Schemata.Actor.Scheduling.Tests.csproj" />
     <Project Path="tests/Schemata.Advice.Generator.Tests/Schemata.Advice.Generator.Tests.csproj" />
     <Project Path="tests/Schemata.Authorization.Integration.Tests/Schemata.Authorization.Integration.Tests.csproj" />
+    <Project Path="tests/Schemata.Authorization.Scim.Integration.Tests/Schemata.Authorization.Scim.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Authorization.Tests/Schemata.Authorization.Tests.csproj" />
     <Project Path="tests/Schemata.Caching.Memory.Integration.Tests/Schemata.Caching.Memory.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Caching.Redis.Tests/Schemata.Caching.Redis.Tests.csproj" />
@@ -160,6 +163,10 @@
     <Project Path="tests/Schemata.Push.WebPush.Tests/Schemata.Push.WebPush.Tests.csproj" />
     <Project Path="tests/Schemata.Push.Http.Integration.Tests/Schemata.Push.Http.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Push.Grpc.Integration.Tests/Schemata.Push.Grpc.Integration.Tests.csproj" />
+    <Project Path="tests/Schemata.Quota.Tests/Schemata.Quota.Tests.csproj" />
+    <Project Path="tests/Schemata.Quota.Integration.Tests/Schemata.Quota.Integration.Tests.csproj" />
+    <Project Path="tests/Schemata.Quota.Grpc.Integration.Tests/Schemata.Quota.Grpc.Integration.Tests.csproj" />
+    <Project Path="tests/Schemata.Quota.Http.Integration.Tests/Schemata.Quota.Http.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Report.Actor.Tests/Schemata.Report.Actor.Tests.csproj" />
     <Project Path="tests/Schemata.Report.Integration.Tests/Schemata.Report.Integration.Tests.csproj" />
     <Project Path="tests/Schemata.Report.Tests/Schemata.Report.Tests.csproj" />

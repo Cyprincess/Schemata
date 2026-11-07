@@ -17,15 +17,15 @@ adds the feature, middlewares, resolvers, and the fluent builder.
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `Schemata.Tenancy.Skeleton`   | `Entities/SchemataTenant.cs`, `Entities/SchemataTenantHost.cs`                                                                                                                                                                                                                                   |
 | `Schemata.Tenancy.Skeleton`   | `ITenantResolver.cs`, `ITenantContextAccessor.cs`, `ITenantContextInitializer.cs`, `ITenantManager.cs`, `ITenantServiceScopeFactory.cs`, `ITenantServiceProviderFactory.cs`, `ITenantProviderCache.cs`, `ITenantProviderLease.cs`, `TenantResolutionStage.cs`, `SchemataTenancyOptions.cs` |
-| `Schemata.Tenancy.Skeleton`   | `Tenancy/TenantContext.cs`, `Tenancy/TenantIdentity.cs`, `Tenancy/TenantResolveException.cs` — the runtime identity and its ambient frame; `Schemata.Abstractions` keeps only `ITenant` and the error constants |
+| `Schemata.Tenancy.Skeleton`   | `Tenancy/TenantIdentity.cs`, `Tenancy/TenantResolveException.cs` — the scoped runtime identity and resolution failure; `Schemata.Abstractions` keeps only `ITenant` and the error constants |
 | `Schemata.Tenancy.Foundation` | `Services/` — `SchemataTenantContextAccessor`, `SchemataTenantManager`, `SchemataTenantServiceProviderFactory`, `SchemataTenantServiceScopeFactory`, `MemoryCacheTenantProviderCache`, `TenantCompositeServiceProvider`, `CompositeScope`, `TenantBoundContextAccessor` |
 | `Schemata.Tenancy.Foundation` | `Handlers/` — `CreateTenantHandler`, `UpdateTenantHandler`, `DeleteTenantHandler`, `SetTenantDisplayNameHandler`, `SetTenantLocalizedDisplayNamesHandler`, `SetTenantHostsHandler`, `FindTenantByIdHandler`, `FindTenantByHostHandler`, `GetTenantHostsHandler` |
-| `Schemata.Tenancy.Foundation` | `Features/SchemataTenancyFeature.cs`, `Features/SchemataTenantPrincipalFeature.cs`, `Features/SchemataTenantExecutionFeature.cs`, `Middlewares/SchemataTenancyMiddleware.cs`, `SchemataTenancyBuilder.cs` |
+| `Schemata.Tenancy.Foundation` | `Features/SchemataTenancyFeature.cs`, `Features/SchemataTenantPrincipalFeature.cs`, `Middlewares/SchemataTenancyMiddleware.cs`, `SchemataTenancyBuilder.cs` |
 | `Schemata.Tenancy.Foundation` | `Extensions/SchemataTenancyBuilderExtensions.cs` (resolvers), `Extensions/SchemataTenancyBuilderOverrideExtensions.cs` (overrides) |
 | `Schemata.Tenancy.Foundation` | `Resolvers/Request{Header,Host,Path,Principal,Query}Resolver.cs`, `Resolvers/TenantId.cs` |
 | `Schemata.Tenancy.Messaging` | `TenantMessageContextPropagator.cs`, `TenantMessageExecutionScopeFactory.cs`, `TenantMessagingExtensions.cs` |
 | `Schemata.Tenancy.Caching`    | `TenantCacheBuilder.cs`, `TenantCacheKeyNormalizer.cs`, `Extensions/TenantCacheExtensions.cs` |
-| `Schemata.Tenancy.Actor` | `TenantActorSystem.cs`, `TenantActorExtensions.cs` |
+| `Schemata.Tenancy.Actor` | `TenantActorSystem.cs`, `ScopedTenantActorSystem.cs`, `TenantActorExtensions.cs` |
 
 Tenant Update, invariant display-name and localized display-name handlers resolve fresh repositories
 from the current operation's service provider for every public manager call. Each operation owns its
@@ -49,23 +49,20 @@ schema.UseTenancy<MyTenantManager, MyTenant, MyTenantHost>(); // custom manager 
 
 Every overload returns a `SchemataTenancyBuilder<TTenant>` for chaining resolver and override
 registrations. Constraints: `TTenant : SchemataTenant`, `TTenantHost : SchemataTenantHost, new()`
-and, for the three-type form, `TManager : class, ITenantManager<TTenant>`. The builder registers
-three features: `SchemataTenancyFeature<TManager, TTenant, TTenantHost>` (request-stage resolution
-and per-request scope binding), `SchemataTenantPrincipalFeature<TTenant>` (Principal-stage resolver
-invocation after authentication), and `SchemataTenantExecutionFeature` (`TenantExecutionMiddleware`
-that enters a `TenantContext` frame for the rest of the pipeline).
+and, for the three-type form, `TManager : class, ITenantManager<TTenant>`. The builder registers two
+features: `SchemataTenancyFeature<TManager, TTenant, TTenantHost>`
+(request-stage resolution and per-request scope binding) and
+`SchemataTenantPrincipalFeature<TTenant>` (Principal-stage resolver invocation after authentication).
 
 `SchemataTenancyFeature<TManager, TTenant, TTenantHost>` has `Priority = SchemataCorsFeature.DefaultPriority +
-5_000_000 = 205_000_000` and `Order = Orders.Max = 900_000_000`. `ConfigureServices` registers the
-nine closed handlers (one per `ITenantManager<TTenant>` operation), decorates `IPolicyEvaluator`
-with `TenantPolicyEvaluator`, decorates `IControllerFactory` with `TenantControllerFactory`, and
-adds the MVC resource filter `TenantExecutionFilter` so each resource execution enters a
-`TenantContext` frame. The exact responsibilities:
+5_000_000 = 205_000_000` and `Order = Orders.Max = 900_000_000`. `ConfigureServices` registers scoped
+host `TenantIdentity`, the nine closed handlers (one per `ITenantManager<TTenant>` operation), and
+decorates `IPolicyEvaluator` with `TenantPolicyEvaluator`. The exact responsibilities:
 
 | Block                                                                                         | Source                                                                                              |
 | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `AddOptions<SchemataTenancyOptions>()` and MVC filter registration                             | `SchemataTenancyFeature.ConfigureServices`                                                          |
-| `IDecorator<IPolicyEvaluator>` / `IDecorator<IControllerFactory>` for tenancy-aware MVC behavior | `SchemataTenancyFeature.ConfigureServices`                                                        |
+| `AddOptions<SchemataTenancyOptions>()` and scoped host `TenantIdentity`                    | `SchemataTenancyFeature.ConfigureServices`                                                          |
+| `IDecorator<IPolicyEvaluator>` for tenant-aware authorization                              | `SchemataTenancyFeature.ConfigureServices`                                                        |
 | Quota rejection postconfiguration (`TenantQuotaOptions`)                                       | `SchemataTenancyFeature.ConfigureServices`                                                          |
 | Nine `TryAddScoped<…Handler<TTenant, TTenantHost>>()` registrations                            | `SchemataTenancyFeature.ConfigureServices`                                                          |
 | `TryAddScoped<ITenantManager<TTenant>, TManager>()` and accessor + interface alias resolution | `SchemataTenancyFeature.ConfigureServices`                                                          |
@@ -75,11 +72,8 @@ adds the MVC resource filter `TenantExecutionFilter` so each resource execution 
 and `ITenantContextInitializer<TTenant>` (write); the two interfaces resolve to the same scoped
 instance. The accessor takes an `IEnumerable<ITenantResolver>` — multiple resolvers participate
 together, not a single one. `ConfigureApplication` adds `SchemataTenancyMiddleware<TTenant>` at priority 205_000_000
-(`SchemataCorsFeature.DefaultPriority + 5_000_000`), `SchemataTenantPrincipalMiddleware<TTenant>`
-at 211_000_000 (`SchemataAuthenticationFeature.DefaultPriority + 1_000_000`), and
-`TenantExecutionMiddleware` at 213_000_000 (`SchemataAuthorizationFeature.DefaultPriority +
-1_000_000`; `SchemataAuthorizationFeature.DefaultPriority = SchemataAuthenticationFeature.
-DefaultPriority + 2_000_000`).
+(`SchemataCorsFeature.DefaultPriority + 5_000_000`) and `SchemataTenantPrincipalMiddleware<TTenant>`
+at 211_000_000 (`SchemataAuthenticationFeature.DefaultPriority + 1_000_000`).
 
 ## Repository isolation
 
@@ -114,17 +108,16 @@ subclasses) remain host metadata: they do not implement `ITenant`, the isolation
 them untouched, and `UseDatabase` rejects them at registration.
 
 The advisor identity is a fixed `TenantRepositoryBinding` constructed from the verified tenant
-identifier when the tenant container is composed; advisors never read the ambient
-`TenantContext`. `Repository/AdviceAddTenant.cs` stamps that identity before canonical-name and
-uniqueness advice. `Repository/AdviceBuildQueryTenant.cs` captures it into a concrete `TenantUid`
-equality predicate. A tenant-bound repository captured in one scope keeps its tenant after the
-ambient context changes. Host-registered repositories resolve through the host binding and see
-`TenantUid IS NULL` rows only;
+identifier when the tenant container is composed. `Repository/AdviceAddTenant.cs` stamps that
+identity before canonical-name and uniqueness advice. `Repository/AdviceBuildQueryTenant.cs`
+captures it into a concrete `TenantUid` equality predicate. A tenant-bound repository retains that
+identity independently of other scopes. Host-registered repositories resolve through the host
+binding and see `TenantUid IS NULL` rows only;
 declaring the same entity in both a global registration and a tenant registration keeps the two
 scopes separate. Owner-query suppression keeps the tenant predicate installed. Background callers
-enter their selected execution scope synchronously after awaiting the scope factory and before
-repository operations. Tenant-specific repository constructor dependencies require explicit
-tenant registrations; advisors do not clone the host service graph.
+create their selected execution scope and use its scoped `TenantIdentity` and services through
+repository operations and disposal. Tenant-specific repository constructor dependencies require
+explicit tenant registrations; advisors do not clone the host service graph.
 
 Tenant isolation through the repository covers `IRepository<TEntity>` operations. Direct
 `DbContext`/`DataConnection` access, raw SQL, and ORM bulk operations bypass the advisor chain and
@@ -218,14 +211,15 @@ middlewares (and code that needs to bind a tenant outside a request) call the in
 
 `SchemataTenancyMiddleware<TTenant>.Invoke` resolves
 `SchemataTenantContextAccessor<TTenant>` (the concrete class that exposes the stage-aware
-initializer) and calls `InitializeAsync(TenantResolutionStage.Request, ct)`. It then enters a
-`TenantContext` frame, opens a tenant scope through `ITenantServiceScopeFactory<TTenant>` via
-`TenantRequestBinding.OpenAsync`, sets `http.RequestServices` to the tenant scope's
-`ServiceProvider`, stores the binding in `http.Features`, and restores the original in a
-`finally`. `SchemataTenantPrincipalMiddleware` calls
-`binding.BindPrincipalAsync(http)` after authentication, which calls
+initializer) and calls `InitializeAsync(TenantResolutionStage.Request, ct)`. It opens a tenant
+scope through `ITenantServiceScopeFactory<TTenant>` via `TenantRequestBinding.OpenAsync`, sets
+`http.RequestServices` to the tenant scope's `ServiceProvider`, stores the binding in
+`http.Features`, and restores the original in a `finally`. `SchemataTenantPrincipalMiddleware`
+calls `binding.BindPrincipalAsync(http)` after authentication, which calls
 `InitializeAsync(TenantResolutionStage.Principal, ct)` and reopens the scope only if the
-resulting `TenantIdentity` differs from the binding's current `Identity`.
+resulting `TenantIdentity` differs from the binding's current `Identity`. Controllers and handlers
+resolve the fixed scoped `TenantIdentity` from the active `RequestServices`, including during
+disposal; reverse-order scope disposal is asynchronous.
 
 `SchemataTenantContextAccessor<TTenant>.InitializeAsync(stage, ct)` iterates the injected
 `IEnumerable<ITenantResolver>` and only invokes resolvers whose `Stage` matches the requested
@@ -291,17 +285,18 @@ callers waiting on it complete asynchronously and observe `ct`. Building a conta
 
 1. Start from an empty `ServiceCollection`.
 2. Register the resolved `TTenant` instance as a Singleton.
-3. Register `TenantBoundContextAccessor<TTenant>` as the `ITenantContextAccessor<TTenant>` Singleton
+3. Register scoped `TenantIdentity` from the verified tenant UID before tenant overrides.
+4. Register `TenantBoundContextAccessor<TTenant>` as the `ITenantContextAccessor<TTenant>` Singleton
    for the tenant scope — it pins the tenant at construction, so no per-request resolution happens
    inside the tenant container.
-4. Apply `SchemataTenancyOptions.TenantOverrides[id]` (the per-tenant delegates) in order.
-5. Apply `SchemataTenancyOptions.DynamicOverrides` (each `Action<string, IServiceCollection,
+5. Apply `SchemataTenancyOptions.TenantOverrides[id]` (the per-tenant delegates) in order.
+6. Apply `SchemataTenancyOptions.DynamicOverrides` (each `Action<string, IServiceCollection,
    IServiceProvider>`) in order.
-6. Validate each added descriptor: open-generic service types or open-generic implementation types
+7. Validate each added descriptor: open-generic service types or open-generic implementation types
    raise `InvalidOperationException` naming the offending service type. `Singleton`, `Scoped`, and
    `Transient` lifetimes are accepted; the composite provider resolves scoped services from the
    underlying tenant scope and transient services per-call.
-7. Build the overrides container and wrap it in `TenantCompositeServiceProvider(overrides, root)`.
+8. Build the overrides container and wrap it in `TenantCompositeServiceProvider(overrides, root)`.
 
 `TenantCompositeServiceProvider.GetService` checks the tenant overrides first and falls back to the
 host root. Resolving `IServiceProvider`, `IServiceScopeFactory`, `IKeyedServiceProvider`,
@@ -329,9 +324,11 @@ never rebuilt under the same key.
 | `ForTenant((id, services, root) => …)` | `SchemataTenancyOptions.DynamicOverrides`, applied to every tenant container | Singleton, Scoped, or Transient; open-generic descriptors are rejected at provider build     |
 
 Host registrations remain constructed by host DI, including their transitive dependencies.
-Services that read only the execution identity use `TenantContext.Current` on each operation.
-Register services requiring tenant-specific constructor dependencies, including repositories and
-their collaborators, explicitly through `ForTenant(...)`. A host-registered service's scoped
+A host singleton that needs execution identity accepts the final invocation `IServiceProvider` and
+resolves the scoped `TenantIdentity` on each operation. Controllers, handlers, and their scoped
+collaborators can inject that identity directly, including during disposal. Register services
+requiring tenant-specific constructor dependencies, including repositories and their collaborators,
+explicitly through `ForTenant(...)`. A host-registered service's scoped
 `ITenantContextAccessor<TTenant>` comes from host DI; it is not the tenant container's
 `TenantBoundContextAccessor` and must not supply the current tenant identity for repository advice.
 
@@ -344,9 +341,14 @@ new provider via `create()`. The cache holds at most `SchemataTenancyOptions.Pro
 entries (default 1000); entries idle longer than `SchemataTenancyOptions.ProviderSlidingExpiration`
 (default 30 minutes) are evicted on the next access. Eviction and explicit `RemoveAsync(id)` retire
 the entry, but the underlying provider is disposed only after the last outstanding lease is
-released. `DisposeAsync()` awaits asynchronous provider disposal. `Dispose()` backs shutdown and
-scope teardown and blocks on asynchronous disposal when the provider only implements
-`IAsyncDisposable`.
+released. `DisposeAsync()` awaits an `IAsyncDisposable` provider once and otherwise calls
+`IDisposable.Dispose()` once. Composite tenant providers expose asynchronous teardown for arbitrary
+consumer registrations. Synchronous release rejects before disposing their container; the lease
+and cache retain the cleanup obligation for a later `DisposeAsync()`. Genuinely synchronous
+providers retain synchronous teardown. A rejected synchronous release never blocks on async work.
+Leased scopes attempt inner-scope cleanup and provider-lease release independently. When both fail,
+the inner cleanup failure is first in `AggregateException`; a later `DisposeAsync()` discharges
+the pending lease obligation without repeating inner-scope cleanup.
 An entry can be retired while a request still uses a scope built from it. A lease acquired
 while the entry was current but later retired keeps using its captured provider; subsequent leases
 on the same id trigger a rebuild keyed by the tenant's current `Timestamp`. Host shutdown also
@@ -355,8 +357,9 @@ retires providers and defers disposal for outstanding leases.
 Cleanup attempts every eligible provider before propagating failures: a single error retains its
 original exception, and multiple errors produce an `AggregateException`. If expiration or capacity
 cleanup fails during acquisition, the cache releases that acquisition's undelivered lease before
-throwing; existing handles remain valid. A failed disposal attempt counts as the provider's one
-cleanup attempt, including when the last lease is released. `ITenantProviderCache` owns container
+throwing; existing handles remain valid. A provider disposal attempt consumes its one cleanup
+attempt even when it throws. Synchronous rejection before provider entry retains the asynchronous
+cleanup obligation. `ITenantProviderCache` owns container
 leases; `ICacheProvider` owns cached values, with tenant key framing supplied by the tenant
 outlet's `TenantCacheKeyNormalizer`. See
 `src/Schemata.Tenancy.Foundation/Services/MemoryCacheTenantProviderCache.cs`
@@ -368,12 +371,12 @@ for acquisition compensation, retirement, and synchronous/asynchronous cleanup.
 `TenantIdentity.Host`, it returns a host scope. Otherwise it leases a tenant provider, creates a
 scope over it (`CompositeScope` layering the tenant overrides above a fresh host scope), and wraps
 the two in a `LeasedTenantScope` that disposes the inner host scope first, then releases the lease.
-Creating the scope establishes its DI lifetime. A direct caller synchronously enters
-`TenantContext.Enter(identity)` after awaiting creation and retains that lease through service use
-and scope disposal. Tenant-bound services (repositories, cache outlets, state profiles) capture
-the binding at composition, not per call; the installed
-`TenantMessageContextPropagator` exports it when `MessageContexts.Capture` iterates the propagator
-collection. `MessageContexts` itself only carries generic items.
+Creating the scope establishes its DI lifetime and fixes the scoped `TenantIdentity` resolved from
+`scope.ServiceProvider`. A direct caller uses that provider for service use and disposal; parallel
+scopes retain independent identities across awaits. Tenant-bound services (repositories, cache
+outlets, state profiles) capture the binding at composition, not per call; the installed
+`TenantMessageContextPropagator` exports the provider's identity when `MessageContexts.Capture`
+iterates the propagator collection. `MessageContexts` itself only carries generic items.
 
 ## Tenant entities
 
@@ -413,26 +416,32 @@ schema.UseTenancy<MyTenant>()
 ```
 
 `TenantMessagingExtensions.UseMessaging<TTenant>` replaces `IMessageExecutionScopeFactory` with
-`TenantMessageExecutionScopeFactory<TTenant>` and adds `TenantMessageContextPropagator` to the
-enumerable propagator collection. The propagator captures `TenantContext.Current` into the
-`tenancy.tenant-id` item as a GUID or `host`. The tenant factory:
+`TenantMessageExecutionScopeFactory<TTenant>`, registers `IMessageExecutionScopeRunner`, and adds
+`TenantMessageContextPropagator` to the enumerable propagator collection. The propagator captures
+the source provider's scoped `TenantIdentity` into the `tenancy.tenant-id` item as a GUID or `host`.
+The tenant factory:
 
 1. Parses that item through `TenantMessageContextPropagator.Identity(context?.Items)`;
    an absent item selects host and a malformed or empty GUID raises `TenantResolveException`.
 2. Opens a bootstrap host scope, resolves `ITenantServiceScopeFactory<TTenant>`, creates the
    selected DI scope, and disposes the bootstrap before returning.
-3. Returns a `MessageExecutionScope` with a synchronous `Enter()` lease. The caller enters
-   after awaiting `CreateAsync`, then calls `RestoreAsync` and uses services while entered.
-   `RestoreAsync` iterates the scope's registered propagators; the tenancy propagator validates
-   that captured and current identities agree. The caller retains the lease through scope disposal.
+3. Returns a `MessageExecutionScope` exposing `Services`, `RestoreAsync`, and `DisposeAsync`.
+   Restoration validates the captured identity against the scoped identity in the final provider.
+
+`IMessageExecutionScopeRunner.RunAsync<T>` performs creation, restoration, the work delegate, and
+asynchronous disposal in that order and returns the work result. Creation failure skips work and
+has no scope to dispose. Restore or work failure disposes the created scope. One failure propagates
+unchanged; simultaneous body and cleanup failures produce `AggregateException(body, cleanup)`.
+Scheduling, event, RabbitMQ, reminder, and tenant actor send/stop operations use this runner. Actor
+callbacks, report recovery, plain dispatch, and stream enumeration retain their specialized
+restoration and cleanup policies through the same scope primitives.
 
 The neutral `MessageExecutionScopeFactory` accepts any `MessageContext`, creates a host DI scope,
-and supplies an empty enter lease. `MessageContexts.Capture` and `MessageExecutionScope.RestoreAsync`
-run whatever propagators DI supplies. Without the tenancy bridge, those neutral services perform
-no tenant parsing, tenant rejection, or tenant scope selection. `MessageExecutionScope` exposes
-`Services`, `Enter()`, `RestoreAsync`, and `DisposeAsync`; its scope carries no typed tenant identity.
-Sources: `src/Schemata.Messaging.Skeleton/Runtime/MessageExecutionScopeFactory.cs`,
-`MessageContexts.cs`, `MessageExecutionScope.cs`, and `src/Schemata.Tenancy.Messaging/`.
+and leaves propagation to the registered propagators. Without the tenancy bridge, those neutral
+services perform no tenant parsing, tenant rejection, or tenant scope selection.
+Sources: `src/Schemata.Messaging.Skeleton/Runtime/MessageExecutionScopeRunner.cs`,
+`MessageExecutionScopeFactory.cs`, `MessageContexts.cs`, `MessageExecutionScope.cs`, and
+`src/Schemata.Tenancy.Messaging/`.
 
 `UseMessaging` also binds the dispatcher to the same owner on both sides of the tenant boundary.
 Each tenant container registers the concrete `InProcessRequestDispatcher`, so a consumed request —
@@ -449,48 +458,64 @@ inbound concrete stays tenant-bound.
 ## Actor bridge
 
 Enable tenant actor isolation through `schema.UseTenancy<MyTenant>().UseActor()` after registering
-the ordinary Actor feature. `TenantActorExtensions.UseActor<TTenant>` installs the messaging bridge
-and selects `TenantActorSystem` as `IActorSystem`. The decorator owns one existing
-`InProcessActorSystem` per host or tenant identity; `ActorId` keeps only its type and business key.
-The same ID can address independent activations in different tenants.
+the ordinary Actor feature. `TenantActorExtensions.UseActor<TTenant>` installs the messaging bridge,
+registers singleton `TenantActorSystem` as `IActorSystemLifetime`, and binds scoped `IActorSystem`
+to `ScopedTenantActorSystem`. The owner keeps one `InProcessActorSystem` per host or tenant identity;
+`ActorId` keeps only its type and business key. The same ID can address independent activations in
+different tenants.
 
-Actor references capture the generic `MessageContext` at creation. The decorator validates the
-current identity, creates and enters the captured or supplied execution scope, restores its
-propagators, and delegates Tell/Ask to the existing runtime. Cross-tenant reference reuse fails
-before dispatch. Stop uses the same scope boundary; the decorator delegates shutdown and idle
-collection across its runtimes. Actor.Foundation consumes generic execution scopes and propagators.
-`UseMessaging()` alone installs execution propagation; `.UseActor()` adds runtime isolation.
-`UseActorPersistence<TTenant>()` registers `ActorStateStore` in tenant DI when persistence is enabled.
-Sources: `src/Schemata.Tenancy.Actor/TenantActorExtensions.cs` and `TenantActorSystem.cs`.
+Actor references capture the generic `MessageContext` at creation. Every tenant Tell/Ask requires
+current explicit message context with the reference's bound tenant identity before runtime or scope
+restoration. Missing or foreign evidence rejects before dispatch. The original caller provider still
+owns self-Ask admission. A retained reference reactivates on its bound runtime after idle collection.
+Parallel operations retain independent scoped identities. Stop uses the same runner;
+the owner delegates shutdown and idle collection across its runtimes. Actor callbacks use the
+activation context directly through create/restore/work/dispose rather than the standard runner.
+Normal actor disposal restores the activation's tenant identity in its turn scope. An
+already-disposed root scope factory causes direct owned-actor disposal, async-first, exactly once;
+actor cleanup failures remain observable.
+Sources: `src/Schemata.Tenancy.Actor/TenantActorExtensions.cs`, `TenantActorSystem.cs`, and
+`ScopedTenantActorSystem.cs`.
 
 
 ## Caching bridge
 
-`Schemata.Tenancy.Caching` composes per-tenant cache outlets through
-`SchemataTenancyBuilder<TTenant>.UseCache(...)`. The host registration selects the backend; the
-tenant composition binds one mode per tenant:
+`Schemata.Tenancy.Caching` activates host and tenant cache partitions through
+`SchemataTenancyBuilder<TTenant>.UseCache()`:
 
 ```csharp
-services.AddMemoryCacheProvider();            // Schemata.Caching.Memory: host global outlet
+services.AddMemoryCacheProvider();
 
 schema.UseTenancy<MyTenant>()
-      .UseCache(tenant => tenant.UseShared(sharedBackend));   // shared instance, tenant key namespace
-// or
-      .UseCache(tenant => tenant.UseDedicated(sp => new MemoryCacheBackend()));  // tenant-owned instance
+      .UseCache();
 ```
 
-`UseShared` borrows an application-owned backend and frames every key with the fixed tenant
-namespace `{uid:N}\x1e{key}` (`TenantCacheKeyNormalizer`); the application retains disposal.
-`UseDedicated` creates the backend through the factory once per tenant container; the tenant
-provider owns the instance and disposes it after the retired provider's last lease is released.
-The two modes are mutually exclusive per outlet: repeating the identical declaration is a no-op
-and a conflicting declaration fails at tenant composition. Prefixing a shared Redis database is
-the shared mode, not a dedicated instance.
+Activation replaces the host's unkeyed `ICacheProvider` with a `CacheProvider` over the keyed
+`CacheServiceKeys.Backend` and the host normalizer. Host keys use `v1\x1ehost\x1e{key}`; tenant keys
+use `v1\x1etenant\x1e{uid:N}\x1e{key}`. Every tenant outlet receives its fixed normalizer at
+composition, so host and tenant values remain independent on the shared backend. Resolving
+`ICacheBackend` through `CacheServiceKeys.Backend` is the explicit unframed global access path.
 
-Both modes construct a fixed `CacheProvider` over the bound backend and normalizer. Cache value
-shape, TTL, and atomic conditional operations remain the backend's contract; the tenant outlet
-adds exactly one synchronous key normalization per operation. The host global outlet keeps global
-semantics under ambient tenant contexts: it never reframes keys.
+`UseCache(configure)` performs the same activation before applying an explicit outlet declaration:
+
+```csharp
+schema.UseTenancy<MyTenant>()
+      .UseCache(tenant => tenant.UseShared(sharedBackend));
+// or
+      .UseCache(tenant => tenant.UseDedicated(sp => new MemoryCacheBackend()));
+```
+
+A callback with no outlet declaration installs the shared keyed-backend fallback with one key
+normalization. `UseShared` borrows an application-owned backend; the application retains disposal.
+`UseDedicated` creates the backend through the factory once per tenant container, and the tenant
+provider disposes it after the retired provider's last lease is released. The two explicit modes
+are mutually exclusive per outlet: repeating the identical declaration is a no-op and a conflicting
+declaration fails at tenant composition. Prefixing a shared Redis database is the shared mode, not
+a dedicated instance.
+
+Every mode constructs a fixed `CacheProvider` over the bound backend and normalizer. Cache value
+shape, TTL, and atomic conditional operations remain the backend's contract; the outlet adds exactly
+one synchronous key normalization per operation.
 Sources: `src/Schemata.Tenancy.Caching/TenantCacheBuilder.cs`, `TenantCacheKeyNormalizer.cs`,
 `Extensions/TenantCacheExtensions.cs`, and `src/Schemata.Caching.Skeleton/CacheProvider.cs`.
 
@@ -514,13 +539,12 @@ tenant data or restores a different identity, or the tenant provider factory rec
 
 ## Cache, data protection, and state boundaries
 
-Cache operations inside a tenant scope resolve the tenant outlet (`UseCache`), which binds the
-verified tenant identity at composition. Conditional writes and collection operations retain the
-backend's atomicity; the outlet adds one key normalization. Host-global consumers keep the host
-outlet under every ambient identity. Enabling tenancy leaves the host `ICacheProvider` registration
-as it is: a tenant container resolves the host provider through the composite fallback until an
-explicit `UseCache` call binds a namespaced outlet, so tenant key framing is always an opt-in
-declaration.
+Cache operations inside a tenant scope resolve the tenant outlet activated by `UseCache`, which
+binds the verified tenant identity at composition. Conditional writes and collection operations
+retain the backend's atomicity; the outlet adds one key normalization. Host-global consumers use
+the raw keyed backend. Enabling tenancy alone leaves the host `ICacheProvider` registration and
+unframed composite fallback unchanged; `UseCache` is the explicit activation boundary for host and
+tenant framing.
 
 `UseSessionCache` registers the tenant `IDistributedCache` over that outlet. Asynchronous members
 (`GetAsync`, `SetAsync`, `RefreshAsync`, `RemoveAsync`) are the request path and return the cache
@@ -554,12 +578,23 @@ share the profile; antiforgery cookie/request token pairs validate only within t
 continuations keep their caller/query/snapshot bindings and reject cross-profile unprotection. A
 host ticket or token is never accepted as a tenant one and vice versa.
 
+Core's `UseSession` and `UseAntiforgery` register the native services and middleware. When Tenancy is
+present, `SchemataTenancyFeature` replaces the registered feature instances at `Orders.Max` with
+`TenantSessionFeature<T>` and `TenantAntiforgeryFeature`. The wrappers preserve service configuration,
+`Order`, and `Priority`, and select `UseTenantStatePipeline` during application configuration. Selection
+resolves `ITenantStatePipelineProvider` from the final request services, so the host and each tenant use
+their own fixed provider and every request runs one native branch. `DefaultTenantStatePipelineProvider`
+caches branches per `(pipeline, next)` and constructs each native `ApplicationBuilder` over that fixed
+provider. Tenant session and antiforgery registrations contribute the provider; the antiforgery validator
+also requires the host antiforgery capability. Core applications without Tenancy execute the native
+middleware directly and have no tenant state provider resolution.
+
 Applications using principal-only tenant resolution authenticate the global scheme first; the
 principal-stage rebind then selects tenant state for operations that declare it. Request-resolved
 tenants authenticate tenant-scheme tickets directly. Sources:
 `src/Schemata.Tenancy.Foundation/State/` (TenantStateBuilder, TenantCookieRegistration,
-TenantBearerRegistration, TenantSessionRegistration, TenantAntiforgeryRegistration) and
-`src/Schemata.Core/State/`.
+TenantBearerRegistration, TenantSessionRegistration, TenantAntiforgeryRegistration,
+ITenantStatePipelineProvider, TenantStatePipelineExtensions).
 
 ## Quota diagnostics
 
@@ -587,8 +622,8 @@ responsibility. Installed-feature tests live in `tests/Schemata.Tenancy.Integrat
 - The messaging, actor, and caching tenancy bridges are opt-in. `.UseMessaging()` and `.UseActor()`
   extend the builder returned by `UseTenancy<TTenant>()`; the message execution factory they install
   resolves that feature's `ITenantServiceScopeFactory<TTenant>`. Cache and state capabilities compose
-  through `UseCache` and `UseState`; a tenant outlet without a declared backend fails at first
-  resolution.
+  through `UseCache` and `UseState`; the shared cache fallback resolves the host's keyed backend,
+  while an explicit dedicated outlet uses its tenant-owned registration.
 - Entity Framework Core options composition differs by target framework: on EF 8 the tenant
   `DbContextOptions` configuration replaces the host's (tenant-first descriptor resolution), while
   EF 9+ aggregates host-first with tenant overrides winning. Tenant `AddRepositorySource`

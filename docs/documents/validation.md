@@ -10,7 +10,7 @@ runs them against any request whose type has a registered validator.
 
 | Package                                | Key types                                                                                        |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `Schemata.Validation.Skeleton`         | `Advisors.IValidationAdvisor<T>`                                                                 |
+| `Schemata.Validation.Skeleton`         | `Advisors.IValidationAdvisor<T>`, `ValidationHelper`                                           |
 | `Schemata.Validation.FluentValidation` | `AddValidator<TValidator>`, `Advisors.AdviceValidation<T>`, `Advisors.AdviceValidationErrors<T>` |
 
 ## IValidationAdvisor
@@ -22,7 +22,7 @@ public interface IValidationAdvisor<in T>
     : IAdvisor<Operations, T, IList<ErrorFieldViolation>>;
 ```
 
-Each advisor receives the CRUD `Operations` kind, the request being validated, and a mutable
+Each advisor receives the `Operations` kind, the request being validated, and a mutable
 `IList<ErrorFieldViolation>` to populate. Advisors run in `Order` sequence. A collecting advisor
 appends violations and returns `AdviseResult.Continue`; a terminal advisor inspects the list and
 returns `AdviseResult.Block` when it is non-empty.
@@ -73,6 +73,10 @@ validate their inner payload exactly once in either registration order, retainin
 `ValidateOnly` behavior. Generic request validation does not replace the Resource owner. Stream validation
 runs inside each enumeration's execution scope; rejection disposes that scope before returning the error.
 
+### Identity requests
+
+`Schemata.Identity.Foundation` calls `Validation.Skeleton.ValidationHelper` directly for its selected request types. Registration validates `RegisterRequest` with `Operations.Create`; login validates `LoginRequest` with `Operations.Authenticate`. Validation finishes before alias resolution and user lookup. Registering `IValidationAdvisor<RegisterRequest>` or `IValidationAdvisor<LoginRequest>` implementations, including through `AddValidator`, is sufficient; these request types do not use `AddRequestValidation`. Identity references only `Schemata.Validation.Skeleton`, so validators can use FluentValidation or another provider without changing Identity's dependencies.
+
 ## Advisor behavior
 
 `Schemata.Validation.FluentValidation.Advisors.AdviceValidation<T>`
@@ -102,13 +106,14 @@ The Create and Update validation wraps call `ValidationHelper.ValidateAsync` aft
 
 1. Collector advisors add violations to the list.
 2. A blocking result produces `ValidationException(errors)`, mapped to `INVALID_ARGUMENT` and HTTP 422.
-3. A request implementing `IValidation` with `ValidateOnly = true` produces `NoContentException` after successful validation. The dry-run termination is an independently installed pipeline stage, so it still applies when the validation wrap was excluded.
+3. A request implementing `IValidation` with `ValidateOnly = true` continues through the handler's live target loading, instance permission, freshness, update-mask, and entity-advisor stages. Create and update-with-`AllowMissing` apply the shared `AdviceAddCanonicalName` resolution before the handler validates the mapped entity and runs `AdviceAddUniqueness.EnsureUniqueAsync`; an ordinary update validates with `Operations.Update` and performs no added uniqueness query.
+4. A successful dry run marks an identified dispatch `NotWritten` and returns an empty result before mutation staging, transaction creation, commit, or committed advisors. HTTP returns 204 and gRPC returns a default detail instance.
 
 The gRPC error adapter preserves each violation's field, description, reason, and optional
 localized message in `google.rpc.BadRequest` details. HTTP validation failures retain the
 framework's 422 mapping; the canonical gRPC status is `INVALID_ARGUMENT`.
 
-`WithoutCreateValidation()`, `WithoutUpdateValidation()`, and `WithoutFreshness()` on the resource builder are registration-time installation choices: the corresponding wraps are never added to the service collection (or are removed when the call follows resource registration), in either ordering. They write no runtime flag. Repository mutations accept `MutationOptions.IgnoreValidation` for one call; the resource request stage itself has no per-request bypass. A request type with no registered validator leaves the violation list empty.
+`WithoutCreateValidation()` and `WithoutUpdateValidation()` exclude the request-validation wraps; entity validation still runs at the handler dry-run boundary and during repository mutation. `WithoutFreshness()` excludes the freshness advisors and default response ETag provider. These are registration-time installation choices in either ordering, with no runtime flag. Repository mutations accept `MutationOptions.IgnoreValidation` for one call; the resource request stage itself has no per-request bypass. A request type with no registered validator leaves the violation list empty.
 
 ## Validator implementation
 

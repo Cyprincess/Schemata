@@ -133,10 +133,10 @@ these repositories. Replace `Tenant` with `SchemataTenant` when you use the non-
 `TenantCompositeServiceProvider.GetService` falls back to the host scope's provider when the
 tenant overrides do not register the type — so a host service receives the host scope's
 `SchemataTenantContextAccessor`, which is never initialized for the current request and reads
-`null` from `accessor.Tenant`. Host services resolve the request's tenant identity through the
-ambient `TenantContext.Current` (set by `SchemataTenancyMiddleware` and refreshed by the
-principal and execution middlewares); services that need tenant-side dependencies must be
-registered explicitly with `ForTenant(...)`.
+`null` from `accessor.Tenant`. Host services that only need execution identity accept the final
+invocation provider and resolve scoped `TenantIdentity` at call time. Controllers and
+tenant-registered handlers can inject `TenantIdentity` directly. Services that need other
+tenant-side dependencies must be registered explicitly with `ForTenant(...)`.
 
 ```csharp
 public interface IFeatureGate
@@ -160,22 +160,28 @@ Lookups hit the per-tenant overrides first, then fall through to the host root. 
 
 ## Tenant cache and state
 
-Tenant key framing is opt-in per tenant. `UseCache` binds one outlet per tenant and frames every
-key with that tenant's namespace. Without it, a tenant container resolves the host `ICacheProvider`
-through the composite fallback and reads the global, unframed keys.
+`UseCache()` activates host and tenant key framing over the host's keyed backend. Host keys use
+`v1\x1ehost\x1e{key}` and tenant keys use `v1\x1etenant\x1e{uid:N}\x1e{key}`. Tenancy without
+`UseCache` retains the original host `ICacheProvider` and its unframed composite fallback.
 
 ```csharp
 schema.UseTenancy<Tenant>()
-      .UseCache(cache => cache.UseShared(sharedBackend))   // or UseDedicated(sp => new MemoryCacheBackend())
+      .UseCache()
       .UseState(state => state.UseCookie("tenant", options => { }))
       .UseHeaderResolver();
 ```
 
-`UseShared` borrows a backend the application owns; `UseDedicated` creates one per tenant provider
-and disposes it when the retired provider's last lease is released. `UseState` adds the tenant's
-cookie, bearer, session, or antiforgery capability. Tenancy registers no authentication scheme,
-session store, or antiforgery service for a tenant that has not declared one, and the host keeps
-its own explicit scheme registrations.
+`UseCache(configure)` also accepts `UseShared(sharedBackend)` or
+`UseDedicated(sp => new MemoryCacheBackend())`. A callback with no outlet declaration shares the
+keyed backend with one normalization. `UseShared` borrows a backend the application owns;
+`UseDedicated` creates one per tenant provider and disposes it when the retired provider's last
+lease is released. Resolving the keyed `CacheServiceKeys.Backend` is the explicit unframed global
+access path. `UseState` adds the tenant's cookie, bearer, session, or antiforgery capability.
+Tenancy registers no authentication scheme, session store, or antiforgery service for a tenant
+that has not declared one, and the host keeps its own explicit scheme registrations. Register Core's
+`UseSession` or `UseAntiforgery` for the corresponding host middleware. With Tenancy enabled, those
+features select one native branch from the final request services; each tenant branch and its options,
+stores, and protection provider are constructed over the tenant's fixed provider.
 
 ## Access the current tenant
 

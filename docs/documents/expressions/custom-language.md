@@ -192,7 +192,7 @@ public sealed class MyPushdownPlanner : IExpressionPushdownPlanner
 {
     public string Language => MyLanguage.Name;
 
-    public ExpressionPushdownPlan Plan(IExpressionTree tree, ExpressionCapabilities capabilities) {
+    public ExpressionPushdownPlan Plan(IExpressionTree tree, ExpressionCapabilities capabilities, Type elementType) {
         if (tree is not MyTree node) {
             throw new ArgumentException("Tree must be a MyTree.", nameof(tree));
         }

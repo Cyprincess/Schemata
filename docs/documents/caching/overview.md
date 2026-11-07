@@ -32,9 +32,23 @@ services.AddSingleton<IConnectionMultiplexer>(
 services.AddRedisCache();
 ```
 
-Both extensions call `AddCacheBackend`, which installs the backend under the keyed `CacheServiceKeys.Backend` slot and exposes one unkeyed `ICacheProvider` outlet: a single `CacheProvider` that applies the registered `ICacheKeyNormalizer` once per operation and delegates to the backend. A later explicit selection replaces the earlier backend; repeating the same selection keeps one singleton outlet. Third-party providers register through the same `AddCacheBackend` overloads. Independent extra backends resolve only through their own explicit keys and never enter the canonical outlet. Resolving the outlet without any backend registration throws at first resolution.
+Both extensions call `AddCacheBackend`, which installs the backend under the keyed
+`CacheServiceKeys.Backend` slot and exposes one unkeyed `ICacheProvider` outlet: a single
+`CacheProvider` that applies the registered `ICacheKeyNormalizer` once per operation and delegates
+to the backend. A later explicit selection replaces the earlier backend; repeating the same
+selection keeps one singleton outlet. Third-party providers register through the same
+`AddCacheBackend` overloads. Independent extra backends resolve only through their own explicit
+keys and never enter the canonical outlet. Resolving the outlet without any backend registration
+throws at first resolution.
 
-Key framing is an `ICacheKeyNormalizer` on the outlet, not a wrapper provider: the tenancy bridge registers its normalizer in the tenant composition while the backend stays the native implementation.
+Key framing is an `ICacheKeyNormalizer` on the outlet, not a wrapper provider. After backend
+registration, `schema.UseTenancy<MyTenant>().UseCache()` replaces the host outlet with a
+`CacheProvider` over the keyed backend and gives every tenant a fixed outlet over that same backend.
+Host keys use `v1\x1ehost\x1e{key}` and tenant keys use `v1\x1etenant\x1e{uid:N}\x1e{key}`. The
+configured `UseCache` overload applies an explicit shared or dedicated outlet and otherwise installs
+the shared keyed-backend fallback with one normalization. Raw `CacheServiceKeys.Backend` resolution
+remains the explicit unframed global access path. A host that never calls `UseCache` retains its
+original registration and behavior.
 
 ## Expiration and ownership
 

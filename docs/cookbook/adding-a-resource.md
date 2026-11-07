@@ -6,6 +6,10 @@ A `Course` resource exposed over both HTTP REST and gRPC with separate request, 
 see how the four type parameters collapse rightward, how `[Resource]` lets registration name the entity alone,
 and how `[HttpResource]` and `[GrpcResource]` select transports.
 
+The snippets are source-traced edits to the prerequisite application, not an executed sample.
+Attribute-only excerpts retain the class body defined in Step 1. Keep the prerequisite web
+project's implicit imports for `System`, tasks, threading, ASP.NET Core, and DI.
+
 ## Prerequisites
 
 - The Student example from [Getting Started](../guides/getting-started.md) is running.
@@ -61,8 +65,8 @@ public class CourseSummary : ICanonicalName         // list items
 }
 ```
 
-**Assertion:** all four compile. `ResourceAttribute<Course>` equals
-`ResourceAttribute<Course, Course, Course, Course>`; use the four-parameter form when the DTOs differ.
+**Expected contract (unexecuted):** all four roles implement `ICanonicalName`.
+`ResourceAttribute<Course>` selects `Course` for all roles; use four parameters when DTOs differ.
 
 ## Step 2: Attach the resource attribute
 
@@ -99,8 +103,9 @@ public sealed class CourseNameAdvisor : IRepositoryAddAdvisor<Course>
         AdviceContext       ctx,
         IRepository<Course> repository,
         Course              entity,
+        MutationOptions     options,
         CancellationToken   ct = default) {
-        if (entity.Uid == Guid.Empty)         entity.Uid  = Identifiers.NewUid();
+        if (entity.Uid == Guid.Empty) entity.Uid = Guid.NewGuid();
         if (string.IsNullOrWhiteSpace(entity.Name)) entity.Name = entity.Uid.ToString("N");
         return Task.FromResult(AdviseResult.Continue);
     }

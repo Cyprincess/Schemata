@@ -6,6 +6,9 @@ A `Book` resource nested under a `Publisher` parent, using the AIP-122 pattern
 `publishers/{publisher}/books/{book}`. The HTTP route, list filter, and name resolution all derive from the single
 `[CanonicalName]` declaration.
 
+These snippets are source-traced changes to the prerequisite web project and were not executed.
+Keep that project's implicit `System`, task, threading, ASP.NET Core, and DI imports.
+
 ## Prerequisites
 
 - The Student example from [Getting Started](../guides/getting-started.md) is running.
@@ -85,10 +88,11 @@ public sealed class AdviceAddBookName : IRepositoryAddAdvisor<Book>
         AdviceContext       ctx,
         IRepository<Book>   repository,
         Book                entity,
+        MutationOptions     options,
         CancellationToken   ct = default)
     {
         if (entity.Uid == Guid.Empty)
-            entity.Uid = Identifiers.NewUid();
+            entity.Uid = Guid.NewGuid();
 
         if (string.IsNullOrWhiteSpace(entity.Name))
             entity.Name = entity.Uid.ToString("N");
@@ -133,6 +137,12 @@ var result     = descriptor.ParseCanonicalName("publishers/acme/books/les-misera
 
 **Assertion:** `ParseCanonicalName` returns a non-null tuple for a well-formed name and `null` when the segment
 count does not match the pattern.
+
+`ParentOf("publishers/acme/books/les-miserables")` returns `"publishers/acme"`. It validates collection
+literals case-insensitively, segment count, and every placeholder against the declared pattern. A root resource
+returns `null`; malformed input throws `InvalidArgumentException` with reason `INVALID_NAME`. During missing-target
+authorization, `AuthorizeHelper` translates that malformed-parent result to the no-parent policy path, preserving
+`PERMISSION_DENIED` when the policy remains undecided.
 
 ## Step 6: Support AIP-159 reading across collections
 

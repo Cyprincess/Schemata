@@ -47,6 +47,9 @@
     "resource": [
       {
         "files": ["ebnf-filtering.txt", "ebnf-modeling.txt"]
+      },
+      {
+        "files": ["evidence/authorization/external-rp.json"]
       }
     ],
     "dest": "_site",

@@ -83,6 +83,14 @@ public interface IScheduledJob
 
 `JobContext.Job` is the job's canonical name, `JobContext.Variables` carries the deserialized dictionary from `SchemataJob.Variables`, `JobContext.ArgsJson` carries typed persisted arguments, and `JobContext.Execution` points to the `SchemataJobExecution` row the dispatcher is running.
 
+### Subject and navigation
+
+`SchemataJob.Subject`, `SchemataJobExecution.Subject`, and `JobContext.Subject` carry an explicit nullable canonical resource name. Scheduling copies the job's Subject into each durable occurrence. A one-shot trigger uses `JobContext.Subject ?? storedJob.Subject`; the dispatcher restores the persisted value, and `OperationMapper.FromExecution` exposes it as `Operation.Metadata.Subject`.
+
+The producing component owns the association. Report schedules supply the report canonical name, Flow timer jobs supply the process canonical name, and scheduled Push sends copy the caller's `PushContext.Subject`. A one-shot job without an explicit or stored Subject keeps null. Arguments, output, variables, message context, Push targets, and tenant-shaped strings never supply an inferred Subject.
+
+Scheduling.Foundation registers `SchedulingLinkContributor<TJob,TExecution>` for the selected persisted entity types. Jobs link to executions using `filter=job="<canonical-job>"`; operations link back to their originating job. Both expose a `subject` relation when Subject matches a registered addressable resource. Transport projectors omit unavailable operations. Core owns standard self, canonical, hierarchy, and pagination relations. Implementation: `Handlers/DefaultScheduleJobHandler.cs`, `Handlers/DefaultTriggerJobHandler.cs`, `Handlers/SchedulingHandlerSupport.cs`, and `Linking/SchedulingLinkContributor.cs` in `src/Schemata.Scheduling.Foundation/`.
+
 `DefaultScheduledJobRegistry` picks a job's key in three steps. `[ScheduledJob("stable-key")]` on the type wins outright and is the way to pin a key across a type rename. On a registry miss the registered `IScheduledJobKeyResolver` implementations are consulted in order, and the first non-null answer is cached. Failing both, the registry derives a key from the type's full name with the generic-arity suffix stripped and each generic argument appended as a dotted short name, which keeps a closed generic inside the length and character set that a `jobs/{job}` segment and the persisted key column accept. Changing a key changes the identity of every future row; rows already persisted under the previous key resolve to nothing and their executions fail.
 
 ## IScheduler
@@ -117,15 +125,18 @@ unkeyed alias), hold the actual materialization logic described above.
 The scheduler's four request commands (`ScheduleJobRequest`, `UnscheduleJobRequest`,
 `TriggerJobRequest`, `RescheduleJobRequest`) cover materialization and schedule changes. Execution
 finalization has no command of its own: `JobExecutionDispatcher` hands the claimed lease and the
-terminal result to `IJobSettlement<TJob, TExecution>`, whose `JobSettlement` writes the execution
-row and the job row's `State`, `RecentRunTime`, `RecentError`, and `NextRunTime` in one unit of work
-(or a sequential schedule-then-execution fallback when the two repositories cannot share it). For a
-recurring `Active` job it also materializes the next `Pending` execution and re-arms its timer. The
+terminal result to `IJobSettlement<TJob, TExecution>`, whose `JobSettlement` persists a settlement
+envelope on the execution row before fallible schedule finalization. Shared repositories commit the
+job row, next pending occurrence, terminal execution, and envelope clearing in one unit of work.
+The non-shared order is Running envelope, schedule and pending occurrence, then terminal execution.
+An expired envelope is reclaimed without another body attempt and replays its exact persisted
+projection and next run through the settlement owner. Outcome observers run after both durable
+writes succeed. For a recurring `Active` job settlement also re-arms its timer. The
 job-row writers are `DefaultScheduleJobHandler`, `DefaultUnscheduleJobHandler`, and
 `JobSettlement`; the first two persist under the process-wide `SchemataJobWriteGate`, and
 `JobSettlement` takes the same gate around its combined write (`DefaultRescheduleJobHandler`
 delegates to the schedule handler), so schedule commands and execution finalization serialize on
-the job row and a concurrency conflict propagates to the caller. `DefaultTriggerJobHandler` writes
+the job row and a concurrency conflict leaves the execution envelope pending guarded recovery. `DefaultTriggerJobHandler` writes
 only the `SchemataJobExecution` row and does not take the gate.
 
 Registered `IRequestPipelineAdvisor<TRequest,TResponse>` wraps run for each scheduling command, whether it originates from `IScheduler` or a raw dispatcher call. The command closure selects the wrap registration and handler. See [Messaging](../messaging/overview.md) for dispatcher and advice-context behavior.
@@ -142,6 +153,9 @@ The `SchemataJobExecution` row is the single durable unit of work for cron, peri
   restored execution scopes, and renewal writes use async scopes; heartbeat repositories are separate
   from body repositories. Terminal CAS and requeue writes serialize with that claimant's renewal.
   The settlement owner advances recurring jobs after settlement.
+- A Running row with a settlement envelope follows settlement-only recovery after lease expiry.
+  Reclaim preserves `Attempt`, skips advisors, trigger notification, and the body, and reuses the
+  envelope's exact job projection and next-run value. The `ScheduleVersion` guard remains in force.
 
 Two background services run alongside the scheduler:
 

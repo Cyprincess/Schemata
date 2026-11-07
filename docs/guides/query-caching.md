@@ -50,7 +50,7 @@ var builder = WebApplication.CreateBuilder(args)
     });
 ```
 
-`AddMemoryCacheProvider()` registers one in-process provider for plain, atomic and collection operations behind the canonical `ICacheProvider` outlet. `UseQueryCache()` registers query, result, and committed eviction advisors together with `SchemataQueryCacheOptions`.
+`AddMemoryCacheProvider()` registers one in-process provider for plain, atomic and collection operations behind the canonical `ICacheProvider` outlet. `UseQueryCache()` registers query, result, and committed eviction advisors together with `SchemataQueryCacheOptions`. Each advisor resolves the cache from the current `AdviceContext.ServiceProvider` for every operation, so a tenant invocation uses its activated `UseCache` partition while a host invocation uses the host partition.
 
 If you skipped Unit of Work, omit `.WithUnitOfWork<AppDbContext>()`; query caching remains active, while
 the open-transaction behavior below applies only when a repository joins a unit of work.

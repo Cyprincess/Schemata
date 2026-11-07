@@ -66,7 +66,7 @@ In `Residual`, the handler resolves `IExpressionPushdownPlanner` keyed by the se
 
 ```csharp
 var planner = _sp.GetRequiredKeyedService<IExpressionPushdownPlanner>(resolved.Language);
-var plan = planner.Plan(tree, ExpressionCapabilities.Relational);
+var plan = planner.Plan(tree, ExpressionCapabilities.Relational, typeof(TEntity));
 
 if (plan.Pushed is not null) {
     container.ApplyWhere(compiler.Compile<TEntity, bool>(plan.Pushed));
@@ -115,9 +115,9 @@ AIP remains the default language when `UseAip()` is the first enabled entry. Its
 | --------------------- | ----------- | ------------------------------- |
 | Equality              | `=`         | `full_name = "alice"`           |
 | Inequality            | `!=`        | `age != 20`                     |
-| Less than             | `<`         | `age < 25`                      |
-| Less than or equal    | `<=`        | `age <= 25`                     |
-| Greater than          | `>`         | `age > 18`                      |
+| Less than             | `<`         | `age < 25`, `full_name < "bob"`     |
+| Less than or equal    | `<=`        | `age <= 25`                         |
+| Greater than          | `>`         | `age > 18`, `full_name > "alice"`   |
 | Greater than or equal | `>=`        | `age >= 18`                     |
 | Has                   | `:`         | `full_name:"ali"`               |
 | Presence              | `:*`        | `tags:*`                        |
@@ -125,6 +125,10 @@ AIP remains the default language when `UseAip()` is the first enabled entry. Its
 | Logical OR            | `OR`        | `age = 1 OR age = 2`            |
 | Logical NOT           | `NOT` / `-` | `NOT age = 3`, `-age = 3`       |
 | Grouping              | `(...)`     | `(age > 18 OR full_name:"ali")` |
+
+Typed string relations use ordinal comparison. A literal or operand that is incompatible with the resource field fails at compile time and follows the `INVALID_FILTER` mapping below. A `:` membership test against a null dictionary evaluates to false.
+
+AIP parsing caches the pristine parser tree and returns a complete deep copy with independent nested nodes and lists on every call, preserving `Filter.Source`. Structural compile-cache keys remain unchanged: identical tree structures reuse expressions, while explicit mutations to a returned tree recompile under their new fingerprint.
 
 For CEL syntax, see [CEL Expressions](../expressions/cel.md). For the full AIP grammar, see [AIP Expressions](../expressions/aip.md).
 
@@ -134,8 +138,9 @@ For CEL syntax, see [CEL Expressions](../expressions/cel.md). For the full AIP g
 implements `Schemata.Common.IPagination` (`Skip`, `PageSize`), so advisors can feed it to
 `PaginationExtensions.WithPaginating`. It is serialized to JSON, Brotli-compressed, sealed with ASP.NET
 Core Data Protection purpose `Schemata.Resource.Foundation.PageToken`, and emitted as URL-safe Base64.
-`PageToken.FromStringAsync` rejects tampered or malformed tokens with `ValidationException`
-(`INVALID_PAGE_TOKEN`).
+`PageToken.ToString(IDataProtector)` and `PageToken.FromString(string?, IDataProtector)` are synchronous.
+`FromString` rejects tampered or malformed tokens with `ValidationException` (`INVALID_PAGE_TOKEN`) and
+returns null for null or whitespace input.
 
 | Parameter   | Default                  | Maximum                   |
 | ----------- | ------------------------ | ------------------------- |
@@ -151,9 +156,9 @@ maximum coerces to it. A continuation that omits `page_size` keeps the token's e
 subject to the current maximum; an explicit new `page_size` applies and paging resumes at the previous
 page's end, so shrinking a continuation page yields neither gaps nor duplicates.
 
-HTTP binds `ListRequest` query fields using snake_case names, including `page_size`, `page_token`,
-`order_by`, and `show_deleted`. This metadata is registered by the resource HTTP transport and applies
-only to `ListRequest`; custom request DTOs retain their own binding rules.
+HTTP binds `ListRequest` and derived request containers using snake_case query names, including
+`page_size`, `page_token`, `order_by`, and `show_deleted`. Unrelated custom request DTOs retain their own
+binding rules.
 
 Without a residual predicate, paging applies in the backend query with one look-ahead row. With a residual predicate, backend paging is delayed until `ResidualPage` has applied local filtering.
 

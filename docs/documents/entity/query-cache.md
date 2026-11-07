@@ -164,7 +164,7 @@ services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
         .UseQueryCache(o => o.Ttl = TimeSpan.FromMinutes(10));
 ```
 
-`UseQueryCache` registers query, result, and committed eviction advisors as open-generic scoped services and registers `SchemataQueryCacheOptions`. A concrete `ICacheProvider` backend must be registered separately.
+`UseQueryCache` registers query, result, and committed eviction advisors as open-generic scoped services and registers `SchemataQueryCacheOptions`. A concrete `ICacheProvider` backend must be registered separately. Each advisor resolves `ICacheProvider` from `AdviceContext.ServiceProvider` at its cache operation, so every query, fill, and generation eviction uses the final invocation scope's outlet. `UseCache` therefore supplies the host or tenant partition without changing query keys, generations, or advisor registration.
 
 ## Caveats
 

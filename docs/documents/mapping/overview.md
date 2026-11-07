@@ -39,8 +39,6 @@ namespace Schemata.Mapping.Skeleton;
 
 public interface ISimpleMapper
 {
-    T? Map<T>(object source);
-    T? Map<T>(object source, Type sourceType, Type destinationType);
     TDestination? Map<TSource, TDestination>(TSource source);
     void Map<TSource, TDestination>(TSource source, TDestination destination);
     void Map<TSource, TDestination>(TSource source, TDestination destination, IEnumerable<string> fields);
@@ -51,16 +49,16 @@ Three families of overload, each with distinct null behavior:
 
 | Overload                                               | Semantics                     | Null source member                                  |
 | ------------------------------------------------------ | ----------------------------- | --------------------------------------------------- |
-| `Map<T>(source)`, `Map<TSource, TDestination>(source)` | Produce a fresh instance      | Copied to the result                                |
+| `Map<TSource, TDestination>(source)`                  | Produce a fresh instance      | Copied to the result                                |
 | `Map(source, destination)`                             | Merge onto an existing object | Preserves the destination value                     |
 | `Map(source, destination, fields)`                     | Field-selective update        | Masked fields are authoritative; unmasked preserved |
 
 Both adapters route the two-argument `Map(source, destination)` through
 `SimpleMapperHelper.MapMerging` and the field overload through `SimpleMapperHelper.MapWithMask`.
-The fresh-instance overloads call the engine directly, so they copy null source members verbatim.
+The fresh-instance overload calls the engine directly, so it copies null source members verbatim.
 
-`MapperExtensions.Each` and `EachAsync` (in `Schemata.Mapping.Skeleton`) map a sequence element
-by element and drop null results.
+`MapperExtensions.Each` and `EachAsync` (in `Schemata.Mapping.Skeleton`) map a typed source sequence element
+by element to the requested destination type and drop null results.
 
 ## Merge semantics
 
@@ -93,13 +91,18 @@ public static void MapWithMask<TSource, TDestination>(
 ```
 
 1. Parse the mask into a `MaskTree` rooted at `typeof(TDestination)` via `MaskTree.FromClr`.
-2. A null source or destination, an empty mask, or a mask naming every writable destination member
-   takes the `mapAction` path, where mapping the destination is safe.
-3. Otherwise `project(source)` builds one fresh staged instance under the current map
+2. Return immediately when the parsed tree has no children. An empty mask and a mask whose system-field entries
+   were all removed therefore leave every destination value unchanged.
+3. A null source or destination, or a mask naming every writable destination member, takes the `mapAction` path.
+   This whole-resource selection remains separate from empty-tree handling.
+4. Otherwise `project(source)` builds one fresh staged instance under the current map
    configuration; the real destination is never mapped, so unmasked mutable members cannot be
    polluted by the engine's in-place writes. A null projection raises `InvalidOperationException`.
-4. `SimpleMapperHelper.ApplyMasked` is the single owner of the masked copy: it walks the staged
+5. `SimpleMapperHelper.ApplyMasked` is the single owner of the masked copy: it walks the staged
    instance against the mask tree and writes selected members onto the destination.
+
+At the resource update boundary, omitted masks and explicit `*` use the same full-request merge path. Mixed masks
+copy only writable selected fields, while empty and system-only effective masks preserve the loaded entity.
 
 A masked leaf replaces the member outright with the staged value, object references, collections,
 and record values included, so a null source value clears the destination leaf. A descendant

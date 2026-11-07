@@ -10,14 +10,21 @@ The Schemata Modeling Language (SKM) defines entities, traits, and enums in `.sk
 
 | Declaration | Generated C#                                                                                 |
 | ----------- | -------------------------------------------------------------------------------------------- |
-| `Entity`    | `public record` with one init-set auto-property per field; trait interfaces in the base list |
-| `Trait`     | `public interface I{Name}` with one property per field                                       |
+| `Entity` | `public record`; declared/local-trait fields emit `get; set;`, imported interface properties follow their required accessors |
+| `Trait` | `public interface I{Name}` with mutable `get; set;` properties |
 | `Enum`      | `public enum` with one member per value                                                      |
 
-`Object` blocks, `Index` declarations, field options, and field properties are parsed into
-the AST and carried on their declarations, but produce no C# output. The parser accepts them
-so a model can record indexing and projection intent; only entities, traits, and enums reach
-the compiler.
+`Object` blocks (Views), `Index` declarations (Pointers), field options, and field properties are
+parsed into the AST but produce no projection classes, indexes, validation, or persistence mapping.
+`DocumentGenerator.Generate` invokes only enum, trait, and entity generation. Views have no generated
+type inference or expression evaluation. Pointers have no generated index names or database effect.
+
+Sources: `generators/Schemata.Modeling.Generator/Generators/DocumentGenerator.cs`,
+`EntityGenerator.cs`, `InterfaceProperties.cs`, and `TraitGenerator.cs`.
+
+Imported CLR interfaces may require a getter only, a setter, or an init accessor.
+`InterfaceProperties.Generate` preserves those requirements and diagnoses incompatible field/type
+contracts; it does not turn every imported property into a mutable setter.
 
 ## Document structure
 
@@ -42,6 +49,8 @@ Enum EnrollmentStatus {
     Graduated
 }
 ```
+
+This example was source-traced, not compiled or executed during documentation alignment.
 
 The `Namespace` declaration, when present, is the first declaration in the file. Keywords are
 case-insensitive (`Entity`, `entity`, `ENTITY` are equivalent). Comments use `//` for a line

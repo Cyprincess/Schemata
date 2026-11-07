@@ -5,6 +5,9 @@ registration through **features** that implement `ISimpleFeature` (usually by ex
 `FeatureBase`). Each feature declares a `Priority` — and optionally a separate `Order` — and is
 activated by a `Use*()` extension on `SchemataBuilder`.
 
+Activation snippets are source-traced configuration fragments and were not executed as standalone
+applications. Their host project must import ASP.NET Core builder and dependency-injection extensions.
+
 ## Where the code lives
 
 | Package                 | Key files                                               |
@@ -33,11 +36,9 @@ features pick values outside it.
 
 ## Built-in features (Schemata.Core)
 
-The core chain starts at `Orders.Base` (100M) with 10M strides. Each feature's `DefaultPriority`
-is the previous one plus 10M, leaving 160M open for the tenancy extension and applying a +5M
-sub-feature offset for `WellKnown`, a +20M gap before `CookiePolicy`, a +2M authorization
-middleware slot after authentication, and a +5M quota offset after authorization so rate
-limiting partitions authenticated traffic.
+The core chain starts at `Orders.Base` (100M). Source constants in
+`src/Schemata.Core/Features/Schemata*Feature.cs` define the values below. Transport.Http occupies
+201M before authentication; Tenancy request resolution occupies 205M and principal rebinding 211M.
 
 | Priority    | Feature class                           | `Use*()` method                    | Registers                                                              |
 | ----------- | --------------------------------------- | ---------------------------------- | ---------------------------------------------------------------------- |
@@ -55,10 +56,9 @@ limiting partitions authenticated traffic.
 | 210,000,000 | `SchemataAuthenticationFeature`         | `UseAuthentication()`              | Authentication and authorization services; `UseAuthentication` middleware |
 | 211,000,000 | _(Tenancy principal rebind — extension)_ |                                    |                                                                        |
 | 212,000,000 | `SchemataAuthorizationFeature`          | _(added by `UseAuthentication()`)_ | `UseAuthorization` middleware                                          |
-| 213,000,000 | _(Tenancy execution scope — extension)_ |                                    |                                                                        |
-| 214,000,000 | `SchemataAntiforgeryFeature`            | `UseAntiforgery()`                 | Antiforgery services and middleware through the state branch point     |
-| 215,000,000 | `SchemataQuotaFeature`                  | `UseQuota()`                       | Rate limiter services and middleware                                   |
-| 220,000,000 | `SchemataSessionFeature<T>`             | `UseSession()` / `UseSession<T>()` | Session services and middleware through the state branch point; pluggable `ISessionStore` |
+| 214,000,000 | `SchemataAntiforgeryFeature`            | `UseAntiforgery()`                 | Native antiforgery services and middleware                               |
+| 215,000,000 | `SchemataRateLimitingFeature`         | `UseRateLimiting()`                | Rate limiter services and middleware                                   |
+| 220,000,000 | `SchemataSessionFeature<T>`             | `UseSession()` / `UseSession<T>()` | Native session services and middleware; pluggable `ISessionStore` |
 | 230,000,000 | `SchemataControllersFeature`            | `UseControllers()`                 | MVC controllers via `AddControllers`; maps `MapDefaultControllerRoute` |
 | 240,000,000 | `SchemataJsonSerializerFeature`         | `UseJsonSerializer()`              | snake_case JSON, kebab-case enums, long-as-string                      |
 
@@ -69,24 +69,26 @@ can log request and response bodies, so it carries PII warnings.
 
 ## Extension features
 
-Extension features ship in separate packages and anchor off `Orders.Extension` (400M) with 10M
-strides. Bridge and transport sub-features stack `+100K`, `+200K`, etc. above their parent anchor.
-The tenancy feature is the exception: it occupies the 205M slot inside the core range while
-registering its services at `Orders.Max`.
+Extension features usually anchor off `Orders.Extension` (400M), with smaller offsets for
+transports and bridges. Transport.Http and Tenancy run inside the core middleware range;
+Tenancy registers its services at `Orders.Max`.
 
 | Priority    | Package                             | Feature class                                                   | `Use*()` method                           | Registers                                                                                                                                                                                 |
 | ----------- | ----------------------------------- | --------------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 201,000,000 | `Schemata.Transport.Http` | `SchemataTransportHttpFeature` | _(dependency)_ | HTTP exception handling and JSON traits; `src/Schemata.Transport.Http/Features/SchemataTransportHttpFeature.cs` |
 | 205,000,000 | `Schemata.Tenancy.Foundation`       | `SchemataTenancyFeature<TManager, TTenant, TTenantHost>`        | `UseTenancy()`                            | Tenant manager, context accessor, scope factory, provider cache, request middleware. **`Order` overridden to `Orders.Max` (900M)** so services register last while middleware runs early. |
+| 211,000,000 | `Schemata.Tenancy.Foundation` | `SchemataTenantPrincipalFeature<TTenant>` | _(dependency)_ | Principal-stage tenant resolution |
 | 400,000,000 | `Schemata.Security.Foundation`      | `SchemataSecurityFeature`                                       | `UseSecurity()`                           | Default `IAccessProvider<,>` and `IEntitlementProvider<,>` open-generic fallbacks                                                                                                         |
-| 410,000,000 | `Schemata.Transport.Http`           | `SchemataTransportHttpFeature`                                  | _(auto-pulled)_                           | AIP-193 exception-handler middleware, `SchemataJsonTraits` applied to MVC and minimal-API JSON options                                                                                    |
 | 420,000,000 | `Schemata.Transport.Grpc`           | `SchemataTransportGrpcFeature`                                  | _(auto-pulled)_                           | `AddCodeFirstGrpc` with the exception-mapping interceptor, protobuf-net traits, gRPC reflection                                                                                           |
 | 430,000,000 | `Schemata.Identity.Foundation`      | `SchemataIdentityFeature<TUser, TRole, TUserClaim, TRoleClaim, TUserLogin, TUserToken, TUserRole, TUserStore, TRoleStore>` | `UseIdentity()`                           | ASP.NET Core Identity with bearer-token authentication, composite auth handler, stores closed on the seven host-selected entity types                                                                                          |
+| 430,100,000 | `Schemata.Identity.Scim` | `SchemataIdentityScimFeature<TUser,TRole>` | `UseScim()` on the Identity builder | User and Group provisioning handlers |
 | 440,000,000 | `Schemata.Event.Foundation`         | `SchemataEventFeature`                                          | `UseEvent()`                              | Event bus, type registry, producer/consumer builders                                                                                                                                      |
 | 450,000,000 | `Schemata.Actor.Foundation`         | `SchemataActorFeature<TActor>`                                  | `UseActor()` / `UseActor<TActor>()` on `SchemataBuilder` | In-process actor system with per-instance mailbox serialization, closed on the persisted actor-state entity |
 | 450,100,000 | `Schemata.Actor.Event`              | `SchemataActorEventFeature`                                     | `UseEvent()` on the actor builder          | Bridge: actor + event-bus (+100K)                                                                                                                                                          |
 | 450,200,000 | `Schemata.Actor.Scheduling`         | `SchemataActorSchedulingFeature`                                | `UseScheduling()` on the actor builder     | Bridge: actor + scheduler (+200K), durable reminders                                                                                                                                       |
 | 460,000,000 | `Schemata.Authorization.Foundation` | `SchemataAuthorizationFeature<TApp, TAuth, TScope, TSubjectMapping, TSecurity, TToken>` | `UseAuthorization()`                      | Authorization server core, token validation, entity stores, advisors; the token type comes from the registered security feature |
 | 460,100,000 | `Schemata.Authorization.Identity` | `SchemataAuthorizationIdentityFeature<TUser>` | `UseIdentity<TUser>()` on the authorization builder | Identity integration bridge for the explicitly selected host user type |
+| 460,100,000 | `Schemata.Authorization.Scim` | `SchemataAuthorizationScimFeature<TApp>` | `UseScim()` on the Authorization builder | Application provisioning handler |
 | 470,000,000 | `Schemata.Mapping.Foundation`       | `SchemataMappingFeature<T>`                                     | `UseMapping()`                            | `ISimpleMapper` implementation as a scoped service                                                                                                                                        |
 | 480,000,000 | `Schemata.Scheduling.Foundation`    | `SchemataSchedulingFeature<TJob, TExecution>`                   | `UseScheduling()`                         | `IScheduler`, job registration, request handlers, settlement, and the job-row write gate, closed on the host-selected job/execution types |
 | 480,100,000 | `Schemata.Scheduling.Event`         | `SchemataSchedulingEventFeature`                                | `UseEvent()` on the scheduling builder    | Event-publishing job lifecycle observer                                                                                                                                                   |
@@ -94,7 +96,7 @@ registering its services at `Orders.Max`.
 | 480,300,000 | `Schemata.Scheduling.Grpc`          | `SchemataSchedulingGrpcFeature`                                 | `.MapGrpc()` on the scheduling builder     | Scheduling gRPC transport (+300K)                                                                                                                                                          |
 | 490,000,000 | `Schemata.Flow.Foundation`          | `SchemataFlowFeature<TProcess, TToken, TTransition, TCompensation, TParticipant, TSource, TEffectIntent>` | `UseFlow()`                               | Process engine, process registry, closed on the host-selected persisted row types |
 | 490,050,000 | `Schemata.Flow.StateMachine`        | `SchemataFlowStateMachineFeature`                               | `UseStateMachine()` on the flow builder    | Default state-machine engine on Flow (+50K)                                                                                                                                               |
-| 490,060,000 | `Schemata.Flow.Bpmn`                | `SchemataFlowBpmnFeature`                                       | `UseBpmn()` on the flow builder            | Full BPMN 2.0.2 engine on Flow (+60K)                                                                                                                                                      |
+| 490,060,000 | `Schemata.Flow.Bpmn`                | `SchemataFlowBpmnFeature`                                       | `UseBpmn()` on the flow builder            | Multi-token executable BPMN subset engine on Flow (+60K) |
 | 490,100,000 | `Schemata.Flow.Http`                | `SchemataFlowHttpFeature`                                       | `MapHttp()` on the flow builder           | Flow HTTP transport (+100K)                                                                                                                                                                |
 | 490,200,000 | `Schemata.Flow.Grpc`                | `SchemataFlowGrpcFeature`                                       | `MapGrpc()` on the flow builder           | Flow gRPC transport (+200K)                                                                                                                                                                |
 | 490,300,000 | `Schemata.Flow.Event`               | `SchemataFlowEventFeature`                                      | `UseEvent()` on the flow builder          | Bridge: Flow + Event (+300K)                                                                                                                                                              |
@@ -107,12 +109,28 @@ registering its services at `Orders.Max`.
 | 510,100,000 | `Schemata.Insight.Http`             | `SchemataInsightHttpFeature`                                    | `.MapHttp()` on the insight builder        | Insight HTTP transport (+100K)                                                                                                                                                            |
 | 510,200,000 | `Schemata.Insight.Grpc`             | `SchemataInsightGrpcFeature`                                    | `.MapGrpc()` on the insight builder        | Insight gRPC transport (+200K)                                                                                                                                                            |
 | 520,000,000 | `Schemata.Push.Foundation`          | `SchemataPushFeature`                                           | `UsePush()`                               | Push notification fan-out                                                                                                                                                                  |
+| 520,100,000 | `Schemata.Push.Http` | `SchemataPushHttpFeature` | `MapHttp()` on the Push builder | Push HTTP control plane |
 | 520,400,000 | `Schemata.Push.Scheduling`          | `SchemataPushSchedulingFeature`                                 | `UseScheduling()` on the push builder      | Deferred push dispatch through the scheduler (+400K)                                                                                                                                       |
+| 520,600,000 | `Schemata.Push.Actor` | `SchemataPushActorFeature` | `UseActor()` on the Push builder | Per-subscription serialization |
 | 530,000,000 | `Schemata.Report.Foundation`        | `SchemataReportFeature<TReport, TSnapshot, TChunk>`             | `UseReport()`                             | Report definitions, snapshots, generation                                                                                                                                                 |
 | 530,100,000 | `Schemata.Report.Http`              | `SchemataReportHttpFeature`                                     | `.MapHttp()` on the report builder         | Report HTTP transport (+100K)                                                                                                                                                             |
 | 530,200,000 | `Schemata.Report.Grpc`              | `SchemataReportGrpcFeature`                                     | `.MapGrpc()` on the report builder         | Report gRPC transport (+200K)                                                                                                                                                             |
 | 530,400,000 | `Schemata.Report.Scheduling`        | `SchemataReportSchedulingFeature`                               | `UseScheduling()` on the report builder    | Bridge: Report + Scheduling (+400K)                                                                                                                                                        |
+| 530,600,000 | `Schemata.Report.Actor` | `SchemataReportActorFeature` | `UseActor()` on the Report builder | Per-report serialization |
 | 540,000,000 | `Schemata.Modular`                  | `SchemataModulesFeature<TProvider, TRunner>`                    | `UseModular()`                            | Module discovery via `IModulesProvider`, lifecycle via `IModulesRunner`                                                                                                                   |
+| 550,000,000 | `Schemata.Quota.Foundation`       | `SchemataQuotaAccountingFeature`                                | `UseQuotaAccounting()`                    | Durable weighted accounts, reservations, settlement ledger, lazy expiry, and optional scheduler triggers                                                                                 |
+| 550,100,000 | `Schemata.Quota.Http`             | `SchemataQuotaHttpFeature`                                      | `.MapHttp()` on the quota builder         | Authenticated quota reserve, settlement, and ledger endpoints (+100K)                                                                                                                     |
+| 550,200,000 | `Schemata.Quota.Grpc`             | `SchemataQuotaGrpcFeature`                                      | `.MapGrpc()` on the quota builder         | Code-first quota reserve, settlement, and ledger service (+200K)                                                                                                                          |
+
+`Schemata.Scim` maps shared discovery and resource controllers through the Identity/Authorization
+SCIM features; it declares no separate feature priority. `Schemata.Push.Grpc` uses
+`AddSchemataPushGrpc` / `MapSchemataPushGrpc` directly. `Schemata.Security.Grpc` supplies signature
+helpers rather than a feature. Their source directories contain no priority constant.
+
+Extension constants live in each package's `Features/` directory. Authorization's anchor is
+`SchemataAuthorizationOrders.Feature` in `Schemata.Authorization.Foundation/Features/SchemataAuthorizationFeature.cs`.
+Flow.StateMachine and Push.Http compute `Priority` directly from their parent anchor. The remaining
+rows use `DefaultPriority`; generic features forward their non-generic anchor where one exists.
 
 ## Activation pattern
 
@@ -166,6 +184,8 @@ instantiation), or `[DependsOn("type.name")]` (string, check-only):
 | `SchemataSchedulingEventFeature` | `SchemataSchedulingFeature`, `SchemataEventFeature`                                                    |
 | `SchemataHttpResourceFeature`    | `SchemataResourceFeature`, `SchemataTransportHttpFeature`                                              |
 | `SchemataGrpcResourceFeature`    | `SchemataResourceFeature`, `SchemataTransportGrpcFeature`                                              |
+| `SchemataQuotaHttpFeature`       | `SchemataQuotaAccountingFeature`, `SchemataTransportHttpFeature`                                       |
+| `SchemataQuotaGrpcFeature`       | `SchemataQuotaAccountingFeature`, `SchemataTransportGrpcFeature`                                       |
 
 ## Design rationale
 

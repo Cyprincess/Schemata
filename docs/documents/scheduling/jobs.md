@@ -151,7 +151,7 @@ public interface IJobLifecycleObserver
 }
 ```
 
-`OnScheduledAsync` and `OnUnscheduledAsync` run when a schedule is recorded, advanced, paused, or removed. `OnTriggeredAsync` runs after the execution advisors return `Continue` and before the body runs; it returns a plain `Task` and carries no gating result. `OnBlockedAsync` and `OnSkippedAsync` run when an execution advisor blocks or handles the fire; both ship default no-op bodies. `OnSucceededAsync` and `OnFailedAsync` run after the body settles. Terminal observer callbacks are caught, logged at `Warning`, and do not stop the remaining callbacks. `OnTriggeredAsync` runs before the job body's exception boundary, so an observer implementation must return successfully.
+`OnScheduledAsync` and `OnUnscheduledAsync` run when a schedule is recorded, advanced, paused, or removed. `OnTriggeredAsync` runs after the execution advisors return `Continue` and before the body runs; it returns a plain `Task` and carries no gating result. `OnBlockedAsync` and `OnSkippedAsync` run when an execution advisor blocks or handles the fire; both ship default no-op bodies. Finalization selects the terminal callback from `ExecutionState` after both the schedule and execution settle. A pre-body setup failure persists `Failed` and `RecentError` without an outcome callback; a terminal body failure supplies its exception to both `RecentError` and `OnFailedAsync`. A schedule-stage failure leaves a Running settlement envelope and defers the outcome observer until recovery completes both writes. Terminal observer callbacks are caught, logged at `Warning`, and do not stop the remaining callbacks. `OnTriggeredAsync` runs before the job body's exception boundary, so an observer implementation must return successfully.
 
 ### Advisor outcomes
 
@@ -191,14 +191,18 @@ call ExecuteAsync(context, linkedToken)
 ```
 
 `JobExecutionDispatcher` owns the execution row from claim through terminal state. It hands the
-claimed lease and the terminal result to `IJobSettlement<TJob, TExecution>`. `JobSettlement` writes
-the execution row and the job row's `State`, `RecentRunTime`, `RecentError`, and `NextRunTime` in
-one unit of work; when the two repositories cannot share that unit, it persists the schedule stage
-and the execution stage in sequence. For a recurring `Active` job the same settlement materializes
-the next `Pending` execution and arms its timer. The other job-row writers share two of those
+claimed lease and the terminal result to `IJobSettlement<TJob, TExecution>`. `JobSettlement` stores
+the terminal execution result and exact job projection in an execution-row envelope. A shared unit
+of work commits the schedule, replacement occurrence, terminal execution, and envelope clearing
+together. Non-shared stores commit the Running envelope before the schedule and pending occurrence,
+then mark the execution terminal. If schedule persistence fails, the body result remains durable
+for settlement-only recovery. Reclaim keeps `Attempt` unchanged and does not rerun advisors or the
+body; replay uses the persisted next-run value without another missed-fire calculation. For a
+recurring `Active` job the completed settlement materializes the next `Pending` execution and arms
+its timer. The other job-row writers share two of those
 fields: the schedule handler also writes `State` and `NextRunTime`, and the unschedule handler
 writes `State` as `Paused`. Job-row writers run under the same `SchemataJobWriteGate`, and a
-concurrency conflict on the job row propagates to the caller instead of being retried.
+concurrency conflict leaves the claimed execution unsettled for guarded recovery.
 
 ## Cancelling a running execution
 

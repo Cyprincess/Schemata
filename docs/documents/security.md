@@ -55,7 +55,7 @@ The default access provider is the instance-level implementation. Coarse authori
 
 A transport scheme populates the request principal. The authentication wrap advisor is the single `IsAuthenticated` decision point. `MapHttp()` and `MapGrpc()` are domain-specific extensions that activate their domain feature; shared transport behavior is declared through those features' dependencies.
 
-Identity User and Role management resources and Authorization Application, Scope, and Token management resources require an explicit `MapHttp()` or `MapGrpc()` call. The IdentityCore endpoints and Authorization protocol endpoints retain their own transport paths.
+Native Identity and Authorization managers own administrative mutations. Dynamic client registration, SCIM, IdentityCore endpoints, and Authorization protocol endpoints retain their respective protocol paths. Generic Resource HTTP and gRPC transports remain available to application-owned resource builders.
 
 ## Stored resource identity
 
@@ -73,6 +73,59 @@ with optional kind, usage, and status filters. `SecurityStore<TSecurity>` orders
 descending `CreateTime`, then `Key`. Adding the label field does not add a select-by-key API or
 change which credential kinds and statuses an authentication consumer accepts. `Kid` remains a
 separate key-material identifier.
+
+## Key rotation
+
+`UseSecurity()` registers `SecurityKeyRotationService<TSecurity>` and the local
+`RsaSecurityKeyGenerator<TSecurity>`. Register a replacement `ISecurityKeyGenerator<TSecurity>`
+before `UseSecurity()` to obtain material from an external key source. The generator receives a
+`SecurityKeyGenerationContext` containing the requested `Parent`, `Usage`, and `Algorithm`; it returns
+an unpersisted row carrying the material and its `Kid`.
+
+Call `RotateAsync(parent, usage, algorithm, ct)` for either `SecurityConstants.Usages.Signing` or
+`SecurityConstants.Usages.Encryption`. The service captures the current `valid` row's `Uid` and
+`Timestamp`, generates the successor, and commits it as `staged` through `ISecurityStore.CreateAsync`.
+Consumer add advisors therefore supply its resource `Name`. A staged signing key appears in JWKS but
+cannot sign or validate tokens. A staged encryption key cannot encrypt or decrypt tokens.
+
+After the staged commit, one serializable repository transaction activates the successor and retires
+the predecessor. The service compares the active row with the captured `Uid` and `Timestamp`, then
+uses the predecessor's original `Timestamp` for its update. A competing transition aborts with
+`AbortedException`; its candidate remains staged, the winner is the sole `valid` row, and the previous
+row remains available under the retired retention policy. An advisor veto or provider failure rolls
+back both updates. `ActivationTime` records the switch, while `RetirementTime` records when the prior
+row entered retention.
+
+`SchemataSecurityOptions.RetiredKeyRetention` defaults to seven days. Retired signing and encryption
+rows verify and decrypt until `RetirementTime + RetiredKeyRetention`; the boundary instant itself is
+expired. A null `RetirementTime` has no retention boundary. JWKS publishes staged, valid, and retained
+retired signing rows. Expired retired and revoked rows leave JWKS and cannot verify or decrypt.
+Revocation takes effect on the next operation because key selection resolves rows per operation.
+Symmetric material still makes the JWKS result an empty `keys` array.
+
+Set `RotationInterval` and add one entry per slot to `Rotations` to configure periodic rotation:
+
+```csharp
+schema.UseSecurity(options => {
+    options.RetiredKeyRetention = TimeSpan.FromHours(2);
+    options.RotationInterval = TimeSpan.FromDays(30);
+    options.Rotations.Add(new() {
+        Parent = SecurityParents.Issuer("https://as.example"),
+        Usage = SecurityConstants.Usages.Signing,
+        Algorithm = SecurityConstants.Algorithms.Rsa,
+    });
+    options.Rotations.Add(new() {
+        Parent = SecurityParents.Issuer("https://as.example"),
+        Usage = SecurityConstants.Usages.Encryption,
+        Algorithm = SecurityConstants.Algorithms.Rsa,
+    });
+});
+```
+
+Security.Foundation registers `SecurityKeyRotationJob<TSecurity>` and adds its periodic registration
+to `SchemataSchedulingOptions` when the interval and at least one slot are present. The Scheduling
+feature materializes and executes that registration. Each fire calls the same rotation service for
+every configured slot.
 
 `SchemataToken.Key` is the semantic slot identifier used by `GetAsync`, `GetOrCreateAsync`,
 `SetAsync`, and `RemoveAsync` with `Parent` and `Provider`. Repository slots have a unique

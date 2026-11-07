@@ -2,11 +2,12 @@
 
 A field's type specifier is a type name with an optional `?`. Built-in type tokens map to CLR
 types through `Utilities.GetClrType`; any name that does not match a token is written into the
-generated C# verbatim. Type names are case-insensitive.
+generated C# verbatim. Built-in token lookup is case-insensitive; custom CLR type names preserve
+their spelling and follow C# case-sensitive name resolution.
 
 ## Built-in type mappings
 
-The generator emits `clr.FullName`, so the property type is always the fully-qualified CLR name.
+`Utilities.GetClrType` maps built-ins to `clr.FullName`; the table uses familiar C# aliases for readability.
 
 | SKM token    | Aliases                    | C# type                      |
 | ------------ | -------------------------- | ---------------------------- |

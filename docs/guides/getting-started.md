@@ -3,6 +3,10 @@
 This guide builds a Student CRUD API with auto-generated HTTP endpoints. By the end you have a
 running application that creates, lists, reads, updates, and soft-deletes students.
 
+Examples are source-traced integration instructions, not a compiled or executed sample application.
+The `dotnet new web` template supplies implicit `System`, threading, task, ASP.NET Core builder,
+and dependency-injection imports; retain those generated project settings.
+
 ## Prerequisites
 
 - .NET 8 SDK or later
@@ -103,10 +107,11 @@ public sealed class AdviceAddStudentName : IRepositoryAddAdvisor<Student>
         AdviceContext        ctx,
         IRepository<Student> repository,
         Student              entity,
+        MutationOptions      options,
         CancellationToken    ct = default)
     {
         if (entity.Uid == Guid.Empty)
-            entity.Uid = Identifiers.NewUid();
+            entity.Uid = Guid.NewGuid();
 
         if (string.IsNullOrWhiteSpace(entity.Name))
             entity.Name = entity.Uid.ToString("N");
@@ -116,10 +121,10 @@ public sealed class AdviceAddStudentName : IRepositoryAddAdvisor<Student>
 }
 ```
 
-`Identifiers.NewUid()` from `Schemata.Common` is the framework's primary-key generator. It compiles
-on both target frameworks: on .NET 10 it returns a time-ordered UUIDv7 that sorts well as a primary
-key, and on .NET 8 it returns `Guid.NewGuid()`. `Order = 0` runs this advisor ahead of every
-built-in repository advisor, the lowest of which is at 100,000,000.
+`Guid.NewGuid()` produces a UUID v4 on both target frameworks. The built-in
+`AdviceAddIdentifier` uses the same API for an empty `Uid`; this consumer-owned advisor sets it
+early because its chosen resource-name policy uses that UID. `Order = 0` precedes the built-in
+identifier advisor at 90,000,000 and canonical-name derivation at 120,000,000.
 
 ## Configure the application
 

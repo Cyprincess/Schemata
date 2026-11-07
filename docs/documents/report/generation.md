@@ -3,12 +3,15 @@
 `IReportService` dispatches a named definition or an inline Insight query. `ReportRequest` requires
 exactly one of `Name` and `Query`; `Persist` chooses whether rows remain in the response or become a snapshot.
 
+Code blocks below are source-traced API/configuration excerpts, not a compiled or executed sample.
+
 ```csharp
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Resource;
 using Schemata.Report.Skeleton;
+using Schemata.Report.Skeleton.Models;
 
 public interface IReportService
 {
@@ -75,7 +78,7 @@ pending `Operation`. The job writes the eventual snapshot reference or inline re
 
 For `Sync = true`, the handler calls `IOperationService.ExecuteAsync`. That service commits a
 `Running` execution before invoking inline work. The callback receives the persisted operation,
-sets `ReportExecutionContext.Operation` to its canonical name, and dispatches `RunReportRequest`.
+sets `RunReportRequest.Operation` to its canonical name, and dispatches that request.
 The snapshot can therefore reference the actual operation while materialization is running. The
 same execution row receives the terminal output or error; cancellation records `Cancelled` and
 rethrows. See [Inline operations](../scheduling/persistence.md#inline-operations).

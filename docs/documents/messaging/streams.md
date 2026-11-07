@@ -16,8 +16,10 @@ Framing details:
 
 - The first item is awaited and serialized before the response starts, so validation and
   producer failures before any item return the unary structured error status instead of NDJSON.
-- Frames serialize with a per-request clone of the host `JsonSerializerOptions` forcing
-  `WriteIndented = false`; host indentation never splits one frame across lines.
+- Frames serialize with one lazily initialized clone of the host `JsonSerializerOptions` per mapped
+  endpoint, created from the first request's services with `WriteIndented = false`. Results from that
+  endpoint share the clone; a separately mapped endpoint has its own. Host indentation never splits one
+  frame across lines.
 - Each frame is buffered in one reusable `MemoryStream`, then written and flushed before the next
   `MoveNextAsync`, so a slow client backpressures the producer without buffering the sequence.
 - Client cancellation aborts the connection; the enumerator and its execution scope are disposed.
@@ -59,7 +61,9 @@ Behavior:
 - A producer failure before the first item writes zero messages. A failure after output starts
   ends the RPC with its error status and trailers; it cannot appear as successful completion.
 - Cancellation and early client disposal release the stream's `MessageExecutionScope` after
-  iterator cleanup. Each item write is awaited before the dispatcher requests the next item.
+  iterator cleanup. Each item write is awaited before the dispatcher requests the next item. The
+  dispatcher restores the captured context once when it creates the iterator; the scoped provider
+  supplies execution identity for handler work and disposal.
 
 Sources: `src/Schemata.Transport.Grpc/StreamService.cs`,
 `src/Schemata.Transport.Grpc/StreamRegistration.cs`,

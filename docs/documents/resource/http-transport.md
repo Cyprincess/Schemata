@@ -9,7 +9,7 @@ The HTTP transport exposes resources as REST endpoints through MVC controllers s
 | `Schemata.Resource.Http`  | `Features/SchemataHttpResourceFeature.cs`, `Extensions/SchemataResourceBuilderExtensions.cs`                         |
 | `Schemata.Resource.Http`  | `ResourceController.cs`, `ResourceControllerConvention.cs`, `ResourceControllerFeatureProvider.cs`                   |
 | `Schemata.Resource.Http`  | `ResourceMethodController.cs`, `ResourceMethodControllerConvention.cs`, `ResourceMethodControllerFeatureProvider.cs` |
-| `Schemata.Resource.Http`  | `Internal/ResourceHttpConventionHelper.cs`                                                                           |
+| `Schemata.Resource.Http`  | `Runtime/ResourceHttpConventionHelper.cs`                                                                            |
 | `Schemata.Transport.Http` | `Features/SchemataTransportHttpFeature.cs`, `SchemataJsonTraits.cs`                                                  |
 
 ## Activation
@@ -113,6 +113,35 @@ skips synthesizing the generated one.
   as a normal MVC controller.
 - Add an `IControllerModelConvention` to `MvcOptions.Conventions` to customize templates or filters.
 - `[RateLimitPolicy("my-policy")]` on the entity adds `EnableRateLimitingAttribute` to every endpoint.
+
+## Semantic links
+
+`Schemata.Core/Linking/ResourceLinkSemantics.cs` owns standard self, canonical, parent, child,
+and paging relations. Domain contributors supply domain associations through Core `ILinkContributor`.
+`AddSchemataLinkContributor<T>()` registers a domain contributor once in each keyed transport slot;
+the Resource HTTP adapter registers only in `LinkTransports.Http`.
+
+`Schemata.Transport.Http/Linking/HttpLinkProjector.cs` projects registered resource targets and
+domain operations supplied by `ILinkRouteProvider`. Disabled transports, excluded operations,
+unregistered custom methods, and unresolved domain operations produce no link.
+The filter supplies query inputs through `ILinkRequest`; body-bound actions can carry an explicit
+input adapter on their result. Links supplement canonical `name` and body `next_page_token`.
+
+Paging reads the non-generic `IEntitiesResult` contract. The Foundation `IResourceLinkPolicy`
+adapter reopens the protected continuation and changes its offset, preserving page size, caller,
+parent, filter, language, ordering, and deleted-row scope. The `first` relation uses an offset-zero
+continuation. Estimated totals omit `last`.
+The Resource adapter resolves standard semantics from the current `HttpContext.RequestServices`
+at contribution time. `AddResourceExecution` registers its scoped policy and semantics alongside
+resource execution, so a replaced invocation provider supplies the same protection boundary used
+to issue continuations. An adapter invoked without an active HTTP request emits no links.
+
+HTTP uses [RFC 8288](https://www.rfc-editor.org/rfc/rfc8288#section-3) serialization.
+`LinkValue` emits ordinary `title` as a quoted string and `title*` as an unquoted UTF-8
+[RFC 8187 ext-value](https://www.rfc-editor.org/rfc/rfc8187#section-3.2.1).
+The parser rejects quoted ext-values. Invalid charset, language syntax, escapes, UTF-8 bytes,
+raw non-ASCII value characters, and controls are rejected. `rev` is reserved and cannot be
+supplied through extension parameters.
 
 ## Caveats
 

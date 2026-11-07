@@ -4,6 +4,10 @@ Expose the `Student` resource over gRPC alongside its HTTP endpoints, using code
 This is a transport branch: it follows [Authorization](authorization.md) in the full sequence, but it
 only requires the HTTP Student resource from [Getting Started](getting-started.md).
 
+Examples are source-traced fragments, not an executed client/server sample. Retain the prerequisite
+web project's implicit `System`, ASP.NET Core, and DI imports. The client requires the shared DTO
+types and their namespaces from the Object Mapping guide.
+
 ## Add the package
 
 `Schemata.Application.Complex.Targets` already includes `Schemata.Resource.Grpc`. Composing packages by hand:
@@ -11,6 +15,8 @@ only requires the HTTP Student resource from [Getting Started](getting-started.m
 ```shell
 dotnet add package --prerelease Schemata.Resource.Grpc
 ```
+
+Add `Schemata.Security.Grpc` when signing or verifying gRPC calls with the shared HTTP message signature runtime. Its `Schemata.Security.Grpc.Extensions` namespace adapts `Metadata` and `ServerCallContext` to `SignatureMessage` and applies signature output to metadata.
 
 ## Enable gRPC transport
 

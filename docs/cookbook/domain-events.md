@@ -14,6 +14,10 @@ Production code rarely writes this advisor by hand: the `Schemata.Entity.Event` 
 `UseEvent()` on the repository builder (Step 3). This recipe still walks the hand-rolled advisor so
 the mechanism underneath is visible.
 
+The snippets are source-traced alternatives, not a compiled or executed recipe. Step 3 replaces
+the earlier `StudentCreated` declaration and sketches an aggregate rather than replacing the
+prerequisite resource model verbatim. Expected assertions below are reader checks, not test results.
+
 ## Prerequisites
 
 - The `Student` entity and CRUD setup from [guides/getting-started.md](../guides/getting-started.md).
@@ -36,7 +40,7 @@ public sealed class StudentCreated : IEvent
 Every type published over the bus implements `IEvent`. The wire name is assigned in Step 2; the CLR
 type name is never used as a routing key.
 
-**Assertion:** `StudentCreated` compiles and implements `IEvent`.
+**Expected contract (unexecuted):** `StudentCreated` implements `IEvent`.
 
 ## Step 2: Register the event wire name
 
@@ -56,7 +60,7 @@ builder.UseSchemata(schema => {
 via `RequireName(type)` before dispatch or broker publication; an unregistered type throws
 `InvalidOperationException` at the call.
 
-**Assertion:** the application starts without throwing on `IEventTypeRegistry.RequireName`.
+**Reader check (unexecuted):** resolve the registered name through `IEventTypeRegistry.RequireName`.
 
 ## Step 3: Prefer the built-in `UseEvent()` bridge
 
@@ -161,7 +165,7 @@ returned callback at the resource commit segment, so the publish runs after the 
 commits. `Prepare` itself is side-effect free: capture values, return the callback, or return
 `null` when the operation needs no post-commit work.
 
-**Assertion:** the advisor compiles and `Order` is accessible.
+**Expected contract (unexecuted):** the advisor exposes `Prepare` and `Order`.
 
 ## Step 5: Register the advisor
 
@@ -181,8 +185,8 @@ builder.UseSchemata(schema => {
 });
 ```
 
-Use `TryAddEnumerable` so the advisor is appended to the existing committed-advisor set; a plain
-`AddScoped` for the same interface replaces any previously registered advisor.
+`TryAddEnumerable` appends the service/implementation pair once. `AddScoped` also appends to
+enumerable resolution, but repeated calls can register the same advisor more than once.
 
 Register the advisor as scoped because `IEventBus` is scoped. A singleton advisor would capture a
 scoped bus as a captive dependency.
@@ -231,6 +235,7 @@ chain. The feature's audit observer constructs `EventType`; the application's ad
 `Name`; the repository pipeline resolves `CanonicalName`.
 
 ```csharp
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -248,9 +253,10 @@ public sealed class EventAuditNameAdvisor : IRepositoryAddAdvisor<SchemataEvent>
         AdviceContext              context,
         IRepository<SchemataEvent> repository,
         SchemataEvent              entity,
+        MutationOptions            options,
         CancellationToken          ct)
     {
-        entity.Name = entity.EventType;
+        if (string.IsNullOrWhiteSpace(entity.Name)) entity.Name = Guid.NewGuid().ToString("N");
         return Task.FromResult(AdviseResult.Continue);
     }
 }
@@ -266,15 +272,14 @@ Trace, line by line:
 - `Order => 50_000_000` runs before `AdviceAddIdentifier` at `90_000_000`,
   `AdviceAddTimestamp` at `100_000_000`, `AdviceAddConcurrency` at `110_000_000`, and
   `AdviceAddCanonicalName` at `120_000_000`.
-- `entity.EventType` holds the wire name the audit observer set when constructing the record.
-  The wire name (e.g. `students/student-created`) copies into `entity.Name`, providing the value
-  for the `events/{event}` placeholder.
+- This consumer-owned advisor assigns a unique leaf name independently of the event wire name.
+  Explicit resource names remain unchanged. Event type remains a separate routing/audit value.
 - The advisor returns `AdviseResult.Continue` so the chain proceeds. `AdviceAddCanonicalName`
-  then resolves `CanonicalName` to `events/{wireName}`.
+  then resolves `CanonicalName` to `events/{generated-name}`.
 
 
-**Assertion:** publishing `StudentCreated` after `EventAuditNameAdvisor` is registered writes a
-`SchemataEvent` row with `CanonicalName = "events/students/student-created"`.
+**Expected result (unexecuted):** publishing `StudentCreated` with this naming advisor writes
+a `SchemataEvent` whose canonical name is `events/{generated-name}` and whose `EventType` retains the wire name.
 
 ## Common pitfalls
 

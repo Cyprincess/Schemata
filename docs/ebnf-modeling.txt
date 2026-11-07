@@ -56,10 +56,9 @@ field = type specifier, identifier,
 
 type specifier = qualified name, [ "?" ] ;
 
-(* Builtin type names: String, Text, Integer, Int, Int32, Int4,
-   Long, Int64, Int8, BigInteger, BigInt, Float, Double, Decimal,
-   Boolean, DateTime, Timestamp, Guid. Any other qualified name
-   resolves via scoped types and the current namespace. *)
+(* Built-in type lookup is case-insensitive; custom qualified names
+   retain their spelling in emitted C# and use C# name resolution.
+   The mapping is in generators/Schemata.Modeling.Generator/Utilities.cs. *)
 
 (* ── 4  View ──────────────────────────────────────────────────── *)
 
@@ -77,14 +76,9 @@ view field = qualified name, [ "?" ],
    is the field name. Otherwise the qualified name is the field
    name with no explicit type.
 
-   Type inference for view fields (in priority order):
-     1. Explicit type  — type specifier is present.
-     2. Expression type — "= expression" return type overrides.
-     3. Inherited type  — inferred from the same-named field
-                          in the parent entity.
-   If both (1) and (2) are present and their types conflict,
-   the compiler reports an error. If none can be resolved,
-   the compiler reports an error. *)
+   Views are parsed into the AST only. The generator emits no
+   projection classes, type inference, expression evaluation,
+   or view-specific type diagnostics. *)
 
 (* ── 5  Pointer ───────────────────────────────────────────────── *)
 
@@ -92,8 +86,8 @@ pointer = "Index", identifier, { identifier },
           [ pointer options ],
           [ "{", { note }, "}" ] ;
 
-(* Identifiers after "Index" name the indexed columns.
-   The pointer name is derived: IX_{Entity}_{Col1}_{Col2}_... *)
+(* Identifiers after "Index" name the intended indexed columns.
+   Pointers are parsed only; no index name or database index is emitted. *)
 
 (* ── 6  Annotations ───────────────────────────────────────────── *)
 

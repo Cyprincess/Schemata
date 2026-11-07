@@ -12,8 +12,11 @@ Runtime packages follow the Skeleton / Foundation / Provider convention:
 
 This split keeps optional runtimes direct-referenceable. A provider implements the skeleton contract it adapts and references its Foundation when registering through the Foundation builder, as `Schemata.Push.WebPush` registers transports through `SchemataPushBuilder`; a foundation depends on its own skeleton and owns the default feature. Bridge packages join two foundations through a sub-builder, as `Schemata.Push.Scheduling` does for scheduled sends and `Schemata.Flow.Scheduling` does for timer catches.
 
-The current `src/` tree contains 88 source package projects. Generators under `generators/` and the
-10 meta-package projects under `targets/` are separate from that count.
+The tracked inventory contains 90 source package projects under `src/`, 10 meta-package projects
+under `targets/`, two source generator projects under `generators/`, and 68 test projects under `tests/`.
+The [package-layer inventory](../index.md#package-layers) lists the current families. Inventory inputs
+are `git ls-files 'src/*/*.csproj'`, `git ls-files 'targets/*/*.csproj'`,
+`git ls-files 'generators/*/*.csproj'`, and `git ls-files 'tests/*/*.csproj'`.
 
 ## Where the code lives
 
@@ -224,6 +227,10 @@ Reference these packages directly from the host when their runtime is needed:
 - `Schemata.Insight.Http` — combine with `Schemata.Insight.Foundation` and Resource HTTP to expose insight endpoints; see the [Insight overview](insight/overview.md).
 - `Schemata.Insight.Grpc` — combine with `Schemata.Insight.Foundation` and Resource gRPC to expose insight endpoints; see the [Insight overview](insight/overview.md).
 - `Schemata.Expressions.Order` — combine with Resource or repository code that accepts AIP order-by expressions.
+- `Schemata.Security.Grpc` — reference with `Schemata.Security.Foundation` to adapt gRPC metadata and server call contexts for HTTP message signatures.
+- `Schemata.Quota.Foundation` — activate with `UseQuotaAccounting()` for durable weighted accounts and reservations. It uses an optionally registered `IScheduler` at reserve time and has no Scheduling bridge package; see the [Quota overview](quota/overview.md).
+- `Schemata.Quota.Http` — add `.MapHttp()` for authenticated reserve, commit, release, and ledger routes; see [Quota transports](quota/transports.md).
+- `Schemata.Quota.Grpc` — add `.MapGrpc()` for the equivalent code-first gRPC service; see [Quota transports](quota/transports.md).
 
 ## See also
 

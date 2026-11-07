@@ -2,6 +2,9 @@
 
 This cookbook is for an application developer adding the `publish` transition to an existing public `Course` resource. It uses one instance-scoped custom method, one handler as the business owner, and the resource pipeline for authorization, request replay, and freshness checks.
 
+These integration snippets were traced against source but were not compiled or executed as a
+sample application. Wire payloads illustrate the contract rather than captured command output.
+
 ## What you'll build
 
 `publish` moves one course from `draft` to `published`. It is not an ordinary Update: the request has one business meaning, permits one transition, and must fail when the course is already published. The public action is a custom method under [AIP-136](https://google.aip.dev/136), which requires a mutating action to use `POST` and a colon-delimited verb in its HTTP path.
@@ -12,7 +15,7 @@ The transition is synchronous and single-step, so the custom-method handler owns
 | --- | --- | --- |
 | `draft` to `published` precondition and persistence | `PublishCourseHandler` | Application responsibility |
 | Route target, authorization, request replay, and freshness gate | Resource operation and its advisors | Supported by extension point |
-| Timestamp rotation for this resource's ETag | `CourseConcurrencyAdvisor` | Application responsibility |
+| Timestamp rotation for this resource's ETag | Repository provider write boundary | Provider-owned |
 | HTTP JSON and gRPC protobuf projection | Registered resource transports | Enforced |
 
 ## Prerequisites
@@ -179,41 +182,26 @@ public sealed class PublishCourseHandler(IRepository<Course> courses, IResourceM
 
 `IResourceMutation<Course>.UpdateAsync` stages the update on the repository, runs the domain mutation pipeline, and commits the write; the handler never calls `CommitAsync` itself. `SchemataResourceErrors.PreconditionFailed<Course>` creates a `FAILED_PRECONDITION` exception with resource and precondition details. The handler is the only code that decides whether `publish` is a legal state transition.
 
-## Step 3: Rotate the concurrency token on every Course update
+## Step 3: Keep concurrency at the provider boundary
 
-`AdviceMethodFreshness` compares a supplied `EntityTag` with the target entity's `IConcurrency.Timestamp`. The framework creates a timestamp during an add, but its built-in update advisor updates `ITimestamp.UpdateTime`, not `IConcurrency.Timestamp`. Add a repository update advisor so a successful `Course` write changes the weak ETag value used by the next action.
+`AdviceMethodFreshness` compares the supplied `EntityTag` with the entity loaded before handler
+dispatch. EF Core uses the caller's `Timestamp` as the original concurrency value and rotates
+configured GUID concurrency tokens immediately before saving modified entries. LinqToDB predicates
+its update on the original stamp and rotates the stored value on a successful write.
 
-```csharp
-using System.Threading;
-using System.Threading.Tasks;
-using Schemata.Abstractions.Advisors;
-using Schemata.Common;
-using Schemata.Entity.Repository;
-using Schemata.Entity.Repository.Advisors;
+Preserve the caller's stamp on `Course`; a repository update advisor that generates a replacement
+would overwrite the version the provider must compare. The provider rejects stale writes with
+`ABORTED`. The custom-method freshness read and the handler's second read are separate operations;
+an ETag checked by the first read is not atomically bound to the later state transition. Applications
+requiring that stronger invariant must carry the expected version to their conditional write.
 
-public sealed class CourseConcurrencyAdvisor : IRepositoryUpdateAdvisor<Course>
-{
-    public int Order => global::Schemata.Abstractions.SchemataConstants.Orders.Max + 10_000_000;
-
-    public Task<AdviseResult> AdviseAsync(
-        AdviceContext       ctx,
-        IRepository<Course> repository,
-        Course              course,
-        CancellationToken   ct = default)
-    {
-        course.Timestamp = Identifiers.NewUid();
-        return Task.FromResult(AdviseResult.Continue);
-    }
-}
-```
-
-This advisor establishes the resource's persistence rule for all `Course` updates, including writes that do not arrive through `:publish`. It runs after the reserved built-in advisor range and contains no publication decision.
-
-The freshness comparison is a resource-advisor check before dispatch, rather than an atomic provider-level compare-and-swap. A service requiring an atomic state-and-version write must implement that provider-specific invariant at its repository boundary.
+Sources: `src/Schemata.Entity.EntityFrameworkCore/EfCoreRepository.cs`,
+`src/Schemata.Entity.EntityFrameworkCore/EfCoreUnitOfWork.cs`, and
+`src/Schemata.Entity.LinqToDB/LinqToDbRepository.cs`.
 
 ## Step 4: Register persistence, mapping, policy lanes, and transports
 
-Configure the repository, concurrency advisor, cache provider for request replay, Mapster mappings for CRUD, the closed publish access policy, and both transports before registering `Course`.
+Configure the repository, cache provider for request replay, Mapster mappings for CRUD, the closed publish access policy, and both transports before registering `Course`. Retain the consumer-owned Course name advisor from [Adding a Resource](adding-a-resource.md).
 ```csharp
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
@@ -242,8 +230,6 @@ builder.UseSchemata(schema => {
                 .UseEntityFrameworkCore<AppDbContext>(
                     (_, options) => options.UseSqlite("Data Source=courses.db"));
 
-        services.TryAddEnumerable(
-            ServiceDescriptor.Scoped<IRepositoryUpdateAdvisor<Course>, CourseConcurrencyAdvisor>());
         services.AddScoped<IAccessProvider<Course, PublishCourseRequest>, CoursePublishAccessProvider>();
     });
 

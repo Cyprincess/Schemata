@@ -33,8 +33,8 @@ public interface IActor
 public interface IActorRef
 {
     ActorId Id { get; }
-    ValueTask TellAsync<T>(T message, MessageContext? context = null, CancellationToken ct = default) where T : IMessage;
-    ValueTask<TResponse> AskAsync<TRequest, TResponse>(TRequest request, MessageContext? context = null, TimeSpan? timeout = null, CancellationToken ct = default)
+    ValueTask TellAsync<T>(IServiceProvider services, T message, MessageContext? context = null, CancellationToken ct = default) where T : IMessage;
+    ValueTask<TResponse> AskAsync<TRequest, TResponse>(IServiceProvider services, TRequest request, MessageContext? context = null, TimeSpan? timeout = null, CancellationToken ct = default)
         where TRequest : IRequest<TResponse>;
 }
 
@@ -53,9 +53,13 @@ turn's own scope provider — never a long-lived one — and `IMessage`/`IReques
 straight from `Schemata.Messaging.Skeleton`: there is no actor-only message marker, so any existing
 command or query is already a valid actor payload.
 
-Actor callbacks carry runtime-owned turn identity. An Ask to the same tenant/type/key fails before
-mailbox admission; cross-actor requests remain allowed. Callback completion invalidates captured turn
-identity. Ordinary message scopes never install it; multi-actor cycle detection is outside this contract.
+Actor start, receive, and stop callbacks bind one `ActorTurnIdentity` in their own DI scope. Every
+`AskAsync` and `TellAsync` call supplies the caller's current `IServiceProvider`; an Ask whose
+provider contains the same tenant/type/key turn identity fails before mailbox admission or remote
+send. Cross-actor requests remain asynchronous. Failure and cancellation dispose the callback scope,
+so the next turn binds a fresh identity. Ordinary message runners leave their scoped identity
+unbound, and a retained reference's old `MessageContext` does not participate in admission.
+Multi-actor cycle detection is outside this contract.
 
 `Schemata.Actor.Skeleton` is contracts only; `Schemata.Actor.Foundation` supplies the one runtime
 implementation, `InProcessActorSystem`.
@@ -106,6 +110,13 @@ with an "actor did not reply" exception, so a caller can never hang forever on a
 its own — implements this shape directly: resolve the turn's scope, construct the turn's `AdviceContext`,
 resolve the keyed default handler, call it with that context, reply with the result or fault with the exception.
 
+Response inference caches finite metadata by request `Type`: the inferred response `Type` and its closed
+dispatch `MethodInfo`. A declared response reuses that entry only when its response type matches. Other
+declared pairs close their own method without replacing the inferred entry, preserving multiple response
+contracts and derived-payload routing. Cache entries contain only response and method metadata; every turn
+still resolves its keyed handler from `ctx.Services` and constructs its `AdviceContext` from that provider.
+Implementation: `src/Schemata.Actor.Foundation/Runtime/RequestDispatchingActor.cs`.
+
 **Supervision** is driven by `OnFailedAsync(ctx, ex)`'s return value once a turn throws uncaught:
 
 | Returns | Effect |
@@ -137,6 +148,8 @@ An already-retiring self-Tell is rejected instead of waiting for its own callbac
 The hosted service waits using the host-supplied cancellation budget, including `HostOptions.ShutdownTimeout`. When that budget expires, outstanding Ask completions fault and each activation receives an asynchronous cancellation request. The host wait reports cancellation; it does not terminate arbitrary managed callbacks. Running turns, cancellation callbacks and lifecycle cleanup keep their identity slot until they actually finish. Construction already in progress is also retained and receives the current shutdown disposition when it finishes.
 
 Cancellation callback failures are observed before terminal notification, without skipping `OnStoppedAsync` or disposal. A single lifecycle failure retains its exception type; independent failures are aggregated. A later shutdown wait can observe retirement that completed after an earlier budget expired.
+
+Normal actor disposal restores the activation context in a fresh turn scope before disposing the actor. If the root provider's scope factory is already disposed, the activation disposes its owned actor directly, async-first, exactly once. Actor cleanup failures remain observable on this path.
 
 Sources: `Runtime/ActorHostedService.cs`, `Runtime/InProcessActorSystem.cs`, `Runtime/ActorInstance.cs` and `Runtime/MailboxItem.cs` in `src/Schemata.Actor.Foundation/`.
 
@@ -214,7 +227,7 @@ internal sealed class ActorSerializingHandler<TRequest, TResult>(IActorSystem ac
     public async Task<TResult> HandleAsync(TRequest request, AdviceContext context, CancellationToken ct = default) {
         var message = MessageContexts.Capture(caller);
         var actor   = await actors.GetAsync(new ActorId("flow", request.ProcessCanonicalName));
-        return await actor.AskAsync<TRequest, TResult>(request, message, ct: ct);
+        return await actor.AskAsync<TRequest, TResult>(caller, request, message, ct: ct);
     }
 }
 ```
@@ -286,7 +299,7 @@ internal sealed class ActorSerializingHandler<TRequest, TResult>(IActorSystem ac
     public async Task<TResult> HandleAsync(TRequest request, AdviceContext context, CancellationToken ct = default) {
         var message = MessageContexts.Capture(caller);
         var actor   = await actors.GetAsync(new ActorId("push", request.SubscriptionKey));
-        return await actor.AskAsync<TRequest, TResult>(request, message, ct: ct);
+        return await actor.AskAsync<TRequest, TResult>(caller, request, message, ct: ct);
     }
 }
 ```
@@ -341,7 +354,6 @@ var context = MessageContexts.Capture(callerProvider);   // sender side, synchro
 ```csharp
 // Actor.Foundation's turn dispatcher (default MessageExecutionScopeFactory or a tenancy override):
 var scope = await turnScopeFactory.CreateAsync(envelope.Context, ct);
-using var identity = scope.Enter();
 await using (scope) {
     await scope.RestoreAsync(envelope.Context, ct);
     // Resolve and invoke the handler through scope.Services here.
@@ -349,16 +361,19 @@ await using (scope) {
 ```
 
 `IMessageExecutionScopeFactory.CreateAsync` returns a `MessageExecutionScope` that owns the turn's
-DI scope and exposes its `Services`. The caller enters the returned synchronous lease after
-awaiting creation, then runs registered propagators through `RestoreAsync`. Actor activation,
-timer and stop turns use the activation's captured generic `MessageContext`.
+DI scope and exposes its `Services`. Actor callbacks call `RestoreAsync` before resolving handlers,
+then dispose that scope. The final provider supplies the scoped `TenantIdentity` throughout work
+and disposal. Actor activation, timer and stop turns use the activation's captured generic
+`MessageContext`; this direct callback policy is distinct from the standard
+`IMessageExecutionScopeRunner` used for sends and stops.
 
-`Schemata.Tenancy.Actor.TenantActorSystem` selects an independent `InProcessActorSystem` for each
-bound tenant. Enable it with `UseActor` on the tenancy builder; this also enables the
-`Schemata.Tenancy.Messaging` propagator and execution-scope factory. Actor references capture context
-and reject use under another tenant. `ActorId` contains only `Type` and `Key`.
-`ActorHostedService` uses `IActorSystemLifetime` for idle collection and shutdown on both the
-ordinary runtime and the tenant decorator. Both expose asynchronous disposal. Persisted actor
+`Schemata.Tenancy.Actor.TenantActorSystem` owns independent `InProcessActorSystem` runtimes, while
+scoped `ScopedTenantActorSystem` facades supply the explicit identity for Spawn/Get/Stop. Enable
+them with `UseActor` on the tenancy builder; this also enables the `Schemata.Tenancy.Messaging`
+propagator and execution-scope factory. Retained actor references validate an explicit
+`MessageContext` against their bound identity before dispatch. `ActorId` contains only `Type` and
+`Key`. `ActorHostedService` consumes `IActorSystemLifetime` for idle collection and shutdown on both
+the ordinary runtime and the tenant owner. Both expose asynchronous disposal. Persisted actor
 state needs a subtype implementing `ITenant`: `UseActor<TTenant, TActor>()` and
 `UseActorPersistence<TTenant, TActor>()` close the bridge on it, and the tenant's explicit
 `UseRepositories(...)` registration supplies `IRepository<TActor>` and `IResourceMutation<TActor>`.

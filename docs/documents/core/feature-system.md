@@ -13,6 +13,7 @@ deterministic ASP.NET Core pipeline regardless of call order.
 | `Schemata.Core`         | `Features/DependsOnAttribute.cs`, `Features/DependsOnAttribute\`1.cs`, `Features/InformationAttribute.cs` |
 | `Schemata.Core`         | `SchemataBuilder.cs`, `Configurators.cs`, `Extensions/SchemataOptionsExtensions.cs`                       |
 | `Schemata.Abstractions` | `IFeature.cs`, `SchemataConstants.cs` (`Orders`)                                                          |
+| `Schemata.Common`       | `AppDomainTypeCache.cs`                                                                                   |
 
 ## ISimpleFeature and FeatureBase
 
@@ -184,6 +185,20 @@ Key dependency chains across built-in and extension features:
 | `SchemataTransportHttpFeature` | `SchemataControllersFeature`, `SchemataJsonSerializerFeature`, `SchemataDeveloperExceptionPageFeature` |
 | `SchemataTransportGrpcFeature` | `SchemataRoutingFeature`                                                                               |
 
+### Metadata publication
+
+`AppDomainTypeCache` backs string feature-dependency lookup and other reflection consumers. One lock
+serializes assembly indexing, cache publication, and `GetAllTypes()` snapshot acquisition. An assembly
+is marked indexed only after its assembly-name and exported-type entries have been published.
+`GetAllTypes()` materializes its result inside the same lock, so a concurrent reader receives every
+entry published by completed indexing operations.
+
+An indexing failure removes the assembly's indexed marker and rethrows the original exception. A later
+cache access retries indexing. `GetProperties()` and `GetFields()` use ordinal member names and order
+reflection results from derived to base declarations with deterministic tie-breaking. `TryAdd` retains
+the first member, so a `new` member on a derived type wins over a same-named base member. Concurrent
+callers retain the cached dictionary identity.
+
 ## SchemataOptions
 
 `SchemataOptions` is a `string`-keyed `object` bag plus an `ILoggerFactory`, registered as a
@@ -211,8 +226,8 @@ this: `Order` is `Orders.Max` (900M, services register last, after every store i
 ## Caveats
 
 - `AddFeature` deduplicates by `RuntimeTypeHandle`. `SchemataSessionFeature<MyStore>` and
-  `SchemataSessionFeature<OtherStore>` are distinct features; both register — and two session
-  features conflict at pipeline build, since the state branch point accepts one Session wiring.
+  `SchemataSessionFeature<OtherStore>` are distinct features; both register. Applications keep one
+  session feature because Tenancy accepts one Session branch when it decorates registered state features.
 - `SchemataControllersFeature` removes every `Schemata.*` `AssemblyPart` from MVC's
   `ApplicationPartManager`. Expose a controller from a `Schemata.*` assembly by registering a
   `SchemataExtensionPart<T>` for it.

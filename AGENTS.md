@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Schemata is a modular .NET application framework for building extensible business applications with AIP-aligned resource primitives and documented compliance gaps. It ships as 88 `Schemata.*` NuGet packages built from `src/`, targeting `net8.0;net10.0` (source generators target `netstandard2.0`). Consumers bootstrap with `WebApplicationBuilder.UseSchemata(...)`; capabilities compose through a three-phase feature lifecycle. The public API is extension methods in the `Microsoft.AspNetCore.Builder` / `Microsoft.Extensions.DependencyInjection` namespaces; there is no `Program.cs` in this repo.
+Schemata is a modular .NET application framework for building extensible business applications with AIP-aligned resource primitives and documented compliance gaps. The tracked inventory contains 90 source package projects targeting `net8.0;net10.0`, 10 target projects, two generator projects targeting `netstandard2.0`, and 68 test projects. Consumers bootstrap with `WebApplicationBuilder.UseSchemata(...)`. Published documentation and agent-facing operational guidance use English. Integration test projects own their `Program.cs` hosts; production packages expose builder and DI extensions.
 
 ## Architecture & Data Flow
 
@@ -19,7 +19,7 @@ Schemata is a modular .NET application framework for building extensible busines
 
 **Security boundary:** `SecurityOrders` fixes dispatcher-wrap order: Authentication, Authorization, Sanitize, Validation, Idempotency, ResponseFamily. `WithAuthentication<TBuilder>(string?)` and `WithAuthorization<TBuilder>()` are the two shared `IResourceBuilder` extensions in Security.Foundation. Each domain supplies a `ResourceSecurityRegistration`; registration determines whether that domain's closed advisor types run. Authentication and coarse permission matching run in wraps; instance access and entitlement filtering stay in domain handler stages. `IAccessProvider` customizes instance policy, while `IPermissionResolver` and `IPermissionMatcher` customize coarse policy.
 
-**Advisor pipeline (handler stages):** `Advisor.For<TAdvisor>()` (`src/Schemata.Advice/Advisor.cs`) returns a token; source-generated `RunAsync` extensions (`generators/Schemata.Advice.Generator/`) dispatch to `AdviceRunner<...>`, which resolves `IAdvisor<...>` from the passed `AdviceContext`, sorts by `Order`, and short-circuits on the first non-`Continue`. `AdviceContext` (`src/Schemata.Abstractions/Advisors/AdviceContext.cs`) carries the scoped service provider for the advisor pipeline. Business payloads remain in request/response envelopes or local variables.
+**Advisor pipeline (handler stages):** `Advisor.For<TAdvisor>()` (`src/Schemata.Advice/Advisor.cs`) returns a token. `generators/Schemata.Advice.Generator/AdvicePipelineGenerator.cs` emits `RunAsync` extensions and the `AdviceRunner` arity family into the `Schemata.Advice` assembly. Runners resolve the registered advisor collection through `AdviceContext.ServiceProvider`, order it by `Order`, and stop at the first non-`Continue` result.
 
 **Package taxonomy:** `Schemata.<Domain>.<Layer>` — `Skeleton` (contracts), `Foundation` (implementation + `Use{Domain}` registration), `Http`/`Grpc` (transport), bridges (`Event`/`Actor`/`Scheduling`), and provider adapters (`Entity.EntityFrameworkCore`, `Entity.LinqToDB`, `Caching.Redis`, `Mapping.AutoMapper`, `Mapping.Mapster`, `Validation.FluentValidation`, `Messaging.RabbitMq`, `Expressions.Cel`, `Expressions.Aip`). Kernel packages (`Core`, `Common`, `Abstractions`, `Advice`, `Modular`) and `Resource.*`/`Entity.*`/`Transport.*` carry no `Skeleton`.
 
@@ -27,17 +27,17 @@ Schemata is a modular .NET application framework for building extensible busines
 
 | Path | Purpose |
 |---|---|
-| `src/` | 88 packages, `<Domain>.<Layer>` naming |
+| `src/` | 90 source package projects, `<Domain>.<Layer>` naming |
 | `src/Schemata.Core/` | Bootstrap, feature engine, `SchemataBuilder`, startup filter, built-in features, resource building kernel (`Building/`: `SchemataResourceBuilder`, `ResourceRegistry`, wiring) |
 | `src/Schemata.Abstractions/` | Contracts: `IAdvisor`, `AdviceContext`, `SchemataConstants`, exceptions, entity traits |
-| `src/Schemata.Advice/` | `Advisor.For`, `AdvicePipeline<T>` (generated `AdviceRunner` dispatchers) |
+| `src/Schemata.Advice/` | `Advisor.For`, `AdvicePipeline<T>`; generated `AdviceRunner` types belong to this assembly |
 | `src/Schemata.Messaging.Skeleton/` | `IRequest`/`ICommand`/`IQuery`, `IRequestHandler`, `IRequestPipelineAdvisor`, dispatcher |
 | `src/Schemata.Common/` | `ResourceNameDescriptor`, wire-name rules, error factories |
 | `src/Schemata.Resource.Foundation/` | AIP CRUD pipeline: handlers, advisors, default handlers, pipeline wiring |
 | `src/Schemata.Entity.Repository/` | Repository base + persistence advisors (soft-delete, canonical name, timestamps) |
 | `generators/` | `Schemata.Advice.Generator` (advisor `RunAsync` codegen), `Schemata.Modeling.Generator` (`.skm` DSL) |
-| `targets/` | MSBuild meta-packages (`Application`/`Business`/`Module` families) selecting features via `Use*` flags |
-| `tests/` | 63 xUnit projects (`*.Tests`, `*.Integration.Tests`, `*.Conformance.Tests`) |
+| `targets/` | 10 MSBuild meta-package projects in Application/Business/Module families |
+| `tests/` | 68 xUnit projects (`*.Tests`, `*.Integration.Tests`, `*.Conformance.Tests`) |
 | `docs/` | DocFX site: `guides/`, `cookbook/`, `documents/`, `modeling/` |
 | `eng/` | Arcade build scripts and signing assets (`eng/common/` is upstream-generated) |
 | `specs/` | Git submodules: `specs/cel`, `specs/bpmn` (required by tests) |
@@ -91,7 +91,7 @@ Deviations from stock .NET (from `Directory.Build.props`):
 - Every `src/*` project auto-references the `Schemata.Advice.Generator` analyzer unless `SchemataSkipGenerators=true`.
 
 Patterns to follow:
-- **Advisor registration uses `TryAddEnumerable`, never plain `AddScoped`** — the pipeline resolves a collection, and enumerable registration preserves the chain while preventing duplicate descriptors. Applies to open-generic advisors too.
+- **Advisor registration uses enumerable DI.** `AddScoped` appends a descriptor; `TryAddEnumerable(ServiceDescriptor.Scoped(...))` appends only when that service/implementation pair is absent. Prefer the latter for repeatable feature registration so duplicate setup does not execute an advisor twice.
 - `Order` sequences `ConfigureServices`; `Priority` sequences the middleware/endpoint pipeline.
 - Dispatch is registered with `TryAddScoped<InProcessRequestDispatcher>` plus forwarded interface slots per domain capability.
 - Handlers register behind `IRequestHandler<,>` (often keyed) so a wrapper can override without replacing the built-in (`AddHandler` in `src/Schemata.Resource.Foundation/Extensions/ServiceCollectionExtensions.cs`).
@@ -133,7 +133,7 @@ Avoid these AIP errors:
 - **Framework:** xUnit v2 + Moq; assertions are plain `Xunit.Assert` (no FluentAssertions/Shouldly).
 - **Naming:** classes `<Subject>Should` (e.g. `PredicateShould`, `RequestDispatcherShould`); methods `Pascal_Snake_Case` (e.g. `Dispatch_ForACommand_RunsThePipelineChainAroundTheHandler`).
 - **Layers:** `tests/Schemata.*.Tests` (unit/component) and `tests/Schemata.*.Integration.Tests` (integration; `GenerateProgramFile=false`, own `Program`/`WebApplicationFactory`). Integration tests use **local SQLite only** — no Docker, Testcontainers, or live broker. Coverage runs via coverlet (`Coverage=true` for `tests/*`).
-- **Fixtures:** static `*TestHost` helpers for DI setup (`tests/Schemata.Report.Tests/ReportTestHost.cs`); `IAsyncLifetime` fixtures for SQLite integration; `WebApplicationFactory<Program>` via `IClassFixture` for HTTP/gRPC.
+- **Fixtures:** static `*TestHost` helpers for DI setup (`tests/Schemata.Report.Tests/Fixtures/ReportTestHost.cs`); `IAsyncLifetime` fixtures for SQLite integration; integration projects own `Program.cs` and `WebApplicationFactory<Program>` HTTP/gRPC hosts.
 - **Conformance suites** read from `specs/` submodules and are gated:
   - BPMN MIWG (`tests/Schemata.Flow.Bpmn.Conformance.Tests`) runs Windows-only in CI: `dotnet test ... --filter "Speed!=Fast"`; exclusions live in `PendingCatalog.cs`, a guard theory re-runs catalogued vectors to catch stale entries, and `Speed=Fast` picks one vector per MIWG case id for local loops.
   - CEL spec (`tests/Schemata.Expressions.Cel.Tests/Conformance/`) skips cases listed in `cel-spec-skips.txt`.

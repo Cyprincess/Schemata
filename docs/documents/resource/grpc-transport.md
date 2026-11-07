@@ -2,14 +2,16 @@
 
 The gRPC transport exposes resources as code-first gRPC services using protobuf-net. `MapGrpc()` is the concrete Resource extension that activates `SchemataGrpcResourceFeature`; its dependencies provide the shared gRPC runtime and map each registered `ResourceService<TEntity,TRequest,TDetail,TSummary>`.
 
+Code blocks are source-traced registration/signature excerpts, not standalone executed programs.
+
 ## Where the code lives
 
 | Package                   | Key files                                                                                                                                                      |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Schemata.Resource.Grpc`  | `Features/SchemataGrpcResourceFeature.cs`, `Extensions/SchemataResourceBuilderExtensions.cs`                                                                   |
 | `Schemata.Resource.Grpc`  | `IResourceService.cs`, `ResourceService.cs`, `ResourceServiceBinder.cs`, `ResourceServiceMethodProvider.cs`                                                    |
-| `Schemata.Resource.Grpc`  | `ResourceCustomMethod.cs`, `Internal/GrpcResourceNaming.cs`, `ResourceMethodNaming.cs`, `FileDescriptorBridge.cs`                                              |
-| `Schemata.Transport.Grpc` | `Proto/SchemataTransportGrpcFeature.cs`, `Proto/SchemataProtoModelConfigurator.cs`, `Proto/RpcStatusBuilder.cs`, `Interceptors/ExceptionMappingInterceptor.cs` |
+| `Schemata.Resource.Grpc` | `ResourceCustomMethod.cs`, `Runtime/GrpcResourceNaming.cs`, `ResourceMethodNaming.cs`, `FileDescriptorBridge.cs` |
+| `Schemata.Transport.Grpc` | `Features/SchemataTransportGrpcFeature.cs`, `Proto/SchemataProtoModelConfigurator.cs`, `Proto/RpcStatusBuilder.cs`, `Interceptors/ExceptionMappingInterceptor.cs` |
 
 ## Activation
 
@@ -108,6 +110,28 @@ bytes. Implementations: `src/Schemata.Transport.Grpc/Proto/GrpcSchema.cs` and
 - Implement `IResourceService<TEntity, TRequest, TDetail, TSummary>` directly and map it with
   `endpoints.MapGrpcService<MyService>()`.
 - `[ResourcePackage("myapi")]` sets the gRPC service-name prefix.
+
+## Semantic link trailers
+
+`Schemata.Transport.Grpc/Linking/GrpcLinkMetadataInterceptor.cs` resolves only the keyed
+`LinkTransports.Grpc` contributors. Its Resource adapter invokes the same Core
+`ResourceLinkSemantics` used by HTTP. `GrpcLinkProjector` projects through registered
+`IGrpcLinkTargetResolver` implementations; the Resource resolver lives in Resource.Grpc and calls
+`GrpcResourceNaming` directly.
+The Resource adapter resolves semantics through the current ASP.NET Core request provider at
+contribution time. The Resource execution registration supplies the scoped semantics and policy;
+an adapter without an active request emits no links. A custom method returning another registered
+resource uses that response's canonical owner for standard links and parent validation.
+
+Targets contain the full `/{service.FullName}/{Method}` RPC path. Target attributes carry required
+inputs: `name` for a resource instance, `parent` for a nested List, `filter` for filtered collections,
+and `page_token` for navigation. The protected token retains effective page size and query scope.
+The body keeps canonical `name` and `next_page_token`. Unregistered or disabled target operations
+emit no link.
+
+The `link` trailer uses Schemata's RPC projection and the shared `WebLink` serializer.
+RFC 8288 defines HTTP serialization; it does not standardize these gRPC trailers or input attributes.
+The shared serializer validates unquoted UTF-8 `title*` and reserves `rev`.
 
 ## Caveats
 

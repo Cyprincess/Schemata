@@ -4,6 +4,9 @@
 
 A Schemata application that caches repository query results using the distributed cache abstraction, then swaps the in-memory backing store for Redis. You'll configure TTL, understand the eviction strategy, and learn the safety boundaries of each adapter.
 
+Examples are source-traced configuration fragments for the prerequisite web project. They were
+not compiled or executed during this alignment; assertions are checks for the reader to perform.
+
 ## Prerequisites
 
 - The Student example from [Getting Started](../guides/getting-started.md) is running.
@@ -43,7 +46,15 @@ var builder = WebApplication.CreateBuilder(args)
 
 ## Step 2: Configure TTL and understand the cache key
 
-`SchemataQueryCacheOptions.Ttl` is the absolute lifetime of cached results (default 5 minutes); cache hits do not extend it. The query key comes from `QueryContext.ToCacheKey()`, which stringizes the built LINQ expression tree, appends `typeof(T).FullName`, and hashes the result. Filters, ordering, and `Skip`/`Take` operators factor into the key. The stored result key also includes the root entity type's generation captured before query execution. Generation metadata does not expire.
+`SchemataQueryCacheOptions.Ttl` is the absolute result lifetime (default 5 minutes); hits do not
+extend it. `QueryContext.ToCacheKey()` length-frames the provider fragment from
+`IQueryCacheKeyProvider`, the safe structural LINQ key from `Stringizing.ToStructure`, the terminal
+operation, and the result type's full name before hashing. Filters, ordering, projections, and
+`Skip`/`Take` participate through those fragments. A missing provider key or unsafe structure
+returns no key, bypassing both cache read and fill. Open write units of work also bypass caching.
+`CacheGeneration<TEntity>` binds stored results to entity/source generations captured before
+execution; generation metadata does not expire. Sources: `src/Schemata.Entity.Cache/Extensions/QueryContextExtensions.cs`,
+`Advisors/AdviceQueryCache.cs`, `Advisors/AdviceResultCache.cs`, and `CacheGeneration.cs`.
 
 ```csharp
 services.AddRepository<Student, EfCoreRepository<AppDbContext, Student>>()
@@ -80,6 +91,11 @@ services.AddRedisCache();
 | `AdviceQueryCache`          | `IRepositoryQueryAdvisor`     | Returns cached result on hit; `AdviseResult.Handle` short-circuits DB |
 | `AdviceResultCache`         | `IRepositoryResultAdvisor`    | Writes query result to cache after DB execution                       |
 | `AdviceCommittedEvictCache` | `IRepositoryCommittedAdvisor` | Evicts cache entries for updated and removed entities after commit    |
+
+Each advisor resolves `ICacheProvider` from the operation's `AdviceContext.ServiceProvider`. The
+same advisor registration therefore reads, fills, and evicts through the final invocation scope's
+outlet. Tenancy's `UseCache` activation supplies separate host and tenant partitions over the
+selected backend without changing the repository registration.
 
 Eviction happens in the committed advisor pipeline. If the transaction rolls back, committed advisors do not run and the cache retains the pre-update value. A rolled-back write should not invalidate a valid cached read.
 

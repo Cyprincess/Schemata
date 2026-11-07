@@ -6,7 +6,22 @@ graph; an engine advances a token through it in response to external triggers. E
 is written as a `SchemataProcessTransition` row, the live process state lives on a
 `SchemataProcess` row, and the running tokens live on `SchemataProcessToken` rows. The audit
 trail is a byproduct of execution. The default engine `StateMachineEngine` runs a single-token
-subset of the BPMN 2.0 AST; richer engines plug in as keyed `IFlowRuntime` services.
+subset of the BPMN AST; the opt-in multi-token engine has its own [executable-subset matrix](bpmn-engine.md#feature-matrix). Richer engines plug in as keyed `IFlowRuntime` services.
+
+Token and transition `Process` properties carry `[ResourceReference(typeof(SchemataProcess))]`
+and persist the full canonical owner name. Runtime factories require the process canonical name
+before creating either row. Resource names remain assigned by consumer repository advisors.
+Process-scoped execution, read entitlement, call-activity completion, and cancellation compare
+these full references directly.
+`ResourceNameDescriptor` recognizes the typed reference whose target pattern matches the complete
+structural parent. It composes child names from that canonical parent and binds URI parent
+predicates to the same full value; ordinary unannotated parent fields retain leaf identifiers.
+
+Definition navigation uses one Foundation query with optional ordinal name/version filters.
+HTTP binds `definitionName`/`definitionVersion`; gRPC binds `definition_name`/`definition_version`.
+Foundation contributors provide equivalent filtered definitions links and canonical process/token
+associations for both transports. Transport resolvers suppress unpublished destinations.
+Definition GET, catch, and parent/child process-operation links are not part of this surface.
 
 ## Where the code lives
 
@@ -28,7 +43,7 @@ subset of the BPMN 2.0 AST; richer engines plug in as keyed `IFlowRuntime` servi
 | `Schemata.Flow.Skeleton`     | AST, entity types, builders, runtime and observer contracts                         |
 | `Schemata.Flow.Foundation`   | `UseFlow` feature, registry, runner, persistence, lifecycle notifier                |
 | `Schemata.Flow.StateMachine` | Default single-token engine and its validator; activated by `UseStateMachine()`     |
-| `Schemata.Flow.Bpmn`         | Full BPMN 2.0.2 multi-token engine and validator; activated by `UseBpmn()`          |
+| `Schemata.Flow.Bpmn`         | Multi-token executable BPMN subset and validator; activated by `UseBpmn()` |
 | `Schemata.Flow.Event`        | Bridges message/signal catches to the event bus                                     |
 | `Schemata.Flow.Scheduling`   | Bridges timer catches to the scheduler                                              |
 | `Schemata.Flow.Http`         | Process execution and read endpoints over HTTP                                      |

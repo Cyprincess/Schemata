@@ -8,6 +8,11 @@ characteristics, non-interrupting boundary paths, escalation, transaction cancel
 The registration and engine key live in `src/Schemata.Flow.Bpmn/Features/SchemataFlowBpmnFeature.cs`
 and `src/Schemata.Flow.Bpmn/BpmnEngine.cs`.
 
+Its capability boundary is an executable subset, not full BPMN 2.0.2 conformance or certification.
+The table below separates supported execution paths from limits and unsupported shapes. Source
+tracing and conformance-vector coverage establish different kinds of evidence; a vector count
+does not establish support for every BPMN requirement.
+
 The engine uses the shared Flow AST described in [AST Reference](ast.md) and the same runtime
 persistence path described in [Runtime Services](runtime.md). The difference is the position model:
 `StateMachineEngine` keeps one `SchemataProcessToken`, while `BpmnEngine` can create, wait, cancel,
@@ -41,9 +46,9 @@ choose `statemachine`. See [State Machine](state-machine.md) for that engine.
 
 The support levels below are based on `src/Schemata.Flow.Bpmn/BpmnEngine.cs`,
 `src/Schemata.Flow.Bpmn/BpmnValidator.cs`, and the executors under
-`src/Schemata.Flow.Bpmn/Runtime/`. `Full` means the engine has a runtime path for the element in the
-current executable subset. `Subset` means the element class is supported with explicit limits.
-`Not supported` means the engine, validator, or conformance coverage matrix excludes it.
+`src/Schemata.Flow.Bpmn/Runtime/`. `Full` means a runtime path for the stated element within this
+executable subset, not every semantic requirement of BPMN. `Subset` identifies additional limits.
+`Not supported` identifies an excluded shape or a missing runtime path.
 
 | Element                                                                | Category      | Support level | Runtime path                                                                                                                                                     |
 | ---------------------------------------------------------------------- | ------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -114,7 +119,9 @@ rows. The typed execution contract is defined in `ProcedureTaskBase.cs`, `Script
 The BPMN engine returns a `ProcessSnapshot` from every `IFlowRuntime` call. The snapshot contains the
 updated `SchemataProcess`, the full live token set, and the transition rows to persist. The state
 values come from `src/Schemata.Flow.Skeleton/Entities/SchemataProcessToken.cs` and the aggregate
-state rules come from `BpmnEngine.ApplyAggregateState`.
+state rules come from `BpmnEngine.ApplyAggregateState`. Trigger-driven and escalation-driven event
+sub-processes construct tokens through `TokenFactory<TProcess,TToken>.NewChildToken`; their local
+additions are the event sub-process `ScopeName` and a copy of the addressed token's `Bookkeeping`.
 
 | Token state    | Meaning                                                                                               | Engine source                                                                                                                                                |
 | -------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -177,6 +184,22 @@ exception is a process that starts directly into an event-based gateway (`StartI
 with no preceding activity, `StateName` holds the gateway name. The state-machine engine follows
 the same contract (see [Engine](engine.md)), so a bound source projects the business node name
 rather than the synthetic `Await_*` gateway name on either engine.
+
+### Complex gateway activation and resumption
+
+A sequence flow from the start event to a `ComplexGateway` creates the root token and passes it to
+`ComplexGatewayHandler.FromTokenAsync`. The handler evaluates `ActivationCount` when configured.
+An unready result parks the token with `State="Waiting"` and both `StateName` and `WaitingAtName`
+set to the gateway name. Without an activation condition, or after the condition passes, the same
+call resolves outgoing branches through `ResolveInclusiveBranchesAsync` and forks through
+`BranchFromTokenAsync`.
+
+`AdvanceCoreAsync` also sends a token waiting at a complex gateway through `FromTokenAsync`.
+Each advance reevaluates the activation condition. A still-unready waiting token returns the
+current process and token snapshot with an empty transition list, so repeated evaluation adds no
+arrival transition, fork, or child token. Once readiness flips, branch selection and forking use
+the same handler path as direct start. The implementation is in `BpmnEngine.cs` and
+`Runtime/Gateways/ComplexGatewayHandler.cs`.
 
 ## Compensation semantics
 

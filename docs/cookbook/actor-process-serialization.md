@@ -87,7 +87,7 @@ handler and never holds a caller-scoped object across the mailbox boundary.
 public async Task<TResult> HandleAsync(TRequest request, AdviceContext context, CancellationToken ct = default) {
     var message = MessageContexts.Capture(caller);   // sender side, once, synchronous
     var actor   = await actors.GetAsync(new ActorId("flow", request.ProcessCanonicalName));
-    return await actor.AskAsync<TRequest, TResult>(request, message, ct: ct);
+    return await actor.AskAsync<TRequest, TResult>(caller, request, message, ct: ct);
 }
 ```
 
@@ -116,13 +116,14 @@ The actor registered for the `flow` route is the shared `RequestDispatchingActor
 1. Build a fresh DI scope from the injected `IMessageExecutionScopeFactory`.
    `tenancy.UseActor()` selects independent tenant runtimes and enables
    `TenantMessageExecutionScopeFactory<TTenant>` for the turn's tenant-bound provider.
-2. Enter the returned synchronous lease after awaiting creation, then call
-   `scope.RestoreAsync(envelope.Context, ct)` to run registered propagators against the selected scope.
+2. Call `scope.RestoreAsync(envelope.Context, ct)` to run registered propagators against the
+   selected scope. The final provider supplies scoped `TenantIdentity` throughout handler work
+   and disposal.
 3. Resolve the *keyed* default handler (`FlowConstants.Handlers.Default`) inside that fresh scope,
    call it, and `ReplyAsync` with the result. `ClaimsPrincipal` already travels on the request
    record itself, so it does not need to round-trip through `MessageContext`.
-4. The keyed default handler reloads the process row inside the turn — its `Timestamp` is whatever
-   the previous turn committed. The race window between two turns writing the same row is gone.
+4. Dispose the scope before draining the next envelope. The keyed default handler reloads the
+   process row inside the turn, so its `Timestamp` is whatever the previous turn committed.
 
 The drain loop never reads the next envelope until the current turn's scope is fully disposed, so
 a fire-and-forget turn cannot defeat the serialization. A turn that throws faults its own `Ask`
@@ -159,7 +160,10 @@ command records flat: name + payload, never an entity.
 before enqueue (`MessageContexts.Capture(caller)`) by running registered propagators. Restore
 uses the turn's selected execution scope. Install `Schemata.Tenancy.Actor` and enable
 `tenancy.UseActor()` for independent tenant runtimes, captured references and tenant-bound turn
-services. Persisted state needs an `ITenant` subtype: use
+services. Retained references validate an explicit `MessageContext` against their bound tenant
+before enqueueing. Actor callbacks use direct create/restore/work/dispose; tenant Actor sends and
+stops use `IMessageExecutionScopeRunner`, which returns work results and aggregates body and cleanup
+failures in that order. Persisted state needs an `ITenant` subtype: use
 `tenancy.UseActor<Tenant, TenantActor>()` and `UseActorPersistence<Tenant, TenantActor>()`, and
 register `IRepository<TenantActor>` plus `IResourceMutation<TenantActor>` in each tenant.
 

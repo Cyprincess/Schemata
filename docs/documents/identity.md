@@ -50,6 +50,16 @@ security stamp or rebuilding the principal. Authentication-event claims retain t
 sign-in time and methods. User and role stores translate optimistic-concurrency failures from
 both mutation and commit boundaries to Identity concurrency errors.
 
+`SchemataUser.AdministrativelyActive` defaults to `true`. `SetAdministrativeActiveAsync` persists
+the requested state and rotates the security stamp when the state changes. Password sign-in and
+ticket renewal reject an inactive user before issuing replacement credentials. This administrative
+state is independent of lockout: deactivation and reactivation preserve `LockoutEnd`.
+
+Changing the administrative state does not synchronously revoke every existing application cookie.
+Cookie authentication rechecks the rotated security stamp on the host's configured ASP.NET Core
+Identity validation cadence. New password sign-ins and ticket renewals apply the administrative
+check at their next admission.
+
 The supporting entities `SchemataUserClaim`, `SchemataRoleClaim`, `SchemataUserRole`,
 `SchemataUserLogin` and `SchemataUserToken` store canonical `users/{name}` and `roles/{name}`
 references in their inherited string `UserId`/`RoleId` properties. User and role `Uid` values remain
@@ -57,23 +67,19 @@ strict internal identities; claim rows retain their own `Uid` primary keys. Regi
 a regular EF Core `DbContext` using the Schemata mapping conventions, rather than the platform
 `IdentityDbContext` whose shared key constraint cannot represent this split.
 
-## Resource management surface
+## Native management and mutation ownership
 
-`UseIdentity()` returns `SchemataIdentityBuilder<TUser,TRole>`, which implements `IResourceBuilder`. Identity's User and Role management resources are exposed only after an explicit transport call:
+Use `SchemataUserManager<TUser>` and `SchemataRoleManager<TRole>` with the registered stores for
+native administration. Recommend SCIM for external User/Group provisioning. The IdentityCore API
+endpoints retain registration, authentication, account, and token routes. These HTTP protocol
+surfaces do not imply a native Resource management controller or gRPC service.
 
-```csharp
-schema.UseSecurity();
-schema.UseIdentity()
-      .WithAuthentication("Bearer")
-      .WithAuthorization()
-      .MapHttp();
-```
+Sources: `src/Schemata.Identity.Skeleton/Managers/SchemataUserManager.cs`, `SchemataRoleManager.cs`,
+`src/Schemata.Identity.Foundation/Features/SchemataIdentityFeature.cs`, and
+`src/Schemata.Identity.Scim/Features/SchemataIdentityScimFeature.cs`.
 
-The shared Security extensions configure the management resource pipeline. `MapHttp()` and `MapGrpc()` are concrete Identity transport extensions that activate their domain features. The existing IdentityCore API endpoints remain separate from this resource surface.
-
-Management mutations resolve the mutation owners `IResourceMutation<TUser>` and
-`IResourceMutation<TRole>` after resource policy and mapping; the configured Identity stores
-delegate their writes to the same owners. Deletion therefore uses the same transactional dependent
+Store and manager mutations resolve the mutation owners `IResourceMutation<TUser>` and
+`IResourceMutation<TRole>`. Deletion therefore uses the same transactional dependent
 cleanup as direct store deletion. A replacement user or role may reuse a canonical name after
 deletion without inheriting retained relationships. Direct repository writes are low-level
 operations and bypass these owner lifecycle rules.
@@ -125,6 +131,7 @@ following in `ConfigureServices`:
   path that needs the channel, so a host without a registered sender fails that operation at
   its use instead of reporting a fabricated delivery.
 - Registers `IUserStore<TUser>` and `IRoleStore<TRole>` with the supplied store types.
+- Registers the PRECIS username normalizer, uppercase `IEmailNormalizer`, E.164 `IPhoneNumberNormalizer`, the Disabled `IUserAliasResolver`, and the open-generic `IIdentityAliasUniquenessAdvisor<TUser>` pipeline.
 - Overrides `IdentityOptions.ClaimsIdentity` to OIDC-standard claim types: `UserIdClaimType =
 "sub"`, `UserNameClaimType = "preferred_username"`, `EmailClaimType = "email"`, `RoleClaimType =
 "role"`, `SecurityStampClaimType = "security_stamp"`.
@@ -165,8 +172,9 @@ retain their HTTP-specific handling. `IdentityHandler<TUser>` exposes dispatcher
 Login consumes the current HTTP authentication context and returns `IdentityResult<Unit>` after
 writing credentials; its controller returns an empty result. Other operations retain their existing
 payloads. HTTP request bodies remain the `*Request` models in
-`Schemata.Identity.Skeleton.Models`; with snake_case serialization, `RegisterRequest` posts
-`username`, `email_address`, `phone_number`, `password`, and an optional `use_cookies`.
+`Schemata.Identity.Skeleton.Models`; with snake_case serialization, registration and login accept
+`username`, `email_address`, `phone_number`, `phone_region`, `username_type`, and `password`.
+Registration also accepts optional `use_cookies`; login accepts the two-factor, ACR, and cookie fields.
 
 Login uses ASP.NET Core's `PasswordSignInAsync` and, when required, its authenticator or recovery-code
 sign-in operation. The platform owns lockout, pending two-factor identity, remembered-device checks,
@@ -178,6 +186,26 @@ effects, including recovery-code consumption, remain committed.
 persistent cookie nor a remembered-device grant. Authentication evidence reflects the factor actually
 verified, including password-only evidence when an existing remembered device bypasses a supplied code.
 
+
+## Username aliases and normalization
+
+`UseUserNameAliases(UserNameAliasMode mode)` replaces the registered `IUserAliasResolver`. The default resolver uses `Disabled` mode.
+
+| Mode | Registration and login key selection |
+| ---- | ------------------------------------ |
+| `Disabled` | `username` is required. Registration retains email and phone as contacts; login rejects alternate key fields and `username_type`. |
+| `Enabled` | A supplied `username` wins. Without it, exactly one of `email_address` or `phone_number` is required. |
+| `Explicit` | `username_type` selects `user-name`, `email`, or `phone-number`; the selected value is required and other contact values may coexist. |
+
+Registration assigns the selected value to `UserName`. `username_type` is rejected outside `Explicit`, and automatic email-plus-phone input is rejected as ambiguous. A complete E.164 phone and the split `phone_region` plus national `phone_number` form are also ambiguous. Split input is concatenated before manager invocation. The built-in `E164PhoneNumberNormalizer` accepts only a leading plus sign, a nonzero initial digit, and up to 15 total digits, then returns digits without the plus sign. Registration uses those digits for a phone-alias username.
+
+Create, update, registration, phone confirmation, SCIM, and resource writes pass through `SchemataUserManager<TUser>`. After entity advisors run, the manager computes `NormalizedUserName` through `ILookupNormalizer`, `NormalizedEmail` through `IEmailNormalizer`, and canonical `PhoneNumber` through `IPhoneNumberNormalizer`. These services are independent and replaceable through DI. Raw `FindByNameAsync`, `FindByEmailAsync`, and `FindByPhoneAsync` normalize at the same manager boundary; stores select the supplied comparison key without another normalization pass.
+
+`IIdentityAliasUniquenessAdvisor<TUser>` implementations run in ascending `Order` after final normalization and before store staging. The manager passes the explicit `IUnitOfWork` and begins a serializable transaction when the caller does not supply one. `AdviceAliasUniqueness<TUser>` joins the user repository to that transaction, checks `NormalizedUserName`, `NormalizedEmail`, and canonical `PhoneNumber`, and excludes the current UID on update. Manager-owned writes commit once. A store without `IUserProvisioningStore<TUser>` fails before staging. Invalid contact phone input produces an `INVALID_PHONE_NUMBER` field violation for `phone_number` before staging.
+
+Login resolves only the key, then uses the existing password, `PreSignInCheck`, `CanSignInAsync`, administrative-active, lockout, and two-factor pipeline. Zero or multiple matches produce the same invalid-credential failure. Confirmation flags and `RequireConfirmedAccount`, `RequireConfirmedEmail`, and `RequireConfirmedPhoneNumber` retain their platform meanings. Registration leaves contact confirmation unset and uses the existing channel senders for required codes.
+
+`RegisterRequest` validation uses `Operations.Create`; `LoginRequest` validation uses `Operations.Authenticate`. Both run through `Validation.Skeleton.ValidationHelper` and `IValidationAdvisor<TRequest>` before alias resolution. `Schemata.Identity.Foundation` references `Schemata.Validation.Skeleton` directly and has no FluentValidation dependency.
 
 ## Request advisors
 
@@ -240,8 +268,8 @@ package absent. The authorization server's consent/login page is a separate sett
 `UseIdentity()` installs login, refresh, profile, and the host Identity system. Optional operations
 are installed on its returned builder through `UseRegistration()`, `UseAccountConfirmation()`,
 `UsePasswordReset()`, `UsePasswordChange()`, `UseEmailChange()`, `UsePhoneNumberChange()`, and
-`UseTwoFactorAuthentication()`. Each registers its actual request handlers. MVC omits actions whose
-handlers are absent; a selected handler with broken dependencies fails at use.
+`UseTwoFactorAuthentication()`. Each registers its actual request handlers. `UseUserNameAliases(mode)`
+selects the registration and login alias resolver. MVC omits actions whose handlers are absent; a selected handler with broken dependencies fails at use.
 
 `SchemataIdentityOptions.LoginUri` configures the [sign-in redirect](#sign-in-redirect).
 
@@ -252,6 +280,9 @@ handlers are absent; a selected handler with broken dependencies fails at use.
 | `IIdentityRequestAdvisor<TRequest,TResponse>` | Gate or transform any request before the handler runs; a handled advisor writes `IdentityOperationExecution<TResponse>.Response`. |
 | `IMailSender<TUser>`         | Register an application implementation for confirmation and reset emails. |
 | `IMessageSender<TUser>`      | Register an application implementation for SMS confirmation/reset codes. |
+| `IUserAliasResolver`         | Replace registration and login key selection through `UseUserNameAliases`. |
+| `IEmailNormalizer` / `IPhoneNumberNormalizer` | Replace the final manager-owned contact normalization. |
+| `IIdentityAliasUniquenessAdvisor<TUser>` | Add ordered final-alias checks inside the manager's write transaction. |
 | `SchemataUserManager<TUser>` | Subclass for domain-specific user operations.                          |
 
 The selected send operation resolves its sender with `GetRequiredService`; a missing registration

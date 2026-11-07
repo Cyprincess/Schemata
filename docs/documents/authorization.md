@@ -2,8 +2,8 @@
 
 `Schemata.Authorization.Foundation` is a hand-rolled OAuth 2.0 / OpenID Connect authorization
 server. It builds on `Microsoft.IdentityModel` for key material and JWT handling but pulls in no
-external server framework. The core feature is generic over four entity types — `TApp`, `TAuth`,
-TScope` — and runs at priority 460,000,000. Flows are opt-in: `UseAuthorization()`
+external server framework. The public builder selects `TApp`, `TAuth`, `TScope`, and
+`TSubjectMapping`; the core runs at priority 460,000,000. Flows are opt-in: `UseAuthorization()`
 registers the core, and each `Use*Flow` / `Use*` call on the returned builder adds one
 `IAuthorizationFlowFeature`.
 
@@ -52,19 +52,17 @@ and subject mappings, including rows created internally during protocol handling
 resolution fails with `ValidationException` when a required `Name` remains blank; the framework has
 no fallback name generator. Protocol identifiers and secrets remain separate from resource names.
 
-## Resource management surface
+## Native management surfaces
 
-`SchemataAuthorizationBuilder<TApp,TAuth,TScope>` implements `IResourceBuilder`. Application, Scope, and Token management resources are exposed only after an explicit transport activation:
+Use `IApplicationManager<TApp>`, `IScopeManager<TScope>`, and `ITokenStore<TToken>` for native
+administration. Dynamic client registration serves OAuth client provisioning; recommend SCIM for
+external Application provisioning. `/Connect`, OIDC discovery/JWKS, redirects, and cookies retain
+their HTTP protocol roles. They are not native Resource management or missing gRPC counterparts.
 
-```csharp
-schema.UseSecurity();
-schema.UseAuthorization()
-      .WithAuthentication("Bearer")
-      .WithAuthorization()
-      .MapHttp();
-```
-
-The shared Security extensions configure only this resource management surface. `MapHttp()` and `MapGrpc()` activate the concrete Authorization transport features. The `/Connect` OAuth and OpenID Connect endpoints retain their protocol pipeline.
+Sources: `src/Schemata.Authorization.Foundation/Features/SchemataAuthorizationFeature.cs`,
+`Managers/SchemataApplicationManager.cs`, `Managers/SchemataScopeManager.cs`,
+`src/Schemata.Security.Skeleton/Services/ITokenStore.cs`, and
+`src/Schemata.Authorization.Scim/Features/SchemataAuthorizationScimFeature.cs`.
 
 ## What the core feature registers
 
@@ -83,8 +81,9 @@ come first. `ConfigureServices`:
   types instead of the default MVC binders.
 - Registers three scoped managers — `IApplicationManager<TApp>`, `IScopeManager<TScope>`, and
   `IAuthorizationManager<TAuth>` — and resolves the unified token store `ITokenStore<TToken>`
-  that the security feature registered through `AddTokenStores<TToken>()`: the plain and keyed
-  slots are repository-backed, and the `nonce`, `jti`, and `rate-slot` slots are cache-backed.
+  that the security feature registered through `AddTokenStores<TToken>()`: the plain slot is
+  repository-backed, and the `nonce`, `jti`, and `rate-slot` slots are cache-backed. Unknown keyed
+  token-store resolution fails.
 - Registers client authentication: `ClientSecretBasicAuthentication<TApp, TSecurity>`,
   `ClientSecretPostAuthentication<TApp, TSecurity>`, `ClientSecretJwtAuthentication<TApp, TSecurity, TToken>`,
   and `PrivateKeyJwtAuthentication<TApp, TSecurity, TToken>` as `IClientAuthentication<TApp>`, plus
@@ -120,6 +119,8 @@ broken still fails at dispatch; route absence never masks that.
 | `POST` | `/Connect/Register` | `Register` | OIDC Dynamic Client Registration 1.0 §3.1 |
 | `GET` / `PUT` / `DELETE` | `/Connect/Register/{clientId}` | `RegisterRead` / `RegisterReplace` / `RegisterDelete` | RFC 7592 §2 |
 | `GET` / `POST`            | `/Connect/EndSession` | `EndSessionGet` / `EndSessionPost`                    | OpenID Connect RP-Initiated Logout 1.0 §2, RP-Initiated Logout |
+| `POST` | `/Connect/Par` | `Par` | Pushed authorization requests; `UsePushedAuthorizationRequests()` |
+| `GET` | `/Connect/CheckSession` | `CheckSession` | OP iframe; `UseSessionManagement()` |
 
 `IAuthorizationSignInService` owns transport-neutral protocol issuance. `ConnectController` renders
 endpoint token responses as JSON and callback parameters through `ResponseModeService` as query,
@@ -183,11 +184,18 @@ endpoints below are the ones the code implements:
 | Builder method               | Grant type / endpoint                                             | Flow feature                                                            |
 | ---------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | `UseAuthorizationCodeFlow()`              | `authorization_code` (+ PKCE), `/Connect/Authorize`               | `AuthorizationCodeFlowFeature` (+ `TokenFeature`, `InteractionFeature`) |
+| `UseImplicitFlow()` | Adds `token`, `id_token`, `id_token token` and fragment mode to an installed authorization-code endpoint | `ImplicitFlowFeature`; advertises `implicit` |
+| `UseHybridFlow()` | Adds `code token`, `code id_token`, `code id_token token` and fragment mode to that endpoint | `HybridFlowFeature`; advertises `implicit` |
+| `UseNoneFlow()` | Adds exclusive `none` to that endpoint | `NoneFlowFeature`; response metadata, no new grant |
 | `UseClientCredentialsFlow()` | `client_credentials`                                              | `ClientCredentialsFlowFeature`                                          |
 | `UseRefreshTokenFlow()`      | `refresh_token`                                                   | `RefreshTokenFlowFeature`                                               |
 | `UseDeviceFlow()`            | `urn:ietf:params:oauth:grant-type:device_code`, `/Connect/Device` (RFC 8628 §§3.1, 3.4) | `DeviceFlowFeature` (+ `InteractionFeature`)                            |
 | `UseTokenExchange()`         | `urn:ietf:params:oauth:grant-type:token-exchange` (RFC 8693 §2.1)                       | `TokenExchangeFeature`                                                  |
 | `UseJwtBearerGrant()`        | `urn:ietf:params:oauth:grant-type:jwt-bearer` (RFC 7523 §3.1; needs a trusted issuer)   | `JwtBearerGrantFeature<TApp>`                                           |
+| `UseResourceOwnerPasswordFlow()` | Historical `password` token grant; requires an `IResourceOwnerPasswordValidator` | `ResourceOwnerPasswordFlowFeature`; advertises `password` |
+| `UseJwtSecuredAuthorizationRequests()` | By-value Request Object reader, validation and registration advisors; adds no endpoint | `JwtSecuredAuthorizationRequestsFeature`; advertises request support and configured/usable algorithms |
+| `UsePushedAuthorizationRequests()` | `/Connect/Par`, handle redemption and registration advisors; adds `TokenFeature`, not JAR | `PushedAuthorizationRequestsFeature`; advertises PAR endpoint, URI support and required policy |
+| `UseSessionManagement()` | `/Connect/CheckSession`, OP state store and `session_state` advisor | `SessionManagementFeature`; advertises `check_session_iframe` |
 | `UseRichAuthorizationRequests()` | `authorization_details` at `/Connect/Authorize` (RFC 9396 §6; ignored when the feature is absent) | `RichAuthorizationRequestsFeature<TApp>`                              |
 | `UseResourceIndicators()`    | `resource` at `/Connect/Authorize` and `/Connect/Token` (RFC 8707 §§2-2.2; ignored when the feature is absent) | `ResourceIndicatorsFeature<TApp>`                                       |
 | `UseClaimsParameter()`       | `claims` at `/Connect/Authorize` (OIDC Core §5.5; ignored when the feature is absent) | `ClaimsParameterFeature<TApp>`                                                  |
@@ -201,6 +209,46 @@ endpoints below are the ones the code implements:
 | `UseBackChannelLogout()`     | back-channel logout queue + notifier                              | `BackChannelLogoutFeature`                                              |
 | `UsePairwiseSubjects()`      | pairwise `sub` projection + discovery advertisement (OIDC Core 1.0 §8)  | `PairwiseSubjectsFeature<TApp>`                                                 |
 
+Implicit, hybrid, and `none` are explicit historical options. Their features amend response policy;
+install `UseAuthorizationCodeFlow()` for the shared authorize/interaction handlers. Discovery reads
+the final host-wide `AllowedResponseTypes`/`AllowedResponseModes`; client metadata still restricts
+admission. JAR, PAR, and session management are independently installed capabilities, not grants.
+Sources: `Features/{ImplicitFlowFeature,HybridFlowFeature,NoneFlowFeature}.cs`,
+`SchemataAuthorizationBuilder.cs`, `Handlers/DiscoveryHandler.cs`, and the corresponding
+`AdviceDiscovery{ImplicitGrant,RequestObject,Par,SessionManagement}.cs` in Authorization.Foundation.
+
+### Historical security profiles
+
+The relevant boundary is an **access token in the authorization response**: `token`,
+`id_token token`, `code token`, and `code id_token token` do this. Under
+[RFC 10017 §7.2](https://www.rfc-editor.org/rfc/rfc10017.html#section-7.2), browser-based clients MUST
+use authorization code, and the authorization server MUST issue access tokens only at the token
+endpoint, not in the authorization response. Those variants are historical opt-in downgrades, not
+that browser profile. [RFC 9700 §2.1.2](https://www.rfc-editor.org/rfc/rfc9700.html#section-2.1.2)
+says clients SHOULD NOT use such responses unless injection is prevented and leakage mitigated;
+it recommends `code` or another token-endpoint-access-token response, explicitly `code id_token`.
+
+Pure `id_token` and `code id_token` return an ID token rather than a front-channel access token;
+the access-token prohibition alone does not reject them. `code` returns a code; exclusive `none`
+returns no code or token. These distinctions do not establish whole-profile compliance.
+`UseResourceOwnerPasswordFlow()` is also supported as a historical opt-in, contrary to
+[RFC 9700 §2.4](https://www.rfc-editor.org/rfc/rfc9700.html#section-2.4)'s MUST NOT use requirement.
+
+Maintainer-supported `CodeFlowOptions.RelaxPkce`, `RelaxPkceS256`, `RelaxPkceDowngradeProtection`,
+`RelaxCodeSingleUse`, `RelaxNonce`, `RelaxResponseModeSafety`, and
+`RefreshTokenFlowOptions.RelaxRefreshTokenRotation` disable their respective default protections.
+Applications choosing them own the downgrade threat model; their availability is not a BCP claim.
+Sources: `Authentication/{CodeFlowOptions,RefreshTokenFlowOptions}.cs` and
+`Services/AuthorizationSignInService.cs` (response-type-specific issuance).
+
+At `/Connect/Authorize`, omitted `response_mode` defaults to `query` for `code` and `none`, and to
+`fragment` for `token`, `id_token`, and every hybrid combination, per
+[OAuth 2.0 Multiple Response Type Encoding Practices §§2–5](https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html).
+An explicit mode must belong to `AllowedResponseModes`. An unsupported explicit mode or an omitted
+mode whose protocol default is disallowed produces a parameter-free HTTP 400. After request
+normalization and redirect validation, success and error callbacks use the validated response type
+and effective response mode. Error delivery has no query fallback.
+
 `UseClaimsParameter()` owns parameter parsing and final Essential ACR approval checks. Hosts without
 that capability ignore the parameter; the mandatory OAuth/OpenID profile selector does not activate it.
 PAR failures return direct JSON errors even when shared authorization advisors carry browser callback
@@ -211,8 +259,13 @@ verified audiences and the authenticated caller's configured resource audiences.
 `Action<RefreshTokenFlowOptions>` configurators. `TokenFeature` is shared: any grant that lands on
 `/Connect/Token` pulls it in.
 
-`POST /Connect/Token` dispatches by `grant_type` to the registered `IGrantHandler`. Before the
-grant runs, the `ITokenRequestAdvisor<TApp>` chain validates the request over a `TokenRequestContext<TApp>` carrying the parsed request, the authenticated client, the transport DPoP proof, and the validated proof binding:
+`POST /Connect/Token` dispatches by `grant_type` to the registered `IGrantHandler`. The Identity
+bridge's subject validation rejects missing and administratively inactive users. The shared
+`AuthorizationSignInService.IssueAsync` repeats that admission check for every end-user grant before
+session establishment, claims enrichment, signing-key resolution, token creation, and refresh
+rotation. Client-only grants skip subject admission. Rejecting an inactive subject prevents new
+credentials; previously issued access tokens retain their own expiry and revocation behavior.
+Before the grant runs, the `ITokenRequestAdvisor<TApp>` chain validates the request over a `TokenRequestContext<TApp>` carrying the parsed request, the authenticated client, the transport DPoP proof, and the validated proof binding:
 
 | Advisor                                 | Checks                                                      |
 | --------------------------------------- | ----------------------------------------------------------- |
@@ -237,25 +290,43 @@ Native SSO requires exactly one audience equal to the issuer; other profiles own
 
 ### Native SSO issuance
 
-`UseNativeSingleSignOn()` routes the ID-token/device-secret exchange through
-`NativeSsoTokenExchangeHandler` and the shared `AuthorizationSignInService`. The issuer applies
-the configured access-token format, claims advisors, destinations, and target-client subject
-projection. Reference access tokens persist a signed payload for authentication and introspection.
+`UseNativeSingleSignOn()` installs the device-secret token-exchange profile. See
+[issuance mechanics](authorization-token-lifecycle.md#native-sso-issuance) and
+[session authority](authorization-token-lifecycle.md#native-sso-session-authority).
 
-The handler requires trusted device-secret provenance and live online-session or offline-family authority.
-Target scopes must fit registration policy and a valid target consent record, unless the configured
-`IConsentModelProvider` grants implicit consent. Registered source scopes are not consent evidence;
-independent target authorization may grant additional scopes. Omitted scope uses the persisted source
-grant, checked against the same target policy. OAuth-only descendants cannot regain OIDC eligibility.
+### Encrypted ID tokens
 
-During refresh, `AdviceRefreshTokenDeviceSecret` searches by session and checks the secret's
-application, session, resolved device, status, and expiry. Existing records with a null `Parent`
-remain eligible. `TokenHandler` carries the selected secret and session in sign-in properties so
-the response issuer can return the secret together with an ID token containing `ds_hash` and `sid`.
-Native token exchange follows the shared ID/refresh-token grant and scope rules; it does not
-rotate or echo the device secret.
+Register `id_token_encrypted_response_alg` with a client `jwks` or `jwks_uri` encryption public key to receive Nested JWT ID tokens. `id_token_encrypted_response_enc` defaults to `A128CBC-HS256` when omitted; specifying it without `alg` fails registration. The server completes the signed JWT, including `nonce` and applicable token hashes, and then encrypts it. The client decrypts with the corresponding private key and validates the inner signature and claims. Missing or incompatible client keys and unsupported algorithms fail issuance without returning the signed plaintext token. Server access-token encryption keys are not used for this recipient operation. Discovery advertises the supported ID-token JWE algorithms.
 
-### Request Object lifetime
+### Signed, encrypted, and external request objects
+
+`UseJwtSecuredAuthorizationRequests()` configures accepted JWS algorithms through
+`JwtSecuredAuthorizationRequestsOptions.SigningAlgorithms`. Its `EncryptionAlgorithms` and
+`ContentEncryptionAlgorithms` collections enable signed-then-encrypted nested JARs. Client metadata
+`request_object_encryption_alg` and `request_object_encryption_enc` narrows that policy for each
+application. When only `request_object_encryption_alg` is registered, the OIDC default
+`request_object_encryption_enc` is `A128CBC-HS256`; supplying `enc` without `alg` or selecting an
+unconfigured algorithm fails registration with `invalid_client_metadata`. Discovery advertises
+content-encryption values and only those key-management algorithms that have a valid, usable issuer
+encryption key. Decryption accepts current and retained issuer keys, then passes the recovered JWS
+through the existing signature and claim validation. JWE authentication, algorithm, and inner-signature
+failures return `invalid_request_object`.
+
+`UseExternalRequestObjects()` enables retrieval through `IExternalRequestObjectResolver` and uses
+`ExternalRequestObjectOptions.Timeout`, `MaximumBodyBytes`, and `CacheLifetime` as retrieval bounds.
+Register every permitted value in the application's `request_uris` metadata. Resolution compares the
+complete request URI with that registration using an ordinal exact match and permits absolute HTTPS
+URIs only. Redirect responses and non-success responses fail retrieval. Cached bodies are keyed by the
+application metadata `Timestamp` and complete URI, so changing either selects a different entry.
+
+A request URI fragment can carry the bare base64url-encoded SHA-256 hash of the retrieved bytes. The
+resolver rejects malformed commitments, unsupported fragment formats, and content mismatches. Retrieved
+content enters the same `RequestObjectReader` as a by-value object. Discovery sets
+`request_uri_parameter_supported` and `require_request_uri_registration` when the resolver is enabled.
+The `urn:ietf:params:oauth:request_uri:*` PAR branch runs before external resolution, retains its normal
+redemption and replay behavior, and never requires external registration. [RFC 9101 §§5.2 and 6](https://www.rfc-editor.org/rfc/rfc9101.html#section-5.2)
+defines by-reference retrieval and nested-object validation; [OIDC Dynamic Client Registration §2](https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata)
+defines the registration metadata and SHA-256 fragment convention.
 
 `RequestObjectReader` validates optional `exp` and `nbf` NumericDate claims before merging request
 parameters. The check applies to signed objects and to unsigned objects permitted by the signing
@@ -269,77 +340,11 @@ still-valid PAR handle does not extend the JWT's lifetime. These checks implemen
 claim semantics in [RFC 7519 §§4.1.4–4.1.5](https://www.rfc-editor.org/rfc/rfc7519.html#section-4.1.4);
 they do not require `exp`, `nbf`, or `jti` to be present.
 
-### Token timestamps and refresh bounds
+### Token lifecycle reference
 
-Issuance samples the configured `TimeProvider` once before key resolution or signing. The selected
-absolute issue and expiry timestamps are passed through token creation and row persistence, so a
-JWT `iat`/`exp` pair and its `SchemataToken.ExpireTime` share the same temporal authority.
-
-The first refresh token stores its absolute chain deadline in the trusted grant context. Each
-rotation applies the earlier of that deadline and `issuedAt + RefreshTokenLifetime`; key-loading or
-signing latency cannot move the successor beyond either bound. A refresh request at or after the
-deadline fails before redemption or successor issuance. The framework does not apply a sliding or
-inactivity extension to this deadline.
-
-### Refresh family fencing
-
-Rotation-enabled refresh grants carry a semantic family identifier separate from resource `Name`,
-authorization, session, and device identifiers. The repository token store keeps an active family
-marker and commits predecessor redemption, successor rows, and marker-version rotation through one
-unit of work. A concurrent rotation therefore publishes one successor set.
-
-Refresh-token revocation and authenticated reuse invalidate the family marker and revoke its rows;
-unrelated families and sessions remain valid. Access-token-only revocation affects that token alone.
-Authorization-code replay, including a redemption loser, completes family invalidation and grant-wide
-token revocation before `invalid_grant`. Storage failures propagate. Each repository-store operation
-resolves a fresh repository; one scoped store remains usable after success, rollback, or a lost CAS.
-A rotation finishing after invalidation cannot commit. Missing family state is rejected; unchanged
-storage after a failed optimistic write surfaces as a configuration error. Pruning retains markers.
-Native SSO device secrets share the refresh family and its fenced token batch.
-
-Family operations report success only when every dependent write lands. Marker creation and refresh,
-predecessor redemption, member publication, and member revocation each require `MutationResult.Applied`;
-a repository advisor that blocks or handles one of these writes fails the family operation with
-`FAILED_PRECONDITION`, and the unit of work rolls back its staged rows, so a vetoed rotation publishes
-no partial successor set. Prune and participant retirement remain sweeps and report only the rows they
-actually removed.
-
-`RepositoryTokenStore.TryRedeemAsync` checks cancellation first, then admits only a supplied Valid token.
-Fresh Redeemed or Revoked decisions return false without a storage write or stamp change. A stale Valid
-instance still uses native timestamp compare-and-swap and loses to a concurrently consumed token.
-
-### Registration access token rotation
-
-RFC 7592 management rotation is fenced through `ITokenStore<TToken>.TryRotateAsync`, not through
-a refresh-family batch. The store redeems the predecessor and publishes the prepared successors
-in one repository unit of work; a rotation that loses the concurrency check returns `false` and
-publishes no successor. A repository advisor that blocks or handles the predecessor redemption or
-a successor insert fails the rotation with `FAILED_PRECONDITION`, and the unit of work rolls back
-so the predecessor stays unspent and no partial successor set lands. The framework never returns a
-redeemed predecessor as usable: GET and PUT respond `401 invalid_token` once the row has moved.
-
-`RegistrationTokenLifetime` keeps its two existing forms. A null value stays non-expiring on the
-initial token and on every successor the rotation publishes. A finite value supplied by the
-handler row factory stamps the same expiry on each successor; the store neither invents nor caps
-the lifetime.
-
-Software statements use the host's `ISoftwareStatementValidator`. Return
-`SoftwareStatementValidationResult.Invalid` for failed signature or validity checks,
-`Unapproved` for a valid statement the server does not approve, or `Approved(claims)` for verified,
-approved metadata. The first two map to `invalid_software_statement` and
-`unapproved_software_statement`. Approved claims override the plain request before mapping and
-advisors on both POST and PUT. Server-managed identifiers and credentials are excluded from that
-overlay; malformed metadata types produce `invalid_client_metadata`. Without a host validator,
-the server rejects statements as unapproved.
-
-`UseDynamicClientRegistration()` installs the create (POST) and read (authorized GET) capabilities.
-Replace and delete are separate installations: `UseRegistrationReplace()` adds PUT and
-`UseRegistrationDelete()` adds DELETE at the configuration URI. An operation that was never
-installed has no handler and no route — its HTTP verb is rejected (405 where a sibling verb shares
-the route) and local dispatch finds no handler. Omitting the registration feature removes its
-routes entirely (404).
-Language-tagged client names and URI metadata retain their tags through storage and readback;
-enabled DPoP/RAR registration advisors own their metadata, and PUT clears omitted values.
+See [Authorization Token Lifecycle](authorization-token-lifecycle.md) for token timestamps and
+refresh bounds, refresh-family fencing, registration access-token rotation, Native SSO session
+authority, and persisted authentication events and credential-slot identity.
 
 ### Application lifecycle transactions
 
@@ -370,54 +375,11 @@ Canonical names remain reusable after reconstruction; relationships contain no i
 
 Implementation: `src/Schemata.Authorization.Foundation/Managers/SchemataApplicationManager.cs`.
 
-### Native SSO session authority
-
-Native SSO records whether the grant uses online or offline session authority. An online grant has
-a server-side OP-session authority slot with its own configured lifetime. The slot carries an
-opaque generation minted at establishment, and the grant persists the generation it was born
-under; Native exchange and Native refresh must prove that exact generation against a live slot.
-Expiry replaces the slot with a fresh generation and browser sign-out removes it, so a later
-authorization under the same subject and session identifier establishes a new generation and
-grants born under an older one return `invalid_grant`. Remaining access or ID token rows do not
-prove the online session is active.
-
-An `offline_access` Native grant uses its refresh-family marker as the offline authority. Refresh
-rotation preserves that marker; family invalidation, original offline refresh revocation, or expiry
-makes Native exchange and related refresh use invalid. Browser logout clears online authority but
-does not end a separate offline family. Browserless continuations use the authority persisted on the
-grant and never acquire an ambient browser session identifier.
-
 ### OAuth and OpenID Connect grant profiles
 
-The authorize pipeline selects a trusted profile after PAR and Request Object normalization and
-after client scope authorization. An authorized `openid` scope selects OpenID Connect; other
-authorized scopes select OAuth. The profile is stored with the grant context and inherited by
-authorization-code, refresh, device, and Native SSO continuations.
-
-OAuth grants retain authorization code, PKCE, state, access and refresh tokens, DPoP, PAR, Request
-Objects, rich authorization details, resource indicators, interaction parameters, authentication
-evidence, and the configured `offline_access` convention. The Profile endpoint also accepts these
-grants when the persisted subject category is an end user. Application grants, including
-`client_credentials`, cannot use Profile as an end-user identity source.
-
-ID Tokens, `session_state`, relying-party logout participation, and Native SSO device secrets are
-created only for an OpenID Connect grant. An OAuth authorization request that supplies `id_token`,
-top-level `nonce`, `claims.id_token`, `id_token_hint`, or `device_sso` is rejected as an incompatible
-profile request. DPoP nonces are independent proof values carried in DPoP protocol messages.
-
-`session_state` follows the OpenID Connect Session Management contract with a salt-only
-interaction carrier. The authorize advisor mints a random salt per request, overwrites the
-server-side `AuthorizeRequest.SessionStateSalt` with it, and carries it through the interaction
-payload into the sign-in properties, so a client-supplied value never survives. The initial
-value binds SHA-256 over `client_id`, the redirect origin, the current OP user-agent state
-cookie value, and the salt, and serves same-request error redirects. The successful callback
-recomputes it after session issuance from the live OP user-agent state; a sign-in that rotated
-that state publishes the post-login value, while only the salt ever crosses the interaction.
-
-Scope narrowing creates a descendant grant with its own ceiling. Dropping `openid` converts that
-descendant to OAuth, and a later refresh cannot restore either the scope or OpenID Connect profile.
-The separately issued parent credential remains unchanged. Discovery continues to describe the
-features installed on the server rather than one grant's profile.
+Authorized `openid` selects OpenID Connect; other authorized scopes select OAuth. Continuations
+inherit the selected profile. See [grant profiles and session state](authorization-token-lifecycle.md#oauth-and-openid-connect-grant-profiles)
+for claim eligibility, narrowing, and the `session_state` carrier.
 
 ## Advisor families
 
@@ -445,8 +407,8 @@ prefixed per `AuthorizationConstants.PermissionPrefixes`:
 
 `IApplicationManager<TApp>.HasPermissionAsync(app, permission, ct)` is the lookup the endpoint
 permission advisors use. Grant-type, response-type, and scope admission read the typed `GrantTypes`,
-`ResponseTypes`, and `Scope` fields — the same metadata dynamic registration writes and the
-management resources expose — through `HasGrantTypeAsync`, `HasResponseTypeAsync` (component
+`ResponseTypes`, and `Scope` fields — the same metadata dynamic registration writes and native
+managers read — through `HasGrantTypeAsync`, `HasResponseTypeAsync` (component
 order-insensitive), and `HasScopeAsync`. `Permissions` contains administrator-assigned endpoint
 policy. PKCE policy comes from `CodeFlowOptions`; consent policy is resolved per request through
 `IConsentModelProvider`, whose Foundation default is `ExplicitConsentModelProvider`.
@@ -501,7 +463,7 @@ method. Key lookups:
   `RevokeAsync`, `RevokeByAuthorizationAsync`, `RevokeBySessionAsync`, `PruneAsync(ct)`) plus
   key-value slot operations (`GetAsync`, `GetOrCreateAsync`, `SetAsync`, `RemoveAsync`). The
   plain slot resolves to the repository-backed store; the `nonce`, `jti`, and `rate-slot` keyed
-  slots resolve to the cache-backed store.
+  slots resolve to the cache-backed store. Resolving an unknown keyed store fails.
 
 Default Application, Scope and Authorization managers resolve a fresh read repository from their
 actual scoped service provider for each operation. Lazy lists keep that repository alive until
@@ -514,8 +476,9 @@ Client credentials and assertion keys live in security rows addressed through `S
 (`Application(app)` returns the created application's `CanonicalName`; `Issuer(issuer)` returns the
 issuer URI) and read through `ISecurityStore<TSecurity>`, which `UseSecurity()` registers. The shared
 `ClientSecretValidator` verifies the presented secret against the client's newest valid
-`password` row (`usage=authentication`) with `ISecretVerifier`; `client_secret_jwt` reads
-`secret` rows; `private_key_jwt` loads JOSE material from `jwk`, `jwks`, and `jwks-uri` rows
+`password` row (`usage=authentication`) with `ISecretVerifier`; registration replacement uses the same
+verifier with the exact stored row returned by `ISecurityStore.ListByParentAsync`. `client_secret_jwt`
+reads `secret` rows; `private_key_jwt` loads JOSE material from `jwk`, `jwks`, and `jwks-uri` rows
 through `ToKeyMaterialAsync`, adapted by `SecurityKeyAdapter`.
 
 Dynamic registration provisions a usable symmetric `secret` row for `client_secret_jwt` and
@@ -552,39 +515,6 @@ own audience set; the assertion channel reads no ambient endpoint state.
 
 Rows persist verbatim, in plaintext at rest.
 
-### Persisted authentication events
-
-`AuthorizationSignInService` resolves the authentication event after session or continuation
-identity is final. A new authentication calls `IAuthenticationContextProvider` once; an
-authorization-code, device-code, refresh, or validated Native SSO continuation inherits the
-persisted `AuthorizationGrantContext` instead. The context records the canonical subject and
-subject category, effective scope/profile, grant source, optional session association, and the
-original optional `acr`/`amr`/`auth_time` evidence. Missing evidence stays absent; renewal does not
-synthesize `auth_time` from the issuance clock.
-
-The same context is serialized onto authorization-code, access-token, refresh-token, and Native
-SSO device-secret rows. Claims advisors project that context onto access/ID token destinations;
-they do not call the provider on a continuation. Introspection reads `acr` and `auth_time` from the
-stored row context, so the persisted lineage remains authoritative even when a JWT claim view
-would differ. `Claim.Properties` remains an in-process destination mechanism and is not persisted
-as protocol context.
-
-`SchemataToken.Key` holds a semantic slot identifier. Repository slot operations address
-`(Parent, Provider, Key)`, backed by that composite unique index. `Name` has its own unique index and
-identifies the token resource; `FindByNameAsync` still queries that resource name. Cache-backed slot
-results carry `Key` and do not acquire a resource `Name` or pass through a repository naming advisor.
-Persisting a slot through the repository-backed store requires the consumer naming policy.
-
-`SchemataSecurity.Key` holds a parent-scoped credential label, distinct from its resource `Name`.
-The key separation does not introduce a credential-selection API or policy: `ISecurityStore`
-continues to list by parent with optional kind, usage, and status filters. The repository store
-orders those rows by descending creation time, then `Key`. Protocol consumers keep their existing
-credential-kind and status selection rules. See [Security](security.md#stored-resource-identity).
-
-The source paths are `src/Schemata.Security.Skeleton/Entities/SchemataToken.cs`,
-`src/Schemata.Security.Skeleton/Entities/SchemataSecurity.cs`,
-`src/Schemata.Security.Foundation/Stores/{RepositoryTokenStore,CacheTokenStore,SecurityStore}.cs`,
-and `src/Schemata.Authorization.Foundation/Services/SecurityParents.cs`.
 
 ## Background jobs
 
@@ -783,20 +713,23 @@ and symmetric key material on write and readback.
 | `IClientAuthentication<TApp>`            | Add a client authentication method.                            |
 | `ISubjectProvider`                       | Provide the subject identifier (wired by the Identity bridge). |
 
-## Standards compliance
+## Protocol requirement matrix
 
-Every row is judged by the full path — binding, advisor, issuance, storage, wire — never by a
-CLR type or field name alone. Grades: **Enforced** (verified end to end), **Partial** (core
-behavior present, remainder planned), **Application responsibility** (the framework provides the
-mechanism; the host configures it).
+Rows describe bounded requirements after binding, advisors, issuance, storage, and wire handling;
+they do not certify OAuth/OIDC as a whole. **Enforced** means the registered runtime implements the
+stated check with its default protection settings, not that every deployment or profile was executed.
+**Partial** records a narrower implementation; **Application responsibility** leaves policy with the
+host. Historical flow activation and `Relax*` overrides above qualify the relevant defaults.
 
 | Spec | Area | Grade |
 |---|---|---|
+| [RFC 10017 §7.2](https://www.rfc-editor.org/rfc/rfc10017.html#section-7.2), [RFC 9700 §2.1.2](https://www.rfc-editor.org/rfc/rfc9700.html#section-2.1.2) | Code-only browser profile keeps access tokens at the token endpoint. Explicit implicit/hybrid `token` variants still issue front-channel access tokens; pure `id_token`/`code id_token` are distinct. | Partial; historical downgrade options remain supported |
+| [RFC 9700 §2.4](https://www.rfc-editor.org/rfc/rfc9700.html#section-2.4) | Resource-owner password grant remains an explicit historical opt-in, despite the BCP's MUST NOT use requirement. | Partial; opt-in is outside BCP |
 | RFC 6749 §3.1/§3.2 | Duplicate-parameter rejection at binding | Enforced |
 | RFC 6749 §4.1.2/§10.5 | Authorization-code single use; replay cascades revocation of derived tokens | Enforced |
 | RFC 6749 §5.2, OIDC Core §3.1.2.6 | Token-endpoint error-code families | Enforced |
 | RFC 7662 §2/§2.1/§2.2 | Introspection: the caller authenticates as a confidential client holding the `e:/Connect/Introspect` permission; an access token reports active only when a verified `aud` value matches the caller's `IntrospectionResourceAudiences` mapping; unknown, invalid, expired, revoked, and audience-inapplicable tokens all return only `{ "active": false }` | Enforced |
-| RFC 6750 §3, §3.1, RFC 9449 §7.1 | Presented-credential failures at resource endpoints (unknown or status-invalid row, failed signature, expiry, or `typ` validation, unverifiable identity, wrong audience) stage `invalid_token` on the challenge of the scheme the credential was presented with, indistinguishable across failure causes; requests without credentials receive a Bearer challenge carrying a `realm` auth-param (the issuer, or the request host) and no error code | Enforced |
+| RFC 6750 §3, §3.1, RFC 9449 §7.1, RFC 9470 §§3-6 | Presented-credential failures stage `invalid_token` on the scheme used, with failure causes indistinguishable; requests without credentials receive a Bearer `realm` challenge without an error. A consumer `IResourceAuthenticationRequirementProvider` compares validated `acr` and `auth_time` evidence after Bearer or DPoP authentication; unmet policy returns `insufficient_user_authentication` with applicable `acr_values` and `max_age`, and the authorize/approval path enforces the same requirement or returns `unmet_authentication_requirements`. Grant refresh retains the original authentication event | Enforced behind consumer provider registration |
 | RFC 8252 §7.3/§8.3 | Redirect URI matching is exact ordinal string comparison; the single exemption is the loopback port: on `http` URIs whose host is the same loopback IP literal (`127.0.0.1` or `[::1]`) only the explicit port may differ, while scheme spelling, host literal, path, query, and percent encoding must match byte for byte. URIs carrying userinfo or a fragment never match, and registration rejects both with `invalid_redirect_uri`; `localhost` stays excluded per §8.3 | Enforced |
 | RFC 9068 §2.1/§2.2, RFC 8707 §2 | Access token `typ: at+jwt`; `aud` = `DefaultResource ?? Issuer` when no resource parameter is sent | Enforced |
 | OIDC Core §2 | ID token `aud` = `client_id` | Enforced |
@@ -807,8 +740,14 @@ mechanism; the host configures it).
 | Front-Channel Logout §2 | `iss` and `sid` appended to `frontchannel_logout_uri` as a pair | Enforced |
 | Back-Channel Logout §2.4 | Logout token `typ: logout+jwt` | Enforced |
 | RP-Initiated Logout §2 | OP session invalidation before RP notifications; failure closes the logout | Enforced |
+| OIDC DCR §2-§3 | Dynamic registration: full metadata validation, 201 creation with paired registration access token + `registration_client_uri`, Bearer read-back and replace; registration requests pass an initial access token gate satisfied by a host-supplied `IInitialAccessTokenValidator` (anonymous requests rejected with 401); software statements apply to both create and replace when the host supplies a trusting validator, are unapproved otherwise, and their trusted claims take precedence while the submitted statement string is stored and echoed verbatim; OAuth-only registrations (no `openid` scope, redirect URIs, response types, `authorization_code`/`implicit` grants, or OIDC-only metadata such as subject/userinfo algorithms, `default_max_age`, `require_auth_time`, `default_acr_values`, `initiate_login_uri`, or logout URIs/session flags) may omit `redirect_uris` and carry no `authorization_code`/`code` defaults; malformed bodies and wrongly-typed fields return `invalid_client_metadata`/`invalid_software_statement` JSON | Enforced (registration surface) |
+| RFC 8707 §3 | `resource` at the authorize and token endpoints: §2 syntax validation (`invalid_target`), code-payload and refresh-subset grant consistency, access-token `aud` restriction, introspection echo | Enforced |
+| RFC 9396 §§6-7, §9 | `authorization_details` is validated against registered type descriptors and the client's `authorization_details_types` subset (§10). At code exchange and refresh, `IAuthorizationDetailTypeDescriptor.Narrow` owns the type-specific semantic comparison; there is no generic JSON-subset fallback. An omitted token-request parameter retains the grant carried by the code or refresh token, while an accepted narrowing becomes the actual set in the token response JSON array, access-token claim, successor refresh-token lineage, and resource-filtered introspection response. Narrowing never rewrites the original authorization record or authorization-code grant. Without `UseRichAuthorizationRequests()` the bound parameter remains inert and reaches no grant. | Enforced (behind `UseRichAuthorizationRequests()`) |
+| OIDC Core §5.3/§5.5 | UserInfo endpoint over an OpenID Connect bearer token; the configured OAuth profile extension also serves authorized end-user OAuth grants without `openid`, while application grants are rejected by persisted subject provenance; `acr_values` voluntary satisfiability per §5.5.1.1 (level walk, stronger performed authentication covers a weaker request); `claims` request parameter with `userinfo`/`id_token` members parsed and validated (`essential`/`value`/`values`), pinned `sub` mismatch handling, Essential `acr` enforcement, ID-token claim projection, private access-token carriage of requested UserInfo names, discovery `claims_parameter_supported`, and signed or encrypted UserInfo responses per §5.3.2 | Enforced for OpenID Connect; OAuth UserInfo is a Schemata extension |
+| RFC 7523 | Assertion client authentication (`client_secret_jwt`, `private_key_jwt`); §3.1 `jwt-bearer` grant anchored on the `JwtBearerTrustedIssuers` table — an assertion issuer without an entry is rejected, and an empty table leaves the grant unusable | Enforced |
+| RFC 9449 | DPoP proof validation, the [§4.3](https://www.rfc-editor.org/rfc/rfc9449.html#section-4.3) at-most-one DPoP header field rule (`invalid_dpop_proof` on a repeated, empty, or comma-combined value), key-bound tokens, server nonces, discovery metadata, `dpop_jkt` authorize binding, and the [§10.1](https://www.rfc-editor.org/rfc/rfc9449.html#section-10.1) PAR header composition that validates `POST {issuer}/Connect/Par` proofs (no nonce), derives the stored `dpop_jkt` when absent, and rejects a header/parameter mismatch as `invalid_dpop_proof` | Enforced (behind `UseDemonstratingProofOfPossession()`) |
 
-#### OP session identity binding
+### OP session identity binding
 
 `IOpSessionService` resolves one canonical session identifier from collected evidence: a verified
 host ticket (the principal's `sid` claim) outranks every other source, and a fresh identifier is
@@ -820,12 +759,30 @@ session and rotates the OP user-agent state. Clearing records the cleared state 
 request, so subsequent issuance in the same request cannot resurrect the cleared identifier.
 Token-endpoint grants keep their validated lineage from the request properties; the session
 service is only consulted at the interactive login callback.
-| OIDC DCR §2-§3 | Dynamic registration: full metadata validation, 201 creation with paired registration access token + `registration_client_uri`, Bearer read-back and replace; registration requests pass an initial access token gate satisfied by a host-supplied `IInitialAccessTokenValidator` (anonymous requests rejected with 401); software statements apply to both create and replace when the host supplies a trusting validator, are unapproved otherwise, and their trusted claims take precedence while the submitted statement string is stored and echoed verbatim; OAuth-only registrations (no `openid` scope, redirect URIs, response types, `authorization_code`/`implicit` grants, or OIDC-only metadata such as subject/userinfo algorithms, `default_max_age`, `require_auth_time`, `default_acr_values`, `initiate_login_uri`, or logout URIs/session flags) may omit `redirect_uris` and carry no `authorization_code`/`code` defaults; malformed bodies and wrongly-typed fields return `invalid_client_metadata`/`invalid_software_statement` JSON | Enforced (registration surface) |
-| RFC 8707 §3 | `resource` at the authorize and token endpoints: §2 syntax validation (`invalid_target`), code-payload and refresh-subset grant consistency, access-token `aud` restriction, introspection echo | Enforced |
-| RFC 9396 §§6-7, §9 | `authorization_details` is validated against registered type descriptors and the client's `authorization_details_types` subset (§10). At code exchange and refresh, `IAuthorizationDetailTypeDescriptor.Narrow` owns the type-specific semantic comparison; there is no generic JSON-subset fallback. An omitted token-request parameter retains the grant carried by the code or refresh token, while an accepted narrowing becomes the actual set in the token response JSON array, access-token claim, successor refresh-token lineage, and resource-filtered introspection response. Narrowing never rewrites the original authorization record or authorization-code grant. Without `UseRichAuthorizationRequests()` the bound parameter remains inert and reaches no grant. | Enforced (behind `UseRichAuthorizationRequests()`) |
-| OIDC Core §5.3/§5.5 | UserInfo endpoint over an OpenID Connect bearer token; the configured OAuth profile extension also serves authorized end-user OAuth grants without `openid`, while application grants are rejected by persisted subject provenance; `acr_values` voluntary satisfiability per §5.5.1.1 (level walk, stronger performed authentication covers a weaker request); `claims` request parameter with `userinfo`/`id_token` members parsed and validated (`essential`/`value`/`values`), pinned `sub` mismatch handling, Essential `acr` enforcement, ID-token claim projection, private access-token carriage of requested UserInfo names, discovery `claims_parameter_supported`, and signed or encrypted UserInfo responses per §5.3.2 | Enforced for OpenID Connect; OAuth UserInfo is a Schemata extension |
-| RFC 7523 | Assertion client authentication (`client_secret_jwt`, `private_key_jwt`); §3.1 `jwt-bearer` grant anchored on the `JwtBearerTrustedIssuers` table — an assertion issuer without an entry is rejected, and an empty table leaves the grant unusable | Enforced |
-| RFC 9449 | DPoP proof validation, the [§4.3](https://www.rfc-editor.org/rfc/rfc9449.html#section-4.3) at-most-one DPoP header field rule (`invalid_dpop_proof` on a repeated, empty, or comma-combined value), key-bound tokens, server nonces, discovery metadata, `dpop_jkt` authorize binding, and the [§10.1](https://www.rfc-editor.org/rfc/rfc9449.html#section-10.1) PAR header composition that validates `POST {issuer}/Connect/Par` proofs (no nonce), derives the stored `dpop_jkt` when absent, and rejects a header/parameter mismatch as `invalid_dpop_proof` | Enforced (behind `UseDemonstratingProofOfPossession()`) |
+
+## Browser and external-RP evidence matrix
+
+This matrix records the exercised `BrowserProfile` composition, not certification. The exact client
+metadata, CORS policy, commands, target, and post-logout redirect outcome are in the
+[OIDC cookbook](../cookbook/oidc-server.md#modern-browser-and-relying-party-evidence-profile).
+`BrowserProfileHostShould` is the server evidence below; `external-rp.json` identifies the executed
+`openid-client@6.8.1` scenarios. `browser-code-pkce.har` and `security-scim-browser-evidence.json`
+contain the managed-Chromium evidence, including the registered `/logged-out` redirect.
+
+| Requirement | Registration and wire | Owner and application responsibility | Observed evidence |
+| --- | --- | --- | --- |
+| Code+PKCE | `UseAuthorizationCodeFlow`; `code`, S256, `authorization_code` | Framework validates and redeems; application supplies exact redirect/grant/scope metadata and preserves verifier, state, and nonce | PKCE rejection and token-free query callback in server tests; discovery, exchange, state/nonce, replayed state/code in external RP; code-only query callback and DPoP exchange in Chromium |
+| `form_post` | `ResponseModeService`; code-only HTML form | Framework selects the validated response mode; application parses the form without expecting tokens | Server test; code-only POST callback in Chromium |
+| Iframe/session | `UseSessionManagement`; session iframe and `session_state` | Framework owns OP session state; application supplies its iframe, cookie, and third-party-storage policy | `Connect/CheckSession` postMessage returned `unchanged` for current state and `changed` for stale state in Chromium |
+| CORS | `UseCors`; one HTTPS SPA origin, GET/POST/OPTIONS, Authorization/Content-Type/DPoP | Application owns origins, methods, request headers, and endpoint exposure | Allowed/denied preflights in server tests; exact-origin success and denied-origin fetch failure in Chromium |
+| DPoP nonce and binding | `UseDemonstratingProofOfPossession`; `DPoP-Nonce` exposed | Framework challenges and validates proofs; application retains keys and retries with the nonce | Readable header and successful retry in server tests; DPoP exchange/refresh in external RP; nonce challenge then successful exchange in Chromium |
+| Refresh | `UseRefreshTokenFlow`; `refresh_token` and `offline_access` | Framework rotates credentials; application stores the current refresh token | New access token for signed and encrypted-ID-token clients in external RP; nonce challenge and successful refresh in Chromium |
+| Encrypted ID token | Client `IdTokenEncryptedResponseAlg` plus its encryption JWK | Framework completes then encrypts the signed token; application protects the private key and validates inner claims | RSA-OAEP/A128CBC-HS256 decryption and nonce validation in external RP |
+| RP logout | `UseEndSession`; registered post-logout redirect | Framework validates the hint and retires the target; application completes its local logout | Existing server logout coverage; participant deletion and SID clearing in Chromium; registered `/logged-out` redirect completed |
+| Historical responses/password | `UseImplicitFlow`, `UseHybridFlow`, `UseNoneFlow`, `UseResourceOwnerPasswordFlow` | Application opts in and owns the migration threat model, Relax choices, and credential handling | Existing historical/password server coverage; excluded from modern browser and external-RP evidence |
+
+The concurrent-code external-RP boundary yielded one credential set and one non-conforming rejection
+(`OAUTH_RESPONSE_IS_NOT_CONFORM`). It does not establish a clean OAuth error for the losing request.
 
 ## Caveats
 

@@ -125,6 +125,17 @@
       href: scheduling/http.md
     - name: gRPC Transport
       href: scheduling/grpc.md
+- name: Quota
+  href: quota/overview.md
+  items:
+    - name: Overview
+      href: quota/overview.md
+    - name: Accounting
+      href: quota/accounting.md
+    - name: Algorithms
+      href: quota/algorithms.md
+    - name: Transports
+      href: quota/transports.md
 - name: Flow
   href: flow/overview.md
   items:
@@ -223,6 +234,8 @@
       href: scim-surface-matrix.md
 - name: Authorization
   href: authorization.md
+- name: Authorization Token Lifecycle
+  href: authorization-token-lifecycle.md
 - name: Tenancy
   href: tenancy.md
 - name: Modules

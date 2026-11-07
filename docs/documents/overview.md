@@ -4,6 +4,11 @@ Technical reference for every subsystem in Schemata. Each section covers a subsy
 architecture, key types, behavior, configuration, and extension points. Read here to understand
 how a part of the framework works and why it is built that way.
 
+For the OAuth/OpenID Connect server, read [Authorization](authorization.md), including its
+[protocol requirement matrix](authorization.md#protocol-requirement-matrix), activation boundaries,
+historical downgrades, and separately recorded browser evidence. Requirement-level coverage is
+partial and depends on the installed features and host policy.
+
 ## Core
 
 The foundation that the other features build on.
@@ -62,7 +67,7 @@ The distributed cache layer.
 
 ## Resource
 
-The AIP-aligned CRUD service and its transports.
+The code-first CRUD service and its transports have partial AIP coverage. Consult the requirement matrices for [modeling](resource/aip-modeling.md#requirement-matrix), [interactions](resource/aip-interactions.md), and [business logic](resource/aip-business-logic.md) before selecting a contract.
 
 | Document                                       | Covers                                                    |
 | ---------------------------------------------- | --------------------------------------------------------- |
@@ -146,7 +151,7 @@ Report definitions and the snapshots they materialize from Insight queries.
 
 ## Flow
 
-The BPMN process engine.
+The process runtime and its state-machine and BPMN executable subsets. The [BPMN feature matrix](flow/bpmn-engine.md#feature-matrix) states the supported runtime paths and exclusions.
 
 | Document                                     | Covers                                      |
 | -------------------------------------------- | ------------------------------------------- |
@@ -157,7 +162,7 @@ The BPMN process engine.
 | [Validator](flow/validator.md)               | Process-definition validation rules         |
 | [Runtime Services](flow/runtime.md)          | `FlowRunner`, persistence, registration     |
 | [State Machine](flow/state-machine.md)       | The default engine wiring                   |
-| [BPMN Engine](flow/bpmn-engine.md)           | The full BPMN 2.0.2 multi-token engine      |
+| [BPMN Engine](flow/bpmn-engine.md)           | Multi-token executable subset and runtime limits |
 | [BPMN Inclusive Merge](flow/bpmn-inclusive-merge.md) | Live-token analysis at an inclusive join |
 | [Event Integration](flow/event.md)           | Message and signal catches on the event bus |
 | [Scheduling Integration](flow/scheduling.md) | Timer catches on the scheduler              |

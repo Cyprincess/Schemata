@@ -6,6 +6,10 @@ A `SlugNormalizeAdvisor<TEntity>` that lower-cases the `Name` field on every upd
 open-generic so it applies to any entity implementing `ICanonicalName`. You'll also write an
 integration test that confirms the advisor runs and the stored row reflects the normalized value.
 
+The snippets and proposed test were source-traced but not compiled or executed in this alignment.
+Keep the prerequisite web project's implicit imports; the separate test project needs `System`,
+`System.Linq`, `System.Threading`, and `System.Threading.Tasks` imports shown below.
+
 ## Prerequisites
 
 - The Student example from [Getting Started](../guides/getting-started.md) is running.
@@ -15,7 +19,7 @@ integration test that confirms the advisor runs and the stored row reflects the 
 ## Step 1: Implement the advisor
 
 `IRepositoryUpdateAdvisor<TEntity>` runs before an entity is persisted on update. It extends
-`IAdvisor<IRepository<TEntity>, TEntity>`, so the pipeline passes the repository and the entity.
+`IAdvisor<IRepository<TEntity>, TEntity, MutationOptions>`, passing per-call options before cancellation.
 
 ```csharp
 using Schemata.Abstractions.Advisors;
@@ -32,6 +36,7 @@ public sealed class SlugNormalizeAdvisor<TEntity> : IRepositoryUpdateAdvisor<TEn
         AdviceContext        ctx,
         IRepository<TEntity> repository,
         TEntity              entity,
+        MutationOptions      options,
         CancellationToken    ct = default
     ) {
         if (!string.IsNullOrWhiteSpace(entity.Name)) {
@@ -47,8 +52,7 @@ Return `Continue` to let the rest of the pipeline proceed, `Block` to abort the 
 persisting, or `Handle` only when the advisor has already persisted the entity and the repository
 should skip its own write.
 
-**Assertion:** The class compiles. `Order = 50_000_000` is below `Orders.Base` (100M), so it runs
-before every built-in update advisor.
+**Expected contract (unexecuted):** `Order = 50_000_000` precedes the built-in update advisors.
 
 ## Step 2: Register the advisor
 
@@ -87,6 +91,10 @@ The test runs a real in-memory EF Core context through the full repository pipel
 advisor.
 
 ```csharp
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -95,10 +103,11 @@ using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Xunit;
 
+[Trait("Layer", "Integration")]
 public sealed class SlugNormalizeAdvisorShould
 {
     [Fact]
-    public async Task NormalizesNameToLowercase_OnUpdate()
+    public async Task Update_MixedCaseName_PersistsLowercaseName()
     {
         var services = new ServiceCollection();
 
@@ -124,8 +133,9 @@ public sealed class SlugNormalizeAdvisorShould
         await repo.UpdateAsync(student);
         await repo.CommitAsync();
 
-        // Verify — FirstOrDefaultAsync takes a query transform, not a boolean predicate
-        var found = await repo.FirstOrDefaultAsync<Student>(
+        await using var verificationScope = sp.CreateAsyncScope();
+        var verificationRepository = verificationScope.ServiceProvider.GetRequiredService<IRepository<Student>>();
+        var found = await verificationRepository.FirstOrDefaultAsync<Student>(
             q => q.Where(s => s.Name == "alice-updated"));
 
         Assert.NotNull(found);
@@ -138,7 +148,7 @@ public sealed class SlugNormalizeAdvisorShould
 Core repository for `Student`; `EfCoreRepository<TContext, TEntity>` resolves its context from the
 `IDbContextFactory<AppDbContext>` registered by `AddDbContextFactory`.
 
-**Assertion:** The test passes. `found.Name` is `"alice-updated"`, not `"ALICE-UPDATED"`.
+**Expected result (unexecuted):** `found.Name` is `"alice-updated"`.
 
 ## Step 4: Ordering relative to built-in advisors
 
@@ -155,18 +165,18 @@ it does not constrain advisor `Order`. An advisor's `Order` only fixes its posit
 built-in advisor chain, whose anchors come from `SchemataConstants.Orders` (`Base` = 100M for
 built-in advisors, `Extension` = 400M as the extension-feature anchor, `Max` = 900M for advisors
 that must run near the end). A value below `Base`, like the example's 50M, is legal and means
-"before every built-in advisor". The update pipeline applies no concurrency advisor — concurrency runs
-on the add pipeline (`AdviceAddConcurrency`, 110M); freshness on update is enforced by the resource
-layer.
+"before every built-in advisor". Providers own concurrency checking and stamp rotation at their
+write boundary; `AdviceAddConcurrency` initializes the add-time stamp. Resource freshness advisors
+compare request ETags before dispatch.
 
 **Assertion:** Add a second advisor at `Order = 200_000_000` and confirm by test that slug
 normalization happens before the second advisor sees the entity.
 
 ## Common pitfalls
 
-- **Registering with `AddScoped` instead of `TryAddEnumerable`.** `AddScoped(typeof(...))` for a
-  closed advisor type replaces any existing registration; `TryAddEnumerable` appends to the
-  collection the pipeline expects.
+- **Repeating registration.** `AddScoped` appends descriptors and enumerable resolution returns
+  all registrations. `TryAddEnumerable` also appends, but deduplicates the same service and
+  implementation type. Use it when repeated feature setup must not run the same advisor twice.
 - **`FirstOrDefaultAsync` takes a query transform.** The argument is
   `Func<IQueryable<TEntity>, IQueryable<TResult>>`, so pass `q => q.Where(...)`, not a bare boolean
   predicate.

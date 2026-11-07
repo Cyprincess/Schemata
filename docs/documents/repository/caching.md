@@ -28,6 +28,10 @@ services.AddRepository<Book, EfCoreRepository<AppDbContext, Book>>()
 | `AdviceResultCache<,,>`       | `IRepositoryResultAdvisor<,,>`  | 100,000,000 |
 | `AdviceCommittedEvictCache<>` | `IRepositoryCommittedAdvisor<>` | 900,000,000 |
 
+The advisors resolve `ICacheProvider` from each operation's `AdviceContext.ServiceProvider`. Query
+reads, result fills, and committed generation changes therefore use the final invocation scope's
+cache outlet, including the host or tenant partition activated by `UseCache`.
+
 A concrete `ICacheProvider` backend must be registered separately. Use `MemoryCacheBackend` for single-process deployments or `RedisCacheBackend` for multi-process / cluster deployments.
 
 ## Options
