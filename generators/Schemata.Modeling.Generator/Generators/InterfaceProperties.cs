@@ -45,16 +45,17 @@ internal static class InterfaceProperties
             fields.Add(name, field);
         }
         void Visit(string name) {
-            if (active.Contains(name)) { Fail("Cyclic trait '" + name + "'."); return; }
-            if (!visited.Add(name)) return;
-            var local = document.Traits.FirstOrDefault(trait => trait.Name == name);
-            if (local is not null) {
-                active.Add(name);
+            if (LocalTraitResolver.TryResolve(document, name, out var local, out var interfaceName)
+                && local is not null && interfaceName is not null) {
+                if (active.Contains(interfaceName)) { Fail("Cyclic trait '" + local.Name + "'."); return; }
+                if (!visited.Add(interfaceName)) return;
+                active.Add(interfaceName);
                 foreach (var parent in local.Uses.SelectMany(use => use.QualifiedNames).Concat(local.Bases)) Visit(parent);
                 foreach (var field in local.Fields) AddField(field);
-                active.Remove(name);
+                active.Remove(interfaceName);
                 return;
             }
+            if (!visited.Add(name)) return;
             var symbol = Resolve(name) as INamedTypeSymbol;
             if (symbol is null || symbol.TypeKind == TypeKind.Error) { Fail("Unresolved interface '" + name + "'."); return; }
             if (symbol.TypeKind != TypeKind.Interface) { Fail("Use requires an interface: '" + name + "'."); return; }

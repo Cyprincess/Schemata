@@ -35,11 +35,16 @@ Members may appear in any order.
 | `Index`  | No (stored as a `Pointer` node)   |
 | Field    | Yes                               |
 
+Nested `Trait` declarations are inert. They do not enter the document's trait collection, emit an
+interface, or satisfy local trait resolution.
+
 ## Composition
 
 Entities use the same `Use` and base-list syntax as traits. `EntityGenerator.GenerateUses`
-collects names from `Uses` and `Bases`, resolves any name matching a declared trait to its
-`I`-prefixed interface, and deduplicates.
+collects names from `Uses` and `Bases`, and `LocalTraitResolver` resolves either `Marker` or
+`IMarker` to a document trait's emitted `IMarker` interface. Ordinal matching keeps `marker` and
+`Imarker` external names. Canonical interface names and visited-trait keys collapse duplicate and
+transitive references to one contract.
 
 ```text
 Entity Student : Entity, SoftDelete {
@@ -56,9 +61,11 @@ Entity AuditRow {
 }
 ```
 
-This emits `System.DateTime? CreateTime` and `UpdateTime` properties. Interface property types,
-nullable annotations and required get/set/init accessors come from Roslyn symbols. Inherited
-properties are deduplicated; compatible explicit DSL fields are reused. Local trait fields are
+This emits `System.DateTime? CreateTime` and `UpdateTime` properties. A name left unresolved by the
+document-scoped lookup is resolved as an external C# interface. This fallback retains `SKM001`
+diagnostics for missing, non-interface, open, inaccessible, and unsupported contracts. Interface
+property types, nullable annotations and required get/set/init accessors come from Roslyn symbols.
+Inherited properties are deduplicated; compatible explicit DSL fields are reused. Local trait fields are
 also composed recursively. Default interface implementations remain on the interface.
 
 Closed generic arguments support nullable, array and nested generic types. Required methods,

@@ -44,6 +44,8 @@ public static class AppDomainTypeCache
 
     private static readonly ConcurrentDictionary<Assembly, byte> IndexedAssemblies = new();
 
+    private static readonly object PublicationLock = new();
+
     private static readonly ConcurrentDictionary<RuntimeTypeHandle, Dictionary<string, PropertyInfo>> StaticProperties = new();
 
     private static readonly ConcurrentDictionary<RuntimeTypeHandle, PropertyInfo[]> WritableProperties = [];
@@ -64,7 +66,9 @@ public static class AppDomainTypeCache
     public static IEnumerable<Type> GetAllTypes() {
         Refresh();
 
-        return Types.Values;
+        lock (PublicationLock) {
+            return Types.Values.ToArray();
+        }
     }
 
     /// <summary>
@@ -88,7 +92,9 @@ public static class AppDomainTypeCache
             return null;
         }
 
-        Assemblies[name] = assembly;
+        lock (PublicationLock) {
+            Assemblies[name] = assembly;
+        }
         return assembly;
     }
 
@@ -105,7 +111,9 @@ public static class AppDomainTypeCache
 
         type = Type.GetType(name, false);
         if (!string.IsNullOrWhiteSpace(type?.FullName)) {
-            Types[type.FullName] = type;
+            lock (PublicationLock) {
+                Types[type.FullName] = type;
+            }
             return type;
         }
 
@@ -121,7 +129,9 @@ public static class AppDomainTypeCache
                 continue;
             }
 
-            Types[type.FullName] = type;
+            lock (PublicationLock) {
+                Types[type.FullName] = type;
+            }
             return type;
         }
 
@@ -134,19 +144,14 @@ public static class AppDomainTypeCache
     /// <param name="type">The type to inspect.</param>
     /// <returns>A dictionary of property names to property info.</returns>
     public static Dictionary<string, PropertyInfo> GetProperties(Type type) {
-        if (Properties.TryGetValue(type.TypeHandle, out var properties)) {
-            return properties;
-        }
-
-        properties = type.GetProperties(
-                              BindingFlags.GetProperty
-                            | BindingFlags.IgnoreCase
-                            | BindingFlags.Public
-                            | BindingFlags.Instance)
-                         .ToDictionary(m => m.Name, m => m);
-        Properties[type.TypeHandle] = properties;
-
-        return properties;
+        return Properties.GetOrAdd(
+            type.TypeHandle,
+            static (_, t) => CreateMemberDictionary(t.GetProperties(
+                BindingFlags.GetProperty
+                | BindingFlags.IgnoreCase
+                | BindingFlags.Public
+                | BindingFlags.Instance)),
+            type);
     }
 
     /// <summary>
@@ -155,15 +160,10 @@ public static class AppDomainTypeCache
     /// <param name="type">The type to inspect.</param>
     /// <returns>A dictionary of field names to field info.</returns>
     public static Dictionary<string, FieldInfo> GetFields(Type type) {
-        if (Fields.TryGetValue(type.TypeHandle, out var fields)) {
-            return fields;
-        }
-
-        fields = type.GetFields(BindingFlags.Public | BindingFlags.Instance)
-                     .ToDictionary(m => m.Name, m => m);
-        Fields[type.TypeHandle] = fields;
-
-        return fields;
+        return Fields.GetOrAdd(
+            type.TypeHandle,
+            static (_, t) => CreateMemberDictionary(t.GetFields(BindingFlags.Public | BindingFlags.Instance)),
+            type);
     }
 
     /// <summary>
@@ -207,39 +207,81 @@ public static class AppDomainTypeCache
         return properties.GetValueOrDefault(name);
     }
 
+    private static Dictionary<string, T> CreateMemberDictionary<T>(IEnumerable<T> members) where T : MemberInfo {
+        var dictionary = new Dictionary<string, T>(StringComparer.Ordinal);
+        var ordered = members.OrderByDescending(member => GetInheritanceDepth(member.DeclaringType))
+                             .ThenBy(member => member.DeclaringType?.FullName, StringComparer.Ordinal)
+                             .ThenBy(member => member.MetadataToken);
+        foreach (var member in ordered) {
+            dictionary.TryAdd(member.Name, member);
+        }
+        return dictionary;
+    }
+
+    private static int GetInheritanceDepth(Type? type) {
+        if (type is null) {
+            return 0;
+        }
+        if (type.IsInterface) {
+            return type.GetInterfaces().Length;
+        }
+
+        var depth = 0;
+        for (var current = type; current.BaseType is { } parent; current = parent) {
+            depth++;
+        }
+        return depth;
+    }
+
     private static void Refresh() {
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
             Index(assembly);
         }
     }
 
-    private static void Index(Assembly assembly) {
-        if (assembly.IsDynamic || !IndexedAssemblies.TryAdd(assembly, 0)) {
+    internal static void Index(Assembly assembly) {
+        if (assembly.IsDynamic) {
             return;
         }
 
-        var name = assembly.GetName().Name;
-        if (string.IsNullOrWhiteSpace(name)) {
-            return;
-        }
-
-        Assemblies[name] = assembly;
-
-        IEnumerable<Type> types;
-        try {
-            types = assembly.GetExportedTypes();
-        } catch (ReflectionTypeLoadException exception) {
-            // A late-loaded assembly can reference types whose dependencies are not resolvable yet;
-            // indexing the loadable types keeps the rest of the application working.
-            types = exception.Types.OfType<Type>();
-        }
-
-        foreach (var type in types) {
-            if (string.IsNullOrWhiteSpace(type.FullName)) {
-                continue;
+        lock (PublicationLock) {
+            if (IndexedAssemblies.ContainsKey(assembly)) {
+                return;
             }
 
-            Types[type.FullName] = type;
+            try {
+                var name = assembly.GetName().Name;
+                if (string.IsNullOrWhiteSpace(name)) {
+                    IndexedAssemblies.TryAdd(assembly, 0);
+                    return;
+                }
+
+                IEnumerable<Type> types;
+                try {
+                    types = assembly.GetExportedTypes();
+                } catch (ReflectionTypeLoadException exception) {
+                    // A late-loaded assembly can reference types whose dependencies are not resolvable yet;
+                    // indexing the loadable types keeps the rest of the application working.
+                    types = exception.Types.OfType<Type>();
+                }
+
+                var additions = new List<KeyValuePair<string, Type>>();
+                foreach (var type in types) {
+                    if (string.IsNullOrWhiteSpace(type.FullName)) {
+                        continue;
+                    }
+                    additions.Add(new(type.FullName, type));
+                }
+
+                Assemblies[name] = assembly;
+                foreach (var addition in additions) {
+                    Types[addition.Key] = addition.Value;
+                }
+                IndexedAssemblies.TryAdd(assembly, 0);
+            } catch {
+                IndexedAssemblies.TryRemove(assembly, out _);
+                throw;
+            }
         }
     }
 }

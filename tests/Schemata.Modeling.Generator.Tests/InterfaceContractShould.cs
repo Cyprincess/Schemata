@@ -13,6 +13,59 @@ namespace Schemata.Modeling.Generator.Tests;
 
 public class InterfaceContractShould
 {
+    [Theory]
+    [InlineData("Entity Item { Use IMarker }")]
+    [InlineData("Entity Item : IMarker { }")]
+    [InlineData("Trait Group { Use IMarker } Entity Item { Use Group }")]
+    [InlineData("Entity Item { Use Marker, IMarker }")]
+    public void Compose_Generated_Interface_Spellings_As_One_Contract(string declaration) {
+        var (compilation, result) = Generate("Namespace Consumer Trait Marker { string tag } " + declaration, """
+            public static class Probe {
+                public static string Run() {
+                    var item = new Consumer.Item { Tag = "generated" };
+                    Consumer.IMarker marker = item;
+                    return item.Tag + ":" + marker.Tag + ":" + typeof(Consumer.IMarker).GetProperties().Length;
+                }
+            }
+            """);
+        Assert.Null(result.Exception);
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Equal("generated:generated:1", Execute(compilation));
+    }
+
+    [Fact]
+    public void Resolve_Identically_Named_Traits_Within_Their_Own_Documents() {
+        var (compilation, result) = Generate(
+            "Namespace First Trait Marker { string first } Entity Item { Use IMarker }",
+            "public static class Probe { public static string Run() => new First.Item { First = \"a\" }.First + new Second.Item { Second = \"b\" }.Second; }",
+            "Namespace Second Trait Marker { string second } Entity Item { Use Marker }");
+        Assert.Null(result.Exception);
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Equal("ab", Execute(compilation));
+    }
+
+    [Fact]
+    public void Keep_Nested_Entity_Traits_Inert() {
+        var (compilation, result) = Generate(
+            "Namespace Consumer Entity Item { Trait Marker { string tag } string name }",
+            "public static class Probe { public static string Run() => new Consumer.Item { Name = \"inert\" }.Name + \":\" + (typeof(Consumer.Item).Assembly.GetType(\"Consumer.IMarker\") is null); }");
+        Assert.Null(result.Exception);
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Equal("inert:True", Execute(compilation));
+    }
+
+    [Theory]
+    [InlineData("marker")]
+    [InlineData("Imarker")]
+    public void Match_Local_Trait_Names_Ordinally(string name) {
+        var (_, result) = Generate(
+            "Namespace Consumer Trait Marker { string tag } Entity Item { Use " + name + " }", "");
+
+        Assert.Null(result.Exception);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "SKM001"
+            && diagnostic.GetMessage().Contains("Unresolved", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void Compile_And_Execute_External_Timestamp_And_Local_Trait_Contracts() {
         var (compilation, result) = Generate("""

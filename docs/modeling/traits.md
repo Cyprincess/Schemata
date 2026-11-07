@@ -20,8 +20,14 @@ and `Enum` declarations are entity-only.
 ## Composition
 
 A base list is equivalent to a `Use` declaration. `EntityGenerator.GenerateUses` collects names
-from both `Uses` and `Bases`, prefixes any name that resolves to a trait declared in the same
-document with `I`, deduplicates, and writes them as the interface's base list.
+from both `Uses` and `Bases`. For a trait named `Marker` in the same document, `LocalTraitResolver`
+accepts both `Marker` and the generated interface spelling `IMarker`. Matching is ordinal, and both
+spellings resolve to the canonical emitted name `IMarker`. Emission deduplicates by that name, while
+property traversal uses the same canonical key for visited traits, including transitive trait walks.
+
+Names that do not resolve to a document trait continue through Roslyn external-interface resolution.
+Missing, non-interface, open, inaccessible, or unsupported external contracts produce `SKM001` as
+described in [Entities](entities.md#composition).
 
 ```text
 // Equivalent:

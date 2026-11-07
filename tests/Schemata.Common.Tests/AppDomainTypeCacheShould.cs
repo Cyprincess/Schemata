@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
+using Moq;
 using Xunit;
 
 namespace Schemata.Common.Tests;
@@ -29,8 +32,8 @@ public class AppDomainTypeCacheShould
         // Force the cache to initialize and index the assemblies loaded so far.
         AppDomainTypeCache.GetProperties(typeof(string));
 
-        // Moq is referenced by this test project but not used by other tests in it; load it
-        // explicitly so its types only become discoverable through the incremental refresh.
+        // Load Moq explicitly when another test has not already loaded it. The refreshed cache must
+        // contain its exported types in either case.
         var assembly = AppDomain.CurrentDomain.GetAssemblies()
                                  .FirstOrDefault(candidate => candidate.GetName().Name == "Moq")
                     ?? Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, "Moq.dll"));
@@ -41,6 +44,123 @@ public class AppDomainTypeCacheShould
         Assert.All(
             assembly.GetExportedTypes(),
             type => Assert.Contains(type.FullName, types));
+    }
+
+    [Fact]
+    public void GetProperties_NewShadowedMember_SelectsMostDerived() {
+        var properties = AppDomainTypeCache.GetProperties(typeof(DerivedMetadata));
+
+        var property = properties["Value"];
+        Assert.Equal(typeof(DerivedMetadata), property.DeclaringType);
+        Assert.Equal(typeof(int), property.PropertyType);
+    }
+
+    [Fact]
+    public void GetFields_NewShadowedMember_SelectsMostDerived() {
+        var fields = AppDomainTypeCache.GetFields(typeof(DerivedFieldMetadata));
+
+        var field = fields["Value"];
+        Assert.Equal(typeof(DerivedFieldMetadata), field.DeclaringType);
+        Assert.Equal(typeof(int), field.FieldType);
+    }
+
+    [Fact]
+    public void Assembly_Indexing_Failure_Rethrows_And_Retries() {
+        var name     = "Schemata.Cache.Retry." + Guid.NewGuid().ToString("N");
+        var sentinel = new InvalidOperationException("indexing failed");
+        var assembly = new Mock<Assembly>();
+        assembly.SetupGet(candidate => candidate.IsDynamic).Returns(false);
+        assembly.Setup(candidate => candidate.GetName()).Returns(new AssemblyName(name));
+        assembly.SetupSequence(candidate => candidate.GetExportedTypes())
+                .Throws(sentinel)
+                .Returns([typeof(FirstPublishedType)]);
+
+        var thrown = Assert.Throws<InvalidOperationException>(() => AppDomainTypeCache.Index(assembly.Object));
+
+        Assert.Same(sentinel, thrown);
+        Assert.False(AppDomainTypeCache.Assemblies.ContainsKey(name));
+
+        AppDomainTypeCache.Index(assembly.Object);
+
+        assembly.Verify(candidate => candidate.GetExportedTypes(), Times.Exactly(2));
+        Assert.Same(assembly.Object, AppDomainTypeCache.Assemblies[name]);
+        Assert.Same(typeof(FirstPublishedType), AppDomainTypeCache.Types[typeof(FirstPublishedType).FullName!]);
+    }
+
+    [Fact]
+    public async Task Concurrent_Type_Readers_See_Only_Complete_Published_Snapshots() {
+        var name     = "Schemata.Cache.Publication." + Guid.NewGuid().ToString("N");
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var assembly = new Mock<Assembly>();
+        assembly.SetupGet(candidate => candidate.IsDynamic).Returns(false);
+        assembly.Setup(candidate => candidate.GetName()).Returns(new AssemblyName(name));
+        assembly.Setup(candidate => candidate.GetExportedTypes()).Returns(() => {
+            entered.Set();
+            release.Wait();
+            return [typeof(FirstPublishedType), typeof(SecondPublishedType)];
+        });
+
+        var indexing = Task.Run(() => AppDomainTypeCache.Index(assembly.Object));
+        Task<HashSet<string>> reader;
+        bool completedBeforeRelease;
+        try {
+            Assert.True(entered.Wait(TimeSpan.FromSeconds(10)));
+            reader = Task.Run(() => AppDomainTypeCache.GetAllTypes()
+                                                   .Select(type => type.FullName ?? string.Empty)
+                                                   .ToHashSet(StringComparer.Ordinal));
+            completedBeforeRelease = await Task.WhenAny(reader, Task.Delay(100)) == reader;
+        } finally {
+            release.Set();
+        }
+
+        await indexing;
+        var snapshot = await reader;
+
+        Assert.False(completedBeforeRelease);
+        Assert.Contains(typeof(FirstPublishedType).FullName!, snapshot);
+        Assert.Contains(typeof(SecondPublishedType).FullName!, snapshot);
+    }
+
+    [Fact]
+    public async Task Concurrent_Metadata_Readers_Reuse_Published_Dictionaries() {
+        var properties = AppDomainTypeCache.GetProperties(typeof(DerivedMetadata));
+        var fields     = AppDomainTypeCache.GetFields(typeof(DerivedFieldMetadata));
+
+        var readers = Enumerable.Range(0, 16).Select(_ => Task.Run(() => {
+            Assert.Same(properties, AppDomainTypeCache.GetProperties(typeof(DerivedMetadata)));
+            Assert.Same(fields, AppDomainTypeCache.GetFields(typeof(DerivedFieldMetadata)));
+        }));
+
+        await Task.WhenAll(readers);
+    }
+
+    private class BaseMetadata
+    {
+        public string Value { get; set; } = "base";
+    }
+
+    private sealed class DerivedMetadata : BaseMetadata
+    {
+        public new int Value { get; set; }
+    }
+
+    private class BaseFieldMetadata
+    {
+        public string Value = "base";
+    }
+
+    private sealed class DerivedFieldMetadata : BaseFieldMetadata
+    {
+        public new int Value = 1;
+    }
+
+    public sealed class FirstPublishedType
+    {
+    }
+
+    public sealed class SecondPublishedType
+    {
     }
 
     private sealed class FieldSample

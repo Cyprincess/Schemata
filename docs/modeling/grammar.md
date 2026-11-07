@@ -44,7 +44,14 @@ enum value = identifier,
 ```
 
 A base list is equivalent to a `Use` declaration: `Entity Foo : Bar, Baz` is sugar for
-`Use Bar, Baz`. Both resolve through `EntityGenerator.GenerateUses`.
+`Use Bar, Baz`. Both channels and transitive trait references use the same document-scoped resolver.
+A document trait `Marker` accepts the ordinal spellings `Marker` and `IMarker`; both produce the
+canonical emitted interface name `IMarker`. Canonical names deduplicate mixed references and visited
+traits. Unresolved names continue through external C# interface resolution and its `SKM001`
+diagnostics.
+
+A `trait` nested in an entity body is stored on that entity but remains inert: it emits no interface
+and does not join the document-scoped trait lookup.
 
 ## Field
 

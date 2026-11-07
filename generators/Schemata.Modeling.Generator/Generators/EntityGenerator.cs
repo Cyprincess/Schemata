@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Schemata.Modeling.Generator.Expressions;
@@ -51,7 +50,9 @@ internal static class EntityGenerator
         var seen  = new HashSet<string>(StringComparer.Ordinal);
 
         void Add(string name) {
-            var resolved = doc.Traits.Any(t => t.Name == name) ? $"I{name}" : name;
+            var resolved = LocalTraitResolver.TryResolve(doc, name, out _, out var interfaceName) && interfaceName is not null
+                ? interfaceName
+                : name;
             if (seen.Add(resolved)) {
                 names.Add(resolved);
             }

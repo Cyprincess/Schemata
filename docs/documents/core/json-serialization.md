@@ -106,6 +106,13 @@ derived types:
 The discriminator is emitted directly as `@type`; there is no separate rename step. The resolver
 is a singleton, `PolymorphicTypeResolver.Instance`, applied by the HTTP transport.
 
+`AppDomainTypeCache.GetAllTypes()` supplies a materialized snapshot acquired under the same lock used
+for assembly indexing and publication, so this scan cannot observe a partially indexed assembly.
+Failed indexing propagates its original exception and leaves the assembly eligible for retry on a
+later cache access. The cache's property and field dictionaries use ordinal names, deterministic
+most-derived-wins selection for `new`-shadowed members, and stable dictionary identity. See
+[Feature System](feature-system.md#metadata-publication).
+
 ## SchemataJsonTraits
 
 `SchemataJsonTraits.Apply` runs once per options instance from `SchemataTransportHttpFeature`. It
