@@ -42,8 +42,7 @@ public sealed class RepositoryFlowEffectRecorder<TEffectIntent>(
         repository.Join(unitOfWork);
 
         // A provider query cannot see rows staged earlier in this unit of work, so consult the
-        // staged map first: a repeated RequestId must reuse the authoritative row instead of
-        // staging a second creation that would violate the unique RequestId index on save.
+        // staged map first: a repeated RequestId must reuse the authoritative staged row.
         if (_staged.TryGetValue(intent.RequestId, out var staged)) {
             return new() {
                 RequestId = staged.RequestId,

@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -511,8 +512,8 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
         Reopen();
     }
 
-    public virtual IUnitOfWork Begin() {
-        var uow = CreateUnitOfWork();
+    public virtual IUnitOfWork Begin(IsolationLevel? isolationLevel = null) {
+        var uow = CreateUnitOfWork(isolationLevel);
 
         Join(uow);
 
@@ -694,7 +695,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
             return;
         }
 
-        _uow = CreateUnitOfWork();
+        _uow = CreateUnitOfWork(null);
         Enlist(_uow);
     }
 
@@ -771,7 +772,7 @@ public abstract class RepositoryBase<TEntity> : RepositoryBase, IRepository<TEnt
     ///     <see cref="Begin" /> and by <see cref="EnsureWriteUnitOfWork" /> to back standalone
     ///     writes.
     /// </summary>
-    protected abstract IUnitOfWork CreateUnitOfWork();
+    protected abstract IUnitOfWork CreateUnitOfWork(IsolationLevel? isolationLevel);
 
     /// <summary>
     ///     Replaces the repository's owned context with the unit of work's context. The base wires

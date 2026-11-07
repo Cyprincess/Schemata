@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Text.Json;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Exceptions;
@@ -82,6 +83,36 @@ public class UniqueClassificationShould : IAsyncLifetime
         if (info is not null) {
             Assert.NotNull(info.ResourceName);
             Assert.Contains(info.ResourceName, new[] { $"courses/{uid:n}", $"courses/{other:n}" });
+        }
+    }
+
+    [Fact]
+    public async Task Lock_Failure_Throws_Unclassified_Aborted_With_Provider_Cause() {
+        var uid = Guid.NewGuid();
+        await AddCourseAsync(uid, "locked");
+
+        await using var scope = _fixture.ServiceProvider.CreateAsyncScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IRepository<Course>>();
+        var entity = await repository.FirstOrDefaultAsync(query => query.Where(course => course.Uid == uid));
+        Assert.NotNull(entity);
+        entity.Credits = 3;
+        await repository.UpdateAsync(entity);
+
+        await using var blocker = new SqliteConnection($"Data Source={_fixture.DatabasePath}");
+        await blocker.OpenAsync();
+        await using (var begin = blocker.CreateCommand()) {
+            begin.CommandText = "BEGIN IMMEDIATE";
+            await begin.ExecuteNonQueryAsync();
+        }
+
+        try {
+            var error = await Assert.ThrowsAsync<AbortedException>(() => repository.CommitAsync());
+            Assert.IsType<DbUpdateException>(error.InnerException);
+            Assert.DoesNotContain(error.Details ?? [], detail => detail is Abstractions.Errors.ResourceInfoDetail);
+        } finally {
+            await using var rollback = blocker.CreateCommand();
+            rollback.CommandText = "ROLLBACK";
+            await rollback.ExecuteNonQueryAsync();
         }
     }
 }

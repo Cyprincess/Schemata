@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading;
@@ -37,6 +38,9 @@ public class AdviceClaimsPairwiseShould
         // An existing mapping row makes EnsureMappingAsync return the stored pairwise value,
         // so the advisor runs its replacement loop without touching the mapping owner.
         var mappings = new Mock<IRepository<SchemataSubjectMapping>>();
+        var readTransaction = new Mock<IUnitOfWork>();
+        readTransaction.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        mappings.Setup(r => r.Begin(IsolationLevel.Serializable)).Returns(readTransaction.Object);
         mappings.Setup(r => r.FirstOrDefaultAsync(
                     It.IsAny<Func<IQueryable<SchemataSubjectMapping>, IQueryable<SchemataSubjectMapping>>>(),
                     It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
@@ -50,7 +54,7 @@ public class AdviceClaimsPairwiseShould
             new Mock<ISubjectIdentifierService>().Object,
             mappings.Object,
             new Mock<IResourceMutation<SchemataSubjectMapping>>().Object,
-            new ServiceCollection().BuildServiceProvider());
+            new ServiceCollection().AddSingleton(mappings.Object).BuildServiceProvider());
         var advisor = new AdviceClaimsPairwise<SchemataApplication, SchemataSubjectMapping>(apps.Object, translator);
 
         var claims = new List<Claim> {
@@ -94,7 +98,7 @@ public class AdviceClaimsPairwiseShould
                                               query(rows.AsQueryable()).FirstOrDefault()));
         var transaction = new Mock<Schemata.Entity.Repository.IUnitOfWork>();
         transaction.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        mappings.Setup(r => r.Begin()).Returns(transaction.Object);
+        mappings.Setup(r => r.Begin(IsolationLevel.Serializable)).Returns(transaction.Object);
         var mutation = new Mock<IResourceMutation<SchemataSubjectMapping>>();
         mutation.Setup(m => m.CreateAsync(
                     It.IsAny<SchemataSubjectMapping>(),
@@ -141,6 +145,9 @@ public class AdviceClaimsPairwiseShould
             },
         };
         var mappings = new Mock<IRepository<SchemataSubjectMapping>>();
+        var readTransaction = new Mock<IUnitOfWork>();
+        readTransaction.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        mappings.Setup(r => r.Begin(IsolationLevel.Serializable)).Returns(readTransaction.Object);
         mappings.Setup(r => r.FirstOrDefaultAsync(
                     It.IsAny<Func<IQueryable<SchemataSubjectMapping>, IQueryable<SchemataSubjectMapping>>>(),
                     It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
@@ -152,7 +159,7 @@ public class AdviceClaimsPairwiseShould
             new SubjectIdentifierService(Options.Create(new SchemataAuthorizationOptions())),
             mappings.Object,
             new Mock<IResourceMutation<SchemataSubjectMapping>>().Object,
-            new ServiceCollection().BuildServiceProvider());
+            new ServiceCollection().AddSingleton(mappings.Object).BuildServiceProvider());
 
         var caller   = new ClaimsPrincipal(new ClaimsIdentity([new(Claims.ClientId, "client-1")], "grant"));
         var forward  = await translator.ToPairwiseAsync("users/alice", caller);

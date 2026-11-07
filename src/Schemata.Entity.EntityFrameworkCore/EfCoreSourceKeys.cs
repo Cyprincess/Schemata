@@ -41,17 +41,22 @@ internal static class EfCoreSourceKeys
     // costs a cache miss, while a principal subset would collide across security contexts.
     internal static string DescribeSource(DbConnection connection) {
         return Frame(connection.GetType().ToString())
-             + Frame(connection.DataSource)
-             + Frame(connection.Database)
              + Frame(connection.ConnectionString);
     }
 
     internal static bool IsEphemeralDataSource(DbConnection connection) {
-        var dataSource = connection.DataSource;
+        if (string.IsNullOrEmpty(connection.ConnectionString)) {
+            return true;
+        }
 
-        return string.IsNullOrEmpty(dataSource)
-            || dataSource.Equals(":memory:", StringComparison.OrdinalIgnoreCase)
-            || HasMemoryLifetime(connection.ConnectionString);
+        var builder = new DbConnectionStringBuilder { ConnectionString = connection.ConnectionString };
+        if (builder.TryGetValue("Data Source", out var source)
+         && (source is null || string.IsNullOrEmpty(source as string)
+             || source is string memory && memory.Equals(":memory:", StringComparison.OrdinalIgnoreCase))) {
+            return true;
+        }
+
+        return HasMemoryLifetime(connection.ConnectionString);
     }
 
     private static string Frame(string? value) {

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
@@ -18,10 +19,9 @@ namespace Schemata.Security.Foundation.Stores;
 /// <summary>
 ///     Default full-surface implementation of <see cref="ITokenStore{TToken}" /> backed by an
 ///     <see cref="IRepository{TEntity}" />. Rows are stored verbatim, in plaintext at rest;
-///     transparent at-rest encryption is a documented non-goal. The (Parent, Provider, Key)
-///     unique index is the concurrency backstop for slot creation, and the
-///     [<see cref="System.ComponentModel.DataAnnotations.ConcurrencyCheckAttribute" />] Timestamp
-///     is the CAS register for redemption. Every write a reported security-state transition
+///     transparent at-rest encryption is a documented non-goal. Serializable application transactions
+///     guard the (Parent, Provider, Key) slot, and the Timestamp CAS register arbitrates redemption.
+///     Every write a reported security-state transition
 ///     depends on is mandatory: an advisor that blocks or handles such a write fails the
 ///     transition with <c>FAILED_PRECONDITION</c> and the enclosing unit of work rolls back its
 ///     staged rows. Sweep-style removals (prune, participant retirement) report only the rows
@@ -77,7 +77,7 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
                 return await WithFreshStoreAsync(store => store.GetOrCreateCoreAsync(parent, provider, key, value, ttl, ct));
             }
             catch (Exception contention) when (attempt < 2 && (contention is AlreadyExistsException
-                || contention is AbortedException aborted && SchemataTokenConflicts.IsConflict(aborted))) {
+                || contention is AbortedException aborted && SchemataTokenConflicts.IsConflict<TToken>(aborted))) {
             }
         }
     }
@@ -91,9 +91,11 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
         CancellationToken ct
     ) {
         await using var repository = _services.GetRequiredService<IRepository<TToken>>();
+        await using var transaction = repository.Begin(IsolationLevel.Serializable);
         var existing = await repository.SingleOrDefaultAsync(
             q => q.Where(t => t.Parent == parent && t.Provider == provider && t.Key == key), ct);
         if (existing is not null && (existing.ExpireTime is null || existing.ExpireTime > Now())) {
+            await transaction.CommitAsync(ct);
             return existing;
         }
 
@@ -107,7 +109,8 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
 
         if (existing is null) {
             try {
-                await using var transaction = repository.Begin();
+                var availability = new TokenWriteGuard();
+                await availability.EnsureAvailableAsync(repository, candidate, null, ct);
                 await AddMandatoryAsync(repository, candidate,
                     "A blocked slot creation vetoes the establishment.", ct);
                 await transaction.CommitAsync(ct);
@@ -115,24 +118,26 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
                 return candidate;
             }
             catch (AlreadyExistsException) {
-                // A concurrent creator won the (Parent, Provider, Key) unique index.
+                await transaction.DisposeAsync();
                 return await ReadLiveWinnerAsync(parent, provider, key, ct);
             }
         }
 
-        // The stored slot expired: replace it in place so the unique index keeps one row and the
+        // The stored slot expired: replace it in place so the transaction keeps one row and the
         // Timestamp CAS register arbitrates concurrent replacers.
         existing.Value      = candidate.Value;
         existing.ExpireTime = candidate.ExpireTime;
         try {
-            await using var transaction = repository.Begin();
+            var availability = new TokenWriteGuard();
+            await availability.EnsureAvailableAsync(repository, existing, existing.Uid, ct);
             await UpdateMandatoryAsync(repository, existing,
                 "A blocked slot replacement vetoes the establishment.", ct);
             await transaction.CommitAsync(ct);
 
             return existing;
         }
-        catch (AbortedException exception) when (SchemataTokenConflicts.IsConflict(exception)) {
+        catch (AbortedException exception) when (SchemataTokenConflicts.IsConflict<TToken>(exception)) {
+            await transaction.DisposeAsync();
             return await ReadLiveWinnerAsync(parent, provider, key, ct);
         }
     }
@@ -160,6 +165,8 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
     ) {
         ct.ThrowIfCancellationRequested();
         await using var repository = _services.GetRequiredService<IRepository<TToken>>();
+        await using var transaction = repository.Begin(IsolationLevel.Serializable);
+        var availability = new TokenWriteGuard();
 
         DateTime? expire = ttl is null ? null : Now() + ttl.Value;
         var existing = await repository.SingleOrDefaultAsync(
@@ -168,19 +175,23 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
         if (existing is not null) {
             existing.Value      = value;
             existing.ExpireTime = expire;
+            await availability.EnsureAvailableAsync(repository, existing, existing.Uid, ct);
             await UpdateMandatoryAsync(repository, existing,
                 "A blocked slot update vetoes the write.", ct);
         } else {
-            await AddMandatoryAsync(repository, new() {
+            var candidate = new TToken {
                 Parent     = parent,
                 Provider   = provider,
                 Key        = key,
                 Value      = value,
                 ExpireTime = expire,
-            }, "A blocked slot creation vetoes the write.", ct);
+            };
+            await availability.EnsureAvailableAsync(repository, candidate, null, ct);
+            await AddMandatoryAsync(repository, candidate,
+                "A blocked slot creation vetoes the write.", ct);
         }
 
-        await repository.CommitAsync(ct);
+        await transaction.CommitAsync(ct);
     }
 
     public async Task RemoveAsync(string? parent, string provider, string key, CancellationToken ct = default) {
@@ -268,12 +279,12 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
         token.Status = Statuses.Redeemed;
 
         try {
-            await using var transaction = repository.Begin();
+            await using var transaction = repository.Begin(IsolationLevel.Serializable);
             await UpdateMandatoryAsync(repository, token,
                 "A blocked redemption write vetoes the transition.", ct);
             await transaction.CommitAsync(ct);
         }
-        catch (AbortedException exception) when (SchemataTokenConflicts.IsConflict(exception)) {
+        catch (AbortedException exception) when (SchemataTokenConflicts.IsConflict<TToken>(exception)) {
             return await ClassifyRedemptionAbortAsync(token, stamp, ct);
         }
 
@@ -293,19 +304,25 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
         // The Timestamp CAS register as loaded, captured before the in-place status mutation.
         var stamp = predecessor.Timestamp;
         try {
-            await using var uow = repository.Begin();
+            await using var uow = repository.Begin(IsolationLevel.Serializable);
+            var availability = new TokenWriteGuard();
             predecessor.Status = Statuses.Redeemed;
             await UpdateMandatoryAsync(repository, predecessor,
                 "A blocked rotation-predecessor redemption vetoes the rotation.", ct);
             foreach (var successor in successors) {
+                await availability.EnsureAvailableAsync(repository, successor, null, ct);
                 await AddMandatoryAsync(repository, successor,
                     "A blocked successor write vetoes the rotation.", ct);
             }
             if (beforeCommit is not null) await beforeCommit(uow, ct);
             await uow.CommitAsync(ct);
             return true;
-        } catch (Exception contention) when (contention is AlreadyExistsException
-            || contention is AbortedException aborted && SchemataTokenConflicts.IsConflict(aborted)) {
+        } catch (AlreadyExistsException) {
+            var unchanged = await WithFreshStoreAsync(store => store.PredecessorUnchangedAsync(
+                predecessor.ReferenceId, stamp, ct));
+            if (unchanged) throw;
+            return false;
+        } catch (AbortedException exception) when (SchemataTokenConflicts.IsConflict<TToken>(exception)) {
             return await ClassifyRotationAbortAsync(predecessor, stamp, ct);
         }
     }
@@ -325,7 +342,8 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
 
         Guid markerStamp = default;
         try {
-            await using var uow = repository.Begin();
+            await using var uow = repository.Begin(IsolationLevel.Serializable);
+            var availability = new TokenWriteGuard();
             var marker = await FamilyAsync(repository, family, ct);
             markerStamp = marker?.Timestamp ?? default;
             if (marker is null) {
@@ -342,6 +360,7 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
                     Type       = TokenTypes.Family,
                     Status     = Statuses.FamilyActive,
                 };
+                await availability.EnsureAvailableAsync(repository, marker, null, ct);
                 await AddMandatoryAsync(repository, marker,
                     "A blocked family-marker creation vetoes the publication.", ct,
                     new MutationOptions(IgnoreValidation: true));
@@ -353,18 +372,20 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
                     }
                     return false;
                 }
+                await availability.EnsureAvailableAsync(repository, marker, marker.Uid, ct);
                 await UpdateMandatoryAsync(repository, marker,
                     "A blocked family-marker refresh vetoes the publication.", ct);
             }
 
             foreach (var token in tokens) {
+                await availability.EnsureAvailableAsync(repository, token, null, ct);
                 await AddMandatoryAsync(repository, token,
                     "A blocked family-member write vetoes the publication.", ct);
             }
             if (beforeCommit is not null) await beforeCommit(uow, ct);
             await uow.CommitAsync(ct);
             return true;
-        } catch (AbortedException exception) when (SchemataTokenConflicts.IsConflict(exception)) {
+        } catch (AbortedException exception) when (SchemataTokenConflicts.IsConflict<TToken>(exception)) {
             var marker = await WithFreshStoreAsync(store => store.FamilyAsync(family, ct));
             if (marker is null) {
                 throw new InvalidOperationException(
@@ -397,7 +418,8 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
         var predecessorStamp = predecessor.Timestamp;
         Guid markerStamp = default;
         try {
-            await using var uow = repository.Begin();
+            await using var uow = repository.Begin(IsolationLevel.Serializable);
+            var availability = new TokenWriteGuard();
             var marker = await FamilyAsync(repository, predecessor.Family, ct);
             if (marker?.Status != Statuses.FamilyActive || predecessor.Status != Statuses.Valid) {
                 await uow.RollbackAsync(ct);
@@ -409,18 +431,20 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
 
             markerStamp = marker.Timestamp;
             predecessor.Status = Statuses.Redeemed;
+            await availability.EnsureAvailableAsync(repository, marker, marker.Uid, ct);
             await UpdateMandatoryAsync(repository, marker,
                 "A blocked family-marker refresh vetoes the family rotation.", ct);
             await UpdateMandatoryAsync(repository, predecessor,
                 "A blocked rotation-predecessor redemption vetoes the family rotation.", ct);
             foreach (var successor in successors) {
+                await availability.EnsureAvailableAsync(repository, successor, null, ct);
                 await AddMandatoryAsync(repository, successor,
                     "A blocked family-successor write vetoes the family rotation.", ct);
             }
             if (beforeCommit is not null) await beforeCommit(uow, ct);
             await uow.CommitAsync(ct);
             return true;
-        } catch (AbortedException exception) when (SchemataTokenConflicts.IsConflict(exception)) {
+        } catch (AbortedException exception) when (SchemataTokenConflicts.IsConflict<TToken>(exception)) {
             return await WithFreshStoreAsync(store => store.ResolveRotationAbortAsync(
                 predecessor.Family!, predecessor.ReferenceId, markerStamp, predecessorStamp,
                 successors, ct, beforeCommit));
@@ -437,7 +461,7 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
         Guid markerStamp = default;
         Dictionary<Guid, Guid>? memberStamps = null;
         try {
-            await using var uow = repository.Begin();
+            await using var uow = repository.Begin(IsolationLevel.Serializable);
             var marker = await FamilyAsync(repository, family, ct);
             markerStamp = marker?.Timestamp ?? default;
             if (marker is null) {
@@ -463,7 +487,7 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
             }
             await uow.CommitAsync(ct);
             return true;
-        } catch (AbortedException exception) when (SchemataTokenConflicts.IsConflict(exception)) {
+        } catch (AbortedException exception) when (SchemataTokenConflicts.IsConflict<TToken>(exception)) {
             var marker = await WithFreshStoreAsync(store => store.FamilyAsync(family, ct));
             if (marker?.Status == Statuses.FamilyInvalidated) {
                 return true;
@@ -673,7 +697,7 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
             }
 
             await transaction.CommitAsync(ct);
-        } catch (AbortedException exception) when (SchemataTokenConflicts.IsConflict(exception)) {
+        } catch (AbortedException exception) when (SchemataTokenConflicts.IsConflict<TToken>(exception)) {
             throw new ApplicationRevocationAbortedException(stamps, exception);
         }
 
@@ -860,7 +884,7 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
     }
 
     // The record separator cannot occur in a server-minted session identifier, so the composite
-    // slot key stays unambiguous per (session, application) under the unique index.
+    // slot key stays unambiguous per (session, application) under the transaction guard.
     private static string ParticipantKey(string sessionId, string application) {
         return $"{sessionId}\x1e{application}";
     }
@@ -924,7 +948,9 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
         // The write and its participant share one caller-owned transaction on a fresh repository,
         // so consecutive store calls in the same scope never meet a completed unit of work.
         await using var repository = _services.GetRequiredService<IRepository<TToken>>();
-        await using var transaction = repository.Begin();
+        await using var transaction = repository.Begin(IsolationLevel.Serializable);
+        var availability = new TokenWriteGuard();
+        await availability.EnsureAvailableAsync(repository, token, null, ct);
         await AddMandatoryAsync(repository, token,
             "A blocked creation write vetoes the publication.", ct);
         if (beforeCommit is not null) await beforeCommit(transaction, ct);
@@ -942,7 +968,9 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
         }
 
         await using var repository = _services.GetRequiredService<IRepository<TToken>>();
-        await using var transaction = repository.Begin();
+        await using var transaction = repository.Begin(IsolationLevel.Serializable);
+        var availability = new TokenWriteGuard();
+        await availability.EnsureAvailableAsync(repository, token, token.Uid, ct);
         await UpdateMandatoryAsync(repository, token,
             "A blocked update write vetoes the publication.", ct);
         if (beforeCommit is not null) await beforeCommit(transaction, ct);
@@ -957,6 +985,48 @@ public class RepositoryTokenStore<TToken> : ITokenStore<TToken>
     ) : Exception(null, inner)
     {
         public IReadOnlyDictionary<Guid, Guid> Stamps { get; } = stamps;
+    }
+
+    private sealed class TokenWriteGuard
+    {
+        private readonly HashSet<string> _families = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _references = new(StringComparer.Ordinal);
+
+        public async Task EnsureAvailableAsync(
+            IRepository<TToken> repository,
+            TToken token,
+            Guid? excludeUid,
+            CancellationToken ct) {
+            if (!string.IsNullOrWhiteSpace(token.ReferenceId)) {
+                var reference = token.ReferenceId;
+                if (!_references.Add(reference)) {
+                    throw SchemataResourceErrors.AlreadyExists<TToken>(token.CanonicalName);
+                }
+
+                var existing = excludeUid is { } uid
+                    ? await repository.FirstOrDefaultAsync(
+                        query => query.Where(row => row.ReferenceId == reference && row.Uid != uid), ct)
+                    : await repository.FirstOrDefaultAsync(query => query.Where(row => row.ReferenceId == reference), ct);
+                if (existing is not null) {
+                    throw SchemataResourceErrors.AlreadyExists<TToken>(existing.CanonicalName);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(token.FamilyKey)) {
+                var family = token.FamilyKey;
+                if (!_families.Add(family)) {
+                    throw SchemataResourceErrors.AlreadyExists<TToken>(token.CanonicalName);
+                }
+
+                var existing = excludeUid is { } uid
+                    ? await repository.FirstOrDefaultAsync(
+                        query => query.Where(row => row.FamilyKey == family && row.Uid != uid), ct)
+                    : await repository.FirstOrDefaultAsync(query => query.Where(row => row.FamilyKey == family), ct);
+                if (existing is not null) {
+                    throw SchemataResourceErrors.AlreadyExists<TToken>(existing.CanonicalName);
+                }
+            }
+        }
     }
 
     // A security-state transition reports success only when every write it depends on reached the

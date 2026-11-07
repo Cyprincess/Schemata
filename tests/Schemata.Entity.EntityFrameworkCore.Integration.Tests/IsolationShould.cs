@@ -1,6 +1,12 @@
+using System;
+using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.EntityFrameworkCore.Integration.Tests.Fixtures;
 using Schemata.Entity.Repository;
 using Xunit;
@@ -80,5 +86,43 @@ public class IsolationShould : IAsyncLifetime
         var       verify      = verifyScope.ServiceProvider.GetRequiredService<IRepository<Student>>();
         var       count       = await verify.CountAsync(q => q.Where(s => s.Name!.StartsWith("side-")));
         Assert.Equal(5, count);
+    }
+
+    [Fact]
+    public async Task SerializableTransaction_Isolates_Uncommitted_Writes() {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var       writer = scope.ServiceProvider.GetRequiredService<IRepository<Student>>();
+        await using var transaction = writer.Begin(IsolationLevel.Serializable);
+        await writer.AddAsync(new() {
+            FullName = "Serializable",
+            Age      = 20,
+            Grade    = 2,
+            Name     = "serializable",
+        });
+
+        using (var readerScope = _fixture.ServiceProvider.CreateScope()) {
+            var reader = readerScope.ServiceProvider.GetRequiredService<IRepository<Student>>();
+            Assert.Equal(0, await reader.CountAsync(query => query.Where(row => row.Name == "serializable")));
+        }
+
+        await transaction.CommitAsync();
+
+        using var verifyScope = _fixture.ServiceProvider.CreateScope();
+        var       verify      = verifyScope.ServiceProvider.GetRequiredService<IRepository<Student>>();
+        Assert.Equal(1, await verify.CountAsync(query => query.Where(row => row.Name == "serializable")));
+    }
+
+    [Fact]
+    public async Task InMemorySerializableTransaction_Fails_Before_A_Query_Or_Write() {
+        var services = new ServiceCollection();
+        services.AddDbContextFactory<TestDbContext>(options => options.UseInMemoryDatabase(Guid.NewGuid().ToString("n"))
+            .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
+        services.AddRepository<Student, EfCoreRepository<TestDbContext, Student>>();
+        await using var root  = services.BuildServiceProvider();
+        await using var scope = root.CreateAsyncScope();
+        var       repository = scope.ServiceProvider.GetRequiredService<IRepository<Student>>();
+
+        Assert.Throws<NotSupportedException>(() => repository.Begin(IsolationLevel.Serializable));
+        Assert.Equal(0, await repository.CountAsync(query => query));
     }
 }

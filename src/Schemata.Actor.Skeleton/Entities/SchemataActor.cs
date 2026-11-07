@@ -14,7 +14,7 @@ namespace Schemata.Actor.Skeleton.Entities;
 [Table("SchemataActors")]
 [CanonicalName("actors/{actor}")]
 [PrimaryKey(nameof(Uid))]
-[Index(nameof(ActorType), nameof(ActorKey), IsUnique = true)]
+[Index(nameof(ActorType), nameof(ActorKey))]
 public class SchemataActor : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {
     public virtual string ActorType { get; set; } = null!; // EF Core materializes this required column.

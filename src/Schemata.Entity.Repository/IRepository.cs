@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Linq.Expressions;
@@ -29,8 +30,9 @@ public interface IRepository : IAsyncDisposable, IDisposable
     ///     <see cref="IUnitOfWork.CommitAsync" /> / <see cref="IUnitOfWork.RollbackAsync" /> /
     ///     disposal it never reopens; resolve a fresh repository to start new work.
     /// </summary>
+    /// <param name="isolationLevel">The required transaction isolation, or <see langword="null" /> for the provider's existing pipeline.</param>
     /// <returns>A new unit of work that callers must commit, roll back, or dispose.</returns>
-    IUnitOfWork Begin();
+    IUnitOfWork Begin(IsolationLevel? isolationLevel = null);
 
     /// <summary>
     ///     Enlists this repository in an existing unit of work. The repository then

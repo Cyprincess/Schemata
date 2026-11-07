@@ -17,7 +17,7 @@ namespace Schemata.Push.Skeleton.Entities;
 [Table("SchemataPushSubscriptions")]
 [CanonicalName("pushSubscriptions/{push_subscription}")]
 [PrimaryKey(nameof(Uid))]
-[Index(nameof(Owner), nameof(Provider), nameof(ProviderKey), IsUnique = true)]
+[Index(nameof(Owner), nameof(Provider), nameof(ProviderKey))]
 public class SchemataPushSubscription : IIdentifier, ICanonicalName, IOwnable, IConcurrency, IDescriptive,
                                         ISoftDelete, ITimestamp
 {

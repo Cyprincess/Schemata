@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading;
@@ -10,6 +11,7 @@ using Schemata.Abstractions.Entities;
 using Schemata.Authorization.Skeleton;
 using Schemata.Authorization.Skeleton.Entities;
 using Schemata.Authorization.Skeleton.Managers;
+using Schemata.Common.Errors;
 using Schemata.Entity.Repository;
 using static Schemata.Authorization.Skeleton.AuthorizationConstants;
 
@@ -26,14 +28,13 @@ namespace Schemata.Authorization.Foundation.Services;
 ///         <c>AdviceClaimsPairwise</c>) both write a row in
 ///         <c>SchemataSubjectMappings</c> the first time an
 ///         <c>(application, canonical_subject)</c> pair is seen, then return the stored
-///         pairwise hash on every subsequent call. The unique indexes on
-///         <c>(application, canonical_subject)</c> and
-///         <c>(application, pairwise_subject)</c> enforce per-app per-subject stability
-///         even under concurrent token issuance.
+///     pairwise hash on every subsequent call. Serializable application transactions guard both
+///     <c>(application, canonical_subject)</c> and <c>(application, pairwise_subject)</c>
+///     during concurrent token issuance.
 ///     </para>
 ///     <para>
-///         Reverse (<see cref="ToCanonicalAsync" />) is a single index-shaped query on
-///         the <c>(application, pairwise_subject)</c> unique index, so user-facing
+///     Reverse (<see cref="ToCanonicalAsync" />) is a single index-shaped query on
+///     the <c>(application, pairwise_subject)</c> ordinary index, so user-facing
 ///         resource handlers reverse a pairwise <c>sub</c> in O(1) database lookups
 ///         regardless of process lifetime or node identity. A row is missing only when
 ///         the value never went through OIDC issuance on any node sharing this database,
@@ -135,50 +136,63 @@ public sealed class PairwiseSubjectTranslator<TApp, TSubjectMapping> : IPairwise
         string              subject,
         CancellationToken   ct = default) {
         var key = application.CanonicalName;
-
-        // A stored mapping resolves from the row alone: the projection was issued while the
-        // application still carried its sector metadata, which a later replace may have
-        // cleared. Only an application without a usable row needs the owner's decision.
-        TSubjectMapping? existing = null;
-        if (!string.IsNullOrWhiteSpace(key)) {
-            existing = await _mappings.FirstOrDefaultAsync(
-                           q => q.Where(m => m.Application == key && m.Subject == subject),
-                           ct);
-            if (existing is { PairwiseSubject: { Length: > 0 } stored }) {
-                return stored;
-            }
-        }
-
-        // Single ownership: the service decides whether this application projects pairwise
-        // (application override or host default). A passthrough resolve is a public-subject
-        // application; the subject returns unchanged with no mapping row.
-        var pairwise = _subjects.Resolve(subject, application);
-        if (string.Equals(pairwise, subject, StringComparison.Ordinal)) {
-            return subject;
-        }
-
-        if (string.IsNullOrWhiteSpace(key)) {
-            throw new InvalidOperationException(
-                $"Application '{application.Name ?? application.ClientId}' has no canonical name; "
-              + "pairwise subject mapping requires a fully resolved resource name.");
-        }
-
-        if (existing is not null) {
-            // An incomplete stored mapping is repaired through the mapping owner, so reverse
-            // lookups resolve the same value forward issuance returns.
-            existing.PairwiseSubject = pairwise;
-            existing.SectorHost      = TryGetSector(application);
-            var repairs = _services.GetRequiredService<IRepository<TSubjectMapping>>();
-            await using var repair = repairs.Begin();
-            await _mutation.UpdateAsync(existing, repair, Operations.Update, ct);
-            await _apps.EnlistPublicationAsync(repair, key, ct);
-            await repair.CommitAsync(ct);
-            return pairwise;
-        }
-
         var mappings = _services.GetRequiredService<IRepository<TSubjectMapping>>();
+        await using var repository = mappings;
         try {
-            await using var transaction = mappings.Begin();
+            await using var transaction = mappings.Begin(IsolationLevel.Serializable);
+
+            // A stored mapping resolves from the row alone: the projection was issued while the
+            // application still carried its sector metadata, which a later replace may have
+            // cleared. Only an application without a usable row needs the owner's decision.
+            TSubjectMapping? existing = null;
+            if (!string.IsNullOrWhiteSpace(key)) {
+                existing = await mappings.FirstOrDefaultAsync(
+                               q => q.Where(m => m.Application == key && m.Subject == subject),
+                               ct);
+                if (existing is { PairwiseSubject: { Length: > 0 } stored }) {
+                    await transaction.CommitAsync(ct);
+                    return stored;
+                }
+            }
+
+            // Single ownership: the service decides whether this application projects pairwise
+            // (application override or host default). A passthrough resolve is a public-subject
+            // application; the subject returns unchanged with no mapping row.
+            var pairwise = _subjects.Resolve(subject, application);
+            if (string.Equals(pairwise, subject, StringComparison.Ordinal)) {
+                await transaction.CommitAsync(ct);
+                return subject;
+            }
+
+            if (string.IsNullOrWhiteSpace(key)) {
+                throw new InvalidOperationException(
+                    $"Application '{application.Name ?? application.ClientId}' has no canonical name; "
+                  + "pairwise subject mapping requires a fully resolved resource name.");
+            }
+
+            if (existing is not null) {
+                var reverse = await mappings.FirstOrDefaultAsync(
+                    q => q.Where(m => m.Application == key && m.PairwiseSubject == pairwise && m.Uid != existing.Uid), ct);
+                if (reverse is not null) {
+                    throw SchemataResourceErrors.AlreadyExists<TSubjectMapping>(reverse.CanonicalName);
+                }
+
+                // An incomplete stored mapping is repaired through the mapping owner, so reverse
+                // lookups resolve the same value forward issuance returns.
+                existing.PairwiseSubject = pairwise;
+                existing.SectorHost      = TryGetSector(application);
+                await _mutation.UpdateAsync(existing, transaction, Operations.Update, ct);
+                await _apps.EnlistPublicationAsync(transaction, key, ct);
+                await transaction.CommitAsync(ct);
+                return pairwise;
+            }
+
+            var collision = await mappings.FirstOrDefaultAsync(
+                q => q.Where(m => m.Application == key && m.PairwiseSubject == pairwise), ct);
+            if (collision is not null) {
+                throw SchemataResourceErrors.AlreadyExists<TSubjectMapping>(collision.CanonicalName);
+            }
+
             await _mutation.CreateAsync(new TSubjectMapping {
                 Application     = key,
                 Subject         = subject,
@@ -190,8 +204,6 @@ public sealed class PairwiseSubjectTranslator<TApp, TSubjectMapping> : IPairwise
 
             return pairwise;
         } catch (AlreadyExistsException) {
-            // The unique (Application, Subject) index arbitrates concurrent first issuances;
-            // the loser returns the persisted winner so both agree with reverse lookup.
             var winner = await _mappings.FirstOrDefaultAsync(
                              q => q.Where(m => m.Application == key && m.Subject == subject),
                              ct);

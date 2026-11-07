@@ -110,7 +110,7 @@ public class RepositoryCommitShould
 
         protected override IQueryable<Student> AsQueryable() => Array.Empty<Student>().AsQueryable();
 
-        protected override IUnitOfWork CreateUnitOfWork() => new RecordingUnitOfWork();
+        protected override IUnitOfWork CreateUnitOfWork(System.Data.IsolationLevel? isolationLevel) => new RecordingUnitOfWork();
 
         protected override void AttachContext(IUnitOfWork uow) { }
 

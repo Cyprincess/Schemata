@@ -10,6 +10,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
+using Schemata.Event.Skeleton.Entities;
 using Schemata.Flow.Skeleton;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Observers;
@@ -72,6 +73,7 @@ public sealed class EfCoreFlowFixture : IAsyncLifetime, IFlowIntegrationFixture
                                                                .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
         services.AddRepository<Order, EfCoreRepository<TestDbContext, Order>>();
         services.AddRepository<SchemataFlowEffectIntent, EfCoreRepository<TestDbContext, SchemataFlowEffectIntent>>();
+        services.AddRepository<SchemataEventSubscription, EfCoreRepository<TestDbContext, SchemataEventSubscription>>();
         services.AddRepository<SchemataProcess, EfCoreRepository<TestDbContext, SchemataProcess>>();
         services.AddRepository<SchemataProcessToken, EfCoreRepository<TestDbContext, SchemataProcessToken>>();
         services.AddRepository<SchemataProcessTransition, EfCoreRepository<TestDbContext, SchemataProcessTransition>>();
@@ -80,7 +82,7 @@ public sealed class EfCoreFlowFixture : IAsyncLifetime, IFlowIntegrationFixture
         services.AddRepository<SchemataProcessParticipant, EfCoreRepository<TestDbContext, SchemataProcessParticipant>>();
         services.AddScoped<IUnitOfWork<TestDbContext>, EfCoreUnitOfWork<TestDbContext>>();
         FlowFixtureServices.AddResourceTypeResolver(
-            services, typeof(Order), typeof(SchemataProcess), typeof(SchemataProcessToken));
+            services, typeof(Order), typeof(SchemataProcess), typeof(SchemataProcessToken), typeof(SchemataEventSubscription));
         FlowFixtureServices.AddFlowServices(services);
         services.AddSingleton<StampCaptureObserver>();
         services.AddSingleton<IProcessLifecycleObserver>(provider => provider.GetRequiredService<StampCaptureObserver>());

@@ -130,20 +130,24 @@ tenant-owned repositories. Keep consumer name generation configured independentl
 
 ### Database uniqueness
 
-The shipped entities declare unique indexes: process idempotency on
-`(DefinitionName, IdempotencyKey)`, effect request IDs on `RequestId`, and source bindings on
-`(Process, Name)` for `Token IS NULL` plus `(Process, Token, Name)` for `Token IS NOT NULL`. A
-tenant subtype inherits them, and an inherited index that the subtype does not restate keeps its
-host definition and still constrains tenant rows. Restate each property list with the tenant filter
-and add the tenant-partition constraints; `SchemataModelCustomizer` replaces an inherited
-declaration when the subtype declares the same property list.
+Process idempotency, effect request IDs, event subscription IDs, and source bindings are guarded by
+the enclosing serializable application transaction. The process-start guard checks
+`(DefinitionName, IdempotencyKey)` before engine work; an existing live key throws
+`AlreadyExistsException`, while serialization failures and deadlocks remain transient
+`AbortedException` outcomes. Effect intents, event subscriptions, and both source-binding variants
+join that transaction and commit once.
+
+The shipped entities declare ordinary indexes for these lookups, including `(Process, Name)` for
+`Token IS NULL` and `(Process, Token, Name)` for `Token IS NOT NULL`. A tenant subtype can restate
+the property list with its tenant filter; `SchemataModelCustomizer` replaces an inherited declaration
+when the subtype declares the same property list. Consumer-owned unique indexes remain supported.
+Canonical resource names continue to come from the consumer naming advisor.
 
 EF Core applies the entities' generic `IndexAttribute.Filter` SQL through `HasFilter`. Filter SQL
 uses the declared column names; consumers must adapt it when their provider or naming convention
 requires different identifiers or lacks filtered indexes. LinqToDB `CreateTable` does not create
-these indexes from the annotations. Consumers own their production schema DDL, including equivalent
-host/tenant and process/token unique constraints. Framework registration supplies neither schema
-migrations nor data migration tools.
+these indexes from the annotations. Consumers own their production schema DDL. Framework
+registration supplies neither schema migrations nor data migration tools.
 
 ## Define the process
 

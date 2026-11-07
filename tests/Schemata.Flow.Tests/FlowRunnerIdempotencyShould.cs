@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Flow.Foundation;
 using Schemata.Entity.Repository;
 using Schemata.Flow.Skeleton.Entities;
@@ -20,7 +21,7 @@ namespace Schemata.Flow.Tests;
 public class FlowRunnerIdempotencyShould
 {
     [Fact]
-    public async Task Defer_Live_Key_Conflicts_To_The_Store() {
+    public async Task Reject_Live_Key_Conflict_Before_Engine_Work() {
         var live = new SchemataProcess {
             Name              = "p1",
             CanonicalName     = "processes/p1",
@@ -32,12 +33,11 @@ public class FlowRunnerIdempotencyShould
         var engine = Engine();
         var runner = Runner(out _, engine, live);
 
-        var process = await runner.StartAsync("def", new() { IdempotencyKey = "key-1" });
+        await Assert.ThrowsAsync<AlreadyExistsException>(() => runner.StartAsync("def", new() { IdempotencyKey = "key-1" }).AsTask());
 
-        Assert.Equal("key-1", process.IdempotencyKey);
         engine.Verify(e => e.StartAsync(
                           It.IsAny<ProcessDefinition>(), It.IsAny<SchemataProcess>(),
-                          It.IsAny<FlowExecutionContext>(), It.IsAny<CancellationToken>()), Times.Once);
+                          It.IsAny<FlowExecutionContext>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -116,7 +116,7 @@ public class FlowRunnerIdempotencyShould
         var transitions = Repository<SchemataProcessTransition>();
         var sources     = Repository<SchemataProcessSource>();
         var compensations = Repository<SchemataProcessCompensation>();
-        processes.Setup(r => r.Begin()).Returns(Mock.Of<IUnitOfWork>());
+        processes.Setup(r => r.Begin(It.IsAny<System.Data.IsolationLevel?>())).Returns(Mock.Of<IUnitOfWork>());
 
         var collection = new ServiceCollection()
                         .AddLogging()
@@ -141,7 +141,7 @@ public class FlowRunnerIdempotencyShould
         var repository = new Mock<IRepository<T>>();
         repository.Setup(r => r.AdviceContext).Returns(new AdviceContext(new ServiceCollection().BuildServiceProvider()));
         repository.Setup(r => r.Join(It.IsAny<IUnitOfWork>()));
-        repository.Setup(r => r.Begin()).Returns(Mock.Of<IUnitOfWork>());
+        repository.Setup(r => r.Begin(It.IsAny<System.Data.IsolationLevel?>())).Returns(Mock.Of<IUnitOfWork>());
         repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
                   .ReturnsAsync((T entity, CancellationToken _, MutationOptions _) => {
                       FlowTestCreation.Assign(entity);

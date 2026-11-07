@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Schemata.Entity.Repository;
 using Schemata.Messaging.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 
@@ -14,4 +15,7 @@ public sealed record ScheduleJobRequest<TJob>(
     IReadOnlyDictionary<string, string?>? Variables,
     bool                                  ReplaceVariables = false
 ) : ICommand
-    where TJob : SchemataJob;
+    where TJob : SchemataJob
+{
+    public IUnitOfWork? UnitOfWork { get; init; }
+}

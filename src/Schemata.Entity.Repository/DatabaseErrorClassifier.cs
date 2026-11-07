@@ -55,6 +55,44 @@ public static class DatabaseErrorClassifier
         return false;
     }
 
+    /// <summary>
+    ///     Determines whether an exception chain contains a serialization failure, deadlock, or lock-timeout conflict.
+    /// </summary>
+    public static bool IsTransientConflict(Exception exception) {
+        for (var current = exception; current is not null; current = current.InnerException) {
+            switch (current.GetType().FullName) {
+                case SqliteException:
+                    if (ReadIntProperty(current, "SqliteErrorCode") is 5 or 6) {
+                        return true;
+                    }
+
+                    break;
+                case MicrosoftSqlException:
+                case SystemSqlException:
+                    if (ReadIntProperty(current, "Number") == 1205) {
+                        return true;
+                    }
+
+                    break;
+                case PostgresException:
+                    if (ReadStringProperty(current, "SqlState") is "40001" or "40P01") {
+                        return true;
+                    }
+
+                    break;
+                case MySqlDataException:
+                case MySqlConnectorException:
+                    if (ReadIntProperty(current, "Number") is 1205 or 1213) {
+                        return true;
+                    }
+
+                    break;
+            }
+        }
+
+        return false;
+    }
+
     private static int? ReadIntProperty(Exception exception, string name) {
         return AppDomainTypeCache.GetProperty(exception.GetType(), name)?.GetValue(exception) is int value ? value : null;
     }

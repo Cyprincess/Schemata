@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Data.Common;
@@ -244,7 +245,9 @@ public class EfCoreRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQue
         return type;
     }
 
-    protected override IUnitOfWork CreateUnitOfWork() { return new EfCoreUnitOfWork<TContext>(_factory, ServiceProvider); }
+    protected override IUnitOfWork CreateUnitOfWork(IsolationLevel? isolationLevel) {
+        return new EfCoreUnitOfWork<TContext>(_factory, ServiceProvider, isolationLevel);
+    }
 
     protected override void AttachContext(IUnitOfWork uow) {
         if (uow is not EfCoreUnitOfWork<TContext> ef) {

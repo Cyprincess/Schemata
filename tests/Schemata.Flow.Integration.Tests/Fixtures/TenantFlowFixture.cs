@@ -98,20 +98,20 @@ public sealed class TenantFlowFixture(bool linq) : IAsyncLifetime, IFlowIntegrat
             if (linq) {
                 var connection = scope.ServiceProvider.GetRequiredService<TestDataConnection>();
                 connection.CreateTable<TenantProcess>(tableOptions: TableOptions.CreateIfNotExists);
-                connection.Execute("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_TenantFlowProcesses_Tenant_Idempotency\" ON \"TenantFlowProcesses\" (\"TenantUid\", \"DefinitionName\", \"IdempotencyKey\") WHERE \"TenantUid\" IS NOT NULL");
-                connection.Execute("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_TenantFlowProcesses_Host_Idempotency\" ON \"TenantFlowProcesses\" (\"DefinitionName\", \"IdempotencyKey\") WHERE \"TenantUid\" IS NULL");
+                connection.Execute("CREATE INDEX IF NOT EXISTS \"IX_TenantFlowProcesses_Tenant_Idempotency\" ON \"TenantFlowProcesses\" (\"TenantUid\", \"DefinitionName\", \"IdempotencyKey\") WHERE \"TenantUid\" IS NOT NULL");
+                connection.Execute("CREATE INDEX IF NOT EXISTS \"IX_TenantFlowProcesses_Host_Idempotency\" ON \"TenantFlowProcesses\" (\"DefinitionName\", \"IdempotencyKey\") WHERE \"TenantUid\" IS NULL");
                 connection.CreateTable<TenantProcessToken>(tableOptions: TableOptions.CreateIfNotExists);
                 connection.CreateTable<TenantProcessTransition>(tableOptions: TableOptions.CreateIfNotExists);
                 connection.CreateTable<TenantProcessSource>(tableOptions: TableOptions.CreateIfNotExists);
-                connection.Execute("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_TenantFlowProcessSources_Tenant_Token\" ON \"TenantFlowProcessSources\" (\"TenantUid\", \"Process\", \"Token\", \"Name\") WHERE \"TenantUid\" IS NOT NULL AND \"Token\" IS NOT NULL");
-                connection.Execute("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_TenantFlowProcessSources_Tenant_Process\" ON \"TenantFlowProcessSources\" (\"TenantUid\", \"Process\", \"Name\") WHERE \"TenantUid\" IS NOT NULL AND \"Token\" IS NULL");
-                connection.Execute("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_TenantFlowProcessSources_Host_Token\" ON \"TenantFlowProcessSources\" (\"Process\", \"Token\", \"Name\") WHERE \"TenantUid\" IS NULL AND \"Token\" IS NOT NULL");
-                connection.Execute("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_TenantFlowProcessSources_Host_Process\" ON \"TenantFlowProcessSources\" (\"Process\", \"Name\") WHERE \"TenantUid\" IS NULL AND \"Token\" IS NULL");
+                connection.Execute("CREATE INDEX IF NOT EXISTS \"IX_TenantFlowProcessSources_Tenant_Token\" ON \"TenantFlowProcessSources\" (\"TenantUid\", \"Process\", \"Token\", \"Name\") WHERE \"TenantUid\" IS NOT NULL AND \"Token\" IS NOT NULL");
+                connection.Execute("CREATE INDEX IF NOT EXISTS \"IX_TenantFlowProcessSources_Tenant_Process\" ON \"TenantFlowProcessSources\" (\"TenantUid\", \"Process\", \"Name\") WHERE \"TenantUid\" IS NOT NULL AND \"Token\" IS NULL");
+                connection.Execute("CREATE INDEX IF NOT EXISTS \"IX_TenantFlowProcessSources_Host_Token\" ON \"TenantFlowProcessSources\" (\"Process\", \"Token\", \"Name\") WHERE \"TenantUid\" IS NULL AND \"Token\" IS NOT NULL");
+                connection.Execute("CREATE INDEX IF NOT EXISTS \"IX_TenantFlowProcessSources_Host_Process\" ON \"TenantFlowProcessSources\" (\"Process\", \"Name\") WHERE \"TenantUid\" IS NULL AND \"Token\" IS NULL");
                 connection.CreateTable<TenantProcessCompensation>(tableOptions: TableOptions.CreateIfNotExists);
                 connection.CreateTable<TenantProcessParticipant>(tableOptions: TableOptions.CreateIfNotExists);
                 connection.CreateTable<TenantFlowEffectIntent>(tableOptions: TableOptions.CreateIfNotExists);
-                connection.Execute("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_TenantFlowEffectIntents_Tenant_RequestId\" ON \"TenantFlowEffectIntents\" (\"TenantUid\", \"RequestId\") WHERE \"TenantUid\" IS NOT NULL");
-                connection.Execute("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_TenantFlowEffectIntents_Host_RequestId\" ON \"TenantFlowEffectIntents\" (\"RequestId\") WHERE \"TenantUid\" IS NULL");
+                connection.Execute("CREATE INDEX IF NOT EXISTS \"IX_TenantFlowEffectIntents_Tenant_RequestId\" ON \"TenantFlowEffectIntents\" (\"TenantUid\", \"RequestId\") WHERE \"TenantUid\" IS NOT NULL");
+                connection.Execute("CREATE INDEX IF NOT EXISTS \"IX_TenantFlowEffectIntents_Host_RequestId\" ON \"TenantFlowEffectIntents\" (\"RequestId\") WHERE \"TenantUid\" IS NULL");
             } else {
                 var db = scope.ServiceProvider.GetRequiredService<TenantFlowDbContext>();
                 await db.Database.EnsureCreatedAsync();

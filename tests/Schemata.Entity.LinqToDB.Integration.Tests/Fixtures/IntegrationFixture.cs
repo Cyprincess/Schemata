@@ -21,6 +21,8 @@ public class IntegrationFixture : IAsyncLifetime
 
     public IServiceProvider ServiceProvider => _root!;
 
+    public string DatabasePath => _dbPath;
+
     public IntegrationFixture(bool useQueryCache = false) {
         _useQueryCache = useQueryCache;
     }

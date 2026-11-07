@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.EntityFrameworkCore.Integration.Tests.Fixtures;
+using Schemata.Event.Skeleton.Entities;
 using Xunit;
 
 namespace Schemata.Entity.EntityFrameworkCore.Integration.Tests;
@@ -58,5 +62,34 @@ public class UniqueIdentityPolicyShould
         var ex = EfCoreUnitOfWork<TestDbContext>.ClassifyUniqueIdentity(new object?[] { null });
 
         Assert.DoesNotContain(ex.Details ?? [], d => d is Abstractions.Errors.ResourceInfoDetail);
+    }
+
+    [Fact]
+    public void FrameworkIndexes_AreOrdinary_WhileConsumerIndexes_RemainUnique() {
+        var options = new DbContextOptionsBuilder<IndexContext>()
+            .UseSqlite("Data Source=:memory:")
+            .ReplaceService<IModelCustomizer, SchemataModelCustomizer>()
+            .Options;
+        using var db = new IndexContext(options);
+
+        var subscription = db.Model.FindEntityType(typeof(SchemataEventSubscription));
+        Assert.NotNull(subscription);
+        var subscriptionIndex = Assert.Single(subscription.GetIndexes(), index =>
+            index.Properties.Select(property => property.Name).SequenceEqual([nameof(SchemataEventSubscription.SubscriptionId)]));
+        Assert.False(subscriptionIndex.IsUnique);
+
+        var course = db.Model.FindEntityType(typeof(Course));
+        Assert.NotNull(course);
+        var courseIndex = Assert.Single(course.GetIndexes(), index =>
+            index.Properties.Select(property => property.Name).SequenceEqual([nameof(Course.Title)]));
+        Assert.True(courseIndex.IsUnique);
+    }
+
+    private sealed class IndexContext(DbContextOptions<IndexContext> options) : DbContext(options)
+    {
+        protected override void OnModelCreating(ModelBuilder model) {
+            model.Entity<SchemataEventSubscription>();
+            model.Entity<Course>();
+        }
     }
 }

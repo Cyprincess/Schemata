@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using LinqToDB.Data;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Entity.Repository;
 
@@ -22,23 +22,32 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>, IRepos
 {
     private readonly Func<TContext>                            _factory;
     private readonly RepositoryBinding                         _binding;
-    private readonly ILogger?                                  _logger;
+    private readonly IsolationLevel?                           _isolationLevel;
     private          List<(int Order, Func<CancellationToken, Task> Sink)>? _committed;
     private          List<Action>?                             _rollback;
     private          TContext?                                 _context;
     private          DataConnectionTransaction?                _transaction;
-    private          bool                                      _completed;
+    private          Completion                                _completion;
     private          bool                                      _disposed;
 
+    private enum Completion
+    {
+        Open,
+        Committed,
+        RolledBack,
+        Unknown,
+    }
+
     /// <summary>
-    ///     Initializes a unit of work with a data-connection factory and optional logging services.
+    ///     Initializes a unit of work with a data-connection factory and repository binding.
     /// </summary>
     /// <param name="factory">The factory that creates the data connection when the unit of work opens.</param>
     /// <param name="sp">The service provider that resolves optional infrastructure services.</param>
-    public LinqToDbUnitOfWork(Func<TContext> factory, IServiceProvider sp) {
+    /// <param name="isolationLevel">The requested isolation, or <see langword="null" /> for the provider default.</param>
+    public LinqToDbUnitOfWork(Func<TContext> factory, IServiceProvider sp, IsolationLevel? isolationLevel = null) {
         _factory = factory;
         _binding = sp.GetService<RepositoryBinding>() ?? RepositoryBinding.Default;
-        _logger  = sp.GetService<ILogger<LinqToDbUnitOfWork<TContext>>>();
+        _isolationLevel = isolationLevel;
     }
 
     public TContext Context
@@ -46,7 +55,7 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>, IRepos
         get
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            if (_completed) {
+            if (_completion != Completion.Open) {
                 throw new InvalidOperationException("Unit of work already completed. Resolve a new IUnitOfWork instance from a fresh scope to start another transaction.");
             }
 
@@ -61,7 +70,13 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>, IRepos
             var context = _factory();
             DataConnectionTransaction transaction;
             try {
-                transaction = context.BeginTransaction();
+                transaction = _isolationLevel is { } isolation
+                    ? context.BeginTransaction(isolation)
+                    : context.BeginTransaction();
+            }
+            catch (Exception ex) when (DatabaseErrorClassifier.IsTransientConflict(ex)) {
+                context.Dispose();
+                throw new AbortedException(innerException: ex);
             }
             catch {
                 context.Dispose();
@@ -80,43 +95,54 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>, IRepos
 
     public async Task CommitAsync(CancellationToken ct = default) {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_completed) {
+        if (_completion != Completion.Open) {
             throw new InvalidOperationException("Unit of work already completed.");
         }
 
-        if (_transaction is null) {
-            _completed = true;
+        var transaction = _transaction;
+        if (transaction is null) {
+            _completion = Completion.Committed;
             return;
         }
 
         try {
             try {
-                await _transaction.CommitAsync(ct);
+                await transaction.CommitAsync(ct);
             } catch (Exception ex) when (DatabaseErrorClassifier.IsUniqueConstraintViolation(ex)) {
                 throw new AlreadyExistsException(innerException: ex);
+            } catch (Exception ex) when (DatabaseErrorClassifier.IsTransientConflict(ex)) {
+                throw new AbortedException(innerException: ex);
             }
-        } catch (Exception) {
-            if (_rollback is not null) {
-                foreach (var reset in _rollback) {
-                    reset();
-                }
+        } catch (Exception ex) {
+            _completion = Completion.Unknown;
+            List<Exception> failures = [ex];
+
+            // Commit entry makes the outcome unknown even when cleanup rollback succeeds. Cleanup
+            // failures follow the commit failure in rollback-then-dispose order.
+            try {
+                await transaction.RollbackAsync(CancellationToken.None);
+            } catch (Exception cleanup) {
+                failures.Add(cleanup);
             }
 
-            await TryRollbackAsync(_transaction);
-            await _transaction.DisposeAsync();
+            try {
+                await transaction.DisposeAsync();
+            } catch (Exception cleanup) {
+                failures.Add(cleanup);
+            }
 
             _transaction = null;
-            _completed   = true;
             _committed?.Clear();
             _rollback?.Clear();
 
-            throw;
+            if (failures.Count == 1) {
+                throw;
+            }
+
+            throw new AggregateException(failures);
         }
 
-        await _transaction.DisposeAsync();
-
-        _transaction = null;
-        _completed   = true;
+        _completion = Completion.Committed;
 
         List<Exception>? errors = null;
         if (_committed is not null) {
@@ -131,6 +157,13 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>, IRepos
             _committed.Clear();
         }
 
+        try {
+            await transaction.DisposeAsync();
+        } catch (Exception ex) {
+            (errors ??= []).Add(ex);
+        }
+
+        _transaction = null;
         _rollback?.Clear();
 
         if (errors is not null) {
@@ -140,81 +173,98 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>, IRepos
 
     public async Task RollbackAsync(CancellationToken ct = default) {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_completed) {
+        if (_completion != Completion.Open) {
             return;
         }
 
+        var transaction = _transaction;
+        if (transaction is not null) {
+            await transaction.RollbackAsync(ct);
+        }
+
+        _completion = Completion.RolledBack;
+        List<Exception>? errors = null;
         if (_rollback is not null) {
-            foreach (var reset in _rollback) {
-                reset();
+            try {
+                foreach (var reset in _rollback) {
+                    reset();
+                }
+            } catch (Exception ex) {
+                errors = [ex];
             }
         }
 
-        if (_transaction is not null) {
-            await _transaction.RollbackAsync(ct);
-            await _transaction.DisposeAsync();
-            _transaction = null;
+        if (transaction is not null) {
+            try {
+                await transaction.DisposeAsync();
+            } catch (Exception ex) {
+                (errors ??= []).Add(ex);
+            }
         }
 
+        _transaction = null;
         _committed?.Clear();
         _rollback?.Clear();
-        _completed = true;
+
+        if (errors is not null) {
+            throw errors.Count == 1 ? errors.First() : new AggregateException(errors);
+        }
     }
 
     public void Dispose() {
         if (_disposed) return;
 
-        if (!_completed) {
-            if (_rollback is not null) {
-                foreach (var reset in _rollback) reset();
+        List<Exception>? errors = null;
+        if (_completion == Completion.Open) {
+            _completion = Completion.Unknown;
+            try {
+                _transaction?.Rollback();
+                _completion = Completion.RolledBack;
+                if (_rollback is not null) foreach (var reset in _rollback) reset();
+            } catch (Exception error) {
+                (errors ??= []).Add(error);
             }
-
-            if (_transaction is not null) {
-                TryRollback(_transaction);
-                _transaction.Dispose();
-                _transaction = null;
-            }
-
-            _completed = true;
         }
 
+        try { _transaction?.Dispose(); }
+        catch (Exception error) { (errors ??= []).Add(error); }
+        _transaction = null;
         _committed?.Clear();
         _rollback?.Clear();
-
-        _context?.Dispose();
+        try { _context?.Dispose(); }
+        catch (Exception error) { (errors ??= []).Add(error); }
         _context = null;
-
         _disposed = true;
         GC.SuppressFinalize(this);
+        if (errors is not null) throw errors.Count == 1 ? errors[0] : new AggregateException(errors);
     }
 
     public async ValueTask DisposeAsync() {
         if (_disposed) return;
 
-        if (!_completed) {
-            if (_rollback is not null) {
-                foreach (var reset in _rollback) reset();
+        List<Exception>? errors = null;
+        if (_completion == Completion.Open) {
+            _completion = Completion.Unknown;
+            try {
+                if (_transaction is not null) await _transaction.RollbackAsync(CancellationToken.None);
+                _completion = Completion.RolledBack;
+                if (_rollback is not null) foreach (var reset in _rollback) reset();
+            } catch (Exception error) {
+                (errors ??= []).Add(error);
             }
-
-            if (_transaction is not null) {
-                await TryRollbackAsync(_transaction);
-                await _transaction.DisposeAsync();
-                _transaction = null;
-            }
-
-            _completed = true;
         }
 
+        try { if (_transaction is not null) await _transaction.DisposeAsync(); }
+        catch (Exception error) { (errors ??= []).Add(error); }
+        _transaction = null;
         _committed?.Clear();
         _rollback?.Clear();
-
-        if (_context is not null) {
-            await _context.DisposeAsync();
-            _context = null;
-        }
-
+        try { if (_context is not null) await _context.DisposeAsync(); }
+        catch (Exception error) { (errors ??= []).Add(error); }
+        _context = null;
         _disposed = true;
         GC.SuppressFinalize(this);
+        if (errors is not null) throw errors.Count == 1 ? errors[0] : new AggregateException(errors);
     }
 
     #region IUnitOfWork Members
@@ -235,7 +285,7 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>, IRepos
 
     void IUnitOfWork.AddSavePreparation(Action preparation) {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_completed) {
+        if (_completion != Completion.Open) {
             throw new InvalidOperationException("Unit of work already completed.");
         }
 
@@ -248,21 +298,4 @@ public sealed class LinqToDbUnitOfWork<TContext> : IUnitOfWork<TContext>, IRepos
 
     #endregion
 
-    // Rollback during commit-failure or disposal cleanup must not throw: the transaction may already
-    // be completed, and an exception here would mask the original failure.
-    private async Task TryRollbackAsync(DataConnectionTransaction transaction) {
-        try {
-            await transaction.RollbackAsync(CancellationToken.None);
-        } catch (Exception ex) {
-            _logger?.LogWarning(ex, "Rollback during unit-of-work cleanup failed.");
-        }
-    }
-
-    private void TryRollback(DataConnectionTransaction transaction) {
-        try {
-            transaction.Rollback();
-        } catch (Exception ex) {
-            _logger?.LogWarning(ex, "Rollback during unit-of-work cleanup failed.");
-        }
-    }
 }

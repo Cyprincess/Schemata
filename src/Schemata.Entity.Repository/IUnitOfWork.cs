@@ -16,6 +16,13 @@ namespace Schemata.Entity.Repository;
 ///     <see cref="IUnitOfWork{TContext}.Context" /> is first accessed. A unit of work is one-shot:
 ///     after <see cref="CommitAsync" /> or <see cref="RollbackAsync" /> resolve a new instance from
 ///     DI to start another transaction.
+///
+///     Rollback sinks run only for a confirmed no-write or confirmed rollback. Once the provider
+///     save or commit has been entered, an exception without explicit no-commit evidence leaves an
+///     unknown outcome: commit and rollback sinks stay suppressed, and later disposal does not run
+///     rollback sinks. A successful commit is recorded before commit sinks and fallible cleanup.
+///     Cleanup failures retain the original commit failure first, followed by rollback and disposal
+///     failures in that order; after a successful commit, sink failures precede disposal failures.
 /// </remarks>
 public interface IUnitOfWork : IAsyncDisposable, IDisposable
 {
@@ -29,7 +36,9 @@ public interface IUnitOfWork : IAsyncDisposable, IDisposable
     void AddCommitSink(int order, Func<CancellationToken, Task> sink);
 
     /// <summary>
-    ///     Registers a callback that runs when the unit of work rolls back or is disposed before completion.
+    ///     Registers a callback that runs after a confirmed rollback, after a confirmed no-write
+    ///     failure, or when an open unit of work is disposed before completion. Commit-entry
+    ///     failures without explicit no-commit evidence do not run it.
     /// </summary>
     /// <param name="reset">The rollback callback.</param>
     void AddRollbackSink(Action reset);

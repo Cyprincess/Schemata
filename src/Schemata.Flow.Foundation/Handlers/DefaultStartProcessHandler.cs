@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Schemata.Common.Errors;
 using Schemata.Flow.Foundation.Commands;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
@@ -27,6 +29,16 @@ internal sealed class DefaultStartProcessHandler<TProcess, TToken, TTransition, 
         ProcessSnapshot? snapshot = null;
 
         await support.ExecuteWithNotificationAsync(process, async (scope, current) => {
+            if (process.IdempotencyKey is { Length: > 0 } key) {
+                var existing = await scope.Processes.FirstOrDefaultAsync(
+                    query => query.Where(row => row.DefinitionName == process.DefinitionName && row.IdempotencyKey == key
+                                             && row.State != "Completed" && row.State != "Failed"
+                                             && row.State != "Terminated" && row.State != "Cancelled"), current);
+                if (existing is not null) {
+                    throw SchemataResourceErrors.AlreadyExists<TProcess>(existing.CanonicalName);
+                }
+            }
+
             await scope.CreateProcessAsync(process, current);
             await support.BindStartSourceAsync(
                 scope,

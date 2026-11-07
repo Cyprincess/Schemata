@@ -14,14 +14,13 @@ namespace Schemata.Security.Skeleton.Entities;
 [Table("SchemataTokens")]
 [CanonicalName("tokens/{token}")]
 [PrimaryKey(nameof(Uid))]
-[Index(nameof(Parent), nameof(Provider), nameof(Key), IsUnique = true)]
-[Index(nameof(Name), IsUnique = true)]
-
+[Index(nameof(Parent), nameof(Provider), nameof(Key))]
+[Index(nameof(Name))]
 [Index(nameof(Type), nameof(Status))]
 [Index(nameof(DeviceId))]
 [Index(nameof(Family))]
-[Index(nameof(FamilyKey), IsUnique = true)]
-[Index(nameof(ReferenceId), IsUnique = true)]
+[Index(nameof(FamilyKey))]
+[Index(nameof(ReferenceId))]
 public class SchemataToken : IIdentifier, ICanonicalName, IConcurrency, ITimestamp, IExpiration
 {
     /// <summary>Polymorphic owner reference: canonical name of any host resource (users/{x}, applications/{y}, issuer URI).</summary>

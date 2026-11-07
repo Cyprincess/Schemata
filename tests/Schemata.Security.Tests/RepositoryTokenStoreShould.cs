@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -156,7 +157,7 @@ public class RepositoryTokenStoreShould
     public async Task TryRedeem_Fails_The_Transition_When_The_Write_Is_Blocked_And_Commits_Nothing() {
         var transaction = new Mock<IUnitOfWork>();
         var (store, repository) = NewStore(r => {
-            r.Setup(value => value.Begin()).Returns(transaction.Object);
+            r.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(transaction.Object);
             r.Setup(x => x.UpdateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
              .ReturnsAsync(MutationResult.NoWrite);
         });
@@ -171,7 +172,7 @@ public class RepositoryTokenStoreShould
     [Fact]
     public async Task TryRotate_Redeems_The_Predecessor_And_Publishes_The_Successors_Through_One_Unit_Of_Work() {
         var uow = new Mock<IUnitOfWork>();
-        var (store, repository) = NewStore(r => r.Setup(value => value.Begin()).Returns(uow.Object));
+        var (store, repository) = NewStore(r => r.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(uow.Object));
         var predecessor = new SchemataToken {
             Name = "rat", ReferenceId = "rat-1", Type = "registration", Status = Statuses.Valid,
             Timestamp = Guid.NewGuid(),
@@ -210,7 +211,7 @@ public class RepositoryTokenStoreShould
 
         Assert.Equal(Statuses.Redeemed, spent.Status);
         Assert.Equal(Statuses.Valid, valid.Status);
-        repository.Verify(value => value.Begin(), Times.Never);
+        repository.Verify(value => value.Begin(It.IsAny<IsolationLevel?>()), Times.Never);
     }
 
     [Fact]
@@ -219,7 +220,7 @@ public class RepositoryTokenStoreShould
         uow.Setup(value => value.CommitAsync(It.IsAny<CancellationToken>()))
            .ThrowsAsync(SchemataResourceErrors.Aborted<SchemataToken>());
         var (store, _) = NewStore(r => {
-            r.Setup(value => value.Begin()).Returns(uow.Object);
+            r.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(uow.Object);
             SetupStoredRows(r, new SchemataToken {
                 ReferenceId = "rat-1", Status = Statuses.Redeemed, Timestamp = Guid.NewGuid(),
             });
@@ -239,7 +240,7 @@ public class RepositoryTokenStoreShould
            .ThrowsAsync(SchemataResourceErrors.Aborted<SchemataToken>());
         var stamp = Guid.NewGuid();
         var (store, _) = NewStore(r => {
-            r.Setup(value => value.Begin()).Returns(uow.Object);
+            r.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(uow.Object);
             SetupStoredRows(r, new SchemataToken {
                 ReferenceId = "rat-1", Status = Statuses.Valid, Timestamp = stamp,
             });
@@ -262,7 +263,7 @@ public class RepositoryTokenStoreShould
            .ThrowsAsync(new AlreadyExistsException());
         var attempt = new Mock<IRepository<SchemataToken>>();
         SetupTransaction(attempt);
-        attempt.Setup(value => value.Begin()).Returns(uow.Object);
+        attempt.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(uow.Object);
         var reread = new Mock<IRepository<SchemataToken>>();
         SetupStoredRows(reread, new SchemataToken {
             ReferenceId = "rat-1", Status = Statuses.Redeemed, Timestamp = Guid.NewGuid(),
@@ -289,7 +290,7 @@ public class RepositoryTokenStoreShould
     public async Task TryRotate_Fails_When_The_Predecessor_Write_Is_Blocked_And_Publishes_No_Successor() {
         var transaction = new Mock<IUnitOfWork>();
         var (store, repository) = NewStore(r => {
-            r.Setup(value => value.Begin()).Returns(transaction.Object);
+            r.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(transaction.Object);
             r.Setup(x => x.UpdateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
              .ReturnsAsync(MutationResult.NoWrite);
         });
@@ -307,7 +308,7 @@ public class RepositoryTokenStoreShould
     public async Task TryRotate_Fails_When_A_Second_Successor_Write_Is_Blocked() {
         var transaction = new Mock<IUnitOfWork>();
         var (store, repository) = NewStore(r => {
-            r.Setup(value => value.Begin()).Returns(transaction.Object);
+            r.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(transaction.Object);
             r.SetupSequence(x => x.AddAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
              .ReturnsAsync(MutationResult.Applied)
              .ReturnsAsync(MutationResult.NoWrite);
@@ -540,7 +541,7 @@ public class RepositoryTokenStoreShould
     [Fact]
     public async Task GetOrCreate_Mints_A_Value_And_Expires_At_Now_Plus_Ttl() {
         var transaction = new Mock<IUnitOfWork>();
-        var (store, repository) = NewStore(r => r.Setup(value => value.Begin()).Returns(transaction.Object), NewClock());
+        var (store, repository) = NewStore(r => r.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(transaction.Object), NewClock());
 
         var row = await store.GetOrCreateAsync("users/u-1", "dpop", "nonce-1", null, TimeSpan.FromMinutes(5));
 
@@ -575,7 +576,7 @@ public class RepositoryTokenStoreShould
             var insertion = new Mock<IUnitOfWork>();
             insertion.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>()))
                      .ThrowsAsync(new AlreadyExistsException());
-            r.Setup(x => x.Begin()).Returns(insertion.Object);
+            r.Setup(x => x.Begin(It.IsAny<IsolationLevel?>())).Returns(insertion.Object);
         });
 
         var row = await store.GetOrCreateAsync("users/u-1", "dpop", "nonce-1", "candidate", TimeSpan.FromMinutes(5));
@@ -606,7 +607,7 @@ public class RepositoryTokenStoreShould
             var insertion = new Mock<IUnitOfWork>();
             insertion.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>()))
                      .ThrowsAsync(new AlreadyExistsException());
-            r.Setup(x => x.Begin()).Returns(insertion.Object);
+            r.Setup(x => x.Begin(It.IsAny<IsolationLevel?>())).Returns(insertion.Object);
         }, NewClock());
 
         await Assert.ThrowsAsync<AbortedException>(
@@ -646,7 +647,7 @@ public class RepositoryTokenStoreShould
         var scoped = new Mock<IRepository<SchemataToken>>();
         var transaction = new Mock<IUnitOfWork>();
         var scopes = NewScopeFactory(time.Object, scoped);
-        scoped.Setup(x => x.Begin()).Returns(transaction.Object);
+        scoped.Setup(x => x.Begin(It.IsAny<IsolationLevel?>())).Returns(transaction.Object);
         var caller = new Mock<IRepository<SchemataToken>>();
         var store  = new RepositoryTokenStore<SchemataToken>(NewProvider(caller.Object), time.Object, scopes.Object);
 
@@ -704,8 +705,8 @@ public class RepositoryTokenStoreShould
                     .ThrowsAsync(new AlreadyExistsException());
         var secondReread = new Mock<IRepository<SchemataToken>>();
         var scopes = NewScopeFactory(time.Object, first, firstReread, second, secondReread);
-        first.Setup(x => x.Begin()).Returns(firstInsert.Object);
-        second.Setup(x => x.Begin()).Returns(secondInsert.Object);
+        first.Setup(x => x.Begin(It.IsAny<IsolationLevel?>())).Returns(firstInsert.Object);
+        second.Setup(x => x.Begin(It.IsAny<IsolationLevel?>())).Returns(secondInsert.Object);
         var caller = new Mock<IRepository<SchemataToken>>();
         var store  = new RepositoryTokenStore<SchemataToken>(NewProvider(caller.Object), time.Object, scopes.Object);
 
@@ -787,7 +788,7 @@ public class RepositoryTokenStoreShould
     public async Task GetOrCreate_Throws_When_The_Slot_Creation_Is_Vetoed() {
         var transaction = new Mock<IUnitOfWork>();
         var (store, _) = NewStore(r => {
-            r.Setup(x => x.Begin()).Returns(transaction.Object);
+            r.Setup(x => x.Begin(It.IsAny<IsolationLevel?>())).Returns(transaction.Object);
             r.Setup(x => x.AddAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
              .ReturnsAsync(MutationResult.NoWrite);
         }, NewClock());
@@ -807,7 +808,7 @@ public class RepositoryTokenStoreShould
         var transaction = new Mock<IUnitOfWork>();
         var (store, _) = NewStore(r => {
             SetupSingle(r, existing);
-            r.Setup(x => x.Begin()).Returns(transaction.Object);
+            r.Setup(x => x.Begin(It.IsAny<IsolationLevel?>())).Returns(transaction.Object);
             r.Setup(x => x.UpdateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
              .ReturnsAsync(MutationResult.NoWrite);
         }, NewClock());
@@ -824,7 +825,7 @@ public class RepositoryTokenStoreShould
         var insertion = new Mock<IUnitOfWork>();
         insertion.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>()))
                  .ThrowsAsync(new AlreadyExistsException());
-        var (store, repository) = NewStore(r => r.Setup(x => x.Begin()).Returns(insertion.Object), NewClock());
+        var (store, repository) = NewStore(r => r.Setup(x => x.Begin(It.IsAny<IsolationLevel?>())).Returns(insertion.Object), NewClock());
 
         await Assert.ThrowsAsync<AbortedException>(
             () => store.GetOrCreateAsync("users/u-1", "dpop", "nonce-1", "candidate", TimeSpan.FromMinutes(5)));
@@ -837,7 +838,7 @@ public class RepositoryTokenStoreShould
     public async Task Create_WhenAddIsVetoed_DoesNotCommit() {
         var transaction = new Mock<IUnitOfWork>();
         var (store, repository) = NewStore(r => {
-            r.Setup(x => x.Begin()).Returns(transaction.Object);
+            r.Setup(x => x.Begin(It.IsAny<IsolationLevel?>())).Returns(transaction.Object);
             r.Setup(x => x.AddAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
              .ReturnsAsync(MutationResult.NoWrite);
         });
@@ -853,7 +854,7 @@ public class RepositoryTokenStoreShould
     public async Task Update_WhenUpdateIsVetoed_DoesNotCommit() {
         var transaction = new Mock<IUnitOfWork>();
         var (store, repository) = NewStore(r => {
-            r.Setup(x => x.Begin()).Returns(transaction.Object);
+            r.Setup(x => x.Begin(It.IsAny<IsolationLevel?>())).Returns(transaction.Object);
             r.Setup(x => x.UpdateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
              .ReturnsAsync(MutationResult.NoWrite);
         });
@@ -896,7 +897,11 @@ public class RepositoryTokenStoreShould
     [Fact]
     public async Task Set_Updates_The_Existing_Slot_Value_And_Ttl() {
         var existing = new SchemataToken { Name = "assigned-rate", Key = "rate:k-1", Parent = null, Provider = "device", Value = "1" };
-        var (store, repository) = NewStore(r => SetupSingle(r, existing), NewClock());
+        var transaction = new Mock<IUnitOfWork>();
+        var (store, repository) = NewStore(r => {
+            SetupSingle(r, existing);
+            r.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(transaction.Object);
+        }, NewClock());
 
         await store.SetAsync(null, "device", "rate:k-1", "2", TimeSpan.FromSeconds(10));
 
@@ -904,12 +909,14 @@ public class RepositoryTokenStoreShould
         Assert.Equal(Now.AddSeconds(10),   existing.ExpireTime);
         repository.Verify(r => r.UpdateAsync(existing, It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()), Times.Once);
         repository.Verify(r => r.AddAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()), Times.Never);
-        repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        transaction.Verify(t => t.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task Set_Creates_The_Slot_When_Absent() {
-        var (store, repository) = NewStore();
+        var transaction = new Mock<IUnitOfWork>();
+        var (store, repository) = NewStore(r => r.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(transaction.Object));
 
         await store.SetAsync("users/u-1", "dpop", "nonce-1", "value", null);
 
@@ -919,7 +926,8 @@ public class RepositoryTokenStoreShould
                                        && t.Value == "value" && t.ExpireTime == null),
                 It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()),
             Times.Once);
-        repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        transaction.Verify(t => t.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        repository.Verify(r => r.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -954,7 +962,7 @@ public class RepositoryTokenStoreShould
         transaction.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>())).ThrowsAsync(conflict);
         var marker = new SchemataToken { Family = "shared", FamilyKey = "shared", Type = TokenTypes.Family, Status = Statuses.FamilyActive };
         var (store, repository) = NewStore(r => {
-            r.Setup(t => t.Begin()).Returns(transaction.Object);
+            r.Setup(t => t.Begin(It.IsAny<IsolationLevel?>())).Returns(transaction.Object);
             SetupSingle(r, marker);
         });
 
@@ -970,7 +978,7 @@ public class RepositoryTokenStoreShould
     [Fact]
     public async Task Publish_Family_Commits_Marker_And_Successors_Through_One_Unit_Of_Work() {
         var uow = new Mock<IUnitOfWork>();
-        var (store, repository) = NewStore(r => r.Setup(value => value.Begin()).Returns(uow.Object));
+        var (store, repository) = NewStore(r => r.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(uow.Object));
         var access = new SchemataToken { Family = "family-1", Type = "access_token", Status = Statuses.Valid };
         var refresh = new SchemataToken { Family = "family-1", Type = "refresh_token", Status = Statuses.Valid };
 
@@ -991,7 +999,7 @@ public class RepositoryTokenStoreShould
     public async Task PublishFamily_Fails_When_The_Marker_Creation_Is_Blocked() {
         var transaction = new Mock<IUnitOfWork>();
         var (store, repository) = NewStore(r => {
-            r.Setup(value => value.Begin()).Returns(transaction.Object);
+            r.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(transaction.Object);
             r.Setup(x => x.AddAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
              .ReturnsAsync(MutationResult.NoWrite);
         });
@@ -1007,7 +1015,7 @@ public class RepositoryTokenStoreShould
     public async Task PublishFamily_Fails_When_A_Second_Member_Write_Is_Blocked() {
         var transaction = new Mock<IUnitOfWork>();
         var (store, _) = NewStore(r => {
-            r.Setup(value => value.Begin()).Returns(transaction.Object);
+            r.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(transaction.Object);
             r.SetupSequence(x => x.AddAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
              .ReturnsAsync(MutationResult.Applied)
              .ReturnsAsync(MutationResult.Applied)
@@ -1031,7 +1039,7 @@ public class RepositoryTokenStoreShould
         };
         var successor = new SchemataToken { Family = "family-1", Type = "refresh_token", Status = Statuses.Valid };
         var (store, repository) = NewStore(r => {
-            r.Setup(value => value.Begin()).Returns(uow.Object);
+            r.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(uow.Object);
             SetupSingle(r, marker);
         });
 
@@ -1053,7 +1061,7 @@ public class RepositoryTokenStoreShould
         };
         var successor = new SchemataToken { Family = "family-1", Type = "refresh_token", Status = Statuses.Valid };
         var (store, repository) = NewStore(r => {
-            r.Setup(value => value.Begin()).Returns(transaction.Object);
+            r.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(transaction.Object);
             SetupSingle(r, marker);
             r.Setup(x => x.UpdateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
              .ReturnsAsync(MutationResult.NoWrite);
@@ -1073,7 +1081,7 @@ public class RepositoryTokenStoreShould
         var access = new SchemataToken { Family = "family-1", Type = "access_token", Status = Statuses.Valid };
         var unrelated = new SchemataToken { Family = "family-2", Type = "access_token", Status = Statuses.Valid };
         var (store, repository) = NewStore(r => {
-            r.Setup(value => value.Begin()).Returns(uow.Object);
+            r.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(uow.Object);
             SetupSingle(r, marker);
             SetupList(r, access, unrelated);
         });
@@ -1092,7 +1100,7 @@ public class RepositoryTokenStoreShould
         var marker = new SchemataToken { Family = "family-1", FamilyKey = "family-1", Type = TokenTypes.Family, Status = Statuses.FamilyActive };
         var member = new SchemataToken { Family = "family-1", Type = "access_token", Status = Statuses.Valid };
         var (store, _) = NewStore(r => {
-            r.Setup(value => value.Begin()).Returns(transaction.Object);
+            r.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(transaction.Object);
             SetupSingle(r, marker);
             SetupList(r, member);
             r.SetupSequence(x => x.UpdateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
@@ -1320,7 +1328,7 @@ public class RepositoryTokenStoreShould
                                    && t.SessionId == "sid-1"
                                    && t.Application == "applications/client-1"),
             It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()), Times.Once);
-        caller.Verify(r => r.Begin(), Times.Never);
+        caller.Verify(r => r.Begin(It.IsAny<IsolationLevel?>()), Times.Never);
         transaction.Verify(t => t.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
         scopes.VerifyNoOtherCalls();
     }
@@ -1411,7 +1419,7 @@ public class RepositoryTokenStoreShould
         var transaction = new Mock<IUnitOfWork>();
         transaction.Setup(value => value.CommitAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(SchemataResourceErrors.Aborted<SchemataToken>());
-        attempt.Setup(value => value.Begin()).Returns(transaction.Object);
+        attempt.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(transaction.Object);
         // The racing rotation redeemed the loaded predecessor (new Timestamp) and published a
         // successor; the access row is untouched.
         var storedAccess = new SchemataToken {
@@ -1454,7 +1462,7 @@ public class RepositoryTokenStoreShould
         };
         var attempt = new Mock<IRepository<SchemataToken>>();
         SetupList(attempt, predecessor);
-        attempt.Setup(value => value.Begin()).Returns(new Mock<IUnitOfWork>().Object);
+        attempt.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(new Mock<IUnitOfWork>().Object);
         // LinqToDB surfaces an optimistic failure at the update itself, before the commit.
         attempt.Setup(value => value.UpdateAsync(It.IsAny<SchemataToken>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
                .ThrowsAsync(SchemataResourceErrors.Aborted<SchemataToken>());
@@ -1493,7 +1501,7 @@ public class RepositoryTokenStoreShould
         var transaction = new Mock<IUnitOfWork>();
         transaction.Setup(value => value.CommitAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(SchemataResourceErrors.Aborted<SchemataToken>());
-        attempt.Setup(value => value.Begin()).Returns(transaction.Object);
+        attempt.Setup(value => value.Begin(It.IsAny<IsolationLevel?>())).Returns(transaction.Object);
         // The CAS matched zero rows while the stored row still carries exactly the loaded stamp.
         var stored = new SchemataToken {
             Uid = uid, Name = "rat", ReferenceId = "rat-1", Application = "applications/client-1",
@@ -1508,7 +1516,7 @@ public class RepositoryTokenStoreShould
             () => store.RevokeByApplicationAsync("applications/client-1"));
 
         Assert.Contains("not a lost race", error.Message, StringComparison.Ordinal);
-        reread.Verify(value => value.Begin(), Times.Never);
+        reread.Verify(value => value.Begin(It.IsAny<IsolationLevel?>()), Times.Never);
         reread.Verify(value => value.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
         scopes.Verify(factory => factory.CreateScope(), Times.Exactly(2));
     }

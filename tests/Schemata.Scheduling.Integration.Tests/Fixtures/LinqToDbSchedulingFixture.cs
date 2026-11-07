@@ -22,10 +22,10 @@ using Xunit;
 
 namespace Schemata.Scheduling.Integration.Tests.Fixtures;
 
-public sealed class LinqToDbSchedulingFixture(Action<SchemataSchedulingOptions>? configureScheduling = null)
+public sealed class LinqToDbSchedulingFixture(Action<SchemataSchedulingOptions>? configureScheduling = null, string? path = null)
     : IAsyncLifetime
 {
-    private readonly string _dbPath = $"{Guid.NewGuid():n}.db";
+    private readonly string _dbPath = path ?? $"{Guid.NewGuid():n}.db";
 
     private ServiceProvider? _root;
 

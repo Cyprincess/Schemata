@@ -10,7 +10,7 @@ namespace Schemata.Event.Skeleton.Entities;
 [Table("SchemataEventSubscriptions")]
 [PrimaryKey(nameof(Uid))]
 [CanonicalName("event-subscriptions/{event_subscription}")]
-[Index(nameof(SubscriptionId), IsUnique = true)]
+[Index(nameof(SubscriptionId))]
 [Index(nameof(EventType))]
 public class SchemataEventSubscription : IIdentifier, ICanonicalName, IConcurrency, ITimestamp
 {

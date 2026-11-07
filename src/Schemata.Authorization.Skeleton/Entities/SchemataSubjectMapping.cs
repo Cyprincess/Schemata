@@ -28,8 +28,8 @@ namespace Schemata.Authorization.Skeleton.Entities;
 [Table("SchemataSubjectMappings")]
 [CanonicalName("subjectMappings/{subjectMapping}")]
 [PrimaryKey(nameof(Uid))]
-[Index(nameof(Application), nameof(Subject), IsUnique = true)]
-[Index(nameof(Application), nameof(PairwiseSubject),  IsUnique = true)]
+[Index(nameof(Application), nameof(Subject))]
+[Index(nameof(Application), nameof(PairwiseSubject))]
 public class SchemataSubjectMapping : IIdentifier, ICanonicalName, ITimestamp
 {
     /// <summary>Canonical name of the OAuth application this mapping is scoped to.</summary>

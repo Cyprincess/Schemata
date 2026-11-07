@@ -55,7 +55,7 @@ public sealed class FlowRequestDispatchShould
         var transitions   = Repository<SchemataProcessTransition>();
         var sources       = Repository<SchemataProcessSource>();
         var compensations = Repository<SchemataProcessCompensation>();
-        processes.Setup(repository => repository.Begin()).Returns(Mock.Of<IUnitOfWork>());
+        processes.Setup(repository => repository.Begin(It.IsAny<System.Data.IsolationLevel?>())).Returns(Mock.Of<IUnitOfWork>());
 
         var services = new ServiceCollection()
                       .AddLogging()
@@ -97,7 +97,7 @@ public sealed class FlowRequestDispatchShould
         var repository = new Mock<IRepository<TEntity>>();
         repository.Setup(current => current.AdviceContext).Returns(new AdviceContext(new ServiceCollection().BuildServiceProvider()));
         repository.Setup(current => current.Join(It.IsAny<IUnitOfWork>()));
-        repository.Setup(current => current.Begin()).Returns(Mock.Of<IUnitOfWork>());
+        repository.Setup(current => current.Begin(It.IsAny<System.Data.IsolationLevel?>())).Returns(Mock.Of<IUnitOfWork>());
         repository.Setup(current => current.AddAsync(It.IsAny<TEntity>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
                   .ReturnsAsync((TEntity entity, CancellationToken _, MutationOptions _) => {
                       FlowTestCreation.Assign(entity);

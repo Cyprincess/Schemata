@@ -10,6 +10,8 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Core;
+using Schemata.Abstractions.Exceptions;
+using Schemata.Common.Errors;
 using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.LinqToDB;
 using Schemata.Entity.Repository;
@@ -71,6 +73,15 @@ public class CustomTokenEntityShould
         Assert.True(builder.HasFeature<SchemataSecurityFeature<SchemataSecurity, SchemataToken>>());
     }
 
+    [Fact]
+    public void ClassifyConflicts_ForTheActualDerivedTokenType() {
+        var derived = SchemataResourceErrors.Aborted<MyToken>();
+
+        Assert.True(SchemataTokenConflicts.IsConflict<MyToken>(derived));
+        Assert.False(SchemataTokenConflicts.IsConflict<SchemataToken>(derived));
+        Assert.False(SchemataTokenConflicts.IsConflict<MyToken>(new AbortedException()));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -119,6 +130,32 @@ public class CustomTokenEntityShould
                 Name = "late", ReferenceId = "late", Status = Statuses.Valid,
             }]));
             Assert.False(await redeemer.TryRedeemAsync(predecessor));
+        }
+
+        using (var familyScope = host.Services.CreateScope()) {
+            var familyStore = familyScope.ServiceProvider.GetRequiredService<RepositoryTokenStore<MyToken>>();
+            var familyPredecessor = new MyToken {
+                Name = "family-first",
+                ReferenceId = "family-first",
+                Family = "family",
+                Status = Statuses.Valid,
+            };
+            Assert.True(await familyStore.PublishFamilyAsync("family", [familyPredecessor], create: true));
+            var familyRow = await familyStore.FindByReferenceIdAsync("family-first");
+            Assert.NotNull(familyRow);
+            var successor = new MyToken {
+                Name = "family-second",
+                ReferenceId = "family-second",
+                Family = "family",
+                Status = Statuses.Valid,
+            };
+            Assert.True(await familyStore.RotateFamilyAsync(familyRow, [successor]));
+            Assert.True(await familyStore.InvalidateFamilyAsync("family"));
+
+            var marker = await familyStore.FindByNameAsync("family");
+            Assert.NotNull(marker);
+            Assert.Equal(Statuses.FamilyInvalidated, marker.Status);
+            Assert.Equal(Statuses.Revoked, (await familyStore.FindByReferenceIdAsync("family-second"))!.Status);
         }
 
         using var revokeScope = host.Services.CreateScope();

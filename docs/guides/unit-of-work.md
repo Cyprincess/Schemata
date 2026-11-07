@@ -70,6 +70,8 @@ public sealed class EnrollmentService(
 
 `IUnitOfWork<AppDbContext>` is resolved from DI (scoped). `Join` enlists the repository; the first enlisted write opens the transaction. After `Join`, calling `students.CommitAsync()` throws `InvalidOperationException` — use `uow.CommitAsync()` for the transaction boundary.
 
+Call `IRepository.Begin(IsolationLevel.Serializable)` when a lookup and its dependent write must share one serializable transaction. Begin before the first lookup, join each participating repository, and commit once. EF relational providers open an explicit transaction at that level; LinqToDB passes it to `BeginTransaction`. A provider that cannot supply the requested isolation throws before a query or write. Serialization failures and deadlocks surface as retryable `AbortedException` outcomes, distinct from logical duplicate `AlreadyExistsException` results.
+
 ## Rollback on failure
 
 If `CommitAsync` is never called and the unit of work is disposed, the transaction rolls back. You can also roll back explicitly:
@@ -90,6 +92,23 @@ catch
 ```
 
 `RollbackAsync` and `Dispose` are both safe to call after a rollback has already occurred.
+
+## Commit outcomes and retry safety
+
+Commit sinks run after a durable provider commit. LinqToDB runs them before transaction disposal;
+EF Core records a successful save before running them. Failures in commit sinks or disposal leave
+the transaction committed and suppress rollback sinks.
+
+A failure after provider save or commit entry is unknown unless the provider supplies explicit
+no-commit evidence. Unknown outcomes suppress commit and rollback sinks. Preparation failures before
+the EF save and explicit successful rollbacks run rollback sinks. When failures aggregate, the
+original commit failure precedes rollback and disposal cleanup failures; after a successful commit,
+sink failures precede disposal failures.
+
+Identified resource requests use this evidence for idempotency. Confirmed no-write and rollback
+release the reservation. Unknown commit and post-commit cleanup failures keep it pending so a retry
+cannot repeat a possibly durable write. See
+[Request identification](../documents/resource/aip-interactions.md#create-update-and-delete).
 
 ## Multiple repositories
 

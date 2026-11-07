@@ -97,7 +97,7 @@ public class AdvisorOrderShould
 
         protected override IQueryable<AdvisorEntity> AsQueryable() => Enumerable.Empty<AdvisorEntity>().AsQueryable();
 
-        protected override IUnitOfWork CreateUnitOfWork() => throw new System.NotSupportedException();
+        protected override IUnitOfWork CreateUnitOfWork(System.Data.IsolationLevel? isolationLevel) => throw new System.NotSupportedException();
 
         protected override void AttachContext(IUnitOfWork uow) { }
 

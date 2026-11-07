@@ -66,7 +66,10 @@ an `IReadOnlyDictionary<string, string?>` deserialized from `SchemataJob.Variabl
 resolves the job from DI as a transient on each fire.
 
 The scheduler persists each definition and run, so configure a persistence provider (the EF Core
-setup from Getting Started) for the `SchemataJob` and `SchemataJobExecution` rows.
+setup from Getting Started) for the `SchemataJob` and `SchemataJobExecution` rows. Scheduling checks
+a supplied `Key` inside a serializable transaction before the lookup and commits the job and pending
+execution once. `Name` follows the consumer canonical-name generator. The entity indexes remain
+ordinary query indexes; consumer-owned unique indexes are still supported.
 
 ## Cron expression syntax
 

@@ -92,7 +92,7 @@ public sealed class AdviceRequestDeviceCodePolling<TApp, TToken>(
         grant.Value = next.ToString();
         try {
             await tokens.UpdateAsync(grant, ct);
-        } catch (AbortedException exception) when (SchemataTokenConflicts.IsConflict(exception)) {
+        } catch (AbortedException exception) when (SchemataTokenConflicts.IsConflict<TToken>(exception)) {
             // Another poll lost the same race and already persisted a wider interval;
             // every unrelated abort propagates.
         }

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,9 +18,9 @@ using Xunit;
 
 namespace Schemata.Scheduling.Integration.Tests.Fixtures;
 
-public sealed class SchedulingFixture(bool supplyNames = true) : IAsyncLifetime
+public sealed class SchedulingFixture(bool supplyNames = true, string? path = null) : IAsyncLifetime
 {
-    private SqliteConnection? _connection;
+    private readonly string _dbPath = path ?? $"{Guid.NewGuid():n}.db";
     private ServiceProvider?   _root;
 
     public MutableClock Clock { get; } = new(new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
@@ -31,15 +32,12 @@ public sealed class SchedulingFixture(bool supplyNames = true) : IAsyncLifetime
     public IServiceProvider Services => _root!;
 
     public async Task InitializeAsync() {
-        _connection = new("Data Source=:memory:");
-        await _connection.OpenAsync();
-
         var registry = new DefaultScheduledJobRegistry();
         registry.Register<BlockingJob>(BlockingJob.Key);
 
         var services = new ServiceCollection();
 
-        services.AddDbContextFactory<SchedulingDbContext>(opts => opts.UseSqlite(_connection)
+        services.AddDbContextFactory<SchedulingDbContext>(opts => opts.UseSqlite($"Data Source={_dbPath};Pooling=False")
                                                        .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
 
         services.AddRepository<SchemataJob, EfCoreRepository<SchedulingDbContext, SchemataJob>>();
@@ -75,8 +73,9 @@ public sealed class SchedulingFixture(bool supplyNames = true) : IAsyncLifetime
             await _root.DisposeAsync();
         }
 
-        if (_connection is not null) {
-            await _connection.DisposeAsync();
+        SqliteConnection.ClearAllPools();
+        if (File.Exists(_dbPath)) {
+            File.Delete(_dbPath);
         }
     }
 

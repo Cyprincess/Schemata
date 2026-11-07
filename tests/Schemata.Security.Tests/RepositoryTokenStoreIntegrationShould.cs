@@ -22,6 +22,7 @@ using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Security.Foundation.Stores;
 using Schemata.Security.Skeleton.Entities;
+using Schemata.Security.Skeleton.Services;
 using Schemata.Security.Tests.Fixtures;
 using Xunit;
 using static Schemata.Security.Skeleton.SecurityConstants;
@@ -809,6 +810,356 @@ public class RepositoryTokenStoreIntegrationShould : IAsyncLifetime
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConcurrentSlotCreation_LeavesOneDurableRow(bool linq) {
+        await using var host = await VetoHost.CreateAsync(linq, _ => { });
+
+        var attempts = await Task.WhenAll(
+            CaptureSlotAsync(host, "first"),
+            CaptureSlotAsync(host, "second"));
+
+        Assert.All(attempts, AssertAllowedConflict);
+        var (repository, scope) = host.CreateRepositoryScope();
+        using (scope) {
+            Assert.Equal(1, await repository.CountAsync(query => query.Where(row =>
+                row.Parent == "applications/client" && row.Provider == "nonce" && row.Key == "slot")));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConcurrentExpiredSlotReplacement_LeavesOneDurableRow(bool linq) {
+        await using var host = await VetoHost.CreateAsync(linq, _ => { });
+        var (seed, seedScope) = host.CreateRepositoryScope();
+        using (seedScope) {
+            await SeedAsync(seed, new SchemataToken {
+                Name = "slot",
+                Parent = "applications/client",
+                Provider = "nonce",
+                Key = "slot",
+                Value = "expired",
+                ExpireTime = DateTime.UtcNow - TimeSpan.FromMinutes(1),
+            });
+        }
+
+        var attempts = await Task.WhenAll(
+            CaptureSlotAsync(host, "first"),
+            CaptureSlotAsync(host, "second"));
+
+        Assert.All(attempts, AssertAllowedConflict);
+        var (repository, scope) = host.CreateRepositoryScope();
+        using (scope) {
+            var row = Assert.Single(await repository.ListAsync(query => query.Where(row =>
+                row.Parent == "applications/client" && row.Provider == "nonce" && row.Key == "slot")).ToListAsync());
+            Assert.NotEqual("expired", row.Value);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConcurrentFamilyPublication_LeavesOneFamilyMarker(bool linq) {
+        await using var host = await VetoHost.CreateAsync(linq, _ => { });
+
+        var attempts = await Task.WhenAll(
+            CaptureFamilyAsync(host, "first"),
+            CaptureFamilyAsync(host, "second"));
+
+        Assert.All(attempts, AssertAllowedConflict);
+        var (repository, scope) = host.CreateRepositoryScope();
+        using (scope) {
+            Assert.Equal(1, await repository.CountAsync(query => query.Where(row => row.FamilyKey == "family")));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConcurrentRotation_LeavesOneReferenceId(bool linq) {
+        await using var host = await VetoHost.CreateAsync(linq, _ => { });
+        SchemataToken predecessor;
+        var (seed, seedScope) = host.CreateRepositoryScope();
+        using (seedScope) {
+            predecessor = new() {
+                Name = "predecessor",
+                ReferenceId = "predecessor",
+                Status = Statuses.Valid,
+                Timestamp = Guid.NewGuid(),
+            };
+            await SeedAsync(seed, predecessor);
+        }
+
+        var attempts = await Task.WhenAll(
+            CaptureRotationAsync(host, "first"),
+            CaptureRotationAsync(host, "second"));
+
+        Assert.All(attempts, AssertAllowedConflict);
+        var (repository, scope) = host.CreateRepositoryScope();
+        using (scope) {
+            Assert.Equal(1, await repository.CountAsync(query => query.Where(row => row.ReferenceId == "successor")));
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public async Task Logical_Key_Write_Races_Leave_One_Durable_Match(bool linq, bool familyKey, bool update) {
+        await using var host = await VetoHost.CreateAsync(linq, _ => { });
+        if (update) {
+            var (seed, seedScope) = host.CreateRepositoryScope();
+            using (seedScope) {
+                await SeedAsync(seed,
+                    new SchemataToken {
+                        Name = "first", FamilyKey = "first-family", ReferenceId = "first-reference", Status = Statuses.Valid,
+                    },
+                    new SchemataToken {
+                        Name = "second", FamilyKey = "second-family", ReferenceId = "second-reference", Status = Statuses.Valid,
+                    });
+            }
+        }
+
+        var attempts = await Task.WhenAll(
+            CaptureLogicalWriteAsync(host, "first", familyKey, update),
+            CaptureLogicalWriteAsync(host, "second", familyKey, update));
+
+        Assert.Contains(attempts, outcome => outcome is WriteOutcome.Applied or WriteOutcome.Transient);
+        var (repository, scope) = host.CreateRepositoryScope();
+        using (scope) {
+            Assert.Equal(1, await CountLogicalKeyAsync(repository, familyKey, "shared-key"));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Update_Retains_Own_Logical_Keys(bool linq) {
+        await using var host = await VetoHost.CreateAsync(linq, _ => { });
+        var (seed, seedScope) = host.CreateRepositoryScope();
+        using (seedScope) {
+            await SeedAsync(seed, new SchemataToken {
+                Name = "current", FamilyKey = "current-family", ReferenceId = "current-reference", Status = Statuses.Valid,
+            });
+        }
+
+        var (store, scope) = host.CreateStoreScope();
+        using (scope) {
+            var repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataToken>>();
+            var current = await Find(repository, "current");
+            Assert.NotNull(current);
+            current.Value = "updated";
+            await store.UpdateAsync(current);
+
+            var stored = await Find(repository, "current");
+            Assert.NotNull(stored);
+            Assert.Equal("updated", stored.Value);
+            Assert.Equal("current-family", stored.FamilyKey);
+            Assert.Equal("current-reference", stored.ReferenceId);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public async Task Multi_Token_Writes_Reject_Duplicate_Staged_Logical_Keys(
+        bool linq,
+        bool familyPublication,
+        bool familyKey) {
+        await using var host = await VetoHost.CreateAsync(linq, _ => { });
+        if (!familyPublication) {
+            var (seed, seedScope) = host.CreateRepositoryScope();
+            using (seedScope) {
+                await SeedAsync(seed, new SchemataToken {
+                    Name = "predecessor", ReferenceId = "predecessor-reference", Status = Statuses.Valid,
+                });
+            }
+        }
+
+        var (store, scope) = host.CreateStoreScope();
+        using (scope) {
+            SchemataToken Member(string name, string reference) {
+                return new() {
+                    Name = name,
+                    ReferenceId = familyKey ? reference : "shared-key",
+                    FamilyKey = familyKey ? "shared-key" : null,
+                    Status = Statuses.Valid,
+                };
+            }
+
+            var members = new[] { Member("first-member", "first-reference"), Member("second-member", "second-reference") };
+            if (familyPublication) {
+                await Assert.ThrowsAsync<AlreadyExistsException>(
+                    () => store.PublishFamilyAsync("published-family", members, create: true));
+            } else {
+                var repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataToken>>();
+                var predecessor = await Find(repository, "predecessor");
+                Assert.NotNull(predecessor);
+                await Assert.ThrowsAsync<AlreadyExistsException>(() => store.TryRotateAsync(predecessor, members));
+            }
+        }
+
+        var (verify, verifyScope) = host.CreateRepositoryScope();
+        using (verifyScope) {
+            Assert.Equal(0, await CountLogicalKeyAsync(verify, familyKey, "shared-key"));
+            if (familyPublication) {
+                Assert.Equal(0, await verify.CountAsync(query => query.Where(row => row.FamilyKey == "published-family")));
+            } else {
+                Assert.Equal(Statuses.Valid, await StatusOf(verify, "predecessor"));
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Family_Publication_Lock_Failure_Remains_Unclassified_Aborted(bool linq) {
+        await using var host = await VetoHost.CreateAsync(linq, _ => { });
+        await using var blocker = new SqliteConnection($"Data Source={host.DatabasePath};Pooling=False");
+        await blocker.OpenAsync();
+        await using (var begin = blocker.CreateCommand()) {
+            begin.CommandText = "BEGIN IMMEDIATE";
+            await begin.ExecuteNonQueryAsync();
+        }
+
+        try {
+            var (store, scope) = host.CreateStoreScope();
+            using (scope) {
+                var error = await Assert.ThrowsAsync<AbortedException>(() => store.PublishFamilyAsync("locked-family", [
+                    new SchemataToken { Name = "locked-member", ReferenceId = "locked-reference", Status = Statuses.Valid },
+                ], create: true));
+                Assert.NotNull(error.InnerException);
+                Assert.DoesNotContain(error.Details ?? [], detail => detail is Schemata.Abstractions.Errors.ResourceInfoDetail);
+                Assert.False(SchemataTokenConflicts.IsConflict<SchemataToken>(error));
+            }
+        } finally {
+            await using var rollback = blocker.CreateCommand();
+            rollback.CommandText = "ROLLBACK";
+            await rollback.ExecuteNonQueryAsync();
+        }
+
+        var (repository, repositoryScope) = host.CreateRepositoryScope();
+        using (repositoryScope) {
+            Assert.Equal(0, await repository.CountAsync(query => query.Where(row => row.FamilyKey == "locked-family")));
+            Assert.Null(await Find(repository, "locked-member"));
+        }
+    }
+
+    private enum WriteOutcome
+    {
+        Applied,
+        AlreadyExists,
+        Cas,
+        Transient,
+    }
+
+    private static async Task<WriteOutcome> CaptureLogicalWriteAsync(
+        VetoHost host,
+        string name,
+        bool familyKey,
+        bool update) {
+        var (store, scope) = host.CreateStoreScope();
+        using (scope) {
+            try {
+                if (update) {
+                    var repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataToken>>();
+                    var token = await Find(repository, name);
+                    Assert.NotNull(token);
+                    SetLogicalKey(token, familyKey, "shared-key");
+                    await store.UpdateAsync(token);
+                } else {
+                    var token = new SchemataToken { Name = name, Status = Statuses.Valid };
+                    SetLogicalKey(token, familyKey, "shared-key");
+                    await store.CreateAsync(token);
+                }
+
+                return WriteOutcome.Applied;
+            } catch (AlreadyExistsException) {
+                return WriteOutcome.AlreadyExists;
+            } catch (AbortedException error) when (SchemataTokenConflicts.IsConflict<SchemataToken>(error)) {
+                return WriteOutcome.Cas;
+            } catch (AbortedException) {
+                return WriteOutcome.Transient;
+            }
+        }
+    }
+
+    private static void SetLogicalKey(SchemataToken token, bool familyKey, string value) {
+        if (familyKey) {
+            token.FamilyKey = value;
+        } else {
+            token.ReferenceId = value;
+        }
+    }
+
+    private static ValueTask<int> CountLogicalKeyAsync(
+        IRepository<SchemataToken> repository,
+        bool familyKey,
+        string value) {
+        return repository.CountAsync(query => familyKey
+            ? query.Where(row => row.FamilyKey == value)
+            : query.Where(row => row.ReferenceId == value));
+    }
+
+    private static async Task<Exception?> CaptureSlotAsync(VetoHost host, string value) {
+        var (store, scope) = host.CreateStoreScope();
+        using (scope) {
+            try {
+                await store.GetOrCreateAsync("applications/client", "nonce", "slot", value, TimeSpan.FromMinutes(5));
+                return null;
+            } catch (Exception exception) {
+                return exception;
+            }
+        }
+    }
+
+    private static async Task<Exception?> CaptureFamilyAsync(VetoHost host, string reference) {
+        var (store, scope) = host.CreateStoreScope();
+        using (scope) {
+            try {
+                await store.PublishFamilyAsync("family", [
+                    new() { Name = reference, ReferenceId = reference, Family = "family", Status = Statuses.Valid },
+                ], create: true);
+                return null;
+            } catch (Exception exception) {
+                return exception;
+            }
+        }
+    }
+
+    private static async Task<Exception?> CaptureRotationAsync(VetoHost host, string name) {
+        var (store, scope) = host.CreateStoreScope();
+        using (scope) {
+            try {
+                var current = await store.FindByReferenceIdAsync("predecessor");
+                Assert.NotNull(current);
+                await store.TryRotateAsync(current, [
+                    new() { Name = name, ReferenceId = "successor", Status = Statuses.Valid },
+                ]);
+                return null;
+            } catch (Exception exception) {
+                return exception;
+            }
+        }
+    }
+
+    private static void AssertAllowedConflict(Exception? error) {
+        Assert.True(error is null or AlreadyExistsException or AbortedException, error?.ToString());
+    }
+
     private (IRepository<SchemataToken> Repository, IServiceScope Scope) CreateScope() {
         var scope      = _root!.CreateScope();
         var repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataToken>>();
@@ -871,11 +1222,28 @@ public class RepositoryTokenStoreIntegrationShould : IAsyncLifetime
         }
     }
 
+    private sealed class TokenNameAdvisor : IRepositoryAddAdvisor<SchemataToken>
+    {
+        public int Order => AdviceAddCanonicalName.DefaultOrder - 1;
+
+        public Task<AdviseResult> AdviseAsync(
+            AdviceContext context,
+            IRepository<SchemataToken> repository,
+            SchemataToken entity,
+            MutationOptions options,
+            CancellationToken ct) {
+            entity.Name ??= Guid.NewGuid().ToString("n");
+            return Task.FromResult(AdviseResult.Continue);
+        }
+    }
+
     // Isolated dual-provider host for advisor-veto and commit-failure scenarios; each instance owns
     // a private SQLite file so the registered veto state cannot leak into the shared class fixture.
     private sealed class VetoHost(ServiceProvider services, string path) : IAsyncDisposable
     {
         public ServiceProvider Services => services;
+
+        public string DatabasePath => path;
 
         public static async Task<VetoHost> CreateAsync(bool linq, Action<IServiceCollection> configure) {
             var path = Path.Combine(Path.GetTempPath(), $"schemata-token-veto-{Guid.NewGuid():N}.db");
@@ -894,6 +1262,7 @@ public class RepositoryTokenStoreIntegrationShould : IAsyncLifetime
                 services.AddRepository<SchemataToken, EfCoreRepository<VetoContext, SchemataToken>>();
             }
             SecurityTestResources.AddResourceTypeResolver(services);
+            services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataToken>, TokenNameAdvisor>());
             services.AddSingleton(TimeProvider.System);
             services.AddScoped<RepositoryTokenStore<SchemataToken>>();
             configure(services);

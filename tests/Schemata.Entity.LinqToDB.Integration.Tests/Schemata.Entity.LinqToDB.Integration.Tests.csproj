@@ -8,6 +8,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
+    <PackageReference Include="Moq" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
 
   </ItemGroup>
@@ -17,6 +18,7 @@
     <ProjectReference Include="..\..\src\Schemata.Caching.Skeleton\Schemata.Caching.Skeleton.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Entity.Cache\Schemata.Entity.Cache.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Entity.LinqToDB\Schemata.Entity.LinqToDB.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Resource.Foundation\Schemata.Resource.Foundation.csproj" />
   </ItemGroup>
 
 </Project>

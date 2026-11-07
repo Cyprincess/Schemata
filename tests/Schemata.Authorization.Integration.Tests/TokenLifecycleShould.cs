@@ -247,15 +247,18 @@ public class TokenLifecycleShould
         var store = scope.ServiceProvider.GetRequiredService<RepositoryTokenStore<SchemataToken>>();
         await store.CreateAsync(new() { Name = "occupied", ReferenceId = "existing", Status = TokenStatuses.Valid });
 
-        await Assert.ThrowsAsync<AlreadyExistsException>(() => store.CreateAsync(new() {
+        var failure = new IOException("participant publication failed");
+        var caught = await Assert.ThrowsAsync<IOException>(() => store.CreateAsync(new() {
             Name = "candidate", ReferenceId = "rejected", Parent = "users/participant", SessionId = "sid-1",
             Application = "applications/client", Type = TokenTypes.AccessToken, Status = TokenStatuses.Valid,
         }, beforeCommit: async (transaction, ct) => {
             await store.EnlistParticipantAsync(transaction, "users/participant", "sid-1", "applications/client", ct);
             await using var repository = scope.ServiceProvider.GetRequiredService<IRepository<SchemataToken>>();
             repository.Join(transaction);
-            await repository.AddAsync(new() { Name = "occupied", ReferenceId = "colliding", Status = TokenStatuses.Valid }, ct);
+            await repository.AddAsync(new() { Name = "colliding-write", ReferenceId = "colliding", Status = TokenStatuses.Valid }, ct);
+            await Task.FromException(failure);
         }));
+        Assert.Same(failure, caught);
 
         using var verify = host.Services.CreateScope();
         var persisted = verify.ServiceProvider.GetRequiredService<RepositoryTokenStore<SchemataToken>>();

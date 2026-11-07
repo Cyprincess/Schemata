@@ -15,7 +15,7 @@ namespace Schemata.Flow.Skeleton.Entities;
 /// </summary>
 [Table("SchemataFlowEffectIntents")]
 [PrimaryKey(nameof(Uid))]
-[Index(nameof(RequestId), IsUnique = true)]
+[Index(nameof(RequestId))]
 [Index(nameof(Token))]
 public class SchemataFlowEffectIntent : IIdentifier, IConcurrency, ITimestamp
 {

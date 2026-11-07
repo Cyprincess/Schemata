@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -290,6 +291,110 @@ public class SchemataJobWriteGateShould : IAsyncLifetime
             await Assert.ThrowsAsync<ValidationException>(() => scheduler.TriggerAsync<BlockingJob>(new(), CancellationToken.None));
         } finally {
             await fixture.DisposeAsync();
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConcurrentSchedulers_ForANewKey_LeaveOneDurableJob(bool linq) {
+        var pair = await SchedulerPair.CreateAsync(linq);
+        try {
+            var attempts = await Task.WhenAll(
+                ScheduleAsync(pair.First, "first"),
+                ScheduleAsync(pair.Second, "second"));
+
+            Assert.All(attempts, AssertAllowedConflict);
+            Assert.Equal(1, await pair.CountJobsAsync());
+        } finally {
+            await pair.DisposeAsync();
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConcurrentSchedulers_ForAnExistingKey_LeaveOneDurableJob(bool linq) {
+        var pair = await SchedulerPair.CreateAsync(linq);
+        try {
+            Assert.Null(await ScheduleAsync(pair.First, "seed"));
+
+            var attempts = await Task.WhenAll(
+                ScheduleAsync(pair.First, "first"),
+                ScheduleAsync(pair.Second, "second"));
+
+            Assert.All(attempts, AssertAllowedConflict);
+            Assert.Equal(1, await pair.CountJobsAsync());
+        } finally {
+            await pair.DisposeAsync();
+        }
+    }
+
+    private static async Task<Exception?> ScheduleAsync(IServiceProvider services, string args) {
+        var scheduler = services.GetRequiredService<IScheduler<SchemataJob, SchemataJobExecution>>();
+        try {
+            await scheduler.ScheduleAsync(new() {
+                Key = "application:daily",
+                JobKey = BlockingJob.Key,
+                State = JobState.Active,
+                NextRunTime = DateTime.UtcNow.AddDays(1),
+                ArgsJson = args,
+            }, CancellationToken.None);
+            return null;
+        } catch (Exception exception) {
+            return exception;
+        }
+    }
+
+    private static void AssertAllowedConflict(Exception? error) {
+        Assert.True(error is null or AlreadyExistsException or AbortedException, error?.ToString());
+    }
+
+    private sealed class SchedulerPair : IAsyncDisposable
+    {
+        private readonly IAsyncLifetime _firstLifetime;
+        private readonly IAsyncLifetime _secondLifetime;
+
+        private SchedulerPair(
+            IServiceProvider first,
+            IServiceProvider second,
+            IAsyncLifetime firstLifetime,
+            IAsyncLifetime secondLifetime) {
+            First = first;
+            Second = second;
+            _firstLifetime = firstLifetime;
+            _secondLifetime = secondLifetime;
+        }
+
+        public IServiceProvider First { get; }
+        public IServiceProvider Second { get; }
+
+        public static async Task<SchedulerPair> CreateAsync(bool linq) {
+            var path = Path.Combine(Path.GetTempPath(), $"schemata-schedule-race-{Guid.NewGuid():N}.db");
+            if (linq) {
+                var first = new LinqToDbSchedulingFixture(path: path);
+                var second = new LinqToDbSchedulingFixture(path: path);
+                await first.InitializeAsync();
+                await second.InitializeAsync();
+                return new(first.Services, second.Services, first, second);
+            }
+
+            var efFirst = new SchedulingFixture(path: path);
+            var efSecond = new SchedulingFixture(path: path);
+            await efFirst.InitializeAsync();
+            await efSecond.InitializeAsync();
+            return new(efFirst.Services, efSecond.Services, efFirst, efSecond);
+        }
+
+        public async Task<int> CountJobsAsync() {
+            using var scope = First.CreateScope();
+            var jobs = scope.ServiceProvider.GetRequiredService<IRepository<SchemataJob>>();
+            return await jobs.CountAsync(query => query.Where(row => row.Key == "application:daily"));
+        }
+
+        public async ValueTask DisposeAsync() {
+            await _secondLifetime.DisposeAsync();
+            await _firstLifetime.DisposeAsync();
         }
     }
 

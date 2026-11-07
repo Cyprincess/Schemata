@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Schemata.Abstractions.Errors;
 using static Schemata.Abstractions.SchemataConstants;
@@ -29,10 +30,12 @@ public sealed class AbortedException : SchemataException
     ///     <see cref="SchemataResources.CONCURRENCY_MISMATCH" />.
     /// </param>
     /// <param name="args">Optional named arguments substituted into the template.</param>
+    /// <param name="innerException">The provider failure retained for diagnostics.</param>
     public AbortedException(
         string resourceKey = SchemataResources.CONCURRENCY_MISMATCH,
-        IReadOnlyDictionary<string, string?>? args = null
-    ) : base(409, ErrorCodes.Aborted, LocalizedMessageFormatter.FormatInvariant(resourceKey, args)) {
+        IReadOnlyDictionary<string, string?>? args = null,
+        Exception? innerException = null
+    ) : base(409, ErrorCodes.Aborted, LocalizedMessageFormatter.FormatInvariant(resourceKey, args), innerException) {
         Details = [new ErrorInfoDetail { Reason = resourceKey }];
         AttachMetadata(args);
     }

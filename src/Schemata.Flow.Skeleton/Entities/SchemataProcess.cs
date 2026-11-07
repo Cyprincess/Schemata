@@ -10,7 +10,7 @@ namespace Schemata.Flow.Skeleton.Entities;
 [Table("SchemataProcesses")]
 [CanonicalName("processes/{process}")]
 [PrimaryKey(nameof(Uid))]
-[Index(nameof(DefinitionName), nameof(IdempotencyKey), IsUnique = true)]
+[Index(nameof(DefinitionName), nameof(IdempotencyKey))]
 public class SchemataProcess : IIdentifier, ICanonicalName, IConcurrency, IDescriptive,
                                ISoftDelete, ITimestamp, IStateful, IAnnotatable
 {

@@ -36,12 +36,16 @@ public interface IUnitOfWork<TContext> : IUnitOfWork
 | Member                     | Purpose                                                                                                                                              |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `AddCommitSink`            | Registers an ordered callback that runs after the unit of work commits its transaction; enlisted repositories use it to dispatch committed advisors. |
-| `AddRollbackSink`          | Registers a callback that runs when the unit of work rolls back or is disposed before completion; enlisted repositories use it to reset write state. |
+| `AddRollbackSink`          | Registers a callback that runs after confirmed rollback or no-write failure, or when an open unit of work is disposed; enlisted repositories use it to reset write state. |
 | `AddSavePreparation`       | Registers a scalar value projection on already-enlisted entities, applied when provider-generated write values are final. See [Save preparations](#save-preparations). |
 | `CommitAsync`              | Persists the enlisted repositories' changes, commits the transaction, then runs the commit sinks in ascending order.                                  |
 | `RollbackAsync`            | Rolls back the transaction and runs each enlisted rollback sink.                                                                                     |
 | `Context`                  | The provider context (`DbContext` or `DataConnection`). First access opens the connection; the transaction opens per the provider's execution model. Creation and transaction begin are one ownership step: a failure releases the created context and caches nothing, so the next access retries initialization. |
-| `Dispose` / `DisposeAsync` | Rolls back when never committed, then releases the context.                                                                                          |
+| `Dispose` / `DisposeAsync` | Attempts provider rollback before publishing rollback sinks, then releases the transaction and context. A failed rollback retains unknown outcome evidence and propagates cleanup failures in occurrence order. |
+
+Resource CRUD owners preserve an operation failure ahead of a disposal failure in
+`AggregateException`. Failed rollback leaves reached dispatch evidence and its idempotency
+reservation pending even if later connection teardown rolls back the database transaction.
 
 Commit sinks are ordered: the unit of work keeps them sorted by `order` (equal orders keep
 registration sequence) and runs every sink even when one fails, rethrowing the collected errors
@@ -51,6 +55,20 @@ callbacks (pending events, report schedule sync), `Domain` for sinks enlisted di
 owners. The sink registrations are required members of the contract, so every compliant
 `IUnitOfWork` implementation carries commit and rollback semantics.
 
+A successful provider save or commit records committed completion before commit sinks and fallible
+cleanup run. LinqToDB invokes the ordered commit sinks before disposing its transaction. A failure
+after provider save or commit entry has an unknown outcome unless the provider supplies explicit
+no-commit evidence. Unknown completion restores EF caller-visible concurrency stamps, suppresses
+committed advisors and rollback sinks, and prevents disposal from publishing a rollback. Preparation
+failures before EF `SaveChangesAsync`, SQLite unique violations, EF concurrency rejections, and
+explicit successful rollbacks publish confirmed rollback evidence instead.
+
+Exception aggregation preserves outcome evidence and cleanup order. A commit failure comes first,
+followed by rollback-cleanup and disposal failures. After a successful commit, commit-sink failures
+come before disposal failures. Committed and unknown outcomes retain resource idempotency
+reservations through these failures; only `NotWritten` and confirmed rollback release them. See
+[Request identification](../resource/aip-interactions.md#create-update-and-delete).
+
 A unit of work is one-shot: after `CommitAsync` or `RollbackAsync`, resolve a fresh `IUnitOfWork`
 from DI to start another transaction. `IUnitOfWork<TContext>` binds the type parameter to a concrete
 context so multiple provider types coexist in one container.
@@ -59,9 +77,10 @@ context so multiple provider types coexist in one container.
 
 Repository transaction entry points preserve commit ownership:
 
-- `IRepository.Begin()` creates a provider unit of work, enlists the calling repository, and
+- `IRepository.Begin(isolationLevel = null)` creates a provider unit of work, enlists the calling repository, and
   returns it. The caller owns the returned unit of work: commit or roll it back explicitly, and
-  dispose it.
+  dispose it. A requested isolation opens before the first query or write; providers that cannot
+  honor it throw `NotSupportedException` instead of running at a lower level.
 - `IRepository.Join(uow)` enlists the repository in a unit of work resolved separately (typically
   from the DI scope), letting several repositories share one transaction.
 - `IResourceMutation<TEntity>` accepts an optional unit of work: with one, the mutation joins and
@@ -159,10 +178,12 @@ no publication fence.
 
 EF Core preserves the caller's concurrency stamp while staging an update and uses it as the
 original value guarding the write. Immediately before `SaveChangesAsync`, its unit of work rotates
-the stamp on each `Modified` `IConcurrency` entry. A failed save restores the caller-visible stamp
-before rollback sinks run. LinqToDB executes its guarded update and rotates the stamp during
-staging, inside the active transaction. A successful commit followed by a failing commit sink
-leaves the committed stamp intact in both providers. The implementations are
+the stamp on each `Modified` `IConcurrency` entry. Every failed save restores the caller-visible
+stamp; rollback sinks then run only when the failure has confirmed no-commit evidence. An unknown
+save outcome keeps the restored caller stamp without publishing rollback. LinqToDB executes its
+guarded update and rotates the stamp during staging, inside the active transaction. A successful
+commit followed by a failing commit sink leaves the committed stamp intact in both providers. The
+implementations are
 `src/Schemata.Entity.EntityFrameworkCore/EfCoreUnitOfWork.cs` and
 `src/Schemata.Entity.LinqToDB/LinqToDbRepository.cs`.
 
@@ -190,10 +211,16 @@ effects. Registering on a completed or disposed unit of work throws.
 
 ## Rollback and disposal
 
-`RollbackAsync` rolls back the transaction and runs each repository's rollback sink, which resets
-its staged write state. Disposing a unit of work that never committed rolls back the same way. Both
-are safe to call after the unit of work has already completed. A repository enlisted in an
-externally supplied unit of work does not dispose that unit of work — the caller owns its lifetime.
+`RollbackAsync` rolls back the transaction and then runs each repository's rollback sink, which
+resets its staged write state. Disposing an open unit of work rolls back the same way. Both are safe
+to call after the unit of work has already completed. Disposal after committed or unknown completion
+runs no rollback sinks. A repository enlisted in an externally supplied unit of work does not
+dispose that unit of work — the caller owns its lifetime.
+
+Resource idempotency maps this evidence to reservation settlement: `NotWritten` and confirmed
+rollback release the reservation; `Reached`, `Committed`, unknown commit, failed rollback after
+commit entry, and post-commit cleanup failure retain it as pending. This uses the existing cache
+reservation and provider sinks, with no separate request-ID store.
 
 ## Registration
 

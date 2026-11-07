@@ -17,21 +17,19 @@ public sealed class LinqToDbProcessIndexShould : IClassFixture<LinqToDbFlowFixtu
     public LinqToDbProcessIndexShould(LinqToDbFlowFixture fixture) { _fixture = fixture; }
 
     [Fact]
-    public async Task Reject_Duplicate_Definition_And_Idempotency_Key() {
+    public async Task DirectWrites_CanShareAnIdempotencyKey_WhileTheOwnerGuardsIt() {
         var key = Guid.NewGuid().ToString("n");
         using (var scope = _fixture.CreateScope()) {
             var processes = scope.ServiceProvider.GetRequiredService<IRepository<SchemataProcess>>();
             await processes.AddAsync(Process(key));
+            await processes.AddAsync(Process(key));
             await processes.CommitAsync();
         }
 
-        using var duplicateScope = _fixture.CreateScope();
-        var       duplicate      = duplicateScope.ServiceProvider.GetRequiredService<IRepository<SchemataProcess>>();
-        var error = await Assert.ThrowsAsync<Abstractions.Exceptions.AlreadyExistsException>(
-            () => duplicate.AddAsync(Process(key)));
-        var detail = Assert.Single(error.Details!.OfType<Abstractions.Errors.ErrorInfoDetail>());
-        Assert.Equal(Abstractions.SchemataConstants.ErrorReasons.ResourceAlreadyExists,
-                     detail.Reason);
+        using var verifyScope = _fixture.CreateScope();
+        var       verify      = verifyScope.ServiceProvider.GetRequiredService<IRepository<SchemataProcess>>();
+        Assert.Equal(2, await verify.CountAsync(query => query.Where(row =>
+            row.DefinitionName == nameof(IdempotencyProcess) && row.IdempotencyKey == key)));
     }
 
     private static SchemataProcess Process(string key) {

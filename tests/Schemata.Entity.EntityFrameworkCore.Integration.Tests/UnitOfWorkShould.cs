@@ -104,11 +104,13 @@ public class UnitOfWorkShould : IAsyncLifetime
 
     [Fact]
     public async Task RollbackAsync_RollsBackChanges() {
+        var rolledBack = 0;
         {
             var (repo, scope) = _fixture.CreateScopeWithRepository();
             using (scope) {
                 var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork<TestDbContext>>();
                 repo.Join(uow);
+                uow.AddRollbackSink(() => rolledBack++);
                 await repo.AddAsync(new() {
                                         FullName = "Rollback-Alice",
                                         Age      = 18,
@@ -118,6 +120,8 @@ public class UnitOfWorkShould : IAsyncLifetime
                 await uow.RollbackAsync();
             }
         }
+
+        Assert.Equal(1, rolledBack);
 
         {
             var (repo, scope) = _fixture.CreateScopeWithRepository();

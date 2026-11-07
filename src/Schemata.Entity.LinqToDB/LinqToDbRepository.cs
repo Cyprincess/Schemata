@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Data;
 using System.Linq;
 using System.Globalization;
 using System.Reflection;
@@ -89,6 +90,8 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQ
             // The SQL executes here, before any unit-of-work commit, so the provider's unique
             // violation must be classified at this actual execution boundary.
             throw CreateAlreadyExists(ex, entity);
+        } catch (Exception ex) when (DatabaseErrorClassifier.IsTransientConflict(ex)) {
+            throw new AbortedException(innerException: ex);
         }
 
         StageWrite();
@@ -122,6 +125,8 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQ
             // A batch cannot identify which row collided, so the error names the resource type
             // without guessing a conflicting resource name.
             throw CreateAlreadyExists(ex, entity: null);
+        } catch (Exception ex) when (DatabaseErrorClassifier.IsTransientConflict(ex)) {
+            throw new AbortedException(innerException: ex);
         }
 
         // One type-level write fact per successful bulk copy; no entity journal is kept.
@@ -152,6 +157,8 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQ
                 // this boundary and becomes ALREADY_EXISTS, while a stale version still fails
                 // the zero-row check below as ABORTED.
                 throw CreateAlreadyExists(ex, entity);
+            } catch (Exception ex) when (DatabaseErrorClassifier.IsTransientConflict(ex)) {
+                throw new AbortedException(innerException: ex);
             }
 
             if (rows == 0) {
@@ -164,6 +171,8 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQ
                 // An update that moves a column onto an existing unique value fails at execution
                 // time, before the unit-of-work commit classifier could see it.
                 throw CreateAlreadyExists(ex, entity);
+            } catch (Exception ex) when (DatabaseErrorClassifier.IsTransientConflict(ex)) {
+                throw new AbortedException(innerException: ex);
             }
         }
 
@@ -325,8 +334,8 @@ public class LinqToDbRepository<TContext, TEntity> : RepositoryBase<TEntity>, IQ
     /// <inheritdoc />
     public string SourceKey { get { return LinqToDbSourceKeys.CreateKey(_context, _factory, _binding); } }
 
-    protected override IUnitOfWork CreateUnitOfWork() {
-        return new LinqToDbUnitOfWork<TContext>(_factory, ServiceProvider);
+    protected override IUnitOfWork CreateUnitOfWork(IsolationLevel? isolationLevel) {
+        return new LinqToDbUnitOfWork<TContext>(_factory, ServiceProvider, isolationLevel);
     }
 
     protected override void AttachContext(IUnitOfWork uow) {

@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -83,5 +84,30 @@ public class IsolationShould : IAsyncLifetime
         var       verify      = verifyScope.ServiceProvider.GetRequiredService<IRepository<Student>>();
         var       count       = await verify.CountAsync(q => q.Where(s => s.Name!.StartsWith("side-")));
         Assert.Equal(5, count);
+    }
+
+    [Fact]
+    public async Task SerializableTransaction_Isolates_Uncommitted_Writes() {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var       writer = scope.ServiceProvider.GetRequiredService<IRepository<Student>>();
+        await using var transaction = writer.Begin(IsolationLevel.Serializable);
+        await writer.AddAsync(new() {
+            Uid      = Guid.NewGuid(),
+            FullName = "Serializable",
+            Age      = 20,
+            Grade    = 2,
+            Name     = "serializable",
+        });
+
+        using (var readerScope = _fixture.ServiceProvider.CreateScope()) {
+            var reader = readerScope.ServiceProvider.GetRequiredService<IRepository<Student>>();
+            Assert.Equal(0, await reader.CountAsync(query => query.Where(row => row.Name == "serializable")));
+        }
+
+        await transaction.CommitAsync();
+
+        using var verifyScope = _fixture.ServiceProvider.CreateScope();
+        var       verify      = verifyScope.ServiceProvider.GetRequiredService<IRepository<Student>>();
+        Assert.Equal(1, await verify.CountAsync(query => query.Where(row => row.Name == "serializable")));
     }
 }

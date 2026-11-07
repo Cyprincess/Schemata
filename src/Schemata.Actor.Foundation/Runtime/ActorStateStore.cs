@@ -1,3 +1,4 @@
+using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -30,6 +31,7 @@ public sealed class ActorStateStore<TActor>(IRepository<TActor> repository)
     /// <param name="state">The state produced by <see cref="IPersistentActor.SaveStateAsync" />.</param>
     /// <param name="ct">A cancellation token.</param>
     public async Task SaveAsync(ActorId id, byte[] state, CancellationToken ct) {
+        await using var transaction = repository.Begin(IsolationLevel.Serializable);
         var existing = await FindAsync(id, ct);
         if (existing is null) {
             await repository.AddAsync(new() { ActorType = id.Type, ActorKey = id.Key, State = state }, ct);
@@ -38,7 +40,7 @@ public sealed class ActorStateStore<TActor>(IRepository<TActor> repository)
             await repository.UpdateAsync(existing, ct);
         }
 
-        await repository.CommitAsync(ct);
+        await transaction.CommitAsync(ct);
     }
 
     private ValueTask<TActor?> FindAsync(ActorId id, CancellationToken ct) {

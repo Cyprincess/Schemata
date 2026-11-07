@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using Schemata.Entity.LinqToDB;
 using Schemata.Entity.Repository;
+using Schemata.Event.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Observers;
 using Schemata.Flow.Skeleton.Runtime;
@@ -42,6 +43,7 @@ public sealed class LinqToDbFlowFixture : IAsyncLifetime, IFlowIntegrationFixtur
         services.AddRepository<Order, LinqToDbRepository<TestDataConnection, Order>>();
         services.AddRepository<SchemataProcess, LinqToDbRepository<TestDataConnection, SchemataProcess>>();
         services.AddRepository<SchemataFlowEffectIntent, LinqToDbRepository<TestDataConnection, SchemataFlowEffectIntent>>();
+        services.AddRepository<SchemataEventSubscription, LinqToDbRepository<TestDataConnection, SchemataEventSubscription>>();
         services.AddRepository<SchemataProcessToken, LinqToDbRepository<TestDataConnection, SchemataProcessToken>>();
         services.AddRepository<SchemataProcessTransition, LinqToDbRepository<TestDataConnection, SchemataProcessTransition>>();
         services.AddRepository<SchemataProcessSource, LinqToDbRepository<TestDataConnection, SchemataProcessSource>>();
@@ -49,7 +51,7 @@ public sealed class LinqToDbFlowFixture : IAsyncLifetime, IFlowIntegrationFixtur
         services.AddRepository<SchemataProcessParticipant, LinqToDbRepository<TestDataConnection, SchemataProcessParticipant>>();
         services.AddScoped<IUnitOfWork<TestDataConnection>, LinqToDbUnitOfWork<TestDataConnection>>();
         FlowFixtureServices.AddResourceTypeResolver(
-            services, typeof(Order), typeof(SchemataProcess), typeof(SchemataProcessToken));
+            services, typeof(Order), typeof(SchemataProcess), typeof(SchemataProcessToken), typeof(SchemataEventSubscription));
         FlowFixtureServices.AddFlowServices(services);
         services.AddSingleton<StampCaptureObserver>();
         services.AddSingleton<IProcessLifecycleObserver>(provider => provider.GetRequiredService<StampCaptureObserver>());
@@ -66,13 +68,14 @@ public sealed class LinqToDbFlowFixture : IAsyncLifetime, IFlowIntegrationFixtur
             connection.CreateTable<Order>(tableOptions: TableOptions.CreateIfNotExists);
             connection.CreateTable<SchemataProcess>(tableOptions: TableOptions.CreateIfNotExists);
             connection.CreateTable<SchemataFlowEffectIntent>(tableOptions: TableOptions.CreateIfNotExists);
-            connection.Execute("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_SchemataFlowEffectIntents_RequestId\" ON \"SchemataFlowEffectIntents\" (\"RequestId\")");
-            connection.Execute("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_SchemataProcesses_Idempotency\" ON \"SchemataProcesses\" (\"DefinitionName\", \"IdempotencyKey\")");
+            connection.CreateTable<SchemataEventSubscription>(tableOptions: TableOptions.CreateIfNotExists);
+            connection.Execute("CREATE INDEX IF NOT EXISTS \"IX_SchemataFlowEffectIntents_RequestId\" ON \"SchemataFlowEffectIntents\" (\"RequestId\")");
+            connection.Execute("CREATE INDEX IF NOT EXISTS \"IX_SchemataProcesses_Idempotency\" ON \"SchemataProcesses\" (\"DefinitionName\", \"IdempotencyKey\")");
             connection.CreateTable<SchemataProcessToken>(tableOptions: TableOptions.CreateIfNotExists);
             connection.CreateTable<SchemataProcessTransition>(tableOptions: TableOptions.CreateIfNotExists);
             connection.CreateTable<SchemataProcessSource>(tableOptions: TableOptions.CreateIfNotExists);
-            connection.Execute("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_SchemataProcessSources_Token\" ON \"SchemataProcessSources\" (\"Process\", \"Token\", \"Name\") WHERE \"Token\" IS NOT NULL");
-            connection.Execute("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_SchemataProcessSources_Process\" ON \"SchemataProcessSources\" (\"Process\", \"Name\") WHERE \"Token\" IS NULL");
+            connection.Execute("CREATE INDEX IF NOT EXISTS \"IX_SchemataProcessSources_Token\" ON \"SchemataProcessSources\" (\"Process\", \"Token\", \"Name\") WHERE \"Token\" IS NOT NULL");
+            connection.Execute("CREATE INDEX IF NOT EXISTS \"IX_SchemataProcessSources_Process\" ON \"SchemataProcessSources\" (\"Process\", \"Name\") WHERE \"Token\" IS NULL");
             connection.CreateTable<SchemataProcessCompensation>(tableOptions: TableOptions.CreateIfNotExists);
             connection.CreateTable<SchemataProcessParticipant>(tableOptions: TableOptions.CreateIfNotExists);
         }
