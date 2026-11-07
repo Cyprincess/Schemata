@@ -29,6 +29,9 @@ public class SchemataUser : IdentityUser<Guid>, IIdentifier, ICanonicalName, IDe
         set => Timestamp = string.IsNullOrWhiteSpace(value) ? Guid.NewGuid() : Guid.Parse(value);
     }
 
+    /// <summary>Gets or sets whether administrative policy admits this user to new credentials.</summary>
+    public virtual bool AdministrativelyActive { get; set; } = true;
+
     #region ICanonicalName Members
 
     public virtual string? Name { get; set; }

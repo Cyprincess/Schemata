@@ -75,7 +75,8 @@ internal sealed class IdentitySubjectProvider<TUser>(SchemataUserManager<TUser> 
     }
 
     public async Task<bool> ValidateAsync(string subject, CancellationToken ct = default) {
-        return await ResolveAsync(subject) is not null;
+        return await ResolveAsync(subject) is { } user
+            && await manager.IsAdministrativelyActiveAsync(user, ct);
     }
 
     #endregion

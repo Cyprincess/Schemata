@@ -57,4 +57,9 @@ public enum Operations
     ///     <seealso href="https://google.aip.dev/165">AIP-165: Purge</seealso>.
     /// </summary>
     Purge,
+
+    /// <summary>
+    ///     Authenticate a set of credentials.
+    /// </summary>
+    Authenticate,
 }

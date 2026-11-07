@@ -19,6 +19,7 @@ internal sealed partial class IdentityOperationHandler<TUser>
 {
     private readonly IEnumerable<Skeleton.IHostSignInObserver> _hostObservers;
 
+    private readonly IUserAliasResolver               _aliases;
     private readonly IServiceProvider                _services;
     private readonly SignInManager<TUser>            _sign;
     private readonly TimeProvider                    _time;
@@ -27,18 +28,21 @@ internal sealed partial class IdentityOperationHandler<TUser>
     /// <summary>Creates an identity operation handler.</summary>
     /// <param name="users">User manager for account operations.</param>
     /// <param name="sign">Sign-in manager for credential operations.</param>
+    /// <param name="aliases">Registration alias selection policy.</param>
     /// <param name="services">Service provider for channel senders.</param>
     /// <param name="time">Clock for authentication timestamps; defaults to the system clock.</param>
     /// <param name="hostObservers">Observers of host authentication renewal.</param>
     public IdentityOperationHandler(
         SchemataUserManager<TUser>                 users,
         SignInManager<TUser>                       sign,
+        IUserAliasResolver                         aliases,
         IServiceProvider                           services,
         TimeProvider?                              time          = null,
         IEnumerable<Skeleton.IHostSignInObserver>? hostObservers = null
     ) {
         _users         = users;
         _sign          = sign;
+        _aliases       = aliases;
         _services      = services;
         _time          = time ?? TimeProvider.System;
         _hostObservers = hostObservers ?? [];

@@ -7,9 +7,22 @@ namespace Schemata.Identity.Skeleton.Models;
 /// </summary>
 public class LoginRequest
 {
-    /// <summary>Account username used for authentication.</summary>
-    [Required]
-    public string Username { get; set; } = null!; // Wire DTO: the deserializer assigns the value before use.
+    /// <summary>Account username used for authentication when selected by the alias mode.</summary>
+    public string? Username { get; set; }
+
+    /// <summary>Email alias used for authentication.</summary>
+    [EmailAddress]
+    public string? EmailAddress { get; set; }
+
+    /// <summary>Complete E.164 phone alias, or the national number when PhoneRegion is supplied.</summary>
+    [Phone]
+    public string? PhoneNumber { get; set; }
+
+    /// <summary>Country calling code used to assemble a complete E.164 phone alias.</summary>
+    public string? PhoneRegion { get; set; }
+
+    /// <summary>Explicit alias type: user-name, email, or phone-number.</summary>
+    public string? UsernameType { get; set; }
 
     /// <summary>Account password.</summary>
     [Required]

@@ -1,5 +1,6 @@
 using System;
 using System.Security.Claims;
+using System.Threading;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -11,6 +12,7 @@ using Schemata.Abstractions;
 using Schemata.Identity.Foundation.Commands;
 using Schemata.Identity.Foundation.Handlers;
 using Schemata.Identity.Foundation.Queries;
+using Schemata.Identity.Foundation.Services;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Claims;
 using Schemata.Identity.Skeleton.Entities;
@@ -51,6 +53,9 @@ internal sealed class IdentityHandlerTestHost : IDisposable
             NullLogger<SignInManager<SchemataUser>>.Instance,
             Mock.Of<IAuthenticationSchemeProvider>(),
             Mock.Of<IUserConfirmation<SchemataUser>>());
+        Users.Setup(manager => manager.IsAdministrativelyActiveAsync(
+                It.IsAny<SchemataUser>(), It.IsAny<CancellationToken>()))
+             .ReturnsAsync(true);
         Mail    = new(MockBehavior.Strict);
         Message = new(MockBehavior.Strict);
 
@@ -59,6 +64,8 @@ internal sealed class IdentityHandlerTestHost : IDisposable
         services.AddSingleton(SignIn.Object);
         services.AddSingleton(Mail.Object);
         services.AddSingleton(Message.Object);
+        services.AddSingleton<IUserAliasResolver>(new ConfiguredUserAliasResolver(
+            UserNameAliasMode.Disabled, new E164PhoneNumberNormalizer()));
         services.AddSingleton<IdentityOperationHandler<SchemataUser>>();
         services.AddSingleton<
             IRequestHandler<RegisterUserRequest<SchemataUser>, IdentityResult<ClaimsPrincipal>>,

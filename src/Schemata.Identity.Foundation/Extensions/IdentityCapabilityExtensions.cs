@@ -10,12 +10,24 @@ using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Claims;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Models;
+using Schemata.Identity.Skeleton.Services;
+using Schemata.Identity.Foundation.Services;
 using Schemata.Messaging.Skeleton;
 
 namespace Microsoft.AspNetCore.Builder;
 
 public static class IdentityCapabilityExtensions
 {
+    /// <summary>Selects the username, email, and phone alias policy for registration and login.</summary>
+    public static SchemataIdentityBuilder<TUser, TRole> UseUserNameAliases<TUser, TRole>(
+        this SchemataIdentityBuilder<TUser, TRole> builder,
+        UserNameAliasMode mode
+    ) where TUser : SchemataUser, new() where TRole : SchemataRole {
+        builder.Services.Replace(ServiceDescriptor.Scoped<IUserAliasResolver>(provider =>
+            new ConfiguredUserAliasResolver(mode, provider.GetRequiredService<IPhoneNumberNormalizer>())));
+        return builder;
+    }
+
     public static SchemataIdentityBuilder<TUser, TRole> UseRegistration<TUser, TRole>(this SchemataIdentityBuilder<TUser, TRole> builder)
         where TUser : SchemataUser, new() where TRole : SchemataRole {
         builder.Services.TryAddScoped<IRequestHandler<RegisterUserRequest<TUser>, IdentityResult<ClaimsPrincipal>>, RegisterUserHandler<TUser>>();

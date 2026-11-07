@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading;
@@ -30,7 +31,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     IUserEmailStore<TUser>, IUserLockoutStore<TUser>, IUserTwoFactorStore<TUser>, IUserAuthenticationTokenStore<TUser>,
     IUserAuthenticatorKeyStore<TUser>, IUserTwoFactorRecoveryCodeStore<TUser>, IUserRoleStore<TUser>,
     IUserCanonicalNameStore<TUser>, IUserDisplayNameStore<TUser>, IUserPhoneStore<TUser>,
-    IUserPrincipalNameStore<TUser>, IProtectedUserStore<TUser>
+    IUserPrincipalNameStore<TUser>, IProtectedUserStore<TUser>, IUserProvisioningStore<TUser>
     where TUser : SchemataUser
     where TRole : SchemataRole
     where TUserClaim : SchemataUserClaim, new()
@@ -360,7 +361,7 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         ThrowIfDisposed();
 
         await using var users = _services.GetRequiredService<IRepository<TUser>>();
-        return await users.SingleOrDefaultAsync(q => q.Where(u => u.NormalizedEmail == normalizedEmail), ct);
+        return await FindUniqueAsync(users, query => query.Where(u => u.NormalizedEmail == normalizedEmail), ct);
     }
 
     public virtual Task<string?> GetNormalizedEmailAsync(TUser user, CancellationToken ct = default) {
@@ -471,29 +472,70 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
 
     #region IUserLoginStore<TUser> Members
 
+    public virtual IUnitOfWork BeginProvisioning() {
+        ThrowIfDisposed();
+        var users = _services.GetRequiredService<IRepository<TUser>>();
+        return users.Begin(IsolationLevel.Serializable);
+    }
+
     public virtual async Task<IdentityResult> CreateAsync(TUser user, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (user is null) {
-            throw new ArgumentNullException(nameof(user));
+        ArgumentNullException.ThrowIfNull(user);
+        await using var transaction = BeginProvisioning();
+        var result = await CreateAsync(user, transaction, ct);
+        if (result.Succeeded) {
+            await transaction.CommitAsync(ct);
         }
 
-        await _mutation.CreateAsync(user, null, ct);
+        return result;
+    }
 
+    public virtual async Task<IdentityResult> CreateAsync(
+        TUser user,
+        IUnitOfWork transaction,
+        CancellationToken ct
+    ) {
+        ct.ThrowIfCancellationRequested();
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(transaction);
+        var users = _services.GetRequiredService<IRepository<TUser>>();
+        users.Join(transaction);
+        await _mutation.CreateAsync(user, transaction, ct);
         return IdentityResult.Success;
     }
 
     public virtual async Task<IdentityResult> UpdateAsync(TUser user, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (user is null) {
-            throw new ArgumentNullException(nameof(user));
+        ArgumentNullException.ThrowIfNull(user);
+        await using var transaction = BeginProvisioning();
+        var result = await UpdateAsync(user, transaction, ct);
+        if (result.Succeeded) {
+            try {
+                await transaction.CommitAsync(ct);
+            } catch (AbortedException) {
+                return IdentityResult.Failed(ErrorDescriber.ConcurrencyFailure());
+            }
         }
 
-        // Providers signal optimistic concurrency at different boundaries: LinqToDB throws at the
-        // mutation, EF at commit. Translate both, let every other failure propagate.
+        return result;
+    }
+
+    public virtual async Task<IdentityResult> UpdateAsync(
+        TUser user,
+        IUnitOfWork transaction,
+        CancellationToken ct
+    ) {
+        ct.ThrowIfCancellationRequested();
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(transaction);
         try {
-            await _mutation.UpdateAsync(user, null, Operations.Update, ct);
+            var users = _services.GetRequiredService<IRepository<TUser>>();
+            users.Join(transaction);
+            await _mutation.UpdateAsync(user, transaction, Operations.Update, ct);
         } catch (AbortedException) {
             return IdentityResult.Failed(ErrorDescriber.ConcurrencyFailure());
         }
@@ -504,15 +546,31 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     public virtual async Task<IdentityResult> DeleteAsync(TUser user, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (user is null) {
-            throw new ArgumentNullException(nameof(user));
+        ArgumentNullException.ThrowIfNull(user);
+        await using var transaction = BeginProvisioning();
+        var result = await DeleteAsync(user, transaction, ct);
+        if (result.Succeeded) {
+            try {
+                await transaction.CommitAsync(ct);
+            } catch (AbortedException) {
+                return IdentityResult.Failed(ErrorDescriber.ConcurrencyFailure());
+            }
         }
 
-        // The owner removes the user and every dependent row (role links, claims, logins, tokens)
-        // in one unit of work so a failure cannot delete the user while leaving orphaned child
-        // rows behind.
+        return result;
+    }
+
+    public virtual async Task<IdentityResult> DeleteAsync(
+        TUser user,
+        IUnitOfWork transaction,
+        CancellationToken ct
+    ) {
+        ct.ThrowIfCancellationRequested();
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(transaction);
         try {
-            await _mutation.DeleteAsync(user, null, Operations.Delete, ct);
+            await _mutation.DeleteAsync(user, transaction, Operations.Delete, ct);
         } catch (AbortedException) {
             return IdentityResult.Failed(ErrorDescriber.ConcurrencyFailure());
         }
@@ -585,9 +643,8 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     public virtual async Task<TUser?> FindByNameAsync(string normalizedUserName, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-
         await using var users = _services.GetRequiredService<IRepository<TUser>>();
-        return await users.SingleOrDefaultAsync(q => q.Where(u => u.NormalizedUserName == normalizedUserName), ct);
+        return await FindUniqueAsync(users, query => query.Where(u => u.NormalizedUserName == normalizedUserName), ct);
     }
 
     public virtual void Dispose() { _disposed = true; }
@@ -746,7 +803,16 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
         ThrowIfDisposed();
 
         await using var users = _services.GetRequiredService<IRepository<TUser>>();
-        return await users.SingleOrDefaultAsync(q => q.Where(u => u.PhoneNumber == phone), ct);
+        return await FindUniqueAsync(users, query => query.Where(u => u.PhoneNumber == phone), ct);
+    }
+
+    private static async Task<TUser?> FindUniqueAsync(
+        IRepository<TUser> users,
+        Func<IQueryable<TUser>, IQueryable<TUser>> predicate,
+        CancellationToken ct
+    ) {
+        var matches = await users.ListAsync(query => predicate(query).Take(2), ct).ToListAsync(ct);
+        return matches.Count == 1 ? matches[0] : null;
     }
 
     #endregion
@@ -764,23 +830,45 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     public virtual async Task AddToRoleAsync(TUser user, string normalizedRoleName, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (user is null) {
-            throw new ArgumentNullException(nameof(user));
-        }
-
+        ArgumentNullException.ThrowIfNull(user);
         if (string.IsNullOrWhiteSpace(normalizedRoleName)) {
             throw new ArgumentNullException(nameof(normalizedRoleName));
         }
 
-        var roleEntity = await FindRoleAsync(normalizedRoleName, ct);
-        if (roleEntity is null) {
+        var role = await FindRoleAsync(normalizedRoleName, ct);
+        if (role is null) {
             throw new InvalidOperationException(
                 string.Format(SchemataResources.GetResourceString(SchemataResources.NAMED_NOT_FOUND), "Role",
                               normalizedRoleName));
         }
 
-        await UserRoleRepository.AddAsync(CreateUserRole(user, roleEntity), ct);
-        await UserRoleRepository.CommitAsync(ct);
+        await using var scope = _services.CreateAsyncScope();
+        if (scope.ServiceProvider.GetRequiredService<IUserStore<TUser>>() is not IUserProvisioningStore<TUser> provisioning) {
+            throw new NotSupportedException("The user store does not support transactional provisioning.");
+        }
+        await using var transaction = provisioning.BeginProvisioning();
+        await provisioning.AddToRoleAsync(user, role, transaction, ct);
+        await transaction.CommitAsync(ct);
+    }
+
+    public virtual async Task AddToRoleAsync(
+        TUser user,
+        SchemataRole role,
+        IUnitOfWork transaction,
+        CancellationToken ct
+    ) {
+        ct.ThrowIfCancellationRequested();
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(transaction);
+        if (role is not TRole typed) {
+            throw new ArgumentException("The role type does not match this user store.", nameof(role));
+        }
+
+        UserRoleRepository.Join(transaction);
+        if (await UserRoleRepository.AddAsync(CreateUserRole(user, typed), ct) != MutationResult.Applied) {
+            throw new InvalidOperationException("The membership addition was not staged.");
+        }
     }
 
     public virtual async Task RemoveFromRoleAsync(
@@ -790,26 +878,52 @@ public class SchemataUserStore<TUser, TRole, TUserClaim, TUserRole, TUserLogin, 
     ) {
         ct.ThrowIfCancellationRequested();
         ThrowIfDisposed();
-        if (user is null) {
-            throw new ArgumentNullException(nameof(user));
-        }
-
+        ArgumentNullException.ThrowIfNull(user);
         if (string.IsNullOrWhiteSpace(normalizedRoleName)) {
             throw new ArgumentNullException(nameof(normalizedRoleName));
         }
 
-        var roleEntity = await FindRoleAsync(normalizedRoleName, ct);
-        if (roleEntity is null) {
+        var role = await FindRoleAsync(normalizedRoleName, ct);
+        if (role is null) {
             return;
         }
 
-        var userRole = await FindUserRoleAsync(user.CanonicalName!, roleEntity.CanonicalName!, ct);
+        await using var scope = _services.CreateAsyncScope();
+        if (scope.ServiceProvider.GetRequiredService<IUserStore<TUser>>() is not IUserProvisioningStore<TUser> provisioning) {
+            throw new NotSupportedException("The user store does not support transactional provisioning.");
+        }
+        await using var transaction = provisioning.BeginProvisioning();
+        await provisioning.RemoveFromRoleAsync(user, role, transaction, ct);
+        await transaction.CommitAsync(ct);
+    }
+
+    public virtual async Task RemoveFromRoleAsync(
+        TUser user,
+        SchemataRole role,
+        IUnitOfWork transaction,
+        CancellationToken ct
+    ) {
+        ct.ThrowIfCancellationRequested();
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(transaction);
+        if (role is not TRole typed) {
+            throw new ArgumentException("The role type does not match this user store.", nameof(role));
+        }
+
+        if (user.CanonicalName is not { } userId || typed.CanonicalName is not { } roleId) {
+            return;
+        }
+
+        var userRole = await FindUserRoleAsync(userId, roleId, ct);
         if (userRole is null) {
             return;
         }
 
-        await UserRoleRepository.RemoveAsync(userRole, ct);
-        await UserRoleRepository.CommitAsync(ct);
+        UserRoleRepository.Join(transaction);
+        if (await UserRoleRepository.RemoveAsync(userRole, ct) != MutationResult.Applied) {
+            throw new InvalidOperationException("The membership removal was not staged.");
+        }
     }
 
     public virtual async Task<IList<string>> GetRolesAsync(TUser user, CancellationToken ct = default) {

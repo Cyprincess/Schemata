@@ -11,25 +11,30 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Advisors;
 using Schemata.Identity.Skeleton.Entities;
+using Schemata.Identity.Skeleton.Managers;
 using Schemata.Identity.Skeleton.Models;
+using Schemata.Identity.Skeleton.Services;
+using Schemata.Validation.Skeleton;
 
 namespace Schemata.Identity.Foundation;
 
 /// <summary>Runs platform credential verification before Schemata login policy and credential issuance.</summary>
 /// <typeparam name="TUser">The identity user type.</typeparam>
 public class SchemataSignInManager<TUser>(
-    UserManager<TUser> users,
+    SchemataUserManager<TUser> users,
     IHttpContextAccessor accessor,
     IUserClaimsPrincipalFactory<TUser> claims,
     IOptions<IdentityOptions> options,
     ILogger<SignInManager<TUser>> logger,
     IAuthenticationSchemeProvider schemes,
     IUserConfirmation<TUser> confirmation,
+    IUserAliasResolver aliases,
     IEnumerable<IHostSignInObserver> observers,
     TimeProvider? time = null
 ) : SignInManager<TUser>(users, accessor, claims, options, logger, schemes, confirmation)
@@ -70,7 +75,16 @@ public class SchemataSignInManager<TUser>(
                 return _result!;
             }
 
-            var result = await PasswordSignInAsync(request.Username, request.Password, false, true);
+            await ValidationHelper.ValidateAsync(context, request, Operations.Authenticate, ct);
+            var selected = aliases.ResolveLogin(request);
+            var user = selected.Type switch {
+                UserAliasType.UserName => await users.FindByNameAsync(selected.Value),
+                UserAliasType.Email => await users.FindByEmailAsync(selected.Value),
+                UserAliasType.PhoneNumber => await users.FindByPhoneAsync(selected.Value),
+                _ => null,
+            };
+            if (user is null) throw new UnauthenticatedException();
+            var result = await PasswordSignInAsync(user, request.Password, false, true);
             if (result.RequiresTwoFactor) {
                 if (!string.IsNullOrWhiteSpace(request.TwoFactorCode)) {
                     result = await TwoFactorAuthenticatorSignInAsync(request.TwoFactorCode, false, false);
@@ -89,6 +103,16 @@ public class SchemataSignInManager<TUser>(
             _execution = null;
             _result = null;
         }
+    }
+
+    /// <inheritdoc />
+    protected override async Task<SignInResult?> PreSignInCheck(TUser user) {
+        var result = await base.PreSignInCheck(user);
+        if (result is not null) {
+            return result;
+        }
+
+        return await users.IsAdministrativelyActiveAsync(user, _cancellation) ? null : SignInResult.NotAllowed;
     }
 
     /// <inheritdoc />

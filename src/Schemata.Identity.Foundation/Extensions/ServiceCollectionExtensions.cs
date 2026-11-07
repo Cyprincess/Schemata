@@ -131,12 +131,20 @@ public static class ServiceCollectionExtensions
             o.ClaimsIdentity.SecurityStampClaimType = IdentityClaims.SecurityStamp;
         });
 
+        services.TryAddScoped<ILookupNormalizer, UsernameCaseMappedNormalizer>();
+        services.TryAddScoped<IEmailNormalizer, DefaultEmailNormalizer>();
+        services.TryAddScoped<IPhoneNumberNormalizer, E164PhoneNumberNormalizer>();
+        services.TryAddScoped<IUserAliasResolver>(provider =>
+            new ConfiguredUserAliasResolver(UserNameAliasMode.Disabled, provider.GetRequiredService<IPhoneNumberNormalizer>()));
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IIdentityAliasUniquenessAdvisor<>), typeof(AdviceAliasUniqueness<>)));
         var builder = services.AddIdentityApiEndpoints<TUser>(configure)
                               .AddRoles<TRole>()
                               .AddUserManager<SchemataUserManager<TUser>>()
+                              .AddRoleManager<SchemataRoleManager<TRole>>()
                               .AddErrorDescriber<SchemataErrorDescriber>()
                               .AddSignInManager<SchemataSignInManager<TUser>>()
                               .AddClaimsPrincipalFactory<SchemataUserClaimsPrincipalFactory<TUser, TRole>>();
+        services.Replace(ServiceDescriptor.Scoped<IUserValidator<TUser>, PrecisUserValidator<TUser>>());
 
         // Registered after AddIdentityApiEndpoints so this assignment is the last one applied to the
         // application cookie's redirect event.

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
@@ -14,6 +15,7 @@ using Schemata.Identity.Skeleton;
 using Schemata.Identity.Skeleton.Advisors;
 using Schemata.Identity.Skeleton.Entities;
 using Schemata.Identity.Skeleton.Models;
+using Schemata.Validation.Skeleton;
 
 namespace Schemata.Identity.Foundation.Handlers;
 
@@ -78,8 +80,10 @@ internal sealed partial class IdentityOperationHandler<TUser>
             return handled;
         }
 
+        await ValidationHelper.ValidateAsync(context, request, Operations.Create, ct);
+        var selected = _aliases.ResolveRegistration(request);
         var user = new TUser {
-            UserName = request.Username,
+            UserName = selected.RegistrationName,
             Email = request.EmailAddress,
             PhoneNumber = request.PhoneNumber,
         };
@@ -143,6 +147,10 @@ internal sealed partial class IdentityOperationHandler<TUser>
          || ticket.Properties?.ExpiresUtc is not { } expiresUtc
          || _time.GetUtcNow() >= expiresUtc
          || await _sign.ValidateSecurityStampAsync(ticket.Principal) is not { } found) {
+            return IdentityResult<ClaimsPrincipal>.Challenge();
+        }
+
+        if (!await _users.IsAdministrativelyActiveAsync(found, ct)) {
             return IdentityResult<ClaimsPrincipal>.Challenge();
         }
 

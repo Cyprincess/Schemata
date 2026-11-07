@@ -79,7 +79,7 @@ public class AuthenticateContinueShould
         var second = Guid.Parse("22222222-2222-2222-2222-222222222222");
         using var root = TenantedRoot();
         var tenancy = root.GetRequiredService<IOptions<SchemataTenancyOptions>>();
-        using var cache = new MemoryCacheTenantProviderCache(tenancy);
+        await using var cache = new MemoryCacheTenantProviderCache(tenancy);
         var scopes = new SchemataTenantServiceScopeFactory<SchemataTenant>(
             root, new SchemataTenantServiceProviderFactory<SchemataTenant>(root, cache, tenancy));
         await using var issuing = await scopes.CreateAsync(new(host ? (Guid?)null : first));

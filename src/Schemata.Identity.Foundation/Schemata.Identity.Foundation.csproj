@@ -25,6 +25,7 @@
     <ProjectReference Include="..\Schemata.Security.Foundation\Schemata.Security.Foundation.csproj" />
     <ProjectReference Include="..\Schemata.Messaging.Skeleton\Schemata.Messaging.Skeleton.csproj" />
     <ProjectReference Include="..\Schemata.Transport.Http\Schemata.Transport.Http.csproj" />
+    <ProjectReference Include="..\Schemata.Validation.Skeleton\Schemata.Validation.Skeleton.csproj" />
   </ItemGroup>
 
 </Project>
