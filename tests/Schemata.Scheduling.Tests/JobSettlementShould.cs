@@ -153,7 +153,7 @@ public sealed class JobSettlementShould
     }
 
     [Fact]
-    public async Task Settle_Unsupported_Cross_Store_Transaction_Stages_The_Schedule_First() {
+    public async Task Settle_Unsupported_Cross_Store_Transaction_Stages_Envelope_Before_Schedule_And_Terminal_Write() {
         var job = new SchemataJob {
             CanonicalName   = "jobs/fallback",
             ScheduleType    = ScheduleType.Periodic,
@@ -163,7 +163,8 @@ public sealed class JobSettlementShould
             ScheduleVersion = Guid.NewGuid(),
         };
 
-        await using var harness = await Harness.CreateAsync(job, rejectJoin: true);
+        var writes = new List<string>();
+        await using var harness = await Harness.CreateAsync(job, rejectJoin: true, writes: writes);
 
         var outcome = await harness.SettleAsync(ExecutionState.Succeeded, Start.AddSeconds(5), null);
 
@@ -178,11 +179,12 @@ public sealed class JobSettlementShould
         var pending = Assert.Single(harness.Pending);
         Assert.Equal(Start.AddHours(1), pending.StartTime);
         Assert.Equal(ExecutionState.Succeeded, harness.Execution.State);
+        Assert.Equal(["stage", "job", "pending", "settle"], writes);
         harness.Store.Verify(s => s.TrySettleAsync(harness.Execution, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task Settle_Failed_Pending_Stage_Reports_An_Unsettled_Schedule() {
+    public async Task Settle_Failed_Pending_Stage_Retains_A_Recoverable_Running_Envelope() {
         var job = new SchemataJob {
             CanonicalName   = "jobs/pending-failure",
             ScheduleType    = ScheduleType.Periodic,
@@ -196,7 +198,7 @@ public sealed class JobSettlementShould
 
         var outcome = await harness.SettleAsync(ExecutionState.Succeeded, Start.AddSeconds(5), null);
 
-        Assert.True(outcome.ExecutionSettled);
+        Assert.False(outcome.ExecutionSettled);
         Assert.False(outcome.ScheduleSettled);
         var failure = Assert.IsType<InvalidOperationException>(outcome.Failure);
         Assert.Equal("pending stage exploded", failure.Message);
@@ -206,7 +208,10 @@ public sealed class JobSettlementShould
         Assert.Equal(Start.AddHours(1), stored.NextRunTime);
         Assert.Empty(harness.Pending);
         Assert.False(harness.Scheduler.Entries.ContainsKey(job.CanonicalName!));
-        Assert.Equal(ExecutionState.Succeeded, harness.Execution.State);
+        Assert.Equal(ExecutionState.Running, harness.Execution.State);
+        Assert.Equal(ExecutionState.Succeeded, harness.Execution.SettlementState);
+        Assert.Equal(Start.AddHours(1), harness.Execution.SettlementNextRunTime);
+        harness.Store.Verify(s => s.TrySettleAsync(harness.Execution, It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -230,7 +235,7 @@ public sealed class JobSettlementShould
     }
 
     [Fact]
-    public async Task Settle_Vetoed_Job_Write_Keeps_The_Execution_Terminal() {
+    public async Task Settle_Vetoed_Job_Write_Retains_A_Recoverable_Running_Envelope() {
         var job = new SchemataJob {
             CanonicalName   = "jobs/vetoed",
             ScheduleType    = ScheduleType.OneTime,
@@ -243,13 +248,15 @@ public sealed class JobSettlementShould
 
         var outcome = await harness.SettleAsync(ExecutionState.Succeeded, Start.AddSeconds(5), null);
 
-        Assert.True(outcome.ExecutionSettled);
+        Assert.False(outcome.ExecutionSettled);
         Assert.False(outcome.ScheduleSettled);
         Assert.IsType<FailedPreconditionException>(outcome.Failure);
 
-        Assert.Equal(ExecutionState.Succeeded, harness.Execution.State);
-        Assert.Null(harness.Execution.LeaseExpireTime);
-        harness.Store.Verify(s => s.TrySettleAsync(harness.Execution, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(ExecutionState.Running, harness.Execution.State);
+        Assert.Equal(ExecutionState.Succeeded, harness.Execution.SettlementState);
+        Assert.Equal(JobState.Completed, harness.Execution.SettlementJobState);
+        harness.Store.Verify(s => s.TryStageSettlementAsync(harness.Execution, It.IsAny<CancellationToken>()), Times.Once);
+        harness.Store.Verify(s => s.TrySettleAsync(harness.Execution, It.IsAny<CancellationToken>()), Times.Never);
 
         var stored = harness.Stored;
         Assert.NotNull(stored);
@@ -260,7 +267,7 @@ public sealed class JobSettlementShould
     }
 
     [Fact]
-    public async Task Settle_Throwing_Job_Write_Keeps_The_Execution_Terminal() {
+    public async Task Settle_Throwing_Job_Write_Retains_A_Recoverable_Running_Envelope() {
         var job = new SchemataJob {
             CanonicalName   = "jobs/throwing",
             ScheduleType    = ScheduleType.OneTime,
@@ -274,12 +281,14 @@ public sealed class JobSettlementShould
 
         var outcome = await harness.SettleAsync(ExecutionState.Succeeded, Start.AddSeconds(5), null);
 
-        Assert.True(outcome.ExecutionSettled);
+        Assert.False(outcome.ExecutionSettled);
         Assert.False(outcome.ScheduleSettled);
         var failure = Assert.IsType<InvalidOperationException>(outcome.Failure);
         Assert.Equal("job write exploded", failure.Message);
-        Assert.Equal(ExecutionState.Succeeded, harness.Execution.State);
-        Assert.Null(harness.Execution.LeaseExpireTime);
+        Assert.Equal(ExecutionState.Running, harness.Execution.State);
+        Assert.Equal(ExecutionState.Succeeded, harness.Execution.SettlementState);
+        harness.Store.Verify(s => s.TryStageSettlementAsync(harness.Execution, It.IsAny<CancellationToken>()), Times.Once);
+        harness.Store.Verify(s => s.TrySettleAsync(harness.Execution, It.IsAny<CancellationToken>()), Times.Never);
         var stored = harness.Stored;
         Assert.NotNull(stored);
         Assert.Equal(JobState.Active, stored.State);
@@ -331,7 +340,8 @@ public sealed class JobSettlementShould
             Guid?                                   executionScheduleVersion = null,
             bool                                    rejectJoin = false,
             bool                                    failPending = false,
-            MissedFirePolicy?                       policy = null
+            MissedFirePolicy?                       policy = null,
+            List<string>?                           writes = null
         ) {
             var clock   = new FixedClock(new(Start, TimeSpan.Zero));
             var pending = new List<SchemataJobExecution>();
@@ -344,6 +354,7 @@ public sealed class JobSettlementShould
                 .Returns(() => new ValueTask<SchemataJob?>(stored is null ? null : Copy(stored)));
             jobs.Setup(r => r.UpdateAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
                 .Returns(async (SchemataJob entity, CancellationToken _, MutationOptions _) => {
+                    writes?.Add("job");
                     var result = update is null ? MutationResult.Applied : await update(entity);
                     if (result == MutationResult.Applied) {
                         stored = Copy(entity);
@@ -366,6 +377,7 @@ public sealed class JobSettlementShould
             } else {
                 executions.Setup(r => r.AddAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
                           .ReturnsAsync((SchemataJobExecution entity, CancellationToken _, MutationOptions _) => {
+                              writes?.Add("pending");
                               pending.Add(entity);
                               return MutationResult.Applied;
                           });
@@ -384,8 +396,16 @@ public sealed class JobSettlementShould
             }
 
             var store = new Mock<IJobExecutionStore<SchemataJob, SchemataJobExecution>>();
+            store.Setup(s => s.TryStageSettlementAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
+                 .ReturnsAsync(() => {
+                     writes?.Add("stage");
+                     return true;
+                 });
             store.Setup(s => s.TrySettleAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>()))
-                 .ReturnsAsync(true);
+                 .ReturnsAsync(() => {
+                     writes?.Add("settle");
+                     return true;
+                 });
 
             var execution = new SchemataJobExecution {
                 Uid             = Guid.NewGuid(),

@@ -138,7 +138,7 @@ public class ScheduleVetoShould
     }
 
     [Fact]
-    public async Task Settlement_Job_Write_Veto_Keeps_The_Execution_Terminal_And_The_Persisted_Schedule() {
+    public async Task Settlement_Job_Write_Veto_Leaves_A_Running_Envelope_And_Preserves_The_Schedule() {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
         var services = new ServiceCollection();
@@ -178,9 +178,11 @@ public class ScheduleVetoShould
             var job      = await database.Set<SchemataJob>().AsNoTracking().SingleAsync();
             var execution = await database.Set<SchemataJobExecution>().AsNoTracking().SingleAsync();
 
-            Assert.Equal(ExecutionState.Succeeded, execution.State);
+            Assert.Equal(ExecutionState.Running, execution.State);
+            Assert.Equal(ExecutionState.Succeeded, execution.SettlementState);
+            Assert.Equal(due.AddHours(1), execution.SettlementNextRunTime);
             Assert.Equal(SuccessJob.Output, execution.Output);
-            Assert.Null(execution.LeaseExpireTime);
+            Assert.NotNull(execution.LeaseExpireTime);
             Assert.Equal(JobState.Active, job.State);
             Assert.Equal(due, job.NextRunTime);
             Assert.Null(job.RecentRunTime);

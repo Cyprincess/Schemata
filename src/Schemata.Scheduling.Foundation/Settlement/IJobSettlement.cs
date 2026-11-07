@@ -18,7 +18,7 @@ internal interface IJobSettlement<TJob, TExecution>
 {
     Task<SettlementOutcome> SettleAsync(
         JobExecutionLease<TJob, TExecution> lease,
-        JobExecutionResult<TJob>            result,
+        JobExecutionResult<TJob>?           result,
         CancellationToken                   ct = default);
 }
 

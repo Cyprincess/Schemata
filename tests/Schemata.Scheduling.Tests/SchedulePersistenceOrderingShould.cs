@@ -7,8 +7,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Moq;
+using Schemata.Abstractions;
 using Schemata.Entity.Repository;
+using Schemata.Messaging.Skeleton;
 using Schemata.Scheduling.Foundation;
+using Schemata.Scheduling.Foundation.Commands;
 using Schemata.Scheduling.Foundation.Runtime;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -149,15 +152,95 @@ public class SchedulePersistenceOrderingShould
         var mutation = new Mock<IResourceMutation<SchemataJob>>();
         mutation.Setup(m => m.CreateAsync(It.IsAny<SchemataJob>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(MutationResult.NoWrite);
+        var observer = new Mock<IJobLifecycleObserver>();
         await using var services = new ServiceCollection().AddSingleton(jobs.Object).AddSingleton(executions.Object)
-            .AddSingleton(mutation.Object).AddSchemataScheduling().BuildServiceProvider();
+            .AddSingleton(mutation.Object).AddSingleton(observer.Object).AddSchemataScheduling().BuildServiceProvider();
         var scheduler = services.GetRequiredService<DefaultScheduler<SchemataJob, SchemataJobExecution>>();
         await scheduler.StartAsync(CancellationToken.None);
         await scheduler.ScheduleAsync(new() { Name = "new", CanonicalName = "jobs/new", State = JobState.Active,
             NextRunTime = DateTime.UnixEpoch }, CancellationToken.None);
         Assert.Equal(0, scheduler.EntryCount);
+        observer.Verify(value => value.OnScheduledAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>()), Times.Never);
         unit.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
         executions.Verify(r => r.ListAsync(It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()), Times.Never);
+        await scheduler.StopAsync(CancellationToken.None);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Outer_Transaction_Lifecycle_Notifications_Follow_Commit(bool unschedule, bool commit) {
+        var unit = new Mock<IUnitOfWork>();
+        var sinks = new List<(int Order, Func<CancellationToken, Task> Sink)>();
+        unit.Setup(work => work.AddCommitSink(It.IsAny<int>(), It.IsAny<Func<CancellationToken, Task>>()))
+            .Callback<int, Func<CancellationToken, Task>>((order, sink) => sinks.Add((order, sink)));
+        unit.Setup(work => work.CommitAsync(It.IsAny<CancellationToken>()))
+            .Returns(async (CancellationToken token) => {
+                foreach (var (_, sink) in sinks.OrderBy(item => item.Order)) {
+                    await sink(token);
+                }
+            });
+        unit.Setup(work => work.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        var job = new SchemataJob {
+            Name = "outer", CanonicalName = "jobs/outer", Key = "outer-slot", JobKey = "jobs.outer",
+            State = JobState.Active, NextRunTime = DateTime.UtcNow.AddHours(1), ScheduleType = ScheduleType.OneTime,
+        };
+        var jobs = new Mock<IRepository<SchemataJob>>();
+        jobs.Setup(repository => repository.FirstOrDefaultAsync(
+                It.IsAny<Func<IQueryable<SchemataJob>, IQueryable<SchemataJob>>>(),
+                It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+            .Returns(ValueTask.FromResult(unschedule ? job : null));
+        jobs.Setup(repository => repository.AddAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
+            .ReturnsAsync(MutationResult.Applied);
+        jobs.Setup(repository => repository.UpdateAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
+            .ReturnsAsync(MutationResult.Applied);
+
+        var executions = new Mock<IRepository<SchemataJobExecution>>();
+        executions.Setup(repository => repository.ListAsync(
+                It.IsAny<Func<IQueryable<SchemataJobExecution>, IQueryable<SchemataJobExecution>>>(),
+                It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+            .Returns(() => Empty());
+        executions.Setup(repository => repository.AddAsync(
+                It.IsAny<SchemataJobExecution>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
+            .ReturnsAsync(MutationResult.Applied);
+
+        var observer = new Mock<IJobLifecycleObserver>();
+        await using var services = new ServiceCollection()
+            .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
+            .AddSingleton(jobs.Object)
+            .AddSingleton(executions.Object)
+            .AddSingleton(observer.Object)
+            .AddSchemataScheduling()
+            .BuildServiceProvider();
+        var scheduler = services.GetRequiredService<DefaultScheduler<SchemataJob, SchemataJobExecution>>();
+        await scheduler.StartAsync(CancellationToken.None);
+        var dispatcher = services.GetRequiredService<IRequestDispatcher>();
+
+        if (unschedule) {
+            await dispatcher.SendAsync<UnscheduleJobRequest, Unit>(
+                new(job.CanonicalName!) { UnitOfWork = unit.Object }, CancellationToken.None);
+        } else {
+            await dispatcher.SendAsync<ScheduleJobRequest<SchemataJob>, Unit>(
+                new(job, null) { UnitOfWork = unit.Object }, CancellationToken.None);
+        }
+
+        observer.Verify(value => value.OnScheduledAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>()), Times.Never);
+        observer.Verify(value => value.OnUnscheduledAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        if (commit) {
+            await unit.Object.CommitAsync();
+        } else {
+            await unit.Object.RollbackAsync();
+        }
+
+        var expected = commit ? Times.Once() : Times.Never();
+        observer.Verify(value => value.OnScheduledAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>()),
+            unschedule ? Times.Never() : expected);
+        observer.Verify(value => value.OnUnscheduledAsync(It.IsAny<SchemataJob>(), It.IsAny<CancellationToken>()),
+            unschedule ? expected : Times.Never());
         await scheduler.StopAsync(CancellationToken.None);
     }
 

@@ -19,7 +19,7 @@ internal sealed class JobSettlement<TJob, TExecution> : IJobSettlement<TJob, TEx
 
     public async Task<SettlementOutcome> SettleAsync(
         JobExecutionLease<TJob, TExecution> lease,
-        JobExecutionResult<TJob>            result,
+        JobExecutionResult<TJob>?           result,
         CancellationToken                   ct = default
     ) {
         var state = await lease.TransitionAsync(
@@ -30,25 +30,64 @@ internal sealed class JobSettlement<TJob, TExecution> : IJobSettlement<TJob, TEx
 
     #endregion
 
+    internal static JobExecutionResult<TJob> RestoreResult(TExecution execution) {
+        if (execution.SettlementState is not { } state
+            || execution.SettlementEndTime is not { } end
+            || execution.SettlementJobState is not { } jobState
+            || execution.SettlementRecentRunTime is not { } recentRun) {
+            throw new InvalidOperationException("The execution settlement envelope is incomplete.");
+        }
+
+        return new(new TJob {
+            CanonicalName = execution.Job,
+            JobKey = execution.JobKey,
+            ArgsJson = execution.ArgsJson,
+            ScheduleVersion = execution.ScheduleVersion,
+            ScheduleType = ScheduleType.OneTime,
+            State = jobState,
+            RecentRunTime = recentRun,
+            RecentError = execution.SettlementRecentError,
+            NextRunTime = execution.SettlementNextRunTime,
+        }, state, end, execution.SettlementError);
+    }
+
+    internal static void CopyResult(TJob source, TJob target) {
+        target.State = source.State;
+        target.RecentRunTime = source.RecentRunTime;
+        target.RecentError = source.RecentError;
+        target.NextRunTime = source.NextRunTime;
+    }
+
     private static async Task<SettlementState> SettleCoreAsync(
         JobExecutionLease<TJob, TExecution>  lease,
         IServiceProvider                     services,
         IJobExecutionStore<TJob, TExecution> store,
         TExecution                           execution,
-        JobExecutionResult<TJob>             result,
+        JobExecutionResult<TJob>?            result,
         CancellationToken                    ct
     ) {
-        var support = services.GetRequiredService<SchedulingHandlerSupport<TJob, TExecution>>();
-        var jobs    = services.GetService<IRepository<TJob>>();
-        if (jobs is null) {
-            Project(result.Job, result, support.Scheduler.Time.GetUtcNow().UtcDateTime, support, 0);
-            var settled = await SettleExecutionAsync(store, execution, result, ct);
+        if (execution.SettlementState is not null) {
+            result = RestoreResult(execution);
+        }
 
+        if (result is null) {
+            throw new InvalidOperationException("A terminal execution result is required for initial settlement.");
+        }
+
+        var support = services.GetRequiredService<SchedulingHandlerSupport<TJob, TExecution>>();
+        var jobs = services.GetService<IRepository<TJob>>();
+        if (jobs is null) {
+            if (execution.SettlementState is null) {
+                Project(result.Job, result, support.Scheduler.Time.GetUtcNow().UtcDateTime, support, 0);
+                AssignEnvelope(execution, result);
+            }
+
+            var settled = await SettleExecutionAsync(store, execution, result, ct);
             return new(new SettlementOutcome(settled, true, null), null, 0);
         }
 
         var executions = services.GetService<IRepository<TExecution>>();
-        var state      = default(SettlementState);
+        var state = default(SettlementState);
 
         await support.WriteGate.Gate.WaitAsync(ct);
         try {
@@ -58,9 +97,9 @@ internal sealed class JobSettlement<TJob, TExecution> : IJobSettlement<TJob, TEx
                 }
             } else {
                 // A rejected join completes the scope's job repository, so the schedule stage runs
-                // in a fresh scope; the untouched execution store settles the claimed row.
+                // in a fresh scope; the untouched execution store stages the claimed row.
                 state = await lease.RecoverAsync(
-                    (fresh, _, token) => SettleSequentialAsync(fresh, store, execution, result, token), ct);
+                    (fresh, _, token) => SettleSequentialAsync(lease, fresh, store, execution, result, token), ct);
             }
 
             if (state.Rearmed is { } rearmed) {
@@ -77,9 +116,6 @@ internal sealed class JobSettlement<TJob, TExecution> : IJobSettlement<TJob, TEx
         return state;
     }
 
-    // Both stores share a provider and tenant binding when the execution repository accepts the
-    // job repository's unit of work. A rejection leaves the execution repository usable for its
-    // own stage.
     private static async Task<IUnitOfWork?> TryBeginSharedAsync(
         IRepository<TJob>       jobs,
         IRepository<TExecution> executions
@@ -109,20 +145,21 @@ internal sealed class JobSettlement<TJob, TExecution> : IJobSettlement<TJob, TEx
         SchedulingHandlerSupport<TJob, TExecution> support,
         CancellationToken                    ct
     ) {
-        var now          = support.Scheduler.Time.GetUtcNow().UtcDateTime;
-        var mutation     = services.GetRequiredService<IResourceMutation<TJob>>();
-        TJob? persisted = null;
-        Exception?   failure   = null;
-        TJob? rearmed   = null;
-        var          replayed  = 0;
-        var          owned     = false;
-        var          staged    = false;
+        var now = support.Scheduler.Time.GetUtcNow().UtcDateTime;
+        var mutation = services.GetRequiredService<IResourceMutation<TJob>>();
+        var replayed = 0;
+        var staged = false;
+        Exception? failure = null;
 
         try {
-            persisted = await FindJobAsync(jobs, execution, result.Job, ct);
-            owned     = persisted is not null && persisted.ScheduleVersion == execution.ScheduleVersion;
-            replayed  = owned && persisted is not null ? Replayed(support, persisted) : 0;
-            Project(result.Job, result, now, support, replayed);
+            var persisted = await FindJobAsync(jobs, execution, result.Job, ct);
+            var owned = persisted is not null && persisted.ScheduleVersion == execution.ScheduleVersion;
+            var recovered = execution.SettlementState is not null;
+            replayed = recovered ? -1 : owned && persisted is not null ? Replayed(support, persisted) : 0;
+            if (!recovered) {
+                Project(result.Job, result, now, support, replayed);
+                AssignEnvelope(execution, result);
+            }
 
             if (owned && persisted is not null) {
                 CopyResult(result.Job, persisted);
@@ -130,8 +167,7 @@ internal sealed class JobSettlement<TJob, TExecution> : IJobSettlement<TJob, TEx
                 if (await mutation.UpdateAsync(persisted, unit, ct: ct) != MutationResult.Applied) {
                     failure = new FailedPreconditionException("Job settlement was not applied.");
                     await unit.RollbackAsync(ct);
-
-                    return await RecoverExecutionAsync(lease, result, failure, ct);
+                    return await RecoverEnvelopeAsync(lease, execution, result, failure, ct);
                 }
 
                 if (persisted.State == JobState.Active && persisted.NextRunTime is not null) {
@@ -140,27 +176,24 @@ internal sealed class JobSettlement<TJob, TExecution> : IJobSettlement<TJob, TEx
                     } catch (Exception error) {
                         failure = error;
                         await unit.RollbackAsync(ct);
-
-                        return await RecoverExecutionAsync(lease, result, failure, ct);
+                        return await RecoverEnvelopeAsync(lease, execution, result, failure, ct);
                     }
                 }
             }
 
             if (!await StageExecutionAsync(services, execution, result, unit, ct)) {
                 await unit.RollbackAsync(ct);
-
                 return new(new SettlementOutcome(false, false,
                     new FailedPreconditionException("Execution settlement was not applied.")), null, 0);
             }
 
             staged = true;
-
             await unit.CommitAsync(ct);
 
-            if (owned && persisted is not null && persisted.State == JobState.Active && persisted.NextRunTime is not null) {
-                rearmed = persisted;
-            }
-
+            var rearmed = owned && persisted is not null
+                && persisted.State == JobState.Active && persisted.NextRunTime is not null
+                ? persisted
+                : null;
             return new(new SettlementOutcome(true, true, null), rearmed, replayed);
         } catch (Exception error) {
             failure ??= error;
@@ -170,80 +203,77 @@ internal sealed class JobSettlement<TJob, TExecution> : IJobSettlement<TJob, TEx
                 failure = new AggregateException(failure, rollback);
             }
 
-            // An execution write can rotate its concurrency stamp before a failed commit, so only
-            // an attempt that never reached that write retries through a fresh scope.
             return staged
                 ? new(new SettlementOutcome(false, false, failure), null, 0)
-                : await RecoverExecutionAsync(lease, result, failure, ct);
+                : await RecoverEnvelopeAsync(lease, execution, result, failure, ct);
         }
     }
 
-    // A store pair that cannot share a transaction persists the schedule stage first: the job
-    // row, then the next pending occurrence, and only then the claimed execution row.
     private static async Task<SettlementState> SettleSequentialAsync(
+        JobExecutionLease<TJob, TExecution>  lease,
         IServiceProvider                     services,
         IJobExecutionStore<TJob, TExecution> store,
         TExecution                           execution,
         JobExecutionResult<TJob>             result,
         CancellationToken                    ct
     ) {
-        var support   = services.GetRequiredService<SchedulingHandlerSupport<TJob, TExecution>>();
-        var jobs      = services.GetService<IRepository<TJob>>();
+        var support = services.GetRequiredService<SchedulingHandlerSupport<TJob, TExecution>>();
+        var jobs = services.GetRequiredService<IRepository<TJob>>();
         var executions = services.GetService<IRepository<TExecution>>();
-        var now       = support.Scheduler.Time.GetUtcNow().UtcDateTime;
-        var replayed  = 0;
-        var settled   = false;
-        var scheduled = false;
-        Exception? failure = null;
+        var now = support.Scheduler.Time.GetUtcNow().UtcDateTime;
+        var replayed = 0;
         TJob? rearmed = null;
+        Exception? failure = null;
 
-        if (jobs is null) {
-            Project(result.Job, result, now, support, 0);
-        } else {
-            try {
-                var mutation  = services.GetRequiredService<IResourceMutation<TJob>>();
-                var persisted = await FindJobAsync(jobs, execution, result.Job, ct);
-                var owned     = persisted is not null && persisted.ScheduleVersion == execution.ScheduleVersion;
-                replayed      = owned && persisted is not null ? Replayed(support, persisted) : 0;
+        try {
+            var mutation = services.GetRequiredService<IResourceMutation<TJob>>();
+            var persisted = await FindJobAsync(jobs, execution, result.Job, ct);
+            var owned = persisted is not null && persisted.ScheduleVersion == execution.ScheduleVersion;
+            var recovered = execution.SettlementState is not null;
+            replayed = recovered ? -1 : owned && persisted is not null ? Replayed(support, persisted) : 0;
+            if (!recovered) {
                 Project(result.Job, result, now, support, replayed);
+            }
 
-                if (owned && persisted is not null) {
-                    CopyResult(result.Job, persisted);
+            AssignEnvelope(execution, result);
+            if (!await store.TryStageSettlementAsync(execution, ct)) {
+                return new(new SettlementOutcome(false, false,
+                    new AbortedException()), null, 0);
+            }
 
-                    await using (var unit = jobs.Begin()) {
-                        if (await mutation.UpdateAsync(persisted, unit, ct: ct) != MutationResult.Applied) {
-                            failure = new FailedPreconditionException("Job settlement was not applied.");
-                            await unit.RollbackAsync(ct);
-                        } else {
-                            await unit.CommitAsync(ct);
-
-                            if (persisted.State == JobState.Active && persisted.NextRunTime is not null) {
-                                if (executions is not null) {
-                                    await StagePendingAsync(services, executions, persisted, support, ct);
-                                }
-
-                                rearmed   = persisted;
-                                scheduled = true;
-                            } else {
-                                scheduled = true;
+            if (owned && persisted is not null) {
+                CopyResult(result.Job, persisted);
+                await using (var unit = jobs.Begin()) {
+                    if (await mutation.UpdateAsync(persisted, unit, ct: ct) != MutationResult.Applied) {
+                        failure = new FailedPreconditionException("Job settlement was not applied.");
+                        await unit.RollbackAsync(ct);
+                    } else {
+                        await unit.CommitAsync(ct);
+                        if (persisted.State == JobState.Active && persisted.NextRunTime is not null) {
+                            if (executions is not null) {
+                                await StagePendingAsync(services, executions, persisted, support, ct);
                             }
+
+                            rearmed = persisted;
                         }
                     }
-                } else {
-                    scheduled = true;
                 }
-            } catch (Exception error) {
-                failure = error;
             }
+        } catch (Exception error) {
+            failure = error;
+        }
+
+        if (failure is not null) {
+            return new(new SettlementOutcome(false, false, failure), null, 0);
         }
 
         try {
-            settled = await SettleExecutionAsync(store, execution, result, ct);
+            var settled = await lease.RecoverAsync(
+                (_, current, token) => SettleExecutionAsync(current, execution, result, token), ct);
+            return new(new SettlementOutcome(settled, true, null), rearmed, replayed);
         } catch (Exception error) {
-            failure = failure is null ? error : new AggregateException(failure, error);
+            return new(new SettlementOutcome(false, true, error), null, 0);
         }
-
-        return new(new SettlementOutcome(settled, scheduled, failure), rearmed, replayed);
     }
 
     private static async Task StagePendingAsync(
@@ -258,33 +288,38 @@ internal sealed class JobSettlement<TJob, TExecution> : IJobSettlement<TJob, TEx
         await unit.CommitAsync(ct);
     }
 
-    private static async Task<SettlementState> RecoverExecutionAsync(
+    private static async Task<SettlementState> RecoverEnvelopeAsync(
         JobExecutionLease<TJob, TExecution> lease,
+        TExecution                          execution,
         JobExecutionResult<TJob>            result,
         Exception                           failure,
         CancellationToken                   ct
     ) {
         try {
-            var settled = await lease.RecoverAsync(
-                (_, store, token) => SettleExecutionAsync(store, lease.Execution, result, token), ct);
-
-            return new(new SettlementOutcome(settled, false, failure), null, 0);
+            execution.State = ExecutionState.Running;
+            execution.EndTime = null;
+            AssignEnvelope(execution, result);
+            var staged = await lease.RecoverAsync(
+                (_, store, token) => store.TryStageSettlementAsync(execution, token), ct);
+            var outcome = staged
+                ? failure
+                : new AggregateException(failure, new AbortedException());
+            return new(new SettlementOutcome(false, false, outcome), null, 0);
         } catch (Exception error) {
             return new(new SettlementOutcome(false, false, new AggregateException(failure, error)), null, 0);
         }
     }
 
     private static async Task<bool> StageExecutionAsync(
-        IServiceProvider    services,
-        TExecution          execution,
+        IServiceProvider       services,
+        TExecution             execution,
         JobExecutionResult<TJob> result,
-        IUnitOfWork         unit,
-        CancellationToken   ct
+        IUnitOfWork            unit,
+        CancellationToken      ct
     ) {
         AssignResult(execution, result);
-
         return await services.GetRequiredService<IResourceMutation<TExecution>>()
-                             .UpdateAsync(execution, unit, ct: ct) == MutationResult.Applied;
+            .UpdateAsync(execution, unit, ct: ct) == MutationResult.Applied;
     }
 
     private static Task<bool> SettleExecutionAsync(
@@ -294,25 +329,41 @@ internal sealed class JobSettlement<TJob, TExecution> : IJobSettlement<TJob, TEx
         CancellationToken                    ct
     ) {
         AssignResult(execution, result);
-
         return store.TrySettleAsync(execution, ct);
     }
 
-    private static void AssignResult(TExecution execution, JobExecutionResult<TJob> result) {
-        execution.State           = result.State;
-        execution.EndTime         = result.EndTime;
-        execution.RecentError     = result.Error;
-        execution.LeaseExpireTime = null;
+    private static void AssignEnvelope(TExecution execution, JobExecutionResult<TJob> result) {
+        execution.SettlementState = result.State;
+        execution.SettlementEndTime = result.EndTime;
+        execution.SettlementError = result.Error;
+        execution.SettlementJobState = result.Job.State;
+        execution.SettlementRecentRunTime = result.Job.RecentRunTime;
+        execution.SettlementRecentError = result.Job.RecentError;
+        execution.SettlementNextRunTime = result.Job.NextRunTime;
     }
 
-    private static void Project(TJob job, JobExecutionResult<TJob> result, DateTime now, SchedulingHandlerSupport<TJob, TExecution> support, int replayed) {
+    private static void AssignResult(TExecution execution, JobExecutionResult<TJob> result) {
+        execution.State = result.State;
+        execution.EndTime = result.EndTime;
+        execution.RecentError = result.Error;
+        execution.LeaseExpireTime = null;
+        execution.SettlementState = null;
+        execution.SettlementEndTime = null;
+        execution.SettlementError = null;
+        execution.SettlementJobState = null;
+        execution.SettlementRecentRunTime = null;
+        execution.SettlementRecentError = null;
+        execution.SettlementNextRunTime = null;
+    }
+
+    private static void Project(TJob job, JobExecutionResult<TJob> result, DateTime now,
+        SchedulingHandlerSupport<TJob, TExecution> support, int replayed) {
         job.RecentRunTime = result.EndTime;
-        job.RecentError   = result.State == ExecutionState.Failed ? result.Error : null;
+        job.RecentError = result.State == ExecutionState.Failed ? result.Error : null;
 
         var recurring = job.ScheduleType is ScheduleType.Cron or ScheduleType.Periodic;
-
         if (!recurring) {
-            job.State       = result.State == ExecutionState.Failed ? JobState.Failed : JobState.Completed;
+            job.State = result.State == ExecutionState.Failed ? JobState.Failed : JobState.Completed;
             job.NextRunTime = null;
             return;
         }
@@ -343,18 +394,11 @@ internal sealed class JobSettlement<TJob, TExecution> : IJobSettlement<TJob, TEx
         return ScheduleDefinitionMapper.ToDefinition(job).GetNextRunTime(job.NextRunTime ?? now);
     }
 
-    private static void CopyResult(TJob source, TJob target) {
-        target.State         = source.State;
-        target.RecentRunTime = source.RecentRunTime;
-        target.RecentError   = source.RecentError;
-        target.NextRunTime   = source.NextRunTime;
-    }
-
     private static async Task<TJob?> FindJobAsync(
-        IRepository<TJob>        jobs,
-        TExecution               execution,
-        TJob                     job,
-        CancellationToken        ct
+        IRepository<TJob> jobs,
+        TExecution        execution,
+        TJob              job,
+        CancellationToken ct
     ) {
         var identity = job.CanonicalName ?? job.Name ?? execution.Job;
         if (string.IsNullOrWhiteSpace(identity)) {

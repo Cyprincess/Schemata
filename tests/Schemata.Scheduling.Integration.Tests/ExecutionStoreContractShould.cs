@@ -188,6 +188,45 @@ public class ExecutionStoreContractShould : IAsyncLifetime
         Assert.Equal(expiry.AddMinutes(1), persisted.LeaseExpireTime);
     }
 
+    [Fact]
+    public async Task Stage_And_Reclaim_Settlement_Without_Incrementing_The_Attempt() {
+        var job = await SeedJobAsync("app:settlement-store", SuccessJob.Key);
+        await SeedExecutionAsync(new() {
+            Job = job.CanonicalName,
+            JobKey = SuccessJob.Key,
+            ScheduleVersion = job.ScheduleVersion,
+            State = ExecutionState.Running,
+            Attempt = 4,
+            LeaseExpireTime = _fixture.Clock.Now.AddSeconds(-1),
+            StartTime = _fixture.Clock.Now.AddMinutes(-5),
+        });
+
+        await using var scope = _fixture.Services.CreateAsyncScope();
+        var store = scope.ServiceProvider.GetRequiredService<IJobExecutionStore<SchemataJob, SchemataJobExecution>>();
+        SchemataJobExecution? execution = null;
+        await foreach (var row in store.ListDueAsync(_fixture.Clock.Now, 1, CancellationToken.None)) execution = row;
+        Assert.NotNull(execution);
+        execution.SettlementState = ExecutionState.Succeeded;
+        execution.SettlementEndTime = _fixture.Clock.Now;
+        execution.SettlementJobState = JobState.Completed;
+        execution.SettlementRecentRunTime = _fixture.Clock.Now;
+        Assert.True(await store.TryStageSettlementAsync(execution, CancellationToken.None));
+
+        var staged = await _fixture.ExecutionAsync(SuccessJob.Key);
+        Assert.NotNull(staged);
+        Assert.Equal(ExecutionState.Running, staged.State);
+        Assert.Equal(ExecutionState.Succeeded, staged.SettlementState);
+        Assert.Equal(4, staged.Attempt);
+
+        var expiry = _fixture.Clock.Now.AddMinutes(5);
+        Assert.True(await store.TryReclaimSettlementAsync(execution, expiry, CancellationToken.None));
+        var reclaimed = await _fixture.ExecutionAsync(SuccessJob.Key);
+        Assert.NotNull(reclaimed);
+        Assert.Equal(4, reclaimed.Attempt);
+        Assert.Equal(expiry, reclaimed.LeaseExpireTime);
+        Assert.Equal(ExecutionState.Succeeded, reclaimed.SettlementState);
+    }
+
     private Task DispatchAsync() {
         return _fixture.Services.GetRequiredService<JobExecutionDispatcher<SchemataJob, SchemataJobExecution>>()
                        .DispatchPendingAsync(CancellationToken.None)

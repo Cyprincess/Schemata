@@ -39,7 +39,7 @@ public class SchedulingInitializerShould
         repository.Setup(r => r.CommitAsync(It.IsAny<CancellationToken>()))
             .Callback(() => Assert.True(restored)).Returns(Task.CompletedTask);
         await using var services = new ServiceCollection().AddSingleton(repository.Object).AddSingleton(propagator.Object)
-            .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().AddSchemataSchedulingRepositoryStore().BuildServiceProvider();
+            .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>().AddSchemataSchedulingRepositoryStore().BuildServiceProvider();
         await using var scope = services.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<IJobExecutionStore<SchemataJob, SchemataJobExecution>>().FailOrphanedRunningAsync(DateTime.UnixEpoch.AddSeconds(1), default);
         Assert.Equal(ExecutionState.Failed, row.State);
@@ -132,7 +132,7 @@ public class SchedulingInitializerShould
 
         var services = new ServiceCollection().AddSingleton(jobs.Object).AddSingleton(executions.Object)
                                               .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
-                                              .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
+                                              .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>()
                                               .AddSchemataSchedulingRepositoryStore()
                                               .BuildServiceProvider();
 
@@ -201,6 +201,14 @@ public class SchedulingInitializerShould
         }
 
         public Task<bool> TryRenewLeaseAsync(SchemataJobExecution execution, DateTime leaseExpireUtc, CancellationToken ct) {
+            return Task.FromResult(false);
+        }
+
+        public Task<bool> TryStageSettlementAsync(SchemataJobExecution execution, CancellationToken ct = default) {
+            return Task.FromResult(false);
+        }
+
+        public Task<bool> TryReclaimSettlementAsync(SchemataJobExecution execution, DateTime leaseExpire, CancellationToken ct = default) {
             return Task.FromResult(false);
         }
 

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Linq;
-using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,15 +25,20 @@ internal sealed class DefaultUnscheduleJobHandler<TJob, TExecution>(SchedulingHa
         try {
 
             var context = await MessageContexts.CaptureAsync(services, ct);
-            var scope = await scheduler.Services.GetRequiredService<IMessageExecutionScopeFactory>().CreateAsync(context, ct);
-            IDisposable? entered = null;
-            Exception? failure = null;
-            try {
-            entered = scope.Enter();
-            await scope.RestoreAsync(context, ct);
-            var jobs = scope.Services.GetRequiredService<IRepository<TJob>>();
-            var executions = scope.Services.GetRequiredService<IRepository<TExecution>>();
-            await using var transaction = jobs.Begin();
+            var runner = scheduler.Services.GetRequiredService<IMessageExecutionScopeRunner>();
+            Func<IServiceProvider, CancellationToken, ValueTask<Unit>> work = async (provider, token) => {
+            var jobs = provider.GetRequiredService<IRepository<TJob>>();
+            var executions = provider.GetRequiredService<IRepository<TExecution>>();
+            IUnitOfWork transaction;
+            IUnitOfWork? owned = null;
+            if (request.UnitOfWork is not null) {
+                transaction = request.UnitOfWork;
+                jobs.Join(transaction);
+            } else {
+                owned = jobs.Begin();
+                transaction = owned;
+            }
+            await using var ownedTransaction = owned;
             executions.Join(transaction);
             var persisted = await jobs.FirstOrDefaultAsync(
                 query => query.Where(job => job.CanonicalName == request.JobCanonicalName
@@ -43,38 +47,51 @@ internal sealed class DefaultUnscheduleJobHandler<TJob, TExecution>(SchedulingHa
             if (persisted is { State: JobState.Active }) {
                 persisted.State = JobState.Paused;
                 persisted.ScheduleVersion = Guid.NewGuid();
-                if (await scope.Services.GetRequiredService<IResourceMutation<TJob>>()
+                if (await provider.GetRequiredService<IResourceMutation<TJob>>()
                     .UpdateAsync(persisted, transaction, ct: ct) != MutationResult.Applied) return Unit.Value;
                 notified = persisted;
             }
-            await support.CancelPendingAsync(canonical, executions, scope.Services, transaction, ct);
-            await transaction.CommitAsync(ct);
-            await scheduler.Gate.WaitAsync(CancellationToken.None);
-            try {
-                if (scheduler.Entries.TryRemove(canonical, out var entry)) {
-                    await entry.Cts.CancelAsync();
-                    entry.Cts.Dispose();
+            await support.CancelPendingAsync(canonical, executions, provider, transaction, ct);
+            if (ownedTransaction is not null) {
+                await transaction.CommitAsync(ct);
+                await scheduler.Gate.WaitAsync(CancellationToken.None);
+                try {
+                    if (scheduler.Entries.TryRemove(canonical, out var entry)) {
+                        await entry.Cts.CancelAsync();
+                        entry.Cts.Dispose();
+                    }
+                } finally {
+                    scheduler.Gate.Release();
                 }
-            } finally {
-                scheduler.Gate.Release();
+            } else {
+                transaction.AddCommitSink(CommitOrders.Domain, async token => {
+                    await scheduler.Gate.WaitAsync(CancellationToken.None);
+                    try {
+                        if (scheduler.Entries.TryRemove(canonical, out var entry)) {
+                            await entry.Cts.CancelAsync();
+                            entry.Cts.Dispose();
+                        }
+                    } finally {
+                        scheduler.Gate.Release();
+                    }
+                    if (notified is not null) {
+                        await support.NotifyUnscheduledAsync(notified, token);
+                        notified = null;
+                    }
+                });
             }
-            } catch (Exception error) {
-                failure = error;
-                throw;
-            } finally {
-                Exception? cleanup = null;
-                try { await scope.DisposeAsync(); } catch (Exception error) { cleanup = error; }
-                try { entered?.Dispose(); } catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
-                if (cleanup is not null) {
-                    if (failure is not null) throw new AggregateException(failure, cleanup);
-                    ExceptionDispatchInfo.Capture(cleanup).Throw();
-                }
+            return Unit.Value;
+            };
+            if (request.UnitOfWork is not null) {
+                await work(services, ct);
+            } else {
+                await runner.RunAsync(context, work, ct);
             }
         } finally {
             support.WriteGate.Gate.Release();
         }
 
-        if (notified is not null) {
+        if (notified is not null && request.UnitOfWork is null) {
             await support.NotifyUnscheduledAsync(notified, ct);
         }
 

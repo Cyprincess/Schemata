@@ -115,6 +115,11 @@ public sealed class JobExecutionDispatcher<TJob, TExecution>(
         TExecution                           execution,
         CancellationToken                    ct
     ) {
+        if (execution.SettlementState is not null) {
+            await RecoverSettlementAsync(serviceProvider, store, execution, ct);
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(execution.JobKey)) {
             await MarkFailedAsync(store, execution, "Job execution is missing its JobKey.", ct);
             return;
@@ -152,6 +157,69 @@ public sealed class JobExecutionDispatcher<TJob, TExecution>(
             await lease.TransitionAsync(current => MarkFailedAsync(current, execution, error.Message, lease.Token), lease.Token);
             throw;
         }
+    }
+
+    private async Task RecoverSettlementAsync(
+        IServiceProvider                     serviceProvider,
+        IJobExecutionStore<TJob, TExecution> store,
+        TExecution                           execution,
+        CancellationToken                    ct
+    ) {
+        var registry = serviceProvider.GetService<IScheduledJobRegistry>();
+        var jobType = execution.JobKey is null ? null : registry?.Resolve(execution.JobKey);
+        ExecutionPolicy policy;
+        try {
+            policy = ResolvePolicy(jobType);
+        } catch (Exception error) {
+            logger?.LogWarning(error,
+                "Execution settlement '{ExecutionUid}' retains its envelope until the execution policy is repaired.",
+                execution.Uid);
+            return;
+        }
+
+        var leaseExpire = _time.GetUtcNow().UtcDateTime.Add(policy.Lease);
+        if (!await store.TryReclaimSettlementAsync(execution, leaseExpire, ct)) {
+            return;
+        }
+
+        JobExecutionResult<TJob> result;
+        try {
+            result = JobSettlement<TJob, TExecution>.RestoreResult(execution);
+        } catch (InvalidOperationException error) {
+            logger?.LogWarning(error,
+                "Execution settlement '{ExecutionUid}' retains its envelope; the settlement envelope is incomplete.",
+                execution.Uid);
+            return;
+        }
+        await using var lease = new JobExecutionLease<TJob, TExecution>(
+            JobExecutionScopes.Plain(services.GetRequiredService<IServiceScopeFactory>()), execution,
+            policy.Lease, _time, _executions, ct);
+        var outcome = await lease.RecoverAsync(async (provider, current, token) => {
+            var settlement = provider.GetRequiredService<IJobSettlement<TJob, TExecution>>();
+            return await settlement.SettleAsync(lease, null, token);
+        }, lease.Token);
+        if (!outcome.ExecutionSettled || !outcome.ScheduleSettled) {
+            if (outcome.Failure is not null) {
+                logger?.LogWarning(outcome.Failure,
+                    "Job settlement for execution '{ExecutionUid}' remains pending recovery.", execution.Uid);
+            }
+
+            if (!outcome.ExecutionSettled && outcome.Failure is not null and not AbortedException
+                && execution.SettlementState is null) {
+                ExceptionDispatchInfo.Capture(outcome.Failure).Throw();
+            }
+
+            return;
+        }
+
+        var job = await LoadOrSynthesizeJobAsync(serviceProvider, execution, lease.Token);
+        JobSettlement<TJob, TExecution>.CopyResult(result.Job, job);
+        var context = BuildContext(execution);
+        var observers = serviceProvider.GetServices<IJobLifecycleObserver>().ToList();
+        var exception = result.State == ExecutionState.Failed
+            ? new InvalidOperationException(result.Error ?? "Job execution failed.")
+            : null;
+        await NotifyObserversAsync(job, context, observers, result.State, exception, lease.Token);
     }
 
     /// <summary>
@@ -204,7 +272,7 @@ public sealed class JobExecutionDispatcher<TJob, TExecution>(
             // writer advance a recurring schedule.
             job     ??= SynthesizeJob(execution);
             context ??= BuildContext(execution);
-            await FinalizeAsync(serviceProvider, job, execution, ExecutionState.Failed, ex, observers, context, lease, ct);
+            await FinalizeAsync(serviceProvider, job, execution, ExecutionState.Failed, ex, null, observers, context, lease, ct);
             return;
         }
 
@@ -215,12 +283,12 @@ public sealed class JobExecutionDispatcher<TJob, TExecution>(
             default:
                 // An advisor handled or blocked the fire before it ran; leave no terminal row churn
                 // beyond the claim and advance the schedule so the next occurrence is materialized.
-                await FinalizeAsync(serviceProvider, job!, execution, ExecutionState.Skipped, null, observers,
-                    context!, lease, ct, notifySkipped: true);
+                await FinalizeAsync(serviceProvider, job!, execution, ExecutionState.Skipped, null, null, observers,
+                    context!, lease, ct);
                 return;
             case AdviseResult.Block:
-                await FinalizeAsync(serviceProvider, job!, execution, ExecutionState.Blocked, null, observers,
-                    context!, lease, ct, notifyBlocked: true);
+                await FinalizeAsync(serviceProvider, job!, execution, ExecutionState.Blocked, null, null, observers,
+                    context!, lease, ct);
                 return;
         }
 
@@ -247,12 +315,12 @@ public sealed class JobExecutionDispatcher<TJob, TExecution>(
                 return;
             }
 
-            await FinalizeAsync(serviceProvider, job!, execution, ExecutionState.Failed, ex, observers,
-                context!, lease, ct, notifyFailed: true);
+            await FinalizeAsync(serviceProvider, job!, execution, ExecutionState.Failed, ex, ex, observers,
+                context!, lease, ct);
             return;
         }
-        await FinalizeAsync(serviceProvider, job!, execution, ExecutionState.Succeeded, null, observers,
-            context!, lease, ct, true);
+        await FinalizeAsync(serviceProvider, job!, execution, ExecutionState.Succeeded, null, null, observers,
+            context!, lease, ct);
     }
 
 
@@ -267,47 +335,57 @@ public sealed class JobExecutionDispatcher<TJob, TExecution>(
         TJob                                 job,
         TExecution                           execution,
         ExecutionState                       state,
-        Exception?                           exception,
+        Exception?                           settlementError,
+        Exception?                           notificationException,
         List<IJobLifecycleObserver>          observers,
         JobContext                           context,
         JobExecutionLease<TJob, TExecution>  lease,
-        CancellationToken                    ct,
-        bool                                 notifySucceeded = false,
-        bool                                 notifyFailed    = false,
-        bool                                 notifyBlocked   = false,
-        bool                                 notifySkipped   = false
+        CancellationToken                    ct
     ) {
         var settlement = serviceProvider.GetRequiredService<IJobSettlement<TJob, TExecution>>();
         var outcome = await settlement.SettleAsync(
-            lease, new(job, state, _time.GetUtcNow().UtcDateTime, exception?.Message), ct);
+            lease, new(job, state, _time.GetUtcNow().UtcDateTime, settlementError?.Message), ct);
 
-        if (!outcome.ExecutionSettled) {
-            // A concurrency conflict means another worker transitioned the claimed row first;
-            // that transition owns the terminal state and this finalization stops without
-            // overwriting it. Any other failure kept the row unpersisted and surfaces here.
-            if (outcome.Failure is not null and not AbortedException) {
+        if (!outcome.ExecutionSettled || !outcome.ScheduleSettled) {
+            if (outcome.Failure is not null) {
+                logger?.LogWarning(outcome.Failure,
+                    "Job settlement for execution '{ExecutionUid}' remains pending recovery.", execution.Uid);
+            }
+
+            if (!outcome.ExecutionSettled && outcome.Failure is not null and not AbortedException
+                && execution.SettlementState is null) {
                 ExceptionDispatchInfo.Capture(outcome.Failure).Throw();
             }
 
             return;
         }
 
-        if (outcome.Failure is not null) {
-            logger?.LogWarning(outcome.Failure,
-                "Job settlement recorded execution '{ExecutionUid}' without a fully persisted schedule.",
-                execution.Uid);
-        }
+        await NotifyObserversAsync(job, context, observers, state, notificationException, ct);
+    }
 
+    private async Task NotifyObserversAsync(
+        TJob                            job,
+        JobContext                      context,
+        List<IJobLifecycleObserver>     observers,
+        ExecutionState                  state,
+        Exception?                      notificationException,
+        CancellationToken               ct
+    ) {
         foreach (var observer in observers) {
             try {
-                if (notifySucceeded) {
-                    await observer.OnSucceededAsync(job, context, ct);
-                } else if (notifyFailed && exception is { } failure) {
-                    await observer.OnFailedAsync(job, context, failure, ct);
-                } else if (notifyBlocked) {
-                    await observer.OnBlockedAsync(job, context, ct);
-                } else if (notifySkipped) {
-                    await observer.OnSkippedAsync(job, context, ct);
+                switch (state) {
+                    case ExecutionState.Succeeded:
+                        await observer.OnSucceededAsync(job, context, ct);
+                        break;
+                    case ExecutionState.Failed when notificationException is { } failure:
+                        await observer.OnFailedAsync(job, context, failure, ct);
+                        break;
+                    case ExecutionState.Blocked:
+                        await observer.OnBlockedAsync(job, context, ct);
+                        break;
+                    case ExecutionState.Skipped:
+                        await observer.OnSkippedAsync(job, context, ct);
+                        break;
                 }
             } catch (Exception observerEx) {
                 logger?.LogWarning(observerEx, "Lifecycle observer threw while finalizing job '{JobName}'.", job.Name);
@@ -340,6 +418,7 @@ public sealed class JobExecutionDispatcher<TJob, TExecution>(
         return new() {
             MessageContext = execution.MessageContext is null ? null : new(execution.MessageContext),
             CanonicalName = execution.Job,
+            Subject       = execution.Subject,
             JobKey        = execution.JobKey,
             ArgsJson      = execution.ArgsJson,
             ScheduleType  = ScheduleType.OneTime,
@@ -351,6 +430,7 @@ public sealed class JobExecutionDispatcher<TJob, TExecution>(
     private static JobContext BuildContext(TExecution execution) {
         return new() {
             Job          = execution.Job,
+            Subject      = execution.Subject,
             ExecutionUid = execution.Uid,
             StartTime    = execution.StartTime,
             Method       = execution.Method,

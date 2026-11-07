@@ -80,6 +80,12 @@ public interface IJobExecutionStore<TJob, TExecution>
     /// </returns>
     Task<bool> TryRenewLeaseAsync(TExecution execution, DateTime leaseExpireUtc, CancellationToken ct);
 
+    /// <summary>Persists the settlement envelope on the claimed Running row without changing its attempt count.</summary>
+    Task<bool> TryStageSettlementAsync(TExecution execution, CancellationToken ct = default);
+
+    /// <summary>Renews an expired settlement row for replay without claiming another body attempt.</summary>
+    Task<bool> TryReclaimSettlementAsync(TExecution execution, DateTime leaseExpire, CancellationToken ct = default);
+
     /// <summary>
     ///     Persists the terminal state the caller assigned to <paramref name="execution" />
     ///     (<see cref="ExecutionState.Succeeded" />, <see cref="ExecutionState.Failed" />,

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
-using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,24 +29,30 @@ internal sealed class DefaultScheduleJobHandler<TJob, TExecution>(SchedulingHand
                 : new Dictionary<string, string?>(request.Variables);
         }
 
-        await ScheduleCoreAsync(request.Job, ct, null);
+        await ScheduleCoreAsync(request.Job, ct, null, request.UnitOfWork);
         return Unit.Value;
     }
 
-    internal async Task ScheduleCoreAsync(TJob job, CancellationToken ct, Guid? recoveryVersion) {
+    internal async Task ScheduleCoreAsync(TJob job, CancellationToken ct, Guid? recoveryVersion, IUnitOfWork? outer = null) {
         var scheduler = support.Scheduler;
+        bool scheduled;
         await support.WriteGate.Gate.WaitAsync(ct);
         try {
             var context = new MessageContext(job.MessageContext ?? new());
-            var scope = await scheduler.Services.GetRequiredService<IMessageExecutionScopeFactory>().CreateAsync(context, ct);
-            IDisposable? entered = null;
-            Exception? failure = null;
-            try {
-            entered = scope.Enter();
-            await scope.RestoreAsync(context, ct);
-            var jobs = scope.Services.GetRequiredService<IRepository<TJob>>();
-            var executions = scope.Services.GetRequiredService<IRepository<TExecution>>();
-            await using var transaction = jobs.Begin();
+            var runner = scheduler.Services.GetRequiredService<IMessageExecutionScopeRunner>();
+            Func<IServiceProvider, CancellationToken, ValueTask<bool>> work = async (provider, token) => {
+            var jobs = provider.GetRequiredService<IRepository<TJob>>();
+            var executions = provider.GetRequiredService<IRepository<TExecution>>();
+            IUnitOfWork transaction;
+            IUnitOfWork? owned = null;
+            if (outer is not null) {
+                transaction = outer;
+                jobs.Join(outer);
+            } else {
+                owned = jobs.Begin(job.Key is null ? null : IsolationLevel.Serializable);
+                transaction = owned;
+            }
+            await using var ownedTransaction = owned;
             executions.Join(transaction);
             var name = job.CanonicalName ?? job.Name;
             var persisted = job.Key is { } slot
@@ -57,14 +63,14 @@ internal sealed class DefaultScheduleJobHandler<TJob, TExecution>(SchedulingHand
                         query => query.Where(row => row.CanonicalName == name || row.Name == name), ct);
             if (recoveryVersion is { } version
                 && (persisted is null || persisted.State != JobState.Active || persisted.ScheduleVersion != version)) {
-                return;
+                return false;
             }
             var key = persisted?.CanonicalName ?? name;
             var replayedMisses = 0;
             await scheduler.Gate.WaitAsync(ct);
             try {
                 if (scheduler.IsStopped) {
-                    return;
+                    return false;
                 }
 
                 if (key is not null && scheduler.Entries.TryGetValue(key, out var existing)) {
@@ -81,15 +87,16 @@ internal sealed class DefaultScheduleJobHandler<TJob, TExecution>(SchedulingHand
                 scheduler.Gate.Release();
             }
 
-            var mutation = scope.Services.GetRequiredService<IResourceMutation<TJob>>();
+            var mutation = provider.GetRequiredService<IResourceMutation<TJob>>();
             if (persisted is null) {
-                if (await mutation.CreateAsync(job, transaction, ct) != MutationResult.Applied) return;
+                if (await mutation.CreateAsync(job, transaction, ct) != MutationResult.Applied) return false;
             } else {
                 persisted.ScheduleVersion = job.ScheduleVersion;
                 // Execution result fields belong to the settlement owner.
                 persisted.Key          ??= job.Key;
                 persisted.JobKey         = job.JobKey;
                 persisted.ArgsJson       = job.ArgsJson;
+                persisted.Subject        = job.Subject;
                 persisted.ScheduleType   = job.ScheduleType;
                 persisted.NextRunTime    = job.NextRunTime;
                 persisted.IntervalTicks  = job.IntervalTicks;
@@ -99,7 +106,7 @@ internal sealed class DefaultScheduleJobHandler<TJob, TExecution>(SchedulingHand
                 persisted.MessageContext = job.MessageContext;
                 persisted.Replay         = job.Replay;
                 persisted.State          = job.State;
-                if (await mutation.UpdateAsync(persisted, transaction, ct: ct) != MutationResult.Applied) return;
+                if (await mutation.UpdateAsync(persisted, transaction, ct: ct) != MutationResult.Applied) return false;
                 job.Uid           = persisted.Uid;
                 job.Name          = persisted.Name;
                 job.CanonicalName = persisted.CanonicalName;
@@ -111,26 +118,24 @@ internal sealed class DefaultScheduleJobHandler<TJob, TExecution>(SchedulingHand
                 transaction.AddRollbackSink(() => job.Timestamp = staged);
             }
 
-            await support.ReplacePendingExecutionAsync(job, executions, scope.Services, transaction, ct);
-            await transaction.CommitAsync(ct);
-            await support.ArmOneShotTimerAsync(job, replayedMisses);
-            } catch (Exception error) {
-                failure = error;
-                throw;
-            } finally {
-                Exception? cleanup = null;
-                try { await scope.DisposeAsync(); } catch (Exception error) { cleanup = error; }
-                try { entered?.Dispose(); } catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
-                if (cleanup is not null) {
-                    if (failure is not null) throw new AggregateException(failure, cleanup);
-                    ExceptionDispatchInfo.Capture(cleanup).Throw();
-                }
+            await support.ReplacePendingExecutionAsync(job, executions, provider, transaction, token);
+            if (ownedTransaction is not null) {
+                await transaction.CommitAsync(token);
+                await support.ArmOneShotTimerAsync(job, replayedMisses);
+            } else {
+                transaction.AddCommitSink(CommitOrders.Domain, _ => support.ArmOneShotTimerAsync(job, replayedMisses));
+                transaction.AddCommitSink(CommitOrders.Domain, token => support.NotifyScheduledAsync(job, token));
             }
+            return true;
+            };
+            scheduled = outer is not null
+                ? await work(services, ct)
+                : await runner.RunAsync(context, work, ct);
         } finally {
             support.WriteGate.Gate.Release();
         }
 
-        await support.NotifyScheduledAsync(job, ct);
+        if (scheduled && outer is null) await support.NotifyScheduledAsync(job, ct);
     }
 
 }

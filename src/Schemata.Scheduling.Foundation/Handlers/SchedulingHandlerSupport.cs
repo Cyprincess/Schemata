@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -45,6 +44,7 @@ internal sealed class SchedulingHandlerSupport<TJob, TExecution>(DefaultSchedule
         if (job.NextRunTime is { } due) {
             if (await mutation.CreateAsync(new TExecution {
                 Job = job.CanonicalName, JobKey = job.JobKey, ArgsJson = job.ArgsJson,
+                Subject = job.Subject,
                 MessageContext = job.MessageContext is null ? null : new(job.MessageContext),
                 ScheduleVersion = job.ScheduleVersion,
                 Variables = job.Variables is null ? null : new Dictionary<string, string?>(job.Variables),
@@ -82,13 +82,9 @@ internal sealed class SchedulingHandlerSupport<TJob, TExecution>(DefaultSchedule
 
     internal async Task NotifyScheduledAsync(TJob job, CancellationToken ct) {
         var context = new MessageContext(job.MessageContext ?? new());
-        var scope = await scheduler.Services.GetRequiredService<IMessageExecutionScopeFactory>().CreateAsync(context, ct);
-        IDisposable? entered = null;
-        Exception? failure = null;
-        try {
-        entered = scope.Enter();
-        await scope.RestoreAsync(context, ct);
-        var observers = scope.Services.GetServices<IJobLifecycleObserver>().ToList();
+        var runner = scheduler.Services.GetRequiredService<IMessageExecutionScopeRunner>();
+        await runner.RunAsync(context, async (provider, token) => {
+        var observers = provider.GetServices<IJobLifecycleObserver>().ToList();
 
         foreach (var observer in observers) {
             try {
@@ -98,29 +94,15 @@ internal sealed class SchedulingHandlerSupport<TJob, TExecution>(DefaultSchedule
                     ex, "IJobLifecycleObserver.OnScheduledAsync threw for job '{JobName}'.", job.Name);
             }
         }
-        } catch (Exception error) {
-            failure = error;
-            throw;
-        } finally {
-            Exception? cleanup = null;
-            try { await scope.DisposeAsync(); } catch (Exception error) { cleanup = error; }
-            try { entered?.Dispose(); } catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
-            if (cleanup is not null) {
-                if (failure is not null) throw new AggregateException(failure, cleanup);
-                ExceptionDispatchInfo.Capture(cleanup).Throw();
-            }
-        }
+        return true;
+        }, ct);
     }
 
     internal async Task NotifyUnscheduledAsync(TJob job, CancellationToken ct) {
         var context = new MessageContext(job.MessageContext ?? new());
-        var scope = await scheduler.Services.GetRequiredService<IMessageExecutionScopeFactory>().CreateAsync(context, ct);
-        IDisposable? entered = null;
-        Exception? failure = null;
-        try {
-        entered = scope.Enter();
-        await scope.RestoreAsync(context, ct);
-        var observers = scope.Services.GetServices<IJobLifecycleObserver>().ToList();
+        var runner = scheduler.Services.GetRequiredService<IMessageExecutionScopeRunner>();
+        await runner.RunAsync(context, async (provider, token) => {
+        var observers = provider.GetServices<IJobLifecycleObserver>().ToList();
 
         foreach (var observer in observers) {
             try {
@@ -130,18 +112,8 @@ internal sealed class SchedulingHandlerSupport<TJob, TExecution>(DefaultSchedule
                     ex, "IJobLifecycleObserver.OnUnscheduledAsync threw for job '{JobName}'.", job.Name);
             }
         }
-        } catch (Exception error) {
-            failure = error;
-            throw;
-        } finally {
-            Exception? cleanup = null;
-            try { await scope.DisposeAsync(); } catch (Exception error) { cleanup = error; }
-            try { entered?.Dispose(); } catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
-            if (cleanup is not null) {
-                if (failure is not null) throw new AggregateException(failure, cleanup);
-                ExceptionDispatchInfo.Capture(cleanup).Throw();
-            }
-        }
+        return true;
+        }, ct);
     }
 
     /// <summary>
@@ -151,29 +123,15 @@ internal sealed class SchedulingHandlerSupport<TJob, TExecution>(DefaultSchedule
     /// </summary>
     internal async Task PersistExecutionAsync(TExecution execution, CancellationToken ct) {
         var context = new MessageContext(execution.MessageContext ?? new());
-        var scope = await scheduler.Services.GetRequiredService<IMessageExecutionScopeFactory>().CreateAsync(context, ct);
-        IDisposable? entered = null;
-        Exception? failure = null;
-        try {
-            entered = scope.Enter();
-            await scope.RestoreAsync(context, ct);
-            var mutation = scope.Services.GetRequiredService<IResourceMutation<TExecution>>();
+        var runner = scheduler.Services.GetRequiredService<IMessageExecutionScopeRunner>();
+        await runner.RunAsync(context, async (provider, token) => {
+            var mutation = provider.GetRequiredService<IResourceMutation<TExecution>>();
             if (await mutation.CreateAsync(execution, null, ct) != MutationResult.Applied) {
                 throw SchemataResourceErrors.PreconditionFailed<TExecution>(execution.CanonicalName,
                     description: "A blocked execution creation vetoes the trigger.");
             }
-        } catch (Exception error) {
-            failure = error;
-            throw;
-        } finally {
-            Exception? cleanup = null;
-            try { await scope.DisposeAsync(); } catch (Exception error) { cleanup = error; }
-            try { entered?.Dispose(); } catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
-            if (cleanup is not null) {
-                if (failure is not null) throw new AggregateException(failure, cleanup);
-                ExceptionDispatchInfo.Capture(cleanup).Throw();
-            }
-        }
+        return true;
+        }, ct);
     }
 
 

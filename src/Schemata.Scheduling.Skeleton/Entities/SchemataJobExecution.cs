@@ -36,6 +36,9 @@ public class SchemataJobExecution : IIdentifier, ICanonicalName, IConcurrency, I
     [ResourceReference(typeof(SchemataJob))]
     public virtual string? Job { get; set; }
 
+    [ResourceReference]
+    public virtual string? Subject { get; set; }
+
     public virtual Guid ScheduleVersion { get; set; }
 
     /// <summary>
@@ -79,9 +82,9 @@ public class SchemataJobExecution : IIdentifier, ICanonicalName, IConcurrency, I
     public virtual string? Output { get; set; }
 
     /// <summary>
-    ///     Number of times this execution has been claimed. The store increments it atomically
-    ///     with every claim, including crash-recovery reclaims, so the retry ceiling configured on
-    ///     the job registration keeps counting across attempts.
+    ///     Number of times this execution has been claimed for body execution. The store increments it atomically
+    ///     with every body claim, including crash-recovery reclaims, so the retry ceiling configured on
+    ///     the job registration keeps counting across attempts. Settlement-only reclaim retains the count.
     /// </summary>
     public virtual int Attempt { get; set; }
 
@@ -91,6 +94,21 @@ public class SchemataJobExecution : IIdentifier, ICanonicalName, IConcurrency, I
     ///     same lease and fail after expiry because their callbacks cannot be replayed.
     /// </summary>
     public virtual DateTime? LeaseExpireTime { get; set; }
+
+    /// <summary>Terminal execution and job projection awaiting durable settlement.</summary>
+    public virtual ExecutionState? SettlementState { get; set; }
+
+    public virtual DateTime? SettlementEndTime { get; set; }
+
+    public virtual string? SettlementError { get; set; }
+
+    public virtual JobState? SettlementJobState { get; set; }
+
+    public virtual DateTime? SettlementRecentRunTime { get; set; }
+
+    public virtual string? SettlementRecentError { get; set; }
+
+    public virtual DateTime? SettlementNextRunTime { get; set; }
 
     #region ICanonicalName Members
 

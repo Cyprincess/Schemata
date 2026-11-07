@@ -83,8 +83,15 @@ public enum JobState { Active, Paused, Completed, Failed, Cancelled }
 | `EndTime`                   | Wall-clock end time, set when the execution finishes.                                                    |
 | `RecentError`               | Diagnostic message captured on failure.                                                                  |
 | `Output`                    | Serialized result document, exposed as the AIP-151 response payload.                                     |
-| `Attempt`                   | Number of claims, including recovery claims. |
+| `Attempt`                   | Number of body claims, including body recovery claims. Settlement-only reclaim leaves it unchanged. |
 | `LeaseExpireTime`           | Ownership expiration renewed during scheduled or inline execution. |
+| `SettlementState`           | Terminal execution result awaiting schedule and execution settlement. Its presence marks a recoverable envelope. |
+| `SettlementEndTime`         | Persisted execution completion instant used during replay. |
+| `SettlementError`           | Persisted terminal execution error. |
+| `SettlementJobState`        | Projected job lifecycle state. |
+| `SettlementRecentRunTime`   | Projected recent-run instant. |
+| `SettlementRecentError`     | Projected recent-run error. |
+| `SettlementNextRunTime`     | Exact next occurrence to persist and materialize during replay. |
 
 ### ExecutionState
 
@@ -264,13 +271,11 @@ Resource purge uses `TriggerAsync<PurgeJob<TEntity>>`. `PurgeHandler<TEntity>` s
 
 ## Advancing NextRunTime
 
-After a successful, skipped, or blocked fire, `JobExecutionDispatcher` hands the claimed lease and
-the post-fire fields to `IJobSettlement<TJob, TExecution>`. `JobSettlement` fresh-reads the persisted
-job row and writes `State`, `RecentRunTime`, `RecentError`, and `NextRunTime` together with the
-execution row in one unit of work; for a recurring `Active` job it materializes the next `Pending`
-execution row and arms its timer. A failed one-time job settles `Failed`; a failed recurring job
-stays `Active` so its next occurrence still fires. A one-time job that succeeds, skips, or blocks
-settles `Completed` with a `null` `NextRunTime`.
+After a successful, skipped, blocked, or terminally failed fire, `JobExecutionDispatcher` hands the claimed lease and the post-fire fields to `IJobSettlement<TJob, TExecution>`. `JobSettlement` computes the job projection and next run once and copies them with the terminal execution result into the execution-row settlement envelope. Shared repositories commit the job projection, replacement `Pending` occurrence, terminal execution, and envelope clearing in one unit of work. Repositories that cannot share a unit first commit the Running envelope, then persist the job and pending occurrence, and only then mark the execution terminal. A schedule-stage failure therefore leaves the Running envelope available for recovery, and lifecycle outcome observers run only after both schedule and execution settlement succeed.
+
+An expired Running row with an envelope is reclaimed through `TryReclaimSettlementAsync` without incrementing `Attempt`. The dispatcher re-enters only `IJobSettlement` through the existing lease; execution advisors, trigger observers, and the job body do not run again. Recovery hydrates the exact persisted job state, recent-run fields, and `SettlementNextRunTime`, materializes that occurrence, and does not recompute the projection or missed-fire window. The `ScheduleVersion` guard still prevents an old execution from overwriting a newer schedule. Successful terminal settlement clears all envelope fields.
+
+For a recurring `Active` job, settlement materializes the next `Pending` execution row and arms its timer. A failed one-time job settles `Failed`; a failed recurring job stays `Active` so its next occurrence still fires. A one-time job that succeeds, skips, or blocks settles `Completed` with a `null` `NextRunTime`.
 
 Periodic jobs advance by adding `IntervalTicks` to the previous `NextRunTime`. Cron jobs and other mapped schedules round-trip through `ScheduleDefinitionMapper.ToDefinition(job)`, evaluating the next occurrence after the job's current `NextRunTime` when one is set.
 

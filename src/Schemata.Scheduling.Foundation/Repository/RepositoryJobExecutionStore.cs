@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -74,6 +73,19 @@ public sealed class RepositoryJobExecutionStore<TJob, TExecution>(
         return await CommitAsync(execution, ct);
     }
 
+    public Task<bool> TryStageSettlementAsync(TExecution execution, CancellationToken ct = default) {
+        return CommitAsync(execution, ct);
+    }
+
+    public Task<bool> TryReclaimSettlementAsync(
+        TExecution        execution,
+        DateTime          leaseExpire,
+        CancellationToken ct = default
+    ) {
+        execution.LeaseExpireTime = leaseExpire;
+        return CommitAsync(execution, ct);
+    }
+
     public async Task<bool> TrySettleAsync(TExecution execution, CancellationToken ct) {
         execution.LeaseExpireTime = null;
 
@@ -106,28 +118,14 @@ public sealed class RepositoryJobExecutionStore<TJob, TExecution>(
 
         foreach (var row in orphaned) {
             var context = new MessageContext(row.MessageContext ?? new());
-            var scope = await services.GetRequiredService<IMessageExecutionScopeFactory>().CreateAsync(context, ct);
-            IDisposable? entered = null;
-            Exception? failure = null;
-            try {
-                entered = scope.Enter();
-                await scope.RestoreAsync(context, ct);
+            var runner = services.GetRequiredService<IMessageExecutionScopeRunner>();
+            await runner.RunAsync(context, async (provider, token) => {
                 row.State = ExecutionState.Failed;
                 row.EndTime = failedAtUtc;
                 row.RecentError = "Inline execution ownership expired before completion.";
-                await scope.Services.GetRequiredService<IJobExecutionStore<TJob, TExecution>>().TrySettleAsync(row, ct);
-            } catch (Exception error) {
-                failure = error;
-                throw;
-            } finally {
-                Exception? cleanup = null;
-                try { await scope.DisposeAsync(); } catch (Exception error) { cleanup = error; }
-                try { entered?.Dispose(); } catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
-                if (cleanup is not null) {
-                    if (failure is not null) throw new AggregateException(failure, cleanup);
-                    ExceptionDispatchInfo.Capture(cleanup).Throw();
-                }
-            }
+                await provider.GetRequiredService<IJobExecutionStore<TJob, TExecution>>().TrySettleAsync(row, token);
+                return true;
+            }, ct);
         }
 
     }

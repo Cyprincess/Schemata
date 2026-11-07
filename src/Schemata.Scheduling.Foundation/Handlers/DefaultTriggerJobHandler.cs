@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Linq;
-using System.Runtime.ExceptionServices;
 using Schemata.Entity.Repository;
 using System.Threading;
 using System.Threading.Tasks;
@@ -41,17 +40,14 @@ internal sealed class DefaultTriggerJobHandler<TJob, TExecution>(SchedulingHandl
 
         if (!string.IsNullOrWhiteSpace(context.Job)) {
             var message = new MessageContext(job.MessageContext);
-            var scope = await scheduler.Services.GetRequiredService<IMessageExecutionScopeFactory>().CreateAsync(message, ct);
-            IDisposable? entered = null;
-            Exception? failure = null;
-            try {
-            entered = scope.Enter();
-            await scope.RestoreAsync(message, ct);
-            var jobs = scope.Services.GetRequiredService<IRepository<TJob>>();
+            var runner = scheduler.Services.GetRequiredService<IMessageExecutionScopeRunner>();
+            await runner.RunAsync(message, async (provider, token) => {
+            var jobs = provider.GetRequiredService<IRepository<TJob>>();
             var persisted = await jobs.FirstOrDefaultAsync(query => query.Where(row => row.CanonicalName == context.Job || row.Name == context.Job), ct);
             if (persisted is not null) {
                 job.ScheduleVersion = persisted.ScheduleVersion;
                 job.CanonicalName = persisted.CanonicalName;
+                job.Subject = persisted.Subject;
                 context.Job = persisted.CanonicalName;
                 // The fire restores the stored job's captured context through the execution row,
                 // matching the durable fires that never see the trigger caller's ambient scope.
@@ -59,18 +55,8 @@ internal sealed class DefaultTriggerJobHandler<TJob, TExecution>(SchedulingHandl
                     job.MessageContext = new(persisted.MessageContext);
                 }
             }
-            } catch (Exception error) {
-                failure = error;
-                throw;
-            } finally {
-                Exception? cleanup = null;
-                try { await scope.DisposeAsync(); } catch (Exception error) { cleanup = error; }
-                try { entered?.Dispose(); } catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
-                if (cleanup is not null) {
-                    if (failure is not null) throw new AggregateException(failure, cleanup);
-                    ExceptionDispatchInfo.Capture(cleanup).Throw();
-                }
-            }
+            return true;
+            }, ct);
         }
 
         context.StartTime    ??= scheduler.Time.GetUtcNow().UtcDateTime;
@@ -96,6 +82,7 @@ internal sealed class DefaultTriggerJobHandler<TJob, TExecution>(SchedulingHandl
             MessageContext = job.MessageContext is null ? null : new(job.MessageContext),
             Uid           = context.ExecutionUid.GetValueOrDefault(),
             Job           = job.CanonicalName,
+            Subject       = context.Subject ?? job.Subject,
             ScheduleVersion = job.ScheduleVersion,
             Method        = context.Method,
             JobKey        = context.JobKey ?? job.JobKey,
