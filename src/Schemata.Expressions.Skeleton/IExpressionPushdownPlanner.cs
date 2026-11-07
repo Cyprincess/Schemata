@@ -1,3 +1,5 @@
+using System;
+
 namespace Schemata.Expressions.Skeleton;
 
 /// <summary>
@@ -23,5 +25,5 @@ public interface IExpressionPushdownPlanner
     /// <summary>
     ///     Splits a parsed tree into a pushable part and a local residual.
     /// </summary>
-    ExpressionPushdownPlan Plan(IExpressionTree tree, ExpressionCapabilities capabilities);
+    ExpressionPushdownPlan Plan(IExpressionTree tree, ExpressionCapabilities capabilities, Type elementType);
 }

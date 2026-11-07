@@ -326,14 +326,25 @@ internal sealed class AipCompileVisitor
             throw new ParseException("Unsupported AIP comparator.", op.Position);
         }
 
-        return Expression.MakeBinary(type, left, ConvertIfNeeded(right, left.Type));
+        right = ConvertIfNeeded(right, left.Type, op.Position);
+        if (left.Type == typeof(string) && type is ExpressionType.LessThan or ExpressionType.LessThanOrEqual
+            or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual) {
+            var comparison = Expression.Call(typeof(string), nameof(string.Compare), null, left, right,
+                                             Expression.Constant(StringComparison.Ordinal));
+            return Expression.MakeBinary(type, comparison, Expression.Constant(0));
+        }
+
+        EnsureBinary(type, left, right, op.Position);
+        return Expression.MakeBinary(type, left, right);
     }
 
     private static Expression BuildEqual(Expression left, Expression right) {
         // AIP-160 wildcard equality only applies to string literals containing '*'.
         // Other types and quoted strings without '*' fall through to plain equality.
         if (left.Type != typeof(string) || right is not ConstantExpression { Value: string pattern }) {
-            return Expression.Equal(left, ConvertIfNeeded(right, left.Type));
+            right = ConvertIfNeeded(right, left.Type);
+            EnsureBinary(ExpressionType.Equal, left, right, default);
+            return Expression.Equal(left, right);
         }
 
         var (literal, hasWildcard, leading, trailing) = AnalyzeWildcardPattern(pattern);
@@ -407,7 +418,7 @@ internal sealed class AipCompileVisitor
             var method = left.Type.GetMethod("ContainsKey")
                       ?? typeof(IDictionary).GetMethod("Contains", [typeof(object)])!;
             var parameterType = method.GetParameters()[0].ParameterType;
-            return Expression.Call(left, method, ConvertIfNeeded(right, parameterType));
+            return NonNullAnd(left, Expression.Call(left, method, ConvertIfNeeded(right, parameterType)));
         }
 
         if (left.Type != typeof(string) && typeof(IEnumerable).IsAssignableFrom(left.Type)) {
@@ -423,7 +434,7 @@ internal sealed class AipCompileVisitor
             return NonNullAnd(left, Expression.Call(left, nameof(string.Contains), null, ConvertIfNeeded(right, typeof(string))));
         }
 
-        return Expression.Equal(left, ConvertIfNeeded(right, left.Type));
+        return BuildEqual(left, right);
     }
 
     // AIP-160 skip-as-nonmatch: a wildcard, substring, or membership test against a null operand
@@ -454,7 +465,23 @@ internal sealed class AipCompileVisitor
         return typeof(object);
     }
 
-    private static Expression ConvertIfNeeded(Expression expression, Type type) {
+    private static Expression ConvertIfNeeded(Expression expression, Type type, TextPosition position = default) {
+        if (expression.Type == type) {
+            return expression;
+        }
+
+        if (expression is ConstantExpression { Value: null }) {
+            if (!type.IsValueType || Nullable.GetUnderlyingType(type) is not null) {
+                return Expression.Constant(null, type);
+            }
+
+            throw new ParseException($"AIP null cannot be converted to '{type}'.", position);
+        }
+
+        if (type.IsAssignableFrom(expression.Type)) {
+            return Expression.Convert(expression, type);
+        }
+
         if (expression is ConstantExpression { Value: string text }) {
             var target = Nullable.GetUnderlyingType(type) ?? type;
             if (target == typeof(DateTimeOffset)
@@ -470,9 +497,108 @@ internal sealed class AipCompileVisitor
             if (target == typeof(TimeSpan) && TryParseSeconds(text, out var duration)) {
                 return Expression.Constant(duration, type);
             }
+
+            object? value;
+            try {
+                value = target.IsEnum
+                    ? Enum.Parse(target, text, false)
+                    : Convert.ChangeType(text, target, CultureInfo.InvariantCulture);
+            } catch (Exception ex) when (ex is ArgumentException or InvalidCastException or FormatException or OverflowException) {
+                throw new ParseException($"AIP value '{text}' cannot be converted to '{type}'.", position);
+            }
+
+            if (value is null) {
+                throw new ParseException($"AIP value '{text}' cannot be converted to '{type}'.", position);
+            }
+
+            return Expression.Constant(value, type);
         }
 
-        return expression.Type == type ? expression : Expression.Convert(expression, type);
+        if (!CanConvert(expression.Type, type)) {
+            throw new ParseException($"AIP value of type '{expression.Type}' cannot be converted to '{type}'.", position);
+        }
+
+        return Expression.Convert(expression, type);
+    }
+
+    private static bool CanConvert(Type source, Type target) {
+        if (source.IsAssignableFrom(target) || target.IsAssignableFrom(source)) {
+            return true;
+        }
+
+        var sourceOperand = Nullable.GetUnderlyingType(source) ?? source;
+        var targetOperand = Nullable.GetUnderlyingType(target) ?? target;
+        if ((IsNumeric(sourceOperand) || sourceOperand.IsEnum)
+         && (IsNumeric(targetOperand) || targetOperand.IsEnum)) {
+            return true;
+        }
+
+        return DefinesConversion(sourceOperand, sourceOperand, targetOperand)
+            || DefinesConversion(targetOperand, sourceOperand, targetOperand);
+    }
+
+    private static bool DefinesConversion(Type declaring, Type source, Type target) {
+        foreach (var method in declaring.GetMethods(BindingFlags.Static | BindingFlags.Public)) {
+            if (method.Name is not ("op_Implicit" or "op_Explicit") || method.ReturnType != target) {
+                continue;
+            }
+
+            var parameters = method.GetParameters();
+            if (parameters.Length == 1 && parameters[0].ParameterType.IsAssignableFrom(source)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void EnsureBinary(ExpressionType type, Expression left, Expression right, TextPosition position) {
+        var operand = Nullable.GetUnderlyingType(left.Type) ?? left.Type;
+        if (type is ExpressionType.Equal or ExpressionType.NotEqual
+         && (!left.Type.IsValueType || operand.IsPrimitive || operand.IsEnum)) {
+            return;
+        }
+
+        if (type is ExpressionType.LessThan or ExpressionType.LessThanOrEqual
+            or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual && IsNumeric(operand)) {
+            return;
+        }
+
+        var name = type switch {
+            ExpressionType.Equal              => "op_Equality",
+            ExpressionType.NotEqual           => "op_Inequality",
+            ExpressionType.LessThan           => "op_LessThan",
+            ExpressionType.LessThanOrEqual    => "op_LessThanOrEqual",
+            ExpressionType.GreaterThan        => "op_GreaterThan",
+            ExpressionType.GreaterThanOrEqual => "op_GreaterThanOrEqual",
+            var _                             => null,
+        };
+        if (name is not null && DefinesBinary(operand, name)) {
+            return;
+        }
+
+        throw new ParseException($"AIP comparator '{type}' cannot compare '{left.Type}' with '{right.Type}'.", position);
+    }
+
+    private static bool DefinesBinary(Type operand, string name) {
+        foreach (var method in operand.GetMethods(BindingFlags.Static | BindingFlags.Public)) {
+            if (method.Name != name || method.ReturnType != typeof(bool)) {
+                continue;
+            }
+
+            var parameters = method.GetParameters();
+            if (parameters.Length == 2 && parameters[0].ParameterType == operand && parameters[1].ParameterType == operand) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsNumeric(Type type) {
+        return Type.GetTypeCode(type) is TypeCode.Char or TypeCode.SByte or TypeCode.Byte or TypeCode.Int16
+            or TypeCode.UInt16 or TypeCode.Int32 or TypeCode.UInt32 or TypeCode.Int64 or TypeCode.UInt64
+            or TypeCode.Single or TypeCode.Double or TypeCode.Decimal;
     }
 
     private static bool TryParseSeconds(string text, out TimeSpan duration) {

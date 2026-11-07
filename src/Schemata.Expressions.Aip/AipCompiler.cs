@@ -21,7 +21,7 @@ public sealed class AipCompiler : IExpressionCompiler
         }
 
         var key = ExpressionCacheKey.Create(Language, source, null, null, null);
-        return ExpressionCache.GetOrAddTree(key, () => {
+        var tree = ExpressionCache.GetOrAddTree(key, () => {
             try {
                 var filter = AipParser.Filter.Parse(source);
                 if (filter is null) {
@@ -34,6 +34,7 @@ public sealed class AipCompiler : IExpressionCompiler
                 throw new ExpressionException(ex.Message, ex);
             }
         });
+        return AipTreeCloner.Clone((Filter)tree);
     }
 
     public Expression<Func<TContext, TResult>> Compile<TContext, TResult>(

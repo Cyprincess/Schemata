@@ -1,6 +1,10 @@
+using System;
+using System.Linq;
 using System.Threading.Tasks;
+using Google.Rpc;
 using Grpc.Core;
 using ProtoBuf.Grpc.Client;
+using Schemata.Abstractions;
 using Schemata.Resource.Grpc.Integration.Tests.Fixtures;
 using Xunit;
 
@@ -26,6 +30,24 @@ public class ResourceGrpcErrorIntegrationShould
                                                               .AsTask());
 
         Assert.Equal(StatusCode.NotFound, rpc.StatusCode);
+    }
+
+    [Fact]
+    public async Task List_IncompatibleLiteral_ThrowsInvalidFilter() {
+        var (channel, clientFactory) = _factory.CreateGrpcChannelWithClient();
+        var client = channel.CreateGrpcService<IResourceService<Student, Student, Student, Student>>(clientFactory);
+
+        var error = await Assert.ThrowsAsync<RpcException>(() =>
+            client.ListAsync(new() { Filter = "age = 'hello'" }).AsTask());
+
+        Assert.Equal(StatusCode.InvalidArgument, error.StatusCode);
+        var status = Google.Rpc.Status.Parser.ParseFrom(error.Trailers.GetValueBytes("grpc-status-details-bin"));
+        var badRequest = status.Details
+                               .Single(d => d.TypeUrl.EndsWith("google.rpc.BadRequest", StringComparison.Ordinal))
+                               .Unpack<BadRequest>();
+        var violation = Assert.Single(badRequest.FieldViolations);
+        Assert.Equal("filter", violation.Field);
+        Assert.Equal(SchemataResources.INVALID_FILTER, violation.Reason);
     }
 
     [Fact]

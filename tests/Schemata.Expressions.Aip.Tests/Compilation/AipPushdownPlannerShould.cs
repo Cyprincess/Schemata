@@ -35,7 +35,7 @@ public class AipPushdownPlannerShould
     [Fact]
     public void Keep_Residual_When_Disjunction_And_Logical_Disabled() {
         var plan = _planner.Plan(_compiler.Parse("status = 'a' OR status = 'b'"),
-                                 new() { Logical = false });
+                                 new() { Logical = false }, typeof(object));
 
         Assert.True(plan.HasResidual);
     }
@@ -43,7 +43,7 @@ public class AipPushdownPlannerShould
     [Fact]
     public void Keep_Residual_When_MultipleConjuncts_And_Logical_Disabled() {
         var plan = _planner.Plan(_compiler.Parse("age > 18 AND score > 10"),
-                                 new() { Logical = false });
+                                 new() { Logical = false }, typeof(object));
 
         Assert.False(plan.HasPushed);
         Assert.True(plan.HasResidual);
@@ -52,7 +52,7 @@ public class AipPushdownPlannerShould
     [Fact]
     public void Keep_Residual_When_SpaceConjuncts_And_Logical_Disabled() {
         var plan = _planner.Plan(_compiler.Parse("age > 18 score > 10"),
-                                 new() { Logical = false });
+                                 new() { Logical = false }, typeof(object));
 
         Assert.False(plan.HasPushed);
         Assert.True(plan.HasResidual);
@@ -61,7 +61,7 @@ public class AipPushdownPlannerShould
     [Fact]
     public void Keep_Residual_When_ParenthesizedConjuncts_And_Logical_Disabled() {
         var plan = _planner.Plan(_compiler.Parse("(age > 18 score > 10)"),
-                                 new() { Logical = false });
+                                 new() { Logical = false }, typeof(object));
 
         Assert.False(plan.HasPushed);
         Assert.True(plan.HasResidual);
@@ -69,7 +69,7 @@ public class AipPushdownPlannerShould
 
     [Fact]
     public void Push_SingleConjunct_When_Logical_Disabled() {
-        var plan = _planner.Plan(_compiler.Parse("age > 18"), new() { Logical = false });
+        var plan = _planner.Plan(_compiler.Parse("age > 18"), new() { Logical = false }, typeof(object));
 
         Assert.True(plan.HasPushed);
         Assert.False(plan.HasResidual);
@@ -86,7 +86,7 @@ public class AipPushdownPlannerShould
     [Fact]
     public void Keep_Residual_When_Wildcard_Disabled() {
         var plan = _planner.Plan(_compiler.Parse("name = 'a*'"),
-                                 new() { Wildcard = false });
+                                 new() { Wildcard = false }, typeof(object));
 
         Assert.True(plan.HasResidual);
     }
@@ -166,7 +166,7 @@ public class AipPushdownPlannerShould
     }
 
     private ExpressionPushdownPlan Plan(string source) {
-        return _planner.Plan(_compiler.Parse(source), ExpressionCapabilities.Relational);
+        return _planner.Plan(_compiler.Parse(source), ExpressionCapabilities.Relational, typeof(object));
     }
 
     #region Nested types

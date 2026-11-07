@@ -4,7 +4,7 @@ Pushdown lets a resource query apply the backend-safe part of a filter before lo
 
 ## Split semantics
 
-`IExpressionPushdownPlanner.Plan(tree, capabilities)` returns an `ExpressionPushdownPlan`:
+`IExpressionPushdownPlanner.Plan(tree, capabilities, elementType)` returns an `ExpressionPushdownPlan`. The CLR element type binds field operands before deciding whether structural equality can run in the backend:
 
 ```csharp
 public sealed record ExpressionPushdownPlan(IExpressionTree? Pushed, IExpressionTree? Residual)
@@ -53,9 +53,9 @@ The CEL planner is conservative by node kind:
 | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `CelConstant`, `CelIdentifier`                                        | Pushable.                                                                                                      |
 | `CelMember`                                                           | Residual; member/null behavior can differ from backend SQL logic.                                              |
-| Comparison `CelBinary`                                                | Pushes when `Comparison` is enabled, both sides are pushable, and a flat field participates.                   |
+| Comparison `CelBinary` | Scalar comparisons push when `Comparison` is enabled, both sides are pushable, and a flat field participates. List/map equality stays residual, including collection-typed field-to-field operands. |
 | Logical `CelBinary`                                                   | Pushes when `Logical` is enabled and both sides are pushable.                                                  |
-| Arithmetic `CelBinary`                                                | Pushes when `Arithmetic` is enabled, both sides are pushable, and a flat field participates.                   |
+| Arithmetic `CelBinary`                                                | `/` and `%` push when `Arithmetic` is enabled, both sides are pushable, and a flat field participates. Checked `+`, `-`, and `*` stay residual. |
 | `in`                                                                  | Pushes when `Membership` is enabled and both sides are pushable.                                               |
 | `CelUnary` `!`                                                        | Pushes when `Logical` is enabled and the operand is pushable.                                                  |
 | `CelUnary` `-`                                                        | Pushes when `Arithmetic` is enabled and the operand is pushable.                                               |
@@ -95,7 +95,7 @@ public sealed class MyPushdownPlanner : IExpressionPushdownPlanner
 {
     public string Language => MyLanguage.Name;
 
-    public ExpressionPushdownPlan Plan(IExpressionTree tree, ExpressionCapabilities capabilities) {
+    public ExpressionPushdownPlan Plan(IExpressionTree tree, ExpressionCapabilities capabilities, Type elementType) {
         if (tree is not MyTree node) {
             throw new ArgumentException("Tree must be a MyTree.", nameof(tree));
         }

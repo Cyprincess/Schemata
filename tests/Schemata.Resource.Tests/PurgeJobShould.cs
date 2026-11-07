@@ -6,10 +6,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Errors;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Common;
+using Schemata.Core.Building;
 using Schemata.Entity.Repository;
+using Schemata.Expressions.Aip;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Tests.Fixtures;
 using Schemata.Scheduling.Skeleton;
@@ -61,6 +66,26 @@ public class PurgeJobShould
         Assert.False(args.Force);
         Assert.Equal(execution.CanonicalName, operation.CanonicalName);
         Assert.False(operation.Done);
+    }
+
+    [Fact]
+    public async Task Execute_IncompatibleLiteral_ThrowsInvalidFilter() {
+        using var services = new ServiceCollection()
+                            .AddAipExpressions()
+                            .Configure<SchemataResourceOptions>(options => options.Expressions.Enable("aip"))
+                            .BuildServiceProvider();
+        var repository = new Mock<IRepository<ParentTrashStudent>>();
+        var owner      = ResourceMutationMock.Create<ParentTrashStudent>();
+        var job        = new PurgeJob<ParentTrashStudent>(repository.Object, owner.Object, services);
+
+        var error = await Assert.ThrowsAsync<ValidationException>(() => job.ExecuteAsync(new() {
+            ArgsJson = "{\"filter\":\"age = 'hello'\",\"language\":\"aip\",\"force\":false}",
+        }, CancellationToken.None));
+
+        var detail    = Assert.Single(error.Details!.OfType<BadRequestDetail>());
+        var violation = Assert.Single(detail.FieldViolations!);
+        Assert.Equal("filter", violation.Field);
+        Assert.Equal(SchemataResources.INVALID_FILTER, violation.Reason);
     }
 
     [Fact]
@@ -130,6 +155,7 @@ public class PurgeJobShould
         public string? School        { get; set; }
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
+        public int     Age          { get; set; }
         public DateTime? DeleteTime  { get; set; }
         public DateTime? PurgeTime   { get; set; }
     }

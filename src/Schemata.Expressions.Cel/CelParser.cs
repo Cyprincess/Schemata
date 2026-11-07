@@ -291,6 +291,12 @@ public static class CelParser
                 case '\'':
                     builder.Append(escaped);
                     break;
+                case 'x':
+                case 'X':
+                    builder.Append((char)int.Parse(source.AsSpan(i + 1, 2), NumberStyles.HexNumber,
+                                                   CultureInfo.InvariantCulture));
+                    i += 2;
+                    break;
                 case 'u':
                     builder.Append((char)int.Parse(source.AsSpan(i + 1, 4), NumberStyles.HexNumber,
                                                    CultureInfo.InvariantCulture));

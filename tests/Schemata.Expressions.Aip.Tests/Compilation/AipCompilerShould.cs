@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Threading.Tasks;
 using Parlot;
 using Schemata.Expressions.Aip.Expressions;
+using Schemata.Expressions.Aip.Values;
 using Schemata.Expressions.Skeleton;
 using Xunit;
 
@@ -83,6 +85,43 @@ public class AipCompilerShould
 
         Assert.True(func(new() { Age  = 18 }));
         Assert.False(func(new() { Age = 19 }));
+    }
+
+    [Theory]
+    [InlineData("<", "Alice", "Bob", true)]
+    [InlineData("<", "Bob", "Alice", false)]
+    [InlineData("<=", "Bob", "Bob", true)]
+    [InlineData("<=", "Bob", "Alice", false)]
+    [InlineData(">", "ä", "z", true)]
+    [InlineData(">", "z", "ä", false)]
+    [InlineData(">=", "Bob", "Bob", true)]
+    [InlineData(">=", "Alice", "Bob", false)]
+    public void Compile_StringRelation_UsesOrdinalSemanticsForTypedAndDynamic(
+        string @operator,
+        string value,
+        string literal,
+        bool expected
+    ) {
+        var tree      = _compiler.Parse($"full_name {@operator} '{literal}'");
+        var typed     = _compiler.Compile<Student, bool>(tree).Compile();
+        var dynamic   = _compiler.Compile<IReadOnlyDictionary<string, object?>, bool>(tree).Compile();
+        var dynamicRow = new Dictionary<string, object?> { ["full_name"] = value };
+
+        Assert.Equal(expected, typed(new() { FullName = value }));
+        Assert.Equal(expected, dynamic(dynamicRow));
+    }
+
+    [Fact]
+    public void Compile_IncompatibleLiteral_RejectsAtCompileTime() {
+        var tree = _compiler.Parse("age = 'hello'");
+        var error = Assert.Throws<ExpressionException>(() => _compiler.Compile<Student, bool>(tree));
+        Assert.IsType<ParseException>(error.InnerException);
+    }
+
+    [Fact]
+    public void Compile_NullDictionary_HasIsNonMatch() {
+        var func = _compiler.Compile<Student, bool>(_compiler.Parse("metadata : 'owner'")).Compile();
+        Assert.False(func(new() { Metadata = null }));
     }
 
     [Fact]
@@ -349,6 +388,123 @@ public class AipCompilerShould
     }
 
     [Fact]
+    public void Parse_RepeatedCalls_ReturnIndependentNestedTrees() {
+        const string source = "age = 18 AND full_name = 'Alice'";
+        var first  = Assert.IsType<Filter>(_compiler.Parse(source));
+        var second = Assert.IsType<Filter>(_compiler.Parse(source));
+
+        var firstSequence  = first.Sequences[0];
+        var secondSequence = second.Sequences[0];
+        var firstFactor    = firstSequence.Factors[0];
+        var secondFactor   = secondSequence.Factors[0];
+        var firstTerm      = firstFactor.Terms[0];
+        var secondTerm     = secondFactor.Terms[0];
+        var firstRestriction  = Assert.IsType<Restriction>(firstTerm.Simple);
+        var secondRestriction = Assert.IsType<Restriction>(secondTerm.Simple);
+        var firstMember  = Assert.IsType<Member>(firstRestriction.Comparable);
+        var secondMember = Assert.IsType<Member>(secondRestriction.Comparable);
+
+        Assert.NotSame(first, second);
+        Assert.NotSame(first.Sequences, second.Sequences);
+        Assert.NotSame(firstSequence, secondSequence);
+        Assert.NotSame(firstSequence.Factors, secondSequence.Factors);
+        Assert.NotSame(firstFactor, secondFactor);
+        Assert.NotSame(firstFactor.Terms, secondFactor.Terms);
+        Assert.NotSame(firstTerm, secondTerm);
+        Assert.NotSame(firstRestriction, secondRestriction);
+        Assert.NotSame(firstMember, secondMember);
+        Assert.NotSame(firstMember.Fields, secondMember.Fields);
+        Assert.Equal(source, first.Source);
+        Assert.Equal(source, second.Source);
+
+        first.Sequences.RemoveAt(1);
+        firstMember.Fields.Add(new Text(default, "ignored"));
+
+        var secondPredicate = _compiler.Compile<Student, bool>(second).Compile();
+        var fresh           = Assert.IsType<Filter>(_compiler.Parse(source));
+        var freshPredicate  = _compiler.Compile<Student, bool>(fresh).Compile();
+
+        Assert.Equal(source, fresh.Source);
+        Assert.Equal(2, fresh.Sequences.Count);
+        Assert.Empty(Assert.IsType<Member>(Assert.IsType<Restriction>(
+            fresh.Sequences[0].Factors[0].Terms[0].Simple).Comparable).Fields);
+        Assert.True(secondPredicate(new() { Age = 18, FullName = "Alice" }));
+        Assert.False(secondPredicate(new() { Age = 18, FullName = "Bob" }));
+        Assert.True(freshPredicate(new() { Age = 18, FullName = "Alice" }));
+        Assert.False(freshPredicate(new() { Age = 18, FullName = "Bob" }));
+    }
+
+    [Fact]
+    public void Parse_FunctionTrees_ReturnIndependentArgumentsAndMemberLists() {
+        const string source = "startsWith(full_name, 'Al')";
+        var first  = Assert.IsType<Filter>(_compiler.Parse(source));
+        var second = Assert.IsType<Filter>(_compiler.Parse(source));
+        var firstFunction = Assert.IsType<Function>(Assert.IsType<Restriction>(
+            first.Sequences[0].Factors[0].Terms[0].Simple).Comparable);
+        var secondFunction = Assert.IsType<Function>(Assert.IsType<Restriction>(
+            second.Sequences[0].Factors[0].Terms[0].Simple).Comparable);
+
+        Assert.NotSame(firstFunction, secondFunction);
+        Assert.NotSame(firstFunction.Member, secondFunction.Member);
+        Assert.NotSame(firstFunction.Member.Fields, secondFunction.Member.Fields);
+        Assert.NotSame(firstFunction.Args, secondFunction.Args);
+        Assert.NotSame(firstFunction.Args[0], secondFunction.Args[0]);
+
+        firstFunction.Args.Clear();
+        firstFunction.Member.Fields.Add(new Text(default, "ignored"));
+
+        var options = new ExpressionCompileOptions {
+            Functions = {
+                ["startsWith"] = new(args => Expression.Call(
+                    args[0], nameof(string.StartsWith), null, args[1])),
+            },
+        };
+        var secondPredicate = _compiler.Compile<Student, bool>(second, options).Compile();
+        var fresh           = _compiler.Parse(source);
+        var freshPredicate  = _compiler.Compile<Student, bool>(fresh, options).Compile();
+
+        Assert.Equal(source, ((Filter)fresh).Source);
+        Assert.True(secondPredicate(new() { FullName = "Alice" }));
+        Assert.False(secondPredicate(new() { FullName = "Bob" }));
+        Assert.True(freshPredicate(new() { FullName = "Alice" }));
+        Assert.False(freshPredicate(new() { FullName = "Bob" }));
+    }
+
+    [Fact]
+    public void Parse_ParallelConsumers_DoNotShareMutableNodes() {
+        const string source = "age = 18 AND startsWith(full_name, 'Al')";
+        Parallel.For(0, 32, index => {
+            var tree = Assert.IsType<Filter>(_compiler.Parse(source));
+            if (index % 2 == 0) {
+                tree.Sequences.RemoveAt(1);
+                return;
+            }
+
+            var member = Assert.IsType<Member>(Assert.IsType<Restriction>(
+                tree.Sequences[0].Factors[0].Terms[0].Simple).Comparable);
+            member.Fields.Add(new Text(default, "ignored"));
+            var function = Assert.IsType<Function>(Assert.IsType<Restriction>(
+                tree.Sequences[1].Factors[0].Terms[0].Simple).Comparable);
+            function.Args.Clear();
+            function.Member.Fields.Add(new Text(default, "ignored"));
+        });
+
+        var options = new ExpressionCompileOptions {
+            Functions = {
+                ["startsWith"] = new(args => Expression.Call(
+                    args[0], nameof(string.StartsWith), null, args[1])),
+            },
+        };
+        var fresh     = Assert.IsType<Filter>(_compiler.Parse(source));
+        var predicate = _compiler.Compile<Student, bool>(fresh, options).Compile();
+
+        Assert.Equal(source, fresh.Source);
+        Assert.Equal(2, fresh.Sequences.Count);
+        Assert.True(predicate(new() { Age = 18, FullName = "Alice" }));
+        Assert.False(predicate(new() { Age = 18, FullName = "Bob" }));
+    }
+
+    [Fact]
     public void Compile_WildcardMatch_AgainstNullString_SkipsAsNonMatch() {
         var func = _compiler.Compile<Student, bool>(_compiler.Parse("full_name = 'Ali*'")).Compile();
 
@@ -416,7 +572,7 @@ public class AipCompilerShould
         public TimeSpan                   Wait      { get; set; }
         public List<string>               Tags      { get; set; } = [];
         public List<Pet>                  Pets      { get; set; } = [];
-        public Dictionary<string, string> Metadata  { get; set; } = [];
+        public Dictionary<string, string>? Metadata { get; set; } = [];
         public StudentProfile?            Advisor   { get; set; }
     }
 

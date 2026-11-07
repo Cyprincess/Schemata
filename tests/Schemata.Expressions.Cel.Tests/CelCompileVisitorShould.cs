@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -199,6 +200,89 @@ public class CelCompileVisitorShould
         Assert.False(func(new() { Labels = new(["b"]) }));
     }
 
+    [Theory]
+    [InlineData("big_amount + 1", long.MaxValue)]
+    [InlineData("big_amount - 1", long.MinValue)]
+    [InlineData("big_amount * 2", long.MaxValue)]
+    public void Compile_Int64CheckedArithmeticAtBoundary_RaisesOverflow(string source, long value) {
+        var func = _compiler.Compile<NumbersRow, long>(_compiler.Parse(source)).Compile();
+
+        Assert.Throws<OverflowException>(() => func(new() { BigAmount = value }));
+    }
+
+    [Theory]
+    [InlineData("total + 1u", ulong.MaxValue)]
+    [InlineData("total - 1u", 0UL)]
+    [InlineData("total * 2u", ulong.MaxValue)]
+    public void Compile_UInt64CheckedArithmeticAtBoundary_RaisesOverflow(string source, ulong value) {
+        var func = _compiler.Compile<NumbersRow, ulong>(_compiler.Parse(source)).Compile();
+
+        Assert.Throws<OverflowException>(() => func(new() { Total = value }));
+    }
+
+    [Fact]
+    public void Compile_StringSize_CountsUnicodeCodePoints() {
+        var func = _compiler.Compile<Profile, bool>(_compiler.Parse("size(full_name) == 1")).Compile();
+
+        Assert.True(func(new() { FullName = "\U0001F600" }));
+    }
+
+    [Fact]
+    public void Compile_StringOrdering_TypedModeMatchesValueMode() {
+        var typed = _compiler.Compile<TextRow, bool>(_compiler.Parse("first < second")).Compile();
+        var valued = _compiler
+                    .Compile<IReadOnlyDictionary<string, object?>, bool>(_compiler.Parse("first < second"))
+                    .Compile();
+        var row = new Dictionary<string, object?> { ["first"] = "\uE000", ["second"] = "\U00010000" };
+
+        Assert.True(typed(new() { First = "\uE000", Second = "\U00010000" }));
+        Assert.True(valued(row));
+    }
+
+    [Fact]
+    public void Compile_ArrayEquality_ComparesDistinctInstancesByContent() {
+        var equal    = _compiler.Compile<StructuralRow, bool>(_compiler.Parse("left_numbers == right_numbers")).Compile();
+        var notEqual = _compiler.Compile<StructuralRow, bool>(_compiler.Parse("left_numbers != right_numbers")).Compile();
+        var row = new StructuralRow { LeftNumbers = [1, 2], RightNumbers = [1, 2] };
+
+        Assert.NotSame(row.LeftNumbers, row.RightNumbers);
+        Assert.True(equal(row));
+        Assert.False(notEqual(row));
+
+        row.RightNumbers = [1, 3];
+        Assert.False(equal(row));
+        Assert.True(notEqual(row));
+    }
+
+    [Fact]
+    public void Compile_MapEquality_ComparesEntriesRegardlessOfOrder() {
+        var equal    = _compiler.Compile<StructuralRow, bool>(_compiler.Parse("left_labels == right_labels")).Compile();
+        var notEqual = _compiler.Compile<StructuralRow, bool>(_compiler.Parse("left_labels != right_labels")).Compile();
+        var row = new StructuralRow {
+            LeftLabels  = new() { ["first"] = "1", ["second"] = "2" },
+            RightLabels = new() { ["second"] = "2", ["first"] = "1" },
+        };
+
+        Assert.NotSame(row.LeftLabels, row.RightLabels);
+        Assert.True(equal(row));
+        Assert.False(notEqual(row));
+
+        row.RightLabels["second"] = "3";
+        Assert.False(equal(row));
+        Assert.True(notEqual(row));
+    }
+
+    [Theory]
+    [InlineData("amount + '1'")]
+    [InlineData("amount == '1'")]
+    [InlineData("amount < '1'")]
+    [InlineData("'a' - 'b'")]
+    public void Compile_InvalidBinaryOperatorShapes_SurfaceExpressionException(string source) {
+        var tree = _compiler.Parse(source);
+
+        Assert.Throws<ExpressionException>(() => _compiler.Compile<NumbersRow, object>(tree));
+    }
+
     private static string? Shout(object? value) {
         return value is string text ? text.ToUpperInvariant() : null;
     }
@@ -251,6 +335,21 @@ public class CelCompileVisitorShould
         public string First { get; set; } = string.Empty;
 
         public string Second { get; set; } = string.Empty;
+    }
+
+    #endregion
+
+    #region Nested type: StructuralRow
+
+    private sealed class StructuralRow
+    {
+        public long[] LeftNumbers { get; set; } = [];
+
+        public long[] RightNumbers { get; set; } = [];
+
+        public Dictionary<string, string> LeftLabels { get; set; } = new();
+
+        public Dictionary<string, string> RightLabels { get; set; } = new();
     }
 
     #endregion

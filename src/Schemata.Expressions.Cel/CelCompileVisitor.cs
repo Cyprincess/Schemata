@@ -106,11 +106,15 @@ internal sealed class CelCompileVisitor
         }
 
         var operand = Visit(node.Operand);
-        return node.Operator switch {
-            "!"   => Expression.Not(ToBoolean(operand)),
-            "-"   => Expression.Negate(operand),
-            var _ => throw new ParseException($"Unsupported CEL unary operator '{node.Operator}'.", default),
-        };
+        try {
+            return node.Operator switch {
+                "!"   => Expression.Not(ToBoolean(operand)),
+                "-"   => Expression.Negate(operand),
+                var _ => throw new ParseException($"Unsupported CEL unary operator '{node.Operator}'.", default),
+            };
+        } catch (Exception e) when (e is InvalidOperationException or ArgumentException) {
+            throw new ParseException(e.Message, default);
+        }
     }
 
     private Expression BuildBinary(CelBinary node) {
@@ -154,25 +158,80 @@ internal sealed class CelCompileVisitor
             }
         }
 
-        return node.Operator switch {
-            "&&"  => Expression.AndAlso(ToBoolean(left), ToBoolean(right)),
-            "||"  => Expression.OrElse(ToBoolean(left), ToBoolean(right)),
-            "+" when left.Type == typeof(string) && right.Type == typeof(string) => Expression.Call(
-                typeof(string).GetMethod(nameof(string.Concat), [typeof(string), typeof(string)])!, left, right),
-            "+"   => Expression.Add(left, ConvertIfNeeded(right, left.Type)),
-            "-"   => Expression.Subtract(left, ConvertIfNeeded(right, left.Type)),
-            "*"   => Expression.Multiply(left, ConvertIfNeeded(right, left.Type)),
-            "/"   => Expression.Divide(left, ConvertIfNeeded(right, left.Type)),
-            "%"   => Expression.Modulo(left, ConvertIfNeeded(right, left.Type)),
-            "=="  => Expression.Equal(left, ConvertIfNeeded(right, left.Type)),
-            "!="  => Expression.NotEqual(left, ConvertIfNeeded(right, left.Type)),
-            "<"   => Expression.LessThan(left, ConvertIfNeeded(right, left.Type)),
-            "<="  => Expression.LessThanOrEqual(left, ConvertIfNeeded(right, left.Type)),
-            ">"   => Expression.GreaterThan(left, ConvertIfNeeded(right, left.Type)),
-            ">="  => Expression.GreaterThanOrEqual(left, ConvertIfNeeded(right, left.Type)),
-            "in"  => BuildContains(right, left),
-            var _ => throw new ParseException($"Unsupported CEL binary operator '{node.Operator}'.", default),
+        try {
+            return node.Operator switch {
+                "&&" => Expression.AndAlso(ToBoolean(left), ToBoolean(right)),
+                "||" => Expression.OrElse(ToBoolean(left), ToBoolean(right)),
+                "+" when left.Type == typeof(string) && right.Type == typeof(string) => Expression.Call(
+                    typeof(string).GetMethod(nameof(string.Concat), [typeof(string), typeof(string)])!, left, right),
+                "+" or "-" or "*" or "/" or "%" => BuildArithmetic(node.Operator, left, right),
+                "==" or "!=" => BuildEquality(node.Operator, left, right),
+                "<" or "<=" or ">" or ">=" when left.Type == typeof(string) && right.Type == typeof(string) =>
+                    BuildStringRelation(node.Operator, left, right),
+                "<" => Expression.LessThan(left, ConvertIfNeeded(right, left.Type)),
+                "<=" => Expression.LessThanOrEqual(left, ConvertIfNeeded(right, left.Type)),
+                ">" => Expression.GreaterThan(left, ConvertIfNeeded(right, left.Type)),
+                ">=" => Expression.GreaterThanOrEqual(left, ConvertIfNeeded(right, left.Type)),
+                "in" => BuildContains(right, left),
+                var _ => throw new ParseException($"Unsupported CEL binary operator '{node.Operator}'.", default),
+            };
+        } catch (Exception e) when (e is InvalidOperationException or ArgumentException) {
+            throw new ParseException(e.Message, default);
+        }
+    }
+
+    private static Expression BuildArithmetic(string op, Expression left, Expression right) {
+        right = ConvertIfNeeded(right, left.Type);
+        var integral = IsIntegral(left.Type);
+        return op switch {
+            "+" when integral => Expression.AddChecked(left, right),
+            "+"               => Expression.Add(left, right),
+            "-" when integral => Expression.SubtractChecked(left, right),
+            "-"               => Expression.Subtract(left, right),
+            "*" when integral => Expression.MultiplyChecked(left, right),
+            "*"               => Expression.Multiply(left, right),
+            "/"               => Expression.Divide(left, right),
+            "%"               => Expression.Modulo(left, right),
+            var _             => throw new ParseException($"Unsupported CEL arithmetic operator '{op}'.", default),
         };
+    }
+
+    private static Expression BuildEquality(string op, Expression left, Expression right) {
+        if (IsCollection(left.Type) && IsCollection(right.Type)) {
+            var equal = Expression.Call(
+                typeof(CelValues).GetMethod(nameof(CelValues.StructuralEqual), BindingFlags.Static | BindingFlags.NonPublic)!,
+                ToObject(left), ToObject(right));
+            return op == "!=" ? Expression.Not(equal) : equal;
+        }
+
+        right = ConvertIfNeeded(right, left.Type);
+        return op == "!=" ? Expression.NotEqual(left, right) : Expression.Equal(left, right);
+    }
+
+    private static Expression BuildStringRelation(string op, Expression left, Expression right) {
+        var comparison = Expression.Call(
+            typeof(CelValues).GetMethod(nameof(CelValues.CompareStrings), BindingFlags.Static | BindingFlags.NonPublic)!,
+            left, right);
+        var zero = Expression.Constant(0);
+        return op switch {
+            "<"  => Expression.LessThan(comparison, zero),
+            "<=" => Expression.LessThanOrEqual(comparison, zero),
+            ">"  => Expression.GreaterThan(comparison, zero),
+            ">=" => Expression.GreaterThanOrEqual(comparison, zero),
+            var _ => throw new ParseException($"Unsupported CEL string relation '{op}'.", default),
+        };
+    }
+
+    private static bool IsIntegral(Type type) {
+        type = Nullable.GetUnderlyingType(type) ?? type;
+        return type == typeof(sbyte) || type == typeof(byte)
+            || type == typeof(short) || type == typeof(ushort)
+            || type == typeof(int) || type == typeof(uint)
+            || type == typeof(long) || type == typeof(ulong);
+    }
+
+    private static bool IsCollection(Type type) {
+        return type != typeof(string) && typeof(IEnumerable).IsAssignableFrom(type);
     }
 
     private Expression BuildCall(CelCall node) {
@@ -329,7 +388,9 @@ internal sealed class CelCompileVisitor
 
     private static Expression BuildSize(Expression source) {
         if (source.Type == typeof(string)) {
-            return Expression.Property(source, nameof(string.Length));
+            return Expression.Call(
+                typeof(CelValues).GetMethod(nameof(CelValues.StringSize), BindingFlags.Static | BindingFlags.NonPublic)!,
+                source);
         }
 
         if (source.Type.IsArray) {

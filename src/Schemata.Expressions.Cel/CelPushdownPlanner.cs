@@ -1,4 +1,7 @@
 using System;
+using System.Collections;
+using System.Reflection;
+using Humanizer;
 using System.Collections.Generic;
 using System.Linq;
 using Schemata.Expressions.Cel.Expressions;
@@ -20,13 +23,13 @@ public sealed class CelPushdownPlanner : IExpressionPushdownPlanner
 
     public string Language => CelLanguage.Name;
 
-    public ExpressionPushdownPlan Plan(IExpressionTree tree, ExpressionCapabilities capabilities) {
+    public ExpressionPushdownPlan Plan(IExpressionTree tree, ExpressionCapabilities capabilities, Type elementType) {
         if (tree is not CelNode node) {
             throw new ArgumentException("Tree must be a CEL node.", nameof(tree));
         }
 
         if (!capabilities.Logical) {
-            return IsPushable(node, capabilities)
+            return IsPushable(node, capabilities) && !RequiresLocal(node, elementType)
                 ? new(node, null)
                 : new ExpressionPushdownPlan(null, node);
         }
@@ -37,7 +40,7 @@ public sealed class CelPushdownPlanner : IExpressionPushdownPlanner
         var pushed   = new List<CelNode>();
         var residual = new List<CelNode>();
         foreach (var conjunct in conjuncts) {
-            (IsPushable(conjunct, capabilities) ? pushed : residual).Add(conjunct);
+            (IsPushable(conjunct, capabilities) && !RequiresLocal(conjunct, elementType) ? pushed : residual).Add(conjunct);
         }
 
         if (residual.Count == 0) {
@@ -52,6 +55,24 @@ public sealed class CelPushdownPlanner : IExpressionPushdownPlanner
     }
 
     #endregion
+
+    private static bool RequiresLocal(CelNode node, Type elementType) {
+        return node switch {
+            CelBinary binary => binary.Operator is "==" or "!="
+                && (IsCollection(binary.Left, elementType) || IsCollection(binary.Right, elementType))
+                || RequiresLocal(binary.Left, elementType) || RequiresLocal(binary.Right, elementType),
+            CelUnary unary => RequiresLocal(unary.Operand, elementType),
+            _ => false,
+        };
+    }
+
+    private static bool IsCollection(CelNode node, Type elementType) {
+        if (node is CelList or CelMap) return true;
+        if (node is not CelIdentifier identifier) return false;
+        var member = elementType.GetMember(identifier.Name.Pascalize(), BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
+        var type = member switch { PropertyInfo property => property.PropertyType, FieldInfo field => field.FieldType, _ => null };
+        return type is not null && type != typeof(string) && typeof(IEnumerable).IsAssignableFrom(type);
+    }
 
     private static void Flatten(CelNode node, List<CelNode> conjuncts) {
         if (node is CelBinary { Operator: "&&" } binary) {
@@ -102,17 +123,23 @@ public sealed class CelPushdownPlanner : IExpressionPushdownPlanner
 
     private static bool IsPushable(CelBinary node, ExpressionCapabilities caps) {
         return node.Operator switch {
-            "==" or "!=" or "<" or "<=" or ">" or ">=" => caps.Comparison
-                                                                 && IsPushable(node.Left, caps)
-                                                                 && IsPushable(node.Right, caps)
-                                                                 && HasFlatField(node),
-            "&&" or "||"                                    => caps.Logical
-                                                                 && IsPushable(node.Left, caps)
-                                                                 && IsPushable(node.Right, caps),
-            "+" or "-" or "*" or "/" or "%"                => caps.Arithmetic
-                                                                 && IsPushable(node.Left, caps)
-                                                                 && IsPushable(node.Right, caps)
-                                                                 && HasFlatField(node),
+            "==" or "!=" => caps.Comparison
+                            && node.Left is not CelList and not CelMap
+                            && node.Right is not CelList and not CelMap
+                            && IsPushable(node.Left, caps)
+                            && IsPushable(node.Right, caps)
+                            && HasFlatField(node),
+            "<" or "<=" or ">" or ">=" => caps.Comparison
+                                           && IsPushable(node.Left, caps)
+                                           && IsPushable(node.Right, caps)
+                                           && HasFlatField(node),
+            "&&" or "||"                => caps.Logical
+                                           && IsPushable(node.Left, caps)
+                                           && IsPushable(node.Right, caps),
+            "/" or "%"                  => caps.Arithmetic
+                                           && IsPushable(node.Left, caps)
+                                           && IsPushable(node.Right, caps)
+                                           && HasFlatField(node),
             "in"                                             => caps.Membership
                                                                  && IsPushable(node.Left, caps)
                                                                  && IsPushable(node.Right, caps),

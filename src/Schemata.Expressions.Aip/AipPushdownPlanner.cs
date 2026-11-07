@@ -20,7 +20,7 @@ public sealed class AipPushdownPlanner : IExpressionPushdownPlanner
 
     public string Language => AipLanguage.Name;
 
-    public ExpressionPushdownPlan Plan(IExpressionTree tree, ExpressionCapabilities capabilities) {
+    public ExpressionPushdownPlan Plan(IExpressionTree tree, ExpressionCapabilities capabilities, Type elementType) {
         if (tree is not Filter filter) {
             throw new ArgumentException("Tree must be an AIP filter.", nameof(tree));
         }

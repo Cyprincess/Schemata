@@ -98,6 +98,40 @@ public class CelDynamicEvaluationShould
         Assert.True(func(Row("o", ("tags", new object?[] { 0, 1, 2 }))));
     }
 
+    [Fact]
+    public void Evaluate_StringOrdering_UsesUnicodeCodePoints() {
+        var predicate = Predicate("'\\uE000' < '\\U00010000'");
+
+        Assert.True(predicate(new Dictionary<string, object?>()));
+    }
+
+    [Fact]
+    public void Evaluate_StructuralEquality_ComparesNestedArraysAndMaps() {
+        var predicate = Predicate("left == right");
+        var row = new Dictionary<string, object?> {
+            ["left"] = new object?[] { 1L, new Dictionary<string, string> { ["nested"] = "value" } },
+            ["right"] = new object?[] { 1L, new Dictionary<string, string> { ["nested"] = "value" } },
+        };
+
+        Assert.True(predicate(row));
+
+        row["right"] = new object?[] { 1L, new Dictionary<string, string> { ["nested"] = "other" } };
+        Assert.False(predicate(row));
+    }
+
+    [Fact]
+    public void Evaluate_MapEquality_IgnoresEntryOrder() {
+        var equal    = Predicate("left == right");
+        var notEqual = Predicate("left != right");
+        var row = new Dictionary<string, object?> {
+            ["left"] = new Dictionary<string, string> { ["first"] = "1", ["second"] = "2" },
+            ["right"] = new Dictionary<string, string> { ["second"] = "2", ["first"] = "1" },
+        };
+
+        Assert.True(equal(row));
+        Assert.False(notEqual(row));
+    }
+
     private Func<IReadOnlyDictionary<string, object?>, bool> Predicate(string source) {
         var tree = _compiler.Parse(source);
         return _compiler.Compile<IReadOnlyDictionary<string, object?>, bool>(tree).Compile();

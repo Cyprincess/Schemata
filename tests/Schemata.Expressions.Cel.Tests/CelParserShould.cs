@@ -66,6 +66,16 @@ public class CelParserShould
         Assert.Equal(expected, node.Value);
     }
 
+    [Theory]
+    [InlineData("'\\x41'", "A")]
+    [InlineData("'\\X41'", "A")]
+    [InlineData("'\\xff'", "ÿ")]
+    [InlineData("'a\\x41b'", "aAb")]
+    public void Parse_HexEscapeThroughGrammar_ReturnsStringConstant(string source, string expected) {
+        var node = Assert.IsType<CelConstant>(CelParser.Expression.Parse(source));
+        Assert.Equal(expected, node.Value);
+    }
+
     [Fact]
     public void Parse_TernaryOperator_ReturnsConditionalNode() {
         var node = Assert.IsType<CelConditional>(CelParser.Expression.Parse("ready ? 'go' : 'stop'"));
@@ -117,14 +127,21 @@ public class CelParserShould
     [InlineData("'\\u12'")]
     [InlineData("'\\U00110000'")]
     [InlineData("'\\777'")]
+    [InlineData("'\\x1'")]
+    [InlineData("'\\xZZ'")]
+    [InlineData("'\\x'")]
     [InlineData("b'\\x1'")]
     [InlineData("b'\\777'")]
     public void Parse_MalformedLiteral_ThrowsParseException(string source) {
         Assert.Throws<ParseException>(() => CelParser.Expression.Parse(source));
     }
 
-    [Fact]
-    public void Parse_MalformedLiteral_ThroughCompilerSurfacesExpressionException() {
-        Assert.Throws<ExpressionException>(() => new CelCompiler().Parse("18446744073709551616u"));
+    [Theory]
+    [InlineData("18446744073709551616u")]
+    [InlineData("'\\x1'")]
+    [InlineData("'\\xZZ'")]
+    [InlineData("'\\x'")]
+    public void Parse_MalformedLiteral_ThroughCompilerSurfacesExpressionException(string source) {
+        Assert.Throws<ExpressionException>(() => new CelCompiler().Parse(source));
     }
 }

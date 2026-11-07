@@ -58,6 +58,8 @@ schema.UseResource()
 | Bytes              | `b"bytes"`                                     |
 | List / map         | `[1, 2]`, `{"name": "Alice"}`                  |
 
+Ordinary strings decode `\xNN` and `\XNN` escapes using exactly two hexadecimal digits. Truncated or non-hexadecimal escapes fail through the parser's literal-error boundary.
+
 ### Operators
 
 | Category    | Symbols                          |
@@ -103,6 +105,14 @@ The value families covered are:
 - `Duration` (`CelDuration`);
 - `Timestamp` (`CelTimestamp`);
 - error (`CelError`).
+
+### Structural equality, Unicode, and typed arithmetic
+
+Typed and value evaluation share `CelValues.StructuralEqual`, `CelValues.CompareStrings`, and `CelValues.StringSize` for the corresponding operations. Lists, arrays, and other enumerable collections compare element by element. Maps compare their entries independently of insertion order, including nested collection values. Existing numeric, byte, missing-value, and map-key rules apply recursively.
+
+String size counts Unicode code points. String relations compare code points in ordinal sequence, so a supplementary code point orders by its rune value rather than by its UTF-16 surrogate pair.
+
+Typed integral `+`, `-`, and `*` use checked arithmetic and throw `OverflowException` at evaluation boundaries. Value-mode arithmetic returns a `CelError` with the `overflow` message. Invalid typed operator shapes surface as `ExpressionException` during compilation.
 
 ### Numeric comparisons and map keys
 
@@ -154,7 +164,7 @@ A CEL expression like `o.status == 'paid'` compiles against `IReadOnlyDictionary
 
 ## CEL pushdown
 
-`CelPushdownPlanner` flattens top-level `&&` when `ExpressionCapabilities.Logical` is enabled. Flat identifiers, constants, simple comparisons, arithmetic with a flat field, `in`, `has(identifier)`, and selected string calls push when the matching capability flag is true. Navigation chains, macros, regex, indexes, conditionals, lists, and maps stay residual. See [Pushdown and Residual Evaluation](pushdown.md).
+`CelPushdownPlanner` flattens top-level `&&` when `ExpressionCapabilities.Logical` is enabled. Flat identifiers, constants, scalar comparisons, division and modulo with a flat field, `in`, `has(identifier)`, and selected string calls push when the matching capability flag is true. Checked addition, subtraction, multiplication, structural list/map equality, navigation chains, macros, regex, indexes, conditionals, lists, and maps stay residual. See [Pushdown and Residual Evaluation](pushdown.md).
 
 ## Conformance tests
 

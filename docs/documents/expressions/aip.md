@@ -7,7 +7,7 @@
 | Package                      | Key files                                                                                           |
 | ---------------------------- | --------------------------------------------------------------------------------------------------- |
 | `Schemata.Expressions.Aip`   | `AipLanguage.cs`, `AipParser.cs`                                                                    |
-| `Schemata.Expressions.Aip`   | `AipCompiler.cs`, `AipCompileVisitor.cs`, `AipBuiltInFunctions.cs`                                  |
+| `Schemata.Expressions.Aip`   | `AipCompiler.cs`, `AipCompileVisitor.cs`, `AipTreeCloner.cs`, `AipBuiltInFunctions.cs`  |
 | `Schemata.Expressions.Aip`   | `AipPushdownPlanner.cs`, `ExpressionLanguageBuilderExtensions.cs`, `ServiceCollectionExtensions.cs` |
 | `Schemata.Expressions.Order` | `OrderCompiler.cs`, `ServiceCollectionExtensions.cs`                                                |
 
@@ -70,9 +70,9 @@ value       = integer | number | TRUE | FALSE | NULL | unquoted | quoted
 | -------------------------- | ---------- | ------------------------------------------------------------------- |
 | Equality                   | `=`        | String and numeric equality.                                        |
 | Inequality                 | `!=`       | String and numeric inequality.                                      |
-| Less / less-or-equal       | `<`, `<=`  | Numeric comparison.                                                 |
-| Greater / greater-or-equal | `>`, `>=`  | Numeric comparison.                                                 |
-| Has                        | `:`        | Substring on strings, membership on collections, presence with `*`. |
+| Less / less-or-equal       | `<`, `<=`  | Ordinal string and numeric comparison.                              |
+| Greater / greater-or-equal | `>`, `>=`  | Ordinal string and numeric comparison.                              |
+| Has                        | `:`        | Substring on strings, membership on collections, presence with `*`; null maps do not match. |
 | Logical AND                | `AND`      | Case-insensitive; adjacent terms are ANDed.                         |
 | Logical OR                 | `OR`       | Case-insensitive.                                                   |
 | Logical NOT                | `NOT`, `-` | Case-insensitive.                                                   |
@@ -124,7 +124,9 @@ AIP is predicate-only. Its descriptor registers `SupportsValues: false`, and dyn
 
 ## Compilation
 
-`AipCompiler.Parse` caches the AST keyed by `(language, source, null, null, null)`. `AipCompiler.Compile` caches the lambda keyed by language, source, context type, result type, and `AipBuiltInFunctions.Fingerprint(options)`. `AipCompileVisitor` walks the AST: restrictions become comparison expressions, `:` becomes presence or membership logic, functions resolve through `AipBuiltInFunctions.Resolve`, members resolve through `MemberAccess.Resolve`, and `NOT`/`AND`/`OR` become `Expression.Not`/`AndAlso`/`OrElse`.
+`AipCompiler.Parse` caches the pristine parser-produced AST keyed by `(language, source, null, null, null)` and returns a complete deep copy on every call, including nested nodes and parser-produced lists. Each copy preserves `Filter.Source`, so mutations remain local to that caller. `AipCompiler.Compile` caches lambdas by language, structural tree fingerprint, context type, result type, and `AipBuiltInFunctions.Fingerprint(options)`. Structurally identical trees share compiled expressions; explicit tree mutations change the fingerprint and recompile. `AipCompileVisitor` walks the AST: restrictions become comparison expressions, `:` becomes presence or membership logic, functions resolve through `AipBuiltInFunctions.Resolve`, members resolve through `MemberAccess.Resolve`, and `NOT`/`AND`/`OR` become `Expression.Not`/`AndAlso`/`OrElse`.
+
+Typed string relations use `string.Compare` with `StringComparison.Ordinal`. A literal or operand incompatible with the typed field fails during compilation with `ParseException`, which `AipCompiler` exposes as `ExpressionException`. Dictionary membership against a null map evaluates to false.
 
 When compiling against `IReadOnlyDictionary<string, object?>`, AIP uses `DynamicValues.Member`, `Truthy`, `Equal`, and comparison helpers for alias-keyed rows.
 

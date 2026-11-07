@@ -112,6 +112,13 @@ public class CelMapValueShould
         Assert.Equal("b", Evaluate("{[9007199254740993]: 'a', [9007199254740992.0]: 'b'}[[9007199254740992.0]]", new()));
     }
 
+    [Fact]
+    public void Evaluate_ArrayMapKeys_LookUpAcrossEqualContent() {
+        var bindings = new Dictionary<string, object?> { ["values"] = new long[] { 1, 2 } };
+
+        Assert.Equal("yes", Evaluate("{values: 'yes'}[[1, 2]]", bindings));
+    }
+
     [Theory]
     [InlineData("9007199254740993 == 9007199254740992.0", true)]
     [InlineData("9007199254740993 > 9007199254740992.0", false)]

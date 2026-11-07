@@ -61,7 +61,7 @@ public interface IOrderCompiler
 public interface IExpressionPushdownPlanner
 {
     string Language { get; }
-    ExpressionPushdownPlan Plan(IExpressionTree tree, ExpressionCapabilities capabilities);
+    ExpressionPushdownPlan Plan(IExpressionTree tree, ExpressionCapabilities capabilities, Type elementType);
 }
 ```
 
@@ -157,6 +157,12 @@ builtins:v1;functions:name:runtimeHash,...
 ```
 
 Compilers should pass a fingerprint whenever custom `ExpressionFunction` bindings affect output. AIP delegates this to `AipBuiltInFunctions.Fingerprint(options)`; CEL calls `ExpressionCompileOptions.Fingerprint(options)` directly.
+
+### AIP comparison and tree isolation
+
+AIP typed string relations use ordinal comparison. Literal and operand types are validated during compilation, and an incompatible value such as `age = 'hello'` for an integer field surfaces through `ExpressionException`. Dictionary membership evaluates to false when the map is null.
+
+The AIP parse cache retains the pristine parser tree. Every `AipCompiler.Parse` call returns a complete deep copy with independent nested nodes and lists while preserving `Filter.Source`. Compile-cache keys continue to use `AipTreeFingerprint`: identical structures reuse expressions, and mutations to a returned tree produce a different structural key.
 
 ## Dynamic values
 

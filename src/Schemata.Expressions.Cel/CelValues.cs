@@ -229,6 +229,10 @@ public static class CelValues
             return error;
         }
 
+        return StructuralEqual(left, right);
+    }
+
+    internal static bool StructuralEqual(object? left, object? right) {
         return EqualValue(left, right);
     }
 
@@ -338,7 +342,7 @@ public static class CelValues
     public static object? Size(object? value) {
         return value switch {
             CelError => value,
-            string text => (long)CountRunes(text),
+            string text => (long)StringSize(text),
             byte[] bytes => (long)bytes.Length,
             IReadOnlyList<object?> list => (long)list.Count,
             IReadOnlyDictionary<object, object?> map => (long)map.Count,
@@ -346,9 +350,9 @@ public static class CelValues
         };
     }
 
-    private static int CountRunes(string text) {
+    internal static int StringSize(string value) {
         var count = 0;
-        foreach (var _ in text.EnumerateRunes()) {
+        foreach (var _ in value.EnumerateRunes()) {
             count++;
         }
 
@@ -787,13 +791,34 @@ public static class CelValues
         }
 
         return (left, right) switch {
-            (string l, string r) => string.CompareOrdinal(l, r),
+            (string l, string r) => CompareStrings(l, r),
             (byte[] l, byte[] r) => CompareBytes(l, r),
             (bool l, bool r) => l.CompareTo(r),
             (CelTimestamp l, CelTimestamp r) => CompareComponents(l.Seconds, l.Nanos, r.Seconds, r.Nanos),
             (CelDuration l, CelDuration r) => CompareComponents(l.Seconds, l.Nanos, r.Seconds, r.Nanos),
             _ => null,
         };
+    }
+
+    internal static int CompareStrings(string left, string right) {
+        using var leftRunes  = left.EnumerateRunes();
+        using var rightRunes = right.EnumerateRunes();
+        while (true) {
+            var hasLeft  = leftRunes.MoveNext();
+            var hasRight = rightRunes.MoveNext();
+            if (hasLeft != hasRight) {
+                return hasLeft ? 1 : -1;
+            }
+
+            if (!hasLeft) {
+                return 0;
+            }
+
+            var comparison = leftRunes.Current.Value.CompareTo(rightRunes.Current.Value);
+            if (comparison != 0) {
+                return comparison;
+            }
+        }
     }
 
     private static bool EqualValue(object? left, object? right, bool mapKey = false) {
@@ -826,6 +851,59 @@ public static class CelValues
         if (left is IReadOnlyDictionary<object, object?> lm && right is IReadOnlyDictionary<object, object?> rm) {
             return lm.Count == rm.Count
                 && lm.All(kv => rm.TryGetValue(kv.Key, out var value) && EqualValue(kv.Value, value, mapKey));
+        }
+
+        if (left is IDictionary leftMap && right is IDictionary rightMap) {
+            if (leftMap.Count != rightMap.Count) {
+                return false;
+            }
+
+            foreach (DictionaryEntry entry in leftMap) {
+                if (!rightMap.Contains(entry.Key) || !EqualValue(entry.Value, rightMap[entry.Key], mapKey)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        if ((left is IDictionary or IReadOnlyDictionary<object, object?>)
+         || (right is IDictionary or IReadOnlyDictionary<object, object?>)) {
+            return false;
+        }
+
+        if (left is byte[] || right is byte[]) {
+            return false;
+        }
+
+        if (left is IEnumerable leftItems && right is IEnumerable rightItems && left is not string && right is not string) {
+            if (left is ICollection leftCollection && right is ICollection rightCollection
+             && leftCollection.Count != rightCollection.Count) {
+                return false;
+            }
+
+            var leftEnumerator  = leftItems.GetEnumerator();
+            var rightEnumerator = rightItems.GetEnumerator();
+            try {
+                while (true) {
+                    var hasLeft  = leftEnumerator.MoveNext();
+                    var hasRight = rightEnumerator.MoveNext();
+                    if (hasLeft != hasRight) {
+                        return false;
+                    }
+
+                    if (!hasLeft) {
+                        return true;
+                    }
+
+                    if (!EqualValue(leftEnumerator.Current, rightEnumerator.Current, mapKey)) {
+                        return false;
+                    }
+                }
+            } finally {
+                (leftEnumerator as IDisposable)?.Dispose();
+                (rightEnumerator as IDisposable)?.Dispose();
+            }
         }
 
         return left.GetType() == right.GetType() && left.Equals(right);
@@ -1382,16 +1460,42 @@ public static class CelValues
 
     // Losslessly equal numeric map keys share a hash; structural keys follow the same rule.
     private static int HashValue(object? value) {
-        return value switch {
-            null => 0,
-            byte[] bytes => bytes.Aggregate(17, (hash, b) => hash * 31 + b),
-            double d => HashDouble(d),
-            long i => i.GetHashCode(),
-            ulong u => u <= long.MaxValue ? ((long)u).GetHashCode() : u.GetHashCode(),
-            IReadOnlyList<object?> list => list.Aggregate(17, (hash, item) => hash * 31 + HashValue(item)),
-            IReadOnlyDictionary<object, object?> map => map.Aggregate(17, (hash, pair) => hash ^ HashValue(pair.Key) * 397 ^ HashValue(pair.Value)),
-            var other => other.GetHashCode(),
-        };
+        switch (value) {
+            case null:
+                return 0;
+            case byte[] bytes:
+                return bytes.Aggregate(17, (hash, b) => hash * 31 + b);
+            case double d:
+                return HashDouble(d);
+            case long i:
+                return i.GetHashCode();
+            case ulong u:
+                return u <= long.MaxValue ? ((long)u).GetHashCode() : u.GetHashCode();
+        }
+
+        if (value is IReadOnlyDictionary<object, object?> readOnlyMap) {
+            return readOnlyMap.Aggregate(17, (hash, pair) => hash ^ HashValue(pair.Key) * 397 ^ HashValue(pair.Value));
+        }
+
+        if (value is IDictionary map) {
+            var hash = 17;
+            foreach (DictionaryEntry pair in map) {
+                hash ^= HashValue(pair.Key) * 397 ^ HashValue(pair.Value);
+            }
+
+            return hash;
+        }
+
+        if (value is IEnumerable items && value is not string) {
+            var hash = 17;
+            foreach (var item in items) {
+                hash = hash * 31 + HashValue(item);
+            }
+
+            return hash;
+        }
+
+        return value.GetHashCode();
     }
 
     private static int HashDouble(double d) {

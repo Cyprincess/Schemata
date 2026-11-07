@@ -7,6 +7,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Schemata.Abstractions;
 using Schemata.Resource.Http.Integration.Tests.Fixtures;
 using Xunit;
 
@@ -39,6 +40,24 @@ public class ResourceHttpFilterIntegrationShould : IClassFixture<WebAppFactory>
         return [];
     }
 
+    [Theory]
+    [InlineData("tags == other_tags")]
+    [InlineData("tags == ['a']")]
+    public async Task Cel_Collection_Equality_Filters_SQLite_Rows_Locally(string equality) {
+        using var factory = new WebAppFactory();
+        using var client = factory.CreateClient();
+        foreach (var (name, age, tags) in new[] { ("match", 20, new[] { "a" }), ("different", 20, new[] { "b" }), ("young", 10, new[] { "a" }) }) {
+            using var created = await client.PostAsJsonAsync("/v1/students", new {
+                full_name = name, age, tags, other_tags = new[] { "a" },
+            });
+            Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        }
+        using var response = await client.GetAsync("/v1/students?language=cel&filter=" + Uri.EscapeDataString("age > 18 && " + equality));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("match", Assert.Single(GetStudents(body)).GetProperty("full_name").GetString());
+    }
+
     [Fact]
     public async Task Filter_ByAge_ReturnsOnlyMatchingStudents() {
         var client = _factory.CreateClient();
@@ -56,6 +75,21 @@ public class ResourceHttpFilterIntegrationShould : IClassFixture<WebAppFactory>
                 Assert.True(ageProp.GetInt32() < 20);
             }
         }
+    }
+
+    [Fact]
+    public async Task Filter_IncompatibleLiteral_ReturnsInvalidFilter() {
+        using var client = _factory.CreateClient();
+        using var response = await client.GetAsync(
+            "/v1/students?filter=" + Uri.EscapeDataString("age = 'hello'"));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var violation = Assert.Single(body.GetProperty("error").GetProperty("details").EnumerateArray()
+                                            .Where(d => d.TryGetProperty("field_violations", out _))
+                                            .SelectMany(d => d.GetProperty("field_violations").EnumerateArray()));
+        Assert.Equal("filter", violation.GetProperty("field").GetString());
+        Assert.Equal(SchemataResources.INVALID_FILTER, violation.GetProperty("reason").GetString());
     }
 
     [Fact]
