@@ -1,6 +1,4 @@
-﻿using System;
-using System.Runtime.ExceptionServices;
-using System.Threading;
+﻿using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
@@ -18,50 +16,21 @@ public sealed partial class DefaultScheduler<TJob, TExecution>
     public async Task<SchemataJobExecution> TriggerAsync<TJobType>(JobContext context, CancellationToken ct)
         where TJobType : class, IScheduledJob {
         var message = await MessageContexts.CaptureAsync(_services, ct);
-        var scope = await _services.GetRequiredService<IMessageExecutionScopeFactory>().CreateAsync(message, ct);
-        IDisposable? entered = null;
-        Exception? failure = null;
-        try {
-            entered = scope.Enter();
-            await scope.RestoreAsync(message, ct);
-            var dispatcher = scope.Services.GetRequiredService<IRequestDispatcher>();
+        var runner = _services.GetRequiredService<IMessageExecutionScopeRunner>();
+        return await runner.RunAsync(message, async (services, token) => {
+            var dispatcher = services.GetRequiredService<IRequestDispatcher>();
             return await dispatcher.SendAsync<TriggerJobRequest<TExecution>, TExecution>(
-                new(context.Job ?? string.Empty, typeof(TJobType), context), ct);
-        } catch (Exception error) {
-            failure = error;
-            throw;
-        } finally {
-            Exception? cleanup = null;
-            try { await scope.DisposeAsync(); } catch (Exception error) { cleanup = error; }
-            try { entered?.Dispose(); } catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
-            if (cleanup is not null) {
-                if (failure is not null) throw new AggregateException(failure, cleanup);
-                ExceptionDispatchInfo.Capture(cleanup).Throw();
-            }
-        }
+                new(context.Job ?? string.Empty, typeof(TJobType), context), token);
+        }, ct);
     }
 
     public async Task RescheduleAsync(TJob job, JobContext? preparedContext, CancellationToken ct) {
         var message = new MessageContext(job.MessageContext ?? new());
-        var scope = await _services.GetRequiredService<IMessageExecutionScopeFactory>().CreateAsync(message, ct);
-        IDisposable? entered = null;
-        Exception? failure = null;
-        try {
-            entered = scope.Enter();
-            await scope.RestoreAsync(message, ct);
-            var dispatcher = scope.Services.GetRequiredService<IRequestDispatcher>();
-            await dispatcher.SendAsync<RescheduleJobRequest<TJob>, Unit>(new(job, preparedContext), ct);
-        } catch (Exception error) {
-            failure = error;
-            throw;
-        } finally {
-            Exception? cleanup = null;
-            try { await scope.DisposeAsync(); } catch (Exception error) { cleanup = error; }
-            try { entered?.Dispose(); } catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
-            if (cleanup is not null) {
-                if (failure is not null) throw new AggregateException(failure, cleanup);
-                ExceptionDispatchInfo.Capture(cleanup).Throw();
-            }
-        }
+        var runner = _services.GetRequiredService<IMessageExecutionScopeRunner>();
+        await runner.RunAsync(message, async (services, token) => {
+            var dispatcher = services.GetRequiredService<IRequestDispatcher>();
+            await dispatcher.SendAsync<RescheduleJobRequest<TJob>, Unit>(new(job, preparedContext), token);
+            return Unit.Value;
+        }, ct);
     }
 }

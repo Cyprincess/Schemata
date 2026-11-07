@@ -1,5 +1,4 @@
-﻿using System.Runtime.ExceptionServices;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -28,7 +27,7 @@ namespace Schemata.Actor.Scheduling.Runtime;
 public sealed class ActorReminders<TJob, TExecution>(
     IScheduler<TJob, TExecution> scheduler,
     IScheduledJobRegistry        jobRegistry,
-    IMessageExecutionScopeFactory scopeFactory,
+    IMessageExecutionScopeRunner scopeRunner,
     IServiceProvider             services,
     TimeProvider?                time = null
 ) : IActorReminders
@@ -66,22 +65,13 @@ public sealed class ActorReminders<TJob, TExecution>(
         var (target, reminderName) = reminder;
         ArgumentException.ThrowIfNullOrWhiteSpace(reminderName);
         var context = await MessageContexts.CaptureAsync(services, ct);
-        var scope = await scopeFactory.CreateAsync(context, ct);
-        IDisposable? lease = null;
-        Exception? failure = null;
-        try {
-            lease = scope.Enter();
-            await scope.RestoreAsync(context, ct);
-            var repository = scope.Services.GetRequiredService<IRepository<TJob>>();
+        await scopeRunner.RunAsync(context, async (provider, token) => {
+            var repository = provider.GetRequiredService<IRepository<TJob>>();
             var key = ReminderKey(target, reminderName);
-            var job = await repository.FirstOrDefaultAsync<TJob>(q => q.Where(job => job.Key == key), ct);
-            if (job is not null) await scheduler.UnscheduleAsync(job.CanonicalName!, ct);
-        } catch (Exception error) { failure = error; }
-        try { await scope.DisposeAsync(); }
-        catch (Exception cleanup) { failure = failure is null ? cleanup : new AggregateException(failure, cleanup); }
-        try { lease?.Dispose(); }
-        catch (Exception cleanup) { failure = failure is null ? cleanup : new AggregateException(failure, cleanup); }
-        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
+            var job = await repository.FirstOrDefaultAsync<TJob>(q => q.Where(job => job.Key == key), token);
+            if (job is { CanonicalName: { } canonical }) await scheduler.UnscheduleAsync(canonical, token);
+            return true;
+        }, ct);
     }
 
     #endregion

@@ -41,6 +41,21 @@ The dispatcher constructs one `AdviceContext` for a dispatch and passes it to ev
 
 `AdviceContext` exposes the pipeline's `IServiceProvider` and holds no state. Request and response payloads, cache keys, hashes, entities, and other business data stay in envelopes, typed execution objects, or advisor-local state. `PlanExecutor.ExecuteAsync` and the Flow transition and source stages require an `AdviceContext` parameter supplied by their caller. Authorization's `AuthorizationSignInService` is itself a pipeline root: each `IssueAsync` call constructs `new AdviceContext(services)` from its injected provider (`AuthorizationSignInService.cs`).
 
+## Scoped execution
+
+`IMessageExecutionScopeRunner.RunAsync<T>` owns the standard message execution sequence: create
+the selected scope, restore its propagators, invoke work with the final `IServiceProvider`, and
+dispose the scope. The generic result covers response-bearing and response-less operations. A
+creation failure skips work; restore and work failures still dispose the created scope. A single
+failure propagates unchanged, while body and cleanup failures produce
+`AggregateException(body, cleanup)` in that order. Scheduling, Event, RabbitMQ, Actor reminders,
+and tenant Actor sends/stops share this runner.
+
+Actor callbacks restore their activation context directly. Report generation retains its recovery
+and cancellation checks in the restored scope. Plain dispatch creates its own scope without a
+captured message context. Stream enumeration restores once when it creates the handler iterator,
+then retains that scope until iterator and scope cleanup finish.
+
 ## Method envelopes
 
 `ResourceMethodRequest<TEntity,TRequest,TResponse>` carries a custom method's lower-camel-case verb, optional instance name, payload, and caller principal. Resource custom methods and Flow, Report, and Scheduling method operations enter the dispatcher through this envelope. Security wrap advisors can therefore resolve the verb and resource type before a handler runs.
@@ -60,10 +75,12 @@ and cancellation token. Payloads remain caller-owned and must not change during 
 context's captured principal for stream policy, rather than reading mutable principal fields on a payload.
 
 Invocation captures message context and clones caller identities. Each enumeration creates its own
-message execution scope, principal copy, and `AdviceContext` on its first move. Every move and disposal
-enters the captured tenant and advice frames and restores the consumer's previous frames afterward.
-Completion, failure, cancellation, and early disposal release the scope once; an unenumerated sequence
-creates no scope. Distinct enumerators may run concurrently; calls on one enumerator must be serialized.
+message execution scope, principal copy, and `AdviceContext` on its first move. The first move
+restores the captured context into the final provider before constructing the handler iterator.
+Subsequent moves use that same scoped provider and captured principal. Completion, failure,
+cancellation, and early disposal run iterator cleanup and release the scope once; an unenumerated
+sequence creates no scope. Distinct enumerators may run concurrently; calls on one enumerator must
+be serialized.
 
 `IStreamPipelineAdvisor<TRequest,TItem>` surrounds enumeration through `StreamContinuation<TItem>`.
 Admission can reject before the handler is resolved; iterator `finally` blocks run before scope disposal.

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,49 +24,22 @@ public static class MessageContexts
         return new(items);
     }
 
-    public static async ValueTask<MessageContext> CaptureAsync(IServiceProvider source, CancellationToken ct = default,
-        IMessageExecutionScopeFactory? scopes = null) {
+    public static async ValueTask<MessageContext> CaptureAsync(IServiceProvider source, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
-        MessageExecutionScope? selected = null;
-        IDisposable? execution = null;
-        Exception? failure = null;
+        var bootstrap = source.CreateAsyncScope();
+        MessageContext initial;
         try {
-            var bootstrap = source.CreateAsyncScope();
-            MessageContext initial;
-            Exception? preparation = null;
-            try {
-                initial = Capture(bootstrap.ServiceProvider);
-                var factory = scopes ?? bootstrap.ServiceProvider.GetRequiredService<IMessageExecutionScopeFactory>();
-                selected = await factory.CreateAsync(initial, ct);
-            } catch (Exception error) {
-                preparation = error;
-                throw;
-            } finally {
-                try { await bootstrap.DisposeAsync(); }
-                catch (Exception cleanup) {
-                    Exception abandoned = preparation is null ? cleanup : new AggregateException(preparation, cleanup);
-                    if (selected is not null) {
-                        try { execution = selected.Enter(); }
-                        catch (Exception entryFailure) { abandoned = new AggregateException(abandoned, entryFailure); }
-                    }
-                    ExceptionDispatchInfo.Capture(abandoned).Throw();
-                }
-            }
-            execution = selected.Enter();
-            await selected.RestoreAsync(initial, ct);
-            return Capture(selected.Services);
+            initial = Capture(bootstrap.ServiceProvider);
         } catch (Exception error) {
-            failure = error;
-            throw;
-        } finally {
-            Exception? cleanup = null;
-            try { if (selected is not null) await selected.DisposeAsync(); }
-            catch (Exception error) { cleanup = error; }
-            try { execution?.Dispose(); }
-            catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
-            if (cleanup is not null) {
-                ExceptionDispatchInfo.Capture(failure is null ? cleanup : new AggregateException(failure, cleanup)).Throw();
+            try {
+                await bootstrap.DisposeAsync();
+            } catch (Exception cleanup) {
+                throw new AggregateException(error, cleanup);
             }
+            throw;
         }
+        await bootstrap.DisposeAsync();
+        var runner = source.GetRequiredService<IMessageExecutionScopeRunner>();
+        return await runner.RunAsync(initial, (services, _) => ValueTask.FromResult(Capture(services)), ct);
     }
 }

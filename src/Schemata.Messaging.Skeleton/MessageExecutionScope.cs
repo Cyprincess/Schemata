@@ -5,11 +5,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Schemata.Messaging.Skeleton;
 
-public sealed class MessageExecutionScope(AsyncServiceScope scope, Func<IDisposable> enter) : IAsyncDisposable
+public sealed class MessageExecutionScope(AsyncServiceScope scope) : IAsyncDisposable
 {
     public IServiceProvider Services => scope.ServiceProvider;
-    /// <summary>The caller enters after awaiting scope creation and owns the returned lease.</summary>
-    public IDisposable Enter() => enter();
 
     public async ValueTask RestoreAsync(MessageContext? context, CancellationToken ct = default) {
         if (context is null) return;

@@ -63,7 +63,7 @@ public class TenantSchedulingShould
         await connection.OpenAsync();
         var probe = new Probe(clock);
         var services = new ServiceCollection();
-        services.AddSingleton<TimeProvider>(clock).AddSingleton(probe).AddSingleton<ProbeJob>();
+        services.AddSingleton<TimeProvider>(clock).AddSingleton(probe).AddScoped<ProbeJob>();
         services.AddDbContextFactory<Database>(options => options.UseSqlite(connectionString)
             .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
         services.AddRepository<SchemataTenant, EfCoreRepository<Database, SchemataTenant>>();
@@ -78,6 +78,7 @@ public class TenantSchedulingShould
         services.AddSchemataScheduling<TenantJob, TenantJobExecution>().AddSchemataSchedulingRepositoryStore<TenantJob, TenantJobExecution>();
         services.Configure<SchemataSchedulingOptions>(options => options.ExecutionLease = TimeSpan.FromSeconds(10));
         new SchemataTenancyBuilder<SchemataTenant>(services).UseMessaging().UseRepositories(builder => {
+            builder.Services.AddScoped<ProbeJob>();
             builder.Services.AddScoped<Disposal>();
             builder.Services.AddScoped<IMessageContextPropagator, TenantProbePropagator>();
             builder.Services.AddScoped<IJobExecutionStore<TenantJob, TenantJobExecution>>(provider => {
@@ -103,7 +104,6 @@ public class TenantSchedulingShould
         var tenants = first.GetRequiredService<ITenantServiceScopeFactory<SchemataTenant>>();
         foreach (var tenant in new[] { a, b }) {
             await using var scope = await tenants.CreateAsync(new(tenant.Uid));
-            using var entered = TenantContext.Enter(new(tenant.Uid));
             var scheduler = scope.ServiceProvider.GetRequiredService<DefaultScheduler<TenantJob, TenantJobExecution>>();
             scope.ServiceProvider.GetRequiredService<IScheduledJobRegistry>().Register<ProbeJob>("probe");
             await scheduler.StartAsync(default);
@@ -128,7 +128,6 @@ public class TenantSchedulingShould
         tenants = restarted.GetRequiredService<ITenantServiceScopeFactory<SchemataTenant>>();
         foreach (var tenant in new[] { a, b }) {
             await using var scope = await tenants.CreateAsync(new(tenant.Uid));
-            using var entered = TenantContext.Enter(new(tenant.Uid));
             var registry = scope.ServiceProvider.GetRequiredService<IScheduledJobRegistry>();
             registry.Register<ProbeJob>("probe");
             var initializer = new SchedulingInitializer<TenantJob, TenantJobExecution>(
@@ -148,7 +147,6 @@ public class TenantSchedulingShould
         }
         foreach (var tenant in new[] { a, b }) {
             await using var scope = await tenants.CreateAsync(new(tenant.Uid));
-            using var entered = TenantContext.Enter(new(tenant.Uid));
             await scope.ServiceProvider.GetRequiredService<JobExecutionDispatcher<TenantJob, TenantJobExecution>>().DispatchPendingAsync(default);
         }
         Assert.Equal(new[] { a.Uid, b.Uid }.OrderBy(uid => uid), probe.Bodies.OrderBy(uid => uid));
@@ -167,7 +165,6 @@ public class TenantSchedulingShould
             });
             Assert.All(await database.Set<TenantJob>().ToListAsync(), job => Assert.Equal(JobState.Completed, job.State));
         }
-        Assert.Equal(TenantIdentity.Host, TenantContext.Current);
         Assert.Contains(a.Uid, probe.Disposals);
         Assert.Contains(b.Uid, probe.Disposals);
     }
@@ -180,24 +177,22 @@ public class TenantSchedulingShould
         public ConcurrentBag<Guid?> Disposals { get; } = new();
         public Channel<Guid> Heartbeats { get; } = Channel.CreateUnbounded<Guid>();
     }
-    public sealed class Disposal(Probe probe) : IAsyncDisposable
+    public sealed class Disposal(Probe probe, TenantIdentity identity) : IAsyncDisposable
     {
-        private readonly Guid? _identity = TenantContext.Current.Uid;
         public ValueTask DisposeAsync() {
-            Assert.Equal(_identity, TenantContext.Current.Uid);
-            probe.Disposals.Add(TenantContext.Current.Uid);
+            probe.Disposals.Add(identity.Uid);
             return ValueTask.CompletedTask;
         }
     }
 
-    public sealed class ProbeJob(Probe probe) : IScheduledJob
+    public sealed class ProbeJob(Probe probe, TenantIdentity identity) : IScheduledJob
     {
         public async Task ExecuteAsync(JobContext context, CancellationToken ct) {
-            var uid = TenantContext.Current.Uid!.Value;
+            if (identity.Uid is not { } uid) throw new InvalidOperationException("A tenant execution identity is required.");
             Assert.Equal(uid, Assert.IsType<TenantJobExecution>(context.Execution).TenantUid);
             probe.Clock.Advance(TimeSpan.FromSeconds(6));
             Assert.Equal(uid, await probe.Heartbeats.Reader.ReadAsync(ct).AsTask().WaitAsync(TimeSpan.FromSeconds(30)));
-            Assert.Equal(uid, TenantContext.Current.Uid);
+            Assert.Equal(uid, identity.Uid);
             probe.Bodies.Add(uid);
         }
     }
@@ -206,7 +201,7 @@ public class TenantSchedulingShould
         public int Order => int.MaxValue;
         public Task<AdviseResult> AdviseAsync(AdviceContext context, IRepository<TenantJobExecution> repository,
             TenantJobExecution entity, MutationOptions options, CancellationToken ct) {
-            Assert.Equal(entity.TenantUid, TenantContext.Current.Uid);
+            Assert.Equal(entity.TenantUid, context.ServiceProvider.GetRequiredService<TenantIdentity>().Uid);
             if (entity.State == ExecutionState.Running && entity.LeaseExpireTime is not null) {
                 var count = probe.Renewals.AddOrUpdate(entity.TenantUid!.Value, 1, (_, count) => count + 1);
                 if (count >= 3) probe.Heartbeats.Writer.TryWrite(entity.TenantUid.Value);

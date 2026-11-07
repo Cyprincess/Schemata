@@ -59,11 +59,9 @@ public sealed class InProcessStreamDispatcher(IServiceProvider services, IMessag
 
         public async ValueTask<bool> MoveNextAsync() {
             if (_finished) return false;
-            IDisposable? execution = null;
             Exception? failure = null;
             try {
                 _scope ??= await _scopes.CreateAsync(_captured, _ct);
-                execution = _scope.Enter();
                 _ct.ThrowIfCancellationRequested();
                 _advice ??= new AdviceContext(_scope.Services);
                 if (_inner is null) {
@@ -99,21 +97,14 @@ public sealed class InProcessStreamDispatcher(IServiceProvider services, IMessag
                 catch (Exception cleanup) { failure = new AggregateException(error, cleanup); }
                 ExceptionDispatchInfo.Capture(failure).Throw();
                 throw;
-            } finally {
-                try { execution?.Dispose(); }
-                catch (Exception cleanup) {
-                    ExceptionDispatchInfo.Capture(failure is null ? cleanup : new AggregateException(failure, cleanup)).Throw();
-                }
             }
         }
 
         public async ValueTask DisposeAsync() {
             if (_finished) return;
             if (_scope is null) { _finished = true; _linked?.Dispose(); return; }
-            IDisposable? execution = null;
             Exception? failure = null;
             try {
-                execution = _scope.Enter();
                 _advice ??= new AdviceContext(_scope.Services);
                 await FinishAsync();
             } catch (Exception error) {
@@ -123,8 +114,6 @@ public sealed class InProcessStreamDispatcher(IServiceProvider services, IMessag
                 Exception? cleanup = null;
                 try { await FinishAsync(); }
                 catch (Exception error) { cleanup = error; }
-                try { execution?.Dispose(); }
-                catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
                 if (cleanup is not null) {
                     ExceptionDispatchInfo.Capture(failure is null ? cleanup : new AggregateException(failure, cleanup)).Throw();
                 }

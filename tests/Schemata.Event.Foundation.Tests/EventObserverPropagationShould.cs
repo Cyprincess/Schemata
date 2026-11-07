@@ -117,7 +117,7 @@ public class EventObserverPropagationShould
         registry.Setup(value => value.RequireName(typeof(SampleEvent))).Returns(EventName);
         var connections = new Mock<IRabbitMqConnectionProvider>(MockBehavior.Strict);
         await using var services = new ServiceCollection().AddSingleton(observer.Object)
-            .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().BuildServiceProvider();
+            .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>().BuildServiceProvider();
         var bus = new RabbitMqEventBus(Options.Create(new RabbitMqEventOptions()), connections.Object,
             registry.Object, services, Options.Create(new JsonSerializerOptions()));
 
@@ -141,7 +141,7 @@ public class EventObserverPropagationShould
                .AddSingleton(subscriptions.Object)
                .AddSingleton<IEventDispatchContext>(new EventDispatchContext())
                .AddSingleton<HandlerResolver>()
-               .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
+               .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>()
                .AddSingleton(records.Object)
                .AddSingleton<IEventLifecycleObserver>(new SchemataEventAuditObserver(
                    records.Object, Options.Create(new JsonSerializerOptions())));

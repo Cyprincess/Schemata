@@ -76,13 +76,9 @@ public sealed class InProcessEventBus : IEventBus
     )
         where TEvent : IEvent {
         var message = MessageContexts.Capture(_services);
-        var scope = await _services.GetRequiredService<IMessageExecutionScopeFactory>().CreateAsync(message, ct);
-        IDisposable? execution = null;
-        Exception? failure = null;
-        try {
-            execution = scope.Enter();
-        await scope.RestoreAsync(message, ct);
-        var       registry = scope.Services.GetRequiredService<IEventTypeRegistry>();
+        var runner = _services.GetRequiredService<IMessageExecutionScopeRunner>();
+        await runner.RunAsync(message, async (provider, token) => {
+        var       registry = provider.GetRequiredService<IEventTypeRegistry>();
 
         // Resolve by the runtime type so a derived event published through a base/interface
         // static type keeps its registered name and serializes its derived members.
@@ -95,23 +91,23 @@ public sealed class InProcessEventBus : IEventBus
             Correlation   = correlation,
             Source        = source,
         };
-        var adviceCtx = new AdviceContext(scope.Services);
+        var adviceCtx = new AdviceContext(provider);
 
         switch (await Advisor.For<IEventPublishAdvisor>()
                              .RunAsync(adviceCtx, ctx, ct)) {
             case AdviseResult.Continue:
                 break;
             case AdviseResult.Handle:
-                return;
+                return true;
             case AdviseResult.Block:
             default:
                 throw new InvalidOperationException("Event publish blocked by advisor.");
         }
 
-        var observers = scope.Services.GetServices<IEventLifecycleObserver>().ToList();
+        var observers = provider.GetServices<IEventLifecycleObserver>().ToList();
         await NotifyPublishedAsync(observers, ctx, ct);
 
-        var subscriptions = scope.Services.GetRequiredService<IRepository<SchemataEventSubscription>>();
+        var subscriptions = provider.GetRequiredService<IRepository<SchemataEventSubscription>>();
         var matched       = new List<SchemataEventSubscription>();
         await foreach (var sub in subscriptions.ListMatchingAsync(name, ctx.Correlation, ct)) {
             matched.Add(sub);
@@ -119,8 +115,8 @@ public sealed class InProcessEventBus : IEventBus
 
         try {
             // A publish with no subscribers succeeds silently; the consume callbacks are skipped.
-            if (!await DispatchHandlersAsync(scope.Services, type, @event, matched, ct)) {
-                return;
+            if (!await DispatchHandlersAsync(provider, type, @event, matched, ct)) {
+                return true;
             }
 
             ctx.Result = true;
@@ -129,7 +125,7 @@ public sealed class InProcessEventBus : IEventBus
             ctx.Exception = ex;
         }
 
-        var consumeAdviceCtx = new AdviceContext(scope.Services);
+        var consumeAdviceCtx = new AdviceContext(provider);
         switch (await Advisor.For<IEventConsumeAdvisor>()
                              .RunAsync(consumeAdviceCtx, ctx, ct)) {
             case AdviseResult.Continue:
@@ -162,19 +158,8 @@ public sealed class InProcessEventBus : IEventBus
         if (ctx.Exception is not null) {
             ExceptionDispatchInfo.Capture(ctx.Exception).Throw();
         }
-        } catch (Exception error) {
-            failure = error;
-            throw;
-        } finally {
-            Exception? cleanup = null;
-            try { await scope.DisposeAsync(); }
-            catch (Exception error) { cleanup = error; }
-            try { execution?.Dispose(); }
-            catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
-            if (cleanup is not null) {
-                ExceptionDispatchInfo.Capture(failure is null ? cleanup : new AggregateException(failure, cleanup)).Throw();
-            }
-        }
+        return true;
+        }, ct);
     }
 
     private async Task NotifyPublishedAsync(

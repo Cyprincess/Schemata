@@ -8,6 +8,7 @@ using Schemata.Tenancy.Caching;
 using Schemata.Tenancy.Foundation;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
+using Schemata.Tenancy.Skeleton.Tenancy;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -16,20 +17,38 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class TenantCacheExtensions
 {
     /// <summary>
-    ///     Composes per-tenant cache registration through the dynamic tenant overrides. Each tenant
-    ///     container receives the outlet declared by <paramref name="configure" /> under its
-    ///     verified tenant identifier; the identifier never comes from the ambient tenant context.
+    ///     Activates host and tenant cache partitions over the keyed backend selected by the host.
+    /// </summary>
+    public static SchemataTenancyBuilder<TTenant> UseCache<TTenant>(
+        this SchemataTenancyBuilder<TTenant> builder
+    ) where TTenant : SchemataTenant {
+        return builder.UseCache(static _ => { });
+    }
+
+    /// <summary>
+    ///     Activates cache partitioning and composes each tenant outlet through the dynamic tenant
+    ///     overrides. An outlet not declared by <paramref name="configure" /> shares the host's
+    ///     keyed backend under the verified tenant partition.
     /// </summary>
     public static SchemataTenancyBuilder<TTenant> UseCache<TTenant>(
         this SchemataTenancyBuilder<TTenant> builder,
         Action<TenantCacheBuilder<TTenant>> configure
     ) where TTenant : SchemataTenant {
-        builder.Services.Configure<SchemataTenancyOptions>(options => options.DynamicOverrides.Add((identifier, services, _) => {
+        ArgumentNullException.ThrowIfNull(configure);
+
+        builder.Services.Replace(ServiceDescriptor.Singleton<ICacheProvider>(static sp => new CacheProvider(
+            sp.GetRequiredKeyedService<ICacheBackend>(CacheServiceKeys.Backend),
+            new TenantCacheKeyNormalizer(TenantIdentity.Host))));
+        builder.Services.Configure<SchemataTenancyOptions>(options => options.DynamicOverrides.Add((identifier, services, root) => {
             if (!Guid.TryParse(identifier, out var uid) || uid == Guid.Empty) {
                 throw new InvalidOperationException($"Tenant caches require a non-empty verified tenant identifier; tenant '{identifier}' has none.");
             }
 
-            configure(new(services, uid));
+            var cache = new TenantCacheBuilder<TTenant>(services, uid);
+            configure(cache);
+            if (!services.Any(descriptor => descriptor.ServiceType == typeof(ICacheProvider))) {
+                cache.UseShared(root.GetRequiredKeyedService<ICacheBackend>(CacheServiceKeys.Backend));
+            }
         }));
         return builder;
     }

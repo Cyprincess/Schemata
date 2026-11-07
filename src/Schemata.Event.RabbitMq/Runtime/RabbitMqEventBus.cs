@@ -2,7 +2,6 @@ using Schemata.Messaging.Skeleton;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -98,32 +97,28 @@ public sealed class RabbitMqEventBus : IEventBus
         var routingKey = _registry.RequireName(type);
 
         var message = MessageContexts.Capture(_services);
-        var scope = await _services.GetRequiredService<IMessageExecutionScopeFactory>().CreateAsync(message, ct);
-        IDisposable? execution = null;
-        Exception? failure = null;
-        try {
-            execution = scope.Enter();
-        await scope.RestoreAsync(message, ct);
+        var runner = _services.GetRequiredService<IMessageExecutionScopeRunner>();
+        await runner.RunAsync(message, async (provider, token) => {
         var eventCtx = new EventContext(@event, routingKey) {
             Payload       = JsonSerializer.Serialize(@event, type, _json),
             CorrelationId = Guid.NewGuid().ToString("n"),
             Correlation   = correlation,
             Source        = source,
         };
-        var adviceCtx = new AdviceContext(scope.Services);
+        var adviceCtx = new AdviceContext(provider);
 
         switch (await Advisor.For<IEventPublishAdvisor>()
                              .RunAsync(adviceCtx, eventCtx, ct)) {
             case AdviseResult.Continue:
                 break;
             case AdviseResult.Handle:
-                return;
+                return true;
             case AdviseResult.Block:
             default:
                 throw new InvalidOperationException("Event publish blocked by advisor.");
         }
 
-        var observers = scope.Services.GetServices<IEventLifecycleObserver>().ToList();
+        var observers = provider.GetServices<IEventLifecycleObserver>().ToList();
         foreach (var observer in observers) {
             await observer.OnPublishedAsync(eventCtx, ct);
         }
@@ -150,19 +145,8 @@ public sealed class RabbitMqEventBus : IEventBus
         foreach (var observer in observers.OrderBy(observer => observer is SchemataEventAuditObserver)) {
             await observer.OnDeliveredAsync(eventCtx, ct);
         }
-        } catch (Exception error) {
-            failure = error;
-            throw;
-        } finally {
-            Exception? cleanup = null;
-            try { await scope.DisposeAsync(); }
-            catch (Exception error) { cleanup = error; }
-            try { execution?.Dispose(); }
-            catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
-            if (cleanup is not null) {
-                ExceptionDispatchInfo.Capture(failure is null ? cleanup : new AggregateException(failure, cleanup)).Throw();
-            }
-        }
+        return true;
+        }, ct);
     }
 
     private static IDictionary<string, object?>? WriteHeaders(

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -97,25 +96,24 @@ internal sealed class JobExecutionLease<TJob, TExecution> : IAsyncDisposable
     }
 
     private async Task<T> ExecuteInScopeAsync<T>(Func<IServiceProvider, CancellationToken, Task<T>> work, CancellationToken ct) {
-        var          scope   = await _scopes(ct);
-        IDisposable? entered = null;
-        Exception?   failure = null;
-        try {
-            entered = scope.Scope.Enter();
-            await scope.Scope.RestoreAsync(scope.Context, ct);
-            return await work(scope.Scope.Services, ct);
-        } catch (Exception error) {
-            failure = error;
-            throw;
-        } finally {
-            Exception? cleanup = null;
-            try { await scope.Scope.DisposeAsync(); } catch (Exception error) { cleanup = error; }
-            try { entered?.Dispose(); } catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
-            if (cleanup is not null) {
-                if (failure is not null) throw new AggregateException(failure, cleanup);
-                ExceptionDispatchInfo.Capture(cleanup).Throw();
+        var prepared = await _scopes(ct);
+        if (prepared.Scope is { } direct) {
+            try {
+                await direct.RestoreAsync(prepared.Context, ct);
+                var result = await work(direct.Services, ct);
+                await direct.DisposeAsync();
+                return result;
+            } catch (Exception error) {
+                try {
+                    await direct.DisposeAsync();
+                } catch (Exception cleanup) {
+                    throw new AggregateException(error, cleanup);
+                }
+                throw;
             }
         }
+        if (prepared.Runner is not { } runner) throw new InvalidOperationException("The job execution scope has no execution strategy.");
+        return await runner.RunAsync(prepared.Context, async (services, token) => await work(services, token), ct);
     }
 
     internal async Task ConfirmAsync(CancellationToken ct) {
@@ -124,40 +122,25 @@ internal sealed class JobExecutionLease<TJob, TExecution> : IAsyncDisposable
             if (_settled) return;
             ct.ThrowIfCancellationRequested();
             ThrowIfOwnershipLost();
-            var          scope   = await _scopes(ct);
-            IDisposable? entered = null;
-            Exception?   failure = null;
-            try {
-                entered = scope.Scope.Enter();
-                await scope.Scope.RestoreAsync(scope.Context, ct);
-                var store = scope.Scope.Services.GetRequiredService<IJobExecutionStore<TJob, TExecution>>();
+            await ExecuteInScopeAsync(async (services, token) => {
+                var store = services.GetRequiredService<IJobExecutionStore<TJob, TExecution>>();
                 var expires = _time.GetUtcNow().UtcDateTime.Add(_duration);
                 if (!await store.TryRenewLeaseAsync(_execution, expires, ct)) {
                     Interlocked.Exchange(ref _lost, 1);
                     await _work.CancelAsync();
-                    return;
+                    return true;
                 }
-                if (ct.IsCancellationRequested) return;
+                if (ct.IsCancellationRequested) return true;
                 var remaining = expires - _time.GetUtcNow().UtcDateTime;
                 if (remaining <= TimeSpan.Zero) {
                     Interlocked.Exchange(ref _lost, 1);
                     await _work.CancelAsync();
-                    return;
+                    return true;
                 }
                 Interlocked.Exchange(ref _confirmedExpiry, expires.Ticks);
                 _expiry.CancelAfter(remaining);
-            } catch (Exception error) {
-                failure = error;
-                throw;
-            } finally {
-                Exception? cleanup = null;
-                try { await scope.Scope.DisposeAsync(); } catch (Exception error) { cleanup = error; }
-                try { entered?.Dispose(); } catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
-                if (cleanup is not null) {
-                    if (failure is not null) throw new AggregateException(failure, cleanup);
-                    ExceptionDispatchInfo.Capture(cleanup).Throw();
-                }
-            }
+                return true;
+            }, ct);
         } catch (OperationCanceledException) when (ct.IsCancellationRequested) {
             throw;
         } catch (OperationCanceledException error) {

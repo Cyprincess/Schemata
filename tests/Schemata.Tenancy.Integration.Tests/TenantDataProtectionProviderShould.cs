@@ -31,11 +31,9 @@ public sealed class TenantDataProtectionProviderShould
         var b = backend.CreateProtector("Schemata.Tenancy").CreateProtector(TenantB.ToString("N"));
 
         var token = a.Protect(new byte[] { 1 });
-        using (TenantContext.Enter(new(TenantB))) {
-            Assert.Equal(new byte[] { 1 }, a.Unprotect(token));
-            Assert.Throws<CryptographicException>(() => b.Unprotect(token));
-            Assert.Throws<CryptographicException>(() => global.Unprotect(token));
-        }
+        Assert.Equal(new byte[] { 1 }, a.Unprotect(token));
+        Assert.Throws<CryptographicException>(() => b.Unprotect(token));
+        Assert.Throws<CryptographicException>(() => global.Unprotect(token));
     }
 
     [Fact]
@@ -59,15 +57,13 @@ public sealed class TenantDataProtectionProviderShould
 
         var continuation = scope.ServiceProvider.GetRequiredService<IDataProtectionProvider>().CreateProtector("continuation");
         var token = continuation.Protect("cursor");
-        using (TenantContext.Enter(new(TenantB))) {
-            Assert.Equal("cursor", continuation.Unprotect(token));
-            Assert.Throws<CryptographicException>(() => backend.CreateProtector("continuation").Unprotect(token));
-            Assert.Throws<CryptographicException>(() => backend
-                .CreateProtector("Schemata.Tenancy")
-                .CreateProtector(TenantB.ToString("N"))
-                .CreateProtector("continuation")
-                .Unprotect(token));
-        }
+        Assert.Equal("cursor", continuation.Unprotect(token));
+        Assert.Throws<CryptographicException>(() => backend.CreateProtector("continuation").Unprotect(token));
+        Assert.Throws<CryptographicException>(() => backend
+            .CreateProtector("Schemata.Tenancy")
+            .CreateProtector(TenantB.ToString("N"))
+            .CreateProtector("continuation")
+            .Unprotect(token));
         Assert.Same(backend, root.GetRequiredService<IDataProtectionProvider>());
     }
 

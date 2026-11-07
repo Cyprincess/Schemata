@@ -1,29 +1,20 @@
-using System;
 using Schemata.Caching.Skeleton;
+using Schemata.Tenancy.Skeleton.Tenancy;
 
 namespace Schemata.Tenancy.Caching;
 
 /// <summary>
-///     Fixed tenant namespace applied to every logical key before backend dispatch. The verified
-///     tenant identifier is encoded at construction, so a captured outlet keeps its namespace even
-///     when the ambient tenant identity changes or disappears.
+///     Fixed host or tenant namespace applied to every logical key before backend dispatch.
 /// </summary>
 public sealed class TenantCacheKeyNormalizer : ICacheKeyNormalizer
 {
-    // Fixed-format GUIDs and the reserved host label cannot contain this delimiter.
-    private const char Separator = '\x1e';
-
     private readonly string _prefix;
 
-    public TenantCacheKeyNormalizer(Guid tenantUid) {
-        TenantUid = tenantUid;
-        _prefix   = tenantUid.ToString("N") + Separator;
+    public TenantCacheKeyNormalizer(TenantIdentity identity) {
+        _prefix = identity.Uid is { } uid
+            ? $"v1\x1etenant\x1e{uid:N}\x1e"
+            : "v1\x1ehost\x1e";
     }
 
-    /// <summary>Gets the verified tenant identifier encoded into every normalized key.</summary>
-    public Guid TenantUid { get; }
-
-    public string Normalize(string key) {
-        return string.Concat(_prefix, key);
-    }
+    public string Normalize(string key) => string.Concat(_prefix, key);
 }

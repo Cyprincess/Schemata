@@ -67,18 +67,14 @@ public sealed class TenantRepositoryShould
         await using var repositoryBoundToA = scopeA.ServiceProvider.GetRequiredService<IRepository<Row>>();
         await using var repositoryBoundToB = scopeB.ServiceProvider.GetRequiredService<IRepository<Row>>();
         var row = new Row { Name = "a-only", TenantUid = TenantB };
-        using (TenantContext.Enter(new(TenantB))) {
-            Assert.Equal(MutationResult.Applied, await repositoryBoundToA.AddAsync(row));
-            await repositoryBoundToA.CommitAsync();
-        }
+        Assert.Equal(MutationResult.Applied, await repositoryBoundToA.AddAsync(row));
+        await repositoryBoundToA.CommitAsync();
         Assert.Equal(TenantA, row.TenantUid);
         Assert.Null(await repositoryBoundToB.FindAsync(new object[] { row.Uid }));
         Assert.Equal("a-only", (await repositoryBoundToA.FindAsync(new object[] { row.Uid }))!.Name);
-        using (TenantContext.Enter(new(TenantB))) {
-            var rows = await repositoryBoundToA.ListAsync(query => query).ToListAsync();
-            Assert.Equal("a-only", Assert.Single(rows).Name);
-            Assert.Equal(TenantA, rows[0].TenantUid);
-        }
+        var rows = await repositoryBoundToA.ListAsync(query => query).ToListAsync();
+        Assert.Equal("a-only", Assert.Single(rows).Name);
+        Assert.Equal(TenantA, rows[0].TenantUid);
     }
 
     [Theory]
@@ -90,14 +86,10 @@ public sealed class TenantRepositoryShould
         await using var scope = await store.EnterAsync(null);
         await using var repository = scope.ServiceProvider.GetRequiredService<IRepository<Row>>();
         var row = new Row { Name = "global" };
-        using (TenantContext.Enter(new(TenantA))) {
-            Assert.Equal(MutationResult.Applied, await repository.AddAsync(row));
-            await repository.CommitAsync();
-        }
+        Assert.Equal(MutationResult.Applied, await repository.AddAsync(row));
+        await repository.CommitAsync();
         Assert.Null(row.TenantUid);
-        using (TenantContext.Enter(new(TenantB))) {
-            Assert.Equal("global", (await repository.FindAsync(new object[] { row.Uid }))!.Name);
-        }
+        Assert.Equal("global", (await repository.FindAsync(new object[] { row.Uid }))!.Name);
         await using var tenantScope = await store.EnterAsync(TenantA);
         await using var tenantRepository = tenantScope.ServiceProvider.GetRequiredService<IRepository<Row>>();
         Assert.Null(await tenantRepository.FindAsync(new object[] { row.Uid }));

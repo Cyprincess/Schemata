@@ -69,12 +69,12 @@ public class TenantHttpShould
             app.UseAuthentication();
             app.UseMiddleware<SchemataTenantPrincipalMiddleware<SchemataTenant>>();
             app.UseAuthorization();
-            app.UseMiddleware<TenantExecutionMiddleware>();
             app.UseEndpoints(endpoints => {
                 if (mvcFilter) endpoints.MapControllers();
                 else endpoints.MapGet("/probe", async context => {
                     var probe = context.RequestServices.GetRequiredService<TenantProbe>();
-                    await context.Response.WriteAsync($"{probe.Uid:D}|{TenantContext.Current.Uid:D}");
+                    var identity = context.RequestServices.GetRequiredService<TenantIdentity>();
+                    await context.Response.WriteAsync($"{probe.Uid:D}|{identity.Uid:D}");
                 }).RequireAuthorization(new AuthorizationPolicyBuilder("tenant").RequireAuthenticatedUser().Build());
             });
         })).StartAsync();
@@ -117,9 +117,9 @@ public class TenantHttpShould
 }
 
 [Route("/probe")]
-public sealed class TenantProbeController(TenantHttpShould.Observations observations) : ControllerBase, IDisposable
+public sealed class TenantProbeController(TenantHttpShould.Observations observations, TenantIdentity identity) : ControllerBase, IDisposable
 {
     [HttpGet]
-    public string Get([FromServices] TenantHttpShould.TenantProbe probe) => $"{probe.Uid:D}|{TenantContext.Current.Uid:D}";
-    public void Dispose() => observations.DisposedUnder = TenantContext.Current.Uid;
+    public string Get([FromServices] TenantHttpShould.TenantProbe probe) => $"{probe.Uid:D}|{identity.Uid:D}";
+    public void Dispose() => observations.DisposedUnder = identity.Uid;
 }

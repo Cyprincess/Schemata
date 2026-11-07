@@ -6,7 +6,7 @@ namespace Schemata.Tenancy.Foundation.Repository;
 
 /// <summary>
 ///     Fixed tenant-side dependency captured when a tenant container is composed. Advisor
-///     executions resolve this identity from their scope instead of the ambient <c>TenantContext</c>.
+///     executions resolve this binding from their final invocation scope.
 /// </summary>
 /// <param name="Uid">The verified non-empty tenant identifier owning the bound repositories;
 ///     <see langword="null" /> identifies the host partition.</param>

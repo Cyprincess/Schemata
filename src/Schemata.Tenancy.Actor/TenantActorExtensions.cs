@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Schemata.Actor.Foundation.Runtime;
+using Schemata.Actor.Skeleton;
 using Schemata.Actor.Skeleton.Entities;
 using Schemata.Tenancy.Actor;
 using Schemata.Tenancy.Foundation;
@@ -35,7 +36,12 @@ public static class TenantActorExtensions
         where TTenant : SchemataTenant
         where TActor : SchemataActor, new() {
         builder.UseMessaging();
-        builder.Services.AddSchemataActorSystem<TenantActorSystemFactory<TActor>>();
+        builder.Services.TryAddSingleton<TenantActorSystem<TActor>>();
+        builder.Services.Replace(ServiceDescriptor.Singleton<IActorSystemLifetime>(provider => provider.GetRequiredService<TenantActorSystem<TActor>>()));
+        builder.Services.Replace(ServiceDescriptor.Scoped<IActorSystem, ScopedTenantActorSystem<TActor>>());
+        builder.Services.Configure<SchemataTenancyOptions>(options => options.DynamicOverrides.Add((_, services, _) => {
+            services.Replace(ServiceDescriptor.Scoped<IActorSystem, ScopedTenantActorSystem<TActor>>());
+        }));
         return builder;
     }
 

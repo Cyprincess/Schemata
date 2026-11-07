@@ -82,7 +82,7 @@ public class TenantProviderLeaseShould
         });
         await using var root = new ServiceCollection().AddSingleton(manager.Object)
             .AddKeyedScoped<IDisposable>("host", (_, _) => hostScope.Object).BuildServiceProvider();
-        using var cache = new MemoryCacheTenantProviderCache(Options.Create(options));
+        await using var cache = new MemoryCacheTenantProviderCache(Options.Create(options));
         var providers = new SchemataTenantServiceProviderFactory<SchemataTenant>(root, cache, Options.Create(options));
         var factory = new SchemataTenantServiceScopeFactory<SchemataTenant>(root, providers);
         var scope = await factory.CreateAsync(new TenantIdentity(tenant.Uid));
@@ -93,8 +93,16 @@ public class TenantProviderLeaseShould
         singleton.Verify(value => value.Dispose(), Times.Never);
 
         if (asynchronous) Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => scope.DisposeAsync().AsTask()));
-        else Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => scope.Dispose()));
+        else {
+            var errors = Assert.Throws<AggregateException>(() => scope.Dispose());
+            Assert.Same(failure, errors.InnerExceptions[0]);
+            Assert.Contains("DisposeAsync", errors.InnerExceptions[1].Message, StringComparison.Ordinal);
+            singleton.Verify(value => value.Dispose(), Times.Never);
+        }
         await scope.DisposeAsync();
+        await scope.DisposeAsync();
+        singleton.Verify(value => value.Dispose(), Times.Once);
+        await cache.DisposeAsync();
 
         tenantScope.Verify(value => value.Dispose(), Times.Once);
         hostScope.Verify(value => value.Dispose(), Times.Once);
@@ -260,7 +268,7 @@ public class TenantProviderLeaseShould
         new SchemataTenancyBuilder<SchemataTenant>(services).UseState(state => state.CookiePrefix = "lease");
         await using var root = services.BuildServiceProvider();
         var options = root.GetRequiredService<IOptions<SchemataTenancyOptions>>();
-        using var cache = new MemoryCacheTenantProviderCache(options, clock);
+        await using var cache = new MemoryCacheTenantProviderCache(options, clock);
         var providers = new SchemataTenantServiceProviderFactory<SchemataTenant>(root, cache, options);
         var factory = new SchemataTenantServiceScopeFactory<SchemataTenant>(root, providers);
 
@@ -275,9 +283,7 @@ public class TenantProviderLeaseShould
         await using var neighbor = await factory.CreateAsync(new(other.Uid));
         var neighborProtector = neighbor.ServiceProvider.GetRequiredService<IDataProtectionProvider>();
 
-        using (TenantContext.Enter(new(other.Uid))) {
-            Assert.Equal(new byte[] { 1 }, protector.Unprotect(token));
-            Assert.Throws<CryptographicException>(() => ((IDataProtector)neighborProtector).Unprotect(token));
-        }
+        Assert.Equal(new byte[] { 1 }, protector.Unprotect(token));
+        Assert.Throws<CryptographicException>(() => ((IDataProtector)neighborProtector).Unprotect(token));
     }
 }

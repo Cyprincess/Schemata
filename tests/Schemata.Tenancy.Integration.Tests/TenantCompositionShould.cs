@@ -47,14 +47,14 @@ public class TenantCompositionShould
     }
 
     [Fact]
-    public async Task Compose_The_Tenant_Evaluator_And_Controller_Factory_Over_The_Framework_Implementations() {
+    public async Task Compose_The_Tenant_Evaluator_Over_The_Framework_Implementation() {
         using var provider = Compose(withTenancy: true).BuildServiceProvider();
 
         var evaluator = provider.GetRequiredService<IPolicyEvaluator>();
         Assert.IsNotType<PolicyEvaluator>(evaluator);
         Assert.IsType<PolicyEvaluator>(
             provider.GetRequiredKeyedService<IPolicyEvaluator>(SchemataAuthenticationFeature.PolicyEvaluatorServiceKey));
-        Assert.NotSame(
+        Assert.Same(
             provider.GetRequiredKeyedService<IControllerFactory>(SchemataControllersFeature.ControllerFactoryServiceKey),
             provider.GetRequiredService<IControllerFactory>());
 
@@ -114,11 +114,11 @@ public class TenantCompositionShould
             app.UseMiddleware<SchemataTenancyMiddleware<SchemataTenant>>();
             app.UseAuthentication();
             app.UseAuthorization();
-            app.UseMiddleware<TenantExecutionMiddleware>();
             app.UseEndpoints(endpoints => {
                 endpoints.MapGet("/probe", async context => {
                     var resolved = context.RequestServices.GetRequiredService<SchemataTenant>();
-                    await context.Response.WriteAsync($"{resolved.Uid:D}|{TenantContext.Current.Uid:D}");
+                    var identity = context.RequestServices.GetRequiredService<TenantIdentity>();
+                    await context.Response.WriteAsync($"{resolved.Uid:D}|{identity.Uid:D}");
                 }).RequireAuthorization(new AuthorizationPolicyBuilder("tenant").RequireAuthenticatedUser().Build());
             });
         })).StartAsync();

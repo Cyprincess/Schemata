@@ -31,6 +31,7 @@ public sealed class SchemataEventFeature : FeatureBase
     ) {
         services.AddOptions<EventTypeRegistryConfiguration>();
         services.TryAddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>();
+        services.TryAddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>();
         services.TryAddSingleton<IEventTypeRegistry>(sp => EventTypeRegistryActivator.Build(sp.GetRequiredService<IOptions<EventTypeRegistryConfiguration>>()));
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IEventLifecycleObserver, SchemataEventAuditObserver>());

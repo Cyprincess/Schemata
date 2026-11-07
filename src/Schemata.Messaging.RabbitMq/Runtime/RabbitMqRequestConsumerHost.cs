@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -32,19 +31,19 @@ internal sealed class RabbitMqRequestConsumerHost : BackgroundService
     private readonly JsonSerializerOptions                    _json;
     private readonly ILogger<RabbitMqRequestConsumerHost>?    _logger;
     private readonly IOptions<RabbitMqRequestOptions>         _options;
-    private readonly IMessageExecutionScopeFactory _scopes;
+    private readonly IMessageExecutionScopeRunner _runner;
     private          IChannel?                                _channel;
 
     public RabbitMqRequestConsumerHost(
         IOptions<RabbitMqRequestOptions>       options,
         IRabbitMqConnectionProvider            connections,
-        IMessageExecutionScopeFactory         scopes,
+        IMessageExecutionScopeRunner         runner,
         IOptions<JsonSerializerOptions>?       json   = null,
         ILogger<RabbitMqRequestConsumerHost>?  logger = null
     ) {
         _options     = options;
         _connections = connections;
-        _scopes      = scopes;
+        _runner      = runner;
         _json        = json?.Value ?? new JsonSerializerOptions();
         _logger      = logger;
     }
@@ -96,35 +95,21 @@ internal sealed class RabbitMqRequestConsumerHost : BackgroundService
         object? result;
         try {
             var context = new MessageContext(MessageContextHeaders.Read(ea.BasicProperties.Headers));
-            var scope = await _scopes.CreateAsync(context, ct);
-            IDisposable? execution = null;
-            Exception? failure = null;
-            try {
-                execution = scope.Enter();
-            await scope.RestoreAsync(context, ct);
-
+            var invocation = await _runner.RunAsync(context, async (services, token) => {
             var body    = Encoding.UTF8.GetString(ea.Body.Span);
             var request = JsonSerializer.Deserialize(body, binding.Request, _json);
             if (request is null) {
-                return;
+                return (Result: (object?)null, Reply: false);
             }
 
             var invoke = InvokeHandler.MakeGenericMethod(binding.Request, binding.Response);
-            var task   = (Task<object?>)invoke.Invoke(null, [scope.Services, request, ct])!;
-            result = await task;
-            } catch (Exception error) {
-                failure = error;
-                throw;
-            } finally {
-                Exception? cleanup = null;
-                try { await scope.DisposeAsync(); }
-                catch (Exception error) { cleanup = error; }
-                try { execution?.Dispose(); }
-                catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
-                if (cleanup is not null) {
-                    ExceptionDispatchInfo.Capture(failure is null ? cleanup : new AggregateException(failure, cleanup)).Throw();
-                }
+            if (invoke.Invoke(null, [services, request, token]) is not Task<object?> task) {
+                throw new InvalidOperationException("The request handler did not return a task.");
             }
+            return (Result: await task, Reply: true);
+            }, ct);
+            if (!invocation.Reply) return;
+            result = invocation.Result;
         } catch (Exception ex) {
             // Handler failures are returned to the caller through the error envelope.
             _logger?.LogError(ex, "Request {RoutingKey} failed.", ea.RoutingKey);

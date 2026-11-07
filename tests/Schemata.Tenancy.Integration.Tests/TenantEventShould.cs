@@ -62,7 +62,10 @@ public class TenantEventShould
         services.RemoveAll<IEventLifecycleObserver>();
         new SchemataTenancyFeature<SchemataTenantManager<SchemataTenant, SchemataTenantHost>, SchemataTenant, SchemataTenantHost>()
             .ConfigureServices(services, new(), new(), new ConfigurationBuilder().Build(), null!);
-        services.Configure<SchemataTenancyOptions>(options => options.DynamicOverrides.Add((_, tenant, _) => tenant.AddScoped<IEventHandler<Notice>, Subscriber>()));
+        services.Configure<SchemataTenancyOptions>(options => options.DynamicOverrides.Add((_, tenant, _) => {
+            tenant.AddScoped<IEventBus, InProcessEventBus>();
+            tenant.AddScoped<IEventHandler<Notice>, Subscriber>();
+        }));
         new SchemataTenancyBuilder<SchemataTenant>(services).UseMessaging();
         await using var root = services.BuildServiceProvider();
         var tenant = new SchemataTenant { Name = "event" };
@@ -70,19 +73,16 @@ public class TenantEventShould
             await setup.ServiceProvider.GetRequiredService<Database>().Database.EnsureCreatedAsync();
             await setup.ServiceProvider.GetRequiredService<ITenantManager<SchemataTenant>>().CreateAsync(tenant, default);
         }
-        await using var sender = root.CreateAsyncScope();
+        await using var sender = await root.GetRequiredService<ITenantServiceScopeFactory<SchemataTenant>>().CreateAsync(new(tenant.Uid));
         var bus = sender.ServiceProvider.GetRequiredService<IEventBus>();
-        using (TenantContext.Enter(new(tenant.Uid))) {
-            if (fail) {
-                var failure = await Assert.ThrowsAsync<AggregateException>(() => bus.PublishAsync(new Notice()));
-                Assert.Equal(new Exception[] { disposed.HandlerFailure, disposed.CleanupFailure }, failure.Flatten().InnerExceptions);
-            } else {
-                await bus.PublishAsync(new Notice());
-            }
+        if (fail) {
+            var failure = await Assert.ThrowsAsync<AggregateException>(() => bus.PublishAsync(new Notice()));
+            Assert.Equal(new Exception[] { disposed.HandlerFailure, disposed.CleanupFailure }, failure.Flatten().InnerExceptions);
+        } else {
+            await bus.PublishAsync(new Notice());
         }
         Assert.Equal(tenant.Uid, Assert.Single(observed));
         Assert.Equal(tenant.Uid, Assert.Single(disposed.Identities));
-        Assert.Equal(TenantIdentity.Host, TenantContext.Current);
         await using (var setup = root.CreateAsyncScope()) {
             var subscriptions = setup.ServiceProvider.GetRequiredService<IRepository<SchemataEventSubscription>>();
             await subscriptions.AddAsync(new() { Name = "notice", EventType = "notice", SubscriptionId = "notice", Target = "tenant" });
@@ -105,22 +105,21 @@ public class TenantEventShould
         await Assert.ThrowsAsync<TenantResolveException>(() => Deliver("malformed"));
         Assert.Equal(new[] { tenant.Uid, tenant.Uid }, observed);
         Assert.Equal(new Guid?[] { tenant.Uid, tenant.Uid }, disposed.Identities);
-        Assert.Equal(TenantIdentity.Host, TenantContext.Current);
     }
 
     public sealed record Notice : IEvent;
-    public sealed class Subscriber(SchemataTenant tenant, List<Guid> observed, DisposalObservations disposed) : IEventHandler<Notice>, IAsyncDisposable
+    public sealed class Subscriber(SchemataTenant tenant, TenantIdentity identity, List<Guid> observed, DisposalObservations disposed) : IEventHandler<Notice>, IAsyncDisposable
     {
         public async Task HandleAsync(Notice notice, CancellationToken ct) {
             await Task.Yield();
-            Assert.Equal(tenant.Uid, TenantContext.Current.Uid);
+            Assert.Equal(tenant.Uid, identity.Uid);
             observed.Add(tenant.Uid);
             if (disposed.Fail) throw disposed.HandlerFailure;
         }
         public async ValueTask DisposeAsync() {
             await Task.Yield();
-            Assert.Equal(tenant.Uid, TenantContext.Current.Uid);
-            disposed.Identities.Add(TenantContext.Current.Uid);
+            Assert.Equal(tenant.Uid, identity.Uid);
+            disposed.Identities.Add(identity.Uid);
             if (disposed.Fail) throw disposed.CleanupFailure;
         }
     }

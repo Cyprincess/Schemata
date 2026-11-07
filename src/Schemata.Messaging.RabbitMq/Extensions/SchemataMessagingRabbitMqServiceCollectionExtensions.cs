@@ -58,6 +58,7 @@ public static class SchemataMessagingRabbitMqServiceCollectionExtensions
         // (RabbitMQ transport with no domain module) still has it available.
         services.TryAddScoped<InProcessRequestDispatcher>();
         services.TryAddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>();
+        services.TryAddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>();
 
         services.AddHostedService<RabbitMqRequestConsumerHost>();
 

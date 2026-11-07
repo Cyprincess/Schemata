@@ -30,6 +30,7 @@ public class SchedulerScopeShould
         await using var root = new ServiceCollection().AddSingleton(dispatcher.Object).AddSingleton(observed)
             .AddScoped<IMessageContextPropagator, ScopedPropagator>()
             .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
+            .AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>()
             .BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         var scheduler = new DefaultScheduler<SchemataJob, SchemataJobExecution>(root, Options.Create(new SchemataSchedulingOptions()));
         await scheduler.ScheduleAsync(new(), default);
@@ -67,7 +68,8 @@ public class SchedulerScopeShould
         dispatcher.Setup(d => d.SendAsync<TriggerJobRequest<SchemataJobExecution>, SchemataJobExecution>(
             It.IsAny<TriggerJobRequest<SchemataJobExecution>>(), It.IsAny<CancellationToken>())).ReturnsAsync(new SchemataJobExecution());
         await using var services = new ServiceCollection().AddScoped<IRequestDispatcher>(_ => dispatcher.Object)
-            .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().BuildServiceProvider();
+            .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
+            .AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>().BuildServiceProvider();
         var scheduler = new DefaultScheduler<SchemataJob, SchemataJobExecution>(services, Options.Create(new SchemataSchedulingOptions()));
         await scheduler.ScheduleAsync(new(), CancellationToken.None);
         Assert.Equal(1, disposed);

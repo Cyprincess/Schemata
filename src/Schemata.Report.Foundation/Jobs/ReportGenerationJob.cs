@@ -36,10 +36,8 @@ public sealed class ReportGenerationJob<TReport, TSnapshot, TChunk>(
         var (request, kind) = ReadRequest(context);
         var message = new MessageContext(context.Execution?.MessageContext ?? new());
         var scope = await scopes.CreateAsync(message, ct);
-        IDisposable? entered = null;
         Exception? failure = null;
         try {
-            entered = scope.Enter();
             await scope.RestoreAsync(message, ct);
             Func<CancellationToken, ValueTask<bool>>? isCancelled = null;
             if (context.ExecutionUid is { } uid && scope.Services.GetService<IJobExecutionState>() is { } state) {
@@ -62,7 +60,6 @@ public sealed class ReportGenerationJob<TReport, TSnapshot, TChunk>(
         } finally {
             Exception? cleanup = null;
             try { await scope.DisposeAsync(); } catch (Exception error) { cleanup = error; }
-            try { entered?.Dispose(); } catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
             if (cleanup is not null) {
                 if (failure is not null) throw new AggregateException(failure, cleanup);
                 ExceptionDispatchInfo.Capture(cleanup).Throw();

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,6 +27,7 @@ public sealed class DefaultOperationService<TJob, TExecution> : IOperationServic
 {
     private readonly IServiceProvider _services;
     private readonly IMessageExecutionScopeFactory _scopes;
+    private readonly IMessageExecutionScopeRunner _runner;
     private readonly IOptions<SchemataSchedulingOptions> _options;
     private readonly IScheduler _scheduler;
     private readonly IActiveExecutionRegistry _executions;
@@ -39,55 +39,35 @@ public sealed class DefaultOperationService<TJob, TExecution> : IOperationServic
     /// <param name="scheduler">Scheduler used to remove cancelled jobs.</param>
     /// <param name="time">Clock used for terminal execution timestamps.</param>
     public DefaultOperationService(
-        IServiceProvider                     services,
+        IServiceProvider services,
         IOptions<SchemataSchedulingOptions> options,
-        IScheduler                           scheduler,
-        TimeProvider?                        time = null
+        IScheduler scheduler,
+        TimeProvider? time = null
     ) {
-        _services  = services;
-        _scopes    = services.GetRequiredService<IMessageExecutionScopeFactory>();
-        _options   = options;
+        _services = services;
+        _scopes = services.GetRequiredService<IMessageExecutionScopeFactory>();
+        _runner = services.GetRequiredService<IMessageExecutionScopeRunner>();
+        _options = options;
         _scheduler = scheduler;
         _executions = services.GetRequiredService<IActiveExecutionRegistry>();
-        _time      = time ?? TimeProvider.System;
+        _time = time ?? TimeProvider.System;
     }
 
     public async ValueTask<Operation> GetAsync(string operation, CancellationToken ct = default) {
         ArgumentException.ThrowIfNullOrWhiteSpace(operation);
-
         var context = await MessageContexts.CaptureAsync(_services, ct);
-        var scope = await _scopes.CreateAsync(context, ct);
-        IDisposable? entered = null;
-        Exception? failure = null;
-        try {
-            entered = scope.Enter();
-            await scope.RestoreAsync(context, ct);
-            var executions = scope.Services.GetRequiredService<IRepository<TExecution>>();
-            var execution = await FindAsync(executions, operation, ct);
+        return await _runner.RunAsync(context, async (services, token) => {
+            var executions = services.GetRequiredService<IRepository<TExecution>>();
+            var execution = await FindAsync(executions, operation, token);
             return OperationMapper.FromExecution(execution);
-        } catch (Exception error) {
-            failure = error;
-            throw;
-        } finally {
-            Exception? cleanup = null;
-            try { await scope.DisposeAsync(); } catch (Exception error) { cleanup = error; }
-            try { entered?.Dispose(); } catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
-            if (cleanup is not null) {
-                if (failure is not null) throw new AggregateException(failure, cleanup);
-                ExceptionDispatchInfo.Capture(cleanup).Throw();
-            }
-        }
+        }, ct);
     }
 
     public async ValueTask<Operation> WaitAsync(string operation, CancellationToken ct = default) {
         while (true) {
             ct.ThrowIfCancellationRequested();
-
             var current = await GetAsync(operation, ct);
-            if (current.Done) {
-                return current;
-            }
-
+            if (current.Done) return current;
             await Task.Delay(PollInterval, _time, ct);
         }
     }
@@ -95,64 +75,33 @@ public sealed class DefaultOperationService<TJob, TExecution> : IOperationServic
     public async ValueTask<Operation> CancelAsync(string operation, CancellationToken ct = default) {
         ArgumentException.ThrowIfNullOrWhiteSpace(operation);
         var context = await MessageContexts.CaptureAsync(_services, ct);
-        TExecution execution;
-        var lookup = await _scopes.CreateAsync(context, ct);
-        IDisposable? lookupEntry = null;
-        Exception? lookupFailure = null;
-        try {
-            lookupEntry = lookup.Enter();
-            await lookup.RestoreAsync(context, ct);
-            execution = await FindAsync(lookup.Services.GetRequiredService<IRepository<TExecution>>(), operation, ct);
-        } catch (Exception error) {
-            lookupFailure = error;
-            throw;
-        } finally {
-            Exception? cleanup = null;
-            try { await lookup.DisposeAsync(); } catch (Exception error) { cleanup = error; }
-            try { lookupEntry?.Dispose(); } catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
-            if (cleanup is not null) {
-                if (lookupFailure is not null) throw new AggregateException(lookupFailure, cleanup);
-                ExceptionDispatchInfo.Capture(cleanup).Throw();
-            }
-        }
+        var execution = await _runner.RunAsync(context, async (services, token) =>
+            await FindAsync(services.GetRequiredService<IRepository<TExecution>>(), operation, token), ct);
         if (execution.State.IsTerminal()) {
             throw new FailedPreconditionException(SchemataResources.OPERATION_ALREADY_FINISHED,
                 new Dictionary<string, string?> { ["name"] = execution.CanonicalName });
         }
         context = new MessageContext(execution.MessageContext ?? new());
         for (var attempt = 0; attempt < 2; attempt++) {
-            var selected = await _scopes.CreateAsync(context, ct);
-            IDisposable? entered = null;
-            Exception? failure = null;
-            try {
-                entered = selected.Enter();
-                await selected.RestoreAsync(context, ct);
+            var result = await _runner.RunAsync<Operation?>(context, async (services, token) => {
                 if (attempt == 0) {
                     if (execution.State == ExecutionState.Pending && !string.IsNullOrEmpty(execution.Job)) {
-                        await _scheduler.UnscheduleAsync(execution.Job, ct);
-                        return await GetAsync(operation, ct);
+                        await _scheduler.UnscheduleAsync(execution.Job, token);
+                        return await GetAsync(operation, token);
                     }
                     _executions.Cancel(execution.Uid.ToString("n"));
                 } else {
-                    execution = await FindAsync(selected.Services.GetRequiredService<IRepository<TExecution>>(), operation, ct);
+                    execution = await FindAsync(services.GetRequiredService<IRepository<TExecution>>(), operation, token);
                     if (execution.State.IsTerminal()) return OperationMapper.FromExecution(execution);
                 }
                 execution.State = ExecutionState.Cancelled;
                 execution.EndTime = _time.GetUtcNow().UtcDateTime;
-                if (await selected.Services.GetRequiredService<IJobExecutionStore<TJob, TExecution>>().TrySettleAsync(execution, ct))
+                if (await services.GetRequiredService<IJobExecutionStore<TJob, TExecution>>().TrySettleAsync(execution, token)) {
                     return OperationMapper.FromExecution(execution);
-            } catch (Exception error) {
-                failure = error;
-                throw;
-            } finally {
-                Exception? cleanup = null;
-                try { await selected.DisposeAsync(); } catch (Exception error) { cleanup = error; }
-                try { entered?.Dispose(); } catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
-                if (cleanup is not null) {
-                    if (failure is not null) throw new AggregateException(failure, cleanup);
-                    ExceptionDispatchInfo.Capture(cleanup).Throw();
                 }
-            }
+                return null;
+            }, ct);
+            if (result is not null) return result;
         }
         var winner = await GetAsync(operation, ct);
         if (winner.Done) return winner;
@@ -172,56 +121,42 @@ public sealed class DefaultOperationService<TJob, TExecution> : IOperationServic
         var context = await MessageContexts.CaptureAsync(_services, ct);
         var execution = new TExecution {
             MessageContext = new(context.Items),
-            Method    = method,
-            State     = ExecutionState.Running,
+            Method = method,
+            State = ExecutionState.Running,
             StartTime = _time.GetUtcNow().UtcDateTime,
             LeaseExpireTime = _time.GetUtcNow().UtcDateTime.Add(duration),
         };
-        var creation = await _scopes.CreateAsync(context, ct);
-        IDisposable? creationEntry = null;
-        Exception? creationFailure = null;
         JobExecutionLease<TJob, TExecution>? lease = null;
         try {
-            creationEntry = creation.Enter();
-            await creation.RestoreAsync(context, ct);
-            var mutation = creation.Services.GetRequiredService<IResourceMutation<TExecution>>();
-            if (await mutation.CreateAsync(execution, null, ct) != MutationResult.Applied)
-                throw new InvalidOperationException("Inline execution creation was not applied.");
-            lease = new JobExecutionLease<TJob, TExecution>(JobExecutionScopes.Messaging(_scopes, context), execution, duration, _time, _executions, ct);
-        } catch (Exception creationError) {
-            creationFailure = creationError;
-            throw;
-        } finally {
-            Exception? cleanup = null;
-            try { await creation.DisposeAsync(); } catch (Exception disposeError) { cleanup = disposeError; }
-            try { creationEntry?.Dispose(); } catch (Exception entryError) { cleanup = cleanup is null ? entryError : new AggregateException(cleanup, entryError); }
-            if (cleanup is not null) {
-                if (lease is not null) {
-                    try { await lease.DisposeAsync(); } catch (Exception leaseError) { cleanup = new AggregateException(cleanup, leaseError); }
-                }
-                if (creationFailure is not null) throw new AggregateException(creationFailure, cleanup);
-                ExceptionDispatchInfo.Capture(cleanup).Throw();
+            await _runner.RunAsync(context, (services, token) => {
+                var mutation = services.GetRequiredService<IResourceMutation<TExecution>>();
+                return CreateLeaseAsync(mutation, token);
+            }, ct);
+        } catch (Exception creationFailure) {
+            if (lease is null) throw;
+            try {
+                await lease.DisposeAsync();
+            } catch (Exception cleanup) {
+                throw new AggregateException(creationFailure, cleanup);
             }
+            throw;
         }
-        await using var owned = lease!;
+
+        await using var owned = lease ?? throw new InvalidOperationException("Inline execution lease was not created.");
         var state = ExecutionState.Succeeded;
-        string? output = null;
+        string? output;
         string? error = null;
-        MessageExecutionScope? scope = null;
-        IDisposable? entered = null;
-        Exception? failure = null;
         try {
             owned.ThrowIfOwnershipLost();
-            scope = await _scopes.CreateAsync(context, owned.Token);
-            entered = scope.Enter();
-            await scope.RestoreAsync(context, owned.Token);
-            owned.ThrowIfOwnershipLost();
-            await owned.ConfirmAsync(owned.Token);
-            owned.ThrowIfOwnershipLost();
-            output = await execute(OperationMapper.FromExecution(execution), owned.Token);
-            owned.ThrowIfOwnershipLost();
-        } catch (OperationCanceledException exception) when (owned.Token.IsCancellationRequested) {
-            failure = exception;
+            output = await _runner.RunAsync(context, async (_, token) => {
+                owned.ThrowIfOwnershipLost();
+                await owned.ConfirmAsync(token);
+                owned.ThrowIfOwnershipLost();
+                var result = await execute(OperationMapper.FromExecution(execution), token);
+                owned.ThrowIfOwnershipLost();
+                return result;
+            }, owned.Token);
+        } catch (OperationCanceledException) when (owned.Token.IsCancellationRequested) {
             using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             await owned.TransitionAsync(store => {
                 execution.State = ExecutionState.Cancelled;
@@ -229,23 +164,12 @@ public sealed class DefaultOperationService<TJob, TExecution> : IOperationServic
                 return store.TrySettleAsync(execution, cleanup.Token);
             }, cleanup.Token);
             throw;
-        } catch (Exception exception) when (owned.Token.IsCancellationRequested) {
-            failure = exception;
+        } catch (Exception) when (owned.Token.IsCancellationRequested) {
             throw;
         } catch (Exception exception) {
-            failure = exception;
             state = ExecutionState.Failed;
             error = exception.Message;
-        } finally {
-            Exception? cleanup = null;
-            if (scope is not null) {
-                try { await scope.DisposeAsync(); } catch (Exception exception) { cleanup = exception; }
-            }
-            try { entered?.Dispose(); } catch (Exception exception) { cleanup = cleanup is null ? exception : new AggregateException(cleanup, exception); }
-            if (cleanup is not null) {
-                if (failure is not null) throw new AggregateException(failure, cleanup);
-                ExceptionDispatchInfo.Capture(cleanup).Throw();
-            }
+            output = null;
         }
         using var completion = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         if (!await owned.TransitionAsync(store => {
@@ -255,13 +179,23 @@ public sealed class DefaultOperationService<TJob, TExecution> : IOperationServic
             execution.EndTime = _time.GetUtcNow().UtcDateTime;
             return store.TrySettleAsync(execution, completion.Token);
         }, completion.Token)) {
-            var winner = await GetAsync(execution.CanonicalName!, completion.Token);
+            var canonical = execution.CanonicalName
+                         ?? throw new InvalidOperationException("Inline execution has no canonical name.");
+            var winner = await GetAsync(canonical, completion.Token);
             if (winner.Done) return winner;
             throw new AbortedException("Inline operation lost its terminal transition.");
         }
         return OperationMapper.FromExecution(execution);
-    }
 
+        async ValueTask<bool> CreateLeaseAsync(IResourceMutation<TExecution> mutation, CancellationToken token) {
+            if (await mutation.CreateAsync(execution, null, token) != MutationResult.Applied) {
+                throw new InvalidOperationException("Inline execution creation was not applied.");
+            }
+            lease = new JobExecutionLease<TJob, TExecution>(
+                JobExecutionScopes.Messaging(_scopes, context), execution, duration, _time, _executions, token);
+            return true;
+        }
+    }
 
     private TimeSpan PollInterval {
         get {
@@ -274,8 +208,8 @@ public sealed class DefaultOperationService<TJob, TExecution> : IOperationServic
 
     private static async ValueTask<TExecution> FindAsync(
         IRepository<TExecution> executions,
-        string                  operation,
-        CancellationToken       ct
+        string operation,
+        CancellationToken ct
     ) {
         var execution = await executions.FirstOrDefaultAsync<TExecution>(
             query => query.Where(e => e.CanonicalName == operation || e.Name == operation), ct);

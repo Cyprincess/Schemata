@@ -64,6 +64,7 @@ public class TenantReminderShould
         new SchemataTenancyBuilder<SchemataTenant>(services).UseRepositories(builder => {
             builder.Services.AddScoped<IJobExecutionStore<TenantJob, TenantJobExecution>, RepositoryJobExecutionStore<TenantJob, TenantJobExecution>>();
             builder.Services.AddSchemataScheduling<TenantJob, TenantJobExecution>();
+            builder.Services.AddScoped<ActorReminderJob>();
             builder.Services.AddScoped<IActorReminders, ActorReminders<TenantJob, TenantJobExecution>>();
             builder.Services.AddTransient<IRepository<TenantJob>, EfCoreRepository<Database, TenantJob>>();
             builder.Services.AddTransient<IRepository<TenantJobExecution>, EfCoreRepository<Database, TenantJobExecution>>();
@@ -74,7 +75,12 @@ public class TenantReminderShould
         new SchemataActorSchedulingFeature<TenantJob, TenantJobExecution>().ConfigureServices(services, new(), new(), new ConfigurationBuilder().Build(), null!);
         services.AddSchemataActor();
         services.Replace(ServiceDescriptor.Singleton<IMessageExecutionScopeFactory, TenantMessageExecutionScopeFactory<SchemataTenant>>());
-        services.Replace(ServiceDescriptor.Singleton<IActorSystem, TenantActorSystem<SchemataActor>>());
+        services.TryAddSingleton<TenantActorSystem<SchemataActor>>();
+        services.Replace(ServiceDescriptor.Singleton<IActorSystemLifetime>(provider => provider.GetRequiredService<TenantActorSystem<SchemataActor>>()));
+        services.Replace(ServiceDescriptor.Scoped<IActorSystem, ScopedTenantActorSystem<SchemataActor>>());
+        services.Configure<SchemataTenancyOptions>(options => options.DynamicOverrides.Add((_, tenant, _) => {
+            tenant.Replace(ServiceDescriptor.Scoped<IActorSystem, ScopedTenantActorSystem<SchemataActor>>());
+        }));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IMessageContextPropagator, TenantMessageContextPropagator>());
         await using var root = services.BuildServiceProvider();
         var a = new SchemataTenant { Name = "a" };
@@ -86,10 +92,8 @@ public class TenantReminderShould
             await manager.CreateAsync(b, default);
         }
         var tenants = root.GetRequiredService<ITenantServiceScopeFactory<SchemataTenant>>();
-        var actors = root.GetRequiredService<IActorSystem>();
         foreach (var tenant in new[] { a, b }) {
             await using var scope = await tenants.CreateAsync(new(tenant.Uid));
-            using var entered = TenantContext.Enter(new(tenant.Uid));
             scope.ServiceProvider.GetRequiredService<IScheduledJobRegistry>().Register<ActorReminderJob>();
             await scope.ServiceProvider.GetRequiredService<IScheduler<TenantJob, TenantJobExecution>>().StartAsync(default);
             await scope.ServiceProvider.GetRequiredService<IActorReminders>().ScheduleAsync(
@@ -105,7 +109,6 @@ public class TenantReminderShould
         }
         foreach (var tenant in new[] { a, b }) {
             await using var scope = await tenants.CreateAsync(new(tenant.Uid));
-            using var entered = TenantContext.Enter(new(tenant.Uid));
             var jobs = await scope.ServiceProvider.GetRequiredService<IRepository<TenantJob>>().ListAsync<TenantJob>(null).ToListAsync();
             var scheduler = scope.ServiceProvider.GetRequiredService<IScheduler<TenantJob, TenantJobExecution>>();
             foreach (var job in jobs) {
@@ -119,7 +122,6 @@ public class TenantReminderShould
         clock.Advance(TimeSpan.FromMinutes(5));
         foreach (var tenant in new[] { a, b }) {
             await using var scope = await tenants.CreateAsync(new(tenant.Uid));
-            using var entered = TenantContext.Enter(new(tenant.Uid));
             await scope.ServiceProvider.GetRequiredService<JobExecutionDispatcher<TenantJob, TenantJobExecution>>().DispatchPendingAsync(default);
         }
         var first = await received.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30));
@@ -127,25 +129,21 @@ public class TenantReminderShould
         Assert.Contains(a.Uid, new[] { first, second });
         Assert.Contains(b.Uid, new[] { first, second });
         await using (var scope = await tenants.CreateAsync(new(a.Uid))) {
-            using var entered = TenantContext.Enter(new(a.Uid));
             await scope.ServiceProvider.GetRequiredService<IActorReminders>().CancelAsync(new(new("counter", "same"), "same"));
         }
         clock.Advance(TimeSpan.FromMinutes(5));
         foreach (var tenant in new[] { a, b }) {
             await using var scope = await tenants.CreateAsync(new(tenant.Uid));
-            using var entered = TenantContext.Enter(new(tenant.Uid));
             await scope.ServiceProvider.GetRequiredService<JobExecutionDispatcher<TenantJob, TenantJobExecution>>().DispatchPendingAsync(default);
         }
         Assert.Equal(b.Uid, await received.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30)));
         foreach (var uid in new[] { a.Uid, b.Uid }) {
-            using var frame = TenantContext.Enter(new(uid));
-            await actors.StopAsync(new("counter", "same"));
+            await using var scope = await tenants.CreateAsync(new(uid));
+            await scope.ServiceProvider.GetRequiredService<IActorSystem>().StopAsync(new("counter", "same"));
         }
         Assert.False(received.Reader.TryRead(out _));
-        Assert.Equal(TenantIdentity.Host, TenantContext.Current);
         foreach (var tenant in new[] { a, b }) {
             await using var scope = await tenants.CreateAsync(new(tenant.Uid));
-            using var entered = TenantContext.Enter(new(tenant.Uid));
             await scope.ServiceProvider.GetRequiredService<IScheduler<TenantJob, TenantJobExecution>>().StopAsync(default);
         }
     }
@@ -156,7 +154,12 @@ public class TenantReminderShould
         public ValueTask OnStartedAsync(IActorContext context) => ValueTask.CompletedTask;
         public ValueTask OnStoppedAsync(IActorContext context) => ValueTask.CompletedTask;
         public ValueTask<bool> OnFailedAsync(IActorContext context, Exception error) => ValueTask.FromResult(false);
-        public ValueTask OnReceiveAsync(IActorContext context, Envelope envelope) => received.WriteAsync(TenantContext.Current.Uid!.Value);
+        public ValueTask OnReceiveAsync(IActorContext context, Envelope envelope) {
+            if (context.Services.GetRequiredService<TenantIdentity>().Uid is not { } uid) {
+                return ValueTask.FromException(new InvalidOperationException("A tenant execution identity is required."));
+            }
+            return received.WriteAsync(uid);
+        }
     }
     public sealed class Database(DbContextOptions<Database> options) : DbContext(options)
     {

@@ -19,33 +19,23 @@ public class JobExecutionLeaseShould
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Scope_Disposal_Sees_Captured_Identity_And_Preserves_Operation_Failure(bool fail) {
-        var ambient = new AsyncLocal<string?>();
-        var disposed = 0;
+    public async Task Scope_Disposal_Uses_Restored_Scope_State_And_Preserves_Operation_Failure(bool fail) {
+        var disposed = new List<string?>();
         var operation = new InvalidOperationException("renewal");
         var cleanup = new InvalidOperationException("disposal");
         var store = new Mock<IJobExecutionStore<SchemataJob, SchemataJobExecution>>();
         store.Setup(s => s.TryRenewLeaseAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .Returns(() => fail ? Task.FromException<bool>(operation) : Task.FromResult(true));
-        var resource = new Mock<IAsyncDisposable>();
-        resource.Setup(r => r.DisposeAsync()).Returns(() => {
-            Assert.Equal("captured", ambient.Value);
-            disposed++;
-            return fail ? ValueTask.FromException(cleanup) : ValueTask.CompletedTask;
-        });
-        await using var root = new ServiceCollection().AddSingleton(store.Object).AddScoped(_ => resource.Object).BuildServiceProvider();
+        await using var root = new ServiceCollection().AddSingleton(store.Object).AddSingleton(disposed)
+            .AddSingleton(new CleanupOptions(fail ? cleanup : null))
+            .AddScoped<ExecutionMarker>().AddScoped<DisposalProbe>().AddSingleton<IMessageContextPropagator, MarkerPropagator>()
+            .BuildServiceProvider();
         var factory = new Mock<IMessageExecutionScopeFactory>();
         factory.Setup(f => f.CreateAsync(It.IsAny<MessageContext?>(), It.IsAny<CancellationToken>()))
             .Returns((MessageContext? _, CancellationToken _) => {
                 var scope = root.CreateAsyncScope();
-                scope.ServiceProvider.GetRequiredService<IAsyncDisposable>();
-                return ValueTask.FromResult(new MessageExecutionScope(scope, () => {
-                    var previous = ambient.Value;
-                    ambient.Value = "captured";
-                    var entered = new Mock<IDisposable>();
-                    entered.Setup(e => e.Dispose()).Callback(() => ambient.Value = previous);
-                    return entered.Object;
-                }));
+                scope.ServiceProvider.GetRequiredService<DisposalProbe>();
+                return ValueTask.FromResult(new MessageExecutionScope(scope));
             });
         await using var lease = new JobExecutionLease<SchemataJob, SchemataJobExecution>(
             JobExecutionScopes.Messaging(factory.Object, new(new Dictionary<string, string?>())),
@@ -58,8 +48,32 @@ public class JobExecutionLeaseShould
         } else {
             await lease.ConfirmAsync(default);
         }
-        Assert.Equal(1, disposed);
-        Assert.Null(ambient.Value);
+        Assert.Equal(["captured"], disposed);
+    }
+
+    private sealed class ExecutionMarker
+    {
+        public string? Value { get; set; }
+    }
+
+    private sealed class MarkerPropagator : IMessageContextPropagator
+    {
+        public void Capture(IDictionary<string, string?> items, IServiceProvider source) { }
+        public ValueTask RestoreAsync(IReadOnlyDictionary<string, string?> items, IServiceProvider target, CancellationToken ct = default) {
+            target.GetRequiredService<ExecutionMarker>().Value = "captured";
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed record CleanupOptions(Exception? Error);
+
+    private sealed class DisposalProbe(ExecutionMarker marker, List<string?> disposed, CleanupOptions options) : IAsyncDisposable
+    {
+        public ValueTask DisposeAsync() {
+            disposed.Add(marker.Value);
+            if (marker.Value != "captured") return ValueTask.FromException(new InvalidOperationException("Scope state was not restored."));
+            return options.Error is { } error ? ValueTask.FromException(error) : ValueTask.CompletedTask;
+        }
     }
 
     [Fact]

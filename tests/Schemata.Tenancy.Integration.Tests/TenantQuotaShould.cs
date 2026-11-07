@@ -37,14 +37,15 @@ public sealed class TenantQuotaShould
     [InlineData(true, false)]
     [InlineData(true, true)]
     public async Task Bind_Fallback_Subject_Per_Rejection_And_Preserve_Policy_Metadata(bool metadata, bool anonymous) {
-        using var services = Services(_ => { });
+        var current = TenantIdentity.Host;
+        using var services = Services(_ => { }, () => current);
         var reject = services.GetRequiredService<IOptions<RateLimiterOptions>>().Value.OnRejected!;
         var lease = new Mock<RateLimitLease>();
         object? supplied = metadata ? "application:shared-quota" : null;
         lease.Setup(value => value.TryGetMetadata(QuotaMetadata.Subject.Name, out supplied)).Returns(metadata);
         object? retry = TimeSpan.FromSeconds(2);
         lease.Setup(value => value.TryGetMetadata(MetadataName.RetryAfter.Name, out retry)).Returns(true);
-        var http = new DefaultHttpContext();
+        var http = new DefaultHttpContext { RequestServices = services };
         http.Connection.RemoteIpAddress = IPAddress.Loopback;
         if (!anonymous) http.User = new(new ClaimsIdentity([new("sub", "users/alice")], "test"));
         var caller = anonymous ? "client:127.0.0.1" : "users/alice";
@@ -52,7 +53,9 @@ public sealed class TenantQuotaShould
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
             Guid.Parse("22222222-2222-2222-2222-222222222222"), null,
         }) {
-            using var frame = TenantContext.Enter(new(uid));
+            current = new(uid);
+            await using var request = services.CreateAsyncScope();
+            http.RequestServices = request.ServiceProvider;
             var error = await Assert.ThrowsAsync<QuotaExceededException>(() => reject(new() { HttpContext = http, Lease = lease.Object }, default).AsTask());
             var subject = Assert.Single(Assert.Single(error.Details!.OfType<QuotaFailureDetail>()).Violations!).Subject;
             Assert.Equal(metadata ? "application:shared-quota" : uid is { } tenant ? $"tenants/{tenant:D}/{caller}" : caller, subject);
@@ -63,16 +66,15 @@ public sealed class TenantQuotaShould
     [Fact]
     public async Task Preserve_Application_Exception_And_Snapshot_Issuing_Identity() {
         var first = Guid.Parse("11111111-1111-1111-1111-111111111111");
-        var second = Guid.Parse("22222222-2222-2222-2222-222222222222");
         var failure = new QuotaExceededException([new() { Subject = "users/alice", QuotaId = "application-quota" }]);
+        var current = new TenantIdentity(first);
         using var services = Services(options => options.OnRejected = async (_, _) => {
-            using var switched = TenantContext.Enter(new(second));
             await Task.Yield();
             throw failure;
-        });
-        using var frame = TenantContext.Enter(new(first));
+        }, () => current);
         var reject = services.GetRequiredService<IOptions<RateLimiterOptions>>().Value.OnRejected!;
-        var error = await Assert.ThrowsAsync<QuotaExceededException>(() => reject(new() { HttpContext = new DefaultHttpContext(), Lease = Mock.Of<RateLimitLease>() }, default).AsTask());
+        var http = new DefaultHttpContext { RequestServices = services };
+        var error = await Assert.ThrowsAsync<QuotaExceededException>(() => reject(new() { HttpContext = http, Lease = Mock.Of<RateLimitLease>() }, default).AsTask());
         Assert.Same(failure, error);
         var violation = Assert.Single(Assert.Single(error.Details!.OfType<QuotaFailureDetail>()).Violations!);
         Assert.Equal($"tenants/{first:D}/users/alice", violation.Subject);
@@ -83,7 +85,6 @@ public sealed class TenantQuotaShould
     public async Task Preserve_Nonquota_Application_Failure() {
         var failure = new InvalidOperationException("policy-failure");
         using var services = Services(options => options.OnRejected = (_, _) => throw failure);
-        using var frame = TenantContext.Enter(new(Guid.Parse("11111111-1111-1111-1111-111111111111")));
         var reject = services.GetRequiredService<IOptions<RateLimiterOptions>>().Value.OnRejected!;
         Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => reject(new() { HttpContext = new DefaultHttpContext(), Lease = Mock.Of<RateLimitLease>() }, default).AsTask()));
     }
@@ -95,7 +96,6 @@ public sealed class TenantQuotaShould
         var lease = new Mock<RateLimitLease>();
         object? supplied = "application:quota";
         lease.Setup(value => value.TryGetMetadata(QuotaMetadata.Subject.Name, out supplied)).Returns(true);
-        using var frame = TenantContext.Enter(new(Guid.Parse("11111111-1111-1111-1111-111111111111")));
         var reject = services.GetRequiredService<IOptions<RateLimiterOptions>>().Value.OnRejected!;
         var error = await Assert.ThrowsAsync<QuotaExceededException>(() => reject(new() { HttpContext = new DefaultHttpContext(), Lease = lease.Object }, default).AsTask());
         Assert.Same(failure, error);
@@ -115,7 +115,6 @@ public sealed class TenantQuotaShould
             called = true;
             return ValueTask.CompletedTask;
         });
-        using var frame = TenantContext.Enter(new(Guid.Parse("11111111-1111-1111-1111-111111111111")));
         await services.GetRequiredService<IOptions<RateLimiterOptions>>().Value.OnRejected!(
             new() { HttpContext = http, Lease = Mock.Of<RateLimitLease>() }, default);
         Assert.True(called);
@@ -138,9 +137,16 @@ public sealed class TenantQuotaShould
             }).Configure(app => {
                 app.UseSchemataExceptionHandler();
                 app.Use(async (http, next) => {
-                    using var frame = TenantContext.Enter(new(Guid.Parse(http.Request.Headers["X-Tenant"].ToString())));
+                    var original = http.RequestServices;
+                    var identity = Guid.Parse(http.Request.Headers["X-Tenant"].ToString());
+                    await using var selected = IdentityRequestProvider(identity);
+                    http.RequestServices = selected;
                     http.User = new(new ClaimsIdentity([new("sub", "users/alice")], "test"));
-                    await next(http);
+                    try {
+                        await next(http);
+                    } finally {
+                        http.RequestServices = original;
+                    }
                 });
                 app.UseRateLimiter();
                 app.Run(http => http.Response.WriteAsync("accepted"));
@@ -162,10 +168,14 @@ public sealed class TenantQuotaShould
         await host.StopAsync();
     }
 
-    private static ServiceProvider Services(Action<RateLimiterOptions> configure) {
+    private static ServiceProvider Services(Action<RateLimiterOptions> configure, Func<TenantIdentity>? identity = null) {
         var services = new ServiceCollection().AddLogging().AddSchemataRateLimiter(configure);
         new SchemataTenancyFeature<SchemataTenantManager<SchemataTenant, SchemataTenantHost>, SchemataTenant, SchemataTenantHost>()
             .ConfigureServices(services, new(), new(), new ConfigurationBuilder().Build(), null!);
+        if (identity is not null) services.AddScoped(typeof(TenantIdentity), _ => identity());
         return services.BuildServiceProvider();
     }
+
+    private static ServiceProvider IdentityRequestProvider(Guid uid) =>
+        new ServiceCollection().AddScoped(typeof(TenantIdentity), _ => new TenantIdentity(uid)).BuildServiceProvider();
 }

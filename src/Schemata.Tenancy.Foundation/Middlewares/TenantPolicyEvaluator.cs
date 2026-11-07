@@ -26,9 +26,6 @@ internal sealed class TenantPolicyEvaluator(IPolicyEvaluator inner) : IPolicyEva
 
     public async Task<PolicyAuthorizationResult> AuthorizeAsync(AuthorizationPolicy policy, AuthenticateResult authenticationResult,
         HttpContext context, object? resource) {
-        using var frame = TenantContext.Enter(context.Features.Get<ITenantRequestBinding>()?.Identity ?? TenantContext.Current);
-        // The pipeline publishes this evaluator from the application provider; authorization runs
-        // in the request's tenant scope, so the framework evaluator is resolved per request.
         var evaluator = context.RequestServices.GetRequiredKeyedService<IPolicyEvaluator>(
             SchemataAuthenticationFeature.PolicyEvaluatorServiceKey);
         return await evaluator.AuthorizeAsync(policy, authenticationResult, context, resource);
@@ -46,12 +43,4 @@ internal interface ITenantRequestBinding
     TenantIdentity Identity { get; }
     IServiceProvider Original { get; }
     Task BindPrincipalAsync(HttpContext http);
-}
-
-public sealed class TenantExecutionMiddleware(RequestDelegate next)
-{
-    public async Task Invoke(HttpContext http) {
-        using var frame = TenantContext.Enter(http.Features.Get<ITenantRequestBinding>()?.Identity ?? TenantContext.Current);
-        await next(http);
-    }
 }

@@ -7,17 +7,15 @@ using Schemata.Actor.Skeleton;
 
 namespace Schemata.Actor.Foundation.Runtime;
 
-internal sealed class ActorHostedService(IActorSystem system, IHostApplicationLifetime lifetime) : IHostedService, IDisposable
+internal sealed class ActorHostedService(IActorSystemLifetime runtime, IHostApplicationLifetime lifetime) : IHostedService, IDisposable
 {
     private CancellationTokenRegistration _stopping;
     private readonly CancellationTokenSource _collection = new();
     private Task? _collector;
 
     public Task StartAsync(CancellationToken cancellationToken) {
-        if (system is IActorSystemLifetime runtime) {
-            _stopping = lifetime.ApplicationStopping.Register(() => runtime.BeginShutdown());
-            _collector = runtime.CollectIdleAsync(_collection.Token);
-        }
+        _stopping = lifetime.ApplicationStopping.Register(() => runtime.BeginShutdown());
+        _collector = runtime.CollectIdleAsync(_collection.Token);
         return Task.CompletedTask;
     }
 
@@ -28,7 +26,7 @@ internal sealed class ActorHostedService(IActorSystem system, IHostApplicationLi
             if (_collector is not null) await _collector;
         } catch (OperationCanceledException) when (_collection.IsCancellationRequested) { }
         catch (Exception error) { failure = error; }
-        try { if (system is IActorSystemLifetime runtime) await runtime.ShutdownAsync(cancellationToken); }
+        try { await runtime.ShutdownAsync(cancellationToken); }
         catch (Exception error) { failure = failure is null ? error : new AggregateException(failure, error); }
         if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
     }

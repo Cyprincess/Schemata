@@ -53,7 +53,7 @@ internal static class ReportTestHost
     ) {
         state ??= new();
         var services = new ServiceCollection();
-        services.AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>();
+        services.AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>();
         services.Configure<SchemataReportOptions>(options => {
             options.ChunkSize     = chunkSize;
             options.MaxInlineRows = maxInlineRows;

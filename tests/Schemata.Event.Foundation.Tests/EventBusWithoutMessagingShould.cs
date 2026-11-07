@@ -43,7 +43,7 @@ public class EventBusWithoutMessagingShould
                                   .AddSingleton(subscriptions.Object)
                                   .AddSingleton<IEventDispatchContext>(new EventDispatchContext())
                                   .AddSingleton<HandlerResolver>()
-                                  .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
+                                  .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>()
                                   .AddSingleton<IEventHandler<OrderPlaced>>(Mock.Of<IEventHandler<OrderPlaced>>())
                                   .AddSingleton(observer.Object)
                                   .BuildServiceProvider();

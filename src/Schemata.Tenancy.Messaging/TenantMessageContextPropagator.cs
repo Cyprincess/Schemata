@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Messaging.Skeleton;
 using Schemata.Tenancy.Foundation;
 using Schemata.Tenancy.Skeleton.Tenancy;
@@ -11,7 +12,7 @@ namespace Schemata.Tenancy.Messaging;
 public sealed class TenantMessageContextPropagator : IMessageContextPropagator
 {
     public void Capture(IDictionary<string, string?> items, IServiceProvider source) {
-        items[TenancyConstants.Messaging.TenantIdKey] = TenantContext.Current.Uid?.ToString("D") ?? "host";
+        items[TenancyConstants.Messaging.TenantIdKey] = source.GetRequiredService<TenantIdentity>().Uid?.ToString("D") ?? "host";
     }
 
     internal static TenantIdentity Identity(IReadOnlyDictionary<string, string?>? items) {
@@ -23,7 +24,7 @@ public sealed class TenantMessageContextPropagator : IMessageContextPropagator
 
     public ValueTask RestoreAsync(IReadOnlyDictionary<string, string?> items, IServiceProvider target, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
-        if (Identity(items) != TenantContext.Current) throw new TenantResolveException();
+        if (Identity(items) != target.GetRequiredService<TenantIdentity>()) throw new TenantResolveException();
         return ValueTask.CompletedTask;
     }
 }

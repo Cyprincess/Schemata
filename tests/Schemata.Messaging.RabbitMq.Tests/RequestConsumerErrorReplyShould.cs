@@ -59,7 +59,7 @@ public class RequestConsumerErrorReplyShould
         var host = new RabbitMqRequestConsumerHost(
             Options.Create(new RabbitMqRequestOptions().Register<Ping, Unit>("ping")),
             null!,
-            new MessageExecutionScopeFactory(provider.GetRequiredService<IServiceScopeFactory>()));
+            new MessageExecutionScopeRunner(new MessageExecutionScopeFactory(provider.GetRequiredService<IServiceScopeFactory>())));
         typeof(RabbitMqRequestConsumerHost)
            .GetField("_channel", BindingFlags.NonPublic | BindingFlags.Instance)!
            .SetValue(host, channel.Object);
@@ -90,7 +90,7 @@ public class RequestConsumerErrorReplyShould
             It.IsAny<ReadOnlyMemory<byte>>(), It.IsAny<CancellationToken>())).Throws(failure);
         using var services = new ServiceCollection().BuildServiceProvider();
         var host = new RabbitMqRequestConsumerHost(Options.Create(new RabbitMqRequestOptions()), null!,
-            new MessageExecutionScopeFactory(services.GetRequiredService<IServiceScopeFactory>()));
+            new MessageExecutionScopeRunner(new MessageExecutionScopeFactory(services.GetRequiredService<IServiceScopeFactory>())));
         typeof(RabbitMqRequestConsumerHost).GetField("_channel", BindingFlags.NonPublic | BindingFlags.Instance)!
             .SetValue(host, channel.Object);
 

@@ -30,7 +30,6 @@ public sealed class TenantMessageExecutionScopeFactory<TTenant>(IServiceScopeFac
         if (failure is not null) {
             if (final is { } abandoned) {
                 try {
-                    using var execution = TenantContext.Enter(identity);
                     await abandoned.DisposeAsync();
                 }
                 catch (Exception error) { failure = new AggregateException(failure, error); }
@@ -42,6 +41,6 @@ public sealed class TenantMessageExecutionScopeFactory<TTenant>(IServiceScopeFac
             throw new InvalidOperationException("The tenant message execution scope was not created.");
         }
 
-        return new(scope, () => TenantContext.Enter(identity));
+        return new(scope);
     }
 }

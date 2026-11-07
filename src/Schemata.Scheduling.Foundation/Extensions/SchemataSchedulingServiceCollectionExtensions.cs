@@ -38,6 +38,7 @@ public static class SchemataSchedulingServiceCollectionExtensions
         where TJob : SchemataJob, new()
         where TExecution : SchemataJobExecution, new() {
         services.TryAddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>();
+        services.TryAddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>();
         services.AddInProcessRequestDispatcher();
 
         services.AddSchedulingOptions();

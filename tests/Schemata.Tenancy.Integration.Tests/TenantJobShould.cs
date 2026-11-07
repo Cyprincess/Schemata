@@ -49,6 +49,7 @@ public class TenantJobShould
         new SchemataTenancyFeature<SchemataTenantManager<SchemataTenant, SchemataTenantHost>, SchemataTenant, SchemataTenantHost>()
             .ConfigureServices(services, new(), new(), new ConfigurationBuilder().Build(), null!);
         new SchemataTenancyBuilder<SchemataTenant>(services).UseMessaging().UseRepositories(builder => {
+            builder.Services.AddScoped<ProbeJob>();
             builder.Services.AddScoped<IJobExecutionStore<TenantJob, TenantJobExecution>, RepositoryJobExecutionStore<TenantJob, TenantJobExecution>>();
             builder.Services.AddScoped<JobExecutionDispatcher<TenantJob, TenantJobExecution>>();
             builder.Services.AddTransient<IRepository<TenantJob>, EfCoreRepository<Database, TenantJob>>();
@@ -79,7 +80,6 @@ public class TenantJobShould
         }
         foreach (var tenant in new[] { a, b }) {
             await using var scope = await tenants.CreateAsync(new(tenant.Uid));
-            using var entered = TenantContext.Enter(new(tenant.Uid));
             var executions = scope.ServiceProvider.GetRequiredService<IRepository<TenantJobExecution>>();
             await executions.AddAsync(new() {
                 Name = tenant.Name, JobKey = "probe", State = ExecutionState.Pending, StartTime = DateTime.UtcNow.AddMinutes(-1),
@@ -87,7 +87,6 @@ public class TenantJobShould
             await executions.CommitAsync();
         }
         await root.GetRequiredService<JobExecutionDispatcher<TenantJob, TenantJobExecution>>().DispatchPendingAsync(default);
-        Assert.Equal(TenantIdentity.Host, TenantContext.Current);
         Assert.Equal([((Guid?)null, (Guid?)null)], observed);
         await using (var verify = root.CreateAsyncScope()) {
             var database = verify.ServiceProvider.GetRequiredService<Database>();
@@ -97,10 +96,8 @@ public class TenantJobShould
         }
         foreach (var tenant in new[] { a, b }) {
             await using var scope = await tenants.CreateAsync(new(tenant.Uid));
-            using var entered = TenantContext.Enter(new(tenant.Uid));
             await scope.ServiceProvider.GetRequiredService<JobExecutionDispatcher<TenantJob, TenantJobExecution>>().DispatchPendingAsync(default);
         }
-        Assert.Equal(TenantIdentity.Host, TenantContext.Current);
         Assert.Equal(
             new[] { ((Guid?)null, (Guid?)null), (a.Uid, (Guid?)a.Uid), (b.Uid, (Guid?)b.Uid) }.OrderBy(value => value.Item1),
             observed.OrderBy(value => value.Item1));
@@ -110,11 +107,11 @@ public class TenantJobShould
         }
     }
 
-    public sealed class ProbeJob(List<(Guid? TenantUid, Guid? Ambient)> observed) : IScheduledJob
+    public sealed class ProbeJob(List<(Guid? TenantUid, Guid? Ambient)> observed, TenantIdentity identity) : IScheduledJob
     {
         public async Task ExecuteAsync(JobContext context, CancellationToken ct) {
             await Task.Yield();
-            observed.Add((Assert.IsType<TenantJobExecution>(context.Execution).TenantUid, TenantContext.Current.Uid));
+            observed.Add((Assert.IsType<TenantJobExecution>(context.Execution).TenantUid, identity.Uid));
         }
     }
 

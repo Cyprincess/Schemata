@@ -17,7 +17,6 @@ public sealed class SchemataTenancyMiddleware<TTenant>(RequestDelegate next) whe
         var original = http.RequestServices;
         var prior = http.Features.Get<ITenantRequestBinding>();
         var binding = new TenantRequestBinding<TTenant>(accessor, scopes, original);
-        using var frame = TenantContext.Enter(new(accessor.Tenant?.Uid));
         await using var owned = binding;
         await binding.OpenAsync(http);
         http.Features.Set<ITenantRequestBinding>(binding);
@@ -57,7 +56,6 @@ internal sealed class TenantRequestBinding<TTenant>(SchemataTenantContextAccesso
     public async ValueTask DisposeAsync() {
         List<Exception>? failures = null;
         for (var i = _scopes.Count - 1; i >= 0; i--) {
-            using var frame = TenantContext.Enter(_scopes[i].Identity);
             try { await _scopes[i].Scope.DisposeAsync(); }
             catch (Exception error) { (failures ??= []).Add(error); }
         }
@@ -68,9 +66,9 @@ internal sealed class TenantRequestBinding<TTenant>(SchemataTenantContextAccesso
 public sealed class SchemataTenantPrincipalMiddleware<TTenant>(RequestDelegate next) where TTenant : SchemataTenant
 {
     public async Task Invoke(HttpContext http) {
-        var binding = http.Features.Get<ITenantRequestBinding>()!;
+        var binding = http.Features.Get<ITenantRequestBinding>()
+                   ?? throw new InvalidOperationException("The tenant request binding is unavailable.");
         await binding.BindPrincipalAsync(http);
-        using var frame = TenantContext.Enter(binding.Identity);
         await next(http);
     }
 }

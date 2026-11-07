@@ -42,7 +42,7 @@ public class InProcessEventBusShould
                                   .AddSingleton(subscriptions.Object)
                                   .AddSingleton<IEventDispatchContext>(new EventDispatchContext())
                                   .AddSingleton<HandlerResolver>()
-                                  .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
+                                  .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>()
                                   .AddSingleton<IEventHandler<SampleEvent>>(Mock.Of<IEventHandler<SampleEvent>>())
                                   .AddSingleton(throwing.Object)
                                   .AddSingleton(trailing.Object)

@@ -19,25 +19,44 @@ public class TenantCacheBridgeShould
     private static readonly Guid TenantB = Guid.Parse("22222222-2222-2222-2222-222222222222");
 
     [Fact]
-    public async Task Outlets_Keep_Their_Bound_Namespace_Under_Ambient_Tenant_Switches() {
+    public async Task Parameterless_UseCache_Isolates_Host_And_Tenants_On_One_Backend() {
         await using var store = TenancyCacheStore.Create(
             services => services.AddMemoryCacheProvider(),
-            builder => builder.UseCache(cache => cache.UseShared(new MemoryCacheBackend())));
-        var global = store.Root.GetRequiredService<ICacheProvider>();
-        await using var scopeA = await store.EnterAsync(TenantA);
-        var tenantA = scopeA.ServiceProvider.GetRequiredService<ICacheProvider>();
-        await using var scopeB = await store.EnterAsync(TenantB);
-        var tenantB = scopeB.ServiceProvider.GetRequiredService<ICacheProvider>();
+            builder => builder.UseCache());
+        var host = store.Root.GetRequiredService<ICacheProvider>();
+        await using var a = await store.EnterAsync(TenantA);
+        await using var b = await store.EnterAsync(TenantB);
+        var cacheA = a.ServiceProvider.GetRequiredService<ICacheProvider>();
+        var cacheB = b.ServiceProvider.GetRequiredService<ICacheProvider>();
 
-        await global.SetAsync("key", new byte[] { 0 }, new());
-        await tenantA.SetAsync("key", new byte[] { 1 }, new());
-        await tenantB.SetAsync("key", new byte[] { 2 }, new());
+        await host.SetAsync("same", new byte[] { 0 }, new());
+        await cacheA.SetAsync("same", new byte[] { 1 }, new());
+        await cacheB.SetAsync("same", new byte[] { 2 }, new());
 
-        using (TenantContext.Enter(new(TenantB))) {
-            Assert.Equal(new byte[] { 0 }, await global.GetAsync("key"));
-            Assert.Equal(new byte[] { 1 }, await tenantA.GetAsync("key"));
-            Assert.Equal(new byte[] { 2 }, await tenantB.GetAsync("key"));
-        }
+        Assert.Equal(new byte[] { 0 }, await host.GetAsync("same"));
+        Assert.Equal(new byte[] { 1 }, await cacheA.GetAsync("same"));
+        Assert.Equal(new byte[] { 2 }, await cacheB.GetAsync("same"));
+
+        var backend = store.Root.GetRequiredService<MemoryCacheBackend>();
+        Assert.Null(await backend.GetAsync("same"));
+        Assert.Equal(new byte[] { 0 }, await backend.GetAsync("v1\x1ehost\x1esame"));
+        Assert.Equal(new byte[] { 1 }, await backend.GetAsync($"v1\x1etenant\x1e{TenantA:N}\x1esame"));
+        Assert.Equal(new byte[] { 2 }, await backend.GetAsync($"v1\x1etenant\x1e{TenantB:N}\x1esame"));
+    }
+
+    [Fact]
+    public async Task Configured_UseCache_Without_An_Outlet_Uses_The_Shared_Backend() {
+        await using var store = TenancyCacheStore.Create(
+            services => services.AddMemoryCacheProvider(),
+            builder => builder.UseCache(_ => { }));
+        await using var scope = await store.EnterAsync(TenantA);
+        var cache = scope.ServiceProvider.GetRequiredService<ICacheProvider>();
+
+        await cache.SetAsync("key", new byte[] { 1 }, new());
+
+        var backend = store.Root.GetRequiredService<MemoryCacheBackend>();
+        Assert.Equal(new byte[] { 1 }, await backend.GetAsync($"v1\x1etenant\x1e{TenantA:N}\x1ekey"));
+        Assert.Null(await backend.GetAsync("key"));
     }
 
     [Fact]
@@ -66,7 +85,7 @@ public class TenantCacheBridgeShould
         var cache = scope.ServiceProvider.GetRequiredService<ICacheProvider>();
         await cache.SetAsync("key", new byte[] { 9 }, new());
 
-        var frame = TenantA.ToString("N") + '\x1e';
+        var frame = $"v1\x1etenant\x1e{TenantA:N}\x1e";
         Assert.Equal(new byte[] { 9 }, await shared.GetAsync(frame + "key"));
         Assert.Null(await shared.GetAsync(frame + frame + "key"));
     }
@@ -91,7 +110,7 @@ public class TenantCacheBridgeShould
     public async Task Conditional_Writes_Elect_One_Winner_Per_Outlet_And_Collections_Stay_Independent() {
         await using var store = TenancyCacheStore.Create(
             services => services.AddMemoryCacheProvider(),
-            builder => builder.UseCache(cache => cache.UseShared(new MemoryCacheBackend())));
+            builder => builder.UseCache());
         var global = store.Root.GetRequiredService<ICacheProvider>();
         await using var scopeA = await store.EnterAsync(TenantA);
         var tenantA = scopeA.ServiceProvider.GetRequiredService<ICacheProvider>();

@@ -149,7 +149,7 @@ public class EventCorrelationShould
                       .AddSingleton(subscriptions.Object)
                       .AddSingleton<IEventDispatchContext>(dispatch)
                       .AddSingleton<HandlerResolver>()
-                      .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>()
+                      .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>()
                       .AddSingleton(handler.Object)
                       .BuildServiceProvider();
 

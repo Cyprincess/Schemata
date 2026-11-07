@@ -66,7 +66,7 @@ public class RabbitMqConsumerHostShould
             It.IsAny<Func<IQueryable<SchemataEventSubscription>, IQueryable<SchemataEventSubscription>>>(),
             It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>())).Returns(EmptySubscriptions());
         await using var services = new ServiceCollection().AddSingleton(registry.Object).AddSingleton(subscriptions.Object)
-            .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().BuildServiceProvider();
+            .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>().BuildServiceProvider();
         using var host = new RabbitMqConsumerHost(services, connections.Object, Options.Create(new RabbitMqEventOptions()),
             Options.Create(new System.Text.Json.JsonSerializerOptions()));
         await host.StartAsync(CancellationToken.None);
@@ -104,7 +104,7 @@ public class RabbitMqConsumerHostShould
             .AddSingleton(registry.Object).AddSingleton(subscriptions.Object)
             .AddSingleton<IEventDispatchContext>(new EventDispatchContext())
             .AddSingleton(handler.Object).AddSingleton(observer.Object)
-            .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().BuildServiceProvider();
+            .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>().BuildServiceProvider();
         using var host = new RabbitMqConsumerHost(services, null!, Options.Create(new RabbitMqEventOptions()),
             Options.Create(new System.Text.Json.JsonSerializerOptions()));
         var delivery = new RabbitMQ.Client.Events.BasicDeliverEventArgs("consumer", 1, false, "events", "sample",
@@ -193,7 +193,7 @@ public class RabbitMqConsumerHostShould
             .AddSingleton(registry.Object).AddSingleton(subscriptions.Object)
             .AddSingleton<IEventDispatchContext>(new EventDispatchContext())
             .AddSingleton(handler.Object)
-            .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().BuildServiceProvider();
+            .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>().BuildServiceProvider();
         using var host = new RabbitMqConsumerHost(services, connections.Object, Options.Create(new RabbitMqEventOptions()),
             Options.Create(new System.Text.Json.JsonSerializerOptions()));
         await host.StartAsync(CancellationToken.None);

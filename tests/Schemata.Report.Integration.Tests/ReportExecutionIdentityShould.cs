@@ -111,7 +111,7 @@ public class ReportExecutionIdentityShould
         Fixtures.ReportTestResources.AddResourceTypeResolver(services, typeof(SchemataJob), typeof(SchemataJobExecution));
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataReportSnapshot>, AdviceAddResourceName<SchemataReportSnapshot>>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataReportSnapshotChunk>, AdviceAddResourceName<SchemataReportSnapshotChunk>>());
-        services.AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>();
+        services.AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>();
         services.AddScoped<ExecutionIdentity>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IMessageContextPropagator, IdentityPropagator>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IReportGenerateAdvisor, ResolveIdentity>());

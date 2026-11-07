@@ -1,5 +1,6 @@
 using System.Linq;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions.Errors;
 using Schemata.Abstractions.Exceptions;
@@ -13,12 +14,13 @@ internal sealed class TenantQuotaOptions : IPostConfigureOptions<RateLimiterOpti
     public void PostConfigure(string? name, RateLimiterOptions options) {
         if (options.OnRejected is not { } rejected) return;
         options.OnRejected = async (context, ct) => {
-            var identity = TenantContext.Current;
             var supplied = context.Lease.TryGetMetadata(QuotaMetadata.Subject, out var subject)
                         && !string.IsNullOrWhiteSpace(subject);
             try {
                 await rejected(context, ct);
-            } catch (QuotaExceededException error) when (!supplied && identity.Uid.HasValue) {
+            } catch (QuotaExceededException error) when (!supplied) {
+                var identity = context.HttpContext.RequestServices.GetRequiredService<TenantIdentity>();
+                if (identity.Uid is not { } uid) throw;
                 if (error.Details is { } details) {
                     foreach (var detail in details.OfType<QuotaFailureDetail>()) {
                         if (detail.Violations is not { } violations) {
@@ -26,7 +28,7 @@ internal sealed class TenantQuotaOptions : IPostConfigureOptions<RateLimiterOpti
                         }
 
                         foreach (var violation in violations) {
-                            violation.Subject = $"tenants/{identity.Uid.Value:D}/{violation.Subject}";
+                            violation.Subject = $"tenants/{uid:D}/{violation.Subject}";
                         }
                     }
                 }

@@ -63,7 +63,7 @@ public class TenantReceiverShould
         var type = typeof(RabbitMqRequestOptions).Assembly.GetType("Schemata.Messaging.RabbitMq.Runtime.RabbitMqRequestConsumerHost")!;
         using var consumer = (IDisposable)Activator.CreateInstance(type,
             Options.Create(new RabbitMqRequestOptions().Register<Probe, string>("probe")), null,
-            root.GetRequiredService<IMessageExecutionScopeFactory>(), null, null)!;
+            root.GetRequiredService<IMessageExecutionScopeRunner>(), null, null)!;
         type.GetField("_channel", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(consumer, channel.Object);
         var receive = type.GetMethod("HandleAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         async Task Deliver(string? identity, bool redelivered) {
@@ -78,15 +78,14 @@ public class TenantReceiverShould
         Assert.Equal(new[] { tenant.Uid, tenant.Uid }, calls);
         Assert.Equal($"\"{tenant.Uid:D}\"", replies[0]);
         Assert.Contains("internal", replies[2]);
-        Assert.Equal(TenantIdentity.Host, TenantContext.Current);
     }
 
     public sealed record Probe : IRequest<string>;
-    public sealed class Handler(SchemataTenant tenant, List<Guid> calls) : IRequestHandler<Probe, string>
+    public sealed class Handler(SchemataTenant tenant, TenantIdentity identity, List<Guid> calls) : IRequestHandler<Probe, string>
     {
         public async Task<string> HandleAsync(Probe request, AdviceContext context, CancellationToken ct) {
             await Task.Yield();
-            Assert.Equal(tenant.Uid, TenantContext.Current.Uid);
+            Assert.Equal(tenant.Uid, identity.Uid);
             calls.Add(tenant.Uid);
             return tenant.Uid.ToString("D");
         }

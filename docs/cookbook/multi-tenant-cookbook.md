@@ -207,6 +207,35 @@ Inside a per-tenant service provider scope, `TenantBoundContextAccessor<TTenant>
 is used instead of the HTTP-based accessor. It returns the tenant that was
 bound at scope creation time, so HTTP resolution is skipped.
 
+Background work can resolve the fixed scoped identity directly. Host singletons receive the final
+invocation provider and resolve that identity at call time:
+
+```csharp
+public sealed class StudentService(IServiceProvider invocation)
+{
+    public TenantIdentity Identity => invocation.GetRequiredService<TenantIdentity>();
+}
+```
+
+A message hop uses an explicit context and the standard runner:
+
+```csharp
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Schemata.Messaging.Skeleton;
+using Schemata.Tenancy.Skeleton.Tenancy;
+
+var context = MessageContexts.Capture(invocation);
+var identity = await scopeRunner.RunAsync(context,
+    (services, _) => ValueTask.FromResult(services.GetRequiredService<TenantIdentity>()),
+    CancellationToken.None);
+```
+
+The runner restores before work and disposes afterward. Body and cleanup failures are aggregated in
+that order. Actor callbacks, report recovery, plain dispatch, and stream enumeration retain their
+specialized restoration policies.
+
 **Verify:** Log `accessor.Tenant?.Name` in a controller action. The value
 matches the tenant ID sent in the request header.
 

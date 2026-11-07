@@ -49,7 +49,7 @@ public class DefaultOperationServiceShould
         store.Setup(s => s.TryRenewLeaseAsync(It.IsAny<SchemataJobExecution>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
         await using var services = new ServiceCollection().AddSingleton(mutation.Object).AddSingleton(store.Object)
             .AddSingleton(propagator.Object).AddSingleton<IActiveExecutionRegistry>(new ActiveExecutionRegistry())
-            .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().BuildServiceProvider();
+            .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>().BuildServiceProvider();
         var service = new DefaultOperationService<SchemataJob, SchemataJobExecution>(services, Options.Create(new SchemataSchedulingOptions { ExecutionLease = TimeSpan.FromSeconds(10) }),
             Mock.Of<IScheduler>(), clock.Object);
         var called = false;
@@ -374,7 +374,7 @@ public class DefaultOperationServiceShould
             .AddSingleton<IActiveExecutionRegistry>(new ActiveExecutionRegistry())
             .AddScoped<IResourceMutation<SchemataJobExecution>>(_ => mutation.Object)
             .AddSchemataSchedulingRepositoryStore()
-            .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().BuildServiceProvider();
+            .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>().BuildServiceProvider();
         var service = new DefaultOperationService<SchemataJob, SchemataJobExecution>(services, Options.Create(new SchemataSchedulingOptions()), Mock.Of<IScheduler>());
         var entered = false;
         var work = service.ExecuteAsync("teardown", (_, _) => { entered = true; return ValueTask.FromResult<string?>(null); }).AsTask();
@@ -408,7 +408,7 @@ public class DefaultOperationServiceShould
             });
         await using var services = new ServiceCollection().AddSingleton(repository.Object).AddSingleton<IActiveExecutionRegistry>(running)
             .AddSingleton(store.Object)
-            .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().BuildServiceProvider();
+            .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>().BuildServiceProvider();
         var service = new DefaultOperationService<SchemataJob, SchemataJobExecution>(services,
             Options.Create(new SchemataSchedulingOptions()), Mock.Of<IScheduler>());
         var result = await service.CancelAsync(first.CanonicalName!);
@@ -512,7 +512,7 @@ public class DefaultOperationServiceShould
                                                 .AddSingleton(registry ?? new ActiveExecutionRegistry())
                                                 .AddSchemataSchedulingRepositoryStore()
                                                 .AddScoped(typeof(IResourceMutation<>), typeof(ResourceMutation<>))
-                                                .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>();
+                                                .AddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>().AddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>();
 
         var services = collection.BuildServiceProvider();
         return new(

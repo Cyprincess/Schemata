@@ -23,6 +23,7 @@ public static class TenantMessagingExtensions
     public static SchemataTenancyBuilder<TTenant> UseMessaging<TTenant>(this SchemataTenancyBuilder<TTenant> builder)
         where TTenant : SchemataTenant {
         builder.Services.Replace(ServiceDescriptor.Singleton<IMessageExecutionScopeFactory, TenantMessageExecutionScopeFactory<TTenant>>());
+        builder.Services.TryAddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>();
         builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IMessageContextPropagator, TenantMessageContextPropagator>());
         builder.Services.Configure<SchemataTenancyOptions>(options => options.DynamicOverrides.Add((_, services, root) => {
             services.TryAddScoped<InProcessRequestDispatcher>();

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Linq;
-using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,31 +17,15 @@ namespace Schemata.Scheduling.Foundation;
 /// </summary>
 /// <typeparam name="TExecution">The persisted execution entity type registered by the host.</typeparam>
 internal sealed class JobExecutionState<TExecution>(
-    IMessageExecutionScopeFactory scopes
+    IMessageExecutionScopeRunner runner
 ) : IJobExecutionState
     where TExecution : SchemataJobExecution
 {
     public async ValueTask<bool> IsCancelledAsync(Guid uid, MessageContext message, CancellationToken ct = default) {
-        var scope = await scopes.CreateAsync(message, ct);
-        IDisposable? entered = null;
-        Exception? failure = null;
-        try {
-            entered = scope.Enter();
-            await scope.RestoreAsync(message, ct);
-            var repository = scope.Services.GetRequiredService<IRepository<TExecution>>();
-            var execution = await repository.FirstOrDefaultAsync(query => query.Where(row => row.Uid == uid), ct);
+        return await runner.RunAsync(message, async (services, token) => {
+            var repository = services.GetRequiredService<IRepository<TExecution>>();
+            var execution = await repository.FirstOrDefaultAsync(query => query.Where(row => row.Uid == uid), token);
             return execution?.State is ExecutionState.Cancelled;
-        } catch (Exception error) {
-            failure = error;
-            throw;
-        } finally {
-            Exception? cleanup = null;
-            try { await scope.DisposeAsync(); } catch (Exception error) { cleanup = error; }
-            try { entered?.Dispose(); } catch (Exception error) { cleanup = cleanup is null ? error : new AggregateException(cleanup, error); }
-            if (cleanup is not null) {
-                if (failure is not null) throw new AggregateException(failure, cleanup);
-                ExceptionDispatchInfo.Capture(cleanup).Throw();
-            }
-        }
+        }, ct);
     }
 }

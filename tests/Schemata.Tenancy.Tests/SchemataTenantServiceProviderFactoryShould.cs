@@ -146,6 +146,8 @@ public class SchemataTenantServiceProviderFactoryShould
         var fromB = scopeB.ServiceProvider.GetRequiredService<IScopedMarker>();
 
         Assert.NotSame(fromA, fromB);
+        Assert.Equal(UidFor("alpha"), scopeA.ServiceProvider.GetRequiredService<TenantIdentity>().Uid);
+        Assert.Equal(UidFor("alpha"), scopeB.ServiceProvider.GetRequiredService<TenantIdentity>().Uid);
         Assert.IsType<RootDependency>(((ScopedMarker)fromA).Dependency);
         Assert.IsType<RootDependency>(((ScopedMarker)fromB).Dependency);
     }

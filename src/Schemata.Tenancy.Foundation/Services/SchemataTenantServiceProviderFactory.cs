@@ -22,7 +22,7 @@ namespace Schemata.Tenancy.Foundation.Services;
 ///     <para>
 ///         Overrides win for tenant-side top-level resolution. Host service constructors resolve
 ///         from the host container, so their dependencies are not tenant-overridable.
-///         Host singletons can read immutable TenantContext.Current at call time.
+///         Host singletons resolve TenantIdentity from the final invocation provider at call time.
 ///         <see cref="ITenantContextAccessor{TTenant}.GetBaseServiceProviderAsync" /> returns the
 ///         host root provider.
 ///     </para>
@@ -81,6 +81,7 @@ public class SchemataTenantServiceProviderFactory<TTenant> : ITenantServiceProvi
         IServiceCollection overrides = new ServiceCollection();
 
         overrides.AddSingleton(tenant);
+        overrides.AddScoped(typeof(TenantIdentity), _ => new TenantIdentity(tenant.Uid));
         overrides.AddSingleton<ITenantContextAccessor<TTenant>>(_ => new TenantBoundContextAccessor<TTenant>(_root, tenant));
 
         if (_options.TenantOverrides.TryGetValue(id, out var tenantOverrides)) {

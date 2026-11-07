@@ -321,7 +321,6 @@ public sealed class TenantCookieShould
             beforePrincipal?.Invoke(app);
             app.UseMiddleware<SchemataTenantPrincipalMiddleware<SchemataTenant>>();
             app.UseAuthorization();
-            app.UseMiddleware<TenantExecutionMiddleware>();
             app.UseEndpoints(endpoints => {
                 MapScope(endpoints, "global");
                 MapScope(endpoints, "A");

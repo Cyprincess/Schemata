@@ -9,11 +9,6 @@ public sealed class MessageExecutionScopeFactory(IServiceScopeFactory scopes) : 
 {
     public ValueTask<MessageExecutionScope> CreateAsync(MessageContext? context, CancellationToken ct = default) {
         ct.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(new MessageExecutionScope(scopes.CreateAsyncScope(), static () => new EmptyLease()));
-    }
-
-    private sealed class EmptyLease : IDisposable
-    {
-        public void Dispose() { }
+        return ValueTask.FromResult(new MessageExecutionScope(scopes.CreateAsyncScope()));
     }
 }

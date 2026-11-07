@@ -53,6 +53,7 @@ public sealed class ReportActorConcurrencyHarness : IAsyncDisposable
         var services = new ServiceCollection();
         services.AddLogging();
         services.TryAddSingleton<IMessageExecutionScopeFactory, MessageExecutionScopeFactory>();
+        services.TryAddSingleton<IMessageExecutionScopeRunner, MessageExecutionScopeRunner>();
         services.AddDbContextFactory<TestDbContext>(options => options
                      .UseSqlite(connectionString)
                      .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
