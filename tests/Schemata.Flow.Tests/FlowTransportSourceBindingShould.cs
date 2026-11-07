@@ -261,7 +261,7 @@ public class FlowTransportSourceBindingShould
         var uow = UnitOfWork();
         repository.SetupGet(r => r.AdviceContext).Returns(new AdviceContext(new ServiceCollection().BuildServiceProvider()));
         if (begin) {
-            repository.Setup(r => r.Begin()).Returns(uow.Object);
+            repository.Setup(r => r.Begin(It.IsAny<System.Data.IsolationLevel?>())).Returns(uow.Object);
         }
 
         repository.Setup(r => r.Join(It.IsAny<IUnitOfWork>()));
@@ -318,7 +318,7 @@ public class FlowTransportSourceBindingShould
                    var token = new SchemataProcessToken {
                        Name          = "root",
                        CanonicalName = $"{process.CanonicalName}/tokens/root",
-                       Process       = process.Name!,
+                       Process       = process.CanonicalName,
                        ScopeName     = string.Empty,
                        StateName     = "review",
                        WaitingAtName = "review",
@@ -343,7 +343,7 @@ public class FlowTransportSourceBindingShould
                    var token = new SchemataProcessToken {
                        Name          = "root",
                        CanonicalName = $"{process.CanonicalName}/tokens/root",
-                       Process       = process.Name!,
+                       Process       = process.CanonicalName,
                        ScopeName     = string.Empty,
                        StateName     = "review",
                        State         = "Active",

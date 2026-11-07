@@ -27,8 +27,8 @@ public sealed class FlowTenantRepositoryShould
                 Assert.NotNull(scope.ServiceProvider.GetService<IRepository<TenantProcess>>());
             }
             await Exercise(() => new TenantProcess { Name = "shared", DefinitionName = "test", DefinitionVersion = "1", IdempotencyKey = "shared" });
-            await Exercise(() => new TenantProcessToken { Name = "shared", Process = "shared", ScopeName = string.Empty, StateName = "task", State = "Active" });
-            await Exercise(() => new TenantProcessTransition { Name = "shared", Process = "shared", Event = "advance" });
+            await Exercise(() => new TenantProcessToken { Name = "shared", Process = "processes/shared", ScopeName = string.Empty, StateName = "task", State = "Active" });
+            await Exercise(() => new TenantProcessTransition { Name = "shared", Process = "processes/shared", Event = "advance" });
             await Exercise(() => new TenantProcessParticipant { Process = "processes/shared", Subject = "users/shared" });
             await Exercise(() => new TenantProcessSource { Process = "processes/shared", Name = "shared", SourceType = "Order", Source = "orders/shared" });
             await Exercise(() => new TenantProcessCompensation { Name = "shared", Process = "processes/shared", ScopeOwnerCanonicalName = "processes/shared/tokens/shared", ActivityName = "undo", BoundaryName = "boundary" });
@@ -81,33 +81,41 @@ public sealed class FlowTenantRepositoryShould
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Reject_Duplicate_Partition_Keys_Including_Null_Host_And_Process_Source(bool linq) {
+    public async Task Allow_Duplicate_Partition_Keys_Through_Direct_Writes(bool linq) {
         var fixture = new TenantFlowFixture(linq);
         var lifecycle = (IAsyncLifetime)fixture;
         await lifecycle.InitializeAsync();
         try {
             foreach (var tenant in new Guid?[] { null, Guid.NewGuid() }) {
-                await RejectDuplicate(tenant, () => new TenantProcess { DefinitionName = "unique", DefinitionVersion = "1", IdempotencyKey = "key" });
-                await RejectDuplicate(tenant, () => new TenantProcessSource { Process = "processes/unique", Name = "process-source", SourceType = "Order", Source = "orders/unique" });
-                await RejectDuplicate(tenant, () => new TenantProcessSource { Process = "processes/unique", Token = "processes/unique/tokens/unique", Name = "token-source", SourceType = "Order", Source = "orders/unique" });
-                await RejectDuplicate(tenant, () => new TenantFlowEffectIntent { RequestId = "processes/unique/tokens/unique/effects/0", Process = "processes/unique", Token = "processes/unique/tokens/unique", Task = "task" });
+                await AllowDuplicate(tenant, () => new TenantProcess { DefinitionName = "unique", DefinitionVersion = "1", IdempotencyKey = "key" });
+                await AllowDuplicate(tenant, () => new TenantProcessSource { Process = "processes/unique", Name = "process-source", SourceType = "Order", Source = "orders/unique" });
+                await AllowDuplicate(tenant, () => new TenantProcessSource { Process = "processes/unique", Token = "processes/unique/tokens/unique", Name = "token-source", SourceType = "Order", Source = "orders/unique" });
+                await AllowDuplicate(tenant, () => new TenantFlowEffectIntent { RequestId = "processes/unique/tokens/unique/effects/0", Process = "processes/unique", Token = "processes/unique/tokens/unique", Task = "task" });
             }
         } finally {
             await lifecycle.DisposeAsync();
         }
 
-        async Task RejectDuplicate<TEntity>(Guid? tenant, Func<TEntity> create) where TEntity : class {
+        async Task AllowDuplicate<TEntity>(Guid? tenant, Func<TEntity> create) where TEntity : class, IIdentifier {
+            TEntity first;
+            TEntity second;
             await using (var scope = await fixture.EnterTenantAsync(tenant)) {
                 var repository = scope.ServiceProvider.GetRequiredService<IRepository<TEntity>>();
-                await repository.AddAsync(create());
+                first = create();
+                await repository.AddAsync(first);
                 await repository.CommitAsync();
             }
             await using (var scope = await fixture.EnterTenantAsync(tenant)) {
                 var repository = scope.ServiceProvider.GetRequiredService<IRepository<TEntity>>();
-                await Assert.ThrowsAsync<AlreadyExistsException>(async () => {
-                    await repository.AddAsync(create());
-                    await repository.CommitAsync();
-                });
+                second = create();
+                await repository.AddAsync(second);
+                await repository.CommitAsync();
+            }
+            Assert.NotEqual(first.Uid, second.Uid);
+            await using (var scope = await fixture.EnterTenantAsync(tenant)) {
+                var repository = scope.ServiceProvider.GetRequiredService<IRepository<TEntity>>();
+                Assert.NotNull(await repository.FindAsync([first.Uid]));
+                Assert.NotNull(await repository.FindAsync([second.Uid]));
             }
         }
     }

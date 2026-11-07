@@ -99,7 +99,7 @@ public sealed class EventSubProcessExecutor<TProcess, TToken, TTransition>
                 token.CurrentCallActivation = null;
 
                 transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-                    process.Name!,
+                    process,
                     token.CanonicalName,
                     token.StateName,
                     eventSubProcess.Name,
@@ -125,7 +125,7 @@ public sealed class EventSubProcessExecutor<TProcess, TToken, TTransition>
         BpmnEngine<TProcess, TToken, TTransition>.ApplyResolvedToToken(child, resolved);
 
         transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-            process.Name!,
+            process,
             child.CanonicalName,
             eventSubProcess.Name,
             resolved.StateName,
@@ -136,21 +136,16 @@ public sealed class EventSubProcessExecutor<TProcess, TToken, TTransition>
         return BpmnEngine<TProcess, TToken, TTransition>.Snapshot(process, working, transitions, execution);
     }
 
-    private static SchemataProcessToken NewEventSubProcessToken(
+    private static TToken NewEventSubProcessToken(
         SchemataProcess       process,
         EventSubProcess       eventSubProcess,
         SchemataProcessToken  addressed,
         TargetState resolved
     ) {
-        return new() {
-            Process       = process.Name!,
-            Spawner       = addressed.CanonicalName,
-            ScopeName       = eventSubProcess.Name,
-            StateName       = resolved.StateName,
-            WaitingAtName   = resolved.WaitingAtName,
-            Bookkeeping   = new(addressed.Bookkeeping),
-            State         = resolved.IsComplete ? "Completed" : resolved.WaitingAtName is null ? "Active" : "Waiting",
-        };
+        var token = TokenFactory<TProcess, TToken>.NewChildToken((TProcess)process, resolved, (TToken)addressed);
+        token.ScopeName = eventSubProcess.Name;
+        token.Bookkeeping = new(addressed.Bookkeeping);
+        return token;
     }
 
 }

@@ -68,7 +68,7 @@ public sealed class EscalationBoundaryHandler<TProcess, TToken, TTransition>
 
         BpmnEngine<TProcess, TToken, TTransition>.ApplyResolvedToToken(throwing, resolved);
         transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-            process.Name!,
+            process,
             throwing.CanonicalName,
             throwEvent.Name,
             resolved.StateName,
@@ -110,7 +110,7 @@ public sealed class EscalationBoundaryHandler<TProcess, TToken, TTransition>
         throwing.CurrentCallActivation = null;
         throwing.State                 = "Completed";
         transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-            process.Name!,
+            process,
             throwing.CanonicalName,
             previous.Name,
             endEvent.Name,
@@ -239,7 +239,7 @@ public sealed class EscalationBoundaryHandler<TProcess, TToken, TTransition>
                 token.CurrentCallActivation = null;
 
                 transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-                    process.Name!,
+                    process,
                     token.CanonicalName,
                     previous,
                     boundary.Name,
@@ -248,7 +248,7 @@ public sealed class EscalationBoundaryHandler<TProcess, TToken, TTransition>
             }
 
             transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-                process.Name!,
+                process,
                 routed.CanonicalName,
                 boundary.Name,
                 resolved.StateName,
@@ -296,7 +296,7 @@ public sealed class EscalationBoundaryHandler<TProcess, TToken, TTransition>
                 token.CurrentCallActivation = null;
 
                 transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-                    process.Name!,
+                    process,
                     token.CanonicalName,
                     previous,
                     eventSubProcess.Name,
@@ -320,7 +320,7 @@ public sealed class EscalationBoundaryHandler<TProcess, TToken, TTransition>
             child, ct: ct);
         BpmnEngine<TProcess, TToken, TTransition>.ApplyResolvedToToken(child, resolved);
         transitions.Add(BpmnEngine<TProcess, TToken, TTransition>.NewTransition(
-            process.Name!,
+            process,
             child.CanonicalName,
             eventSubProcess.Name,
             resolved.StateName,
@@ -372,21 +372,16 @@ public sealed class EscalationBoundaryHandler<TProcess, TToken, TTransition>
             && (ReferenceEquals(token, host) || ProcessScopeMap.IsDescendant(token, host, working)));
     }
 
-    private static SchemataProcessToken NewEventSubProcessToken(
+    private static TToken NewEventSubProcessToken(
         SchemataProcess        process,
         EventSubProcess        eventSubProcess,
         SchemataProcessToken   throwing,
         TargetState            resolved
     ) {
-        return new() {
-            Process       = process.Name!,
-            Spawner       = throwing.CanonicalName,
-            ScopeName       = eventSubProcess.Name,
-            StateName       = resolved.StateName,
-            WaitingAtName   = resolved.WaitingAtName,
-            Bookkeeping   = new(throwing.Bookkeeping),
-            State         = resolved.IsComplete ? "Completed" : resolved.WaitingAtName is null ? "Active" : "Waiting",
-        };
+        var token = TokenFactory<TProcess, TToken>.NewChildToken((TProcess)process, resolved, (TToken)throwing);
+        token.ScopeName = eventSubProcess.Name;
+        token.Bookkeeping = new(throwing.Bookkeeping);
+        return token;
     }
 
 }

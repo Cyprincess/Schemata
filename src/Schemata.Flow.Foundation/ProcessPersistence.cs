@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -47,11 +48,11 @@ public sealed class ProcessPersistence<TProcess, TToken, TTransition, TCompensat
 
         var waitingProcesses = new HashSet<string>(StringComparer.Ordinal);
         await foreach (var token in tokens.ListAsync<TToken>(q => q.Where(t => t.WaitingAtName != null), ct)) {
-            waitingProcesses.Add(token.Process);
+            if (token.Process is { } process) waitingProcesses.Add(process);
         }
 
         foreach (var processName in waitingProcesses) {
-            var match = await processes.FirstOrDefaultAsync(q => q.Where(p => p.Name == processName), ct);
+            var match = await processes.FirstOrDefaultAsync(q => q.Where(p => p.CanonicalName == processName), ct);
             if (match is not null) {
                 yield return match;
             }
@@ -68,11 +69,11 @@ public sealed class ProcessPersistence<TProcess, TToken, TTransition, TCompensat
         var activeProcesses = new HashSet<string>(StringComparer.Ordinal);
         await foreach (var token in tokens.ListAsync<TToken>(
                            q => q.Where(t => t.WaitingAtName == null && t.State == "Active"), ct)) {
-            activeProcesses.Add(token.Process);
+            if (token.Process is { } process) activeProcesses.Add(process);
         }
 
         foreach (var processName in activeProcesses) {
-            var match = await processes.FirstOrDefaultAsync(q => q.Where(p => p.Name == processName), ct);
+            var match = await processes.FirstOrDefaultAsync(q => q.Where(p => p.CanonicalName == processName), ct);
             if (match is not null) {
                 yield return match;
             }
@@ -92,7 +93,7 @@ public sealed class ProcessPersistence<TProcess, TToken, TTransition, TCompensat
         var sources       = services.GetRequiredService<IRepository<TSource>>();
         var compensations = services.GetRequiredService<IRepository<TCompensation>>();
 
-        await using var uow = processes.Begin();
+        await using var uow = processes.Begin(IsolationLevel.Serializable);
         tokens.Join(uow);
         transitions.Join(uow);
         sources.Join(uow);
@@ -151,7 +152,7 @@ public sealed class ProcessPersistence<TProcess, TToken, TTransition, TCompensat
                 await scope.Mutation<TToken>().UpdateAsync(typedToken, scope.UnitOfWork, ct: ct);
                 continue;
             }
-            tokenIndex ??= await scope.GetTokenIndexAsync(process.Name!, ct);
+            tokenIndex ??= await scope.GetTokenIndexAsync(process.CanonicalName ?? throw new InvalidOperationException("Process canonical name is required."), ct);
             var persisted = token.CanonicalName is { } name && tokenIndex.TryGetValue(name, out var loaded) ? loaded : null;
             if (persisted is null) {
                 await scope.CreateTokenAsync(typedToken, ct);

@@ -14,6 +14,8 @@ using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
 using Schemata.Flow.Skeleton.Runtime;
+using Schemata.Messaging.Skeleton;
+using Schemata.Scheduling.Foundation.Commands;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
 
@@ -93,6 +95,8 @@ public sealed class FlowTimerCatchHandler<TJob, TExecution> : IFlowCatchHandler
                 new Dictionary<string, string?> { ["name"] = process.CanonicalName });
         }
 
+        var dispatcher = _services.GetRequiredService<IRequestDispatcher>();
+
         if (previousTimerJobs.Count > 0) {
             var jobs = _services.GetRequiredService<IRepository<TJob>>();
             if (context.UnitOfWork is { } unitOfWork) {
@@ -101,7 +105,8 @@ public sealed class FlowTimerCatchHandler<TJob, TExecution> : IFlowCatchHandler
             foreach (var previousTimerJob in previousTimerJobs.Distinct(StringComparer.Ordinal)) {
                 var job = await jobs.FirstOrDefaultAsync(query => query.Where(row => row.Key == previousTimerJob), ct);
                 if (job is not null) {
-                    await scheduler.UnscheduleAsync(job.CanonicalName!, ct);
+                    await dispatcher.SendAsync<UnscheduleJobRequest, Unit>(
+                        new(job.CanonicalName!) { UnitOfWork = context.UnitOfWork }, ct);
                 }
             }
         }
@@ -109,7 +114,8 @@ public sealed class FlowTimerCatchHandler<TJob, TExecution> : IFlowCatchHandler
         var jobKey = _services.GetRequiredService<IScheduledJobRegistry>().ResolveKey(typeof(FlowTimerJob<TJob>));
         foreach (var (elementName, timerDefinition) in timers) {
             var (timerJob, timerVariables) = CreateTimerJob(process, token.CanonicalName, elementName, timerDefinition, jobKey);
-            await scheduler.ScheduleAsync(timerJob, timerVariables, ct);
+            await dispatcher.SendAsync<ScheduleJobRequest<TJob>, Unit>(
+                new(timerJob, timerVariables, ReplaceVariables: true) { UnitOfWork = context.UnitOfWork }, ct);
         }
     }
 
@@ -136,6 +142,7 @@ public sealed class FlowTimerCatchHandler<TJob, TExecution> : IFlowCatchHandler
         var job = new TJob {
             Key    = JobName(process, elementName, token),
             JobKey = jobKey,
+            Subject = process.CanonicalName,
             State  = JobState.Active,
         };
         ScheduleDefinitionMapper.ApplyToJob(TimerDefinitionConverter.ToSchedule(timerDefinition), job);

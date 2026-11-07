@@ -99,6 +99,14 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
             return await InclusiveGatewayHandler<TProcess, TToken, TTransition>.StartIntoBranchAsync(this, definition, process, ig, variables, context, ct);
         }
 
+        if (firstTarget is ComplexGateway cg) {
+            var complexToken = NewRootToken(process, new(cg.Name, null, false));
+            await context.CreateTokenAsync(complexToken, ct);
+            var complexWorking = new List<SchemataProcessToken> { complexToken };
+            return await ComplexGatewayHandler<TProcess, TToken, TTransition>.FromTokenAsync(
+                this, definition, process, complexToken, complexWorking, cg, null, context, ct);
+        }
+
         if (firstTarget is EventBasedGateway eb) {
             return await StartIntoEventBasedAsync(process, eb, context, ct);
         }
@@ -133,7 +141,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
         var resolved = await ResolveTargetAsync(definition, firstTarget, variables, TokenView(token), context, working, process, token, ct: ct);
         ApplyResolvedToToken(token, resolved);
         var transition = NewTransition(
-            process.Name!,
+            process,
             token.CanonicalName,
             null,
             resolved.StateName,
@@ -311,12 +319,12 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
                 candidate.State                 = "Cancelled";
                 candidate.WaitingAtName         = null;
                 candidate.CurrentCallActivation = null;
-                transitions.Add(NewTransition(process.Name!, candidate.CanonicalName, candidate.StateName, boundary.Name, TransitionKind.Cancel, trigger.Name));
+                transitions.Add(NewTransition(process, candidate.CanonicalName, candidate.StateName, boundary.Name, TransitionKind.Cancel, trigger.Name));
             }
 
 
             transitions.Add(NewTransition(
-                process.Name!,
+                process,
                 routed.CanonicalName,
                 boundary.Name,
                 resolved.StateName,
@@ -359,6 +367,11 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
 
             if (waiting is InclusiveGateway igWait && IsJoin(definition, igWait)) {
                 return await InclusiveGatewayHandler<TProcess, TToken, TTransition>.ArriveAtJoinAsync(this, definition, process, token, working, igWait, igWait.Name, context, ct);
+            }
+
+            if (waiting is ComplexGateway cgWait) {
+                return await ComplexGatewayHandler<TProcess, TToken, TTransition>.FromTokenAsync(
+                    this, definition, process, token, working, cgWait, cgWait.Name, context, ct);
             }
 
             if (waiting is Activity { LoopCharacteristics: MultiInstanceLoopCharacteristics } completedMultiActivity) {
@@ -562,7 +575,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
 
         var transitions = new List<SchemataProcessTransition> {
             NewTransition(
-                process.Name!,
+                process,
                 token.CanonicalName,
                 current.Name,
                 resolved.StateName,
@@ -624,7 +637,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
             context.Token, ct: ct, compensation: context);
 
         context.Transitions.Add(NewTransition(
-            context.Process.Name!,
+            context.Process,
             context.Scope.CanonicalName,
             activity.Name,
             resolved.StateName,
@@ -717,7 +730,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
 
         ApplyResolvedToToken(throwing, resolved);
         transitions.Add(NewTransition(
-            process.Name!,
+            process,
             throwing.CanonicalName,
             throwEvent.Name,
             resolved.StateName,
@@ -762,7 +775,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
         }
 
         transitions.Add(NewTransition(
-            process.Name!,
+            process,
             throwing.CanonicalName,
             previous.Name,
             endEvent.Name,
@@ -851,7 +864,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
             if (failed) {
                 parent.State = "Failed";
                 parent.WaitingAtName = null;
-                transitions.Add(NewTransition(snapshot.Process.Name!, parent.CanonicalName, parent.StateName, parent.StateName, TransitionKind.Fail, "SubProcessFailed"));
+                transitions.Add(NewTransition(snapshot.Process, parent.CanonicalName, parent.StateName, parent.StateName, TransitionKind.Fail, "SubProcessFailed"));
                 continue;
             }
             var activity = (SubProcess)definition.FindElementByName(parent.StateName)!;
@@ -891,7 +904,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
         var token      = NewRootToken(process, new(eb.Name, eb.Name, false));
         await execution.CreateTokenAsync(token, ct);
         var transition = NewTransition(
-            process.Name!,
+            process,
             token.CanonicalName,
             null,
             eb.Name,
@@ -919,7 +932,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
         await execution.CreateTokenAsync(parent, ct);
 
         var parentTransition = NewTransition(
-            process.Name!,
+            process,
             parent.CanonicalName,
             null,
             sp.Name,
@@ -959,7 +972,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
         await context.CreateTokenAsync(parent, ct);
 
         var parentTransition = NewTransition(
-            process.Name!,
+            process,
             parent.CanonicalName,
             null,
             call.Name,
@@ -1018,7 +1031,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
         CancellationToken          ct
     ) {
         var arrivalTransition = NewTransition(
-            process.Name!,
+            process,
             token.CanonicalName,
             previousState,
             call.Name,
@@ -1129,7 +1142,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
             token.WaitingAtName = null;
 
             var failTransition = NewTransition(
-                process.Name!,
+                process,
                 token.CanonicalName,
                 call.Name,
                 call.Name,
@@ -1179,7 +1192,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
 
         var parkTransition = includeParkTransition
             ? NewTransition(
-                process.Name!,
+                process,
                 parent.CanonicalName,
                 sp.Name,
                 sp.Name,
@@ -1188,20 +1201,16 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
             : null;
 
         var variables = new Dictionary<string, int>();
-        var child = new TToken {
-            Process       = process.Name!,
-            Spawner       = parent.CanonicalName,
-            ScopeName       = sp.Name,
-            StateName       = startOutgoing.Target.Name,
-            State         = "Active",
-        };
+        var child = TokenFactory<TProcess, TToken>.NewChildToken(
+            (TProcess)process, new(startOutgoing.Target.Name, null, false), (TToken)parent);
+        child.ScopeName = sp.Name;
         await execution.CreateTokenAsync(child, ct);
         working.Add(child);
         var resolved = await ResolveTargetAsync(definition, startOutgoing.Target, variables, TokenView(child), execution, working, process, child, ct: ct);
         ApplyResolvedToToken(child, resolved);
 
         var spawnTransition = NewTransition(
-            process.Name!,
+            process,
             child.CanonicalName,
             sp.Name,
             resolved.StateName,
@@ -1222,7 +1231,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
         CancellationToken          ct
     ) {
         var arrivalTransition = NewTransition(
-            process.Name!,
+            process,
             token.CanonicalName,
             previousState,
             sp.Name,
@@ -1263,7 +1272,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
             var resolved = await ResolveTargetAsync(definition, flow.Target, variables, TokenView(child), execution, spawned, process, child, ct: ct);
             ApplyResolvedToToken(child, resolved);
             transitions.Add(NewTransition(
-                process.Name!,
+                process,
                 child.CanonicalName,
                 gateway.Name,
                 resolved.StateName,
@@ -1272,7 +1281,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
         }
 
         var forkTransition = NewTransition(
-            process.Name!,
+            process,
             null,
             null,
             gateway.Name,
@@ -1304,7 +1313,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
         token.WaitingAtName = null;
 
         var forkTransition = NewTransition(
-            process.Name!,
+            process,
             token.CanonicalName,
             previousState,
             gateway.Name,
@@ -1330,7 +1339,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
             ApplyResolvedToToken(child, resolved);
 
             transitions.Add(NewTransition(
-                process.Name!,
+                process,
                 child.CanonicalName,
                 gateway.Name,
                 resolved.StateName,
@@ -1355,7 +1364,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
         CancellationToken                   ct = default
     ) {
         var arrivalTransition = NewTransition(
-            process.Name!,
+            process,
             token.CanonicalName,
             previousState,
             gateway.Name,
@@ -1386,7 +1395,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
         ApplyResolvedToToken(output, resolved);
 
         var joinTransition = NewTransition(
-            process.Name!,
+            process,
             output.CanonicalName,
             gateway.Name,
             resolved.StateName,
@@ -1422,7 +1431,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
         ApplyAggregateState(process, working);
 
         var transition = NewTransition(
-            process.Name!,
+            process,
             token.CanonicalName,
             gateway.Name,
             resolved.StateName,
@@ -1449,7 +1458,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
         token.WaitingAtName = null;
 
         var forkTransition = NewTransition(
-            process.Name!,
+            process,
             token.CanonicalName,
             gateway.Name,
             gateway.Name,
@@ -1470,7 +1479,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
             ApplyResolvedToToken(child, resolved);
 
             transitions.Add(NewTransition(
-                process.Name!,
+                process,
                 child.CanonicalName,
                 gateway.Name,
                 resolved.StateName,
@@ -1511,7 +1520,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
         ApplyAggregateState(process, working);
 
         var transition = NewTransition(
-            process.Name!,
+            process,
             token.CanonicalName,
             catchEvent.Name,
             resolved.StateName,
@@ -1551,7 +1560,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
         FlowExecutionContext       execution
     ) {
         var arrivalTransition = NewTransition(
-            process.Name!,
+            process,
             token.CanonicalName,
             previousState,
             gateway.Name,
@@ -1591,7 +1600,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
         ApplyAggregateState(process, working);
 
         var transition = NewTransition(
-            process.Name!,
+            process,
             token.CanonicalName,
             previousState,
             resolved.StateName,
@@ -1620,7 +1629,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
                 && ProcessScopeMap.IsDescendant(candidate, owner, working)))).ToList();
         var transitions = new List<SchemataProcessTransition> {
             NewTransition(
-                process.Name!,
+                process,
                 token.CanonicalName,
                 current.Name,
                 terminate.Name,
@@ -1639,7 +1648,7 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
             candidate.WaitingAtName         = null;
             candidate.CurrentCallActivation = null;
             transitions.Add(NewTransition(
-                process.Name!,
+                process,
                 candidate.CanonicalName,
                 previous,
                 terminate.Name,
@@ -2192,13 +2201,13 @@ public sealed class BpmnEngine<TProcess, TToken, TTransition> : IFlowRuntime<TPr
     }
 
     internal static TTransition NewTransition(
-        string         processName,
+        SchemataProcess process,
         string?        tokenCanonical,
         string?        previous,
         string?        posterior,
         TransitionKind kind,
         string         eventName
-    ) => TransitionFactory<TTransition>.New(processName, tokenCanonical, previous, posterior, kind, eventName);
+    ) => TransitionFactory<TTransition>.New(process, tokenCanonical, previous, posterior, kind, eventName);
 
     internal static TokenSnapshot TokenView(SchemataProcessToken token) => TokenSnapshotFactory.From(token);
 

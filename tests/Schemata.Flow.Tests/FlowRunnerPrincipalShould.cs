@@ -97,7 +97,7 @@ public class FlowRunnerPrincipalShould
         var transitions   = Repository<SchemataProcessTransition>();
         var sources       = Repository<SchemataProcessSource>();
         var compensations = Repository<SchemataProcessCompensation>();
-        processes.Setup(r => r.Begin()).Returns(Mock.Of<IUnitOfWork>());
+        processes.Setup(r => r.Begin(It.IsAny<System.Data.IsolationLevel?>())).Returns(Mock.Of<IUnitOfWork>());
 
         var collection = new ServiceCollection()
                         .AddLogging()
@@ -122,7 +122,7 @@ public class FlowRunnerPrincipalShould
         var token = new SchemataProcessToken {
             Name          = "t1",
             CanonicalName = $"{process.CanonicalName}/tokens/t1",
-            Process       = process.Name!,
+            Process       = process.CanonicalName,
             State         = "Completed",
         };
         var transition = new SchemataProcessTransition {
@@ -140,7 +140,7 @@ public class FlowRunnerPrincipalShould
         var repository = new Mock<IRepository<T>>();
         repository.Setup(r => r.AdviceContext).Returns(new AdviceContext(new ServiceCollection().BuildServiceProvider()));
         repository.Setup(r => r.Join(It.IsAny<IUnitOfWork>()));
-        repository.Setup(r => r.Begin()).Returns(Mock.Of<IUnitOfWork>());
+        repository.Setup(r => r.Begin(It.IsAny<System.Data.IsolationLevel?>())).Returns(Mock.Of<IUnitOfWork>());
         repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
                   .ReturnsAsync((T entity, CancellationToken _, MutationOptions _) => {
                       FlowTestCreation.Assign(entity);

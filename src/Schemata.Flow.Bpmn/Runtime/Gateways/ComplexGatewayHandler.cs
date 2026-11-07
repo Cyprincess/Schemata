@@ -46,6 +46,10 @@ public static class ComplexGatewayHandler<TProcess, TToken, TTransition>
             var ctx         = engine.BuildConditionContext(definition, BpmnEngine<TProcess, TToken, TTransition>.TokenView(token), cg.Name, execution, bookkeeping, process, token);
             var ready = await cg.ActivationCount.Evaluate(ctx);
             if (!ready) {
+                if (token.State == "Waiting" && token.WaitingAtName == cg.Name) {
+                    return BpmnEngine<TProcess, TToken, TTransition>.Snapshot(process, working, [], execution);
+                }
+
                 return engine.ParkAtGateway(process, token, working, cg, previousState, execution);
             }
         }

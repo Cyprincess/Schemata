@@ -123,7 +123,7 @@ public sealed class EventCompositionShould : IAsyncLifetime
         Assert.Equal(SignalDeliveryStatus.Delivered, second.Status);
         await using var reader = _root.CreateAsyncScope();
         var token = await reader.ServiceProvider.GetRequiredService<IRepository<SchemataProcessToken>>()
-            .SingleOrDefaultAsync(q => q.Where(row => row.Process == process.Name));
+            .SingleOrDefaultAsync(q => q.Where(row => row.Process == process.CanonicalName));
         Assert.NotNull(token);
         Assert.Equal("Completed", token.State);
         Assert.Equal("end", token.StateName);
@@ -164,7 +164,7 @@ public sealed class EventCompositionShould : IAsyncLifetime
         await using (var scope = _root.CreateAsyncScope()) {
             var runner  = scope.ServiceProvider.GetRequiredService<FlowRunner>();
             var process = await runner.StartAsync(definition, null, CancellationToken.None);
-            processName = process.Name!;
+            processName = process.CanonicalName!;
         }
 
         var @event = new ReviewSignal(processName);
@@ -193,7 +193,7 @@ public sealed class EventCompositionShould : IAsyncLifetime
         IMessage? received = null;
         var deadline = DateTime.UtcNow.AddSeconds(5);
         while (received is null && DateTime.UtcNow < deadline) {
-            received = await actor.AskAsync<GetReceived, IMessage?>(new());
+            received = await actor.AskAsync<GetReceived, IMessage?>(_root, new());
             if (received is null) {
                 await Task.Delay(TimeSpan.FromMilliseconds(50));
             }
@@ -254,7 +254,7 @@ public sealed class EventCompositionShould : IAsyncLifetime
         await using (var scope = _root.CreateAsyncScope()) {
             var runner  = scope.ServiceProvider.GetRequiredService<FlowRunner>();
             var process = await runner.StartAsync(definition, null, CancellationToken.None);
-            processName      = process.Name!;
+            processName      = process.CanonicalName!;
             processCanonical = process.CanonicalName!;
         }
 

@@ -95,6 +95,17 @@ one child token per selected branch.
 The start path is `InclusiveGatewayHandler.StartIntoBranchAsync`, which delegates to
 `BpmnEngine.SpawnFromGatewayAsync` to spawn the children without a parent-to-child fork row.
 
+### Complex gateway activation
+
+`ComplexGatewayHandler.FromTokenAsync` applies the same branch selection after its optional
+`ActivationCount` passes. `StartCoreAsync` uses this handler when the start event flows directly
+to a complex gateway, and `AdvanceCoreAsync` uses it again for a token waiting at that gateway.
+An unready arrival parks through `ParkAtGateway`; repeated unready advances return the existing
+waiting snapshot with no new transition or child token. When activation passes,
+`ResolveInclusiveBranchesAsync` selects the outgoing flows and `BranchFromTokenAsync` performs
+one fork. These paths are implemented in `BpmnEngine.cs` and
+`Runtime/Gateways/ComplexGatewayHandler.cs`.
+
 ### Merge decision
 
 `InclusiveGatewayHandler.ArriveAtJoinAsync` handles an `InclusiveGateway` with more than one

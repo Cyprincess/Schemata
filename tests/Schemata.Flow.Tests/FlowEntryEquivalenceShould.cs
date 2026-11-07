@@ -165,7 +165,7 @@ public sealed class FlowEntryEquivalenceShould
         var token = new SchemataProcessToken {
             Name          = "t1",
             CanonicalName = $"{process.CanonicalName}/tokens/t1",
-            Process       = process.Name!,
+            Process       = process.CanonicalName,
             State         = "Completed",
         };
         var transition = new SchemataProcessTransition {
@@ -183,7 +183,7 @@ public sealed class FlowEntryEquivalenceShould
         var repository = new Mock<IRepository<T>>();
         repository.Setup(r => r.AdviceContext).Returns(new AdviceContext(new ServiceCollection().BuildServiceProvider()));
         repository.Setup(r => r.Join(It.IsAny<IUnitOfWork>()));
-        repository.Setup(r => r.Begin()).Returns(unitOfWork);
+        repository.Setup(r => r.Begin(It.IsAny<System.Data.IsolationLevel?>())).Returns(unitOfWork);
         repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
                   .ReturnsAsync((T entity, CancellationToken _, MutationOptions _) => {
                       FlowTestCreation.Assign(entity);

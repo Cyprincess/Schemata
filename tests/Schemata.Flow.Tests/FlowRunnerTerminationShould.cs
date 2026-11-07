@@ -112,7 +112,7 @@ public class FlowRunnerTerminationShould
         var orphan = new SchemataProcessToken {
             Name          = "t9",
             CanonicalName = "processes/missing/tokens/t9",
-            Process       = "missing",
+            Process       = "processes/missing",
             State         = "Waiting",
         };
 
@@ -127,7 +127,7 @@ public class FlowRunnerTerminationShould
         var stranger = new SchemataProcessToken {
             Name          = "t9",
             CanonicalName = "processes/p1/tokens/t9",
-            Process       = "p1",
+            Process       = "processes/p1",
             State         = "Waiting",
         };
 
@@ -139,7 +139,7 @@ public class FlowRunnerTerminationShould
         return new() {
             Name          = name,
             CanonicalName = $"processes/p1/tokens/{name}",
-            Process       = "p1",
+            Process       = "processes/p1",
             State         = state,
             WaitingAtName = waitingAt,
         };
@@ -170,7 +170,7 @@ public class FlowRunnerTerminationShould
 
         var processes = Repository(process);
         var tokenRepo = Repository(tokens);
-        processes.Setup(r => r.Begin()).Returns(Mock.Of<IUnitOfWork>());
+        processes.Setup(r => r.Begin(It.IsAny<System.Data.IsolationLevel?>())).Returns(Mock.Of<IUnitOfWork>());
 
         var collection = new ServiceCollection()
                         .AddLogging()
@@ -197,7 +197,7 @@ public class FlowRunnerTerminationShould
         var repository = new Mock<IRepository<T>>();
         repository.Setup(r => r.AdviceContext).Returns(new AdviceContext(new ServiceCollection().BuildServiceProvider()));
         repository.Setup(r => r.Join(It.IsAny<IUnitOfWork>()));
-        repository.Setup(r => r.Begin()).Returns(Mock.Of<IUnitOfWork>());
+        repository.Setup(r => r.Begin(It.IsAny<System.Data.IsolationLevel?>())).Returns(Mock.Of<IUnitOfWork>());
         repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
                   .ReturnsAsync((T entity, CancellationToken _, MutationOptions _) => {
                       FlowTestCreation.Assign(entity);

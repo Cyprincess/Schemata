@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
 using Schemata.Abstractions.Advisors;
+using Schemata.Abstractions.Resource;
 using Schemata.Entity.Repository;
 using Schemata.Abstractions.Exceptions;
 using Schemata.Flow.Foundation;
@@ -50,12 +51,17 @@ public sealed class FlowMethodEnvelopeShould
         var dispatcher = harness.Services.GetRequiredService<IRequestDispatcher>();
         var principal  = new ClaimsPrincipal(new ClaimsIdentity());
 
+        var envelope = new ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>(
+            FlowOperations.Start,
+            null,
+            new("envelope-process", Source: null, SourceType: null, SourceCanonicalName: null, Options: null, principal),
+            principal) {
+            Dispatch = new(),
+        };
         var process = await dispatcher.SendAsync<ResourceMethodRequest<SchemataProcess, StartProcessRequest, SchemataProcess>, SchemataProcess>(
-            new(FlowOperations.Start,
-                null,
-                new("envelope-process", Source: null, SourceType: null, SourceCanonicalName: null, Options: null, principal),
-                principal),
-            CancellationToken.None);
+            envelope, CancellationToken.None);
+
+        Assert.Equal(ResourceDispatchOutcome.Committed, envelope.Dispatch!.Outcome);
 
         var observed = Assert.Single(wrap.Observed);
         Assert.Equal(FlowOperations.Start, observed.Verb);
@@ -226,7 +232,7 @@ public sealed class FlowMethodEnvelopeShould
         var repository = new Mock<IRepository<T>>();
         repository.Setup(r => r.AdviceContext).Returns(new AdviceContext(new ServiceCollection().BuildServiceProvider()));
         repository.Setup(r => r.Join(It.IsAny<IUnitOfWork>()));
-        repository.Setup(r => r.Begin()).Returns(Mock.Of<IUnitOfWork>());
+        repository.Setup(r => r.Begin(It.IsAny<System.Data.IsolationLevel?>())).Returns(Mock.Of<IUnitOfWork>());
         repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
                   .ReturnsAsync((T entity, CancellationToken _, MutationOptions _) => {
                       FlowTestCreation.Assign(entity);

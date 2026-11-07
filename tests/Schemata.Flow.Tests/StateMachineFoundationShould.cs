@@ -28,7 +28,7 @@ public class StateMachineFoundationShould
         var definition = new ProcessDefinition { Name = "guard", Elements = { task, end }, Flows = {
             new() { Source = task, Target = end, Condition = new LambdaConditionExpression { Lambda = _ => new(false) } },
         } };
-        var token = new SchemataProcessToken { CanonicalName = "processes/p1/tokens/t1", Process = "p1", ScopeName = string.Empty, StateName = "task", State = "Active" };
+        var token = new SchemataProcessToken { CanonicalName = "processes/p1/tokens/t1", Process = "processes/p1", ScopeName = string.Empty, StateName = "task", State = "Active" };
         using var services = new ServiceCollection().BuildServiceProvider();
         var snapshot = await new StateMachineEngine().AdvanceAsync(definition, new() { Name = "p1", CanonicalName = "processes/p1" }, [token], FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), services));
 
@@ -96,7 +96,7 @@ public class StateMachineFoundationShould
             new() { Source = task, Target = selected, IsDefault = true, Condition = new LambdaConditionExpression { Lambda = _ => throw new InvalidOperationException("default evaluated") } },
             new() { Source = task, Target = fallback },
         } };
-        var token = new SchemataProcessToken { CanonicalName = "processes/p1/tokens/t1", Process = "p1", ScopeName = string.Empty, StateName = "task", State = "Active" };
+        var token = new SchemataProcessToken { CanonicalName = "processes/p1/tokens/t1", Process = "processes/p1", ScopeName = string.Empty, StateName = "task", State = "Active" };
         using var services = new ServiceCollection().BuildServiceProvider();
         await new StateMachineEngine().AdvanceAsync(definition, new() { Name = "p1", CanonicalName = "processes/p1" }, [token], FlowTestCreation.Context(Mock.Of<IUnitOfWork>(), services));
 
@@ -133,7 +133,7 @@ public class StateMachineFoundationShould
         var transitions = Repository<SchemataProcessTransition>();
         var sources = Repository<SchemataProcessSource>();
         var compensations = Repository<SchemataProcessCompensation>();
-        processes.Setup(r => r.Begin()).Returns(uow.Object);
+        processes.Setup(r => r.Begin(It.IsAny<System.Data.IsolationLevel?>())).Returns(uow.Object);
         var services = new ServiceCollection()
                       .AddSingleton(processes.Object)
                       .AddSingleton(tokens.Object)
@@ -158,7 +158,7 @@ public class StateMachineFoundationShould
         var repository = new Mock<IRepository<T>>();
         repository.Setup(r => r.AdviceContext).Returns(new AdviceContext(new ServiceCollection().BuildServiceProvider()));
         repository.Setup(r => r.Join(It.IsAny<IUnitOfWork>()));
-        repository.Setup(r => r.Begin()).Returns(Mock.Of<IUnitOfWork>());
+        repository.Setup(r => r.Begin(It.IsAny<System.Data.IsolationLevel?>())).Returns(Mock.Of<IUnitOfWork>());
         repository.Setup(r => r.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>(), It.IsAny<MutationOptions>()))
                   .ReturnsAsync((T entity, CancellationToken _, MutationOptions _) => {
                       FlowTestCreation.Assign(entity);
