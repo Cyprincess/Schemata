@@ -1,9 +1,12 @@
+using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Options;
 using Schemata.Core.Building;
 using Schemata.Resource.Http;
 using Schemata.Resource.Http.Linking;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Core.Linking;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -21,6 +24,10 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddSchemataHttpResources(this IServiceCollection services) {
+        if (services.Any(descriptor => descriptor.ServiceType == typeof(ResourceControllerFeatureProvider))) {
+            return services;
+        }
+
         var provider = new ResourceControllerFeatureProvider();
         var method   = new ResourceMethodControllerFeatureProvider();
         services.AddSingleton(provider);
@@ -40,7 +47,7 @@ public static class ServiceCollectionExtensions
                      manager.FeatureProviders.Add(method);
                  });
 
-        services.AddSchemataLinkContributor<ResourceLinkContributor>();
+        services.TryAddEnumerable(ServiceDescriptor.KeyedScoped<ILinkContributor, ResourceLinkContributor>(LinkTransports.Http));
 
         return services;
     }

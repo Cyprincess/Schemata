@@ -92,6 +92,7 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
     /// </param>
     /// <param name="request">The incoming request payload.</param>
     /// <param name="principal">The authenticated caller, or <see langword="null" /> for anonymous calls.</param>
+    /// <param name="dispatch">The identified execution carried by the framework envelope.</param>
     /// <param name="ctx">The advisor context shared with the caller.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The method's response.</returns>
@@ -100,6 +101,7 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
         string?           name,
         TRequest          request,
         ClaimsPrincipal?  principal,
+        ResourceDispatchExecution? dispatch,
         AdviceContext     ctx,
         CancellationToken ct
     ) {
@@ -124,12 +126,8 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
             Target    = instance ? name : null,
             Request   = request,
             Principal = principal,
+            Dispatch  = dispatch,
         };
-
-        // The idempotency wrap attaches its dispatch execution to the inner request DTO. Method
-        // stages and the business handler report their transaction completion through it; a
-        // dispatch whose owner never reports settles conservatively.
-        execution.Dispatch = (request as IResourceDispatchCarrier)?.Dispatch;
 
         var requestResult = await HandledResponseRunner.RunAsync(
             execution,
@@ -171,12 +169,12 @@ public sealed class ResourceMethodOperationHandler<TEntity, TRequest, TResponse>
             }
         }
 
-        // The business dispatch is running: without an explicit completion report the outcome
-        // stays Reached, which the idempotency wrap treats as unknown and keeps pending.
         execution.Dispatch?.MarkReached();
 
         request.Principal = principal;
-        return await _dispatcher.SendAsync<TRequest, TResponse>(request, ct);
+        var response = await _dispatcher.SendAsync<TRequest, TResponse>(request, ct);
+        execution.Dispatch?.MarkCommitted();
+        return response;
     }
 
     private ResourceMethodScope ResolveScope(string verb) {

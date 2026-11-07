@@ -82,6 +82,7 @@ Descriptors are cached per `RuntimeTypeHandle` in a `ConcurrentDictionary`. Get 
 | ----------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `Resolve(entity)`                               | Builds the full canonical name by reading the placeholder properties from an entity |
 | `ParseCanonicalName(name)`                      | Splits a full name into `(ParentValues, LeafName)`; `null` on mismatch              |
+| `ParentOf(name)`                                | Validates the full name against the pattern and resolves its complete parent; `null` for a root or absent name, `InvalidArgumentException` (`INVALID_NAME`) on mismatch |
 | `ParseParent(parent)`                           | Parses a parent path into a placeholder-to-value dictionary                         |
 | `BuildParentPredicate<T>(values)`               | Builds a `Where` predicate from parent values, skipping `"-"` (AIP-159)             |
 | `ResolveParent(routeValues)`                    | Builds a parent path string from ASP.NET route values; `null` when the pattern declares no parent segments or any parent placeholder is unbound |

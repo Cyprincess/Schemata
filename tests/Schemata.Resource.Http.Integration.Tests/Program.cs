@@ -13,9 +13,11 @@ using Schemata.Entity.EntityFrameworkCore;
 using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Expressions.Aip;
+using Schemata.Expressions.Cel;
 using Schemata.Expressions.Order;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Caching.Memory;
+using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Http.Integration.Tests.Fixtures;
 using Schemata.Scheduling.Skeleton.Entities;
 using Schemata.Tenancy.Skeleton;
@@ -46,6 +48,7 @@ builder.UseSchemata(schema => {
         resource.WithoutCreateValidation().WithoutUpdateValidation().WithoutFreshness();
     }
     resource.UseAip().UseOrdering();
+    resource.UseCel(entry => entry.Filtering = Schemata.Expressions.Skeleton.FilteringMode.Residual);
     if (builder.Configuration["ResourceDeclarations"] == "true") {
         resource.MapHttp().MapGrpc();
         schema.UseMapster().Map<HttpNote, HttpNote>();
@@ -194,7 +197,7 @@ builder.UseSchemata(schema => {
     schema.Services.AddScheduledJob<ProbeJob>();
 
     // Auto-assign a unique Name to every new Student so that FindByNameAsync works.
-    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, AdviceAddStudentName>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IResourceCreateAdvisor<Student, Student, Student>, AdviceAddStudentName>());
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<StudentNote>, AdviceAddResourceName<StudentNote>>());
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<EstimatedThing>, AdviceAddResourceName<EstimatedThing>>());
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Trash>, AdviceAddTrashName>());

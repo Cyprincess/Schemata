@@ -15,9 +15,11 @@ using Schemata.Abstractions.Resource;
 using Schemata.Advice;
 using Schemata.Common;
 using Schemata.Entity.Repository;
+using Schemata.Entity.Repository.Advisors;
 using Schemata.Security.Skeleton;
 using Schemata.Mapping.Skeleton;
 using Schemata.Resource.Foundation.Advisors;
+using Schemata.Validation.Skeleton;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Resource.Foundation;
@@ -45,8 +47,8 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
     /// <param name="ct">A cancellation token.</param>
     /// <param name="execution">
     ///     The identified dispatch execution carried from the idempotency wrap, or
-    ///     <see langword="null" /> when the dispatch runs unidentified. This handler commits every
-    ///     dispatch; a non-null execution additionally receives the transaction-completion evidence.
+    ///     <see langword="null" /> when the dispatch runs unidentified. Mutating dispatches commit through the
+    ///     handler-owned unit of work and record transaction-completion evidence on a non-null execution.
     /// </param>
     /// <returns>An <see cref="UpdateResultBase{TDetail}" /> containing the updated detail DTO.</returns>
     public Task<UpdateResultBase<TDetail>> UpdateAsync(
@@ -133,12 +135,36 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
                 }
             });
 
+        if (request is IValidation { ValidateOnly: true }) {
+            await ValidationHelper.ValidateAsync(ctx, entity, Operations.Update, ct);
+            execution?.MarkNotWritten();
+            return new();
+        }
+
         var mutation = _sp.GetRequiredService<IResourceMutation<TEntity>>();
 
-        return await ExecuteOwnedAsync(
-            (transaction, token) => MutateUpdateAsync(mutation, entity, transaction, execution, token),
-            execution,
-            ct);
+        var transaction = _repository.Begin();
+        execution?.MarkReached();
+        if (execution is not null) {
+            transaction.AddCommitSink(CommitOrders.Repository - 1, _ => {
+                execution.MarkCommitted();
+                return Task.CompletedTask;
+            });
+            transaction.AddRollbackSink(execution.MarkRolledBack);
+        }
+
+        Exception? failure = null;
+        try {
+            var response = await MutateUpdateAsync(mutation, entity, transaction, execution, ct);
+            await transaction.CommitAsync(ct);
+            return response;
+        } catch (Exception error) {
+            failure = error;
+            throw;
+        } finally {
+            try { await transaction.DisposeAsync(); }
+            catch (Exception cleanup) when (failure is not null) { throw new AggregateException(failure, cleanup); }
+        }
     }
 
     private async Task<UpdateResultBase<TDetail>> MutateUpdateAsync(
@@ -156,7 +182,11 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         }
 
         var detail = RequireDetail(_mapper.Map<TEntity, TDetail>(entity));
-        ResourceCommitOwner.SyncStamp(entity, detail, transaction);
+        transaction.AddSavePreparation(() => {
+            if (entity is IConcurrency source && detail is IConcurrency stamped) {
+                stamped.Timestamp = source.Timestamp;
+            }
+        });
 
         return new() { Detail = detail };
     }
@@ -208,12 +238,38 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             return new UpdateResultBase<TDetail> { Detail = entityResult.Detail };
         }
 
+        if (request is IValidation { ValidateOnly: true }) {
+            AdviceAddCanonicalName.Apply(entity);
+            await ValidationHelper.ValidateAsync(ctx, entity, Operations.Create, ct);
+            await AdviceAddUniqueness.EnsureUniqueAsync(_repository, entity, ct);
+            execution?.MarkNotWritten();
+            return new();
+        }
+
         var mutation = _sp.GetRequiredService<IResourceMutation<TEntity>>();
 
-        return await ExecuteOwnedAsync(
-            (transaction, token) => MutateMissingAsync(mutation, entity, transaction, execution, token),
-            execution,
-            ct);
+        var transaction = _repository.Begin();
+        execution?.MarkReached();
+        if (execution is not null) {
+            transaction.AddCommitSink(CommitOrders.Repository - 1, _ => {
+                execution.MarkCommitted();
+                return Task.CompletedTask;
+            });
+            transaction.AddRollbackSink(execution.MarkRolledBack);
+        }
+
+        Exception? failure = null;
+        try {
+            var response = await MutateMissingAsync(mutation, entity, transaction, execution, ct);
+            await transaction.CommitAsync(ct);
+            return response;
+        } catch (Exception error) {
+            failure = error;
+            throw;
+        } finally {
+            try { await transaction.DisposeAsync(); }
+            catch (Exception cleanup) when (failure is not null) { throw new AggregateException(failure, cleanup); }
+        }
     }
 
     private async Task<UpdateResultBase<TDetail>> MutateMissingAsync(
@@ -231,7 +287,11 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         }
 
         var detail = RequireDetail(_mapper.Map<TEntity, TDetail>(entity));
-        ResourceCommitOwner.SyncStamp(entity, detail, transaction);
+        transaction.AddSavePreparation(() => {
+            if (entity is IConcurrency source && detail is IConcurrency stamped) {
+                stamped.Timestamp = source.Timestamp;
+            }
+        });
 
         return new() { Detail = detail };
     }

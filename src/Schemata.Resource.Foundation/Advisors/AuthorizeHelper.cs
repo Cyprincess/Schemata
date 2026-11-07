@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Common;
 using Schemata.Common.Errors;
 using Schemata.Security.Skeleton;
@@ -121,7 +122,11 @@ internal static class AuthorizeHelper
     /// </summary>
     internal static string? ResolveParent<TEntity>(string? name)
         where TEntity : class, ICanonicalName {
-        return ResourceNameDescriptor.ForType<TEntity>().ParentOf(name);
+        try {
+            return ResourceNameDescriptor.ForType<TEntity>().ParentOf(name);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
     }
 
     private static async Task EnsureCoreAsync<TEntity, TRequest>(

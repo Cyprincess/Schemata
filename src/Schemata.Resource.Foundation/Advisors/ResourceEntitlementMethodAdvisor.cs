@@ -21,6 +21,10 @@ public sealed class ResourceEntitlementMethodAdvisor<TEntity, TRequest, TRespons
         ResourceRequestContainer<TEntity>                     container,
         CancellationToken                                     ct = default
     ) {
+        if (execution.Target is null) {
+            return AdviseResult.Continue;
+        }
+
         var expression = await entitlement.GenerateEntitlementExpressionAsync(
             new() { Operation = execution.Verb, Request = execution.Request }, execution.Principal, ct);
         container.ApplyWhere(expression);

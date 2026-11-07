@@ -258,6 +258,33 @@ public class ResourceMissingAccessShould
     }
 
     [Fact]
+    public async Task Get_MissingTarget_MalformedName_IndeterminatePolicy_ThrowsPermissionDenied() {
+        var access = new Mock<IAccessProvider<EnrolledStudent, GetRequest>>();
+        access.SetupSequence(provider => provider.HasAccessAsync(
+                       It.IsAny<EnrolledStudent?>(),
+                       It.IsAny<AccessContext<GetRequest>>(),
+                       It.IsAny<ClaimsPrincipal?>(),
+                       It.IsAny<CancellationToken>()))
+              .ReturnsAsync(AccessDecision.Indeterminate)
+              .ReturnsAsync(AccessDecision.Indeterminate);
+        var resolver = new DefaultPermissionResolver();
+
+        var ex = await Assert.ThrowsAsync<PermissionDeniedException>(
+            () => AuthorizeHelper.FinalizeMissingAsync<EnrolledStudent, GetRequest>(
+                access.Object, resolver, nameof(Operations.Get), new GetRequest { Name = "not/a/canonical" },
+                "not/a/canonical", null, CancellationToken.None));
+
+        Assert.Equal("PERMISSION_DENIED", ex.Status);
+        access.Verify(provider => provider.HasAccessAsync(
+            null,
+            It.Is<AccessContext<GetRequest>>(context => context.Stage == AccessStage.Missing
+                                                      && context.Name == "not/a/canonical"
+                                                      && context.Parent == null),
+            It.IsAny<ClaimsPrincipal?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task Get_MissingTarget_Without_Access_Provider_KeepsNotFound() {
         var (repository, mapper) = AbsentLoad();
         using var services = Services<Student>();

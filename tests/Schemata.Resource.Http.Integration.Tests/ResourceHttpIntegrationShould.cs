@@ -103,6 +103,43 @@ public class ResourceHttpIntegrationShould : IClassFixture<WebAppFactory>
         Assert.NotEqual(Guid.Empty, Guid.Parse(uid));
     }
 
+    [Theory]
+    [InlineData(null, true, true)]
+    [InlineData("*", true, true)]
+    [InlineData("", false, false)]
+    [InlineData("uid", false, false)]
+    [InlineData("full_name", true, false)]
+    [InlineData("uid,full_name", true, false)]
+    public async Task Patch_UpdateMaskControlsPersistedBusinessFields(
+        string? mask,
+        bool    updatesName,
+        bool    replacesPopulatedFields
+    ) {
+        var client = _factory.CreateClient();
+        var original = $"Mask-{Guid.NewGuid():n}";
+        var created = await client.PostAsync("/v1/students",
+            new StringContent(JsonSerializer.Serialize(new { full_name = original, age = 7, grade = 3 }),
+                              Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var createdBody = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var name = createdBody.GetProperty("name").GetString();
+        var uid = createdBody.GetProperty("uid").GetString();
+        var payload = mask is null
+            ? JsonSerializer.Serialize(new { full_name = "Changed", age = 42, grade = 9 })
+            : JsonSerializer.Serialize(new { full_name = "Changed", age = 42, grade = 9, update_mask = mask });
+
+        var updated = await client.PatchAsync($"/v1/{name}",
+            new StringContent(payload, Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+        var fetched = await client.GetFromJsonAsync<JsonElement>($"/v1/{name}");
+        Assert.Equal(updatesName ? "Changed" : original, fetched.GetProperty("full_name").GetString());
+        Assert.Equal(replacesPopulatedFields ? 42 : 7, fetched.GetProperty("age").GetInt32());
+        Assert.Equal(replacesPopulatedFields ? 9 : 3, fetched.GetProperty("grade").GetInt32());
+        Assert.Equal(uid, fetched.GetProperty("uid").GetString());
+        Assert.Equal(name, fetched.GetProperty("name").GetString());
+    }
+
     [Fact]
     public async Task Delete_ExistingStudent_Returns204() {
         var client  = _factory.CreateClient();

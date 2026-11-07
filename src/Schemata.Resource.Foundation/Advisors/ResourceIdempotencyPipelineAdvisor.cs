@@ -46,8 +46,8 @@ public static class ResourceIdempotencyPipelineAdvisor
 ///         so another owner's reservation is never deletable. A committed dispatch is never released: a
 ///         failure in response shaping, cache settlement, or a later post-commit sink keeps the
 ///         reservation pending as the unfinalized record of the dispatch, and a retry within the
-///         retention window is rejected instead of repeating the write. A dispatch whose owner never
-///         reported completion — unreported AIP-136 custom methods — is treated the same way.
+///         retention window is rejected instead of repeating the write. A dispatch that stops after
+///         reaching its owner without a terminal outcome is treated the same way.
 ///     </para>
 ///     <para>
 ///         Retention is not failure poison: ordinary failures (validation denials, confirmed
@@ -66,6 +66,7 @@ public static class ResourceIdempotencyPipelineAdvisor
 ///     <param name="operation">Resolves the operation token of the idempotency key; <see langword="null" /> passes through.</param>
 ///     <param name="payload">Resolves the request DTO hashed and inspected for a request id.</param>
 ///     <param name="target">Resolves the canonical-name partition of the idempotency key.</param>
+///     <param name="attach">Attaches the execution to the framework dispatch envelope.</param>
 ///     <param name="replayShape">Wraps a cached detail into the verb's response envelope.</param>
 ///     <param name="commitExtract">Reads the detail to cache off a verb response.</param>
 ///     <param name="time">The clock used for pending reservation timeouts.</param>
@@ -73,6 +74,7 @@ public class ResourceIdempotencyPipelineAdvisor<TEntity, TRequest, TEnvelope, TD
     Func<TEnvelope, string?>  operation,
     Func<TEnvelope, TRequest> payload,
     Func<TEnvelope, string>   target,
+    Action<TEnvelope, ResourceDispatchExecution> attach,
     Func<TDetail?, TResponse> replayShape,
     Func<TResponse, TDetail?> commitExtract,
     TimeProvider?             time = null)
@@ -121,13 +123,7 @@ public class ResourceIdempotencyPipelineAdvisor<TEntity, TRequest, TEnvelope, TD
             Retention   = options.IdempotencyRetention,
         };
 
-        // The execution rides the dispatch object the mutation owner already receives: the envelope
-        // for standard verbs, the inner request DTO for custom methods.
-        if (request is IResourceDispatchCarrier envelopeCarrier) {
-            envelopeCarrier.Dispatch = execution;
-        } else if (dto is IResourceDispatchCarrier payloadCarrier) {
-            payloadCarrier.Dispatch = execution;
-        }
+        attach(request, execution);
 
         var template = new PendingIdempotencyRecord {
             Operation     = operationToken,
@@ -202,7 +198,7 @@ public class ResourceIdempotencyPipelineAdvisor<TEntity, TRequest, TEnvelope, TD
 
     /// <summary>
     ///     Releases the reservation when the failure evidence permits and rethrows the original
-    ///     failure. Confirmed no-write and confirmed rollback release; committed and unreported
+    ///     failure. Confirmed no-write and confirmed rollback release; committed and reached
     ///     outcomes keep the reservation pending so a retry cannot repeat the write.
     /// </summary>
     private async Task FailAsync(ResourceDispatchExecution execution, Exception failure, ICacheProvider cache) {
@@ -224,7 +220,7 @@ public class ResourceIdempotencyPipelineAdvisor<TEntity, TRequest, TEnvelope, TD
 
     /// <summary>
     ///     Settles the reservation after the dispatch produced its response: releasable outcomes are
-    ///     removed with the attempt's exact reservation bytes, unreported outcomes stay pending as
+    ///     removed with the attempt's exact reservation bytes, reached outcomes stay pending as
     ///     the unfinalized record, and a committed dispatch swaps its shaped detail into the slot.
     /// </summary>
     private async Task SettleAsync(ResourceDispatchExecution execution, TResponse response, ICacheProvider cache, CancellationToken ct) {

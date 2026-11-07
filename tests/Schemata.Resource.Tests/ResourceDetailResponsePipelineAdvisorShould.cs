@@ -41,7 +41,7 @@ public class ResourceDetailResponsePipelineAdvisorShould
         var result = await DispatchCreateAsync(services);
 
         Assert.NotNull(result.Detail);
-        Assert.Equal("tenants/t1", result.Detail.Parent);
+        Assert.Equal("organizations/o/projects/p", result.Detail.Parent);
         Assert.Equal(WeakTag(Timestamp), result.Detail.EntityTag);
     }
 
@@ -55,7 +55,7 @@ public class ResourceDetailResponsePipelineAdvisorShould
 
         // Derivation overrides whatever the mapping left behind.
         Assert.NotNull(result.Detail);
-        Assert.Equal("tenants/t1", result.Detail.Parent);
+        Assert.Equal("organizations/o/projects/p", result.Detail.Parent);
         Assert.Equal(WeakTag(Timestamp), result.Detail.EntityTag);
     }
 
@@ -67,7 +67,7 @@ public class ResourceDetailResponsePipelineAdvisorShould
         var result = await DispatchUpdateAsync(services);
 
         Assert.NotNull(result.Detail);
-        Assert.Equal("tenants/t1", result.Detail.Parent);
+        Assert.Equal("organizations/o/projects/p", result.Detail.Parent);
         Assert.Equal(WeakTag(Timestamp), result.Detail.EntityTag);
     }
 
@@ -80,7 +80,7 @@ public class ResourceDetailResponsePipelineAdvisorShould
         var result = await DispatchGetAsync<Detail>(services);
 
         Assert.NotNull(result.Detail);
-        Assert.Equal("tenants/t1", result.Detail.Parent);
+        Assert.Equal("organizations/o/projects/p", result.Detail.Parent);
         Assert.Null(result.Detail.EntityTag);
     }
 
@@ -95,13 +95,13 @@ public class ResourceDetailResponsePipelineAdvisorShould
         var result = await DispatchGetAsync<Detail>(services);
 
         Assert.NotNull(result.Detail);
-        Assert.Equal("tenants/t1", result.Detail.Parent);
+        Assert.Equal("organizations/o/projects/p", result.Detail.Parent);
         Assert.Equal("W/\"custom\"", result.Detail.EntityTag);
     }
 
     [Fact]
     public async Task Get_PlainDetail_ReturnsContinuationDetail() {
-        var detail = new PlainDetail { CanonicalName = "tenants/t1/hosts/h1" };
+        var detail = new PlainDetail { CanonicalName = "organizations/o/projects/p/datasets/d" };
 
         using var services = BuildServices<PlainDetail>(CreateRepository(), CreatePlainMapper(detail));
         var result = await DispatchGetAsync<PlainDetail>(services);
@@ -128,13 +128,10 @@ public class ResourceDetailResponsePipelineAdvisorShould
     }
 
     [Theory]
-    [InlineData(null,                                    null)]
-    [InlineData("",                                      null)]
-    [InlineData("tenants/t1",                            null)]
-    [InlineData("tenants/t1/hosts/h1",                   "tenants/t1")]
+    [InlineData(null, null)]
+    [InlineData("", null)]
     [InlineData("organizations/o/projects/p/datasets/d", "organizations/o/projects/p")]
-    [InlineData("organizations/o/projects/p/datasets",   null)]
-    public async Task DerivedParent_Matches_StripLastTwoSegments(string? canonical, string? expected) {
+    public async Task DerivedParent_MatchesDeclaredPattern(string? canonical, string? expected) {
         var detail = new Detail { CanonicalName = canonical };
 
         var advisor  = new ResourceGetResponsePipelineAdvisor<Entity, Detail>();
@@ -214,18 +211,18 @@ public class ResourceDetailResponsePipelineAdvisorShould
         where TGetDetail : class, ICanonicalName {
         var dispatcher = new InProcessRequestDispatcher(services);
         return dispatcher.SendAsync<GetResourceQueryRequest<Entity, TGetDetail>, GetResultBase<TGetDetail>>(
-            new(new() { CanonicalName = "entities/e1" }, null), CancellationToken.None);
+            new(new() { CanonicalName = "organizations/o/projects/p/datasets/e1" }, null), CancellationToken.None);
     }
 
     private static Task<UpdateResultBase<Detail>> DispatchUpdateAsync(ServiceProvider services) {
         var dispatcher = new InProcessRequestDispatcher(services);
         return dispatcher.SendAsync<UpdateResourceRequest<Entity, Request, Detail>, UpdateResultBase<Detail>>(
-            new("entities/e1", new(), null), CancellationToken.None);
+            new("organizations/o/projects/p/datasets/e1", new(), null), CancellationToken.None);
     }
 
     private static Detail MappedDetail() {
         return new() {
-            CanonicalName = "tenants/t1/hosts/h1",
+            CanonicalName = "organizations/o/projects/p/datasets/d",
             Timestamp     = Timestamp,
         };
     }
@@ -236,7 +233,7 @@ public class ResourceDetailResponsePipelineAdvisorShould
         repository.Setup(r => r.SingleOrDefaultAsync(
                           It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
                           It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
-                  .Returns(new ValueTask<Entity?>(new Entity { Name = "e1", CanonicalName = "entities/e1" }));
+                  .Returns(new ValueTask<Entity?>(new Entity { Name = "e1", CanonicalName = "organizations/o/projects/p/datasets/e1" }));
 
         return repository;
     }
@@ -244,7 +241,7 @@ public class ResourceDetailResponsePipelineAdvisorShould
     private static Mock<ISimpleMapper> CreateMapper(Detail detail) {
         var mapper = new Mock<ISimpleMapper>();
         mapper.Setup(m => m.Map<Request, Entity>(It.IsAny<Request>()))
-              .Returns(new Entity { Name = "e1", CanonicalName = "entities/e1" });
+              .Returns(new Entity { Name = "e1", CanonicalName = "organizations/o/projects/p/datasets/e1" });
         mapper.Setup(m => m.Map<Entity, Detail>(It.IsAny<Entity>()))
               .Returns(detail);
 
@@ -318,9 +315,11 @@ public class ResourceDetailResponsePipelineAdvisorShould
 
     #region Fixtures
 
-    [CanonicalName("entities/{entity}")]
+    [CanonicalName("organizations/{organization}/projects/{project}/datasets/{dataset}")]
     public sealed class Entity : ICanonicalName
     {
+        public string? Organization  { get; set; }
+        public string? Project       { get; set; }
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
     }

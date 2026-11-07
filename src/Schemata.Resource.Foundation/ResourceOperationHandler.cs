@@ -123,24 +123,4 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
 
         return (pageSize, maxSize);
     }
-
-    /// <summary>
-    ///     Runs one mutation through <see cref="ResourceCommitOwner" />: this handler's injected
-    ///     repository begins the unit of work, the mutation joins and stages through it, fail-able
-    ///     response preparation runs inside <paramref name="mutate" /> before the provider commit, and
-    ///     an identified dispatch records the transaction outcome through the unit of work's commit
-    ///     and rollback sinks.
-    /// </summary>
-    /// <typeparam name="TResponse">The response the mutate delegate shapes from the committed write.</typeparam>
-    /// <param name="mutate">The mutation and every fail-able response preparation before the commit.</param>
-    /// <param name="execution">The identified dispatch execution, or <see langword="null" />.</param>
-    /// <param name="ct">A cancellation token.</param>
-    /// <returns>The value produced by <paramref name="mutate" /> after the commit completes.</returns>
-    private Task<TResponse> ExecuteOwnedAsync<TResponse>(
-        Func<IUnitOfWork, CancellationToken, Task<TResponse>> mutate,
-        ResourceDispatchExecution?                            execution,
-        CancellationToken                                    ct
-    ) {
-        return ResourceCommitOwner.ExecuteAsync(_repository, execution, mutate, ct);
-    }
 }

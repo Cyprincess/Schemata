@@ -4,10 +4,13 @@ using System.Linq;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using Schemata.Abstractions;
 using Schemata.Flow.Scheduling.Handlers;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
+using Schemata.Messaging.Skeleton;
+using Schemata.Scheduling.Foundation.Commands;
 using Schemata.Scheduling.Foundation.Runtime;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -38,6 +41,7 @@ public class FlowTimerObserverShould
 
         var services = new ServiceCollection();
         services.AddSingleton(scheduler.Object);
+        services.AddSingleton(Dispatcher(scheduler.Object));
         services.AddSingleton<IScheduledJobRegistry, DefaultScheduledJobRegistry>();
         var provider = services.BuildServiceProvider();
         var handler = new FlowTimerCatchHandler<SchemataJob, SchemataJobExecution>(provider);
@@ -78,6 +82,7 @@ public class FlowTimerObserverShould
            .Returns(SystemTask.CompletedTask);
 
         var services = new ServiceCollection().AddSingleton(scheduler.Object)
+                                              .AddSingleton(Dispatcher(scheduler.Object))
                                               .AddSingleton<IScheduledJobRegistry, DefaultScheduledJobRegistry>()
                                               .BuildServiceProvider();
         var handler = new FlowTimerCatchHandler<SchemataJob, SchemataJobExecution>(services);
@@ -116,6 +121,7 @@ public class FlowTimerObserverShould
            .Returns(SystemTask.CompletedTask);
 
         var services = new ServiceCollection().AddSingleton(scheduler.Object)
+                                              .AddSingleton(Dispatcher(scheduler.Object))
                                               .AddSingleton<IScheduledJobRegistry, DefaultScheduledJobRegistry>()
                                               .BuildServiceProvider();
         var handler = new FlowTimerCatchHandler<SchemataJob, SchemataJobExecution>(services);
@@ -162,6 +168,7 @@ public class FlowTimerObserverShould
 
         var services = new ServiceCollection().AddSingleton(scheduler.Object)
                                               .AddSingleton(jobs.Object)
+                                              .AddSingleton(Dispatcher(scheduler.Object))
                                               .AddSingleton<IScheduledJobRegistry, DefaultScheduledJobRegistry>()
                                               .BuildServiceProvider();
         var handler = new FlowTimerCatchHandler<SchemataJob, SchemataJobExecution>(services);
@@ -221,6 +228,7 @@ public class FlowTimerObserverShould
 
         var services = new ServiceCollection().AddSingleton(scheduler.Object)
                                               .AddSingleton(jobs.Object)
+                                              .AddSingleton(Dispatcher(scheduler.Object))
                                               .AddSingleton<IScheduledJobRegistry, DefaultScheduledJobRegistry>()
                                               .BuildServiceProvider();
         var handler = new FlowTimerCatchHandler<SchemataJob, SchemataJobExecution>(services);
@@ -257,6 +265,7 @@ public class FlowTimerObserverShould
                  .Returns(SystemTask.CompletedTask);
 
         var services = new ServiceCollection().AddSingleton(scheduler.Object)
+                                              .AddSingleton(Dispatcher(scheduler.Object))
                                               .AddSingleton<IScheduledJobRegistry, DefaultScheduledJobRegistry>()
                                               .BuildServiceProvider();
         var handler = new FlowTimerCatchHandler<SchemataJob, SchemataJobExecution>(services);
@@ -277,6 +286,23 @@ public class FlowTimerObserverShould
         await handler.ArmAsync(Context(process, definition, null, stateName: "host", previousStateName: "host"));
 
         Assert.Empty(unscheduled);
+    }
+
+    private static IRequestDispatcher Dispatcher(IScheduler<SchemataJob, SchemataJobExecution> scheduler) {
+        var dispatcher = new Mock<IRequestDispatcher>();
+        dispatcher.Setup(d => d.SendAsync<ScheduleJobRequest<SchemataJob>, Unit>(
+                       It.IsAny<ScheduleJobRequest<SchemataJob>>(), It.IsAny<CancellationToken>()))
+                  .Returns(async (ScheduleJobRequest<SchemataJob> request, CancellationToken ct) => {
+                       await scheduler.ScheduleAsync(request.Job, request.Variables, ct);
+                       return Unit.Value;
+                   });
+        dispatcher.Setup(d => d.SendAsync<UnscheduleJobRequest, Unit>(
+                       It.IsAny<UnscheduleJobRequest>(), It.IsAny<CancellationToken>()))
+                  .Returns(async (UnscheduleJobRequest request, CancellationToken ct) => {
+                       await scheduler.UnscheduleAsync(request.JobCanonicalName, ct);
+                       return Unit.Value;
+                   });
+        return dispatcher.Object;
     }
 
     private static FlowTransitionContext Context(

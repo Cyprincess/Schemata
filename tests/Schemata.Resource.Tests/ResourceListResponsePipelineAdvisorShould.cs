@@ -33,14 +33,14 @@ public class ResourceListResponsePipelineAdvisorShould
     [Fact]
     public async Task List_PopulatedResult_DerivesParent_OnResponseSummaries() {
         var rows = new[] {
-            new Entity { Name = "e1", CanonicalName = "entities/e1" },
-            new Entity { Name = "e2", CanonicalName = "entities/e2" },
-            new Entity { Name = "e3", CanonicalName = "entities/e3" },
+            new Entity { Name = "e1", CanonicalName = "tenants/t1/hosts/e1" },
+            new Entity { Name = "e2", CanonicalName = "tenants/t1/hosts/e2" },
+            new Entity { Name = "e3", CanonicalName = "tenants/t1/hosts/e3" },
         };
         var canonicals = new Dictionary<string, string?> {
             ["e1"] = "tenants/t1/hosts/h1",
             ["e2"] = "tenants/t2/hosts/h2",
-            ["e3"] = "tenants/t3",
+            ["e3"] = null,
         };
 
         var mapped = new List<Summary>();
@@ -91,7 +91,7 @@ public class ResourceListResponsePipelineAdvisorShould
     [Fact]
     public async Task List_NonChildSummary_PassesThrough() {
         var rows = new[] {
-            new Entity { Name = "e1", CanonicalName = "entities/e1" },
+            new Entity { Name = "e1", CanonicalName = "tenants/t1/hosts/e1" },
         };
 
         var mapped = new List<PlainSummary>();
@@ -156,8 +156,8 @@ public class ResourceListResponsePipelineAdvisorShould
     [Trait("Category", "Integration")]
     public async Task List_UnavailableOrZeroEstimate_PaginatesWithoutExactFallback(long? estimate) {
         var rows = new[] {
-            new Entity { Name = "e1", CanonicalName = "entities/e1" },
-            new Entity { Name = "e2", CanonicalName = "entities/e2" },
+            new Entity { Name = "e1", CanonicalName = "tenants/t1/hosts/e1" },
+            new Entity { Name = "e2", CanonicalName = "tenants/t1/hosts/e2" },
         };
         var (repository, mapper) = CreateDoubles(rows);
         repository.Setup(r => r.EstimateCountAsync(
@@ -189,9 +189,9 @@ public class ResourceListResponsePipelineAdvisorShould
     [Trait("Category", "Integration")]
     public async Task List_Estimated_UsesFilteredScopeBeforePagination() {
         var rows = new[] {
-            new Entity { Name = "e1", CanonicalName = "entities/e1" },
-            new Entity { Name = "e2", CanonicalName = "entities/e2" },
-            new Entity { Name = "e3", CanonicalName = "entities/e3" },
+            new Entity { Name = "e1", CanonicalName = "tenants/t1/hosts/e1" },
+            new Entity { Name = "e2", CanonicalName = "tenants/t1/hosts/e2" },
+            new Entity { Name = "e3", CanonicalName = "tenants/t1/hosts/e3" },
         };
         var (repository, mapper) = CreateDoubles(rows);
         repository.Setup(r => r.EstimateCountAsync(
@@ -228,7 +228,7 @@ public class ResourceListResponsePipelineAdvisorShould
     [Fact]
     [Trait("Category", "Integration")]
     public async Task List_None_PagesWithoutInvokingEitherCount() {
-        var rows = new[] { new Entity { Name = "e1", CanonicalName = "entities/e1" } };
+        var rows = new[] { new Entity { Name = "e1", CanonicalName = "tenants/t1/hosts/e1" } };
         var (repository, mapper) = CreateDoubles(rows);
         mapper.Setup(m => m.Map<Entity, Summary>(It.IsAny<Entity>()))
               .Returns((Entity e) => new() { Name = e.Name, CanonicalName = e.CanonicalName });
@@ -292,13 +292,74 @@ public class ResourceListResponsePipelineAdvisorShould
         Assert.True(estimated);
     }
 
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task List_NullSummary_Preserves_Source_Continuation() {
+        var rows = new[] { "a", "b", "c", "d" }.Select(name => new Entity {
+            Name = name, CanonicalName = $"tenants/t1/hosts/{name}",
+        }).ToArray();
+        var (repository, mapper) = CreateDoubles(rows);
+        var materialized = new List<string[]>();
+        repository.Setup(r => r.ListAsync(
+                              It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
+                              It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns((Func<IQueryable<Entity>, IQueryable<Entity>> query, CancellationToken _, QueryOptions _) => {
+                      var source = query(rows.AsQueryable()).ToArray();
+                      materialized.Add(source.Select(entity => entity.Name!).ToArray());
+                      return ToAsyncEnumerable(source);
+                  });
+        mapper.Setup(m => m.Map<Entity, PlainSummary>(It.IsAny<Entity>()))
+              .Returns((Entity entity) => entity.Name == "c"
+                   ? null
+                   : new PlainSummary { Name = entity.Name, CanonicalName = entity.CanonicalName });
+        using var services = BuildServices<PlainSummary>(repository.Object, mapper.Object);
+        var dispatcher = new InProcessRequestDispatcher(services);
+
+        var first = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, PlainSummary>, ListResultBase<Entity, PlainSummary>>(
+            new(new() { PageSize = 2 }, null), CancellationToken.None);
+
+        Assert.Equal(new[] { "a", "b" }, first.Entities!.Select(row => row.Name));
+        Assert.Equal(4, first.TotalSize);
+        Assert.NotNull(first.NextPageToken);
+        Assert.Equal(new[] { new[] { "a", "b", "c" } }, materialized);
+        mapper.Verify(m => m.Map<Entity, PlainSummary>(It.Is<Entity>(entity => entity.Name == "c")), Times.Never);
+
+        var second = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, PlainSummary>, ListResultBase<Entity, PlainSummary>>(
+            new(new() { PageSize = 2, PageToken = first.NextPageToken }, null), CancellationToken.None);
+
+        Assert.Equal("d", Assert.Single(second.Entities!).Name);
+        Assert.Equal(4, second.TotalSize);
+        Assert.Null(second.NextPageToken);
+        Assert.Equal(new[] { new[] { "a", "b", "c" }, new[] { "c", "d" } }, materialized);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task List_ExactSourceBoundary_OmitsContinuation() {
+        var rows = new[] { "a", "b" }.Select(name => new Entity {
+            Name = name, CanonicalName = $"tenants/t1/hosts/{name}",
+        }).ToArray();
+        var (repository, mapper) = CreateDoubles(rows);
+        mapper.Setup(m => m.Map<Entity, PlainSummary>(It.IsAny<Entity>()))
+              .Returns((Entity entity) => new PlainSummary { Name = entity.Name, CanonicalName = entity.CanonicalName });
+        using var services = BuildServices<PlainSummary>(repository.Object, mapper.Object);
+        var dispatcher = new InProcessRequestDispatcher(services);
+
+        var result = await dispatcher.SendAsync<ListResourceQueryRequest<Entity, PlainSummary>, ListResultBase<Entity, PlainSummary>>(
+            new(new() { PageSize = 2 }, null), CancellationToken.None);
+
+        Assert.Equal(new[] { "a", "b" }, result.Entities!.Select(row => row.Name));
+        Assert.Equal(2, result.TotalSize);
+        Assert.Null(result.NextPageToken);
+    }
+
     [Theory]
     [InlineData(TotalSizeMode.Estimated)]
     [InlineData(TotalSizeMode.None)]
     [Trait("Category", "Integration")]
     public async Task List_ResidualWithoutExactTotal_StopsAtMatchingLookahead(TotalSizeMode mode) {
         var rows = Enumerable.Range(0, 100)
-                             .Select(i => new Entity { Name = i.ToString("D3"), CanonicalName = $"entities/{i:D3}" })
+                             .Select(i => new Entity { Name = i.ToString("D3"), CanonicalName = $"tenants/t1/hosts/{i:D3}" })
                              .ToArray();
         var (repository, mapper) = CreateDoubles(rows);
         mapper.Setup(m => m.Map<Entity, Summary>(It.IsAny<Entity>()))
@@ -309,7 +370,7 @@ public class ResourceListResponsePipelineAdvisorShould
         compiler.Setup(c => c.Compile<Entity, bool>(tree, null))
                 .Returns((Expression<Func<Entity, bool>>)(e => e.Name != "000"));
         var planner = new Mock<IExpressionPushdownPlanner>();
-        planner.Setup(p => p.Plan(tree, It.IsAny<ExpressionCapabilities>()))
+        planner.Setup(p => p.Plan(tree, It.IsAny<ExpressionCapabilities>(), typeof(Entity)))
                .Returns(new ExpressionPushdownPlan(null, tree));
         using var services = BuildServices<Summary>(repository.Object, mapper.Object, s => {
             s.Configure<SchemataResourceOptions>(o => {
@@ -340,7 +401,7 @@ public class ResourceListResponsePipelineAdvisorShould
     [Trait("Layer", "Integration")]
     public async Task List_UsesSupplementedRegistrationPolicyAfterCallerMutationAndRejectedConflict() {
         var rows = Enumerable.Range(1, 4).Select(i => new Entity {
-            Name = $"e{i}", CanonicalName = $"entities/e{i}",
+            Name = $"e{i}", CanonicalName = $"tenants/t1/hosts/e{i}",
         }).ToArray();
         var (repository, mapper) = CreateDoubles(rows);
         mapper.Setup(m => m.Map<Entity, PlainSummary>(It.IsAny<Entity>()))
@@ -381,7 +442,7 @@ public class ResourceListResponsePipelineAdvisorShould
         var repository = new Mock<IRepository<Entity>>(MockBehavior.Strict);
         using var services = BuildServices<PlainSummary>(repository.Object, Mock.Of<ISimpleMapper>());
         var protector = services.GetRequiredService<IDataProtectionProvider>().CreateProtector(PageToken.ProtectionPurpose);
-        var token = await new PageToken { Skip = int.MaxValue, PageSize = 1 }.ToStringAsync(protector);
+        var token = new PageToken { Skip = int.MaxValue, PageSize = 1 }.ToString(protector);
         var dispatcher = new InProcessRequestDispatcher(services);
         await Assert.ThrowsAsync<ValidationException>(() => dispatcher.SendAsync<ListResourceQueryRequest<Entity, PlainSummary>, ListResultBase<Entity, PlainSummary>>(
             new(new() { PageToken = token, Skip = 1 }, null), CancellationToken.None));
@@ -398,7 +459,7 @@ public class ResourceListResponsePipelineAdvisorShould
         var repository = new Mock<IRepository<Entity>>(MockBehavior.Strict);
         using var services = BuildServices<PlainSummary>(repository.Object, Mock.Of<ISimpleMapper>());
         var protector = services.GetRequiredService<IDataProtectionProvider>().CreateProtector(PageToken.ProtectionPurpose);
-        var token = await new PageToken().ToStringAsync(protector);
+        var token = new PageToken().ToString(protector);
         var request = new ListRequest { PageToken = token };
         if (changed == "filter") request.Filter = "changed";
         if (changed == "language") request.Language = "other";
@@ -457,9 +518,10 @@ public class ResourceListResponsePipelineAdvisorShould
 
     #region Fixtures
 
-    [CanonicalName("entities/{entity}")]
+    [CanonicalName("tenants/{tenant}/hosts/{host}")]
     public sealed class Entity : ICanonicalName
     {
+        public string? Tenant        { get; set; }
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
     }

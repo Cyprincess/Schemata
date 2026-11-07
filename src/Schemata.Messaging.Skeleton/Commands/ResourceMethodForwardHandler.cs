@@ -24,12 +24,15 @@ public sealed class ResourceMethodForwardHandler<TEntity, TRequest, TResponse>(I
 {
     #region IRequestHandler<ResourceMethodRequest<TEntity,TRequest,TResponse>,TResponse> Members
 
-    public Task<TResponse> HandleAsync(ResourceMethodRequest<TEntity, TRequest, TResponse> request, AdviceContext context, CancellationToken ct = default) {
+    public async Task<TResponse> HandleAsync(ResourceMethodRequest<TEntity, TRequest, TResponse> request, AdviceContext context, CancellationToken ct = default) {
+        request.Dispatch?.MarkReached();
         if (request.Request is IRequestPrincipal principal) {
             principal.Principal = request.Principal;
         }
 
-        return dispatcher.SendAsync<TRequest, TResponse>(request.Request, ct);
+        var response = await dispatcher.SendAsync<TRequest, TResponse>(request.Request, ct);
+        request.Dispatch?.MarkCommitted();
+        return response;
     }
 
     #endregion

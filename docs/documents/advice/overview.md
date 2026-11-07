@@ -72,6 +72,12 @@ Two `AdviceContext` instances coexist per resource request: the handler's dispat
 `IRepository<T>.AdviceContext`. Each is bound to its own provider, and an option passed to a
 repository call affects only that call's pipeline.
 
+Resource idempotency executions travel on `CreateResourceRequest`, `UpdateResourceRequest`, and
+`ResourceMethodRequest`. Standard Create and Update handlers register completion sinks on their
+unit of work. The custom-method operation handler marks completion after its business dispatcher
+returns normally, and a finalized response replays without invoking that handler again. The
+execution does not travel on consumer request DTOs or in `AdviceContext`.
+
 ## Registering advisors
 
 Advisors register with `TryAddEnumerable` and a `ServiceDescriptor.Scoped` descriptor, so each

@@ -24,7 +24,7 @@ public sealed class ResourceMethodDispatchHandler<TEntity, TRequest, TResponse>(
     #region IRequestHandler<ResourceMethodRequest<TEntity,TRequest,TResponse>,TResponse> Members
 
     public Task<TResponse> HandleAsync(ResourceMethodRequest<TEntity, TRequest, TResponse> request, AdviceContext context, CancellationToken ct = default) {
-        return operation.InvokeCoreAsync(request.Verb, request.Name, request.Request, request.Principal, context, ct);
+        return operation.InvokeCoreAsync(request.Verb, request.Name, request.Request, request.Principal, request.Dispatch, context, ct);
     }
 
     #endregion

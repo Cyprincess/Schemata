@@ -61,11 +61,10 @@ public sealed class UndeleteHandler<TEntity, TDetail>
         entity.DeleteTime = null;
         entity.PurgeTime  = null;
 
-        return await ResourceCommitOwner.ExecuteAsync<TEntity, TDetail?>(
-            _repository,
-            null,
-            (transaction, token) => MutateUndeleteAsync(entity, transaction, token),
-            ct);
+        await using var transaction = _repository.Begin();
+        var response = await MutateUndeleteAsync(entity, transaction, ct);
+        await transaction.CommitAsync(ct);
+        return response;
     }
 
     private async Task<TDetail?> MutateUndeleteAsync(TEntity entity, IUnitOfWork transaction, CancellationToken ct) {
@@ -86,7 +85,11 @@ public sealed class UndeleteHandler<TEntity, TDetail>
             );
         }
 
-        ResourceCommitOwner.SyncStamp(entity, map, transaction);
+        transaction.AddSavePreparation(() => {
+            if (entity is IConcurrency source && map is IConcurrency stamped) {
+                stamped.Timestamp = source.Timestamp;
+            }
+        });
 
         return map;
     }

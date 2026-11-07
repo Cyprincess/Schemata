@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using Schemata.Abstractions.Entities;
 using Schemata.Abstractions.Resource;
@@ -13,6 +14,8 @@ public class Student : IIdentifier, ICanonicalName, IConcurrency, IFreshness, IV
     public string? FullName { get; set; }
     public int     Age      { get; set; }
     public int     Grade    { get; set; }
+    public List<string> Tags { get; set; } = [];
+    public List<string> OtherTags { get; set; } = [];
 
     #region ICanonicalName Members
 

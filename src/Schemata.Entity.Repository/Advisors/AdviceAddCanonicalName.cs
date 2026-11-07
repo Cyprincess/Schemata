@@ -14,6 +14,21 @@ public static class AdviceAddCanonicalName
     ///     (110,000,000 + 10,000,000 = 120,000,000).
     /// </summary>
     public const int DefaultOrder = AdviceAddConcurrency.DefaultOrder + 10_000_000;
+
+    /// <summary>
+    ///     Applies the entity's declared resource-name pattern when it implements <see cref="ICanonicalName" />.
+    /// </summary>
+    public static void Apply<TEntity>(TEntity entity)
+        where TEntity : class {
+        if (entity is not ICanonicalName named) {
+            return;
+        }
+
+        var descriptor = ResourceNameDescriptor.ForType(entity.GetType());
+        if (descriptor.Pattern is not null) {
+            named.CanonicalName = descriptor.Resolve(entity);
+        }
+    }
 }
 
 /// <summary>
@@ -40,16 +55,7 @@ public sealed class AdviceAddCanonicalName<TEntity> : IRepositoryAddAdvisor<TEnt
         MutationOptions      options,
         CancellationToken    ct
     ) {
-        if (entity is not ICanonicalName named) {
-            return Task.FromResult(AdviseResult.Continue);
-        }
-
-        var descriptor = ResourceNameDescriptor.ForType(entity.GetType());
-        if (descriptor.Pattern is null) {
-            return Task.FromResult(AdviseResult.Continue);
-        }
-
-        named.CanonicalName = descriptor.Resolve(entity);
+        AdviceAddCanonicalName.Apply(entity);
 
         return Task.FromResult(AdviseResult.Continue);
     }

@@ -24,6 +24,7 @@ public sealed class ResourceUpdateIdempotencyPipelineAdvisor<TEntity, TRequest, 
         : base(static _ => nameof(Operations.Update),
             static envelope => envelope.Request,
             static envelope => envelope.Name,
+            static (envelope, execution) => envelope.Dispatch = execution,
             static detail => new() { Detail = detail },
             static response => response.Detail) {
     }

@@ -1,4 +1,8 @@
+using System.Linq;
+using Schemata.Abstractions;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Errors;
+using Schemata.Abstractions.Exceptions;
 using Xunit;
 
 namespace Schemata.Common.Tests;
@@ -38,14 +42,38 @@ public class ResourceNameDescriptorShould
     }
 
     [Fact]
-    public void ParentOf_StripsCollectionAndLeaf() {
+    public void ParentOf_RootResource_ReturnsNull() {
+        var descriptor = ResourceNameDescriptor.ForType<Book>();
+
+        Assert.Null(descriptor.ParentOf("books/b1"));
+        Assert.Null(descriptor.ParentOf(null));
+    }
+
+    [Fact]
+    public void ParentOf_MultiLevelChild_ReturnsFullResolvedParent() {
         var descriptor = ResourceNameDescriptor.ForType<Widget>();
 
         Assert.Equal("tenants/acme", descriptor.ParentOf("tenants/acme/widgets/w1"));
-        Assert.Equal("organizations/o/projects/p", descriptor.ParentOf("organizations/o/projects/p/datasets/d"));
-        Assert.Null(descriptor.ParentOf("tenants/acme"));
-        Assert.Null(descriptor.ParentOf("not/a/canonical"));
-        Assert.Null(descriptor.ParentOf(null));
+    }
+
+    [Fact]
+    public void ParentOf_CollectionLiterals_MatchCaseInsensitively() {
+        var descriptor = ResourceNameDescriptor.ForType<Widget>();
+
+        Assert.Equal("tenants/acme", descriptor.ParentOf("TENANTS/acme/WIDGETS/w1"));
+    }
+
+    [Theory]
+    [InlineData("not/a/canonical")]
+    [InlineData("books/b1/extra")]
+    [InlineData("schools/acme/widgets/w1")]
+    [InlineData("tenants//widgets/w1")]
+    public void ParentOf_MalformedCanonicalName_RejectsTheName(string name) {
+        var descriptor = ResourceNameDescriptor.ForType<Widget>();
+
+        var error = Assert.Throws<InvalidArgumentException>(() => descriptor.ParentOf(name));
+
+        Assert.Equal(SchemataResources.INVALID_NAME, Assert.Single(error.Details!.OfType<ErrorInfoDetail>()).Reason);
     }
 
     [CanonicalName("salesOrders/{salesOrder}")]

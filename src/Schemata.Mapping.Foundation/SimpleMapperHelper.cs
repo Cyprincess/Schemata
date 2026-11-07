@@ -45,7 +45,11 @@ public static class SimpleMapperHelper
         }
 
         var tree = MaskTree.FromClr(typeof(TDestination), mask, false);
-        if (tree.Children.Count == 0 || SelectsEveryWritableMember(tree, typeof(TDestination))) {
+        if (tree.Children.Count == 0) {
+            return;
+        }
+
+        if (SelectsEveryWritableMember(tree, typeof(TDestination))) {
             mapAction(source, destination);
             return;
         }

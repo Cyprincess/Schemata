@@ -11,9 +11,8 @@ namespace Schemata.Resource.Foundation.Advisors;
 ///     for AIP-136 custom-method dispatches: the verb is the operation token, the key target is the
 ///     envelope's instance name (falling back to the inner request's own canonical name or name for a
 ///     collection-scoped method), and replays and commits are the identity pair over the method's own
-///     response. The wrap is installed only when the request DTO implements
-///     <see cref="IResourceDispatchCarrier" /> — the channel the execution travels on and the handler
-///     reports transaction completion through.
+///     response. The framework envelope carries the execution, and a normal business dispatcher
+///     return supplies the completion evidence.
 /// </summary>
 /// <typeparam name="TEntity">The resource entity type behind the method.</typeparam>
 /// <typeparam name="TRequest">The custom method's request DTO type.</typeparam>
@@ -28,6 +27,7 @@ public sealed class ResourceMethodIdempotencyPipelineAdvisor<TEntity, TRequest, 
         : base(static envelope => envelope.Verb,
             static envelope => envelope.Request,
             static envelope => envelope.Name ?? envelope.Request.CanonicalName ?? envelope.Request.Name ?? string.Empty,
+            static (envelope, execution) => envelope.Dispatch = execution,
             static response => response!,
             static response => response) {
     }

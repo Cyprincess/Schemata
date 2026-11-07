@@ -39,7 +39,7 @@ Repeated registration of one entity requires the same entity/request/detail/summ
 
 The builder and `AddResource` use the same registry. Its merged snapshots supply handler wiring, paging, authentication, HTTP conventions, gRPC model configuration, and reflection. Resource naming remains owned by the entity's `ResourceNameMetadata`, independently of request/detail/summary DTOs. Source: `src/Schemata.Core/Building/ResourceRegistry.cs`, `ResourceRegistration.cs`, and the Resource Foundation registration extensions.
 
-`WithoutCreateValidation()`, `WithoutUpdateValidation()`, `WithoutFreshness()`, `WithoutCreateIdempotency()`, `WithoutUpdateIdempotency()`, and `WithoutMethodIdempotency()` select the stages installed for the host. The shared registry applies these choices when resources register and when feature configuration installs the shared pipeline into the host collection. Choices can precede resource registration or follow it; repeated `UseResource()` retains them. Each exclusion is independent: `WithoutFreshness()` removes built-in freshness checks and the default response ETag provider while preserving host-supplied providers, and `WithoutMethodIdempotency()` removes only the custom-method idempotency wrap while freshness on custom methods stays installed. The idempotency exclusions remove the matching wraps, so an uninstalled wrap never touches the cache. The `ValidateOnly` terminator retains its own behavior.
+`WithoutCreateValidation()`, `WithoutUpdateValidation()`, `WithoutFreshness()`, `WithoutCreateIdempotency()`, `WithoutUpdateIdempotency()`, and `WithoutMethodIdempotency()` select the stages installed for the host. The shared registry applies these choices when resources register and when feature configuration installs the shared pipeline into the host collection. Choices can precede resource registration or follow it; repeated `UseResource()` retains them. Each exclusion is independent: `WithoutFreshness()` removes built-in freshness checks and the default response ETag provider while preserving host-supplied providers, and `WithoutMethodIdempotency()` removes only the custom-method idempotency wrap while freshness on custom methods stays installed. The idempotency exclusions remove the matching wraps, so an uninstalled wrap never touches the cache. Request-validation exclusions leave entity validation active at the handler dry-run boundary and during repository mutation.
 
 ## Dispatcher-wrap pipeline
 
@@ -56,6 +56,8 @@ Resource registration adds the following wraps for the closed request envelopes.
 
 The idempotency advisor holds its reservation in local invocation state. Registration selects whether the wrap is installed; cache identity and serialized payloads stay in the reservation and request objects, not in `AdviceContext`.
 
+`CreateResourceRequest`, `UpdateResourceRequest`, and `ResourceMethodRequest` carry the identified `ResourceDispatchExecution`. Create and Update register commit and rollback sinks on their handler-owned unit of work before staging the mutation, prepare the response before commit, and record completion from the commit sink. Custom methods mark their execution committed after the inner business dispatcher returns normally. A finalized committed response replays on an identical retry; an exception after business dispatch starts retains the pending reservation. Consumer request DTOs carry no dispatch execution.
+
 Detail-response wraps derive `IChild.Parent` from the response detail's canonical name, then obtain an ETag from `IEntityTagProvider` when the detail implements `IFreshness`. The default provider derives the weak tag from a populated concurrency timestamp. List-response wraps derive parent values for summaries.
 
 ## Handler stages
@@ -66,14 +68,16 @@ Handlers retain work that needs a loaded entity or a query container:
 handler request stage: entitlement predicate and container-scoped policy
   map or load entity
     handler entity stage: instance access, freshness, and entity policy
-      repository work and commit
+      update mask mapping and entity validation
+        create canonical-name resolution and uniqueness check
+          repository work and commit
 ```
 
 The instance access advisor calls `IAccessProvider<TEntity,TRequest>` with the mapped entity on Create and the loaded entity on Get, Update, Delete, and instance methods. Entitlement advisors apply `IEntitlementProvider<TEntity,TRequest>` expressions to the request container, including anonymous query operations. Resource request and entity extension points remain `IAdvisor<>` interfaces and run through `Advisor.For<>()`.
 
 ## Custom methods
 
-`ResourceMethodOperationHandler<TEntity,TRequest,TResponse>` constructs `ResourceMethodRequest<TEntity,TRequest,TResponse>` with the verb, target name, payload, and principal and dispatches it. The envelope makes the verb available to Authentication, Authorization, response, and idempotency wraps. Its Resource dispatch handler then runs method request and entity stages, loads an instance target when needed, and dispatches the inner method request.
+`ResourceMethodOperationHandler<TEntity,TRequest,TResponse>` constructs `ResourceMethodRequest<TEntity,TRequest,TResponse>` with the verb, target name, payload, and principal and dispatches it. The envelope makes the verb available to Authentication, Authorization, response, and idempotency wraps. Its Resource dispatch handler then runs method request and entity stages, loads an instance target when needed, and dispatches the inner method request. Collection-scoped methods skip instance entitlement generation while retaining their other advisor and dispatcher stages.
 
 ## Security behavior
 

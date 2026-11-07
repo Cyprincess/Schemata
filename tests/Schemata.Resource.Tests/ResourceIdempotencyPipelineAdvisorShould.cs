@@ -101,7 +101,7 @@ public class ResourceIdempotencyPipelineAdvisorShould
         using var services = BuildUpdateServices(cache, repository, mapper,
             detailWrap: false, owner: owner);
 
-        var result = await DispatchUpdateAsync(services, "entities/e1", request);
+        var result = await DispatchUpdateAsync(services, "tenants/t1/hosts/e1", request);
 
         Assert.NotNull(result.Detail);
         Assert.Equal("tenants/t1/hosts/h9", result.Detail.CanonicalName);
@@ -256,13 +256,13 @@ public class ResourceIdempotencyPipelineAdvisorShould
         using var services = BuildUpdateServices(cache, repository, mapper,
             detailWrap: true);
 
-        var result = await DispatchUpdateAsync(services, "entities/e1", request);
+        var result = await DispatchUpdateAsync(services, "tenants/t1/hosts/e1", request);
 
         var reservation = Assert.Single(reserved);
         var record = JsonDocument.Parse(reservation.Value).RootElement;
         // Target = envelope.Name: the addressed URI target partitions the key, so the inner
         // request's null name fields cannot alias two different targets onto one key.
-        Assert.Equal("entities/e1", record.GetProperty("CanonicalName").GetString());
+        Assert.Equal("tenants/t1/hosts/e1", record.GetProperty("CanonicalName").GetString());
         Assert.Equal("Update", record.GetProperty("Operation").GetString());
 
         Assert.Equal("DONE", Kind(store[reservation.Key]));
@@ -389,8 +389,8 @@ public class ResourceIdempotencyPipelineAdvisorShould
         using var services = BuildUpdateServices(cache, repository, mapper,
             detailWrap: false);
 
-        await DispatchUpdateAsync(services, "entities/e1", CreateRequest());
-        await DispatchUpdateAsync(services, "entities/e2", CreateRequest());
+        await DispatchUpdateAsync(services, "tenants/t1/hosts/e1", CreateRequest());
+        await DispatchUpdateAsync(services, "tenants/t1/hosts/e2", CreateRequest());
 
         Assert.Equal(2, keys.Count);
         Assert.NotEqual(keys[0], keys[1]);
@@ -521,8 +521,8 @@ public class ResourceIdempotencyPipelineAdvisorShould
         using var services = BuildUpdateServices(cache, repository, mapper,
             detailWrap: false, owner: owner);
 
-        var first = await DispatchUpdateAsync(services, "entities/e1", request);
-        var retry = await DispatchUpdateAsync(services, "entities/e1", request);
+        var first = await DispatchUpdateAsync(services, "tenants/t1/hosts/e1", request);
+        var retry = await DispatchUpdateAsync(services, "tenants/t1/hosts/e1", request);
 
         Assert.Null(first.Detail);
         Assert.Null(retry.Detail);
@@ -562,6 +562,29 @@ public class ResourceIdempotencyPipelineAdvisorShould
         var retry = await DispatchCreateAsync(services, request);
         Assert.NotNull(retry.Detail);
         owner.Verify(o => o.CreateAsync(It.IsAny<Entity>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task Create_LostCommitAcknowledgement_KeepsReservationPending() {
+        var request  = CreateRequest();
+        var store    = new Dictionary<string, byte[]>();
+        var reserved = new List<(string Key, byte[] Value, CacheEntryOptions Options)>();
+        var replaced = new List<(string Key, byte[] Expected, byte[] Replacement, CacheEntryOptions Options)>();
+        var cache    = StatefulCache(store, reserved, replaced);
+
+        var transaction = UnitOfWork(lostCommitAcknowledgement: true);
+        var (repository, mapper) = CreateDoubles(MappedDetail(), transaction);
+        var owner = ResourceMutationMock.Create<Entity>();
+        using var services = BuildCreateServices(cache, repository, mapper,
+            detailWrap: false, owner: owner);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => DispatchCreateAsync(services, request));
+
+        var reservation = Assert.Single(reserved);
+        Assert.Equal("PENDING", Kind(store[reservation.Key]));
+        Assert.Empty(replaced);
+        cache.Verify(c => c.TryRemoveAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
+        owner.Verify(o => o.CreateAsync(It.IsAny<Entity>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -620,7 +643,7 @@ public class ResourceIdempotencyPipelineAdvisorShould
         using var services = BuildUpdateServices(cache, repository, mapper,
             detailWrap: false, owner: owner);
 
-        var result = await DispatchUpdateAsync(services, "entities/e1", request);
+        var result = await DispatchUpdateAsync(services, "tenants/t1/hosts/e1", request);
 
         // The waiter never takes a missing slot for a replay: after the release it re-reserves and,
         // as the winner, executes the dispatch exactly once.
@@ -728,23 +751,36 @@ public class ResourceIdempotencyPipelineAdvisorShould
     ///     registered commit sinks, disposal without commit runs the rollback sinks. Lets the tests
     ///     observe which completion evidence the handler-owned path produces.
     /// </summary>
-    private static Mock<IUnitOfWork> UnitOfWork() {
+    private static Mock<IUnitOfWork> UnitOfWork(bool lostCommitAcknowledgement = false) {
         var transaction = new Mock<IUnitOfWork>();
         var committed   = new List<Func<CancellationToken, Task>>();
         var rollbacks   = new List<Action>();
+        var completed   = false;
         transaction.Setup(t => t.AddCommitSink(It.IsAny<int>(), It.IsAny<Func<CancellationToken, Task>>()))
                    .Callback<int, Func<CancellationToken, Task>>((_, sink) => committed.Add(sink));
         transaction.Setup(t => t.AddRollbackSink(It.IsAny<Action>()))
                    .Callback<Action>(rollbacks.Add);
         transaction.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>()))
                    .Callback(() => {
+                       if (lostCommitAcknowledgement) {
+                           completed = true;
+                           throw new InvalidOperationException("lost commit acknowledgement");
+                       }
+
                        foreach (var sink in committed.ToArray()) {
                            sink(CancellationToken.None).GetAwaiter().GetResult();
                        }
+
+                       completed = true;
                    })
                    .Returns(Task.CompletedTask);
         transaction.Setup(t => t.DisposeAsync())
                    .Callback(() => {
+                       if (completed) {
+                           return;
+                       }
+
+                       completed = true;
                        foreach (var reset in rollbacks) {
                            reset();
                        }
@@ -759,6 +795,7 @@ public class ResourceIdempotencyPipelineAdvisorShould
             static _ => nameof(Operations.Create),
             static envelope => envelope.Request,
             static envelope => envelope.Request.CanonicalName ?? envelope.Request.Name ?? string.Empty,
+            static (envelope, execution) => envelope.Dispatch = execution,
             static detail => new() { Detail = detail },
             static response => response.Detail);
     }
@@ -768,21 +805,22 @@ public class ResourceIdempotencyPipelineAdvisorShould
             static _ => nameof(Operations.Update),
             static envelope => envelope.Request,
             static envelope => envelope.Name,
+            static (envelope, execution) => envelope.Dispatch = execution,
             static detail => new() { Detail = detail },
             static response => response.Detail);
     }
 
     private static (Mock<IRepository<Entity>> Repository, Mock<ISimpleMapper> Mapper) CreateDoubles(Detail detail, Mock<IUnitOfWork>? transaction = null) {
         var repository = new Mock<IRepository<Entity>>();
-        repository.Setup(r => r.Begin()).Returns(transaction?.Object ?? Mock.Of<IUnitOfWork>());
+        repository.Setup(r => r.Begin()).Returns(() => transaction?.Object ?? UnitOfWorkMock.Create().Object);
         repository.Setup(r => r.SingleOrDefaultAsync(
                               It.IsAny<Func<IQueryable<Entity>, IQueryable<Entity>>>(),
                               It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
-                  .Returns(new ValueTask<Entity?>(new Entity { Name = "e1", CanonicalName = "entities/e1" }));
+                  .Returns(new ValueTask<Entity?>(new Entity { Name = "e1", CanonicalName = "tenants/t1/hosts/e1" }));
 
         var mapper = new Mock<ISimpleMapper>();
         mapper.Setup(m => m.Map<Request, Entity>(It.IsAny<Request>()))
-              .Returns(new Entity { Name = "e1", CanonicalName = "entities/e1" });
+              .Returns(new Entity { Name = "e1", CanonicalName = "tenants/t1/hosts/e1" });
         mapper.Setup(m => m.Map<Entity, Detail>(It.IsAny<Entity>()))
               .Returns(detail);
 
@@ -875,9 +913,10 @@ public class ResourceIdempotencyPipelineAdvisorShould
 
     #region Fixtures
 
-    [CanonicalName("entities/{entity}")]
+    [CanonicalName("tenants/{tenant}/hosts/{host}")]
     public sealed class Entity : ICanonicalName
     {
+        public string? Tenant        { get; set; }
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
     }

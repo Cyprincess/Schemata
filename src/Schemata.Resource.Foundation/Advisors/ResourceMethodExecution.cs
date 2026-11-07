@@ -45,9 +45,9 @@ public sealed class ResourceMethodExecution<TEntity, TRequest, TResponse> : IHan
 
     /// <summary>
     ///     The identified dispatch execution attached by the idempotency wrap, or
-    ///     <see langword="null" /> when the dispatch runs unidentified. The completion marks on it are
-    ///     the accepted evidence of the method's transaction outcome; the wrap never infers one from
-    ///     the return value or an exception.
+    ///     <see langword="null" /> when the dispatch runs unidentified. The operation handler marks
+    ///     it committed after the business dispatcher returns normally; an exception leaves it
+    ///     reached so the reservation remains pending.
     /// </summary>
     public ResourceDispatchExecution? Dispatch { get; set; }
 

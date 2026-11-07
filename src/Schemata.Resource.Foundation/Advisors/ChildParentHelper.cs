@@ -5,8 +5,8 @@ namespace Schemata.Resource.Foundation.Advisors;
 
 /// <summary>
 ///     Shared helper for the <c>IChild</c>-aware advisors. Parent derivation is owned by
-///     <see cref="ResourceNameDescriptor.ParentOf" />; a value without a collection/leaf tail
-///     produces <see langword="null" />.
+///     <see cref="ResourceNameDescriptor.ParentOf" />; an absent name or addressable root produces
+///     <see langword="null" />, and a malformed name raises <c>INVALID_NAME</c>.
 /// </summary>
 internal static class ChildParentHelper
 {

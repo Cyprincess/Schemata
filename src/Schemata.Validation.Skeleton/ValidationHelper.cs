@@ -8,17 +8,15 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Advice;
 using Schemata.Validation.Skeleton.Advisors;
 
-namespace Schemata.Resource.Foundation.Advisors;
+namespace Schemata.Validation.Skeleton;
 
 /// <summary>
-///     Shared request validation execution for create and update advisors. The
-///     <c>ValidateOnly</c> dry-run termination is a separate pipeline stage installed alongside.
+///     Runs the registered validation advisors for one operation and throws the collected field violations.
 /// </summary>
-internal static class ValidationHelper
+public static class ValidationHelper
 {
     /// <summary>
-    ///     Runs all registered <see cref="IValidationAdvisor{TRequest}" /> implementations against the request.
-    ///     On validation failure, throws <see cref="ValidationException" /> with the collected errors.
+    ///     Runs all registered <see cref="IValidationAdvisor{TRequest}" /> implementations against the value.
     /// </summary>
     public static async Task<AdviseResult> ValidateAsync<TRequest>(
         AdviceContext     ctx,

@@ -79,9 +79,9 @@ public sealed class SchemataResourceBuilder : IExpressionLanguageBuilder, IResou
 
 
     /// <summary>
-    ///     Excludes the create-request validation stage from every resource
+    ///     Excludes the create-request validation wrap from every resource
     ///     per <seealso href="https://google.aip.dev/133">AIP-133: Standard methods: Create</seealso>.
-    ///     A <c>ValidateOnly</c> create request still terminates as a dry-run.
+    ///     Entity validation still runs at the handler validation and mutation boundaries.
     /// </summary>
     /// <returns>This builder for chaining.</returns>
     public SchemataResourceBuilder WithoutCreateValidation() {
@@ -90,9 +90,9 @@ public sealed class SchemataResourceBuilder : IExpressionLanguageBuilder, IResou
     }
 
     /// <summary>
-    ///     Excludes the update-request validation stage from every resource
+    ///     Excludes the update-request validation wrap from every resource
     ///     per <seealso href="https://google.aip.dev/134">AIP-134: Standard methods: Update</seealso>.
-    ///     A <c>ValidateOnly</c> update request still terminates as a dry-run.
+    ///     Entity validation still runs at the handler validation and mutation boundaries.
     /// </summary>
     /// <returns>This builder for chaining.</returns>
     public SchemataResourceBuilder WithoutUpdateValidation() {

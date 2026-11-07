@@ -28,6 +28,7 @@ public sealed class ResourceNameDescriptor
     private readonly Type      _type;
     private readonly string?   _plural;
     private readonly string?   _singular;
+    private readonly PropertyInfo? _parentReference;
 
     private ResourceNameDescriptor(Type type) {
         var canonical = type.GetCustomAttribute<CanonicalNameAttribute>(false);
@@ -88,6 +89,13 @@ public sealed class ResourceNameDescriptor
             _parentSegments = SliceSegments(_segments, 0, _segments.Length - 2);
         } else {
             _parentSegments = SliceSegments(_segments, 0, _segments.Length - 1);
+        }
+        if (identifies && leaf.IsPlaceholder && _parentSegments is [{ IsPlaceholder: false }, { IsPlaceholder: true, Property: { } parentProperty }]
+            && AppDomainTypeCache.GetProperties(type).TryGetValue(parentProperty, out var referenceProperty)
+            && referenceProperty.PropertyType == typeof(string)
+            && referenceProperty.GetCustomAttribute<ResourceReferenceAttribute>()?.Target is { } target
+            && target.GetCustomAttribute<CanonicalNameAttribute>(false)?.ResourceName == string.Join("/", _parentSegments.Select(segment => segment.Raw))) {
+            _parentReference = referenceProperty;
         }
     }
 
@@ -214,6 +222,14 @@ public sealed class ResourceNameDescriptor
         if (_segments.Length == 0) {
             throw new InvalidOperationException(SchemataResources.GetResourceString(SchemataResources.PATTERN_REQUIRED));
         }
+        if (_parentReference is { } reference) {
+            var parent = reference.GetValue(entity) as string;
+            var name = ((ICanonicalName)entity).Name;
+            if (ParseParent(parent) is not { } values || values.Values.Any(value => value == "-") || string.IsNullOrWhiteSpace(name)) {
+                throw new ValidationException([new() { Field = reference.Name.Underscore(), Description = "A concrete canonical parent and resource name are required." }]);
+            }
+            return $"{parent}/{Collection}/{name}";
+        }
         if (entity is IChild child && _parentSegments is [{ IsPlaceholder: false }, { IsPlaceholder: true }]
             && !AppDomainTypeCache.GetProperties(entity.GetType()).ContainsKey(_parentSegments[1].Property!)) {
             var parent = ParseParent(child.Parent);
@@ -313,21 +329,23 @@ public sealed class ResourceNameDescriptor
 
     /// <summary>
     ///     Returns the parent canonical name of a child resource, or <see langword="null" /> for a
-    ///     root resource or a malformed value.
+    ///     root resource or an absent name.
     /// </summary>
     /// <param name="canonicalName">The full canonical resource name.</param>
-    /// <returns>The parent path without the collection and leaf segments.</returns>
+    /// <returns>The resolved parent path without the collection and leaf segments.</returns>
+    /// <exception cref="InvalidArgumentException">Thrown when a non-empty name does not match the declared pattern.</exception>
     public string? ParentOf(string? canonicalName) {
         if (string.IsNullOrWhiteSpace(canonicalName)) {
             return null;
         }
 
-        var segments = canonicalName.Split('/');
-        if (segments.Length < 4 || segments.Length % 2 != 0) {
-            return null;
+        if (ParseCanonicalName(canonicalName) is not { } parsed) {
+            throw new InvalidArgumentException(
+                SchemataResources.INVALID_NAME,
+                new Dictionary<string, string?> { ["name"] = canonicalName });
         }
 
-        return string.Join('/', segments[..^2]);
+        return ResolveParentValues(parsed.ParentValues);
     }
 
     /// <summary>
@@ -341,6 +359,10 @@ public sealed class ResourceNameDescriptor
     ///     <paramref name="routeValues" /> leaves a parent placeholder unbound.
     /// </returns>
     public string? ResolveParent(IDictionary<string, object?> routeValues) {
+        return ResolveParentValues(routeValues);
+    }
+
+    private string? ResolveParentValues<T>(IDictionary<string, T> routeValues) {
         if (_parentSegments.Length == 0) return null;
         var parts = new string[_parentSegments.Length];
         for (var i = 0; i < _parentSegments.Length; i++) {
@@ -387,6 +409,12 @@ public sealed class ResourceNameDescriptor
     public void SetParentFromRouteValues(object target, IDictionary<string, object?> routeValues) {
         if (_parentSegments.Length == 0) return;
         var properties = AppDomainTypeCache.GetProperties(target.GetType());
+        if (_parentReference is { } reference) {
+            var canonicalParent = ResolveParent(routeValues);
+            if (properties.TryGetValue(reference.Name, out var targetReference)) targetReference.SetValue(target, canonicalParent);
+            if (target is IChild referencedChild) referencedChild.Parent = canonicalParent;
+            return;
+        }
         foreach (var seg in _parentSegments) {
             if (!seg.IsPlaceholder) continue;
             if (routeValues.TryGetValue(seg.Placeholder!, out var value) && value is string text) {
@@ -416,6 +444,12 @@ public sealed class ResourceNameDescriptor
     public Expression<Func<T, bool>>? BuildParentPredicate<T>(Dictionary<string, string> parentValues) {
         var parameter  = Expression.Parameter(typeof(T), "e");
         var properties = AppDomainTypeCache.GetProperties(typeof(T));
+        if (_parentReference is { } reference && _parentSegments[1].Placeholder is { } placeholder) {
+            if (!parentValues.TryGetValue(placeholder, out var value) || value == "-") return null;
+            var parent = ResolveParentValues(parentValues);
+            var member = Expression.Property(parameter, reference);
+            return Expression.Lambda<Func<T, bool>>(Expression.Equal(member, Expression.Constant(parent, typeof(string))), parameter);
+        }
         if (typeof(IChild).IsAssignableFrom(typeof(T)) && _parentSegments is [{ IsPlaceholder: false }, { IsPlaceholder: true }]
             && !properties.ContainsKey(_parentSegments[1].Property!)) {
             if (!parentValues.TryGetValue(_parentSegments[1].Placeholder!, out var value) || value == "-") return null;

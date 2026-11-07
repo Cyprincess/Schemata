@@ -20,6 +20,7 @@ using Schemata.Messaging.Skeleton.Runtime;
 using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Foundation;
 using Schemata.Resource.Foundation.Handlers;
+using Schemata.Security.Skeleton;
 using Xunit;
 
 namespace Schemata.Resource.Tests.ResourceMethodHandler;
@@ -118,6 +119,25 @@ public class ResourceMethodOperationHandlerShould
         Assert.Same(request, handler.Request);
         Assert.Same(principal, handler.Request!.Principal);
         Assert.Equal(cts.Token, handler.Ct);
+    }
+
+    [Fact]
+    public async Task Collection_Method_Skips_Entitlement_Generation() {
+        var entitlement = new Mock<IEntitlementProvider<MethodEntity, MethodRequest>>(MockBehavior.Strict);
+        var handler     = new MethodHandler();
+        using var services = Services(
+            Mock.Of<IRepository<MethodEntity>>(MockBehavior.Strict), handler, services => {
+                services.AddSingleton<IResourceMethodRequestAdvisor<MethodEntity, MethodRequest, MethodResponse>>(
+                    new ResourceEntitlementMethodAdvisor<MethodEntity, MethodRequest, MethodResponse>(entitlement.Object));
+            });
+        var operation = services.GetRequiredService<ResourceMethodOperationHandler<MethodEntity, MethodRequest, MethodResponse>>();
+
+        var response = await operation.InvokeAsync("batchArchive", null, new MethodRequest(), null, default);
+
+        Assert.Same(handler.Response, response);
+        Assert.Equal(1, handler.Invocations);
+        entitlement.Verify(provider => provider.GenerateEntitlementExpressionAsync(
+            It.IsAny<AccessContext<MethodRequest>>(), It.IsAny<ClaimsPrincipal?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

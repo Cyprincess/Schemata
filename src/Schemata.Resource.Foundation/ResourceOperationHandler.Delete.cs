@@ -1,3 +1,4 @@
+using System;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -111,10 +112,19 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
 
         var mutation = _sp.GetRequiredService<IResourceMutation<TEntity>>();
 
-        return await ExecuteOwnedAsync(
-            (transaction, token) => MutateDeleteAsync(mutation, entity, transaction, token),
-            null,
-            ct.Value);
+        var transaction = _repository.Begin();
+        Exception? failure = null;
+        try {
+            var response = await MutateDeleteAsync(mutation, entity, transaction, ct.Value);
+            await transaction.CommitAsync(ct.Value);
+            return response;
+        } catch (Exception error) {
+            failure = error;
+            throw;
+        } finally {
+            try { await transaction.DisposeAsync(); }
+            catch (Exception cleanup) when (failure is not null) { throw new AggregateException(failure, cleanup); }
+        }
     }
 
     private async Task<DeleteResultBase<TDetail>> MutateDeleteAsync(
@@ -139,7 +149,11 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
         if (entity is ISoftDelete { DeleteTime: not null }) {
             var detail = _mapper.Map<TEntity, TDetail>(entity);
             if (detail is not null) {
-                ResourceCommitOwner.SyncStamp(entity, detail, transaction);
+                transaction.AddSavePreparation(() => {
+                    if (entity is IConcurrency source && detail is IConcurrency stamped) {
+                        stamped.Timestamp = source.Timestamp;
+                    }
+                });
             }
 
             return new() { Detail = detail };

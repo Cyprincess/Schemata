@@ -1,5 +1,7 @@
 using System.Security.Claims;
+using System.Text.Json.Serialization;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Resource;
 
 namespace Schemata.Messaging.Skeleton.Commands;
 
@@ -26,4 +28,8 @@ public sealed record ResourceMethodRequest<TEntity, TRequest, TResponse>(
     where TResponse : class
 {
     public ClaimsPrincipal? Principal { get; set; } = Principal;
+
+    /// <summary>The identified dispatch execution attached by the idempotency wrap.</summary>
+    [JsonIgnore]
+    public ResourceDispatchExecution? Dispatch { get; set; }
 }

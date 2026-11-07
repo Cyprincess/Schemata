@@ -23,6 +23,7 @@ public sealed class ResourceCreateIdempotencyPipelineAdvisor<TEntity, TRequest, 
         : base(static _ => nameof(Operations.Create),
             static envelope => envelope.Request,
             static envelope => envelope.Request.CanonicalName ?? envelope.Request.Name ?? string.Empty,
+            static (envelope, execution) => envelope.Dispatch = execution,
             static detail => new() { Detail = detail },
             static response => response.Detail) {
     }

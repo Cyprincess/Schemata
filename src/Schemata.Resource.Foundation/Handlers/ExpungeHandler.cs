@@ -53,11 +53,10 @@ public sealed class ExpungeHandler<TEntity> : IRequestHandler<ExpungeResourceReq
                 "Resource is not deleted.");
         }
 
-        return await ResourceCommitOwner.ExecuteAsync<TEntity, EmptyResourceResponse>(
-            _repository,
-            null,
-            (transaction, token) => MutateExpungeAsync(entity, transaction, token),
-            ct);
+        await using var transaction = _repository.Begin();
+        var response = await MutateExpungeAsync(entity, transaction, ct);
+        await transaction.CommitAsync(ct);
+        return response;
     }
 
     private async Task<EmptyResourceResponse> MutateExpungeAsync(

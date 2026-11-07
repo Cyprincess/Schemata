@@ -23,9 +23,6 @@ public sealed class ThrowSignalHandler(IRequestDispatcher dispatcher)
         await dispatcher.SendAsync<ThrowProcessSignalRequest, IReadOnlyList<SignalDeliveryResult>>(
             new(request.SignalName, request.Payload, request.Token, request.Principal), ct);
 
-        // The broadcast completed: report the commit so the idempotency wrap can finalize the
-        // reservation. A failure throws past this point and the outcome stays unreported.
-        request.Dispatch?.MarkCommitted();
         return new();
     }
 }

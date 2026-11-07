@@ -275,7 +275,7 @@ public class SchemataResourceFeatureRegisterMethodShould
         var builder = new SchemataResourceBuilder(options, services);
         builder.Use<SoftEntity, SoftEntity, SoftEntity, SoftEntity>();
         builder.Use<SoftEntity, SoftEntity, SoftEntity, SoftEntity>(null, resource => {
-            resource.Methods = [new("run", typeof(PlainRunHandler), ResourceMethodScope.Collection)];
+            resource.Methods = [new("run", typeof(SoftRunHandler), ResourceMethodScope.Collection)];
         });
         services.AddSchemataResources(options);
         AddRunDependencies(services);
@@ -348,7 +348,7 @@ public class SchemataResourceFeatureRegisterMethodShould
             });
         });
         var services = host.Services;
-        var archived   = new SoftEntity { Name = "archived", CanonicalName = "softEntities/archived", DeleteTime = new DateTime(2026, 1, 1) };
+        var archived   = new SoftEntity { Name = "archived", CanonicalName = "accounts/one/softResults/archived", DeleteTime = new DateTime(2026, 1, 1) };
         var unit       = UnitOfWorkMock.Create();
         var repository = UnitOfWorkMock.Repository<SoftEntity>(unit);
         repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<SoftEntity>, IQueryable<SoftEntity>>>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
@@ -370,7 +370,7 @@ public class SchemataResourceFeatureRegisterMethodShould
         Assert.Equal("removeArchived", Assert.Single(registry.GetMethods(typeof(PlainEntity))).Verb);
         var dispatcher = new InProcessRequestDispatcher(provider);
         await dispatcher.SendAsync<ResourceMethodRequest<PlainEntity, ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>, EmptyResourceResponse>(
-            new("removeArchived", null, new() { CanonicalName = "softEntities/archived" }, null));
+            new("removeArchived", null, new() { CanonicalName = "accounts/one/softResults/archived" }, null));
         mutation.Verify(m => m.DeleteAsync(archived, unit.Object, Operations.Expunge, It.IsAny<CancellationToken>()), Times.Once);
         unit.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
         var expunge = await Assert.ThrowsAsync<InvalidOperationException>(() => dispatcher.SendAsync<
@@ -387,11 +387,11 @@ public class SchemataResourceFeatureRegisterMethodShould
         host.UseSchemata(schema => {
             options = schema.Options;
             schema.UseResource().Use<SoftEntity, SoftEntity, SoftEntity, SoftEntity>(null, resource => {
-                resource.Methods = [new("run", typeof(PlainRunHandler), ResourceMethodScope.Collection)];
+                resource.Methods = [new("run", typeof(SoftRunHandler), ResourceMethodScope.Collection)];
             });
             AddRunDependencies(schema.Services);
         });
-        var archived   = new SoftEntity { CanonicalName = "softEntities/application", DeleteTime = new DateTime(2026, 1, 1) };
+        var archived   = new SoftEntity { CanonicalName = "accounts/one/softResults/application", DeleteTime = new DateTime(2026, 1, 1) };
         var unit       = UnitOfWorkMock.Create();
         var repository = UnitOfWorkMock.Repository<SoftEntity>(unit);
         repository.Setup(r => r.SingleOrDefaultAsync(It.IsAny<Func<IQueryable<SoftEntity>, IQueryable<SoftEntity>>>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
@@ -422,7 +422,7 @@ public class SchemataResourceFeatureRegisterMethodShould
         Assert.Contains(typeof(UndeleteResourceRequest<SoftEntity, SoftEntity>).FullName!, undelete.Message, StringComparison.Ordinal);
         Assert.Empty(provider.GetServices<IRequestPipelineAdvisor<ResourceMethodRequest<SoftEntity, ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>, EmptyResourceResponse>>());
         Assert.Empty(provider.GetServices<IResourceMethodAdvisor<SoftEntity, ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>>());
-        await dispatcher.SendAsync<ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>(new() { CanonicalName = "softEntities/application" });
+        await dispatcher.SendAsync<ExpungeResourceRequest<SoftEntity>, EmptyResourceResponse>(new() { CanonicalName = "accounts/one/softResults/application" });
         mutation.Verify(m => m.DeleteAsync(archived, unit.Object, Operations.Expunge, It.IsAny<CancellationToken>()), Times.Once);
         unit.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -478,9 +478,11 @@ public class SchemataResourceFeatureRegisterMethodShould
 
     #region Nested type: PlainEntity
 
-    [CanonicalName("plainEntities/{plain_entity}")]
+    [CanonicalName("accounts/{account}/results/{result}")]
     public sealed class PlainEntity : ICanonicalName
     {
+        public string? Account { get; set; }
+
         #region ICanonicalName Members
 
         public string? Name          { get; set; }
@@ -511,6 +513,18 @@ AdviceContext context,
     }
 
     #endregion
+
+    public sealed class SoftRunHandler(IRepository<PlainEntity> repository) : IRequestHandler<PlainRunRequest, RunResponse>
+    {
+        public async Task<RunResponse> HandleAsync(
+            PlainRunRequest request,
+            AdviceContext context,
+            CancellationToken ct = default
+        ) {
+            var entity = await repository.SingleOrDefaultAsync(q => q, ct);
+            return new RunResponse { Value = entity!.Value + request.Amount, CanonicalName = "accounts/one/softResults/total" };
+        }
+    }
 
     #region Nested type: PlainRunRequest
 
@@ -604,9 +618,11 @@ AdviceContext context,
 
     #region Nested type: SoftEntity
 
-    [CanonicalName("softEntities/{soft_entity}")]
+    [CanonicalName("accounts/{account}/softResults/{result}")]
     public sealed class SoftEntity : ICanonicalName, ISoftDelete
     {
+        public string? Account { get; set; }
+
         #region ICanonicalName Members
 
         public string? Name          { get; set; }

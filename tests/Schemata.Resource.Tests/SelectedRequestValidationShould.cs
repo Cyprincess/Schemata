@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentValidation;
@@ -18,6 +19,9 @@ using Schemata.Validation.Skeleton.Advisors;
 using Schemata.Abstractions.Resource;
 using Schemata.Core;
 using Schemata.Core.Building;
+using Schemata.Entity.Repository;
+using Schemata.Mapping.Skeleton;
+using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Foundation.Commands;
 using Xunit;
 
@@ -43,9 +47,29 @@ public sealed class SelectedRequestValidationShould
         if (genericFirst) services.AddRequestValidation<CreateResourceRequest<ResourceEntity, ResourcePayload, ResourceEntity>, CreateResultBase<ResourceEntity>>(Operations.Create);
         new SchemataResourceBuilder(options, services).Use<ResourceEntity, ResourcePayload, ResourceEntity, ResourceEntity>();
         if (!genericFirst) services.AddRequestValidation<CreateResourceRequest<ResourceEntity, ResourcePayload, ResourceEntity>, CreateResultBase<ResourceEntity>>(Operations.Create);
+        var repository = new Mock<IRepository<ResourceEntity>>();
+        repository.Setup(r => r.GetAsync(
+                              It.IsAny<ResourceEntity>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns(new ValueTask<ResourceEntity?>((ResourceEntity?)null));
+        services.AddSingleton(repository.Object);
+        var mapper = new Mock<ISimpleMapper>();
+        mapper.Setup(m => m.Map<ResourcePayload, ResourceEntity>(It.IsAny<ResourcePayload>()))
+              .Returns((ResourcePayload value) => new() { Name = value.Name, CanonicalName = value.CanonicalName });
+        services.AddSingleton(mapper.Object);
+        var naming = new Mock<IResourceCreateAdvisor<ResourceEntity, ResourcePayload, ResourceEntity>>();
+        naming.Setup(a => a.AdviseAsync(
+                           It.IsAny<AdviceContext>(), It.IsAny<ResourcePayload>(), It.IsAny<ResourceEntity>(),
+                           It.IsAny<ClaimsPrincipal?>(), It.IsAny<HandledResponse<CreateResultBase<ResourceEntity>>>(),
+                           It.IsAny<CancellationToken>()))
+              .Callback((AdviceContext _, ResourcePayload _, ResourceEntity entity, ClaimsPrincipal? _,
+                         HandledResponse<CreateResultBase<ResourceEntity>> _, CancellationToken _) =>
+                  entity.Name = "resource")
+              .ReturnsAsync(AdviseResult.Continue);
+        services.AddSingleton(naming.Object);
         using var provider = services.BuildServiceProvider();
-        await Assert.ThrowsAsync<NoContentException>(() => new InProcessRequestDispatcher(provider)
-            .SendAsync<CreateResourceRequest<ResourceEntity, ResourcePayload, ResourceEntity>, CreateResultBase<ResourceEntity>>(new(new() { ValidateOnly = true }, null)));
+        var result = await new InProcessRequestDispatcher(provider)
+            .SendAsync<CreateResourceRequest<ResourceEntity, ResourcePayload, ResourceEntity>, CreateResultBase<ResourceEntity>>(new(new() { ValidateOnly = true }, null));
+        Assert.Null(result.Detail);
         Assert.Equal(1, runs);
         Assert.Equal(1, ResourceValidator.Runs);
     }

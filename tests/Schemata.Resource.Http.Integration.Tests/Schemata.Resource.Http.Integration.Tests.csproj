@@ -18,6 +18,7 @@
     <ProjectReference Include="..\..\src\Schemata.Resource.Http\Schemata.Resource.Http.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Resource.Grpc\Schemata.Resource.Grpc.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Expressions.Aip\Schemata.Expressions.Aip.csproj" />
+    <ProjectReference Include="..\..\src\Schemata.Expressions.Cel\Schemata.Expressions.Cel.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Expressions.Order\Schemata.Expressions.Order.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Mapping.Mapster\Schemata.Mapping.Mapster.csproj" />
     <ProjectReference Include="..\..\src\Schemata.Entity.EntityFrameworkCore\Schemata.Entity.EntityFrameworkCore.csproj" />

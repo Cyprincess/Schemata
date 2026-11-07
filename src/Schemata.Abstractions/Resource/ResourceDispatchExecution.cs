@@ -5,10 +5,9 @@ namespace Schemata.Abstractions.Resource;
 /// <summary>
 ///     The one execution payload for an identified resource dispatch. The idempotency wrap creates
 ///     it when the reservation is reserved and fills its reservation side; the mutation owner that
-///     actually stages the dispatch fills its completion side, either directly (standard verbs own
-///     the unit of work) or through an explicit report (AIP-136 custom methods). The payload
-///     travels on the dispatch object the owner already receives: the envelope for standard verbs,
-///     the inner request for custom methods.
+///     actually stages the dispatch fills its completion side. Standard verbs record completion
+///     through unit-of-work sinks, and custom methods complete after their business dispatcher
+///     returns normally. The framework dispatch envelope carries the payload to its owner.
 /// </summary>
 public sealed class ResourceDispatchExecution
 {

@@ -63,7 +63,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
 
         var caller = ProtectedContinuationCaller.Bind(principal);
 
-        var token = await PageToken.FromStringAsync(request.PageToken, Protector)
+        var token = PageToken.FromString(request.PageToken, Protector)
                  ?? new PageToken {
                         Parent      = request.Parent,
                         Filter      = request.Filter,
@@ -134,7 +134,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
                 var tree = compiler.Parse(request.Filter);
                 if (resolved.Filtering is FilteringMode.Residual) {
                     var planner = _sp.GetRequiredKeyedService<IExpressionPushdownPlanner>(resolved.Language);
-                    var plan    = planner.Plan(tree, ExpressionCapabilities.Relational);
+                    var plan = planner.Plan(tree, ExpressionCapabilities.Relational, typeof(TEntity));
                     if (plan.Pushed is not null) {
                         container.ApplyWhere(compiler.Compile<TEntity, bool>(plan.Pushed));
                     }
@@ -200,12 +200,18 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
             // relied on once total_size becomes optional.
             container.ApplyPaginating(token, 1);
 
-            var entities = _repository.ListAsync(q => container.Query(q), ct.Value, options);
-            summaries = await _mapper.EachAsync<TEntity, TSummary>(entities, ct.Value).ToListAsync(ct.Value);
-
-            hasMore = summaries.Count > token.PageSize;
+            var source = await _repository.ListAsync(q => container.Query(q), ct.Value, options)
+                                          .ToListAsync(ct.Value);
+            hasMore = source.Count > token.PageSize;
             if (hasMore) {
-                summaries.RemoveAt(summaries.Count - 1);
+                source.RemoveAt(source.Count - 1);
+            }
+
+            summaries = new(source.Count);
+            foreach (var entity in source) {
+                if (_mapper.Map<TEntity, TSummary>(entity) is { } summary) {
+                    summaries.Add(summary);
+                }
             }
         } else {
             var mode = ResolveTotalSizeMode();
@@ -245,7 +251,7 @@ public sealed partial class ResourceOperationHandler<TEntity, TRequest, TDetail,
                 }]);
             }
 
-            nextPageToken = await token.ToStringAsync(Protector);
+            nextPageToken = token.ToString(Protector);
         }
 
         return new() {

@@ -330,11 +330,11 @@ public class ResourceOperationHandlerUpdateShould
         var entity = new Student {
             Name = "s1", CanonicalName = "students/s1", Uid = uid, Timestamp = timestamp, Age = 7,
         };
-        var request = new Student { FullName = "Renamed", UpdateMask = mask };
+        var request = new Student { FullName = "Renamed", Age = 42, UpdateMask = mask };
 
         var (repository, unit) = LoadedRepository(entity);
         var owner      = ResourceMutationMock.Create<Student>();
-        var mapper     = MergingMapper();
+        var mapper     = MergingMapper<Student>();
 
         using var services = Services<Student, Student, Student>(owner);
         var advice  = new AdviceContext(services);
@@ -347,8 +347,41 @@ public class ResourceOperationHandlerUpdateShould
         Assert.Equal(timestamp, entity.Timestamp);
         Assert.Equal("s1", entity.Name);
         Assert.Equal("Renamed", entity.FullName);
+        Assert.Equal(42, entity.Age);
         Assert.Same(entity, result.Detail);
         owner.Verify(o => o.UpdateAsync(entity, unit.Object, Operations.Update, CancellationToken.None), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("uid")]
+    [InlineData("owner")]
+    public async Task SystemOnlyMask_Preserves_Business_And_System_Fields(string mask) {
+        var uid       = Guid.NewGuid();
+        var timestamp = Guid.NewGuid();
+        var entity = new OwnedStudent {
+            Name = "s1", CanonicalName = "students/s1", Uid = uid, Timestamp = timestamp,
+            Owner = "loaded-owner", FullName = "Original", Age = 7,
+        };
+        var request = new OwnedStudent {
+            FullName = "Renamed", Age = 42, Owner = "replacement-owner", UpdateMask = mask,
+        };
+
+        var (repository, _) = LoadedRepository(entity);
+        var owner      = ResourceMutationMock.Create<OwnedStudent>();
+        var mapper     = MergingMapper<OwnedStudent>();
+
+        using var services = Services<OwnedStudent, OwnedStudent, OwnedStudent>(owner);
+        var advice  = new AdviceContext(services);
+        var handler = new ResourceOperationHandler<OwnedStudent, OwnedStudent, OwnedStudent, OwnedStudent>(
+            services, repository.Object, mapper.Object);
+
+        await handler.UpdateAsync("students/s1", request, null, advice, CancellationToken.None);
+
+        Assert.Equal(uid, entity.Uid);
+        Assert.Equal(timestamp, entity.Timestamp);
+        Assert.Equal("loaded-owner", entity.Owner);
+        Assert.Equal("Original", entity.FullName);
+        Assert.Equal(7, entity.Age);
     }
 
     [Fact]
@@ -356,13 +389,13 @@ public class ResourceOperationHandlerUpdateShould
         var uid       = Guid.NewGuid();
         var timestamp = Guid.NewGuid();
         var entity = new Student {
-            Name = "s1", CanonicalName = "students/s1", Uid = uid, Timestamp = timestamp,
+            Name = "s1", CanonicalName = "students/s1", Uid = uid, Timestamp = timestamp, Age = 7,
         };
-        var request = new Student { FullName = "Renamed", UpdateMask = "uid,timestamp,full_name" };
+        var request = new Student { FullName = "Renamed", Age = 42, UpdateMask = "uid,full_name" };
 
         var (repository, _) = LoadedRepository(entity);
         var owner      = ResourceMutationMock.Create<Student>();
-        var mapper     = MergingMapper();
+        var mapper     = MergingMapper<Student>();
 
         using var services = Services<Student, Student, Student>(owner);
         var advice  = new AdviceContext(services);
@@ -374,34 +407,35 @@ public class ResourceOperationHandlerUpdateShould
         Assert.Equal(uid, entity.Uid);
         Assert.Equal(timestamp, entity.Timestamp);
         Assert.Equal("Renamed", entity.FullName);
+        Assert.Equal(7, entity.Age);
     }
 
-    private static (Mock<IRepository<Student>> Repository, Mock<IUnitOfWork> Unit) LoadedRepository(Student entity) {
+    private static (Mock<IRepository<T>> Repository, Mock<IUnitOfWork> Unit) LoadedRepository<T>(T entity) where T : class {
         var unit       = UnitOfWorkMock.Create();
-        var repository = UnitOfWorkMock.Repository<Student>(unit);
+        var repository = UnitOfWorkMock.Repository<T>(unit);
         repository.Setup(r => r.SingleOrDefaultAsync(
-                              It.IsAny<Func<IQueryable<Student>, IQueryable<Student>>>(),
+                              It.IsAny<Func<IQueryable<T>, IQueryable<T>>>(),
                               It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
-                  .Returns(new ValueTask<Student?>(entity));
+                  .Returns(new ValueTask<T?>(entity));
         return (repository, unit);
     }
 
     // Mirrors the adapters' shared SimpleMapperHelper.MapMerging: a populated source member
     // (including a value-type default like Guid.Empty) overwrites the destination.
-    private static Mock<ISimpleMapper> MergingMapper() {
+    private static Mock<ISimpleMapper> MergingMapper<T>() where T : class {
         var mapper = new Mock<ISimpleMapper>();
-        mapper.Setup(m => m.Map<Student, Student>(It.IsAny<Student>(), It.IsAny<Student>()))
-              .Callback((Student source, Student destination) => MergePopulated(source, destination, null));
-        mapper.Setup(m => m.Map<Student, Student>(
-                   It.IsAny<Student>(), It.IsAny<Student>(), It.IsAny<IEnumerable<string>>()))
-              .Callback((Student source, Student destination, IEnumerable<string> fields)
+        mapper.Setup(m => m.Map<T, T>(It.IsAny<T>(), It.IsAny<T>()))
+              .Callback((T source, T destination) => MergePopulated(source, destination, null));
+        mapper.Setup(m => m.Map<T, T>(
+                   It.IsAny<T>(), It.IsAny<T>(), It.IsAny<IEnumerable<string>>()))
+              .Callback((T source, T destination, IEnumerable<string> fields)
                          => MergePopulated(source, destination, fields.ToHashSet()));
-        mapper.Setup(m => m.Map<Student, Student>(It.IsAny<Student>())).Returns((Student source) => source);
+        mapper.Setup(m => m.Map<T, T>(It.IsAny<T>())).Returns((T source) => source);
         return mapper;
     }
 
-    private static void MergePopulated(Student source, Student destination, ISet<string>? fields) {
-        foreach (var property in typeof(Student).GetProperties()) {
+    private static void MergePopulated<T>(T source, T destination, ISet<string>? fields) where T : class {
+        foreach (var property in typeof(T).GetProperties()) {
             if (!property.CanWrite || fields is not null && !fields.Contains(property.Name)) {
                 continue;
             }
@@ -448,6 +482,12 @@ public class ResourceOperationHandlerUpdateShould
         }
 
         return services.BuildServiceProvider();
+    }
+
+    [CanonicalName("students/{student}")]
+    public sealed class OwnedStudent : Student, IOwnable
+    {
+        public string? Owner { get; set; }
     }
 
     private sealed class RequestWithoutAllowMissing : ICanonicalName

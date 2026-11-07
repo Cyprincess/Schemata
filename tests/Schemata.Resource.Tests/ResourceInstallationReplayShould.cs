@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading;
@@ -88,35 +89,49 @@ public class ResourceInstallationReplayShould
     }
 
     [Fact]
-    public async Task RegisteredMethodIdempotency_IdentifiedDispatch_ReservesAndReleasesThroughTheCache() {
+    public async Task RegisteredMethodIdempotency_NormalReturn_FinalizesAndReplaysResponse() {
+        var store = new Dictionary<string, byte[]>();
         var cache = new Mock<ICacheProvider>();
         cache.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-             .ReturnsAsync((byte[]?)null);
+             .ReturnsAsync((string key, CancellationToken _) => store.TryGetValue(key, out var value) ? value : null);
         cache.Setup(c => c.TryAddAsync(
                   It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(), It.IsAny<CancellationToken>()))
-             .ReturnsAsync(true);
-        cache.Setup(c => c.TryRemoveAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
-             .ReturnsAsync(true);
+             .ReturnsAsync((string key, byte[] value, CacheEntryOptions _, CancellationToken _) => store.TryAdd(key, value));
+        cache.Setup(c => c.TryReplaceAsync(
+                  It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
+                  It.IsAny<CancellationToken>()))
+             .ReturnsAsync((string key, byte[] expected, byte[] replacement, CacheEntryOptions _, CancellationToken _) => {
+                  if (!store.TryGetValue(key, out var current) || !current.SequenceEqual(expected)) {
+                      return false;
+                  }
+
+                  store[key] = replacement;
+                  return true;
+              });
         await using var app = BuildHost(cache: cache, methodIdempotency: true);
         using var scope = app.Services.CreateScope();
         var dispatcher = new InProcessRequestDispatcher(scope.ServiceProvider);
 
-        var response = await dispatcher.SendAsync<ResourceMethodRequest<Widget, IdentifiedRequest, Widget>, Widget>(
+        var first = await dispatcher.SendAsync<ResourceMethodRequest<Widget, IdentifiedRequest, Widget>, Widget>(
+            new("identify", Name, new() { CanonicalName = Name, RequestId = "req-1" }, null));
+        var replay = await dispatcher.SendAsync<ResourceMethodRequest<Widget, IdentifiedRequest, Widget>, Widget>(
             new("identify", Name, new() { CanonicalName = Name, RequestId = "req-1" }, null));
 
-        Assert.NotNull(response);
+        Assert.Equal(first.CanonicalName, replay.CanonicalName);
         cache.Verify(c => c.TryAddAsync(
             It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(), It.IsAny<CancellationToken>()),
-            Times.Once);
-        // The method reported no durable write, so the wrap settles by releasing the reservation
-        // with its exact bytes instead of finalizing an envelope.
-        cache.Verify(c => c.TryRemoveAsync(
-            It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()),
             Times.Once);
         cache.Verify(c => c.TryReplaceAsync(
             It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
             It.IsAny<CancellationToken>()),
+            Times.Once);
+        cache.Verify(c => c.TryRemoveAsync(
+            It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()),
             Times.Never);
+        var repository = Mock.Get(scope.ServiceProvider.GetRequiredService<IRepository<Widget>>());
+        repository.Verify(r => r.SingleOrDefaultAsync(
+            It.IsAny<Func<IQueryable<Widget>, IQueryable<Widget>>>(), It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()),
+            Times.Exactly(2));
     }
 
     [Fact]
@@ -254,24 +269,18 @@ public class ResourceInstallationReplayShould
         }
     }
 
-    public sealed class IdentifiedRequest : ICanonicalName, ICommand<Widget>, IRequestPrincipal, IRequestIdentification, IResourceDispatchCarrier
+    public sealed class IdentifiedRequest : ICanonicalName, ICommand<Widget>, IRequestPrincipal, IRequestIdentification
     {
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
         public string? RequestId     { get; set; }
         public ClaimsPrincipal? Principal { get; set; }
-
-        public ResourceDispatchExecution? Dispatch { get; set; }
     }
 
     public sealed class IdentifiedHandler(IRepository<Widget> repository) : IRequestHandler<IdentifiedRequest, Widget>
     {
         public async Task<Widget> HandleAsync(IdentifiedRequest request, AdviceContext context, CancellationToken ct = default) {
             var widget = (await repository.SingleOrDefaultAsync(q => q.Where(w => w.CanonicalName == request.CanonicalName), ct))!;
-
-            // A read-only method reports no durable write so its reservation releases and a retry
-            // re-executes instead of replaying.
-            request.Dispatch?.MarkNotWritten();
             return widget;
         }
     }

@@ -14,7 +14,7 @@ namespace Schemata.Resource.Foundation.Commands;
 /// <typeparam name="TRequest">The resource request DTO type.</typeparam>
 /// <typeparam name="TDetail">The resource detail response type.</typeparam>
 public sealed record CreateResourceRequest<TEntity, TRequest, TDetail>(TRequest Request, ClaimsPrincipal? Principal)
-    : ICommand<CreateResultBase<TDetail>>, IRequestPrincipal, IResourceDispatchCarrier
+    : ICommand<CreateResultBase<TDetail>>, IRequestPrincipal
     where TEntity : class, ICanonicalName
     where TRequest : class, ICanonicalName
     where TDetail : class, ICanonicalName

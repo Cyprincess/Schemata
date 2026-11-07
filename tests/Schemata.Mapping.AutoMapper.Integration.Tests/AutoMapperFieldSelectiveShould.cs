@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -38,6 +39,30 @@ public class AutoMapperFieldSelectiveShould
         var app   = builder.Build();
         var scope = app.Services.CreateScope();
         return scope.ServiceProvider.GetRequiredService<ISimpleMapper>();
+    }
+
+    [Fact]
+    public void Map_WithEmptyFieldList_LeavesEveryDestinationValueUnchanged() {
+        var mapper = CreateMapper();
+        var source = new Source {
+            Name = "Alice", Age = 30, Grade = 10, Sex = Sex.Female,
+            Profile = new() { DisplayName = "New", Bio = "New Bio", Locale = "fr" },
+        };
+        var profile = new DestinationProfile { DisplayName = "Old", Bio = "Old Bio", Locale = "en" };
+        var destination = new Destination {
+            DisplayName = "Original", Age = 99, Grade = 77, Sex = "Unknown", Profile = profile,
+        };
+
+        mapper.Map(source, destination, Array.Empty<string>());
+
+        Assert.Equal("Original", destination.DisplayName);
+        Assert.Equal(99, destination.Age);
+        Assert.Equal(77, destination.Grade);
+        Assert.Equal("Unknown", destination.Sex);
+        Assert.Same(profile, destination.Profile);
+        Assert.Equal("Old", profile.DisplayName);
+        Assert.Equal("Old Bio", profile.Bio);
+        Assert.Equal("en", profile.Locale);
     }
 
     [Fact]

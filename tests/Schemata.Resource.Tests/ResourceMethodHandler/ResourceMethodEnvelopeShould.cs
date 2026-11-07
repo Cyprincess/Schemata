@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Schemata.Abstractions.Advisors;
 using Schemata.Abstractions.Entities;
+using Schemata.Abstractions.Exceptions;
 using Schemata.Abstractions.Resource;
 using Schemata.Caching.Skeleton;
 using Schemata.Entity.Repository;
@@ -69,18 +70,18 @@ public class ResourceMethodEnvelopeShould
             services.AddSingleton<IRequestPipelineAdvisor<ResourceMethodRequest<MethodEntity, MethodRequest, MethodResponse>, MethodResponse>>(wrap);
         });
 
-        await DispatchAsync(services, "archive", "entities/e1", new() { CanonicalName = "entities/payload" }, null);
+        await DispatchAsync(services, "archive", "tenants/t1/hosts/e1", new() { CanonicalName = "tenants/t1/hosts/payload" }, null);
 
         var observed = Assert.Single(wrap.Observed);
         Assert.Equal("archive", observed.Verb);
-        Assert.Equal("entities/e1", observed.Name);
+        Assert.Equal("tenants/t1/hosts/e1", observed.Name);
         Assert.Equal(typeof(MethodEntity), observed.Entity);
         Assert.Equal(1, handler.Invocations);
     }
 
     [Fact]
     public async Task Instance_Name_Routes_The_Envelope_To_Entity_Loading() {
-        var entity  = new MethodEntity { Name = "e1", CanonicalName = "entities/e1" };
+        var entity  = new MethodEntity { Name = "e1", CanonicalName = "tenants/t1/hosts/e1" };
         var handler = new MethodHandler();
         var entityAdvisor = new RecordingMethodEntityAdvisor();
         var repository = new Mock<IRepository<MethodEntity>>();
@@ -92,7 +93,7 @@ public class ResourceMethodEnvelopeShould
             services.AddSingleton<IResourceMethodAdvisor<MethodEntity, MethodRequest, MethodResponse>>(entityAdvisor);
         });
 
-        var response = await DispatchAsync(services, "archive", "entities/e1", new(), null);
+        var response = await DispatchAsync(services, "archive", "tenants/t1/hosts/e1", new(), null);
 
         Assert.Same(handler.Response, response);
         Assert.Same(entity, entityAdvisor.Entity);
@@ -132,7 +133,7 @@ public class ResourceMethodEnvelopeShould
                 ResourceMethodIdempotencyPipelineAdvisor<MethodEntity, MethodRequest, MethodResponse>>();
         });
 
-        var response = await DispatchAsync(services, "archive", "entities/e1", request, null);
+        var response = await DispatchAsync(services, "archive", "tenants/t1/hosts/e1", request, null);
 
         Assert.Equal("tenants/t1/hosts/h9", response.CanonicalName);
         Assert.Equal(0, handler.Invocations);
@@ -160,14 +161,14 @@ public class ResourceMethodEnvelopeShould
                 ResourceMethodIdempotencyPipelineAdvisor<MethodEntity, MethodRequest, MethodResponse>>();
         });
 
-        var response = await DispatchAsync(services, "archive", "entities/e1", request, null);
+        var response = await DispatchAsync(services, "archive", "tenants/t1/hosts/e1", request, null);
 
         Assert.Same(handler.Response, response);
 
         var pending = Assert.Single(reserved);
         var record  = JsonDocument.Parse(pending).RootElement;
         Assert.Equal("archive", record.GetProperty("Operation").GetString());
-        Assert.Equal("entities/e1", record.GetProperty("CanonicalName").GetString());
+        Assert.Equal("tenants/t1/hosts/e1", record.GetProperty("CanonicalName").GetString());
 
         var done = Assert.Single(replaced);
         var envelope = JsonDocument.Parse(done).RootElement;
@@ -177,7 +178,7 @@ public class ResourceMethodEnvelopeShould
     }
 
     [Fact]
-    public async Task Method_Idempotency_WithAnUnreportedSuccess_KeepsTheReservationPending() {
+    public async Task Method_Idempotency_WithNormalReturn_FinalizesTheResponse() {
         var request = new MethodRequest { RequestId = "req-1" };
         var handler = new SilentMethodHandler();
         var store    = new Dictionary<string, byte[]>();
@@ -191,14 +192,10 @@ public class ResourceMethodEnvelopeShould
                 ResourceMethodIdempotencyPipelineAdvisor<MethodEntity, MethodRequest, MethodResponse>>();
         });
 
-        var response = await DispatchAsync(services, "archive", "entities/e1", request, null);
+        var response = await DispatchAsync(services, "archive", "tenants/t1/hosts/e1", request, null);
 
-        // The handler returned without reporting completion: the wrap cannot certify the result,
-        // so the reservation stays pending and is neither finalized nor removed.
         Assert.Same(handler.Response, response);
-        var pending = Assert.Single(reserved);
-        Assert.Equal("PENDING", JsonDocument.Parse(pending).RootElement.GetProperty("Kind").GetString());
-        Assert.Empty(replaced);
+        Assert.Equal("DONE", JsonDocument.Parse(Assert.Single(replaced)).RootElement.GetProperty("Kind").GetString());
         cache.Verify(c => c.TryRemoveAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -217,7 +214,7 @@ public class ResourceMethodEnvelopeShould
         });
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => DispatchAsync(services, "archive", "entities/e1", request, null));
+            () => DispatchAsync(services, "archive", "tenants/t1/hosts/e1", request, null));
 
         // The failure carries no completion evidence: the reservation stays pending so a retry
         // inside the retention window cannot repeat the dispatch.
@@ -228,6 +225,48 @@ public class ResourceMethodEnvelopeShould
     }
 
     [Fact]
+    public async Task Nested_And_Replayed_Dispatches_Preserve_Execution_Evidence() {
+        var failingRequest = new MethodRequest { RequestId = "failing" };
+        var failing = new ResourceMethodRequest<MethodEntity, MethodRequest, MethodResponse>(
+            "batchArchive", null, failingRequest, null);
+        var handler = new NestedMethodHandler(failingRequest, failing);
+        var outer = new ResourceMethodRequest<MethodEntity, MethodRequest, MethodResponse>(
+            "batchArchive", null, new() { RequestId = "outer" }, null);
+        var store    = new Dictionary<string, byte[]>();
+        var reserved = new List<byte[]>();
+        var replaced = new List<byte[]>();
+        var cache    = StatefulCache(store, reserved, replaced);
+        using var services = BuildServices(handler: handler, configure: services => {
+            services.Configure<SchemataResourceOptions>(options => options.IdempotencyPendingWait = TimeSpan.Zero);
+            services.AddSingleton(cache.Object);
+            services.AddSingleton<
+                IRequestPipelineAdvisor<ResourceMethodRequest<MethodEntity, MethodRequest, MethodResponse>, MethodResponse>,
+                ResourceMethodIdempotencyPipelineAdvisor<MethodEntity, MethodRequest, MethodResponse>>();
+        });
+        var dispatcher = new InProcessRequestDispatcher(services);
+
+        var firstResponse = await dispatcher.SendAsync<ResourceMethodRequest<MethodEntity, MethodRequest, MethodResponse>, MethodResponse>(
+            outer, CancellationToken.None);
+
+        Assert.Equal(ResourceDispatchOutcome.Committed, outer.Dispatch!.Outcome);
+        Assert.Equal(ResourceDispatchOutcome.Reached, failing.Dispatch!.Outcome);
+        Assert.IsType<InvalidOperationException>(handler.NestedFailure);
+        Assert.Equal(2, handler.InvocationCount);
+
+        await Assert.ThrowsAsync<AbortedException>(
+            () => dispatcher.SendAsync<ResourceMethodRequest<MethodEntity, MethodRequest, MethodResponse>, MethodResponse>(
+                failing, CancellationToken.None));
+        Assert.Equal(2, handler.InvocationCount);
+
+        var replayedResponse = await dispatcher.SendAsync<ResourceMethodRequest<MethodEntity, MethodRequest, MethodResponse>, MethodResponse>(
+            outer, CancellationToken.None);
+
+        Assert.Equal(firstResponse.CanonicalName, replayedResponse.CanonicalName);
+        Assert.Equal(2, handler.InvocationCount);
+        Assert.Single(replaced);
+    }
+
+    [Fact]
     public async Task Delete_Dispatch_Derives_Parent_And_Sets_Weak_ETag() {
         var detail     = new SoftDetail { CanonicalName = "tenants/t1/hosts/h1", Timestamp = Timestamp };
         var unit       = UnitOfWorkMock.Create();
@@ -235,7 +274,7 @@ public class ResourceMethodEnvelopeShould
         repository.Setup(r => r.SingleOrDefaultAsync(
                        It.IsAny<Func<IQueryable<SoftEntity>, IQueryable<SoftEntity>>>(),
                        It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
-                  .Returns(new ValueTask<SoftEntity?>(new SoftEntity { Name = "e1", CanonicalName = "entities/e1" }));
+                  .Returns(new ValueTask<SoftEntity?>(new SoftEntity { Name = "e1", CanonicalName = "tenants/t1/hosts/e1" }));
         var mapper = new Mock<Mapping.Skeleton.ISimpleMapper>();
         mapper.Setup(m => m.Map<SoftEntity, SoftDetail>(It.IsAny<SoftEntity>())).Returns(detail);
         var services = new ServiceCollection();
@@ -260,7 +299,7 @@ public class ResourceMethodEnvelopeShould
 
         var result = await new InProcessRequestDispatcher(provider).SendAsync
             <DeleteResourceRequest<SoftEntity, SoftDetail>, DeleteResultBase<SoftDetail>>(
-                new("entities/e1", null, null), CancellationToken.None);
+                new("tenants/t1/hosts/e1", null, null), CancellationToken.None);
 
         Assert.NotNull(result.Detail);
         Assert.Equal("tenants/t1", result.Detail.Parent);
@@ -348,7 +387,7 @@ public class ResourceMethodEnvelopeShould
         repository.Setup(r => r.SingleOrDefaultAsync(
                        It.IsAny<Func<IQueryable<MethodEntity>, IQueryable<MethodEntity>>>(),
                        It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
-                  .Returns(new ValueTask<MethodEntity?>(new MethodEntity { Name = "e1", CanonicalName = "entities/e1" }));
+                  .Returns(new ValueTask<MethodEntity?>(new MethodEntity { Name = "e1", CanonicalName = "tenants/t1/hosts/e1" }));
         return repository;
     }
 
@@ -363,11 +402,14 @@ public class ResourceMethodEnvelopeShould
         cache.Setup(c => c.TryAddAsync(
                   It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
                   It.IsAny<CancellationToken>()))
-             .Callback((string key, byte[] value, CacheEntryOptions options, CancellationToken _) => {
+             .ReturnsAsync((string key, byte[] value, CacheEntryOptions options, CancellationToken _) => {
+                  if (!store.TryAdd(key, value)) {
+                      return false;
+                  }
+
                   reserved.Add(value);
-                  store.TryAdd(key, value);
-              })
-             .ReturnsAsync(true);
+                  return true;
+              });
         cache.Setup(c => c.TryReplaceAsync(
                   It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<CacheEntryOptions>(),
                   It.IsAny<CancellationToken>()))
@@ -418,21 +460,20 @@ public class ResourceMethodEnvelopeShould
         }
     }
 
-    [CanonicalName("entities/{entity}")]
+    [CanonicalName("tenants/{tenant}/hosts/{host}")]
     public sealed class MethodEntity : ICanonicalName
     {
+        public string? Tenant        { get; set; }
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
     }
 
-    public sealed class MethodRequest : ICanonicalName, ICommand<MethodResponse>, IRequestPrincipal, IRequestIdentification, IResourceDispatchCarrier
+    public sealed class MethodRequest : ICanonicalName, ICommand<MethodResponse>, IRequestPrincipal, IRequestIdentification
     {
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
         public string? RequestId     { get; set; }
         public ClaimsPrincipal? Principal { get; set; }
-
-        public ResourceDispatchExecution? Dispatch { get; set; }
     }
 
     public sealed class MethodResponse : ICanonicalName, IChild, IFreshness, IConcurrency
@@ -450,22 +491,52 @@ public class ResourceMethodEnvelopeShould
 
         public MethodRequest? Request { get; private set; }
 
-        public MethodResponse Response { get; set; } = new() { CanonicalName = "entities/handled" };
+        public MethodResponse Response { get; set; } = new() { CanonicalName = "tenants/t1/hosts/handled" };
 
         public Task<MethodResponse> HandleAsync(MethodRequest request, AdviceContext context, CancellationToken ct = default) {
             Invocations++;
             Request = request;
-            // Stand-in for a business method completing its transaction: the completion report on
-            // the dispatch execution is the wrap's only accepted commit evidence.
-            request.Dispatch?.MarkCommitted();
             return Task.FromResult(Response);
         }
     }
 
-    /// <summary>A business method that finishes without reporting its transaction completion.</summary>
+    private sealed class NestedMethodHandler(
+        MethodRequest failingRequest,
+        ResourceMethodRequest<MethodEntity, MethodRequest, MethodResponse> nested
+    ) : IRequestHandler<MethodRequest, MethodResponse>
+    {
+        private ResourceMethodRequest<MethodEntity, MethodRequest, MethodResponse>? _nested = nested;
+
+        public int InvocationCount { get; private set; }
+
+        public Exception? NestedFailure { get; private set; }
+
+        public MethodResponse Response { get; } = new() { CanonicalName = "tenants/t1/hosts/outer" };
+
+        public async Task<MethodResponse> HandleAsync(MethodRequest request, AdviceContext context, CancellationToken ct = default) {
+            InvocationCount++;
+            if (ReferenceEquals(request, failingRequest)) {
+                throw new InvalidOperationException("nested business dispatch failed");
+            }
+
+            if (_nested is { } failing) {
+                _nested = null;
+                try {
+                    await new InProcessRequestDispatcher(context.ServiceProvider)
+                        .SendAsync<ResourceMethodRequest<MethodEntity, MethodRequest, MethodResponse>, MethodResponse>(failing, ct);
+                } catch (InvalidOperationException failure) {
+                    NestedFailure = failure;
+                }
+            }
+
+            return Response;
+        }
+    }
+
+    /// <summary>A business method with no nested dispatch behavior.</summary>
     public sealed class SilentMethodHandler : IRequestHandler<MethodRequest, MethodResponse>
     {
-        public MethodResponse Response { get; } = new() { CanonicalName = "entities/silent" };
+        public MethodResponse Response { get; } = new() { CanonicalName = "tenants/t1/hosts/silent" };
 
         public Task<MethodResponse> HandleAsync(MethodRequest request, AdviceContext context, CancellationToken ct = default) {
             return Task.FromResult(Response);
@@ -480,9 +551,10 @@ public class ResourceMethodEnvelopeShould
         }
     }
 
-    [CanonicalName("entities/{entity}")]
+    [CanonicalName("tenants/{tenant}/hosts/{host}")]
     public sealed class SoftEntity : ICanonicalName, ISoftDelete
     {
+        public string? Tenant        { get; set; }
         public string? Name          { get; set; }
         public string? CanonicalName { get; set; }
         public DateTime? DeleteTime { get; set; }

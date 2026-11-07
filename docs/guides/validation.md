@@ -20,8 +20,9 @@ request is mapped onto the entity. `AdviceValidation<T>` collects field violatio
 (HTTP 422).
 
 `StudentRequest` implements `IValidation` from [Object Mapping](object-mapping.md). Its
-`ValidateOnly` property enables a dry run: a valid `validate_only` request returns HTTP 204 without
-persisting.
+`ValidateOnly` property runs the live permission, freshness, mask, request, and entity checks without
+persisting. Create and update-with-`AllowMissing` also check repository-key uniqueness. A successful
+request returns HTTP 204; gRPC returns a default detail instance.
 
 ## Add the package
 
@@ -150,7 +151,9 @@ curl -X POST http://localhost:5000/v1/students \
      -d '{"full_name":"Alice","age":20,"validate_only":true}'
 ```
 
-A valid `validate_only` request returns HTTP 204; an invalid one returns the same HTTP 422 shape.
+A valid `validate_only` request returns HTTP 204 after the same request and entity validators run.
+Failures retain the live error, including this HTTP 422 shape. The handler returns before mutation
+staging, transaction creation, commit, and committed advisors, so a successful dry run writes nothing.
 
 ## Next steps
 

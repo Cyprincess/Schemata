@@ -16,6 +16,22 @@ public static class AdviceAddUniqueness
     ///     Default execution order: 170,000,000.
     /// </summary>
     public const int DefaultOrder = AdviceAddValidation.DefaultOrder + 30_000_000;
+
+    /// <summary>
+    ///     Rejects an entity whose repository key already exists, including soft-deleted rows.
+    /// </summary>
+    public static async Task EnsureUniqueAsync<TEntity>(
+        IRepository<TEntity> repository,
+        TEntity              entity,
+        CancellationToken    ct = default
+    )
+        where TEntity : class {
+        var existing = await repository.GetAsync(entity, ct, new QueryOptions(IgnoreSoftDelete: true));
+        if (existing is not null) {
+            var name = (entity as ICanonicalName)?.CanonicalName;
+            throw SchemataResourceErrors.AlreadyExists<TEntity>(name);
+        }
+    }
 }
 
 /// <summary>
@@ -51,12 +67,7 @@ public sealed class AdviceAddUniqueness<TEntity> : IRepositoryAddAdvisor<TEntity
             return AdviseResult.Continue;
         }
 
-        var existing = await repository.GetAsync(entity, ct, new QueryOptions(IgnoreSoftDelete: true));
-
-        if (existing is not null) {
-            var name = (entity as ICanonicalName)?.CanonicalName;
-            throw SchemataResourceErrors.AlreadyExists<TEntity>(name);
-        }
+        await AdviceAddUniqueness.EnsureUniqueAsync(repository, entity, ct);
 
         return AdviseResult.Continue;
     }

@@ -13,6 +13,7 @@ using Schemata.Entity.Repository;
 using Schemata.Entity.Repository.Advisors;
 using Schemata.Expressions.Aip;
 using Schemata.Expressions.Order;
+using Schemata.Resource.Foundation.Advisors;
 using Schemata.Resource.Grpc.Integration.Tests.Fixtures;
 using Schemata.Flow.Skeleton.Entities;
 using Schemata.Tenancy.Skeleton;
@@ -94,7 +95,7 @@ builder.UseSchemata(schema => {
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryUpdateAdvisor<Trash>, AdviceNoWriteTrash>());
 
     // Supply the leaf name before canonical-name advice builds students/{slug}.
-    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<Student>, AdviceAddStudentName>());
+    schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IResourceCreateAdvisor<Student, Student, Student>, AdviceAddStudentName>());
     schema.Services.AddRepository<IdempotentOrder, EfCoreRepository<TestDbContext, IdempotentOrder>>();
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<IdempotentOrder>, AdviceAddResourceName<IdempotentOrder>>());
     schema.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataJob>, AdviceAddResourceName<SchemataJob>>());

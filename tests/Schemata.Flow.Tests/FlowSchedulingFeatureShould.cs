@@ -4,11 +4,14 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using Schemata.Abstractions;
 using Schemata.Flow.Scheduling.Features;
 using Schemata.Flow.Scheduling.Runtime;
 using Schemata.Flow.Skeleton.Models;
 using Schemata.Flow.Skeleton.Observers;
 using Schemata.Flow.Skeleton.Runtime;
+using Schemata.Messaging.Skeleton;
+using Schemata.Scheduling.Foundation.Commands;
 using Schemata.Scheduling.Foundation.Runtime;
 using Schemata.Scheduling.Skeleton;
 using Schemata.Scheduling.Skeleton.Entities;
@@ -58,6 +61,14 @@ public sealed class FlowSchedulingFeatureShould
     private static ServiceProvider CreateServices(Mock<IScheduler<SchemataJob, SchemataJobExecution>> scheduler) {
         var services = new ServiceCollection();
         services.AddSingleton(scheduler.Object);
+        var dispatcher = new Mock<IRequestDispatcher>();
+        dispatcher.Setup(d => d.SendAsync<ScheduleJobRequest<SchemataJob>, Unit>(
+                       It.IsAny<ScheduleJobRequest<SchemataJob>>(), It.IsAny<CancellationToken>()))
+                  .Returns(async (ScheduleJobRequest<SchemataJob> request, CancellationToken ct) => {
+                       await scheduler.Object.ScheduleAsync(request.Job, request.Variables, ct);
+                       return Unit.Value;
+                   });
+        services.AddSingleton(dispatcher.Object);
         services.AddSingleton<IScheduledJobRegistry, DefaultScheduledJobRegistry>();
         new SchemataFlowSchedulingFeature<SchemataJob, SchemataJobExecution>().ConfigureServices(
             services, new(), new(), new ConfigurationBuilder().Build(), null!);

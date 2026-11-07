@@ -38,14 +38,12 @@ public sealed class FlowStartProcessHandler(
                 SourceCanonicalName: null,
                 options,
                 principal), ct);
-            request.Dispatch?.MarkCommitted();
             return started;
         }
 
         var command = await sources.CreateRequestAsync(
             request.DefinitionName, request.Source, options, principal, ct);
         var process = await dispatcher.SendAsync<StartProcessCommand, SchemataProcess>(command, ct);
-        request.Dispatch?.MarkCommitted();
         return process;
     }
 }

@@ -6,6 +6,7 @@ using Schemata.Abstractions.Resource;
 using Schemata.Messaging.Skeleton.Advisors;
 using Schemata.Resource.Foundation.Commands;
 using Schemata.Security.Skeleton;
+using Schemata.Validation.Skeleton;
 
 namespace Schemata.Resource.Foundation.Advisors;
 

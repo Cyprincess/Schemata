@@ -87,6 +87,37 @@ public class ResourceGrpcIntegrationShould
         Assert.Equal(created.CanonicalName, fetched.CanonicalName);
     }
 
+    [Theory]
+    [InlineData(null, true, true)]
+    [InlineData("*", true, true)]
+    [InlineData("", false, false)]
+    [InlineData("uid", false, false)]
+    [InlineData("full_name", true, false)]
+    [InlineData("uid,full_name", true, false)]
+    public async Task Update_MaskControlsPersistedBusinessFields(
+        string? mask,
+        bool    updatesName,
+        bool    replacesPopulatedFields
+    ) {
+        var (channel, clientFactory) = _factory.CreateGrpcChannelWithClient();
+        var client = channel.CreateGrpcService<IResourceService<Student, Student, Student, Student>>(clientFactory);
+        var original = $"Mask-{Guid.NewGuid():n}";
+        var created = await client.CreateAsync(new() { FullName = original, Age = 7, Grade = 3 });
+        Assert.NotNull(created);
+
+        var updated = await client.UpdateAsync(new() {
+            CanonicalName = created.CanonicalName, FullName = "Changed", Age = 42, Grade = 9, UpdateMask = mask,
+        });
+
+        Assert.NotNull(updated);
+        var fetched = await client.GetAsync(new() { CanonicalName = created.CanonicalName });
+        Assert.Equal(updatesName ? "Changed" : original, fetched.FullName);
+        Assert.Equal(replacesPopulatedFields ? 42 : 7, fetched.Age);
+        Assert.Equal(replacesPopulatedFields ? 9 : 3, fetched.Grade);
+        Assert.Equal(created.Uid, fetched.Uid);
+        Assert.Equal(created.CanonicalName, fetched.CanonicalName);
+    }
+
     [Fact]
     public async Task Delete_MissingStudent_WithAllowMissing_Succeeds() {
         var (channel, clientFactory) = _factory.CreateGrpcChannelWithClient();
