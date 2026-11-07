@@ -19,7 +19,6 @@ using Schemata.Abstractions.Exceptions;
 using Schemata.Core;
 using Schemata.Core.Features;
 using Schemata.Core.Json;
-using Schemata.Core.State;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -294,24 +293,6 @@ public static class ServiceCollectionExtensions
                     (provider, _) => native.ImplementationFactory!(provider), native.Lifetime);
 
         services.Add(new ServiceDescriptor(typeof(IControllerFactory), sp => Compose<IControllerFactory>(sp, key), native.Lifetime));
-
-        return services;
-    }
-
-    /// <summary>
-    ///     Registers the single state branch provider over the collection, running every
-    ///     <see cref="IStatePipelineValidator" /> once before the provider is created.
-    /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddStatePipelineProvider(this IServiceCollection services) {
-        services.TryAddSingleton<IStatePipelineProvider>(sp => {
-            foreach (var validator in sp.GetServices<IStatePipelineValidator>()) {
-                validator.Validate();
-            }
-
-            return new DefaultStatePipelineProvider(sp);
-        });
 
         return services;
     }

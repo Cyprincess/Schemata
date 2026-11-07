@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
@@ -43,18 +44,13 @@ public static class AdviceResultCache
 public class AdviceResultCache<TEntity, TResult, T> : IRepositoryResultAdvisor<TEntity, TResult, T>
     where TEntity : class
 {
-    private readonly ICacheProvider                _cache;
     private readonly IOptions<SchemataQueryCacheOptions> _options;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="AdviceResultCache{TEntity, TResult, T}" /> class.
     /// </summary>
-    /// <param name="cache">The cache provider holding query results and generation metadata.</param>
     /// <param name="options">The query cache options.</param>
-    public AdviceResultCache(ICacheProvider cache, IOptions<SchemataQueryCacheOptions> options) {
-        _cache   = cache;
-        _options = options;
-    }
+    public AdviceResultCache(IOptions<SchemataQueryCacheOptions> options) { _options = options; }
 
     #region IRepositoryResultAdvisor<TEntity,TResult,T> Members
 
@@ -79,7 +75,8 @@ public class AdviceResultCache<TEntity, TResult, T> : IRepositoryResultAdvisor<T
 
         var ttl   = _options.Value.Ttl;
         var bytes = JsonSerializer.SerializeToUtf8Bytes(context.Result);
-        await _cache.SetAsync(key, bytes, new() {
+        var cache = ctx.ServiceProvider.GetRequiredService<ICacheProvider>();
+        await cache.SetAsync(key, bytes, new() {
             AbsoluteExpirationRelativeToNow = ttl,
         }, ct);
 

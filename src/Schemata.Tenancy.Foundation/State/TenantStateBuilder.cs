@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Session;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Schemata.Core.State;
 using Schemata.Tenancy.Skeleton.Entities;
 
 namespace Schemata.Tenancy.Foundation.State;
@@ -118,7 +117,7 @@ public sealed class TenantStateBuilder<TTenant>
     /// <summary>
     ///     Declares the tenant-owned session capability: a closed native session graph in the
     ///     tenant collection and the native <c>UseSession</c> branch of
-    ///     <see cref="DefaultStatePipelineProvider" /> bound to <typeparamref name="TStore" />,
+    ///     <see cref="DefaultTenantStatePipelineProvider" /> bound to <typeparamref name="TStore" />,
     ///     whose dependencies resolve from this closure. The session-id cookie is named
     ///     <c>CookiePrefix + SessionDefaults.CookieName</c> and protected by the profile's
     ///     fixed data protection provider, so a cookie or session identifier issued by
@@ -153,7 +152,7 @@ public sealed class TenantStateBuilder<TTenant>
     ///     Declares the tenant-owned antiforgery capability: the native antiforgery service
     ///     graph transplanted from the public <c>AddAntiforgery</c> registration into this
     ///     closure, plus the native <c>UseAntiforgery</c> branch of
-    ///     <see cref="DefaultStatePipelineProvider" />, so endpoint metadata validation and
+    ///     <see cref="DefaultTenantStatePipelineProvider" />, so endpoint metadata validation and
     ///     direct <see cref="IAntiforgery" /> consumers resolve the profile's protector and
     ///     cookie namespace. The antiforgery cookie is named
     ///     <c>CookiePrefix +</c> the native name derived from the application discriminator,

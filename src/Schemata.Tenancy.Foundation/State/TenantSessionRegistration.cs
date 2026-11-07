@@ -4,15 +4,14 @@ using Microsoft.AspNetCore.Session;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Schemata.Core.State;
 
 namespace Schemata.Tenancy.Foundation.State;
 
 /// <summary>
 ///     Registers the native session capability of one tenant profile inside the tenant
 ///     collection: closed <see cref="SessionOptions" /> services, the declared
-///     <see cref="ISessionStore" />, and a fixed <see cref="DefaultStatePipelineProvider" />
-///     over the tenant services, so <c>UseStatePipeline(Session)</c> builds the native
+///     <see cref="ISessionStore" />, and a fixed <see cref="DefaultTenantStatePipelineProvider" />
+///     over the tenant services, so <c>UseTenantStatePipeline(Session)</c> builds the native
 ///     <c>SessionMiddleware</c> branch from this closure. The branch derives its session-id
 ///     cookie protector from the profile's fixed data protection provider, and its cookie is
 ///     named <c>CookiePrefix + SessionDefaults.CookieName</c>, so a session identifier issued
@@ -40,6 +39,6 @@ internal static class TenantSessionRegistration
             }));
 
         services.TryAddTransient<ISessionStore, TStore>();
-        services.AddStatePipelineProvider();
+        services.AddTenantStatePipelineProvider();
     }
 }

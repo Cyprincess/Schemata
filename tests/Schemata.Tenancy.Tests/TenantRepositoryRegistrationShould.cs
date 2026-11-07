@@ -120,7 +120,6 @@ public sealed class TenantRepositoryRegistrationShould
         using var provider = BindingProvider(TenantUid);
         var advisor        = new AdviceAddTenant<Row>();
         var row            = new Row { TenantUid = OtherUid };
-        using var ambient  = TenantContext.Enter(new(OtherUid));
 
         Assert.Equal(AdviseResult.Continue,
             await advisor.AdviseAsync(new(provider), new Mock<IRepository<Row>>().Object, row, default));
@@ -209,7 +208,7 @@ public sealed class TenantRepositoryRegistrationShould
         where TEntity : class
     {
         public AdviceContext AdviceContext => throw new NotSupportedException();
-        public IUnitOfWork Begin() => throw new NotSupportedException();
+        public IUnitOfWork Begin(System.Data.IsolationLevel? isolationLevel = null) => throw new NotSupportedException();
         public void Join(IUnitOfWork uow) => throw new NotSupportedException();
         public Task CommitAsync(System.Threading.CancellationToken ct = default) => throw new NotSupportedException();
         public void Dispose() { }

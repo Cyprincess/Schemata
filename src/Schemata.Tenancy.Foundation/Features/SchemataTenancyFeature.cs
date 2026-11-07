@@ -1,5 +1,5 @@
-using Microsoft.AspNetCore.Mvc.Controllers;
 using System;
+using System.Linq;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Builder;
@@ -16,6 +16,7 @@ using Schemata.Tenancy.Foundation.Services;
 using Schemata.Tenancy.Foundation.State;
 using Schemata.Tenancy.Skeleton;
 using Schemata.Tenancy.Skeleton.Entities;
+using Schemata.Tenancy.Skeleton.Tenancy;
 using static Schemata.Abstractions.SchemataConstants;
 
 namespace Schemata.Tenancy.Foundation.Features;
@@ -54,10 +55,32 @@ public sealed class SchemataTenancyFeature<TManager, TTenant, TTenantHost> : Fea
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
+        var usesState = false;
+        if (schemata.GetFeatures() is { } features) {
+            foreach (var key in features.Keys.ToArray()) {
+                var feature = features[key];
+                if (feature is SchemataAntiforgeryFeature antiforgery) {
+                    features[key] = new TenantAntiforgeryFeature(antiforgery);
+                    usesState     = true;
+                    continue;
+                }
+
+                var type = feature.GetType();
+                if (!type.IsGenericType || type.GetGenericTypeDefinition() != typeof(SchemataSessionFeature<>)) continue;
+
+                var wrapper = typeof(TenantSessionFeature<>).MakeGenericType(type.GenericTypeArguments);
+                if (Activator.CreateInstance(wrapper, feature) is not ISimpleFeature tenant) {
+                    throw new InvalidOperationException($"Could not create the tenant state wrapper for '{type}'.");
+                }
+                features[key] = tenant;
+                usesState     = true;
+            }
+        }
+        if (usesState) services.AddTenantStatePipelineProvider();
+
         services.AddOptions<SchemataTenancyOptions>();
-        services.Configure<Microsoft.AspNetCore.Mvc.MvcOptions>(options => options.Filters.Add(new TenantExecutionFilter()));
+        services.TryAdd(ServiceDescriptor.Scoped(typeof(TenantIdentity), _ => TenantIdentity.Host));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IDecorator<IPolicyEvaluator>, TenantPolicyEvaluatorDecorator>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IDecorator<IControllerFactory>, TenantControllerFactoryDecorator>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IPostConfigureOptions<Microsoft.AspNetCore.RateLimiting.RateLimiterOptions>, TenantQuotaOptions>());
         services.TryAddScoped<CreateTenantHandler<TTenant, TTenantHost>>();
         services.TryAddScoped<UpdateTenantHandler<TTenant, TTenantHost>>();

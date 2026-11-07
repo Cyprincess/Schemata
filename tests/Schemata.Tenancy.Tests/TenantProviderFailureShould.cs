@@ -36,7 +36,7 @@ public class TenantProviderFailureShould
         var manager = new Mock<ITenantManager<SchemataTenant>>();
         manager.Setup(value => value.FindByTenantId(tenant.Uid, It.IsAny<CancellationToken>())).ReturnsAsync(tenant);
         await using var root = new ServiceCollection().AddSingleton(manager.Object).BuildServiceProvider();
-        using var cache = new MemoryCacheTenantProviderCache(Options.Create(new SchemataTenancyOptions()));
+        await using var cache = new MemoryCacheTenantProviderCache(Options.Create(new SchemataTenancyOptions()));
         var singleton = new Mock<IDisposable>();
         var options = new SchemataTenancyOptions();
         options.DynamicOverrides.Add((_, _, _) => throw failure);
@@ -51,8 +51,8 @@ public class TenantProviderFailureShould
         Assert.Same(singleton.Object, lease.Provider.GetRequiredService<IDisposable>());
         await cache.RemoveAsync(tenant.Uid.ToString());
         singleton.Verify(value => value.Dispose(), Times.Never);
-        lease.Dispose();
-        lease.Dispose();
+        await lease.DisposeAsync();
+        await lease.DisposeAsync();
         singleton.Verify(value => value.Dispose(), Times.Once);
     }
 }

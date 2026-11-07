@@ -15,9 +15,9 @@ namespace Schemata.Tenancy.Skeleton;
 ///     <para>
 ///         Disposal is idempotent in both forms, so repeated disposal leaves the active
 ///         lease tally consistent. <see cref="IAsyncDisposable.DisposeAsync" /> awaits
-///         asynchronous provider disposal. <see cref="IDisposable.Dispose" /> backs shutdown
-///         and scope teardown; it blocks on asynchronous disposal when the provider only
-///         implements <see cref="IAsyncDisposable" />.
+///         asynchronous provider disposal. <see cref="IDisposable.Dispose" /> preserves synchronous
+///         disposal exceptions and throws <see cref="InvalidOperationException" /> for an async-only
+///         provider, with an instruction to call <see cref="IAsyncDisposable.DisposeAsync" />.
 ///     </para>
 /// </remarks>
 public interface ITenantProviderLease : IDisposable, IAsyncDisposable

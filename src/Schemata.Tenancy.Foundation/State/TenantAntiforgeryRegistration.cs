@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.ObjectPool;
 using Microsoft.Extensions.Options;
-using Schemata.Core.State;
 
 namespace Schemata.Tenancy.Foundation.State;
 
@@ -20,8 +19,8 @@ namespace Schemata.Tenancy.Foundation.State;
 ///     standalone collection is not transplanted: the fixed tenant provider registered by
 ///     <c>UseState</c> precedes this closure, so the transplanted token serializer derives its
 ///     protector from the profile's purpose chain. A fixed
-///     <see cref="DefaultStatePipelineProvider" /> over the tenant services lets the
-///     <c>UseStatePipeline(Antiforgery)</c> selection build the native middleware branch from
+///     <see cref="DefaultTenantStatePipelineProvider" /> over the tenant services lets the
+///     <c>UseTenantStatePipeline(Antiforgery)</c> selection build the native middleware branch from
 ///     this graph.
 /// </summary>
 internal static class TenantAntiforgeryRegistration
@@ -63,8 +62,8 @@ internal static class TenantAntiforgeryRegistration
         // The state branch is contributed once by the shared provider registration; this
         // capability's host boundary is enforced by a validator that runs when the provider is
         // created, independent of the order capabilities are declared in.
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IStatePipelineValidator>(new TenantAntiforgeryStateValidator(profile, host)));
-        services.AddStatePipelineProvider();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<ITenantStatePipelineValidator>(new TenantAntiforgeryStateValidator(profile, host)));
+        services.AddTenantStatePipelineProvider();
     }
 
     private static bool IsCapabilityOwned(Type serviceType) {

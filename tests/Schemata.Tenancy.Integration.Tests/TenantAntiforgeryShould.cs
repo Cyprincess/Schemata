@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -11,19 +12,11 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Moq;
-using Schemata.Core;
-using Schemata.Core.Features;
-using Schemata.Core.State;
 using Schemata.Tenancy.Foundation;
-using Schemata.Tenancy.Foundation.Features;
-using Schemata.Tenancy.Foundation.Middlewares;
-using Schemata.Tenancy.Foundation.Resolvers;
 using Schemata.Tenancy.Foundation.Services;
 using Schemata.Tenancy.Foundation.State;
 using Schemata.Tenancy.Skeleton;
@@ -39,6 +32,29 @@ public sealed class TenantAntiforgeryShould
 
     private static readonly Guid TenantA = new("11111111-1111-1111-1111-111111111111");
     private static readonly Guid TenantB = new("22222222-2222-2222-2222-222222222222");
+
+    [Fact]
+    public async Task Protected_Posts_Use_One_Native_Branch_From_The_Fixed_Profile_Provider() {
+        var observations = new AntiforgeryBranchObservations();
+        using var host    = await CreateServerAsync(StandardState(), observations: observations);
+        using var handler = Client(host);
+        using var client  = CreateClient(handler);
+
+        var (tokenA, cookiesA)           = await EstablishAsync(client, "A");
+        var (tokenB, cookiesB)           = await EstablishAsync(client, "B");
+        var (tokenGlobal, cookiesGlobal) = await EstablishAsync(client, "global");
+
+        Assert.Single(cookiesA, value => value.StartsWith(".a" + AntiforgeryOptions.DefaultCookiePrefix, StringComparison.Ordinal));
+        Assert.Single(cookiesB, value => value.StartsWith(".b" + AntiforgeryOptions.DefaultCookiePrefix, StringComparison.Ordinal));
+        Assert.Single(cookiesGlobal, value => value.StartsWith(AntiforgeryOptions.DefaultCookiePrefix, StringComparison.Ordinal));
+
+        Assert.Equal(HttpStatusCode.OK, await SubmitAsync(client, "A", "metadata", tokenA));
+        Assert.Equal(HttpStatusCode.OK, await SubmitAsync(client, "B", "metadata", tokenB));
+        Assert.Equal(HttpStatusCode.OK, await SubmitAsync(client, "global", "metadata", tokenGlobal));
+        Assert.Equal(1, observations.ValidationCount("A"));
+        Assert.Equal(1, observations.ValidationCount("B"));
+        Assert.Equal(1, observations.ValidationCount("global"));
+    }
 
     [Fact]
     public async Task Token_Pair_Issued_By_A_Profile_Only_Validates_Within_Its_Own_Branch() {
@@ -116,12 +132,20 @@ public sealed class TenantAntiforgeryShould
     }
 
     [Fact]
-    public async Task Tenant_Branch_Without_Global_Antiforgery_Registration_Fails_Loudly() {
-        using var host    = await CreateServerAsync(StandardState(), globalFeature: false);
-        using var handler = Client(host);
-        using var client  = CreateClient(handler);
+    public async Task Tenant_State_Without_Global_Antiforgery_Registration_Fails_Loudly() {
+        var tenant  = new SchemataTenant { Uid = TenantA, Timestamp = Guid.NewGuid() };
+        var manager = new Mock<ITenantManager<SchemataTenant>>();
+        manager.Setup(value => value.FindByTenantId(TenantA, It.IsAny<CancellationToken>())).ReturnsAsync(tenant);
+        var services = new ServiceCollection();
+        services.AddSingleton(manager.Object);
+        services.AddDataProtection();
+        new SchemataTenancyBuilder<SchemataTenant>(services).UseState(StandardState());
+        await using var root     = services.BuildServiceProvider();
+        var             tenancy  = root.GetRequiredService<IOptions<SchemataTenancyOptions>>();
+        var             providers = new SchemataTenantServiceProviderFactory<SchemataTenant>(root, new MemoryCacheTenantProviderCache(tenancy), tenancy);
 
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => client.GetAsync("/A/af/token"));
+        await using var scope = await new SchemataTenantServiceScopeFactory<SchemataTenant>(root, providers).CreateAsync(new(tenant.Uid));
+        var error = Assert.Throws<InvalidOperationException>(() => scope.ServiceProvider.GetRequiredService<ITenantStatePipelineProvider>());
         Assert.Contains("antiforgery", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -199,7 +223,7 @@ public sealed class TenantAntiforgeryShould
 
     private static async Task<IHost> CreateServerAsync(
         Action<TenantStateBuilder<SchemataTenant>> state,
-        bool                                       globalFeature = true
+        AntiforgeryBranchObservations?             observations = null
     ) {
         var a = new SchemataTenant { Uid = TenantA, Timestamp = Guid.NewGuid() };
         var b = new SchemataTenant { Uid = TenantB, Timestamp = Guid.NewGuid() };
@@ -207,33 +231,24 @@ public sealed class TenantAntiforgeryShould
         manager.Setup(value => value.FindByTenantId(TenantA, It.IsAny<CancellationToken>())).ReturnsAsync(a);
         manager.Setup(value => value.FindByTenantId(TenantB, It.IsAny<CancellationToken>())).ReturnsAsync(b);
 
-        return await new HostBuilder().ConfigureWebHost(web => web.UseTestServer().ConfigureServices(services => {
-            services.AddRouting();
+        return await new HostBuilder().ConfigureWebHost(web => web.UseTestServer().ConfigureServices((context, services) => {
             services.AddHttpContextAccessor();
             services.AddSingleton(manager.Object);
-            services.AddScoped<ITenantResolver, RequestHeaderResolver>();
-            if (globalFeature) {
-                var configurators = new Configurators();
-                configurators.Set<AntiforgeryOptions>(_ => { });
-                new SchemataAntiforgeryFeature().ConfigureServices(services, new(), configurators, new ConfigurationBuilder().Build(), null!);
-            } else {
-                services.AddDataProtection();
-                services.TryAddSingleton<IStatePipelineProvider, DefaultStatePipelineProvider>();
+            services.AddSchemata(context.Configuration, context.HostingEnvironment, schema => {
+                schema.UseRouting();
+                schema.UseAntiforgery();
+                var tenancy = schema.UseTenancy<SchemataTenant>().UseHeaderResolver();
+                tenancy.UseState(tenant => {
+                    state(tenant);
+                    if (observations is not null) {
+                        RecordingAntiforgery.Decorate(tenant.Services, tenant.TenantUid == TenantA ? "A" : "B", observations);
+                    }
+                });
+            });
+            if (observations is not null) {
+                RecordingAntiforgery.Decorate(services, "global", observations);
             }
-            new SchemataTenancyFeature<SchemataTenantManager<SchemataTenant, SchemataTenantHost>, SchemataTenant, SchemataTenantHost>()
-                .ConfigureServices(services, new(), new(), new ConfigurationBuilder().Build(), null!);
-            var builder = new SchemataTenancyBuilder<SchemataTenant>(services);
-            builder.UseState(state);
         }).Configure(app => {
-            app.UseRouting();
-            app.UseMiddleware<SchemataTenancyMiddleware<SchemataTenant>>();
-            app.UseMiddleware<SchemataTenantPrincipalMiddleware<SchemataTenant>>();
-            app.UseMiddleware<TenantExecutionMiddleware>();
-            if (globalFeature) {
-                new SchemataAntiforgeryFeature().ConfigureApplication(app, new ConfigurationBuilder().Build(), null!);
-            } else {
-                app.UseStatePipeline(StatePipeline.Antiforgery);
-            }
             app.UseEndpoints(endpoints => {
                 MapAntiforgery(endpoints, "global");
                 MapAntiforgery(endpoints, "A");
@@ -296,6 +311,51 @@ public sealed class TenantAntiforgeryShould
         if (requestToken is not null) request.Headers.Add(HeaderName, requestToken);
         using var response = await client.SendAsync(request);
         return response.StatusCode;
+    }
+
+    private sealed class RecordingAntiforgery(IAntiforgery inner, string scope, AntiforgeryBranchObservations observations) : IAntiforgery
+    {
+        public AntiforgeryTokenSet GetAndStoreTokens(HttpContext httpContext) {
+            return inner.GetAndStoreTokens(httpContext);
+        }
+
+        public AntiforgeryTokenSet GetTokens(HttpContext httpContext) {
+            return inner.GetTokens(httpContext);
+        }
+
+        public Task<bool> IsRequestValidAsync(HttpContext httpContext) {
+            return inner.IsRequestValidAsync(httpContext);
+        }
+
+        public Task ValidateRequestAsync(HttpContext httpContext) {
+            observations.Validations.AddOrUpdate(scope, 1, (_, count) => count + 1);
+            return inner.ValidateRequestAsync(httpContext);
+        }
+
+        public void SetCookieTokenAndHeader(HttpContext httpContext) {
+            inner.SetCookieTokenAndHeader(httpContext);
+        }
+
+        public static void Decorate(IServiceCollection services, string scope, AntiforgeryBranchObservations observations) {
+            var descriptor = services.Last(value => value.ServiceType == typeof(IAntiforgery));
+            services.Remove(descriptor);
+            services.Add(ServiceDescriptor.Describe(typeof(IAntiforgery), provider => {
+                var inner = descriptor.ImplementationInstance is IAntiforgery instance ? instance
+                    : descriptor.ImplementationFactory is { } create ? (IAntiforgery)create(provider)
+                    : descriptor.ImplementationType is { } type ? (IAntiforgery)ActivatorUtilities.CreateInstance(provider, type)
+                    : throw new InvalidOperationException("The native antiforgery descriptor has no implementation.");
+                return new RecordingAntiforgery(inner, scope, observations);
+            }, descriptor.Lifetime));
+        }
+    }
+
+    private sealed class AntiforgeryBranchObservations
+    {
+        public ConcurrentDictionary<string, int> Validations { get; } = new(StringComparer.Ordinal);
+
+        public int ValidationCount(string scope) {
+            return Validations.TryGetValue(scope, out var count) ? count : 0;
+        }
     }
 
     private sealed class TenantClientHandler : DelegatingHandler

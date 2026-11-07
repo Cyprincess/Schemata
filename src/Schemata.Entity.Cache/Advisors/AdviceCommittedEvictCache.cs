@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions.Advisors;
 using Schemata.Caching.Skeleton;
 using Schemata.Entity.Repository;
@@ -27,14 +28,6 @@ public static class AdviceCommittedEvictCache
 public sealed class AdviceCommittedEvictCache<TEntity> : IRepositoryCommittedAdvisor<TEntity>
     where TEntity : class
 {
-    private readonly ICacheProvider _cache;
-
-    /// <summary>
-    ///     Initializes a cache-eviction advisor with the cache provider holding generation metadata.
-    /// </summary>
-    /// <param name="cache">The cache provider containing query results and generation metadata.</param>
-    public AdviceCommittedEvictCache(ICacheProvider cache) { _cache = cache; }
-
     public int Order => AdviceCommittedEvictCache.DefaultOrder;
 
     public async Task<AdviseResult> AdviseAsync(
@@ -53,7 +46,8 @@ public sealed class AdviceCommittedEvictCache<TEntity> : IRepositoryCommittedAdv
             return AdviseResult.Continue;
         }
 
-        await _cache.SetAsync(CacheGeneration<TEntity>.GenerationKey(sourceKey), Guid.NewGuid().ToByteArray(), new(), ct);
+        var cache = ctx.ServiceProvider.GetRequiredService<ICacheProvider>();
+        await cache.SetAsync(CacheGeneration<TEntity>.GenerationKey(sourceKey), Guid.NewGuid().ToByteArray(), new(), ct);
 
         return AdviseResult.Continue;
     }

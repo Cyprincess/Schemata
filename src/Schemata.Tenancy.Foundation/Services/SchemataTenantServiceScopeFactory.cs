@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -63,31 +64,31 @@ public class SchemataTenantServiceScopeFactory<TTenant> : ITenantServiceScopeFac
         public IServiceProvider ServiceProvider => _inner.ServiceProvider;
 
         public void Dispose() {
-            if (Interlocked.Exchange(ref _disposed, 1) != 0) {
-                return;
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0) return;
+            Exception? failure = null;
+            try { _inner.Dispose(); }
+            catch (Exception error) { failure = error; }
+            try { _lease.Dispose(); }
+            catch (Exception cleanup) {
+                Interlocked.Exchange(ref _disposed, 2);
+                failure = failure is null ? cleanup : new AggregateException(failure, cleanup);
             }
-
-            try {
-                _inner.Dispose();
-            } finally {
-                _lease.Dispose();
-            }
+            if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
         }
 
         public async ValueTask DisposeAsync() {
-            if (Interlocked.Exchange(ref _disposed, 1) != 0) {
-                return;
+            var previous = Interlocked.Exchange(ref _disposed, 1);
+            if (previous == 1) return;
+            Exception? failure = null;
+            if (previous == 0) {
+                try {
+                    if (_inner is IAsyncDisposable inner) await inner.DisposeAsync();
+                    else _inner.Dispose();
+                } catch (Exception error) { failure = error; }
             }
-
-            try {
-                if (_inner is IAsyncDisposable inner) {
-                    await inner.DisposeAsync();
-                } else {
-                    _inner.Dispose();
-                }
-            } finally {
-                await _lease.DisposeAsync();
-            }
+            try { await _lease.DisposeAsync(); }
+            catch (Exception cleanup) { failure = failure is null ? cleanup : new AggregateException(failure, cleanup); }
+            if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
         }
 
         #endregion

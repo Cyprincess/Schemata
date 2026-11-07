@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Schemata.Abstractions;
 using Schemata.Abstractions.Advisors;
 using Schemata.Caching.Skeleton;
@@ -39,14 +40,6 @@ public static class AdviceQueryCache
 public sealed class AdviceQueryCache<TEntity, TResult, T> : IRepositoryQueryAdvisor<TEntity, TResult, T>
     where TEntity : class
 {
-    private readonly ICacheProvider _cache;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="AdviceQueryCache{TEntity, TResult, T}" /> class.
-    /// </summary>
-    /// <param name="cache">The cache provider holding query results and generation metadata.</param>
-    public AdviceQueryCache(ICacheProvider cache) { _cache = cache; }
-
     #region IRepositoryQueryAdvisor<TEntity,TResult,T> Members
 
     public int Order => AdviceQueryCache.DefaultOrder;
@@ -66,12 +59,13 @@ public sealed class AdviceQueryCache<TEntity, TResult, T> : IRepositoryQueryAdvi
         }
 
         var sourceKey = context.Repository is IRepositorySource source ? source.SourceKey : null;
-        var key = await CacheGeneration<TEntity>.CaptureAsync(_cache, context, queryKey, sourceKey, ct);
+        var cache = ctx.ServiceProvider.GetRequiredService<ICacheProvider>();
+        var key = await CacheGeneration<TEntity>.CaptureAsync(cache, context, queryKey, sourceKey, ct);
         if (string.IsNullOrWhiteSpace(key)) {
             return AdviseResult.Continue;
         }
 
-        var bytes = await _cache.GetAsync(key, ct);
+        var bytes = await cache.GetAsync(key, ct);
         if (bytes is null) {
             return AdviseResult.Continue;
         }

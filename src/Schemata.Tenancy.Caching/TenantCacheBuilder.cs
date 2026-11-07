@@ -8,8 +8,8 @@ using Schemata.Tenancy.Skeleton.Entities;
 namespace Schemata.Tenancy.Caching;
 
 /// <summary>
-///     Registration-only builder handed to <see cref="TenantCacheExtensions.UseCache{TTenant}" />
-///     callbacks while a tenant service collection is composed. One cache mode per tenant outlet:
+///     Registration-only builder handed to <see cref="TenantCacheExtensions" /> callbacks while a
+///     tenant service collection is composed. One cache mode per tenant outlet:
 ///     <see cref="UseShared" /> borrows an application-owned backend that no container disposes,
 ///     <see cref="UseDedicated" /> hands the created backend to the tenant provider, which disposes
 ///     it only after the retired provider's last lease is released. Repeating the identical
@@ -52,7 +52,7 @@ public sealed class TenantCacheBuilder<TTenant>
     }
 
     private void AddOutlet() {
-        var normalizer = new TenantCacheKeyNormalizer(TenantUid);
+        var normalizer = new TenantCacheKeyNormalizer(new(TenantUid));
         Services.TryAddSingleton<ICacheProvider>(sp => new CacheProvider(
             sp.GetRequiredService<ICacheBackend>(),
             normalizer));

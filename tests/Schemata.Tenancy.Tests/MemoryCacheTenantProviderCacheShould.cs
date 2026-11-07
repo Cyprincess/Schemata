@@ -144,15 +144,31 @@ public class MemoryCacheTenantProviderCacheShould
     }
 
     [Fact]
-    public async Task Shutdown_Disposes_Async_Only_Provider_Through_Async_Disposal() {
-        using var cache = BuildCache();
+    public async Task Synchronous_Shutdown_Rejects_An_Async_Only_Provider_Without_Disposing_It() {
+        var cache = BuildCache();
         var mock = new Mock<IServiceProvider>();
         var asynchronous = mock.As<IAsyncDisposable>();
         asynchronous.Setup(d => d.DisposeAsync()).Returns(ValueTask.CompletedTask);
 
         (await cache.LeaseVersionAsync("t1", Guid.Empty, () => mock.Object)).Dispose();
 
-        cache.Dispose();
+        var error = Assert.Throws<InvalidOperationException>(() => cache.Dispose());
+
+        Assert.Contains(mock.Object.GetType().Name, error.Message, StringComparison.Ordinal);
+        Assert.Contains("DisposeAsync", error.Message, StringComparison.Ordinal);
+        asynchronous.Verify(d => d.DisposeAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task Asynchronous_Shutdown_Disposes_An_Async_Only_Provider_Exactly_Once() {
+        await using var cache = BuildCache();
+        var mock = new Mock<IServiceProvider>();
+        var asynchronous = mock.As<IAsyncDisposable>();
+        asynchronous.Setup(d => d.DisposeAsync()).Returns(ValueTask.CompletedTask);
+
+        (await cache.LeaseVersionAsync("t1", Guid.Empty, () => mock.Object)).Dispose();
+
+        await cache.DisposeAsync();
 
         asynchronous.Verify(d => d.DisposeAsync(), Times.Once);
     }

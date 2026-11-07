@@ -109,8 +109,10 @@ public class MemoryCacheTenantProviderCacheLeaseShould
         provider.As<IDisposable>().Verify(value => value.Dispose(), Times.Once);
     }
 
-    [Fact]
-    public async Task Sync_Lease_Disposal_Disposes_Dual_Interface_Provider_With_Async_Only_Service() {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Synchronous_Lease_Disposal_Rejects_A_Composed_Async_Only_Service(bool shutdown) {
         const string id = "22222222-2222-2222-2222-222222222222";
         var singleton = new Mock<IAsyncDisposable>();
         singleton.Setup(disposable => disposable.DisposeAsync()).Returns(ValueTask.CompletedTask);
@@ -125,12 +127,18 @@ public class MemoryCacheTenantProviderCacheLeaseShould
         var lease = await factory.CreateServiceProviderAsync(tenant.Uid);
         _ = lease.Provider.GetRequiredService<IAsyncDisposable>();
 
-        await cache.RemoveAsync(tenant.Uid.ToString());
+        if (shutdown) cache.Dispose();
+        else await cache.RemoveAsync(tenant.Uid.ToString());
         singleton.Verify(disposable => disposable.DisposeAsync(), Times.Never);
 
-        lease.Dispose();
-        lease.Dispose();
+        var error = Assert.Throws<InvalidOperationException>(() => lease.Dispose());
+        Assert.Throws<InvalidOperationException>(() => lease.Dispose());
 
+        Assert.Contains("DisposeAsync", error.Message, StringComparison.Ordinal);
+        singleton.Verify(disposable => disposable.DisposeAsync(), Times.Never);
+        await lease.DisposeAsync();
+        await lease.DisposeAsync();
+        await cache.DisposeAsync();
         singleton.Verify(disposable => disposable.DisposeAsync(), Times.Once);
     }
 
@@ -265,6 +273,7 @@ public class MemoryCacheTenantProviderCacheLeaseShould
         _ = first.Provider.GetRequiredService<IAsyncDisposable>();
         using var replacement = await cache.LeaseVersionAsync("replacement", Guid.Empty, BuildProvider);
 
+        Assert.Throws<InvalidOperationException>(() => first.Dispose());
         await first.DisposeAsync();
 
         singleton.Verify(disposable => disposable.DisposeAsync(), Times.Once);
@@ -467,6 +476,63 @@ public class MemoryCacheTenantProviderCacheLeaseShould
         lease.Dispose();
         current.As<IDisposable>().Verify(value => value.Dispose(), Times.Once);
         retired.As<IDisposable>().Verify(value => value.Dispose(), Times.Once);
+    }
+
+    [Fact]
+    public async Task Cache_Async_Shutdown_Recovers_A_Rejected_Synchronous_Shutdown_Exactly_Once() {
+        var provider = DisposableProvider(asynchronous: true);
+        var cache = BuildCache();
+        var lease = await cache.LeaseVersionAsync("async", Guid.Empty, () => provider.Object);
+        lease.Dispose();
+        Assert.Throws<InvalidOperationException>(() => cache.Dispose());
+        provider.As<IAsyncDisposable>().Verify(value => value.DisposeAsync(), Times.Never);
+
+        await cache.DisposeAsync();
+        await cache.DisposeAsync();
+        await lease.DisposeAsync();
+
+        provider.As<IAsyncDisposable>().Verify(value => value.DisposeAsync(), Times.Once);
+    }
+
+    [Fact]
+    [Trait("Layer", "Unit")]
+    public async Task Rejected_Synchronous_Cleanup_Enters_A_Throwing_Async_Provider_Only_Once() {
+        var failure = new InvalidOperationException("async cleanup failed");
+        var provider = new Mock<IServiceProvider>();
+        provider.As<IAsyncDisposable>().Setup(value => value.DisposeAsync())
+            .Returns(() => new ValueTask(Task.FromException(failure)));
+        var cache = BuildCache();
+        var lease = await cache.LeaseVersionAsync("async", Guid.Empty, () => provider.Object);
+        lease.Dispose();
+        Assert.Throws<InvalidOperationException>(() => cache.Dispose());
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => cache.DisposeAsync().AsTask());
+        Assert.Same(failure, error);
+        await lease.DisposeAsync();
+        await cache.DisposeAsync();
+        await cache.DisposeAsync();
+
+        provider.As<IAsyncDisposable>().Verify(value => value.DisposeAsync(), Times.Once);
+    }
+
+    [Fact]
+    [Trait("Layer", "Unit")]
+    public async Task Pending_Lease_Cannot_Repeat_A_Throwing_Cache_Cleanup_Attempt() {
+        var failure = new InvalidOperationException("async cleanup failed");
+        var provider = new Mock<IServiceProvider>();
+        provider.As<IAsyncDisposable>().Setup(value => value.DisposeAsync())
+            .Returns(() => new ValueTask(Task.FromException(failure)));
+        var cache = BuildCache();
+        var lease = await cache.LeaseVersionAsync("async", Guid.Empty, () => provider.Object);
+        await cache.RemoveAsync("async");
+        Assert.Throws<InvalidOperationException>(() => lease.Dispose());
+
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => cache.DisposeAsync().AsTask()));
+        await lease.DisposeAsync();
+        await lease.DisposeAsync();
+        await cache.DisposeAsync();
+
+        provider.As<IAsyncDisposable>().Verify(value => value.DisposeAsync(), Times.Once);
     }
 
     private static Mock<IServiceProvider> DisposableProvider(Exception? failure = null, bool asynchronous = false) {

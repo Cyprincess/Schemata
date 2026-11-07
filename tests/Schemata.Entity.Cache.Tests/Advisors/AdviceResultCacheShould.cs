@@ -15,6 +15,30 @@ namespace Schemata.Entity.Cache.Tests.Advisors;
 public class AdviceResultCacheShould
 {
     [Fact]
+    public async Task One_Advisor_Uses_The_Cache_From_Each_Invocation_Provider() {
+        using var first = new QueryCacheTestContext();
+        using var second = new QueryCacheTestContext();
+        var firstQuery = first.Query<int>(QueryOperation.Count);
+        var secondQuery = second.Query<int>(QueryOperation.Count);
+        await first.Read(firstQuery);
+        await second.Read(secondQuery);
+        firstQuery.Result = 7;
+        secondQuery.Result = 9;
+        var advisor = new AdviceResultCache<Student, Student, int>(
+            Microsoft.Extensions.Options.Options.Create(first.Options));
+
+        await advisor.AdviseAsync(first.Advice, firstQuery);
+        await advisor.AdviseAsync(second.Advice, secondQuery);
+
+        var firstHit = first.Query<int>(QueryOperation.Count);
+        var secondHit = second.Query<int>(QueryOperation.Count);
+        Assert.Equal(AdviseResult.Handle, await first.Read(firstHit));
+        Assert.Equal(AdviseResult.Handle, await second.Read(secondHit));
+        Assert.Equal(7, firstHit.Result);
+        Assert.Equal(9, secondHit.Result);
+    }
+
+    [Fact]
     public async Task Fill_WithoutQuerySnapshot_DoesNotPublishResult() {
         using var cache = new QueryCacheTestContext();
         await cache.Fill(cache.Query<int>(QueryOperation.Count), 7);

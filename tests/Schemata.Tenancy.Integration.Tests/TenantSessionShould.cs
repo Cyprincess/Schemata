@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -12,21 +13,15 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Session;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Moq;
 using Schemata.Caching.Memory;
 using Schemata.Caching.Skeleton;
-using Schemata.Core.State;
 using Schemata.Tenancy.Caching;
 using Schemata.Tenancy.Foundation;
-using Schemata.Tenancy.Foundation.Features;
-using Schemata.Tenancy.Foundation.Middlewares;
-using Schemata.Tenancy.Foundation.Resolvers;
 using Schemata.Tenancy.Foundation.Services;
 using Schemata.Tenancy.Foundation.State;
 using Schemata.Tenancy.Skeleton;
@@ -46,6 +41,44 @@ public sealed class TenantSessionShould
     private static readonly Guid TenantB = new("22222222-2222-2222-2222-222222222222");
 
     private static readonly TimeSpan IdleTimeout = TimeSpan.FromMinutes(10);
+
+    [Fact]
+    public async Task Concurrent_Global_A_And_B_Requests_Use_One_Fixed_Native_Branch() {
+        var backend       = new MemoryCacheBackend();
+        var observations = new SessionBranchObservations();
+        using var host = await CreateServerAsync(SharedSessionCache(backend), StandardState(), observations);
+
+        var established = await Task.WhenAll(new[] { "global", "A", "B" }
+            .SelectMany(scope => Enumerable.Range(0, 2).Select(index => EstablishIsolatedSessionAsync(host, scope, index))));
+
+        foreach (var (scope, cookies) in established) {
+            var expected = scope switch {
+                "A" => CookieA,
+                "B" => CookieB,
+                _   => CookieName,
+            };
+            Assert.Single(cookies, value => value.StartsWith(expected + "=", StringComparison.Ordinal));
+        }
+
+        Assert.Equal(2, observations.CreateCount("global"));
+        Assert.Equal(2, observations.CreateCount("A"));
+        Assert.Equal(2, observations.CreateCount("B"));
+        Assert.Equal(6, observations.Sessions.Count);
+        Assert.Equal(6, observations.Sessions.Select(observation => observation.Session).Distinct(ReferenceEqualityComparer.Instance).Count());
+        foreach (var scope in new[] { "global", "A", "B" }) {
+            Assert.Equal(2, observations.Sessions.Where(observation => observation.Scope == scope).Select(observation => observation.SessionId).Distinct().Count());
+        }
+
+        using var handler = Client(host);
+        using var client  = CreateClient(handler);
+        foreach (var scope in new[] { "global", "A", "B" }) {
+            await SetSessionAsync(client, scope, "final-" + scope);
+        }
+        foreach (var scope in new[] { "global", "A", "B" }) {
+            Assert.Equal("final-" + scope, await ReadSessionAsync(client, scope));
+            Assert.Equal(4, observations.CreateCount(scope));
+        }
+    }
 
     [Fact]
     public async Task Session_State_Keeps_Global_A_And_B_Isolated_Across_Write_Read_And_Clear() {
@@ -280,7 +313,7 @@ public sealed class TenantSessionShould
         services.AddSingleton(manager.Object);
         services.AddSingleton(host.Object);
         using var root = services.BuildServiceProvider();
-        using var providers = new MemoryCacheTenantProviderCache(options);
+        await using var providers = new MemoryCacheTenantProviderCache(options);
         var factory = new SchemataTenantServiceProviderFactory<SchemataTenant>(root, providers, options);
 
         await using var lease = await factory.CreateServiceProviderAsync(TenantA);
@@ -319,7 +352,8 @@ public sealed class TenantSessionShould
 
     private static async Task<IHost> CreateServerAsync(
         Action<TenantCacheBuilder<SchemataTenant>> cache,
-        Action<TenantStateBuilder<SchemataTenant>> state
+        Action<TenantStateBuilder<SchemataTenant>> state,
+        SessionBranchObservations?                 observations = null
     ) {
         var a = new SchemataTenant { Uid = TenantA, Timestamp = Guid.NewGuid() };
         var b = new SchemataTenant { Uid = TenantB, Timestamp = Guid.NewGuid() };
@@ -327,35 +361,35 @@ public sealed class TenantSessionShould
         manager.Setup(value => value.FindByTenantId(TenantA, It.IsAny<CancellationToken>())).ReturnsAsync(a);
         manager.Setup(value => value.FindByTenantId(TenantB, It.IsAny<CancellationToken>())).ReturnsAsync(b);
 
-        return await new HostBuilder().ConfigureWebHost(web => web.UseTestServer().ConfigureServices(services => {
-            services.AddRouting();
+        return await new HostBuilder().ConfigureWebHost(web => web.UseTestServer().ConfigureServices((context, services) => {
             services.AddHttpContextAccessor();
             services.AddSingleton(manager.Object);
-            services.AddScoped<ITenantResolver, RequestHeaderResolver>();
             services.AddDistributedMemoryCache();
-            services.AddSession();
-            services.TryAddSingleton<IStatePipelineProvider, DefaultStatePipelineProvider>();
-            new SchemataTenancyFeature<SchemataTenantManager<SchemataTenant, SchemataTenantHost>, SchemataTenant, SchemataTenantHost>()
-                .ConfigureServices(services, new(), new(), new ConfigurationBuilder().Build(), null!);
-            var builder = new SchemataTenancyBuilder<SchemataTenant>(services);
-            builder.UseCache(cache);
-            builder.UseState(state);
-        }).Configure(app => {
-            app.UseRouting();
-            app.UseMiddleware<SchemataTenancyMiddleware<SchemataTenant>>();
-            app.UseMiddleware<SchemataTenantPrincipalMiddleware<SchemataTenant>>();
-            app.UseMiddleware<TenantExecutionMiddleware>();
-            app.UseStatePipeline(StatePipeline.Session);
-            app.UseEndpoints(endpoints => {
-                MapSession(endpoints, "global");
-                MapSession(endpoints, "A");
-                MapSession(endpoints, "B");
+            services.AddSchemata(context.Configuration, context.HostingEnvironment, schema => {
+                schema.UseRouting();
+                schema.UseSession<DistributedSessionStore>();
+                var tenancy = schema.UseTenancy<SchemataTenant>().UseHeaderResolver();
+                tenancy.UseCache(cache);
+                tenancy.UseState(tenant => {
+                    state(tenant);
+                    if (observations is not null) {
+                        RecordingSessionStore.Decorate(tenant.Services, tenant.TenantUid == TenantA ? "A" : "B", observations);
+                    }
+                });
             });
-        })).StartAsync();
+            if (observations is not null) {
+                RecordingSessionStore.Decorate(services, "global", observations);
+            }
+        }).Configure(app => app.UseEndpoints(endpoints => {
+            MapSession(endpoints, "global", observations);
+            MapSession(endpoints, "A", observations);
+            MapSession(endpoints, "B", observations);
+        }))).StartAsync();
     }
 
-    private static void MapSession(IEndpointRouteBuilder endpoints, string scope) {
+    private static void MapSession(IEndpointRouteBuilder endpoints, string scope, SessionBranchObservations? observations) {
         endpoints.MapGet($"/{scope}/session/set", async context => {
+            observations?.Sessions.Add((context.Session.Id, context.Session, scope));
             context.Session.SetString("user", context.Request.Query["value"].ToString());
             await context.Response.WriteAsync("ok");
         });
@@ -394,6 +428,13 @@ public sealed class TenantSessionShould
         return response.Headers.TryGetValues("Set-Cookie", out var cookies) ? cookies.ToArray() : [];
     }
 
+    private static async Task<(string Scope, IReadOnlyList<string> Cookies)> EstablishIsolatedSessionAsync(IHost host, string scope, int index) {
+        using var handler = Client(host);
+        using var client  = CreateClient(handler);
+        var cookies = await SetSessionAsync(client, scope, $"{scope}-{index}");
+        return (scope, cookies);
+    }
+
     private static async Task<string> ReadSessionAsync(HttpClient client, string scope) {
         using var response = await client.GetAsync($"/{scope}/session/read");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -419,6 +460,37 @@ public sealed class TenantSessionShould
 
     private static async Task FailSessionAsync(HttpClient client, string scope) {
         await client.GetAsync($"/{scope}/session/fail");
+    }
+
+    private sealed class RecordingSessionStore(ISessionStore inner, string scope, SessionBranchObservations observations) : ISessionStore
+    {
+        public ISession Create(string sessionKey, TimeSpan idleTimeout, TimeSpan ioTimeout, Func<bool> tryEstablishSession, bool isNewSessionKey) {
+            observations.Creates.AddOrUpdate(scope, 1, (_, count) => count + 1);
+            return inner.Create(sessionKey, idleTimeout, ioTimeout, tryEstablishSession, isNewSessionKey);
+        }
+
+        public static void Decorate(IServiceCollection services, string scope, SessionBranchObservations observations) {
+            var descriptor = services.Last(value => value.ServiceType == typeof(ISessionStore));
+            services.Remove(descriptor);
+            services.Add(ServiceDescriptor.Describe(typeof(ISessionStore), provider => {
+                var inner = descriptor.ImplementationInstance is ISessionStore instance ? instance
+                    : descriptor.ImplementationFactory is { } create ? (ISessionStore)create(provider)
+                    : descriptor.ImplementationType is { } type ? (ISessionStore)ActivatorUtilities.CreateInstance(provider, type)
+                    : throw new InvalidOperationException("The native session store descriptor has no implementation.");
+                return new RecordingSessionStore(inner, scope, observations);
+            }, descriptor.Lifetime));
+        }
+    }
+
+    private sealed class SessionBranchObservations
+    {
+        public ConcurrentDictionary<string, int> Creates { get; } = new(StringComparer.Ordinal);
+
+        public ConcurrentBag<(string SessionId, object Session, string Scope)> Sessions { get; } = [];
+
+        public int CreateCount(string scope) {
+            return Creates.TryGetValue(scope, out var count) ? count : 0;
+        }
     }
 
     private sealed class TenantClientHandler : DelegatingHandler

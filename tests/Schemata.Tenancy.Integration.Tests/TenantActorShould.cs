@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json.Serialization;
@@ -51,7 +52,8 @@ public class TenantActorShould
             services.TryAddEnumerable(ServiceDescriptor.Scoped<IRepositoryAddAdvisor<TenantSessionActor>, ActorName>());
             new SchemataTenancyFeature<SchemataTenantManager<SchemataTenant, SchemataTenantHost>, SchemataTenant, SchemataTenantHost>()
                 .ConfigureServices(services, new(), new(), new ConfigurationBuilder().Build(), null!);
-            new SchemataActorBuilder(new(), services).Register<Counter>("counter").UsePersistence();
+            var observations = new List<(Guid? Identity, int Count)>();
+            new SchemataActorBuilder(new(), services).Register<Counter>("counter", observations).UsePersistence();
             services.AddSchemataActor<TenantSessionActor>();
             new SchemataTenancyBuilder<SchemataTenant>(services).UseActor<SchemataTenant, TenantSessionActor>().UseActorPersistence<SchemataTenant, TenantSessionActor>().UseRepositories(builder
                 => builder.Services.AddTransient<IRepository<TenantSessionActor>, EfCoreRepository<Database, TenantSessionActor>>());
@@ -64,32 +66,34 @@ public class TenantActorShould
                 await manager.CreateAsync(a, default);
                 await manager.CreateAsync(b, default);
             }
-            var system = root.GetRequiredService<IActorSystem>();
-            Assert.IsType<TenantActorSystem<TenantSessionActor>>(system);
-            IActorRef first;
-            using (TenantContext.Enter(new(a.Uid))) {
-                first = await system.GetAsync(new("counter", "same"));
-                Assert.Equal(1, await first.AskAsync<Increment, int>(new()));
-                Assert.Equal(2, await first.AskAsync<Increment, int>(new()));
-            }
-            using (TenantContext.Enter(new(b.Uid))) {
-                var second = await system.GetAsync(new("counter", "same"));
-                Assert.NotSame(first, second);
-                Assert.Equal(1, await second.AskAsync<Increment, int>(new()));
-                await Assert.ThrowsAsync<InvalidOperationException>(() => first.AskAsync<Increment, int>(new()).AsTask());
-                await system.StopAsync(second.Id);
-            }
-            using (TenantContext.Enter(new(a.Uid))) {
-                await system.StopAsync(first.Id);
-                var restored = await system.GetAsync(new("counter", "same"));
-                Assert.Equal(3, await restored.AskAsync<Increment, int>(new()));
-                await system.StopAsync(restored.Id);
-            }
+            var scopes = root.GetRequiredService<ITenantServiceScopeFactory<SchemataTenant>>();
+            await using var scopeA = await scopes.CreateAsync(new(a.Uid));
+            await using var scopeB = await scopes.CreateAsync(new(b.Uid));
+            var systemA = scopeA.ServiceProvider.GetRequiredService<IActorSystem>();
+            var systemB = scopeB.ServiceProvider.GetRequiredService<IActorSystem>();
+            Assert.IsType<ScopedTenantActorSystem<TenantSessionActor>>(systemA);
+            Assert.IsType<ScopedTenantActorSystem<TenantSessionActor>>(systemB);
+            var first = await systemA.GetAsync(new("counter", "same"));
+            Assert.Equal(1, await first.AskAsync<Increment, int>(scopeA.ServiceProvider, new(), MessageContexts.Capture(scopeA.ServiceProvider)));
+            Assert.Equal(2, await first.AskAsync<Increment, int>(scopeA.ServiceProvider, new(), MessageContexts.Capture(scopeA.ServiceProvider)));
+            var second = await systemB.GetAsync(new("counter", "same"));
+            Assert.NotSame(first, second);
+            var initial = await second.AskAsync<Increment, int>(scopeB.ServiceProvider, new(), MessageContexts.Capture(scopeB.ServiceProvider));
+            Assert.Equal([(a.Uid, 0), (a.Uid, 1), (b.Uid, 0)], observations);
+            Assert.Equal(1, initial);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => first.AskAsync<Increment, int>(scopeA.ServiceProvider, new(), MessageContexts.Capture(scopeB.ServiceProvider)).AsTask());
+            await Assert.ThrowsAsync<InvalidOperationException>(() => first.AskAsync<Increment, int>(scopeB.ServiceProvider, new()).AsTask());
+            await Assert.ThrowsAsync<InvalidOperationException>(() => first.TellAsync(scopeB.ServiceProvider, new Increment()).AsTask());
+            await systemB.StopAsync(second.Id);
+            await systemA.StopAsync(first.Id);
+            var restored = await systemA.GetAsync(new("counter", "same"));
+            Assert.Equal(3, await restored.AskAsync<Increment, int>(scopeA.ServiceProvider, new(), MessageContexts.Capture(scopeA.ServiceProvider)));
+            await systemA.StopAsync(restored.Id);
 
             // Drain the tenant runtime before the root provider is disposed: stop notifications
             // create a tenant message scope, and a provider disposed under them would surface as a
             // shutdown race instead of a test assertion.
-            await ((IActorSystemLifetime)system).ShutdownAsync(CancellationToken.None);
+            await root.GetRequiredService<IActorSystemLifetime>().ShutdownAsync(CancellationToken.None);
             await using (var verification = root.CreateAsyncScope()) {
                 var rows = await verification.ServiceProvider.GetRequiredService<Database>().Set<TenantSessionActor>().ToListAsync();
                 Assert.Equal(2, rows.Count);
@@ -113,14 +117,14 @@ public class TenantActorShould
         public Guid? TenantUid { get; set; }
     }
 
-    public sealed class Counter : IPersistentActor
+    public sealed class Counter(List<(Guid? Identity, int Count)> observations) : IPersistentActor
     {
         private int _count;
         private TenantIdentity _identity;
-        public ValueTask OnStartedAsync(IActorContext context) { _identity = TenantContext.Current; return ValueTask.CompletedTask; }
-        public ValueTask OnStoppedAsync(IActorContext context) { Assert.Equal(_identity, TenantContext.Current); return ValueTask.CompletedTask; }
+        public ValueTask OnStartedAsync(IActorContext context) { _identity = context.Services.GetRequiredService<TenantIdentity>(); return ValueTask.CompletedTask; }
+        public ValueTask OnStoppedAsync(IActorContext context) { Assert.Equal(_identity, context.Services.GetRequiredService<TenantIdentity>()); return ValueTask.CompletedTask; }
         public ValueTask<bool> OnFailedAsync(IActorContext context, Exception error) => ValueTask.FromResult(false);
-        public async ValueTask OnReceiveAsync(IActorContext context, Envelope envelope) { Assert.Equal(_identity, TenantContext.Current); await context.ReplyAsync(++_count); }
+        public async ValueTask OnReceiveAsync(IActorContext context, Envelope envelope) { Assert.Equal(_identity, context.Services.GetRequiredService<TenantIdentity>()); observations.Add((_identity.Uid, _count)); await context.ReplyAsync(++_count); }
         public ValueTask LoadStateAsync(IActorContext context, byte[] state, CancellationToken ct) { _count = BitConverter.ToInt32(state); return ValueTask.CompletedTask; }
         public ValueTask<byte[]?> SaveStateAsync(IActorContext context) => ValueTask.FromResult<byte[]?>(BitConverter.GetBytes(_count));
     }

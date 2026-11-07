@@ -77,7 +77,7 @@ public class TenantQueryCacheShould
 
             await using var root = services.BuildServiceProvider();
             var tenancy = root.GetRequiredService<IOptions<SchemataTenancyOptions>>();
-            using var providers = new MemoryCacheTenantProviderCache(tenancy);
+            await using var providers = new MemoryCacheTenantProviderCache(tenancy);
             var scopes = new SchemataTenantServiceScopeFactory<SchemataTenant>(
                 root, new SchemataTenantServiceProviderFactory<SchemataTenant>(root, providers, tenancy));
 

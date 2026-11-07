@@ -24,7 +24,6 @@ internal sealed class TenantCompositeServiceProvider :
     IKeyedServiceProvider,
     IServiceProviderIsService,
     IServiceProviderIsKeyedService,
-    IDisposable,
     IAsyncDisposable
 {
     private readonly ServiceProvider  _overrides;
@@ -52,12 +51,6 @@ internal sealed class TenantCompositeServiceProvider :
     /// <summary>Gets the host root provider.</summary>
     internal IServiceProvider Root      => _root;
 
-    #region IDisposable Members
-
-    public void Dispose() {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-        _overrides.Dispose();
-    }
 
     public ValueTask DisposeAsync() {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) {
@@ -67,7 +60,6 @@ internal sealed class TenantCompositeServiceProvider :
         return _overrides.DisposeAsync();
     }
 
-    #endregion
 
     #region IServiceProvider Members
 

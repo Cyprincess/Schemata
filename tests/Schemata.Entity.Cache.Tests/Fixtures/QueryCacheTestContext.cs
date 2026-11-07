@@ -14,12 +14,13 @@ namespace Schemata.Entity.Cache.Tests.Fixtures;
 
 internal sealed class QueryCacheTestContext : IDisposable
 {
-    private readonly ServiceProvider _services = new ServiceCollection().BuildServiceProvider();
+    private readonly ServiceProvider _services;
     private readonly ConcurrentDictionary<string, (byte[] Value, TimeSpan? Expires)> _entries = new();
     private readonly IQueryable<Student> _query = Array.Empty<Student>().AsQueryable();
     private readonly Mock<IRepository<Student>> _repository = new();
 
     internal QueryCacheTestContext() {
+        _services = new ServiceCollection().AddSingleton(Cache.Object).BuildServiceProvider();
         Advice = new(_services);
         UseProviderKey("students");
         Cache.Setup(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -76,17 +77,17 @@ internal sealed class QueryCacheTestContext : IDisposable
     }
 
     internal Task<AdviseResult> Read<TResult, T>(QueryContext<Student, TResult, T> query) {
-        return new AdviceQueryCache<Student, TResult, T>(Cache.Object).AdviseAsync(Advice, query);
+        return new AdviceQueryCache<Student, TResult, T>().AdviseAsync(Advice, query);
     }
 
     internal Task<AdviseResult> Fill<TResult, T>(QueryContext<Student, TResult, T> query, T value) {
         query.Result = value;
-        return new AdviceResultCache<Student, TResult, T>(Cache.Object,
+        return new AdviceResultCache<Student, TResult, T>(
             Microsoft.Extensions.Options.Options.Create(Options)).AdviseAsync(Advice, query);
     }
 
     internal Task<AdviseResult> Commit(MutationOptions options = default) {
-        return new AdviceCommittedEvictCache<Student>(Cache.Object).AdviseAsync(Advice, Repository, options);
+        return new AdviceCommittedEvictCache<Student>().AdviseAsync(Advice, Repository, options);
     }
 
     public void Dispose() { _services.Dispose(); }

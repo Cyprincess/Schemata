@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
-using Schemata.Core.State;
 using Schemata.Tenancy.Foundation.Middlewares;
 using Schemata.Tenancy.Foundation.Services;
 

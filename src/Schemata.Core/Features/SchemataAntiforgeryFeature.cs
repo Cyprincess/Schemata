@@ -3,13 +3,12 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Schemata.Core.State;
 
 namespace Schemata.Core.Features;
 
 /// <summary>
 ///     Enables antiforgery token validation. Registers the native antiforgery
-///     services and wires the antiforgery state branch after authentication,
+///     services and adds native antiforgery middleware after authentication,
 ///     authorization.
 /// </summary>
 public sealed class SchemataAntiforgeryFeature : FeatureBase
@@ -31,7 +30,6 @@ public sealed class SchemataAntiforgeryFeature : FeatureBase
     ) {
         var configure = configurators.Pop<AntiforgeryOptions>();
         services.AddAntiforgery(configure);
-        services.AddStatePipelineProvider();
     }
 
     public override void ConfigureApplication(
@@ -39,6 +37,6 @@ public sealed class SchemataAntiforgeryFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        app.UseStatePipeline(StatePipeline.Antiforgery);
+        app.UseAntiforgery();
     }
 }

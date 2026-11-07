@@ -33,8 +33,8 @@ internal sealed class TenancyCacheStore : IAsyncDisposable
                 _tenants.TryGetValue(identifier, out var found) ? found : null));
         var services = new ServiceCollection();
         services.AddSingleton(manager.Object);
-        tenancy?.Invoke(new SchemataTenancyBuilder<SchemataTenant>(services));
         configure?.Invoke(services);
+        tenancy?.Invoke(new SchemataTenancyBuilder<SchemataTenant>(services));
         _root = services.BuildServiceProvider();
         try {
             var options = _root.GetRequiredService<IOptions<SchemataTenancyOptions>>();

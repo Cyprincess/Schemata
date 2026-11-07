@@ -1,95 +1,95 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.ExceptionServices;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Schemata.Actor.Foundation;
 using Schemata.Actor.Foundation.Runtime;
 using Schemata.Actor.Skeleton;
 using Schemata.Actor.Skeleton.Entities;
 using Schemata.Messaging.Skeleton;
+using Schemata.Messaging.Skeleton.Runtime;
 using Schemata.Tenancy.Foundation;
 using Schemata.Tenancy.Skeleton.Tenancy;
 
 namespace Schemata.Tenancy.Actor;
 
 /// <summary>
-///     Routes actor operations to a per-tenant <see cref="InProcessActorSystem{TActor}" /> owner. A
-///     retained <see cref="IActorRef" /> never pins the runtime it was created against: every
-///     turn re-resolves the current owner for its tenant identity, so a runtime retired by idle
-///     collection is only ever replaced by a new owner, never resurrected through a stale
-///     reference. The single idle collector also retires runtimes whose activations have all
-///     finished, and retirement is mutually exclusive with turn admission through in-flight
-///     leases, so a runtime removed from the owner table cannot admit another turn.
+///     Owns one actor runtime per explicit tenant identity. Retained references resolve the current
+///     runtime for every operation, allowing idle runtimes to retire without stranding references.
 /// </summary>
 /// <typeparam name="TActor">The persisted actor-state entity type every per-tenant runtime is closed on.</typeparam>
 public sealed class TenantActorSystem<TActor>(
     IServiceProvider services, IActorRegistry registry, IMessageExecutionScopeFactory scopes,
-    IOptions<SchemataActorOptions> options, TimeProvider? clock = null) : IActorSystem, IActorSystemLifetime
+    IOptions<SchemataActorOptions> options, TimeProvider? clock = null) : IActorSystemLifetime
     where TActor : SchemataActor, new()
 {
     private readonly object _gate = new();
+    private readonly IMessageExecutionScopeRunner _runner = new MessageExecutionScopeRunner(scopes);
     private readonly Dictionary<TenantIdentity, RuntimeOwner> _owners = [];
     private bool _stopping;
     private Task? _shutdown;
 
-    /// <summary>
-    ///     Runs <paramref name="action" /> against the current owner runtime for the ambient
-    ///     tenant, holding an in-flight lease for the whole operation. Runtime retirement waits
-    ///     for zero leases, so the collector can never close a runtime mid-turn.
-    /// </summary>
-    private async Task<T> WithRuntimeAsync<T>(Func<InProcessActorSystem<TActor>, Task<T>> action) {
+    private async Task<T> WithRuntimeAsync<T>(TenantIdentity identity, Func<InProcessActorSystem<TActor>, Task<T>> action) {
         RuntimeOwner owner;
         lock (_gate) {
             if (_stopping) throw new InvalidOperationException("The actor system is stopping.");
-            var identity = TenantContext.Current;
-            if (!_owners.TryGetValue(identity, out owner!)) {
-                owner = new RuntimeOwner(new(services, registry, scopes, options, clock,
-                    (id, props, context) => new Reference(this, identity, id, props, context, scopes),
+            if (!_owners.TryGetValue(identity, out var selected)) {
+                selected = new RuntimeOwner(new(services, registry, scopes, options, clock,
+                    (id, props, context) => new Reference(this, identity, id, props, context,
+                        _runner),
                     () => CaptureAsync(identity)));
-                _owners.Add(identity, owner);
+                _owners.Add(identity, selected);
             }
+            owner = selected;
             owner.Leases++;
         }
-        try { return await action(owner.Runtime); }
-        finally {
+        try {
+            return await action(owner.Runtime);
+        } finally {
             lock (_gate) owner.Leases--;
         }
     }
 
-    private async Task WithRuntimeAsync(Func<InProcessActorSystem<TActor>, Task> action) {
-        await WithRuntimeAsync<object?>(async runtime => {
+    private async Task WithRuntimeAsync(TenantIdentity identity, Func<InProcessActorSystem<TActor>, Task> action) {
+        await WithRuntimeAsync<object?>(identity, async runtime => {
             await action(runtime);
             return null;
         });
     }
 
-    public Task<IActorRef> SpawnAsync(ActorId id, Props props) => WithRuntimeAsync(runtime => runtime.SpawnAsync(id, props));
-
-    public Task<IActorRef> GetAsync(ActorId id) => WithRuntimeAsync(runtime => runtime.GetAsync(id));
-
-    private async ValueTask<MessageContext> CaptureAsync(TenantIdentity identity) {
-        using var entered = TenantContext.Enter(identity);
-        return await MessageContexts.CaptureAsync(services, scopes: scopes);
+    public Task<IActorRef> SpawnAsync(TenantIdentity identity, IServiceProvider invocation, ActorId id, Props props) {
+        Validate(identity, invocation);
+        return WithRuntimeAsync(identity, runtime => runtime.SpawnAsync(id, props));
     }
 
-    public Task StopAsync(ActorId id) => WithRuntimeAsync(async runtime => {
-        var context = await CaptureAsync(TenantContext.Current);
-        var scope = await scopes.CreateAsync(context);
-        IDisposable? lease = null;
-        Exception? failure = null;
-        try {
-            lease = scope.Enter();
-            await scope.RestoreAsync(context);
+    public Task<IActorRef> GetAsync(TenantIdentity identity, IServiceProvider invocation, ActorId id) {
+        Validate(identity, invocation);
+        return WithRuntimeAsync(identity, runtime => runtime.GetAsync(id));
+    }
+
+    private static void Validate(TenantIdentity identity, IServiceProvider invocation) {
+        if (invocation.GetRequiredService<TenantIdentity>() != identity) {
+            throw new InvalidOperationException("The actor facade belongs to a different tenant identity.");
+        }
+    }
+
+    private async ValueTask<MessageContext> CaptureAsync(TenantIdentity identity) {
+        var context = new MessageContext(new Dictionary<string, string?> {
+            [TenancyConstants.Messaging.TenantIdKey] = identity.Uid?.ToString("D") ?? "host",
+        });
+        var runner = _runner;
+        return await runner.RunAsync(context, (provider, _) => ValueTask.FromResult(MessageContexts.Capture(provider)));
+    }
+
+    public Task StopAsync(TenantIdentity identity, IServiceProvider invocation, ActorId id) => WithRuntimeAsync(identity, async runtime => {
+        var context = await CaptureAsync(identity);
+        await _runner.RunAsync(context, async (_, token) => {
             await runtime.StopAsync(id);
-        } catch (Exception error) { failure = error; }
-        try { await scope.DisposeAsync(); }
-        catch (Exception cleanup) { failure = failure is null ? cleanup : new AggregateException(failure, cleanup); }
-        try { lease?.Dispose(); }
-        catch (Exception cleanup) { failure = failure is null ? cleanup : new AggregateException(failure, cleanup); }
-        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
+            return true;
+        });
     });
 
     public Task BeginShutdown() {
@@ -144,63 +144,37 @@ public sealed class TenantActorSystem<TActor>(
         public int Leases { get; set; }
     }
 
-    /// <summary>
-    ///     A reference that resolves the tenant's current owner runtime on every turn. The
-    ///     mailbox-level reference exists only for the duration of one turn, so retiring a
-    ///     runtime never strands the reference: the next turn resolves the same tenant identity
-    ///     to a new owner and reactivates there.
-    /// </summary>
     private sealed class Reference(TenantActorSystem<TActor> system, TenantIdentity identity, ActorId id, Props props,
-        MessageContext captured, IMessageExecutionScopeFactory scopes) : IActorRef
+        MessageContext captured, IMessageExecutionScopeRunner runner) : IActorRef
     {
         public ActorId Id => id;
 
-        private void Validate() {
-            if (TenantContext.Current != identity) throw new InvalidOperationException("Actor reference belongs to a different tenant identity.");
+        private void Validate(MessageContext? context) {
+            if (context is null || !context.Items.TryGetValue(TenancyConstants.Messaging.TenantIdKey, out var value)
+                || (identity.Uid is { } uid ? !Guid.TryParse(value, out var supplied) || supplied != uid : value != "host")) {
+                throw new InvalidOperationException("Actor reference requires current message evidence for its tenant identity.");
+            }
         }
 
-        public ValueTask TellAsync<T>(T message, MessageContext? context = null, CancellationToken ct = default) where T : IMessage {
-            Validate();
-            return new ValueTask(system.WithRuntimeAsync(async runtime => {
+        public ValueTask TellAsync<T>(IServiceProvider services, T message, MessageContext? context = null, CancellationToken ct = default) where T : IMessage {
+            Validate(context);
+            return new ValueTask(system.WithRuntimeAsync(identity, async runtime => {
                 var inner = runtime.CreateReference(id, props, captured);
-                var scope = await scopes.CreateAsync(context ?? captured, ct);
-                IDisposable? lease = null;
-                Exception? failure = null;
-                try {
-                    lease = scope.Enter();
-                    Validate();
-                    await scope.RestoreAsync(context ?? captured, ct);
-                    await inner.TellAsync(message, context ?? captured, ct);
-                } catch (Exception error) { failure = error; }
-                try { await scope.DisposeAsync(); }
-                catch (Exception cleanup) { failure = failure is null ? cleanup : new AggregateException(failure, cleanup); }
-                try { lease?.Dispose(); }
-                catch (Exception cleanup) { failure = failure is null ? cleanup : new AggregateException(failure, cleanup); }
-                if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
+                await runner.RunAsync(context, async (provider, token) => {
+                    await inner.TellAsync(services, message, context, token);
+                    return true;
+                }, ct);
             }));
         }
 
-        public ValueTask<TResponse> AskAsync<TRequest, TResponse>(TRequest request, MessageContext? context = null,
+        public ValueTask<TResponse> AskAsync<TRequest, TResponse>(IServiceProvider services, TRequest request, MessageContext? context = null,
             TimeSpan? timeout = null, CancellationToken ct = default) where TRequest : IRequest<TResponse> {
-            Validate();
-            return new ValueTask<TResponse>(system.WithRuntimeAsync(async runtime => {
+            Validate(context);
+            return new ValueTask<TResponse>(system.WithRuntimeAsync(identity, runtime => {
                 var inner = runtime.CreateReference(id, props, captured);
-                var scope = await scopes.CreateAsync(context ?? captured, ct);
-                IDisposable? lease = null;
-                Exception? failure = null;
-                TResponse response = default!; // definite-assignment sentinel: assigned on every path before the result is used
-                try {
-                    lease = scope.Enter();
-                    Validate();
-                    await scope.RestoreAsync(context ?? captured, ct);
-                    response = await inner.AskAsync<TRequest, TResponse>(request, context ?? captured, timeout, ct);
-                } catch (Exception error) { failure = error; }
-                try { await scope.DisposeAsync(); }
-                catch (Exception cleanup) { failure = failure is null ? cleanup : new AggregateException(failure, cleanup); }
-                try { lease?.Dispose(); }
-                catch (Exception cleanup) { failure = failure is null ? cleanup : new AggregateException(failure, cleanup); }
-                if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
-                return response;
+                return runner.RunAsync(context, async (provider, token) => {
+                    return await inner.AskAsync<TRequest, TResponse>(services, request, context, timeout, token);
+                }, ct).AsTask();
             }));
         }
     }

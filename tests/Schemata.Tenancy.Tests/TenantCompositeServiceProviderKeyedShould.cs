@@ -33,9 +33,9 @@ public class TenantCompositeServiceProviderKeyedShould
         } };
 
         using var root    = RegisterTenantManager(services, id).BuildServiceProvider();
-        using var cache   = new MemoryCacheTenantProviderCache(Options.Create(new SchemataTenancyOptions { ProviderMaxCapacity = 10 }));
+        await using var cache = new MemoryCacheTenantProviderCache(Options.Create(new SchemataTenancyOptions { ProviderMaxCapacity = 10 }));
         var       factory = new SchemataTenantServiceProviderFactory<SchemataTenant>(root, cache, Options.Create(options));
-        using var lease   = await factory.CreateServiceProviderAsync(UidFor(id));
+        await using var lease = await factory.CreateServiceProviderAsync(UidFor(id));
         var keyed = (IKeyedServiceProvider)lease.Provider;
 
         Assert.IsType<TenantKeyedMarker>(keyed.GetRequiredKeyedService(typeof(IKeyedMarker), "overridden"));
@@ -63,9 +63,9 @@ public class TenantCompositeServiceProviderKeyedShould
         } };
 
         using var root    = RegisterTenantManager(services, id).BuildServiceProvider();
-        using var cache   = new MemoryCacheTenantProviderCache(Options.Create(new SchemataTenancyOptions { ProviderMaxCapacity = 10 }));
+        await using var cache = new MemoryCacheTenantProviderCache(Options.Create(new SchemataTenancyOptions { ProviderMaxCapacity = 10 }));
         var       factory = new SchemataTenantServiceProviderFactory<SchemataTenant>(root, cache, Options.Create(options));
-        using var lease   = await factory.CreateServiceProviderAsync(UidFor(id));
+        await using var lease = await factory.CreateServiceProviderAsync(UidFor(id));
 
         var probe = lease.Provider.GetRequiredService<CompositeProbe>();
         Assert.Same(lease.Provider, probe.Provider);
@@ -103,9 +103,9 @@ public class TenantCompositeServiceProviderKeyedShould
         } };
 
         using var root    = RegisterTenantManager(services, id).BuildServiceProvider();
-        using var cache   = new MemoryCacheTenantProviderCache(Options.Create(new SchemataTenancyOptions { ProviderMaxCapacity = 10 }));
+        await using var cache = new MemoryCacheTenantProviderCache(Options.Create(new SchemataTenancyOptions { ProviderMaxCapacity = 10 }));
         var       factory = new SchemataTenantServiceProviderFactory<SchemataTenant>(root, cache, Options.Create(options));
-        using var lease   = await factory.CreateServiceProviderAsync(UidFor(id));
+        await using var lease = await factory.CreateServiceProviderAsync(UidFor(id));
 
         Assert.IsType<RootDependency>(lease.Provider.GetRequiredService<IInsertedConsumer>().Dependency);
         Assert.IsType<ReplacementConsumer>(lease.Provider.GetRequiredService<IReplacementConsumer>());

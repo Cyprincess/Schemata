@@ -41,7 +41,7 @@ public class TenantQueryCacheShould
                         repositories.Services.AddDbContextFactory<Database>(options => options.UseSqlite($"Data Source={path};Pooling=False")
                             .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
                     })
-                    .UseCache(cache => cache.UseShared(new MemoryCacheBackend())));
+                    .UseCache());
             await using (var database = await store.Root.GetRequiredService<IDbContextFactory<Database>>().CreateDbContextAsync()) {
                 await database.Database.EnsureCreatedAsync();
                 database.Rows.Add(new Row { Uid = Guid.NewGuid(), TenantUid = TenantA, Name = "a", Value = "a original", Timestamp = Guid.NewGuid() });

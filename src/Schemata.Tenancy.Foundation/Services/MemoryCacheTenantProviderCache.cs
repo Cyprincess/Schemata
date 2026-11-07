@@ -23,6 +23,7 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
     private readonly Dictionary<string, LinkedListNode<Entry>> _index;
     private readonly LinkedList<Entry>                         _order = [];
     private readonly Dictionary<string, Pending>               _pending = [];
+    private readonly HashSet<Entry>                            _cleanup = [];
     private readonly TimeProvider                              _time;
     private readonly TimeSpan                                  _ttl;
     private          bool                                      _disposed;
@@ -273,11 +274,18 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
     private List<Entry> RetireAll() {
         lock (_gate) {
             if (_disposed) {
-                return [];
+                var retry = new List<Entry>();
+                foreach (var entry in _cleanup.ToArray()) {
+                    if (TryBeginDisposalLocked(entry)) retry.Add(entry);
+                }
+                return retry;
             }
 
             _disposed = true;
             var orphaned = new List<Entry>(_order.Count);
+            foreach (var entry in _cleanup.ToArray()) {
+                if (TryBeginDisposalLocked(entry)) orphaned.Add(entry);
+            }
             foreach (var entry in _order) {
                 entry.Retired = true;
                 if (TryBeginDisposalLocked(entry)) {
@@ -405,37 +413,35 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
     }
 
     private void DisposeEntry(Entry entry) {
-        try { DisposeProviderSynchronously(entry.Provider); }
-        catch {
-            ReleaseDisposalClaim(entry);
-            throw;
+        lock (_gate) {
+            if (entry.Provider is IAsyncDisposable and not IDisposable) {
+                entry.Disposing = false;
+                _cleanup.Add(entry);
+            } else {
+                _cleanup.Remove(entry);
+            }
         }
+        DisposeProviderSynchronously(entry.Provider);
     }
 
     private async ValueTask DisposeEntryAsync(Entry entry) {
-        try { await DisposeProviderAsync(entry.Provider); }
-        catch {
-            ReleaseDisposalClaim(entry);
-            throw;
-        }
-    }
-
-    private void ReleaseDisposalClaim(Entry entry) {
-        lock (_gate) { entry.Disposing = false; }
+        lock (_gate) _cleanup.Remove(entry);
+        await DisposeProviderAsync(entry.Provider);
     }
 
     /// <summary>
-    ///     Synchronous disposal backs <see cref="IDisposable.Dispose" /> on the cache and its leases,
-    ///     which run on scope teardown and host shutdown rather than on the acquisition path.
-    ///     Dual-interface providers go through <see cref="IAsyncDisposable" /> because their
-    ///     synchronous <see cref="IDisposable.Dispose" /> fails for async-only services; the caller
-    ///     blocks until that completes.
+    ///     Synchronous disposal preserves provider exceptions. Providers that expose only
+    ///     asynchronous disposal require the caller to use <see cref="DisposeAsync" />.
     /// </summary>
     private static void DisposeProviderSynchronously(IServiceProvider provider) {
-        if (provider is IAsyncDisposable asynchronous) {
-            asynchronous.DisposeAsync().AsTask().GetAwaiter().GetResult();
-        } else if (provider is IDisposable disposable) {
+        if (provider is IDisposable disposable) {
             disposable.Dispose();
+            return;
+        }
+
+        if (provider is IAsyncDisposable) {
+            throw new InvalidOperationException(
+                $"Tenant provider '{provider.GetType()}' supports only asynchronous disposal; call DisposeAsync instead.");
         }
     }
 
@@ -518,19 +524,24 @@ public sealed class MemoryCacheTenantProviderCache : ITenantProviderCache, IDisp
         public IServiceProvider Provider => _entry.Provider;
 
         public void Dispose() {
-            if (Interlocked.Exchange(ref _released, 1) != 0) {
-                return;
-            }
+            var previous = Interlocked.CompareExchange(ref _released, 1, 0);
+            if (previous == 2) throw new InvalidOperationException("Tenant provider cleanup requires DisposeAsync.");
+            if (previous != 0) return;
 
-            _cache.Release(_entry);
+            try { _cache.Release(_entry); }
+            catch {
+                if (_entry.Provider is IAsyncDisposable and not IDisposable) Interlocked.Exchange(ref _released, 2);
+                throw;
+            }
         }
 
         public ValueTask DisposeAsync() {
-            if (Interlocked.Exchange(ref _released, 1) != 0) {
-                return ValueTask.CompletedTask;
-            }
-
-            return _cache.ReleaseAsync(_entry);
+            var previous = Interlocked.Exchange(ref _released, 1);
+            return previous switch {
+                0 => _cache.ReleaseAsync(_entry),
+                2 => _cache.DisposeIfZeroAsync(_entry),
+                _ => ValueTask.CompletedTask,
+            };
         }
 
         #endregion
