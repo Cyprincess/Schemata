@@ -76,22 +76,33 @@ builder.UseSchemata(schema => {
 ## Step 3: Record a subscription
 
 ```csharp
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Schemata.Push.Skeleton;
+
 public sealed class EnrollmentNotifier(IPushSubscriptionManager subscriptions, IPushService push)
 {
     public async Task SubscribeAsync(string userId, string deviceKey, CancellationToken ct)
     {
-        await subscriptions.AddAsync(
+        var subscription = await subscriptions.AddAsync(
             owner:       $"users/{userId}",
             provider:    "console",
             providerKey: deviceKey,
             metadata:    null,
             ct:          ct);
+        if (subscription is null)
+        {
+            throw new InvalidOperationException("The subscription write was not applied.");
+        }
     }
 }
 ```
 
 `AddAsync` is idempotent on `(owner, provider, providerKey)`: a second call with the same triple
-returns the existing row without inserting a duplicate. The owner is a free-form canonical name, so
+returns the existing row without inserting a duplicate. Its nullable result is null when a repository
+advisor prevents the create or undelete write. Fresh state then contains no new row or retains the
+soft-deleted row, respectively. The owner is a free-form canonical name, so
 `groups/{id}` or `tags/{id}` work the same way.
 
 **Assertion:** calling `SubscribeAsync("chino", "desk-1", ct)` twice leaves exactly one row in

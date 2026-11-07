@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Grpc.Core;
 using Grpc.Net.Client;
@@ -7,10 +8,15 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoBuf.Grpc.Client;
 using ProtoBuf.Grpc.Configuration;
+using Schemata.Abstractions.Advisors;
+using Schemata.Entity.Repository;
+using Schemata.Entity.Repository.Advisors;
 using Schemata.Push.Grpc;
 using Schemata.Push.Skeleton;
+using Schemata.Push.Skeleton.Entities;
 using Xunit;
 using static Schemata.Push.Grpc.Integration.Tests.Fixtures.PushGrpcAuthenticationHandler;
 
@@ -23,6 +29,8 @@ public sealed class PushControlGrpcShould
         protected override void ConfigureWebHost(IWebHostBuilder builder) {
             builder.UseEnvironment("Testing");
             builder.UseContentRoot(AppContext.BaseDirectory);
+            builder.ConfigureServices(services => services.TryAddEnumerable(
+                ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataPushSubscription>, BlockCreate>()));
         }
     }
 
@@ -54,6 +62,20 @@ public sealed class PushControlGrpcShould
         _ = await alice.DeleteAsync(new() { Provider = "fcm", ProviderKey = "device-secret" });
         var afterDelete = await alice.ListAsync(new());
         Assert.Empty(afterDelete.Subscriptions);
+    }
+
+    [Fact]
+    public async Task Return_An_Empty_View_When_Subscription_Create_Is_Not_Applied() {
+        using var factory = new Factory();
+        var client = Client(factory, "users/alice", "push.subscriptions.create");
+
+        var created = await client.CreateAsync(new() { Provider = "blocked", ProviderKey = "device-secret" });
+
+        Assert.Equal(string.Empty, created.Uid);
+        Assert.Equal(string.Empty, created.CanonicalName);
+        Assert.Equal(string.Empty, created.Provider);
+        Assert.Null(created.CreateTime);
+        Assert.Null(created.UpdateTime);
     }
 
     [Fact]
@@ -91,6 +113,21 @@ public sealed class PushControlGrpcShould
 
         var error = await Assert.ThrowsAsync<RpcException>(() => reader.CreateAsync(new() { Provider = "fcm", ProviderKey = "device-secret" }).AsTask());
         Assert.Equal(StatusCode.PermissionDenied, error.StatusCode);
+    }
+
+    private sealed class BlockCreate : IRepositoryAddAdvisor<SchemataPushSubscription>
+    {
+        public int Order => int.MaxValue;
+
+        public Task<AdviseResult> AdviseAsync(
+            AdviceContext                         context,
+            IRepository<SchemataPushSubscription> repository,
+            SchemataPushSubscription              entity,
+            MutationOptions                       options,
+            CancellationToken                     ct
+        ) {
+            return Task.FromResult(entity.Provider == "blocked" ? AdviseResult.Block : AdviseResult.Continue);
+        }
     }
 
     private static IPushControlService Client(WebApplicationFactory<Program> factory, string owner, params string[] permissions) {

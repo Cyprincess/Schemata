@@ -5,8 +5,8 @@ using Schemata.Push.Skeleton.Entities;
 namespace Schemata.Push.Foundation.Commands;
 
 /// <summary>
-///     Requests creation of a new push subscription, or returns the existing row if the
-///     <c>(owner, provider, providerKey)</c> triple already exists.
+///     Requests creation of a new push subscription, returns the existing row if the
+///     <c>(owner, provider, providerKey)</c> triple already exists, or returns null when no write is applied.
 /// </summary>
 /// <param name="Owner">The owner canonical name.</param>
 /// <param name="Provider">The transport provider name.</param>
@@ -17,7 +17,7 @@ public sealed record AddPushSubscriptionRequest(
     string                       Provider,
     string                       ProviderKey,
     Dictionary<string, string?>? Metadata = null
-) : ICommand<SchemataPushSubscription>, ISubscriptionScoped
+) : ICommand<SchemataPushSubscription?>, ISubscriptionScoped
 {
     public string SubscriptionKey => $"{Owner}|{Provider}|{ProviderKey}";
 }

@@ -66,7 +66,7 @@ public sealed class CustomPushSubscriptionShould
 
         Assert.True(builder.HasFeature<SchemataPushFeature<CustomPushSubscription>>());
         Assert.IsType<AddPushSubscriptionHandler<CustomPushSubscription>>(
-            scope.ServiceProvider.GetRequiredService<IRequestHandler<AddPushSubscriptionRequest, SchemataPushSubscription>>());
+            scope.ServiceProvider.GetRequiredService<IRequestHandler<AddPushSubscriptionRequest, SchemataPushSubscription?>>());
         Assert.IsType<RemovePushSubscriptionHandler<CustomPushSubscription>>(
             scope.ServiceProvider.GetRequiredService<IRequestHandler<RemovePushSubscriptionRequest, Unit>>());
         Assert.IsType<GetPushSubscriptionsHandler<CustomPushSubscription>>(
@@ -84,15 +84,16 @@ public sealed class CustomPushSubscriptionShould
 
         using (var scope = host.Services.CreateScope()) {
             var dispatcher = scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
-            var created = await dispatcher.SendAsync<AddPushSubscriptionRequest, SchemataPushSubscription>(
+            var created = await dispatcher.SendAsync<AddPushSubscriptionRequest, SchemataPushSubscription?>(
                 new("owners/one", "email", "primary", new Dictionary<string, string?> { ["locale"] = "en" }));
 
             var custom = Assert.IsType<CustomPushSubscription>(created);
             Assert.Equal("customPushSubscriptions/custom-1", custom.CanonicalName);
             Assert.Equal("en", custom.Metadata!["locale"]);
 
-            var repeated = await dispatcher.SendAsync<AddPushSubscriptionRequest, SchemataPushSubscription>(
+            var repeated = await dispatcher.SendAsync<AddPushSubscriptionRequest, SchemataPushSubscription?>(
                 new("owners/one", "email", "primary"));
+            Assert.NotNull(repeated);
             Assert.Equal(custom.Uid, repeated.Uid);
 
             var rows = await dispatcher.SendAsync<GetPushSubscriptionsQuery, IReadOnlyList<SchemataPushSubscription>>(

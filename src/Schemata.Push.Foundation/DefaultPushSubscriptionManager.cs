@@ -26,14 +26,14 @@ public sealed class DefaultPushSubscriptionManager(IRequestDispatcher dispatcher
         }
     }
 
-    public async ValueTask<SchemataPushSubscription> AddAsync(
+    public async ValueTask<SchemataPushSubscription?> AddAsync(
         string                       owner,
         string                       provider,
         string                       providerKey,
         Dictionary<string, string?>? metadata = null,
         CancellationToken            ct       = default
     ) {
-        return await dispatcher.SendAsync<AddPushSubscriptionRequest, SchemataPushSubscription>(
+        return await dispatcher.SendAsync<AddPushSubscriptionRequest, SchemataPushSubscription?>(
             new(owner, provider, providerKey, metadata), ct);
     }
 

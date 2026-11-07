@@ -3,12 +3,16 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Schemata.Abstractions.Advisors;
 using Schemata.Push.Skeleton.Entities;
 using Schemata.Entity.Repository;
+using Schemata.Entity.Repository.Advisors;
 using Xunit;
 
 namespace Schemata.Push.Http.Integration.Tests;
@@ -20,6 +24,8 @@ public sealed class PushControlShould
         protected override void ConfigureWebHost(IWebHostBuilder builder) {
             builder.UseEnvironment("Testing");
             builder.UseContentRoot(Path.GetDirectoryName(typeof(Program).Assembly.Location)!);
+            builder.ConfigureServices(services => services.TryAddEnumerable(
+                ServiceDescriptor.Scoped<IRepositoryAddAdvisor<SchemataPushSubscription>, BlockCreate>()));
         }
     }
 
@@ -61,6 +67,18 @@ public sealed class PushControlShould
     }
 
     [Fact]
+    public async Task Return_NoContent_When_Subscription_Create_Is_Not_Applied() {
+        using var factory = new Factory();
+        var client = Client(factory, "users/alice", "push.subscriptions.create");
+
+        var response = await client.PostAsync("/v1/push/subscriptions",
+            Json("""{"provider":"blocked","provider_key":"device-secret"}"""));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Empty(await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Report_Each_Transport_Outcome_Separately_On_Send() {
         using var factory = new Factory();
         var operatorClient = Client(factory, "users/operator", "push.send");
@@ -72,6 +90,21 @@ public sealed class PushControlShould
         Assert.Equal(2, results.GetArrayLength());
         Assert.Contains(results.EnumerateArray(), result => result.GetProperty("transport").GetString() == "ok" && result.GetProperty("status").GetString() == "sent");
         Assert.Contains(results.EnumerateArray(), result => result.GetProperty("transport").GetString() == "later" && result.GetProperty("error").GetString() == "backend unavailable");
+    }
+
+    private sealed class BlockCreate : IRepositoryAddAdvisor<SchemataPushSubscription>
+    {
+        public int Order => int.MaxValue;
+
+        public Task<AdviseResult> AdviseAsync(
+            AdviceContext                         context,
+            IRepository<SchemataPushSubscription> repository,
+            SchemataPushSubscription              entity,
+            MutationOptions                       options,
+            CancellationToken                     ct
+        ) {
+            return Task.FromResult(entity.Provider == "blocked" ? AdviseResult.Block : AdviseResult.Continue);
+        }
     }
 
     private static HttpClient Client(WebApplicationFactory<Program> factory, string owner, params string[] permissions) {

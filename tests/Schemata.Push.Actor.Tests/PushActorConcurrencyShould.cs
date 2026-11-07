@@ -30,14 +30,14 @@ public class PushActorConcurrencyShould
         using var scope = harness.Root.CreateScope();
 
         var handler = scope.ServiceProvider.GetRequiredService<
-            IRequestHandler<CreatePushControlRequest, PushSubscriptionInfo>>();
+            IRequestHandler<CreatePushControlRequest, PushSubscriptionInfo?>>();
 
         var tasks = Enumerable.Range(0, Concurrency)
                               .Select(_ => Task.Run(() => handler.HandleAsync(
                                                          new(Caller(), "email", "primary"), new AdviceContext(scope.ServiceProvider),
                                                          CancellationToken.None)))
                               .ToArray();
-        var results = await Task.WhenAll(tasks);
+        var results = (await Task.WhenAll(tasks)).Select(result => Assert.IsType<PushSubscriptionInfo>(result)).ToArray();
 
         Assert.Single(results.Select(result => result.Uid).Distinct());
         var subscriptions = await SubscriptionRows(harness);
@@ -51,32 +51,32 @@ public class PushActorConcurrencyShould
 
 
     [Fact]
-    public async Task Add_Committed_Inside_Another_Adds_Uniqueness_Window_Surfaces_Already_Exists() {
+    public async Task Add_WhenAnotherSerializableAddHoldsTheWriteLock_SurfacesAborted() {
         var gate = new FirstAddCommitGate();
         await using var harness = await PushActorConcurrencyHarness.BuildAsync(withActor: false, addAdvisor: gate);
 
         await using var parkedScope = harness.Root.CreateAsyncScope();
         var parked = Task.Run(() => parkedScope.ServiceProvider.GetRequiredService<
-                                   IRequestHandler<AddPushSubscriptionRequest, SchemataPushSubscription>>()
+                                   IRequestHandler<AddPushSubscriptionRequest, SchemataPushSubscription?>>()
                               .HandleAsync(new("owners/one", "email", "primary"), new AdviceContext(parkedScope.ServiceProvider), CancellationToken.None));
 
-        // The parked add's uniqueness lookup has passed and its row is not committed yet.
+        // The parked add's uniqueness lookup has passed and its transaction holds the write lock.
         await gate.Holding.WaitAsync(TimeSpan.FromSeconds(30));
 
         await using var racingScope = harness.Root.CreateAsyncScope();
-        var racing = await racingScope.ServiceProvider.GetRequiredService<
-                         IRequestHandler<AddPushSubscriptionRequest, SchemataPushSubscription>>()
-                     .HandleAsync(new("owners/one", "email", "primary"), new AdviceContext(racingScope.ServiceProvider), CancellationToken.None);
-        Assert.Equal("owners/one", racing.Owner);
+        try {
+            await Assert.ThrowsAsync<AbortedException>(() => racingScope.ServiceProvider.GetRequiredService<
+                IRequestHandler<AddPushSubscriptionRequest, SchemataPushSubscription?>>()
+                .HandleAsync(new("owners/one", "email", "primary"), new AdviceContext(racingScope.ServiceProvider), CancellationToken.None));
+        } finally {
+            gate.Release();
+        }
 
-        gate.Release();
-
-        // The uniqueness protection is optimistic: an insert landing between the lookup and the
-        // commit surfaces as ALREADY_EXISTS.
-        await Assert.ThrowsAsync<AlreadyExistsException>(() => parked);
-
-        var rows = await SubscriptionRows(harness);
-        Assert.Single(rows);
+        var committed = await parked;
+        Assert.NotNull(committed);
+        Assert.Equal("owners/one", committed.Owner);
+        var row = Assert.Single(await SubscriptionRows(harness));
+        Assert.Equal(committed.Uid, row.Uid);
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public class PushActorConcurrencyShould
         {
             using var seed = harness.Root.CreateScope();
             await seed.ServiceProvider.GetRequiredService<IRequestDispatcher>()
-                      .SendAsync<CreatePushControlRequest, PushSubscriptionInfo>(
+                      .SendAsync<CreatePushControlRequest, PushSubscriptionInfo?>(
                           new(Caller(), "email", "primary"), CancellationToken.None);
         }
 

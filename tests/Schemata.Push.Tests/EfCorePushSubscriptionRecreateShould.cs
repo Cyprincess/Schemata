@@ -4,5 +4,7 @@ namespace Schemata.Push.Tests;
 
 public sealed class EfCorePushSubscriptionRecreateShould : PushSubscriptionRecreateShould
 {
-    protected override IPushSubscriptionFixture CreateFixture(bool nameAdvisor) { return new EfCorePushSubscriptionFixture(nameAdvisor); }
+    protected override IPushSubscriptionFixture CreateFixture(bool nameAdvisor, bool blockCreate, bool blockUndelete) {
+        return new EfCorePushSubscriptionFixture(nameAdvisor, blockCreate, blockUndelete);
+    }
 }

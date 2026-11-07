@@ -4,7 +4,7 @@ Push control-plane contracts over HTTP and gRPC: endpoints are explicit and auth
 
 | Method & path | Policy | Behavior |
 |---|---|---|
-| `POST /v1/push/subscriptions` | `push.subscriptions.create` | Creates the calling owner's subscription; identical `(owner, provider, providerKey)` returns the existing row. 201 + `PushSubscriptionInfo`. |
+| `POST /v1/push/subscriptions` | `push.subscriptions.create` | Creates the calling owner's subscription; identical `(owner, provider, providerKey)` returns the existing row. Applied writes and existing rows return 201 + `PushSubscriptionInfo`; a create or undelete prevented by a repository advisor returns 204 with an empty body. |
 | `GET /v1/push/subscriptions?provider=` | `push.subscriptions.get` | Lists only the calling owner's subscriptions. |
 | `DELETE /v1/push/subscriptions` | `push.subscriptions.delete` | Deletes the calling owner's `(provider, providerKey)` address; 204 regardless of prior existence. |
 | `POST /v1/push/subscriptions:send` | `push.send` | Operator capability: fans one dispatch through every registered `IPushTransport` and returns each outcome, including partial failures. |
@@ -57,7 +57,10 @@ a failed transport leaves the other outcomes visible.
 
 `Schemata.Push.Grpc` exposes `schemata.push.v1.PushControl` (`IPushControlService`):
 `Create`, `List`, `Delete`, and `Send` adapt to the shared control requests and dispatch through
-`IRequestDispatcher`. The service takes its principal from the gRPC server's HTTP context.
+`IRequestDispatcher`. Create returns the populated `PushSubscriptionView` for an existing live row or
+an applied write. A create or undelete prevented by a repository advisor returns the standard empty
+`PushSubscriptionView`: empty uid, canonical name, and provider, with null timestamps. The service
+takes its principal from the gRPC server's HTTP context.
 Register with `services.AddSchemataPushGrpc()` and `app.MapSchemataPushGrpc()`; responses use
 the shared `PushGrpcModel`, with credential-free `PushSubscriptionView` and per-transport outcomes.
 

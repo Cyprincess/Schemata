@@ -22,17 +22,17 @@ public sealed class PushControlHandler(
     IAuthorizationService authorization,
     IPushOwnerResolver owners,
     IRequestDispatcher dispatcher)
-    : IRequestHandler<CreatePushControlRequest, PushSubscriptionInfo>,
+    : IRequestHandler<CreatePushControlRequest, PushSubscriptionInfo?>,
       IRequestHandler<ListPushControlRequest, IReadOnlyList<PushSubscriptionInfo>>,
       IRequestHandler<DeletePushControlRequest, Unit>,
       IRequestHandler<SendPushControlRequest, ImmutableArray<TransportResult>>
 {
-    public async Task<PushSubscriptionInfo> HandleAsync(CreatePushControlRequest request, AdviceContext context, CancellationToken ct = default) {
+    public async Task<PushSubscriptionInfo?> HandleAsync(CreatePushControlRequest request, AdviceContext context, CancellationToken ct = default) {
         await AuthorizeAsync(request.Principal, PushPolicies.Create);
         var owner = Owner(request.Principal);
-        var subscription = await dispatcher.SendAsync<AddPushSubscriptionRequest, SchemataPushSubscription>(
+        var subscription = await dispatcher.SendAsync<AddPushSubscriptionRequest, SchemataPushSubscription?>(
             new(owner, Required(request.Provider, "provider"), Required(request.ProviderKey, "provider_key"), request.Metadata), ct);
-        return PushSubscriptionInfo.From(subscription);
+        return subscription is null ? null : PushSubscriptionInfo.From(subscription);
     }
 
     public async Task<IReadOnlyList<PushSubscriptionInfo>> HandleAsync(ListPushControlRequest request, AdviceContext context, CancellationToken ct = default) {

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -12,7 +13,10 @@ namespace Schemata.Push.Tests;
 [Trait("Category", "Integration")]
 public abstract class PushSubscriptionRecreateShould
 {
-    protected abstract IPushSubscriptionFixture CreateFixture(bool nameAdvisor = true);
+    protected abstract IPushSubscriptionFixture CreateFixture(
+        bool nameAdvisor = true,
+        bool blockCreate = false,
+        bool blockUndelete = false);
 
     [Fact]
     public async Task Recreate_ForARetainedTriple_UndeletesTheExistingRow() {
@@ -21,6 +25,7 @@ public abstract class PushSubscriptionRecreateShould
         try {
             var created = await fixture.AddAsync(
                 new("users/1", "fcm", "token-1", new Dictionary<string, string?> { ["endpoint"] = "alpha" }));
+            Assert.NotNull(created);
             await fixture.RemoveAsync(new("users/1", "fcm", "token-1"));
 
             var retained = await fixture.SubscriptionsAsync();
@@ -30,6 +35,7 @@ public abstract class PushSubscriptionRecreateShould
             var restored = await fixture.AddAsync(
                 new("users/1", "fcm", "token-1", new Dictionary<string, string?> { ["endpoint"] = "beta" }));
 
+            Assert.NotNull(restored);
             Assert.Equal(created.Uid, restored.Uid);
 
             var rows = await fixture.SubscriptionsAsync();
@@ -45,6 +51,42 @@ public abstract class PushSubscriptionRecreateShould
     }
 
     [Fact]
+    public async Task Add_WhenCreateIsBlocked_ReturnsNullWithoutPersistingARow() {
+        var fixture = CreateFixture(blockCreate: true);
+        await fixture.InitializeAsync();
+        try {
+            var added = await fixture.AddAsync(new("owners/alice", "blocked", "endpoint-1"));
+
+            Assert.Null(added);
+            var rows = await fixture.SubscriptionsAsync();
+            Assert.Empty(rows);
+        } finally {
+            await fixture.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Recreate_WhenUndeleteIsBlocked_ReturnsNullAndRetainsDeletion() {
+        var fixture = CreateFixture(blockUndelete: true);
+        await fixture.InitializeAsync();
+        try {
+            var created = await fixture.AddAsync(new("owners/alice", "blocked", "endpoint-1"));
+            Assert.NotNull(created);
+            await fixture.RemoveAsync(new("owners/alice", "blocked", "endpoint-1"));
+            fixture.BlockUndelete();
+
+            var restored = await fixture.AddAsync(new("owners/alice", "blocked", "endpoint-1"));
+
+            Assert.Null(restored);
+            var row = Assert.Single(await fixture.SubscriptionsAsync());
+            Assert.Equal(created.Uid, row.Uid);
+            Assert.NotNull(row.DeleteTime);
+        } finally {
+            await fixture.DisposeAsync();
+        }
+    }
+
+    [Fact]
     public async Task Add_ForAnActiveTriple_ReturnsTheExistingRow() {
         var fixture = CreateFixture();
         await fixture.InitializeAsync();
@@ -54,6 +96,8 @@ public abstract class PushSubscriptionRecreateShould
             var repeated = await fixture.AddAsync(
                 new("users/1", "fcm", "token-1", new Dictionary<string, string?> { ["endpoint"] = "beta" }));
 
+            Assert.NotNull(created);
+            Assert.NotNull(repeated);
             Assert.Equal(created.Uid, repeated.Uid);
 
             var rows = await fixture.SubscriptionsAsync();
@@ -122,10 +166,64 @@ public abstract class PushSubscriptionRecreateShould
         try {
             var created = await fixture.AddAsync(new("users/1", "fcm", "token-1"));
 
+            Assert.NotNull(created);
             Assert.Equal("subscription-1", created.Name);
             Assert.Equal("pushSubscriptions/subscription-1", created.CanonicalName);
         } finally {
             await fixture.DisposeAsync();
         }
+    }
+
+    [Fact]
+    public async Task ConcurrentAdds_ForANewTriple_LeaveOneDurableRow() {
+        var fixture = CreateFixture();
+        await fixture.InitializeAsync();
+        try {
+            var attempts = await Task.WhenAll(
+                TryAddAsync(fixture, new("users/1", "fcm", "token-1", new() { ["endpoint"] = "first" })),
+                TryAddAsync(fixture, new("users/1", "fcm", "token-1", new() { ["endpoint"] = "second" })));
+
+            Assert.All(attempts, AssertAllowedConflict);
+            var row = Assert.Single(await fixture.SubscriptionsAsync());
+            Assert.Equal("users/1", row.Owner);
+            Assert.Equal("fcm", row.Provider);
+            Assert.Equal("token-1", row.ProviderKey);
+        } finally {
+            await fixture.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task ConcurrentAdds_ForARetainedTriple_LeaveOneRestoredRow() {
+        var fixture = CreateFixture();
+        await fixture.InitializeAsync();
+        try {
+            await fixture.AddAsync(new("users/1", "fcm", "token-1"));
+            await fixture.RemoveAsync(new("users/1", "fcm", "token-1"));
+
+            var attempts = await Task.WhenAll(
+                TryAddAsync(fixture, new("users/1", "fcm", "token-1", new() { ["endpoint"] = "first" })),
+                TryAddAsync(fixture, new("users/1", "fcm", "token-1", new() { ["endpoint"] = "second" })));
+
+            Assert.All(attempts, AssertAllowedConflict);
+            var row = Assert.Single(await fixture.SubscriptionsAsync());
+            Assert.Null(row.DeleteTime);
+            Assert.Null(row.PurgeTime);
+        } finally {
+            await fixture.DisposeAsync();
+        }
+    }
+
+    private static async Task<Exception?> TryAddAsync(IPushSubscriptionFixture fixture, AddPushSubscriptionRequest request) {
+        try {
+            await fixture.AddAsync(request);
+            return null;
+        } catch (Exception exception) {
+            return exception;
+        }
+    }
+
+    private static void AssertAllowedConflict(Exception? error) {
+        Assert.True(error is null or AlreadyExistsException or AbortedException, error?.ToString());
     }
 }

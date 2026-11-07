@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,20 +22,23 @@ using Schemata.Resource.Foundation;
 using Schemata.Abstractions.Advisors;
 namespace Schemata.Push.Tests.Fixtures;
 
-public sealed class EfCorePushSubscriptionFixture(bool nameAdvisor = true) : IPushSubscriptionFixture
+public sealed class EfCorePushSubscriptionFixture(
+    bool nameAdvisor = true,
+    bool blockCreate = false,
+    bool blockUndelete = false) : IPushSubscriptionFixture
 {
     private int _names;
 
-    private SqliteConnection? _connection;
+    private readonly BlockPushSubscriptionUndelete _undeleteBlocker = new();
+
+    private readonly string _dbPath = $"{Guid.NewGuid():n}.db";
+
     private ServiceProvider?  _root;
 
     public async Task InitializeAsync() {
-        _connection = new("Data Source=:memory:");
-        await _connection.OpenAsync();
-
         var services = new ServiceCollection();
 
-        services.AddDbContextFactory<PushDbContext>(options => options.UseSqlite(_connection)
+        services.AddDbContextFactory<PushDbContext>(options => options.UseSqlite($"Data Source={_dbPath};Pooling=False")
                                                               .ReplaceService<IModelCustomizer, SchemataModelCustomizer>());
 
         services.AddRepository<SchemataPushSubscription, EfCoreRepository<PushDbContext, SchemataPushSubscription>>();
@@ -45,6 +49,14 @@ public sealed class EfCorePushSubscriptionFixture(bool nameAdvisor = true) : IPu
         if (nameAdvisor) {
             services.TryAddEnumerable(ServiceDescriptor.Singleton<IRepositoryAddAdvisor<SchemataPushSubscription>>(
                 new AdviceAddSubscriptionName(() => $"subscription-{++_names}")));
+        }
+        if (blockCreate) {
+            services.TryAddEnumerable(ServiceDescriptor.Singleton<IRepositoryAddAdvisor<SchemataPushSubscription>>(
+                new BlockPushSubscriptionCreate()));
+        }
+        if (blockUndelete) {
+            services.TryAddEnumerable(ServiceDescriptor.Singleton<IRepositoryUpdateAdvisor<SchemataPushSubscription>>(
+                _undeleteBlocker));
         }
 
         services.TryAddScoped<AddPushSubscriptionHandler<SchemataPushSubscription>>();
@@ -62,12 +74,13 @@ public sealed class EfCorePushSubscriptionFixture(bool nameAdvisor = true) : IPu
             await _root.DisposeAsync();
         }
 
-        if (_connection is not null) {
-            await _connection.DisposeAsync();
+        SqliteConnection.ClearAllPools();
+        if (File.Exists(_dbPath)) {
+            File.Delete(_dbPath);
         }
     }
 
-    public async Task<SchemataPushSubscription> AddAsync(AddPushSubscriptionRequest request) {
+    public async Task<SchemataPushSubscription?> AddAsync(AddPushSubscriptionRequest request) {
         await using var scope = _root!.CreateAsyncScope();
         var           handler   = scope.ServiceProvider.GetRequiredService<AddPushSubscriptionHandler<SchemataPushSubscription>>();
         return await handler.HandleAsync(request, new AdviceContext(_root!), CancellationToken.None);
@@ -77,6 +90,10 @@ public sealed class EfCorePushSubscriptionFixture(bool nameAdvisor = true) : IPu
         await using var scope = _root!.CreateAsyncScope();
         var           handler   = scope.ServiceProvider.GetRequiredService<RemovePushSubscriptionHandler<SchemataPushSubscription>>();
         await handler.HandleAsync(request, new AdviceContext(_root!), CancellationToken.None);
+    }
+
+    public void BlockUndelete() {
+        _undeleteBlocker.Enabled = true;
     }
 
     public async Task<List<SchemataPushSubscription>> SubscriptionsAsync() {

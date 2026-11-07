@@ -23,15 +23,15 @@ public interface IPushSubscriptionManager
     );
 
     /// <summary>
-    ///     Adds a subscription, or returns the existing row when <c>(owner, provider, providerKey)</c>
-    ///     already exists.
+    ///     Adds a subscription, returns the existing row when <c>(owner, provider, providerKey)</c>
+    ///     already exists, or returns null when a repository advisor prevents the write.
     /// </summary>
     /// <param name="owner">The owner canonical name.</param>
     /// <param name="provider">The transport name.</param>
     /// <param name="providerKey">The transport-specific endpoint identity.</param>
     /// <param name="metadata">Optional transport-specific metadata.</param>
     /// <param name="ct">A cancellation token.</param>
-    ValueTask<SchemataPushSubscription> AddAsync(
+    ValueTask<SchemataPushSubscription?> AddAsync(
         string                       owner,
         string                       provider,
         string                       providerKey,

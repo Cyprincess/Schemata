@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -28,8 +29,8 @@ public class DefaultPushSubscriptionManagerShould
         exact.DisplayNames  = new() { ["en"] = "Primary" };
         exact.Description   = "Description";
         exact.Descriptions  = new() { ["en"] = "Description" };
-        exact.DeleteTime    = new DateTime(2025, 1, 1, 1, 2, 3, DateTimeKind.Utc);
-        exact.PurgeTime     = new DateTime(2025, 2, 1, 1, 2, 3, DateTimeKind.Utc);
+        exact.DeleteTime    = null;
+        exact.PurgeTime     = null;
         exact.CreateTime    = new DateTime(2024, 12, 1, 1, 2, 3, DateTimeKind.Utc);
         exact.UpdateTime    = new DateTime(2024, 12, 2, 1, 2, 3, DateTimeKind.Utc);
         var rows = new[] {
@@ -39,6 +40,9 @@ public class DefaultPushSubscriptionManagerShould
             exact,
         };
         var repository = new Mock<IRepository<SchemataPushSubscription>>();
+        var transaction = new Mock<IUnitOfWork>();
+        transaction.Setup(unit => unit.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        repository.Setup(value => value.Begin(IsolationLevel.Serializable)).Returns(transaction.Object);
         repository.Setup(value => value.SingleOrDefaultAsync<SchemataPushSubscription>(
                              It.IsAny<Func<IQueryable<SchemataPushSubscription>, IQueryable<SchemataPushSubscription>>>(),
                              It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
@@ -55,6 +59,29 @@ public class DefaultPushSubscriptionManagerShould
         owner.Verify(value => value.CreateAsync(
                          It.IsAny<SchemataPushSubscription>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()),
                      Times.Never);
+    }
+
+
+    [Fact]
+    public async Task Add_WhenCreateIsBlocked_ReturnsNull() {
+        var repository = new Mock<IRepository<SchemataPushSubscription>>();
+        var transaction = new Mock<IUnitOfWork>();
+        repository.Setup(value => value.Begin(IsolationLevel.Serializable)).Returns(transaction.Object);
+        repository.Setup(value => value.SingleOrDefaultAsync<SchemataPushSubscription>(
+                             It.IsAny<Func<IQueryable<SchemataPushSubscription>, IQueryable<SchemataPushSubscription>>>(),
+                             It.IsAny<CancellationToken>(), It.IsAny<QueryOptions>()))
+                  .Returns(ValueTask.FromResult<SchemataPushSubscription?>(null));
+        var owner = CreateMutation();
+        owner.Setup(value => value.CreateAsync(
+                         It.IsAny<SchemataPushSubscription>(), It.IsAny<IUnitOfWork?>(), It.IsAny<CancellationToken>()))
+             .ReturnsAsync(MutationResult.NoWrite);
+        using var services = BuildServices(repository.Object, owner);
+        var manager = services.GetRequiredService<IPushSubscriptionManager>();
+
+        var result = await manager.AddAsync("owners/one", "email", "one");
+
+        Assert.Null(result);
+        transaction.Verify(value => value.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
 

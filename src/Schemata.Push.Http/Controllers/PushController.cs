@@ -22,9 +22,9 @@ public sealed class PushController(IRequestDispatcher dispatcher) : ControllerBa
     [HttpPost(PushConstants.Routes.Subscriptions)]
     [Authorize(Policy = PushPolicies.Create)]
     public async Task<IActionResult> Create([FromBody] CreatePushSubscriptionRequest request, CancellationToken ct) {
-        var result = await dispatcher.SendAsync<CreatePushControlRequest, PushSubscriptionInfo>(
+        var result = await dispatcher.SendAsync<CreatePushControlRequest, PushSubscriptionInfo?>(
             new(User, request.Provider, request.ProviderKey, request.Metadata), ct);
-        return StatusCode(StatusCodes.Status201Created, result);
+        return result is null ? NoContent() : StatusCode(StatusCodes.Status201Created, result);
     }
 
     [HttpGet(PushConstants.Routes.Subscriptions)]

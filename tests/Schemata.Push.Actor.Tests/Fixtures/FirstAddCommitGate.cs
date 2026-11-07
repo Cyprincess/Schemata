@@ -9,9 +9,8 @@ namespace Schemata.Push.Actor.Tests.Fixtures;
 
 /// <summary>
 ///     Parks the first push-subscription add after its uniqueness lookup passed and before its
-///     commit, so a test can commit a same-key row inside that window and observe the provider's
-///     own constraint error on the parked add — the optimistic-uniqueness race the actor bridge
-///     exists to serialize.
+///     commit, while its serializable transaction holds the provider write lock. A second add can
+///     then observe the lock conflict before the parked add completes.
 /// </summary>
 internal sealed class FirstAddCommitGate : IRepositoryAddAdvisor<SchemataPushSubscription>
 {

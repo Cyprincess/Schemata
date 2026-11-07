@@ -26,9 +26,14 @@ using TableAttribute = System.ComponentModel.DataAnnotations.Schema.TableAttribu
 using Schemata.Abstractions.Advisors;
 namespace Schemata.Push.Tests.Fixtures;
 
-public sealed class LinqToDbPushSubscriptionFixture(bool nameAdvisor = true) : IPushSubscriptionFixture
+public sealed class LinqToDbPushSubscriptionFixture(
+    bool nameAdvisor = true,
+    bool blockCreate = false,
+    bool blockUndelete = false) : IPushSubscriptionFixture
 {
     private int _names;
+
+    private readonly BlockPushSubscriptionUndelete _undeleteBlocker = new();
 
     private readonly string _dbPath = $"{Guid.NewGuid():n}.db";
 
@@ -54,6 +59,14 @@ public sealed class LinqToDbPushSubscriptionFixture(bool nameAdvisor = true) : I
             services.TryAddEnumerable(ServiceDescriptor.Singleton<IRepositoryAddAdvisor<SchemataPushSubscription>>(
                 new AdviceAddSubscriptionName(() => $"subscription-{++_names}")));
         }
+        if (blockCreate) {
+            services.TryAddEnumerable(ServiceDescriptor.Singleton<IRepositoryAddAdvisor<SchemataPushSubscription>>(
+                new BlockPushSubscriptionCreate()));
+        }
+        if (blockUndelete) {
+            services.TryAddEnumerable(ServiceDescriptor.Singleton<IRepositoryUpdateAdvisor<SchemataPushSubscription>>(
+                _undeleteBlocker));
+        }
         services.TryAddScoped<AddPushSubscriptionHandler<SchemataPushSubscription>>();
         services.TryAddScoped<RemovePushSubscriptionHandler<SchemataPushSubscription>>();
 
@@ -76,7 +89,7 @@ public sealed class LinqToDbPushSubscriptionFixture(bool nameAdvisor = true) : I
         }
     }
 
-    public async Task<SchemataPushSubscription> AddAsync(AddPushSubscriptionRequest request) {
+    public async Task<SchemataPushSubscription?> AddAsync(AddPushSubscriptionRequest request) {
         await using var scope = _root!.CreateAsyncScope();
         var           handler   = scope.ServiceProvider.GetRequiredService<AddPushSubscriptionHandler<SchemataPushSubscription>>();
         return await handler.HandleAsync(request, new AdviceContext(_root!), CancellationToken.None);
@@ -86,6 +99,10 @@ public sealed class LinqToDbPushSubscriptionFixture(bool nameAdvisor = true) : I
         await using var scope = _root!.CreateAsyncScope();
         var           handler   = scope.ServiceProvider.GetRequiredService<RemovePushSubscriptionHandler<SchemataPushSubscription>>();
         await handler.HandleAsync(request, new AdviceContext(_root!), CancellationToken.None);
+    }
+
+    public void BlockUndelete() {
+        _undeleteBlocker.Enabled = true;
     }
 
     public async Task<List<SchemataPushSubscription>> SubscriptionsAsync() {

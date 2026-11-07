@@ -75,24 +75,35 @@ A `RecipientTarget` resolves to a delivery endpoint through the `SchemataPushSub
 Inject `IPushSubscriptionManager` and add a row:
 
 ```csharp
+using System.Threading;
+using System.Threading.Tasks;
 using Schemata.Push.Skeleton;
 using Schemata.Push.Skeleton.Entities;
 
 public sealed class SubscriptionService(IPushSubscriptionManager subscriptions)
 {
-    public ValueTask<SchemataPushSubscription> SubscribeAsync(string userId, string device, CancellationToken ct)
+    public async ValueTask<SchemataPushSubscription?> SubscribeAsync(string userId, string device, CancellationToken ct)
     {
-        return subscriptions.AddAsync(
+        var subscription = await subscriptions.AddAsync(
             owner:       $"users/{userId}",
             provider:    "console",
             providerKey: device,
             ct:          ct);
+        if (subscription is null)
+        {
+            return null;
+        }
+
+        return subscription;
     }
 }
 ```
 
 `AddAsync` is idempotent on `(owner, provider, providerKey)`: calling it twice with the same triple
-returns the existing row. The owner is a free-form canonical name, so `groups/{id}` and `tags/{id}`
+returns the existing row. It returns `SchemataPushSubscription?`; a repository advisor that prevents
+a create or undelete write yields null. A blocked create leaves no new row, and a blocked undelete
+leaves the retained row soft-deleted. Branch on null before treating the subscription as active.
+The owner is a free-form canonical name, so `groups/{id}` and `tags/{id}`
 address groups and tags through the same table.
 
 The subscription mutation uses the host's repository add advisors to supply `Name`. Register the
@@ -158,6 +169,9 @@ Add a temporary endpoint after `var app = builder.Build()` to exercise the subsc
 paths together:
 
 ```csharp
+using System;
+using System.Threading;
+using Microsoft.AspNetCore.Http;
 using Schemata.Push.Skeleton;
 
 app.MapPost("/demo/notify/{userId}", async (
@@ -165,7 +179,11 @@ app.MapPost("/demo/notify/{userId}", async (
     IPushSubscriptionManager subscriptions,
     IPushService push,
     CancellationToken ct) => {
-    await subscriptions.AddAsync($"users/{userId}", "console", "desk-1", ct: ct);
+    var subscription = await subscriptions.AddAsync($"users/{userId}", "console", "desk-1", ct: ct);
+    if (subscription is null)
+    {
+        return Results.Problem("The subscription write was not applied.", statusCode: StatusCodes.Status409Conflict);
+    }
 
     await foreach (var result in push.SendAsync(
                        new PushContext("Welcome, Alice", new RecipientTarget($"users/{userId}")), ct))

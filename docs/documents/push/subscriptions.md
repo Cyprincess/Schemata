@@ -53,7 +53,7 @@ public interface IPushSubscriptionManager
     IAsyncEnumerable<SchemataPushSubscription> GetForOwnerAsync(
         string owner, string? provider = null, CancellationToken ct = default);
 
-    ValueTask<SchemataPushSubscription> AddAsync(
+    ValueTask<SchemataPushSubscription?> AddAsync(
         string owner, string provider, string providerKey,
         Dictionary<string, string?>? metadata = null, CancellationToken ct = default);
 
@@ -73,7 +73,7 @@ and `RemovePushSubscriptionRequest`. The facade keeps its `IAsyncEnumerable` sig
 | Method             | Behaviour                                                                                           |
 | ------------------ | --------------------------------------------------------------------------------------------------- |
 | `GetForOwnerAsync` | `GetPushSubscriptionsQuery` — `ToListAsync` over `Owner == owner && (provider == null \|\| Provider == provider)`, materialized before yield |
-| `AddAsync`         | `AddPushSubscriptionRequest`: returns the existing row, or creates through `IResourceMutation<SchemataPushSubscription>` and returns the entity stamped by that owner |
+| `AddAsync`         | `AddPushSubscriptionRequest`: returns an existing live row unchanged; returns an applied create or undelete entity; returns null when a repository advisor produces `MutationResult.NoWrite` |
 | `RemoveAsync`      | `RemovePushSubscriptionRequest`: deletes through the same mutation owner; a missing row produces no write |
 | `ExistsAsync`      | `ExistsPushSubscriptionQuery` — `AnyAsync` over the triple                                          |
 
@@ -81,8 +81,10 @@ Each request carries the subscription triple on the wire. `Uid` is stamped by th
 `AdviceAddIdentifier` when the row is added; the manager never assigns it itself.
 
 The mutation path preserves consumer-supplied `Name` generation through repository add advisors.
-The lower subscription manager returns the entity directly. The public control handler projects
-that entity into `PushSubscriptionInfo`, which contains only uid, canonical name, provider, and
+`AddPushSubscriptionRequest` returns `SchemataPushSubscription?`, and `CreatePushControlRequest`
+returns `PushSubscriptionInfo?`. A blocked create or undelete produces null; fresh state respectively
+has no new row or retains the soft-deleted row. The public control handler projects only a non-null
+entity into `PushSubscriptionInfo`, which contains only uid, canonical name, provider, and
 create/update times. Provider keys and metadata remain input-only at the control boundary.
 
 `CreatePushControlRequest`, `ListPushControlRequest`, and `DeletePushControlRequest` carry a

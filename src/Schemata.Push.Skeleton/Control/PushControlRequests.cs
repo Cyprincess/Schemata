@@ -14,7 +14,7 @@ public sealed record CreatePushControlRequest(
     ClaimsPrincipal? Principal,
     string? Provider,
     string? ProviderKey,
-    Dictionary<string, string?>? Metadata = null) : IRequest<PushSubscriptionInfo>, IRequestPrincipal
+    Dictionary<string, string?>? Metadata = null) : IRequest<PushSubscriptionInfo?>, IRequestPrincipal
 {
     [JsonIgnore]
     public ClaimsPrincipal? Principal { get; set; } = Principal;

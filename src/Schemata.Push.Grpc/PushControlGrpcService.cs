@@ -22,10 +22,10 @@ namespace Schemata.Push.Grpc;
 public sealed class PushControlGrpcService(IRequestDispatcher dispatcher) : IPushControlService
 {
     public async ValueTask<PushSubscriptionView> CreateAsync(CreatePushSubscriptionCommand request, CallContext context = default) {
-        var result = await dispatcher.SendAsync<CreatePushControlRequest, PushSubscriptionInfo>(
+        var result = await dispatcher.SendAsync<CreatePushControlRequest, PushSubscriptionInfo?>(
             new(Caller(context), request.Provider, request.ProviderKey,
                 request.Metadata.ToDictionary(pair => pair.Key, pair => (string?)pair.Value)), context.CancellationToken);
-        return PushSubscriptionView.From(result);
+        return result is null ? new() : PushSubscriptionView.From(result);
     }
 
     public async ValueTask<ListPushSubscriptionsResult> ListAsync(ListPushSubscriptionsQuery request, CallContext context = default) {

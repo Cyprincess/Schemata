@@ -47,7 +47,7 @@ public sealed class SchemataPushActorFeature : FeatureBase
         IConfiguration      configuration,
         IWebHostEnvironment environment
     ) {
-        Register<AddPushSubscriptionRequest, SchemataPushSubscription>(services);
+        Register<AddPushSubscriptionRequest, SchemataPushSubscription?>(services);
         Register<RemovePushSubscriptionRequest, Unit>(services);
 
         new SchemataActorBuilder(schemata, services).Register<Schemata.Actor.Foundation.Runtime.RequestDispatchingActor>(

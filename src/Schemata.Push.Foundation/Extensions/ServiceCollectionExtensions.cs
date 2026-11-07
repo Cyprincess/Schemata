@@ -10,6 +10,7 @@ using Schemata.Push.Skeleton;
 using Schemata.Push.Skeleton.Entities;
 using Schemata.Push.Skeleton.Control;
 using Schemata.Push.Skeleton.Models;
+using Schemata.Push.Foundation.Linking;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -36,16 +37,17 @@ public static class ServiceCollectionExtensions
         where TPushSubscription : SchemataPushSubscription, new() {
         services.AddInProcessRequestDispatcher();
         services.AddAuthorizationCore();
+        services.AddSchemataLinkContributor<PushLinkContributor>();
 
         AddHandler<SendPushRequest, ImmutableArray<TransportResult>, SendPushHandler>(services);
-        AddHandler<AddPushSubscriptionRequest, SchemataPushSubscription, AddPushSubscriptionHandler<TPushSubscription>>(services);
+        AddHandler<AddPushSubscriptionRequest, SchemataPushSubscription?, AddPushSubscriptionHandler<TPushSubscription>>(services);
         AddHandler<RemovePushSubscriptionRequest, Unit, RemovePushSubscriptionHandler<TPushSubscription>>(services);
         AddHandler<GetPushSubscriptionsQuery, IReadOnlyList<SchemataPushSubscription>,
             GetPushSubscriptionsHandler<TPushSubscription>>(services);
         AddHandler<ExistsPushSubscriptionQuery, bool, ExistsPushSubscriptionHandler<TPushSubscription>>(services);
 
         services.TryAddScoped<PushControlHandler>();
-        services.TryAddScoped<IRequestHandler<CreatePushControlRequest, PushSubscriptionInfo>>(sp => sp.GetRequiredService<PushControlHandler>());
+        services.TryAddScoped<IRequestHandler<CreatePushControlRequest, PushSubscriptionInfo?>>(sp => sp.GetRequiredService<PushControlHandler>());
         services.TryAddScoped<IRequestHandler<ListPushControlRequest, IReadOnlyList<PushSubscriptionInfo>>>(sp => sp.GetRequiredService<PushControlHandler>());
         services.TryAddScoped<IRequestHandler<DeletePushControlRequest, Unit>>(sp => sp.GetRequiredService<PushControlHandler>());
         services.TryAddScoped<IRequestHandler<SendPushControlRequest, ImmutableArray<TransportResult>>>(sp => sp.GetRequiredService<PushControlHandler>());
